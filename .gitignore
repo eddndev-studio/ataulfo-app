@@ -1,0 +1,15 @@
+# Local env
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+*.iml
+
+# (Flutter ignores se añadirán cuando se inicialice el proyecto Flutter:
+# /build/, .dart_tool/, .flutter-plugins, .flutter-plugins-dependencies,
+# pubspec.lock en libs, ios/Pods/, android/.gradle/, etc.)
