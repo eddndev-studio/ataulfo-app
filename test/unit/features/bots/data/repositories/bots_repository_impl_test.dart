@@ -45,4 +45,38 @@ void main() {
       await expectLater(repo.list(), throwsA(isA<BotsForbiddenFailure>()));
     });
   });
+
+  group('BotsRepositoryImpl.byId', () {
+    const bot = Bot(
+      id: 'b1',
+      orgId: 'o1',
+      templateId: 't1',
+      name: 'Soporte',
+      channel: BotChannel.waUnofficial,
+      identifier: '52155...',
+      version: 3,
+      paused: false,
+      aiDisabled: false,
+    );
+
+    test('delega al datasource y devuelve el Bot tal cual', () async {
+      when(() => ds.byId('b1')).thenAnswer((_) async => bot);
+
+      final result = await repo.byId('b1');
+
+      expect(result, bot);
+      verify(() => ds.byId('b1')).called(1);
+    });
+
+    test('propaga BotsNotFoundFailure', () async {
+      when(
+        () => ds.byId('missing'),
+      ).thenAnswer((_) => Future<Bot>.error(const BotsNotFoundFailure()));
+
+      await expectLater(
+        repo.byId('missing'),
+        throwsA(isA<BotsNotFoundFailure>()),
+      );
+    });
+  });
 }
