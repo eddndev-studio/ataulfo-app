@@ -41,4 +41,40 @@ void main() {
       expect(() => TokenResp.fromJson(incomplete), throwsFormatException);
     });
   });
+
+  group('MeResp', () {
+    test('parsea las 3 claves del contrato S02 /auth/me', () {
+      final json = <String, dynamic>{
+        'user_id': 'u-123',
+        'org_id': 'o-456',
+        'role': 'OWNER',
+      };
+
+      final resp = MeResp.fromJson(json);
+
+      expect(resp.userId, 'u-123');
+      expect(resp.orgId, 'o-456');
+      expect(resp.role, 'OWNER');
+    });
+
+    test('lanza FormatException si falta una clave obligatoria', () {
+      final incomplete = <String, dynamic>{
+        'user_id': 'u-1',
+        'org_id': 'o-1',
+        // role ausente
+      };
+
+      expect(() => MeResp.fromJson(incomplete), throwsFormatException);
+    });
+
+    test('lanza FormatException si una clave tiene tipo equivocado', () {
+      final wrongType = <String, dynamic>{
+        'user_id': 'u-1',
+        'org_id': 42, // debería ser String
+        'role': 'ADMIN',
+      };
+
+      expect(() => MeResp.fromJson(wrongType), throwsFormatException);
+    });
+  });
 }

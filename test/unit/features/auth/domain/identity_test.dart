@@ -1,3 +1,5 @@
+import 'package:agentic/features/auth/data/dto/login_dto.dart';
+import 'package:agentic/features/auth/data/mappers/auth_mapper.dart';
 import 'package:agentic/features/auth/domain/entities/identity.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,6 +30,19 @@ void main() {
       expect(base, isNot(otherUser));
       expect(base, isNot(otherOrg));
       expect(base, isNot(otherRole));
+    });
+  });
+
+  group('AuthMapper.meRespToEntity', () {
+    test('MeResp → Identity preserva los 3 campos', () {
+      const resp = MeResp(userId: 'u1', orgId: 'o1', role: 'OWNER');
+
+      final identity = AuthMapper.meRespToEntity(resp);
+
+      expect(
+        identity,
+        const Identity(userId: 'u1', orgId: 'o1', role: 'OWNER'),
+      );
     });
   });
 }
