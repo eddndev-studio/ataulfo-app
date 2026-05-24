@@ -115,8 +115,7 @@ class LoginFailed extends LoginState {
   final LoginFailureKind kind;
 
   @override
-  bool operator ==(Object other) =>
-      other is LoginFailed && other.kind == kind;
+  bool operator ==(Object other) => other is LoginFailed && other.kind == kind;
 
   @override
   int get hashCode => kind.hashCode;

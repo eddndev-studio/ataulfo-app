@@ -12,9 +12,7 @@ class _MockLoginBloc extends MockBloc<LoginEvent, LoginState>
 
 void main() {
   setUpAll(() {
-    registerFallbackValue(
-      const LoginSubmitted(email: '', password: ''),
-    );
+    registerFallbackValue(const LoginSubmitted(email: '', password: ''));
   });
 
   late _MockLoginBloc bloc;
@@ -56,7 +54,10 @@ void main() {
 
     verify(
       () => bloc.add(
-        const LoginSubmitted(email: 'op@example.com', password: 'hunter2-secret'),
+        const LoginSubmitted(
+          email: 'op@example.com',
+          password: 'hunter2-secret',
+        ),
       ),
     ).called(1);
   });

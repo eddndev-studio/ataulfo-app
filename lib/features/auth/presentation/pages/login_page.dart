@@ -48,10 +48,7 @@ class _LoginPageState extends State<LoginPage> {
           builder: (context, state) {
             final submitting = state is LoginSubmitting;
             return Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 32,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
@@ -100,7 +97,9 @@ class _LoginPageState extends State<LoginPage> {
                     Text(
                       _messageFor(state.kind),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                 ],
               ),

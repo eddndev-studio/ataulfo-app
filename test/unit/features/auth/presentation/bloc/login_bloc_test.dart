@@ -55,8 +55,7 @@ void main() {
         ).thenThrow(const InvalidCredentialsFailure());
         return LoginBloc(repo);
       },
-      act: (b) =>
-          b.add(const LoginSubmitted(email: 'x@y.z', password: 'bad')),
+      act: (b) => b.add(const LoginSubmitted(email: 'x@y.z', password: 'bad')),
       expect: () => const <LoginState>[
         LoginSubmitting(),
         LoginFailed(LoginFailureKind.invalidCredentials),
@@ -121,8 +120,9 @@ void main() {
       'email vacío: no llama al repo, emite Failed(invalidInput)',
       build: () => LoginBloc(repo),
       act: (b) => b.add(const LoginSubmitted(email: '', password: 'p')),
-      expect: () =>
-          const <LoginState>[LoginFailed(LoginFailureKind.invalidInput)],
+      expect: () => const <LoginState>[
+        LoginFailed(LoginFailureKind.invalidInput),
+      ],
       verify: (_) {
         verifyNever(
           () => repo.login(
