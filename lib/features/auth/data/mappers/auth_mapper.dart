@@ -1,4 +1,5 @@
 import '../../domain/entities/auth_tokens.dart';
+import '../../domain/entities/identity.dart';
 import '../dto/login_dto.dart';
 
 /// Traduce DTOs del wire S02 a entidades de dominio.
@@ -15,4 +16,7 @@ class AuthMapper {
     tokenType: resp.tokenType,
     expiresInSeconds: resp.expiresIn,
   );
+
+  static Identity meRespToEntity(MeResp resp) =>
+      Identity(userId: resp.userId, orgId: resp.orgId, role: resp.role);
 }
