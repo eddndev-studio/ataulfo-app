@@ -10,11 +10,11 @@ import 'package:mocktail/mocktail.dart';
 class _MockLoginBloc extends MockBloc<LoginEvent, LoginState>
     implements LoginBloc {}
 
-class _FakeLoginEvent extends Fake implements LoginEvent {}
-
 void main() {
   setUpAll(() {
-    registerFallbackValue(_FakeLoginEvent());
+    registerFallbackValue(
+      const LoginSubmitted(email: '', password: ''),
+    );
   });
 
   late _MockLoginBloc bloc;

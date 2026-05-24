@@ -59,6 +59,15 @@ class LoginSubmitted extends LoginEvent {
 
   final String email;
   final String password;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LoginSubmitted &&
+      other.email == email &&
+      other.password == password;
+
+  @override
+  int get hashCode => Object.hash(email, password);
 }
 
 // States --------------------------------------------------------------------
