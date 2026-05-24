@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/identity.dart';
+import '../../domain/failures/auth_failure.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 /// Bloc global de sesión: única fuente de verdad del estado de autenticación
@@ -23,8 +24,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(const AuthUnauthenticated());
       return;
     }
-    final identity = await _repo.me();
-    emit(AuthAuthenticated(identity));
+    try {
+      final identity = await _repo.me();
+      emit(AuthAuthenticated(identity));
+    } on AuthFailure {
+      emit(const AuthUnauthenticated());
+    }
   }
 }
 
