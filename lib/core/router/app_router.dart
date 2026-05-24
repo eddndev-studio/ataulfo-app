@@ -9,7 +9,9 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
+import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
+import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
@@ -66,6 +68,25 @@ class AppRouter {
           // failures) entre Bots ⇄ Ajustes.
           child: const ShellPage(),
         ),
+      ),
+      GoRoute(
+        path: '/bots/:id',
+        builder: (context, state) {
+          // El ID lo aporta el path param; el BotDetailBloc se construye
+          // con ese ID y arranca cargando inmediato. Sin seed desde la
+          // lista — la cache local (RFC-0001) será la que evite el flash
+          // de spinner cuando aterrice.
+          final id = state.pathParameters['id']!;
+          return BlocProvider<BotDetailBloc>(
+            create: (_) =>
+                BotDetailBloc(repo: _botsRepo, id: id)
+                  ..add(const BotDetailLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Detalle del bot')),
+              body: const BotDetailPage(),
+            ),
+          );
+        },
       ),
     ],
   );
