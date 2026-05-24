@@ -6,6 +6,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
@@ -125,5 +126,41 @@ void main() {
     // la lista permanece visible mientras el spinner del RefreshIndicator
     // hace overlay (timing del overlay no es testeable de forma estable).
     expect(find.text('Soporte'), findsOneWidget);
+  });
+
+  testWidgets('tap en un tile navega al detalle vía /bots/:id', (tester) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+
+    // Capturamos la ubicación efectiva del router para verificar el go.
+    // Un GoRouter local con un destino dummy en /bots/:id permite no
+    // depender del provider real del BotDetailBloc en este test.
+    final navigated = <String>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<BotsBloc>.value(
+            value: bloc,
+            child: const Scaffold(body: BotsListPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/bots/:id',
+          builder: (_, state) {
+            navigated.add('/bots/${state.pathParameters['id']}');
+            return const Scaffold(body: SizedBox.shrink());
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.text('Soporte'));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/bots/b1']);
   });
 }
