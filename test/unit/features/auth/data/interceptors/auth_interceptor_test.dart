@@ -82,6 +82,7 @@ void main() {
     unrecoverableCalls = 0;
     dio.interceptors.add(
       AuthInterceptor(
+        retryDio: dio,
         storage: storage,
         refreshDatasource: refreshDs,
         onUnrecoverable: () async {
@@ -124,5 +125,72 @@ void main() {
       // decide qué ruta exige auth; cualquier 401 posterior lo gestionará.
       expect(unrecoverableCalls, 0);
     });
+  });
+
+  group('AuthInterceptor.onError 401 → refresh happy path', () {
+    test(
+      'refresca, persiste el par nuevo y reintenta con el access FRESCO',
+      () async {
+        await storage.save(
+          const AuthTokens(
+            accessToken: 'OLD-ACCESS',
+            refreshToken: 'OLD-REFRESH',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          ),
+        );
+
+        var call = 0;
+        adapter.handler = (options) async {
+          call += 1;
+          if (call == 1) {
+            return _jsonBody(401, <String, dynamic>{});
+          }
+          return _jsonBody(200, <String, dynamic>{'ok': true});
+        };
+
+        when(() => refreshDs.refresh('OLD-REFRESH')).thenAnswer(
+          (_) async => const AuthTokens(
+            accessToken: 'NEW-ACCESS',
+            refreshToken: 'NEW-REFRESH',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          ),
+        );
+
+        final res = await dio.get<Map<String, dynamic>>('/bots/abc');
+
+        expect(res.statusCode, 200);
+        expect(res.data, <String, dynamic>{'ok': true});
+        verify(() => refreshDs.refresh('OLD-REFRESH')).called(1);
+
+        // Asserción clave: el RETRY lleva el access nuevo, no el viejo
+        // de err.requestOptions.headers. Lo verifica sobre el RequestOptions
+        // que llegó al transporte (después de onRequest del retry).
+        expect(adapter.captured, hasLength(2));
+        expect(
+          adapter.captured[0].headers['Authorization'],
+          'Bearer OLD-ACCESS',
+        );
+        expect(
+          adapter.captured[1].headers['Authorization'],
+          'Bearer NEW-ACCESS',
+        );
+
+        // El storage quedó con el par rotado.
+        final persisted = await storage.read();
+        expect(
+          persisted,
+          const AuthTokens(
+            accessToken: 'NEW-ACCESS',
+            refreshToken: 'NEW-REFRESH',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          ),
+        );
+
+        expect(unrecoverableCalls, 0);
+      },
+    );
   });
 }
