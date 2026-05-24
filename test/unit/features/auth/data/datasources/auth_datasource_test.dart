@@ -346,4 +346,29 @@ void main() {
       await expectLater(ds.me(), throwsA(isA<UnknownAuthFailure>()));
     });
   });
+
+  Response<void> logoutResp(int status) => Response<void>(
+    requestOptions: RequestOptions(path: '/auth/logout'),
+    statusCode: status,
+  );
+
+  group('DioAuthDatasource.logout', () {
+    test('204 → completa sin excepción y envía refresh_token', () async {
+      when(
+        () => dio.post<void>(
+          '/auth/logout',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer((_) async => logoutResp(204));
+
+      await ds.logout('r-32');
+
+      verify(
+        () => dio.post<void>(
+          '/auth/logout',
+          data: <String, dynamic>{'refresh_token': 'r-32'},
+        ),
+      ).called(1);
+    });
+  });
 }
