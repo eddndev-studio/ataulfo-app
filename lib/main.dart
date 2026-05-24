@@ -12,6 +12,8 @@ import 'features/auth/data/interceptors/auth_interceptor.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/data/repositories/token_storage.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/bots/data/datasources/bots_datasource.dart';
+import 'features/bots/data/repositories/bots_repository_impl.dart';
 
 /// Punto de entrada. Composición manual de dependencias — sin DI framework
 /// hasta que un slice futuro lo justifique.
@@ -63,10 +65,21 @@ void main() {
   );
 
   final mainDs = DioAuthDatasource(mainDio);
-  final repository = AuthRepositoryImpl(datasource: mainDs, storage: storage);
-  authBloc = AuthBloc(repository);
+  final authRepository = AuthRepositoryImpl(
+    datasource: mainDs,
+    storage: storage,
+  );
+  authBloc = AuthBloc(authRepository);
 
-  final router = AppRouter(authBloc: authBloc, repository: repository);
+  final botsRepository = BotsRepositoryImpl(
+    datasource: DioBotsDatasource(mainDio),
+  );
+
+  final router = AppRouter(
+    authBloc: authBloc,
+    authRepository: authRepository,
+    botsRepository: botsRepository,
+  );
 
   // Dispara el check inicial: lee storage, si hay tokens valida con
   // /auth/me, emite Authenticated o Unauthenticated. El Splash se queda

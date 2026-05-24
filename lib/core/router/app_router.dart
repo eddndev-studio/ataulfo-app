@@ -8,23 +8,33 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/bots/domain/repositories/bots_repository.dart';
+import '../../features/bots/presentation/bloc/bots_bloc.dart';
+import '../../features/bots/presentation/pages/bots_list_page.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
-/// `/login` o `/home`. El Splash es ahora un widget tonto — sólo
-/// muestra spinner mientras el bloc está en `AuthInitial`.
+/// `/login` o `/home`. El Splash es un widget tonto.
 ///
 /// `refreshListenable` se cabla al stream del bloc vía un `Listenable`
 /// que invoca `notifyListeners()` en cada emisión. Cualquier transición
 /// del estado de auth se traduce en una re-evaluación del redirect.
+///
+/// `/home` arma su propio `BotsBloc` page-scoped y dispara el primer load
+/// al construirse. Cuando el shell con tabs aterrice, el bloc subirá al
+/// nivel del shell para que la lista sobreviva al cambio de tab.
 class AppRouter {
-  AppRouter({required AuthBloc authBloc, required AuthRepository repository})
-    : _authBloc = authBloc,
-      _repo = repository;
+  AppRouter({
+    required AuthBloc authBloc,
+    required AuthRepository authRepository,
+    required BotsRepository botsRepository,
+  }) : _authBloc = authBloc,
+       _authRepo = authRepository,
+       _botsRepo = botsRepository;
 
   final AuthBloc _authBloc;
-  final AuthRepository _repo;
+  final AuthRepository _authRepo;
+  final BotsRepository _botsRepo;
 
   late final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -35,7 +45,7 @@ class AppRouter {
       GoRoute(
         path: '/login',
         builder: (context, _) => BlocProvider<LoginBloc>(
-          create: (_) => LoginBloc(_repo),
+          create: (_) => LoginBloc(_authRepo),
           child: LoginPage(
             onSucceeded: (_) {
               // El verify dispara la transición a Authenticated y el
@@ -47,7 +57,13 @@ class AppRouter {
           ),
         ),
       ),
-      GoRoute(path: '/home', builder: (_, _) => const HomePage()),
+      GoRoute(
+        path: '/home',
+        builder: (context, _) => BlocProvider<BotsBloc>(
+          create: (_) => BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+          child: const BotsListPage(),
+        ),
+      ),
     ],
   );
 
