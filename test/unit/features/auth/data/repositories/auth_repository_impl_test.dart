@@ -146,7 +146,9 @@ void main() {
           expiresInSeconds: 900,
         );
         await storage.save(tokens);
-        when(() => ds.logout(any())).thenThrow(const InvalidCredentialsFailure());
+        when(
+          () => ds.logout(any()),
+        ).thenThrow(const InvalidCredentialsFailure());
 
         await repo.logout();
 
