@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:agentic/core/storage/secure_kv_store.dart';
@@ -313,5 +314,81 @@ void main() {
       expect(await storage.read(), isNotNull);
       expect(unrecoverableCalls, 0);
     });
+  });
+
+  group('AuthInterceptor concurrencia — un solo refresh para N 401', () {
+    test(
+      'dos requests 401 simultáneos comparten un único refresh y retransmiten con access fresco',
+      () async {
+        await storage.save(
+          const AuthTokens(
+            accessToken: 'OLD-ACCESS',
+            refreshToken: 'OLD-REFRESH',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          ),
+        );
+
+        // Quien lleva OLD-ACCESS recibe 401; quien lleva el access nuevo (o
+        // cualquier otro) recibe 200. Más robusto que contar invocaciones —
+        // no depende del orden en que se sirven los dos requests paralelos.
+        adapter.handler = (options) async {
+          if (options.headers['Authorization'] == 'Bearer OLD-ACCESS') {
+            return _jsonBody(401, <String, dynamic>{});
+          }
+          return _jsonBody(200, <String, dynamic>{
+            'path': options.path,
+          });
+        };
+
+        final gate = Completer<AuthTokens>();
+        when(() => refreshDs.refresh('OLD-REFRESH'))
+            .thenAnswer((_) => gate.future);
+
+        final f1 = dio.get<dynamic>('/a');
+        final f2 = dio.get<dynamic>('/b');
+
+        // Drena event loop para que ambos requests hagan su primer fetch,
+        // reciban 401 y entren a onError ANTES de que el Completer del
+        // refresh complete. Sin esto la verificación de "refresh llamado 1
+        // vez" puede ser racy.
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+
+        verify(() => refreshDs.refresh('OLD-REFRESH')).called(1);
+
+        gate.complete(
+          const AuthTokens(
+            accessToken: 'NEW-ACCESS',
+            refreshToken: 'NEW-REFRESH',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          ),
+        );
+
+        final r1 = await f1;
+        final r2 = await f2;
+
+        expect(r1.statusCode, 200);
+        expect(r2.statusCode, 200);
+
+        // 2 originales + 2 retries = 4 hits totales en el transporte.
+        expect(adapter.captured, hasLength(4));
+        // Los retries (los últimos dos) llevan el access fresco — sin
+        // importar el orden en que se sirvieron.
+        final retryAuths = <Object?>[
+          adapter.captured[2].headers['Authorization'],
+          adapter.captured[3].headers['Authorization'],
+        ];
+        expect(retryAuths, everyElement('Bearer NEW-ACCESS'));
+
+        // El refresh siguió siendo una sola vez incluso después de drenar
+        // toda la cadena.
+        verifyNoMoreInteractions(refreshDs);
+
+        expect(unrecoverableCalls, 0);
+      },
+    );
   });
 }
