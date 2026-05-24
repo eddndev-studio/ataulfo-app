@@ -152,4 +152,126 @@ void main() {
       );
     });
   });
+
+  Response<Map<String, dynamic>> refreshResp(
+    int status, {
+    Map<String, dynamic>? body,
+  }) => Response<Map<String, dynamic>>(
+    requestOptions: RequestOptions(path: '/auth/refresh'),
+    statusCode: status,
+    data: body,
+  );
+
+  group('DioAuthDatasource.refresh', () {
+    test('200 con par rotado → AuthTokens nuevo', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => refreshResp(
+          200,
+          body: <String, dynamic>{
+            'access_token': 'a2.b2.c2',
+            'refresh_token': 'r-33-rotated',
+            'token_type': 'Bearer',
+            'expires_in': 900,
+          },
+        ),
+      );
+
+      final tokens = await ds.refresh('r-32-original');
+
+      expect(
+        tokens,
+        const AuthTokens(
+          accessToken: 'a2.b2.c2',
+          refreshToken: 'r-33-rotated',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        ),
+      );
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: <String, dynamic>{'refresh_token': 'r-32-original'},
+        ),
+      ).called(1);
+    });
+
+    test('401 → InvalidCredentialsFailure (refresh inválido/revocado)',
+        () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/refresh'),
+          response: refreshResp(401),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        ds.refresh('r-revoked'),
+        throwsA(isA<InvalidCredentialsFailure>()),
+      );
+    });
+
+    test('timeout → NetworkFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/refresh'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+
+      await expectLater(
+        ds.refresh('r-32'),
+        throwsA(isA<NetworkFailure>()),
+      );
+    });
+
+    test('500 → UnknownAuthFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/refresh'),
+          response: refreshResp(500),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        ds.refresh('r-32'),
+        throwsA(isA<UnknownAuthFailure>()),
+      );
+    });
+
+    test('body nulo/malformado → UnknownAuthFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer((_) async => refreshResp(200));
+
+      await expectLater(
+        ds.refresh('r-32'),
+        throwsA(isA<UnknownAuthFailure>()),
+      );
+    });
+  });
 }
