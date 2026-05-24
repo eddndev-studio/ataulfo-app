@@ -32,6 +32,17 @@ class _MockAuthDs extends Mock implements AuthDatasource {}
 
 typedef _Handler = Future<ResponseBody> Function(RequestOptions);
 
+/// Snapshot inmutable de un request en el instante en que llegó al transporte.
+/// Necesario porque Dio reusa el mismo `RequestOptions` entre primer fetch
+/// y retry: sin snapshot, una mutación posterior (onRequest del retry)
+/// reescribiría lo capturado al primer hit y los asserts perderían historia.
+class _CapturedRequest {
+  _CapturedRequest({required this.path, required this.headers});
+
+  final String path;
+  final Map<String, dynamic> headers;
+}
+
 /// Adapter HTTP fake: intercepta lo que Dio dispara realmente al transporte
 /// (después de los interceptors). Permite afirmar headers del request final
 /// y simular respuestas/errores sin tocar red.
@@ -39,7 +50,7 @@ class _MockHttpAdapter implements HttpClientAdapter {
   _MockHttpAdapter(this._handler);
 
   _Handler _handler;
-  final List<RequestOptions> captured = <RequestOptions>[];
+  final List<_CapturedRequest> captured = <_CapturedRequest>[];
 
   set handler(_Handler h) => _handler = h;
 
@@ -49,7 +60,12 @@ class _MockHttpAdapter implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<dynamic>? cancelFuture,
   ) {
-    captured.add(options);
+    captured.add(
+      _CapturedRequest(
+        path: options.path,
+        headers: Map<String, dynamic>.from(options.headers),
+      ),
+    );
     return _handler(options);
   }
 

@@ -19,15 +19,17 @@ import '../repositories/token_storage.dart';
 /// interceptor evita doble-borrado y desinforma menos a slices superiores.
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
+    required Dio retryDio,
     required TokenStorage storage,
     required AuthDatasource refreshDatasource,
     required Future<void> Function() onUnrecoverable,
-  })  : _storage = storage,
+  })  : _retryDio = retryDio,
+        _storage = storage,
         _refreshDs = refreshDatasource,
         _onUnrecoverable = onUnrecoverable;
 
+  final Dio _retryDio;
   final TokenStorage _storage;
-  // ignore: unused_field
   final AuthDatasource _refreshDs;
   // ignore: unused_field
   final Future<void> Function() _onUnrecoverable;
@@ -42,5 +44,31 @@ class AuthInterceptor extends Interceptor {
       options.headers['Authorization'] = 'Bearer ${tokens.accessToken}';
     }
     handler.next(options);
+  }
+
+  @override
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    if (err.response?.statusCode != 401) {
+      handler.next(err);
+      return;
+    }
+    final tokens = await _storage.read();
+    if (tokens == null) {
+      handler.next(err);
+      return;
+    }
+
+    final fresh = await _refreshDs.refresh(tokens.refreshToken);
+    await _storage.save(fresh);
+
+    // Limpiar el header viejo: onRequest del retry leerá el storage fresco
+    // y reinyectará el Authorization con el access nuevo. Mantiene una sola
+    // fuente de verdad del shape del header.
+    err.requestOptions.headers.remove('Authorization');
+    final retryRes = await _retryDio.fetch<dynamic>(err.requestOptions);
+    handler.resolve(retryRes);
   }
 }
