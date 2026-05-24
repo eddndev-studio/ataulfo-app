@@ -38,7 +38,9 @@ void main() {
     });
 
     test('propaga BotsFailure sin atraparla', () async {
-      when(() => ds.list()).thenThrow(const BotsForbiddenFailure());
+      when(() => ds.list()).thenAnswer(
+        (_) => Future<List<Bot>>.error(const BotsForbiddenFailure()),
+      );
 
       await expectLater(repo.list(), throwsA(isA<BotsForbiddenFailure>()));
     });
