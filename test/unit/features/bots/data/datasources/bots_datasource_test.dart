@@ -27,10 +27,20 @@ void main() {
         data: body,
       );
 
-  DioException badResponse(int status) => DioException(
-    requestOptions: RequestOptions(path: '/bots'),
+  Response<Map<String, dynamic>> respMap(
+    int status, {
+    Map<String, dynamic>? body,
+    String path = '/bots/b1',
+  }) => Response<Map<String, dynamic>>(
+    requestOptions: RequestOptions(path: path),
+    statusCode: status,
+    data: body,
+  );
+
+  DioException badResponse(int status, {String path = '/bots'}) => DioException(
+    requestOptions: RequestOptions(path: path),
     response: Response<dynamic>(
-      requestOptions: RequestOptions(path: '/bots'),
+      requestOptions: RequestOptions(path: path),
       statusCode: status,
     ),
     type: DioExceptionType.badResponse,
@@ -148,6 +158,90 @@ void main() {
       );
 
       await expectLater(ds.list(), throwsA(isA<UnknownBotsFailure>()));
+    });
+  });
+
+  group('DioBotsDatasource.byId', () {
+    test('200 con botResp → Bot', () async {
+      when(() => dio.get<Map<String, dynamic>>('/bots/b1')).thenAnswer(
+        (_) async =>
+            respMap(200, body: botJson(id: 'b1', channel: 'WA_UNOFFICIAL')),
+      );
+
+      final bot = await ds.byId('b1');
+
+      expect(bot.id, 'b1');
+      expect(bot.channel, BotChannel.waUnofficial);
+      expect(bot.paused, isFalse);
+      verify(() => dio.get<Map<String, dynamic>>('/bots/b1')).called(1);
+    });
+
+    test('404 → BotsNotFoundFailure', () async {
+      // El detalle introduce la única variante nueva del mapping respecto al
+      // listado: un ID inválido / borrado responde 404 puntual y el bloc
+      // debe poder distinguirlo del 5xx genérico para el copy de error.
+      when(
+        () => dio.get<Map<String, dynamic>>('/bots/missing'),
+      ).thenThrow(badResponse(404, path: '/bots/missing'));
+
+      await expectLater(
+        ds.byId('missing'),
+        throwsA(isA<BotsNotFoundFailure>()),
+      );
+    });
+
+    test('403 → BotsForbiddenFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/bots/b1'),
+      ).thenThrow(badResponse(403, path: '/bots/b1'));
+
+      await expectLater(ds.byId('b1'), throwsA(isA<BotsForbiddenFailure>()));
+    });
+
+    test('timeout → BotsTimeoutFailure', () async {
+      when(() => dio.get<Map<String, dynamic>>('/bots/b1')).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/bots/b1'),
+          type: DioExceptionType.receiveTimeout,
+        ),
+      );
+
+      await expectLater(ds.byId('b1'), throwsA(isA<BotsTimeoutFailure>()));
+    });
+
+    test('sin conexión → BotsNetworkFailure', () async {
+      when(() => dio.get<Map<String, dynamic>>('/bots/b1')).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/bots/b1'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(ds.byId('b1'), throwsA(isA<BotsNetworkFailure>()));
+    });
+
+    test('500 → BotsServerFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/bots/b1'),
+      ).thenThrow(badResponse(500, path: '/bots/b1'));
+
+      await expectLater(ds.byId('b1'), throwsA(isA<BotsServerFailure>()));
+    });
+
+    test('body nulo → UnknownBotsFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/bots/b1'),
+      ).thenAnswer((_) async => respMap(200));
+
+      await expectLater(ds.byId('b1'), throwsA(isA<UnknownBotsFailure>()));
+    });
+
+    test('body malformado → UnknownBotsFailure', () async {
+      when(() => dio.get<Map<String, dynamic>>('/bots/b1')).thenAnswer(
+        (_) async => respMap(200, body: <String, dynamic>{'id': 'x'}),
+      );
+
+      await expectLater(ds.byId('b1'), throwsA(isA<UnknownBotsFailure>()));
     });
   });
 }
