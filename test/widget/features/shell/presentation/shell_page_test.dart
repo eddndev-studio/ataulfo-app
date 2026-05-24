@@ -122,12 +122,16 @@ void main() {
 
       await tester.pumpWidget(host());
       // Capturamos el bloc visto desde Bots tab.
-      final blocBefore = tester.element(find.byType(BotsListPage)).read<BotsBloc>();
+      final blocBefore = tester
+          .element(find.byType(BotsListPage))
+          .read<BotsBloc>();
       await tester.tap(find.text('Ajustes'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Bots'));
       await tester.pumpAndSettle();
-      final blocAfter = tester.element(find.byType(BotsListPage)).read<BotsBloc>();
+      final blocAfter = tester
+          .element(find.byType(BotsListPage))
+          .read<BotsBloc>();
 
       // El cambio de tab NO debe reconstruir el bloc — el provider está
       // en el route builder, no dentro de cada tab.

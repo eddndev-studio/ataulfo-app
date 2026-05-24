@@ -58,8 +58,9 @@ void main() {
         return BotDetailBloc(repo: repo, id: 'missing');
       },
       act: (bloc) => bloc.add(const BotDetailLoadRequested()),
-      expect: () =>
-          const <BotDetailState>[BotDetailFailed(BotsNotFoundFailure())],
+      expect: () => const <BotDetailState>[
+        BotDetailFailed(BotsNotFoundFailure()),
+      ],
     );
 
     blocTest<BotDetailBloc, BotDetailState>(

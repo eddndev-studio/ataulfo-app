@@ -41,10 +41,7 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.text('OWNER'), findsOneWidget);
-    expect(
-      find.widgetWithText(FilledButton, 'Cerrar sesión'),
-      findsOneWidget,
-    );
+    expect(find.widgetWithText(FilledButton, 'Cerrar sesión'), findsOneWidget);
   });
 
   testWidgets('tap Cerrar sesión dispara AuthLoggedOut en el bloc', (

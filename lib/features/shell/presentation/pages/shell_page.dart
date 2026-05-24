@@ -27,10 +27,7 @@ class _ShellPageState extends State<ShellPage> {
     _TabSpec(label: 'Ajustes', icon: Icons.settings_outlined),
   ];
 
-  static const List<Widget> _bodies = <Widget>[
-    BotsListPage(),
-    SettingsPage(),
-  ];
+  static const List<Widget> _bodies = <Widget>[BotsListPage(), SettingsPage()];
 
   void _select(int i) => setState(() => _index = i);
 

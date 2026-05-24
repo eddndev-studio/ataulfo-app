@@ -399,55 +399,52 @@ void main() {
   });
 
   group('AuthInterceptor — retry-loop guard', () {
-    test(
-      'si el retry post-refresh vuelve a 401, NO dispara segundo refresh; '
-      'propaga el 401 al llamador',
-      () async {
-        await storage.save(
-          const AuthTokens(
-            accessToken: 'OLD-ACCESS',
-            refreshToken: 'OLD-REFRESH',
-            tokenType: 'Bearer',
-            expiresInSeconds: 900,
+    test('si el retry post-refresh vuelve a 401, NO dispara segundo refresh; '
+        'propaga el 401 al llamador', () async {
+      await storage.save(
+        const AuthTokens(
+          accessToken: 'OLD-ACCESS',
+          refreshToken: 'OLD-REFRESH',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        ),
+      );
+
+      // Todos los hits responden 401, sin importar el access que lleven —
+      // simula desincronización del servidor: el refresh devuelve un par
+      // nuevo, pero el servidor sigue rechazando 401. Sin guarda, esto
+      // entra en bucle (cada retry vuelve a onError, dispara refresh otra
+      // vez, etc.).
+      adapter.handler = (_) async => _jsonBody(401, <String, dynamic>{});
+
+      when(() => refreshDs.refresh(any<String>())).thenAnswer(
+        (_) async => const AuthTokens(
+          accessToken: 'NEW-ACCESS',
+          refreshToken: 'NEW-REFRESH',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        ),
+      );
+
+      await expectLater(
+        dio.get<dynamic>('/protected'),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.response?.statusCode,
+            'statusCode',
+            401,
           ),
-        );
+        ),
+      );
 
-        // Todos los hits responden 401, sin importar el access que lleven —
-        // simula desincronización del servidor: el refresh devuelve un par
-        // nuevo, pero el servidor sigue rechazando 401. Sin guarda, esto
-        // entra en bucle (cada retry vuelve a onError, dispara refresh otra
-        // vez, etc.).
-        adapter.handler = (_) async => _jsonBody(401, <String, dynamic>{});
+      // El refresh corrió UNA sola vez. El retry post-refresh recibió 401
+      // y el interceptor lo dejó pasar sin volver a refrescar.
+      verify(() => refreshDs.refresh(any<String>())).called(1);
+      verifyNoMoreInteractions(refreshDs);
 
-        when(() => refreshDs.refresh(any<String>())).thenAnswer(
-          (_) async => const AuthTokens(
-            accessToken: 'NEW-ACCESS',
-            refreshToken: 'NEW-REFRESH',
-            tokenType: 'Bearer',
-            expiresInSeconds: 900,
-          ),
-        );
-
-        await expectLater(
-          dio.get<dynamic>('/protected'),
-          throwsA(
-            isA<DioException>().having(
-              (e) => e.response?.statusCode,
-              'statusCode',
-              401,
-            ),
-          ),
-        );
-
-        // El refresh corrió UNA sola vez. El retry post-refresh recibió 401
-        // y el interceptor lo dejó pasar sin volver a refrescar.
-        verify(() => refreshDs.refresh(any<String>())).called(1);
-        verifyNoMoreInteractions(refreshDs);
-
-        // 2 hits: el original + 1 retry. No hay tercer hit (que sería el
-        // síntoma del bucle).
-        expect(adapter.captured, hasLength(2));
-      },
-    );
+      // 2 hits: el original + 1 retry. No hay tercer hit (que sería el
+      // síntoma del bucle).
+      expect(adapter.captured, hasLength(2));
+    });
   });
 }

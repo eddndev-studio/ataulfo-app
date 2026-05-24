@@ -164,8 +164,10 @@ void main() {
   group('DioBotsDatasource.byId', () {
     test('200 con botResp → Bot', () async {
       when(() => dio.get<Map<String, dynamic>>('/bots/b1')).thenAnswer(
-        (_) async =>
-            respMap(200, body: botJson(id: 'b1', channel: 'WA_UNOFFICIAL')),
+        (_) async => respMap(
+          200,
+          body: botJson(id: 'b1', channel: 'WA_UNOFFICIAL'),
+        ),
       );
 
       final bot = await ds.byId('b1');
