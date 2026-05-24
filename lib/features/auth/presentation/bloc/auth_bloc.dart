@@ -12,6 +12,7 @@ import '../../domain/repositories/auth_repository.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc(this._repo) : super(const AuthInitial()) {
     on<AuthCheckRequested>(_onCheck);
+    on<AuthLoggedOut>(_onLoggedOut);
   }
 
   final AuthRepository _repo;
@@ -31,6 +32,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(const AuthUnauthenticated());
     }
   }
+
+  Future<void> _onLoggedOut(
+    AuthLoggedOut event,
+    Emitter<AuthState> emit,
+  ) async {
+    await _repo.logout();
+    emit(const AuthUnauthenticated());
+  }
 }
 
 // Events --------------------------------------------------------------------
@@ -47,6 +56,16 @@ class AuthCheckRequested extends AuthEvent {
 
   @override
   int get hashCode => (AuthCheckRequested).hashCode;
+}
+
+class AuthLoggedOut extends AuthEvent {
+  const AuthLoggedOut();
+
+  @override
+  bool operator ==(Object other) => other is AuthLoggedOut;
+
+  @override
+  int get hashCode => (AuthLoggedOut).hashCode;
 }
 
 // States --------------------------------------------------------------------
