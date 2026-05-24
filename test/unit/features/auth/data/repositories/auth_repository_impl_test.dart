@@ -97,5 +97,24 @@ void main() {
       verifyNever(() => ds.logout(any()));
       expect(storage.clears, 0);
     });
+
+    test(
+      'con tokens: lee refresh → ds.logout(refresh) → storage.clear()',
+      () async {
+        const tokens = AuthTokens(
+          accessToken: 'a',
+          refreshToken: 'r-32',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        );
+        await storage.save(tokens);
+        when(() => ds.logout('r-32')).thenAnswer((_) async {});
+
+        await repo.logout();
+
+        verify(() => ds.logout('r-32')).called(1);
+        expect(storage.clears, 1);
+      },
+    );
   });
 }
