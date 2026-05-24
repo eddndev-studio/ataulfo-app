@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../domain/failures/auth_failure.dart';
 import '../datasources/auth_datasource.dart';
 import '../repositories/token_storage.dart';
 
@@ -31,7 +32,6 @@ class AuthInterceptor extends Interceptor {
   final Dio _retryDio;
   final TokenStorage _storage;
   final AuthDatasource _refreshDs;
-  // ignore: unused_field
   final Future<void> Function() _onUnrecoverable;
 
   @override
@@ -61,14 +61,20 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    final fresh = await _refreshDs.refresh(tokens.refreshToken);
-    await _storage.save(fresh);
+    try {
+      final fresh = await _refreshDs.refresh(tokens.refreshToken);
+      await _storage.save(fresh);
 
-    // Limpiar el header viejo: onRequest del retry leerá el storage fresco
-    // y reinyectará el Authorization con el access nuevo. Mantiene una sola
-    // fuente de verdad del shape del header.
-    err.requestOptions.headers.remove('Authorization');
-    final retryRes = await _retryDio.fetch<dynamic>(err.requestOptions);
-    handler.resolve(retryRes);
+      // Limpiar el header viejo: onRequest del retry leerá el storage fresco
+      // y reinyectará el Authorization con el access nuevo. Mantiene una sola
+      // fuente de verdad del shape del header.
+      err.requestOptions.headers.remove('Authorization');
+      final retryRes = await _retryDio.fetch<dynamic>(err.requestOptions);
+      handler.resolve(retryRes);
+    } on AuthFailure {
+      await _storage.clear();
+      await _onUnrecoverable();
+      handler.next(err);
+    }
   }
 }
