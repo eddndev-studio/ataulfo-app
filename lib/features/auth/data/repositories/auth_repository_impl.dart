@@ -1,4 +1,5 @@
 import '../../domain/entities/auth_tokens.dart';
+import '../../domain/entities/identity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_datasource.dart';
 import 'token_storage.dart';
@@ -27,4 +28,7 @@ class AuthRepositoryImpl implements AuthRepository {
     await _storage.save(tokens);
     return tokens;
   }
+
+  @override
+  Future<Identity> me() async => _ds.me();
 }

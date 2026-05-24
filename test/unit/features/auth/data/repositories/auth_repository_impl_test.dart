@@ -2,6 +2,7 @@ import 'package:agentic/features/auth/data/datasources/auth_datasource.dart';
 import 'package:agentic/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:agentic/features/auth/data/repositories/token_storage.dart';
 import 'package:agentic/features/auth/domain/entities/auth_tokens.dart';
+import 'package:agentic/features/auth/domain/entities/identity.dart';
 import 'package:agentic/features/auth/domain/failures/auth_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -64,6 +65,27 @@ void main() {
         throwsA(isA<InvalidCredentialsFailure>()),
       );
       expect(storage.saved, isEmpty);
+    });
+  });
+
+  group('me', () {
+    test('OK devuelve la identidad del datasource sin tocar storage', () async {
+      const identity = Identity(userId: 'u1', orgId: 'o1', role: 'OWNER');
+      when(() => ds.me()).thenAnswer((_) async => identity);
+
+      final got = await repo.me();
+
+      expect(got, identity);
+      expect(storage.saved, isEmpty);
+      expect(storage.clears, 0);
+    });
+
+    test('falla del datasource propaga sin tocar storage', () async {
+      when(() => ds.me()).thenThrow(const InvalidCredentialsFailure());
+
+      await expectLater(repo.me(), throwsA(isA<InvalidCredentialsFailure>()));
+      expect(storage.saved, isEmpty);
+      expect(storage.clears, 0);
     });
   });
 }

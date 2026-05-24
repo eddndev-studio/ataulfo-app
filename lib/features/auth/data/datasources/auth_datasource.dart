@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/auth_tokens.dart';
+import '../../domain/entities/identity.dart';
 import '../../domain/failures/auth_failure.dart';
 import '../dto/login_dto.dart';
 import '../mappers/auth_mapper.dart';
@@ -17,6 +18,11 @@ abstract interface class AuthDatasource {
   /// expirado de familia revocada por fuga; el cliente trata ambos como
   /// "sesión inválida, re-login".
   Future<AuthTokens> refresh(String refreshToken);
+
+  /// Devuelve la identidad derivada del access token (S02 `/auth/me`).
+  /// Stateless: el backend no golpea BD; los claims del JWT son la fuente
+  /// de verdad. Bearer lo inyecta el interceptor; aquí no se gestiona.
+  Future<Identity> me();
 }
 
 /// Implementación contra dio. Se inyecta una instancia ya configurada con
@@ -62,6 +68,22 @@ class DioAuthDatasource implements AuthDatasource {
         throw const UnknownAuthFailure();
       }
       return AuthMapper.tokenRespToEntity(TokenResp.fromJson(body));
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownAuthFailure();
+    }
+  }
+
+  @override
+  Future<Identity> me() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/auth/me');
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownAuthFailure();
+      }
+      return AuthMapper.meRespToEntity(MeResp.fromJson(body));
     } on DioException catch (e) {
       throw _mapDioException(e);
     } on FormatException {

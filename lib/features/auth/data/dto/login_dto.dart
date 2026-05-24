@@ -49,3 +49,21 @@ class TokenResp {
   final String tokenType;
   final int expiresIn;
 }
+
+class MeResp {
+  const MeResp({required this.userId, required this.orgId, required this.role});
+
+  factory MeResp.fromJson(Map<String, dynamic> json) {
+    final user = json['user_id'];
+    final org = json['org_id'];
+    final role = json['role'];
+    if (user is! String || org is! String || role is! String) {
+      throw const FormatException('meResp: clave obligatoria ausente');
+    }
+    return MeResp(userId: user, orgId: org, role: role);
+  }
+
+  final String userId;
+  final String orgId;
+  final String role;
+}

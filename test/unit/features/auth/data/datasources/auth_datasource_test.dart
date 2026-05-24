@@ -1,5 +1,6 @@
 import 'package:agentic/features/auth/data/datasources/auth_datasource.dart';
 import 'package:agentic/features/auth/domain/entities/auth_tokens.dart';
+import 'package:agentic/features/auth/domain/entities/identity.dart';
 import 'package:agentic/features/auth/domain/failures/auth_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -265,6 +266,84 @@ void main() {
       ).thenAnswer((_) async => refreshResp(200));
 
       await expectLater(ds.refresh('r-32'), throwsA(isA<UnknownAuthFailure>()));
+    });
+  });
+
+  Response<Map<String, dynamic>> meHttpResp(
+    int status, {
+    Map<String, dynamic>? body,
+  }) => Response<Map<String, dynamic>>(
+    requestOptions: RequestOptions(path: '/auth/me'),
+    statusCode: status,
+    data: body,
+  );
+
+  group('DioAuthDatasource.me', () {
+    test('200 con {user_id, org_id, role} → Identity', () async {
+      when(() => dio.get<Map<String, dynamic>>('/auth/me')).thenAnswer(
+        (_) async => meHttpResp(
+          200,
+          body: <String, dynamic>{
+            'user_id': 'u-123',
+            'org_id': 'o-456',
+            'role': 'OWNER',
+          },
+        ),
+      );
+
+      final identity = await ds.me();
+
+      expect(
+        identity,
+        const Identity(userId: 'u-123', orgId: 'o-456', role: 'OWNER'),
+      );
+      verify(() => dio.get<Map<String, dynamic>>('/auth/me')).called(1);
+    });
+
+    test(
+      '401 → InvalidCredentialsFailure (token inválido tras refresh)',
+      () async {
+        when(() => dio.get<Map<String, dynamic>>('/auth/me')).thenThrow(
+          DioException(
+            requestOptions: RequestOptions(path: '/auth/me'),
+            response: meHttpResp(401),
+            type: DioExceptionType.badResponse,
+          ),
+        );
+
+        await expectLater(ds.me(), throwsA(isA<InvalidCredentialsFailure>()));
+      },
+    );
+
+    test('timeout → NetworkFailure', () async {
+      when(() => dio.get<Map<String, dynamic>>('/auth/me')).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/me'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+
+      await expectLater(ds.me(), throwsA(isA<NetworkFailure>()));
+    });
+
+    test('500 → UnknownAuthFailure', () async {
+      when(() => dio.get<Map<String, dynamic>>('/auth/me')).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/me'),
+          response: meHttpResp(500),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(ds.me(), throwsA(isA<UnknownAuthFailure>()));
+    });
+
+    test('body nulo → UnknownAuthFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/auth/me'),
+      ).thenAnswer((_) async => meHttpResp(200));
+
+      await expectLater(ds.me(), throwsA(isA<UnknownAuthFailure>()));
     });
   });
 }
