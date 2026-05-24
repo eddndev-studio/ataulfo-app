@@ -23,6 +23,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(const AuthUnauthenticated());
       return;
     }
+    final identity = await _repo.me();
+    emit(AuthAuthenticated(identity));
   }
 }
 
