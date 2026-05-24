@@ -10,7 +10,7 @@ import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
-import '../../features/bots/presentation/pages/bots_list_page.dart';
+import '../../features/shell/presentation/pages/shell_page.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -61,7 +61,10 @@ class AppRouter {
         path: '/home',
         builder: (context, _) => BlocProvider<BotsBloc>(
           create: (_) => BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
-          child: const BotsListPage(),
+          // BotsBloc vive a nivel del shell: cambiar de tab no rebuildea
+          // el provider y la lista preserva estado (Loaded, refresh,
+          // failures) entre Bots ⇄ Ajustes.
+          child: const ShellPage(),
         ),
       ),
     ],

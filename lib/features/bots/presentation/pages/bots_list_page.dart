@@ -5,22 +5,19 @@ import '../../domain/entities/bot.dart';
 import '../bloc/bots_bloc.dart';
 
 /// Listado de Bots (S04). Consume el BotsBloc del scope; el cableado del
-/// provider lo hace el shell. La página es presentación pura — todas las
-/// transiciones de estado pasan por el bloc.
+/// provider lo hace el shell. Es content-only: el Scaffold y el AppBar los
+/// aporta el ShellPage, que también orquesta el título dinámico por tab.
 class BotsListPage extends StatelessWidget {
   const BotsListPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Bots')),
-      body: BlocBuilder<BotsBloc, BotsState>(
-        builder: (context, state) => switch (state) {
-          BotsInitial() || BotsLoading() => const _LoadingView(),
-          BotsLoaded(items: final items) => _LoadedView(items: items),
-          BotsFailed() => const _FailedView(),
-        },
-      ),
+    return BlocBuilder<BotsBloc, BotsState>(
+      builder: (context, state) => switch (state) {
+        BotsInitial() || BotsLoading() => const _LoadingView(),
+        BotsLoaded(items: final items) => _LoadedView(items: items),
+        BotsFailed() => const _FailedView(),
+      },
     );
   }
 }

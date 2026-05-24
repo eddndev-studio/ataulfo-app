@@ -49,7 +49,9 @@ void main() {
   Widget host() => MaterialApp(
     home: BlocProvider<BotsBloc>.value(
       value: bloc,
-      child: const BotsListPage(),
+      // BotsListPage es content-only; el shell aporta Scaffold/AppBar.
+      // En aislamiento envolvemos en Scaffold para tener Material upstream.
+      child: const Scaffold(body: BotsListPage()),
     ),
   );
 

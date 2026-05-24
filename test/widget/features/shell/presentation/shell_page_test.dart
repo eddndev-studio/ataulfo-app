@@ -1,5 +1,6 @@
 import 'package:agentic/features/auth/domain/entities/identity.dart';
 import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:agentic/features/bots/domain/entities/bot.dart';
 import 'package:agentic/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:agentic/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:agentic/features/settings/presentation/pages/settings_page.dart';
@@ -26,7 +27,13 @@ void main() {
     authBloc = _MockAuthBloc();
     botsBloc = _MockBotsBloc();
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-    when(() => botsBloc.state).thenReturn(const BotsLoading());
+    // Loaded([]) en vez de Loading: el spinner del CircularProgressIndicator
+    // tiene animación infinita y pumpAndSettle nunca termina. Loaded es
+    // estado terminal sin animaciones; cubre el árbol que necesitamos
+    // navegar.
+    when(
+      () => botsBloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[], isRefreshing: false));
   });
 
   Widget host() => MultiBlocProvider(
