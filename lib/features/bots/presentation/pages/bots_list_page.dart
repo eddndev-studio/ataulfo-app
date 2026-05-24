@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/bot.dart';
 import '../bloc/bots_bloc.dart';
@@ -138,6 +139,7 @@ class _BotTile extends StatelessWidget {
       trailing: bot.paused
           ? const Icon(Icons.pause_circle, semanticLabel: 'En pausa')
           : null,
+      onTap: () => context.go('/bots/${bot.id}'),
     );
   }
 
