@@ -249,4 +249,69 @@ void main() {
       },
     );
   });
+
+  group('AuthInterceptor.onError non-401 pass-through', () {
+    test('500 con tokens en storage: propaga sin tocar refresh ni storage',
+        () async {
+      await storage.save(
+        const AuthTokens(
+          accessToken: 'ACCESS',
+          refreshToken: 'REFRESH',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        ),
+      );
+
+      adapter.handler = (_) async => _jsonBody(500, <String, dynamic>{});
+
+      await expectLater(
+        dio.get<dynamic>('/bots/abc'),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.response?.statusCode,
+            'statusCode',
+            500,
+          ),
+        ),
+      );
+
+      verifyNever(() => refreshDs.refresh(any<String>()));
+      expect(await storage.read(), isNotNull);
+      expect(unrecoverableCalls, 0);
+      expect(adapter.captured, hasLength(1));
+    });
+
+    test('timeout sin response: propaga sin intentar refresh', () async {
+      await storage.save(
+        const AuthTokens(
+          accessToken: 'ACCESS',
+          refreshToken: 'REFRESH',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        ),
+      );
+
+      adapter.handler = (options) async {
+        throw DioException(
+          requestOptions: options,
+          type: DioExceptionType.connectionTimeout,
+        );
+      };
+
+      await expectLater(
+        dio.get<dynamic>('/bots/abc'),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.type,
+            'type',
+            DioExceptionType.connectionTimeout,
+          ),
+        ),
+      );
+
+      verifyNever(() => refreshDs.refresh(any<String>()));
+      expect(await storage.read(), isNotNull);
+      expect(unrecoverableCalls, 0);
+    });
+  });
 }
