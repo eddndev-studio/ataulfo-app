@@ -116,5 +116,42 @@ void main() {
         expect(storage.clears, 1);
       },
     );
+
+    test(
+      'backend falla con NetworkFailure → storage.clear() igual + no rethrow',
+      () async {
+        const tokens = AuthTokens(
+          accessToken: 'a',
+          refreshToken: 'r-32',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        );
+        await storage.save(tokens);
+        when(() => ds.logout(any())).thenThrow(const NetworkFailure());
+
+        await repo.logout(); // No debe propagar.
+
+        verify(() => ds.logout('r-32')).called(1);
+        expect(storage.clears, 1);
+      },
+    );
+
+    test(
+      'backend falla con InvalidCredentials → storage.clear() igual + no rethrow',
+      () async {
+        const tokens = AuthTokens(
+          accessToken: 'a',
+          refreshToken: 'r-32',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        );
+        await storage.save(tokens);
+        when(() => ds.logout(any())).thenThrow(const InvalidCredentialsFailure());
+
+        await repo.logout();
+
+        expect(storage.clears, 1);
+      },
+    );
   });
 }
