@@ -1,4 +1,5 @@
 import 'package:agentic/features/auth/domain/entities/identity.dart';
+import 'package:agentic/features/auth/domain/failures/auth_failure.dart';
 import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
 import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -39,6 +40,30 @@ void main() {
         },
         act: (bloc) => bloc.add(const AuthCheckRequested()),
         expect: () => const <AuthState>[AuthAuthenticated(_identity)],
+      );
+
+      blocTest<AuthBloc, AuthState>(
+        'con tokens + me() falla → AuthUnauthenticated (sin propagar)',
+        build: () {
+          final repo = _MockRepo();
+          when(repo.hasTokens).thenAnswer((_) async => true);
+          when(repo.me).thenThrow(const InvalidCredentialsFailure());
+          return AuthBloc(repo);
+        },
+        act: (bloc) => bloc.add(const AuthCheckRequested()),
+        expect: () => const <AuthState>[AuthUnauthenticated()],
+      );
+
+      blocTest<AuthBloc, AuthState>(
+        'con tokens + me() falla por red → AuthUnauthenticated (no retiene tokens en sesión)',
+        build: () {
+          final repo = _MockRepo();
+          when(repo.hasTokens).thenAnswer((_) async => true);
+          when(repo.me).thenThrow(const NetworkFailure());
+          return AuthBloc(repo);
+        },
+        act: (bloc) => bloc.add(const AuthCheckRequested()),
+        expect: () => const <AuthState>[AuthUnauthenticated()],
       );
     });
   });
