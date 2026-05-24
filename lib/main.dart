@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'core/network/dio_client.dart';
 import 'core/router/app_router.dart';
+import 'core/storage/device_id_provider.dart';
 import 'core/storage/secure_kv_store.dart';
 import 'features/auth/data/datasources/auth_datasource.dart';
 import 'features/auth/data/repositories/token_storage.dart';
@@ -26,6 +29,13 @@ void main() {
   final dio = DioClient.create(baseUrl: baseUrl);
   final ds = DioAuthDatasource(dio);
   final router = AppRouter(authDatasource: ds, tokenStorage: storage);
+
+  // Fire-and-forget: el device_id queda persistido en cuanto pueda. Los
+  // consumidores reales (refresh family, registro FCM) ocurren post-login —
+  // hay tiempo de sobra para que el primer `getOrCreate` termine antes que
+  // alguien lo lea. Nacer estable hoy evita rotar familias el día que
+  // aterrice el slice de push.
+  unawaited(DeviceIdProvider(kv).getOrCreate());
 
   runApp(AgenticApp(router: router));
 }
