@@ -39,5 +39,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> logout() async {
     final tokens = await _storage.read();
     if (tokens == null) return;
+    await _ds.logout(tokens.refreshToken);
+    await _storage.clear();
   }
 }
