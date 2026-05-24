@@ -9,16 +9,37 @@ import '../../domain/repositories/auth_repository.dart';
 /// El bloc no toca storage directamente; toda I/O persistente y de red pasa
 /// por `AuthRepository`. Eso lo hace testable contra un mock del puerto.
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
-  AuthBloc(this._repo) : super(const AuthInitial());
+  AuthBloc(this._repo) : super(const AuthInitial()) {
+    on<AuthCheckRequested>(_onCheck);
+  }
 
-  // ignore: unused_field
   final AuthRepository _repo;
+
+  Future<void> _onCheck(
+    AuthCheckRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    if (!await _repo.hasTokens()) {
+      emit(const AuthUnauthenticated());
+      return;
+    }
+  }
 }
 
 // Events --------------------------------------------------------------------
 
 sealed class AuthEvent {
   const AuthEvent();
+}
+
+class AuthCheckRequested extends AuthEvent {
+  const AuthCheckRequested();
+
+  @override
+  bool operator ==(Object other) => other is AuthCheckRequested;
+
+  @override
+  int get hashCode => (AuthCheckRequested).hashCode;
 }
 
 // States --------------------------------------------------------------------

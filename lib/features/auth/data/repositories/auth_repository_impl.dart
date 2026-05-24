@@ -31,4 +31,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Identity> me() async => _ds.me();
+
+  @override
+  Future<bool> hasTokens() async => (await _storage.read()) != null;
 }

@@ -12,4 +12,9 @@ abstract interface class AuthRepository {
   /// No persiste — el dato es barato de re-pedir y agregar otra cache aquí
   /// sería estado sombra del JWT.
   Future<Identity> me();
+
+  /// Fast-path para el arranque: indica si hay tokens persistidos sin
+  /// validarlos contra el backend. El bloc lo usa para evitar un golpe
+  /// inútil a `/auth/me` cuando no hay sesión que verificar.
+  Future<bool> hasTokens();
 }
