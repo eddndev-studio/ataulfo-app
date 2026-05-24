@@ -200,26 +200,28 @@ void main() {
       ).called(1);
     });
 
-    test('401 → InvalidCredentialsFailure (refresh inválido/revocado)',
-        () async {
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          '/auth/refresh',
-          data: any<Object?>(named: 'data'),
-        ),
-      ).thenThrow(
-        DioException(
-          requestOptions: RequestOptions(path: '/auth/refresh'),
-          response: refreshResp(401),
-          type: DioExceptionType.badResponse,
-        ),
-      );
+    test(
+      '401 → InvalidCredentialsFailure (refresh inválido/revocado)',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            '/auth/refresh',
+            data: any<Object?>(named: 'data'),
+          ),
+        ).thenThrow(
+          DioException(
+            requestOptions: RequestOptions(path: '/auth/refresh'),
+            response: refreshResp(401),
+            type: DioExceptionType.badResponse,
+          ),
+        );
 
-      await expectLater(
-        ds.refresh('r-revoked'),
-        throwsA(isA<InvalidCredentialsFailure>()),
-      );
-    });
+        await expectLater(
+          ds.refresh('r-revoked'),
+          throwsA(isA<InvalidCredentialsFailure>()),
+        );
+      },
+    );
 
     test('timeout → NetworkFailure', () async {
       when(
@@ -234,10 +236,7 @@ void main() {
         ),
       );
 
-      await expectLater(
-        ds.refresh('r-32'),
-        throwsA(isA<NetworkFailure>()),
-      );
+      await expectLater(ds.refresh('r-32'), throwsA(isA<NetworkFailure>()));
     });
 
     test('500 → UnknownAuthFailure', () async {
@@ -254,10 +253,7 @@ void main() {
         ),
       );
 
-      await expectLater(
-        ds.refresh('r-32'),
-        throwsA(isA<UnknownAuthFailure>()),
-      );
+      await expectLater(ds.refresh('r-32'), throwsA(isA<UnknownAuthFailure>()));
     });
 
     test('body nulo/malformado → UnknownAuthFailure', () async {
@@ -268,10 +264,7 @@ void main() {
         ),
       ).thenAnswer((_) async => refreshResp(200));
 
-      await expectLater(
-        ds.refresh('r-32'),
-        throwsA(isA<UnknownAuthFailure>()),
-      );
+      await expectLater(ds.refresh('r-32'), throwsA(isA<UnknownAuthFailure>()));
     });
   });
 }

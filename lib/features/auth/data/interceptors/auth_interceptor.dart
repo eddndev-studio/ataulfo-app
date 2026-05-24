@@ -27,10 +27,10 @@ class AuthInterceptor extends Interceptor {
     required TokenStorage storage,
     required AuthDatasource refreshDatasource,
     required Future<void> Function() onUnrecoverable,
-  })  : _retryDio = retryDio,
-        _storage = storage,
-        _refreshDs = refreshDatasource,
-        _onUnrecoverable = onUnrecoverable;
+  }) : _retryDio = retryDio,
+       _storage = storage,
+       _refreshDs = refreshDatasource,
+       _onUnrecoverable = onUnrecoverable;
 
   final Dio _retryDio;
   final TokenStorage _storage;

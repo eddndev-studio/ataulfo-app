@@ -94,7 +94,9 @@ void main() {
   setUp(() {
     storage = TokenStorage(_MemKv());
     refreshDs = _MockAuthDs();
-    adapter = _MockHttpAdapter((_) async => _jsonBody(200, <String, dynamic>{}));
+    adapter = _MockHttpAdapter(
+      (_) async => _jsonBody(200, <String, dynamic>{}),
+    );
     dio = Dio(BaseOptions(baseUrl: 'http://test.local'));
     dio.httpClientAdapter = adapter;
     unrecoverableCalls = 0;
@@ -111,25 +113,27 @@ void main() {
   });
 
   group('AuthInterceptor.onRequest', () {
-    test('con tokens persistidos: agrega Authorization Bearer <access>',
-        () async {
-      await storage.save(
-        const AuthTokens(
-          accessToken: 'ACCESS-1',
-          refreshToken: 'r',
-          tokenType: 'Bearer',
-          expiresInSeconds: 900,
-        ),
-      );
+    test(
+      'con tokens persistidos: agrega Authorization Bearer <access>',
+      () async {
+        await storage.save(
+          const AuthTokens(
+            accessToken: 'ACCESS-1',
+            refreshToken: 'r',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          ),
+        );
 
-      await dio.get<dynamic>('/bots');
+        await dio.get<dynamic>('/bots');
 
-      expect(adapter.captured, hasLength(1));
-      expect(
-        adapter.captured.first.headers['Authorization'],
-        'Bearer ACCESS-1',
-      );
-    });
+        expect(adapter.captured, hasLength(1));
+        expect(
+          adapter.captured.first.headers['Authorization'],
+          'Bearer ACCESS-1',
+        );
+      },
+    );
 
     test('sin tokens persistidos: no agrega Authorization', () async {
       await dio.get<dynamic>('/health');
@@ -226,8 +230,9 @@ void main() {
         );
 
         adapter.handler = (_) async => _jsonBody(401, <String, dynamic>{});
-        when(() => refreshDs.refresh('REVOKED-REFRESH'))
-            .thenThrow(const InvalidCredentialsFailure());
+        when(
+          () => refreshDs.refresh('REVOKED-REFRESH'),
+        ).thenThrow(const InvalidCredentialsFailure());
 
         await expectLater(
           dio.get<dynamic>('/bots/abc'),
@@ -252,35 +257,37 @@ void main() {
   });
 
   group('AuthInterceptor.onError non-401 pass-through', () {
-    test('500 con tokens en storage: propaga sin tocar refresh ni storage',
-        () async {
-      await storage.save(
-        const AuthTokens(
-          accessToken: 'ACCESS',
-          refreshToken: 'REFRESH',
-          tokenType: 'Bearer',
-          expiresInSeconds: 900,
-        ),
-      );
-
-      adapter.handler = (_) async => _jsonBody(500, <String, dynamic>{});
-
-      await expectLater(
-        dio.get<dynamic>('/bots/abc'),
-        throwsA(
-          isA<DioException>().having(
-            (e) => e.response?.statusCode,
-            'statusCode',
-            500,
+    test(
+      '500 con tokens en storage: propaga sin tocar refresh ni storage',
+      () async {
+        await storage.save(
+          const AuthTokens(
+            accessToken: 'ACCESS',
+            refreshToken: 'REFRESH',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
           ),
-        ),
-      );
+        );
 
-      verifyNever(() => refreshDs.refresh(any<String>()));
-      expect(await storage.read(), isNotNull);
-      expect(unrecoverableCalls, 0);
-      expect(adapter.captured, hasLength(1));
-    });
+        adapter.handler = (_) async => _jsonBody(500, <String, dynamic>{});
+
+        await expectLater(
+          dio.get<dynamic>('/bots/abc'),
+          throwsA(
+            isA<DioException>().having(
+              (e) => e.response?.statusCode,
+              'statusCode',
+              500,
+            ),
+          ),
+        );
+
+        verifyNever(() => refreshDs.refresh(any<String>()));
+        expect(await storage.read(), isNotNull);
+        expect(unrecoverableCalls, 0);
+        expect(adapter.captured, hasLength(1));
+      },
+    );
 
     test('timeout sin response: propaga sin intentar refresh', () async {
       await storage.save(
@@ -336,14 +343,13 @@ void main() {
           if (options.headers['Authorization'] == 'Bearer OLD-ACCESS') {
             return _jsonBody(401, <String, dynamic>{});
           }
-          return _jsonBody(200, <String, dynamic>{
-            'path': options.path,
-          });
+          return _jsonBody(200, <String, dynamic>{'path': options.path});
         };
 
         final gate = Completer<AuthTokens>();
-        when(() => refreshDs.refresh('OLD-REFRESH'))
-            .thenAnswer((_) => gate.future);
+        when(
+          () => refreshDs.refresh('OLD-REFRESH'),
+        ).thenAnswer((_) => gate.future);
 
         final f1 = dio.get<dynamic>('/a');
         final f2 = dio.get<dynamic>('/b');
