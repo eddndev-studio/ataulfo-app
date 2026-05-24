@@ -1,5 +1,6 @@
 import '../../domain/entities/auth_tokens.dart';
 import '../../domain/entities/identity.dart';
+import '../../domain/failures/auth_failure.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_datasource.dart';
 import 'token_storage.dart';
@@ -31,4 +32,23 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Identity> me() async => _ds.me();
+
+  @override
+  Future<bool> hasTokens() async => (await _storage.read()) != null;
+
+  @override
+  Future<void> logout() async {
+    final tokens = await _storage.read();
+    if (tokens == null) return;
+    try {
+      await _ds.logout(tokens.refreshToken);
+    } on AuthFailure {
+      // Revocación remota best-effort: el contrato del logout es que el
+      // cliente quede en estado sin sesión incluso si el backend está
+      // caído o el bearer ya está revocado. El interceptor purgaría
+      // storage en su propio path; aquí asumimos la responsabilidad
+      // explícitamente.
+    }
+    await _storage.clear();
+  }
 }

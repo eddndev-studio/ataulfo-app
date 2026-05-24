@@ -346,4 +346,74 @@ void main() {
       await expectLater(ds.me(), throwsA(isA<UnknownAuthFailure>()));
     });
   });
+
+  Response<void> logoutResp(int status) => Response<void>(
+    requestOptions: RequestOptions(path: '/auth/logout'),
+    statusCode: status,
+  );
+
+  group('DioAuthDatasource.logout', () {
+    test('204 → completa sin excepción y envía refresh_token', () async {
+      when(
+        () => dio.post<void>('/auth/logout', data: any<Object?>(named: 'data')),
+      ).thenAnswer((_) async => logoutResp(204));
+
+      await ds.logout('r-32');
+
+      verify(
+        () => dio.post<void>(
+          '/auth/logout',
+          data: <String, dynamic>{'refresh_token': 'r-32'},
+        ),
+      ).called(1);
+    });
+
+    test(
+      '401 → InvalidCredentialsFailure (delega a _mapDioException)',
+      () async {
+        when(
+          () =>
+              dio.post<void>('/auth/logout', data: any<Object?>(named: 'data')),
+        ).thenThrow(
+          DioException(
+            requestOptions: RequestOptions(path: '/auth/logout'),
+            response: logoutResp(401),
+            type: DioExceptionType.badResponse,
+          ),
+        );
+
+        await expectLater(
+          ds.logout('r-32'),
+          throwsA(isA<InvalidCredentialsFailure>()),
+        );
+      },
+    );
+
+    test('timeout → NetworkFailure', () async {
+      when(
+        () => dio.post<void>('/auth/logout', data: any<Object?>(named: 'data')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/logout'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+
+      await expectLater(ds.logout('r-32'), throwsA(isA<NetworkFailure>()));
+    });
+
+    test('500 → UnknownAuthFailure', () async {
+      when(
+        () => dio.post<void>('/auth/logout', data: any<Object?>(named: 'data')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/logout'),
+          response: logoutResp(500),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(ds.logout('r-32'), throwsA(isA<UnknownAuthFailure>()));
+    });
+  });
 }

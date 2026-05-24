@@ -23,6 +23,12 @@ abstract interface class AuthDatasource {
   /// Stateless: el backend no golpea BD; los claims del JWT son la fuente
   /// de verdad. Bearer lo inyecta el interceptor; aquí no se gestiona.
   Future<Identity> me();
+
+  /// Revoca la familia del refresh dado (S02 RF#4). El backend responde
+  /// 204 sin body. Requiere Bearer válido (lo inyecta el interceptor);
+  /// si el access caducó, el flujo de refresh transparente lo renueva
+  /// antes del retry.
+  Future<void> logout(String refreshToken);
 }
 
 /// Implementación contra dio. Se inyecta una instancia ya configurada con
@@ -88,6 +94,18 @@ class DioAuthDatasource implements AuthDatasource {
       throw _mapDioException(e);
     } on FormatException {
       throw const UnknownAuthFailure();
+    }
+  }
+
+  @override
+  Future<void> logout(String refreshToken) async {
+    try {
+      await _dio.post<void>(
+        '/auth/logout',
+        data: <String, dynamic>{'refresh_token': refreshToken},
+      );
+    } on DioException catch (e) {
+      throw _mapDioException(e);
     }
   }
 

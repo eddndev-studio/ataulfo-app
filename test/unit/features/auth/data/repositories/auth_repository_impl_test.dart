@@ -88,4 +88,72 @@ void main() {
       expect(storage.clears, 0);
     });
   });
+
+  group('logout', () {
+    test('sin tokens persistidos: no llama al datasource y no falla', () async {
+      // Storage empieza vacío (saved.isEmpty → read() = null).
+      await repo.logout();
+
+      verifyNever(() => ds.logout(any()));
+      expect(storage.clears, 0);
+    });
+
+    test(
+      'con tokens: lee refresh → ds.logout(refresh) → storage.clear()',
+      () async {
+        const tokens = AuthTokens(
+          accessToken: 'a',
+          refreshToken: 'r-32',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        );
+        await storage.save(tokens);
+        when(() => ds.logout('r-32')).thenAnswer((_) async {});
+
+        await repo.logout();
+
+        verify(() => ds.logout('r-32')).called(1);
+        expect(storage.clears, 1);
+      },
+    );
+
+    test(
+      'backend falla con NetworkFailure → storage.clear() igual + no rethrow',
+      () async {
+        const tokens = AuthTokens(
+          accessToken: 'a',
+          refreshToken: 'r-32',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        );
+        await storage.save(tokens);
+        when(() => ds.logout(any())).thenThrow(const NetworkFailure());
+
+        await repo.logout(); // No debe propagar.
+
+        verify(() => ds.logout('r-32')).called(1);
+        expect(storage.clears, 1);
+      },
+    );
+
+    test(
+      'backend falla con InvalidCredentials → storage.clear() igual + no rethrow',
+      () async {
+        const tokens = AuthTokens(
+          accessToken: 'a',
+          refreshToken: 'r-32',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        );
+        await storage.save(tokens);
+        when(
+          () => ds.logout(any()),
+        ).thenThrow(const InvalidCredentialsFailure());
+
+        await repo.logout();
+
+        expect(storage.clears, 1);
+      },
+    );
+  });
 }

@@ -9,7 +9,9 @@ import 'core/storage/device_id_provider.dart';
 import 'core/storage/secure_kv_store.dart';
 import 'features/auth/data/datasources/auth_datasource.dart';
 import 'features/auth/data/interceptors/auth_interceptor.dart';
+import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/data/repositories/token_storage.dart';
+import 'features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Punto de entrada. Composición manual de dependencias — sin DI framework
 /// hasta que un slice futuro lo justifique.
@@ -42,10 +44,9 @@ void main() {
 
   final mainDio = DioClient.create(baseUrl: baseUrl);
 
-  // `late` difiere la captura: la closure de onUnrecoverable se construye
-  // antes que `router`, pero solo se ejecuta en runtime, cuando `router`
-  // ya está asignada.
-  late final AppRouter router;
+  // `late` difiere la captura del bloc: la closure de onUnrecoverable se
+  // construye antes que `authBloc`, pero solo se ejecuta en runtime.
+  late final AuthBloc authBloc;
 
   mainDio.interceptors.add(
     AuthInterceptor(
@@ -53,13 +54,24 @@ void main() {
       storage: storage,
       refreshDatasource: refreshDs,
       onUnrecoverable: () async {
-        router.router.go('/login');
+        // El interceptor ya purgó el storage; re-disparamos el check
+        // para que el bloc colapse a Unauthenticated y el redirect
+        // navegue a /login. Una sola entrada al cambio de estado.
+        authBloc.add(const AuthCheckRequested());
       },
     ),
   );
 
-  final loginDs = DioAuthDatasource(mainDio);
-  router = AppRouter(authDatasource: loginDs, tokenStorage: storage);
+  final mainDs = DioAuthDatasource(mainDio);
+  final repository = AuthRepositoryImpl(datasource: mainDs, storage: storage);
+  authBloc = AuthBloc(repository);
+
+  final router = AppRouter(authBloc: authBloc, repository: repository);
+
+  // Dispara el check inicial: lee storage, si hay tokens valida con
+  // /auth/me, emite Authenticated o Unauthenticated. El Splash se queda
+  // hasta que el primer estado no-Initial llegue.
+  authBloc.add(const AuthCheckRequested());
 
   // Fire-and-forget: el device_id queda persistido en cuanto pueda. Los
   // consumidores reales (refresh family, registro FCM) ocurren post-login —
@@ -68,5 +80,5 @@ void main() {
   // aterrice el slice de push.
   unawaited(DeviceIdProvider(kv).getOrCreate());
 
-  runApp(AgenticApp(router: router));
+  runApp(AgenticApp(router: router, authBloc: authBloc));
 }
