@@ -60,8 +60,7 @@ class AppRouter {
       GoRoute(
         path: '/home',
         builder: (context, _) => BlocProvider<BotsBloc>(
-          create: (_) =>
-              BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+          create: (_) => BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
           child: const BotsListPage(),
         ),
       ),

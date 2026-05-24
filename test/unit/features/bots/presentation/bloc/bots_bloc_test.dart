@@ -71,9 +71,9 @@ void main() {
         '403 → [Loading, Failed(Forbidden)]',
         build: () {
           final repo = _MockRepo();
-          when(
-            repo.list,
-          ).thenAnswer((_) => Future<List<Bot>>.error(const BotsForbiddenFailure()));
+          when(repo.list).thenAnswer(
+            (_) => Future<List<Bot>>.error(const BotsForbiddenFailure()),
+          );
           return BotsBloc(repo);
         },
         act: (bloc) => bloc.add(const BotsLoadRequested()),
@@ -87,9 +87,9 @@ void main() {
         'network → [Loading, Failed(Network)]',
         build: () {
           final repo = _MockRepo();
-          when(
-            repo.list,
-          ).thenAnswer((_) => Future<List<Bot>>.error(const BotsNetworkFailure()));
+          when(repo.list).thenAnswer(
+            (_) => Future<List<Bot>>.error(const BotsNetworkFailure()),
+          );
           return BotsBloc(repo);
         },
         act: (bloc) => bloc.add(const BotsLoadRequested()),
@@ -108,8 +108,7 @@ void main() {
           when(repo.list).thenAnswer((_) async => const <Bot>[_b2]);
           return BotsBloc(repo);
         },
-        seed: () =>
-            const BotsLoaded(items: <Bot>[_b1], isRefreshing: false),
+        seed: () => const BotsLoaded(items: <Bot>[_b1], isRefreshing: false),
         act: (bloc) => bloc.add(const BotsRefreshRequested()),
         expect: () => const <BotsState>[
           BotsLoaded(items: <Bot>[_b1], isRefreshing: true),
@@ -124,13 +123,12 @@ void main() {
         // El widget puede ofrecer reintento manteniendo el contexto.
         build: () {
           final repo = _MockRepo();
-          when(
-            repo.list,
-          ).thenAnswer((_) => Future<List<Bot>>.error(const BotsNetworkFailure()));
+          when(repo.list).thenAnswer(
+            (_) => Future<List<Bot>>.error(const BotsNetworkFailure()),
+          );
           return BotsBloc(repo);
         },
-        seed: () =>
-            const BotsLoaded(items: <Bot>[_b1], isRefreshing: false),
+        seed: () => const BotsLoaded(items: <Bot>[_b1], isRefreshing: false),
         act: (bloc) => bloc.add(const BotsRefreshRequested()),
         expect: () => const <BotsState>[
           BotsLoaded(items: <Bot>[_b1], isRefreshing: true),

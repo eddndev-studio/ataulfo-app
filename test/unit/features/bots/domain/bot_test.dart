@@ -57,11 +57,13 @@ void main() {
       expect(b.aiDisabled, isFalse);
     });
 
-    test('identifier es opcional (puede ser null cuando el backend lo omite)',
-        () {
-      final b = make(identifier: null);
-      expect(b.identifier, isNull);
-    });
+    test(
+      'identifier es opcional (puede ser null cuando el backend lo omite)',
+      () {
+        final b = make(identifier: null);
+        expect(b.identifier, isNull);
+      },
+    );
 
     test('dos Bot con misma data son iguales (value-type)', () {
       final a = make();

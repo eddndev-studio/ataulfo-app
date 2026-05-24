@@ -66,9 +66,7 @@ void main() {
   ) async {
     when(
       () => bloc.state,
-    ).thenReturn(
-      const BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false),
-    );
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false));
 
     await tester.pumpWidget(host());
 
@@ -94,9 +92,7 @@ void main() {
   testWidgets('Failed muestra mensaje genérico y botón Reintentar', (
     tester,
   ) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const BotsFailed(BotsNetworkFailure()));
+    when(() => bloc.state).thenReturn(const BotsFailed(BotsNetworkFailure()));
 
     await tester.pumpWidget(host());
 
@@ -105,9 +101,7 @@ void main() {
   });
 
   testWidgets('tap Reintentar dispara BotsLoadRequested', (tester) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const BotsFailed(BotsServerFailure()));
+    when(() => bloc.state).thenReturn(const BotsFailed(BotsServerFailure()));
 
     await tester.pumpWidget(host());
     await tester.tap(find.widgetWithText(FilledButton, 'Reintentar'));
@@ -121,9 +115,7 @@ void main() {
   ) async {
     when(
       () => bloc.state,
-    ).thenReturn(
-      const BotsLoaded(items: <Bot>[_b1], isRefreshing: true),
-    );
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: true));
 
     await tester.pumpWidget(host());
 

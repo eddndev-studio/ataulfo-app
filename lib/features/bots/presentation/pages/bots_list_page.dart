@@ -48,8 +48,7 @@ class _LoadedView extends StatelessWidget {
         // Failed). Sin este await el RefreshIndicator quita el spinner
         // antes de tiempo y la animación parpadea.
         await bloc.stream.firstWhere(
-          (s) =>
-              (s is BotsLoaded && !s.isRefreshing) || s is BotsFailed,
+          (s) => (s is BotsLoaded && !s.isRefreshing) || s is BotsFailed,
         );
       },
       child: items.isEmpty
@@ -136,9 +135,7 @@ class _BotTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: CircleAvatar(
-        child: Text(_initial(bot.name)),
-      ),
+      leading: CircleAvatar(child: Text(_initial(bot.name))),
       title: Text(bot.name),
       subtitle: Text(_channelLabel(bot.channel)),
       trailing: bot.paused

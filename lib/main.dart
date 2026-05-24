@@ -65,12 +65,15 @@ void main() {
   );
 
   final mainDs = DioAuthDatasource(mainDio);
-  final authRepository =
-      AuthRepositoryImpl(datasource: mainDs, storage: storage);
+  final authRepository = AuthRepositoryImpl(
+    datasource: mainDs,
+    storage: storage,
+  );
   authBloc = AuthBloc(authRepository);
 
-  final botsRepository =
-      BotsRepositoryImpl(datasource: DioBotsDatasource(mainDio));
+  final botsRepository = BotsRepositoryImpl(
+    datasource: DioBotsDatasource(mainDio),
+  );
 
   final router = AppRouter(
     authBloc: authBloc,

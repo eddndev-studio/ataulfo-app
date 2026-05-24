@@ -54,9 +54,7 @@ void main() {
 
   group('DioBotsDatasource.list', () {
     test('200 con [botResp...] → List<Bot>', () async {
-      when(
-        () => dio.get<List<dynamic>>('/bots'),
-      ).thenAnswer(
+      when(() => dio.get<List<dynamic>>('/bots')).thenAnswer(
         (_) async => resp(
           200,
           body: <dynamic>[
@@ -86,9 +84,7 @@ void main() {
     });
 
     test('timeout → BotsTimeoutFailure', () async {
-      when(
-        () => dio.get<List<dynamic>>('/bots'),
-      ).thenThrow(
+      when(() => dio.get<List<dynamic>>('/bots')).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/bots'),
           type: DioExceptionType.receiveTimeout,
@@ -99,9 +95,7 @@ void main() {
     });
 
     test('sin conexión → BotsNetworkFailure', () async {
-      when(
-        () => dio.get<List<dynamic>>('/bots'),
-      ).thenThrow(
+      when(() => dio.get<List<dynamic>>('/bots')).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/bots'),
           type: DioExceptionType.connectionError,
@@ -147,7 +141,9 @@ void main() {
       when(() => dio.get<List<dynamic>>('/bots')).thenAnswer(
         (_) async => resp(
           200,
-          body: <dynamic>[<String, dynamic>{'id': 'x'}], // faltan claves
+          body: <dynamic>[
+            <String, dynamic>{'id': 'x'},
+          ], // faltan claves
         ),
       );
 
