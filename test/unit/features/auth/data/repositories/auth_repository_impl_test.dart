@@ -88,4 +88,14 @@ void main() {
       expect(storage.clears, 0);
     });
   });
+
+  group('logout', () {
+    test('sin tokens persistidos: no llama al datasource y no falla', () async {
+      // Storage empieza vacío (saved.isEmpty → read() = null).
+      await repo.logout();
+
+      verifyNever(() => ds.logout(any()));
+      expect(storage.clears, 0);
+    });
+  });
 }
