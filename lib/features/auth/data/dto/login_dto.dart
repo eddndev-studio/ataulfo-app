@@ -51,11 +51,7 @@ class TokenResp {
 }
 
 class MeResp {
-  const MeResp({
-    required this.userId,
-    required this.orgId,
-    required this.role,
-  });
+  const MeResp({required this.userId, required this.orgId, required this.role});
 
   factory MeResp.fromJson(Map<String, dynamic> json) {
     final user = json['user_id'];

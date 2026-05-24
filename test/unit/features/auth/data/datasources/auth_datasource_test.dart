@@ -280,9 +280,7 @@ void main() {
 
   group('DioAuthDatasource.me', () {
     test('200 con {user_id, org_id, role} → Identity', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>('/auth/me'),
-      ).thenAnswer(
+      when(() => dio.get<Map<String, dynamic>>('/auth/me')).thenAnswer(
         (_) async => meHttpResp(
           200,
           body: <String, dynamic>{
@@ -302,17 +300,20 @@ void main() {
       verify(() => dio.get<Map<String, dynamic>>('/auth/me')).called(1);
     });
 
-    test('401 → InvalidCredentialsFailure (token inválido tras refresh)', () async {
-      when(() => dio.get<Map<String, dynamic>>('/auth/me')).thenThrow(
-        DioException(
-          requestOptions: RequestOptions(path: '/auth/me'),
-          response: meHttpResp(401),
-          type: DioExceptionType.badResponse,
-        ),
-      );
+    test(
+      '401 → InvalidCredentialsFailure (token inválido tras refresh)',
+      () async {
+        when(() => dio.get<Map<String, dynamic>>('/auth/me')).thenThrow(
+          DioException(
+            requestOptions: RequestOptions(path: '/auth/me'),
+            response: meHttpResp(401),
+            type: DioExceptionType.badResponse,
+          ),
+        );
 
-      await expectLater(ds.me(), throwsA(isA<InvalidCredentialsFailure>()));
-    });
+        await expectLater(ds.me(), throwsA(isA<InvalidCredentialsFailure>()));
+      },
+    );
 
     test('timeout → NetworkFailure', () async {
       when(() => dio.get<Map<String, dynamic>>('/auth/me')).thenThrow(

@@ -83,10 +83,7 @@ void main() {
     test('falla del datasource propaga sin tocar storage', () async {
       when(() => ds.me()).thenThrow(const InvalidCredentialsFailure());
 
-      await expectLater(
-        repo.me(),
-        throwsA(isA<InvalidCredentialsFailure>()),
-      );
+      await expectLater(repo.me(), throwsA(isA<InvalidCredentialsFailure>()));
       expect(storage.saved, isEmpty);
       expect(storage.clears, 0);
     });
