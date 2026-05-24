@@ -26,7 +26,10 @@ void main() {
   Widget host() => MaterialApp(
     home: BlocProvider<AuthBloc>.value(
       value: authBloc,
-      child: const SettingsPage(),
+      // En el shell real, SettingsPage es content-only del Scaffold del
+      // ShellPage. En aislamiento, lo envolvemos en Scaffold para que
+      // Chip/FilledButton tengan Material upstream.
+      child: const Scaffold(body: SettingsPage()),
     ),
   );
 
