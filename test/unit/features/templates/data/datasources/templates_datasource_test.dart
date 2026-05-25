@@ -1,5 +1,6 @@
 import 'package:agentic/features/templates/data/datasources/templates_datasource.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
+import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -358,6 +359,202 @@ void main() {
         ds.create('Soporte'),
         throwsA(isA<UnknownTemplatesFailure>()),
       );
+    });
+  });
+
+  group('DioTemplatesDatasource.listVarDefs', () {
+    Map<String, dynamic> varDefJson({
+      String id = 'v1',
+      String name = 'nombre',
+      String type = 'text',
+      String def = '',
+      String description = '',
+    }) => <String, dynamic>{
+      'id': id,
+      'name': name,
+      'type': type,
+      'default': def,
+      'description': description,
+    };
+
+    test('200 con {version, defs[]} → List<VariableDef>', () async {
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenAnswer(
+        (_) async => respMap(
+          200,
+          body: <String, dynamic>{
+            'version': 3,
+            'defs': <dynamic>[
+              varDefJson(name: 'nombre', def: 'cliente'),
+              varDefJson(id: 'v2', name: 'edad', def: '0'),
+            ],
+          },
+          path: '/templates/t1/variable-definitions',
+        ),
+      );
+
+      final defs = await ds.listVarDefs('t1');
+
+      expect(defs, hasLength(2));
+      expect(defs[0].name, 'nombre');
+      expect(defs[0].defaultValue, 'cliente');
+      expect(defs[0].type, VarType.text);
+      expect(defs[1].name, 'edad');
+    });
+
+    test(
+      '200 con defs vacío → lista vacía (plantilla sin variables)',
+      () async {
+        when(
+          () => dio.get<Map<String, dynamic>>(
+            '/templates/t1/variable-definitions',
+          ),
+        ).thenAnswer(
+          (_) async => respMap(
+            200,
+            body: <String, dynamic>{'version': 1, 'defs': <dynamic>[]},
+            path: '/templates/t1/variable-definitions',
+          ),
+        );
+
+        expect(await ds.listVarDefs('t1'), isEmpty);
+      },
+    );
+
+    test(
+      '404 → TemplatesNotFoundFailure (plantilla padre no existe)',
+      () async {
+        // El backend devuelve 404 si la plantilla del path no existe en la
+        // org. Reusa el mismo mapping que /templates/:id.
+        when(
+          () => dio.get<Map<String, dynamic>>(
+            '/templates/desconocido/variable-definitions',
+          ),
+        ).thenThrow(
+          badResponse(404, path: '/templates/desconocido/variable-definitions'),
+        );
+
+        await expectLater(
+          ds.listVarDefs('desconocido'),
+          throwsA(isA<TemplatesNotFoundFailure>()),
+        );
+      },
+    );
+
+    test('403 → TemplatesForbiddenFailure', () async {
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenThrow(badResponse(403, path: '/templates/t1/variable-definitions'));
+
+      await expectLater(
+        ds.listVarDefs('t1'),
+        throwsA(isA<TemplatesForbiddenFailure>()),
+      );
+    });
+
+    test('5xx → TemplatesServerFailure', () async {
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenThrow(badResponse(503, path: '/templates/t1/variable-definitions'));
+
+      await expectLater(
+        ds.listVarDefs('t1'),
+        throwsA(isA<TemplatesServerFailure>()),
+      );
+    });
+
+    test('timeout → TemplatesTimeoutFailure', () async {
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(
+            path: '/templates/t1/variable-definitions',
+          ),
+          type: DioExceptionType.receiveTimeout,
+        ),
+      );
+
+      await expectLater(
+        ds.listVarDefs('t1'),
+        throwsA(isA<TemplatesTimeoutFailure>()),
+      );
+    });
+
+    test('sin conexión → TemplatesNetworkFailure', () async {
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(
+            path: '/templates/t1/variable-definitions',
+          ),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        ds.listVarDefs('t1'),
+        throwsA(isA<TemplatesNetworkFailure>()),
+      );
+    });
+
+    test('body nulo → UnknownTemplatesFailure (contrato roto)', () async {
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenAnswer(
+        (_) async => respMap(200, path: '/templates/t1/variable-definitions'),
+      );
+
+      await expectLater(
+        ds.listVarDefs('t1'),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+
+    test('body malformado → UnknownTemplatesFailure', () async {
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenAnswer(
+        (_) async => respMap(
+          200,
+          body: <String, dynamic>{'version': 1},
+          path: '/templates/t1/variable-definitions',
+        ),
+      );
+
+      await expectLater(
+        ds.listVarDefs('t1'),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+
+    test('tipo desconocido en el wire → ArgumentError (fail-loud)', () async {
+      // Drift de contrato: el backend introdujo un tipo nuevo. El
+      // cliente debe romper aquí en boot, no degradar.
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenAnswer(
+        (_) async => respMap(
+          200,
+          body: <String, dynamic>{
+            'version': 1,
+            'defs': <dynamic>[varDefJson(type: 'number')],
+          },
+          path: '/templates/t1/variable-definitions',
+        ),
+      );
+
+      await expectLater(ds.listVarDefs('t1'), throwsArgumentError);
     });
   });
 

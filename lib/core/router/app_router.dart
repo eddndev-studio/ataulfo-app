@@ -17,6 +17,7 @@ import '../../features/templates/domain/repositories/templates_repository.dart';
 import '../../features/templates/presentation/bloc/template_create_bloc.dart';
 import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
 import '../../features/templates/presentation/bloc/templates_bloc.dart';
+import '../../features/templates/presentation/bloc/var_defs_bloc.dart';
 import '../../features/templates/presentation/pages/template_create_page.dart';
 import '../../features/templates/presentation/pages/template_detail_page.dart';
 
@@ -121,10 +122,19 @@ class AppRouter {
         path: '/templates/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return BlocProvider<TemplateDetailBloc>(
-            create: (_) =>
-                TemplateDetailBloc(repo: _templatesRepo, id: id)
-                  ..add(const TemplateDetailLoadRequested()),
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TemplateDetailBloc>(
+                create: (_) =>
+                    TemplateDetailBloc(repo: _templatesRepo, id: id)
+                      ..add(const TemplateDetailLoadRequested()),
+              ),
+              BlocProvider<VarDefsBloc>(
+                create: (_) =>
+                    VarDefsBloc(repo: _templatesRepo, templateId: id)
+                      ..add(const VarDefsLoadRequested()),
+              ),
+            ],
             child: Scaffold(
               appBar: AppBar(title: const Text('Detalle de plantilla')),
               body: const TemplateDetailPage(),

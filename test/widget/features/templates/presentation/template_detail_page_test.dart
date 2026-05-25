@@ -1,6 +1,8 @@
 import 'package:agentic/features/templates/domain/entities/template.dart';
+import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
 import 'package:agentic/features/templates/presentation/bloc/template_detail_bloc.dart';
+import 'package:agentic/features/templates/presentation/bloc/var_defs_bloc.dart';
 import 'package:agentic/features/templates/presentation/pages/template_detail_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +12,9 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockBloc extends MockBloc<TemplateDetailEvent, TemplateDetailState>
     implements TemplateDetailBloc {}
+
+class _MockVarDefsBloc extends MockBloc<VarDefsEvent, VarDefsState>
+    implements VarDefsBloc {}
 
 const _tpl = Template(
   id: 't1',
@@ -30,18 +35,29 @@ const _tpl = Template(
 void main() {
   setUpAll(() {
     registerFallbackValue(const TemplateDetailLoadRequested());
+    registerFallbackValue(const VarDefsLoadRequested());
   });
 
   late _MockBloc bloc;
+  late _MockVarDefsBloc varDefsBloc;
 
   setUp(() {
     bloc = _MockBloc();
+    varDefsBloc = _MockVarDefsBloc();
     when(() => bloc.state).thenReturn(const TemplateDetailLoading());
+    // Default: var-defs Loaded vacío (estado terminal sin animaciones).
+    // Tests específicos de la sección Variables sobreescriben este stub.
+    when(
+      () => varDefsBloc.state,
+    ).thenReturn(const VarDefsLoaded(<VariableDef>[]));
   });
 
   Widget host() => MaterialApp(
-    home: BlocProvider<TemplateDetailBloc>.value(
-      value: bloc,
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<TemplateDetailBloc>.value(value: bloc),
+        BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+      ],
       // TemplateDetailPage es content-only; el host envuelve en Scaffold
       // para dar Material upstream a Chip/FilledButton/etc.
       child: const Scaffold(body: TemplateDetailPage()),
@@ -227,5 +243,94 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.text('DeepSeek'), findsOneWidget);
+  });
+
+  // ── Sección Variables (T2.5) ───────────────────────────────────────────────
+  group('sección Variables', () {
+    setUp(() {
+      // Sin Template no se renderiza el resto de la página; las pruebas de
+      // var-defs necesitan el detalle ya en Loaded para que la sección sea
+      // visible debajo del prompt.
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+    });
+
+    testWidgets('siempre muestra el título "Variables"', (tester) async {
+      await tester.pumpWidget(host());
+      expect(find.text('Variables'), findsOneWidget);
+    });
+
+    testWidgets('VarDefsLoading muestra spinner inline', (tester) async {
+      when(() => varDefsBloc.state).thenReturn(const VarDefsLoading());
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('var_defs.loading')), findsOneWidget);
+    });
+
+    testWidgets('VarDefsLoaded([]) muestra empty state italic', (tester) async {
+      when(
+        () => varDefsBloc.state,
+      ).thenReturn(const VarDefsLoaded(<VariableDef>[]));
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('var_defs.empty')), findsOneWidget);
+    });
+
+    testWidgets(
+      'VarDefsLoaded con defs muestra una fila por variable (name + default)',
+      (tester) async {
+        when(() => varDefsBloc.state).thenReturn(
+          const VarDefsLoaded(<VariableDef>[
+            VariableDef(
+              id: 'v1',
+              name: 'nombre',
+              type: VarType.text,
+              defaultValue: 'cliente',
+              description: 'Saludo personalizado',
+            ),
+            VariableDef(
+              id: 'v2',
+              name: 'edad',
+              type: VarType.text,
+              defaultValue: '',
+              description: '',
+            ),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(find.text('{{nombre}}'), findsOneWidget);
+        expect(find.text('cliente'), findsOneWidget);
+        expect(find.text('Saludo personalizado'), findsOneWidget);
+        expect(find.text('{{edad}}'), findsOneWidget);
+      },
+    );
+
+    testWidgets('VarDefsFailed muestra mensaje + botón Reintentar', (
+      tester,
+    ) async {
+      when(
+        () => varDefsBloc.state,
+      ).thenReturn(const VarDefsFailed(TemplatesServerFailure()));
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('var_defs.failed')), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Reintentar'), findsOneWidget);
+    });
+
+    testWidgets('tap Reintentar dispara VarDefsLoadRequested', (tester) async {
+      when(
+        () => varDefsBloc.state,
+      ).thenReturn(const VarDefsFailed(TemplatesNetworkFailure()));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.widgetWithText(TextButton, 'Reintentar'));
+      await tester.pump();
+
+      verify(() => varDefsBloc.add(const VarDefsLoadRequested())).called(1);
+    });
   });
 }

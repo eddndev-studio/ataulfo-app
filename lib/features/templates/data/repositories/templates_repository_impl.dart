@@ -1,4 +1,5 @@
 import '../../domain/entities/template.dart';
+import '../../domain/entities/variable_def.dart';
 import '../../domain/repositories/templates_repository.dart';
 import '../datasources/templates_datasource.dart';
 
@@ -20,4 +21,7 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
 
   @override
   Future<Template> create(String name) => _ds.create(name);
+
+  @override
+  Future<List<VariableDef>> listVarDefs(String id) => _ds.listVarDefs(id);
 }

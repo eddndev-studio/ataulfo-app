@@ -8,6 +8,7 @@ import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
+import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/repositories/templates_repository.dart';
 import 'package:agentic/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:agentic/features/templates/presentation/pages/template_create_page.dart';
@@ -185,9 +186,9 @@ void main() {
     tester,
   ) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-    // El TemplateDetailBloc de la ruta arranca con LoadRequested al
-    // construirse; el repo mock devuelve un Template para que el load
-    // termine sin colgar pumpAndSettle.
+    // El TemplateDetailBloc y el VarDefsBloc de la ruta arrancan ambos con
+    // LoadRequested al construirse; los repos mock devuelven valores
+    // terminales para que pumpAndSettle no cuelgue.
     when(() => templatesRepo.byId('t1')).thenAnswer(
       (_) async => const Template(
         id: 't1',
@@ -205,6 +206,9 @@ void main() {
         ),
       ),
     );
+    when(
+      () => templatesRepo.listVarDefs('t1'),
+    ).thenAnswer((_) async => const <VariableDef>[]);
 
     await tester.pumpWidget(_host(router, authBloc));
     await tester.pumpAndSettle();
@@ -213,6 +217,10 @@ void main() {
 
     expect(find.byType(TemplateDetailPage), findsOneWidget);
     verify(() => templatesRepo.byId('t1')).called(1);
+    // El VarDefsBloc del route builder dispara su propio LoadRequested al
+    // construirse; sin este verify, un futuro slice podría dejar el bloc
+    // huérfano (sin load) sin romper otros tests.
+    verify(() => templatesRepo.listVarDefs('t1')).called(1);
   });
 
   testWidgets('AuthAuthenticated → /templates/new muestra TemplateCreatePage', (
