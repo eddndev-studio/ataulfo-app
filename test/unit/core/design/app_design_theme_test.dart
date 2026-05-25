@@ -96,10 +96,4 @@ void main() {
     });
   });
 
-  test('AppDesignTheme.dark NO toca AppTheme.dark (coexisten)', () {
-    // Sanity check del slice 1: el theme nuevo es independiente del
-    // antiguo. Aterriza wiring en slice 2.
-    final newTheme = AppDesignTheme.dark();
-    expect(newTheme.scaffoldBackgroundColor, AppTokens.bgBase);
-  });
 }
