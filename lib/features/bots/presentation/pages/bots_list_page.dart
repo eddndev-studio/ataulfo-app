@@ -139,7 +139,10 @@ class _BotTile extends StatelessWidget {
       trailing: bot.paused
           ? const Icon(Icons.pause_circle, semanticLabel: 'En pausa')
           : null,
-      onTap: () => context.go('/bots/${bot.id}'),
+      // push (no go): el detalle se apila sobre el listado para que el
+      // back físico y la flecha del AppBar vuelvan al shell con la tab
+      // Bots activa. Ver narrativa del fix en templates_list_page.
+      onTap: () => context.push('/bots/${bot.id}'),
     );
   }
 

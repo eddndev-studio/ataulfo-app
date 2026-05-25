@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
 import 'package:agentic/features/templates/presentation/bloc/template_create_bloc.dart';
@@ -167,7 +169,72 @@ void main() {
     );
   });
 
-  testWidgets('Succeeded navega a /templates/{id}', (tester) async {
+  testWidgets(
+    'Succeeded reemplaza /templates/new con /templates/{id} sobre la pila '
+    'del shell (back vuelve al shell, no al formulario)',
+    (tester) async {
+      // Reproducción del bug del smoke device: si la página usa go() en
+      // Succeeded, la pila se aplasta y el back del sistema saca al
+      // usuario de la app. pushReplacement() reemplaza /templates/new
+      // con /templates/{id} dejando el shell debajo (canPop = true).
+      whenListen(
+        bloc,
+        Stream<TemplateCreateState>.fromIterable(const <TemplateCreateState>[
+          TemplateCreateSucceeded(_tpl),
+        ]),
+        initialState: const TemplateCreateInitial(),
+      );
+
+      final canPopAtDestination = <bool>[];
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => const Scaffold(body: Text('SHELL')),
+          ),
+          GoRoute(
+            path: '/templates/new',
+            builder: (_, _) => BlocProvider<TemplateCreateBloc>.value(
+              value: bloc,
+              child: const Scaffold(body: TemplateCreatePage()),
+            ),
+          ),
+          GoRoute(
+            path: '/templates/:id',
+            builder: (_, _) => Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  canPopAtDestination.add(Navigator.of(ctx).canPop());
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      // El future de push se resuelve cuando la ruta retorna (al popear),
+      // que en este test no ocurre — basta con disparar la navegación y
+      // esperar al settle.
+      unawaited(router.push<void>('/templates/new'));
+      await tester.pumpAndSettle();
+
+      expect(
+        canPopAtDestination,
+        <bool>[true],
+        reason:
+            'tras Succeeded, el detalle debe quedar sobre la pila del shell; '
+            'pushReplacement reemplaza /templates/new (no se vuelve al form) '
+            'pero preserva el shell debajo (back vuelve al shell)',
+      );
+    },
+  );
+
+  testWidgets('Succeeded navega a /templates/{id} (registra la url)', (
+    tester,
+  ) async {
     // El estado terminal arranca como Succeeded para que el BlocListener
     // dispare la navegación en el primer pump. La página es content-only
     // y delega el go() al GoRouter del entorno.

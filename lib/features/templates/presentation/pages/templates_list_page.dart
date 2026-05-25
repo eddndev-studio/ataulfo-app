@@ -136,7 +136,11 @@ class _TemplateTile extends StatelessWidget {
       leading: CircleAvatar(child: Text(_initial(template.name))),
       title: Text(template.name),
       subtitle: Text(_providerLabel(template.ai.provider)),
-      onTap: () => context.go('/templates/${template.id}'),
+      // push (no go): el detalle se APILA sobre el listado. Así el back
+      // físico de Android y la flecha del AppBar de detalle vuelven al
+      // shell. context.go() reemplaza la pila y deja al usuario sin back,
+      // sacándolo de la app al primer tap del sistema.
+      onTap: () => context.push('/templates/${template.id}'),
     );
   }
 
