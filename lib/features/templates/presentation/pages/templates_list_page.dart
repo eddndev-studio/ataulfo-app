@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/template.dart';
 import '../bloc/templates_bloc.dart';
@@ -135,7 +136,7 @@ class _TemplateTile extends StatelessWidget {
       leading: CircleAvatar(child: Text(_initial(template.name))),
       title: Text(template.name),
       subtitle: Text(_providerLabel(template.ai.provider)),
-      // Sin onTap por hoy — el detalle de Template entra en su propio slice.
+      onTap: () => context.go('/templates/${template.id}'),
     );
   }
 
