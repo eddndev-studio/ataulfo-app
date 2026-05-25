@@ -1,9 +1,12 @@
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/template.dart';
+import '../../domain/entities/variable_def.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../dto/template_dto.dart';
+import '../dto/var_def_dto.dart';
 import '../mappers/templates_mapper.dart';
+import '../mappers/var_defs_mapper.dart';
 
 /// Puerto de datos para los endpoints de Template (S03).
 ///
@@ -26,6 +29,12 @@ abstract interface class TemplatesDatasource {
   /// del dominio (vacío, longitud) — mapea a `TemplatesInvalidNameFailure`.
   /// El backend devuelve la Template ya creada con la AIConfig default.
   Future<Template> create(String name);
+
+  /// `GET /templates/:id/variable-definitions` org-scoped. 404 si la
+  /// Template padre no existe en la org (mapea a NotFound). Devuelve la
+  /// lista plana en el orden del backend; el `version` del wrapper se
+  /// descarta (sólo lo necesita el CRUD, todavía no implementado).
+  Future<List<VariableDef>> listVarDefs(String id);
 }
 
 class DioTemplatesDatasource implements TemplatesDatasource {
@@ -91,6 +100,28 @@ class DioTemplatesDatasource implements TemplatesDatasource {
         throw const UnknownTemplatesFailure();
       }
       return TemplatesMapper.templateRespToEntity(TemplateResp.fromJson(body));
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
+  @override
+  Future<List<VariableDef>> listVarDefs(String id) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/templates/$id/variable-definitions',
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownTemplatesFailure();
+      }
+      return VarDefsMapper.listToEntities(ListVarDefsResp.fromJson(body));
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {
