@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_text_field.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
 import 'package:agentic/features/templates/presentation/bloc/template_create_bloc.dart';
@@ -43,6 +46,7 @@ void main() {
   });
 
   Widget host() => MaterialApp(
+    theme: AppDesignTheme.dark(),
     home: BlocProvider<TemplateCreateBloc>.value(
       value: bloc,
       // Página content-only: el shell de la ruta aporta Scaffold/AppBar.
@@ -51,17 +55,29 @@ void main() {
     ),
   );
 
-  testWidgets('Initial muestra TextField y botón "Crear" deshabilitado', (
-    tester,
-  ) async {
-    await tester.pumpWidget(host());
+  AppButton submitButton(WidgetTester tester) => tester.widget<AppButton>(
+    find.byKey(const Key('template_create.submit')),
+  );
 
-    expect(find.byKey(const Key('template_create.field.name')), findsOneWidget);
-    final btn = tester.widget<FilledButton>(
-      find.byKey(const Key('template_create.submit')),
-    );
-    expect(btn.onPressed, isNull, reason: 'name vacío deshabilita el submit');
-  });
+  testWidgets(
+    'Initial muestra AppTextField y AppButton "Crear" deshabilitado',
+    (tester) async {
+      await tester.pumpWidget(host());
+
+      expect(find.byType(AppTextField), findsOneWidget);
+      expect(
+        find.byKey(const Key('template_create.field.name')),
+        findsOneWidget,
+      );
+      final btn = submitButton(tester);
+      expect(
+        btn.onPressed,
+        isNull,
+        reason: 'name vacío deshabilita el submit',
+      );
+      expect(btn.loading, false);
+    },
+  );
 
   testWidgets('al escribir texto, el botón se habilita', (tester) async {
     await tester.pumpWidget(host());
@@ -72,10 +88,7 @@ void main() {
     );
     await tester.pump();
 
-    final btn = tester.widget<FilledButton>(
-      find.byKey(const Key('template_create.submit')),
-    );
-    expect(btn.onPressed, isNotNull);
+    expect(submitButton(tester).onPressed, isNotNull);
   });
 
   testWidgets('tap "Crear" dispara TemplateCreateSubmitted con name trim', (
@@ -96,19 +109,20 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('Submitting muestra spinner y deshabilita el botón', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(const TemplateCreateSubmitting());
+  testWidgets(
+    'Submitting pone el AppButton en loading=true (spinner + tap bloqueado)',
+    (tester) async {
+      when(() => bloc.state).thenReturn(const TemplateCreateSubmitting());
 
-    await tester.pumpWidget(host());
-
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    final btn = tester.widget<FilledButton>(
-      find.byKey(const Key('template_create.submit')),
-    );
-    expect(btn.onPressed, isNull);
-  });
+      await tester.pumpWidget(host());
+      // Aún sin texto en el field el bloc ya está en Submitting (caso
+      // sintético del test): lo crítico del contrato es que el button
+      // entra en estado loading, no que onPressed sea null — el primitivo
+      // bloquea el tap internamente cuando loading=true.
+      expect(submitButton(tester).loading, true);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    },
+  );
 
   testWidgets('Failed(InvalidName) muestra error con copy específico', (
     tester,
@@ -214,7 +228,12 @@ void main() {
         ],
       );
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        MaterialApp.router(
+          theme: AppDesignTheme.dark(),
+          routerConfig: router,
+        ),
+      );
       // El future de push se resuelve cuando la ruta retorna (al popear),
       // que en este test no ocurre — basta con disparar la navegación y
       // esperar al settle.
@@ -268,7 +287,9 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpWidget(
+      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+    );
     await tester.pumpAndSettle();
 
     expect(navigated, <String>['/templates/t1']);
