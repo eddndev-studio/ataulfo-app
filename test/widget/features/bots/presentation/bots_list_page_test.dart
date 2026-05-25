@@ -1,3 +1,9 @@
+import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/tokens.dart';
+import 'package:agentic/core/design/widgets/app_avatar.dart';
+import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_card.dart';
+import 'package:agentic/core/design/widgets/app_pill.dart';
 import 'package:agentic/features/bots/domain/entities/bot.dart';
 import 'package:agentic/features/bots/domain/failures/bots_failure.dart';
 import 'package:agentic/features/bots/presentation/bloc/bots_bloc.dart';
@@ -48,6 +54,7 @@ void main() {
   });
 
   Widget host() => MaterialApp(
+    theme: AppDesignTheme.dark(),
     home: BlocProvider<BotsBloc>.value(
       value: bloc,
       // BotsListPage es content-only; el shell aporta Scaffold/AppBar.
@@ -56,15 +63,18 @@ void main() {
     ),
   );
 
-  testWidgets('Loading muestra spinner', (tester) async {
+  testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
     when(() => bloc.state).thenReturn(const BotsLoading());
 
     await tester.pumpWidget(host());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    final spinner = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('Loaded con N bots renderiza un tile por cada uno', (
+  testWidgets('Loaded con N bots renderiza una AppCard por cada uno', (
     tester,
   ) async {
     when(
@@ -75,6 +85,34 @@ void main() {
 
     expect(find.text('Soporte'), findsOneWidget);
     expect(find.text('Cobranza'), findsOneWidget);
+    expect(find.byType(AppCard), findsNWidgets(2));
+    // Los ListTile M3 ya no deben aparecer.
+    expect(find.byType(ListTile), findsNothing);
+    // Cada tile lleva su AppAvatar (sin Material CircleAvatar).
+    expect(find.byType(AppAvatar), findsNWidgets(2));
+    expect(find.byType(CircleAvatar), findsNothing);
+  });
+
+  testWidgets('bot pausado muestra AppPill neutral "Pausado"', (tester) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b2], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    expect(find.widgetWithText(AppPill, 'Pausado'), findsOneWidget);
+    // El icono pause_circle legacy desaparece — el estado vive en el pill.
+    expect(find.byIcon(Icons.pause_circle), findsNothing);
+  });
+
+  testWidgets('bot activo muestra AppPill primary "Activo"', (tester) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    expect(find.widgetWithText(AppPill, 'Activo'), findsOneWidget);
   });
 
   testWidgets('Loaded vacío muestra empty state (sin tiles)', (tester) async {
@@ -84,11 +122,7 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    // El copy preciso es decisión de UI; alcanza con verificar que NO hay
-    // tiles renderizados con nombres de bots y que el árbol contiene un
-    // mensaje (cualquier Text) que el operador puede leer.
     expect(find.text('Soporte'), findsNothing);
-    expect(find.text('Cobranza'), findsNothing);
     expect(find.byKey(const Key('bots.empty')), findsOneWidget);
   });
 
@@ -100,14 +134,15 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('bots.error')), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Reintentar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
+    expect(find.byType(FilledButton), findsNothing);
   });
 
   testWidgets('tap Reintentar dispara BotsLoadRequested', (tester) async {
     when(() => bloc.state).thenReturn(const BotsFailed(BotsServerFailure()));
 
     await tester.pumpWidget(host());
-    await tester.tap(find.widgetWithText(FilledButton, 'Reintentar'));
+    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
 
     verify(() => bloc.add(const BotsLoadRequested())).called(1);
