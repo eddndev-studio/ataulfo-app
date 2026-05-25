@@ -23,26 +23,20 @@ void main() {
       expect(ent.description, 'Saludo personalizado');
     });
 
-    test(
-      'tipo desconocido en el wire → ArgumentError sin envolver',
-      () {
-        // El mapper propaga el ArgumentError del fromWire sin
-        // convertirlo a otra cosa — el drift de contrato no se degrada
-        // a un failure reintentable.
-        const resp = VarDefResp(
-          id: 'v1',
-          name: 'nombre',
-          type: 'number',
-          defaultValue: '',
-          description: '',
-        );
+    test('tipo desconocido en el wire → ArgumentError sin envolver', () {
+      // El mapper propaga el ArgumentError del fromWire sin
+      // convertirlo a otra cosa — el drift de contrato no se degrada
+      // a un failure reintentable.
+      const resp = VarDefResp(
+        id: 'v1',
+        name: 'nombre',
+        type: 'number',
+        defaultValue: '',
+        description: '',
+      );
 
-        expect(
-          () => VarDefsMapper.varDefRespToEntity(resp),
-          throwsArgumentError,
-        );
-      },
-    );
+      expect(() => VarDefsMapper.varDefRespToEntity(resp), throwsArgumentError);
+    });
 
     test('listToEntities mapea cada def y preserva el orden', () {
       const resp = ListVarDefsResp(

@@ -43,6 +43,5 @@ class VariableDef {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, type, defaultValue, description);
+  int get hashCode => Object.hash(id, name, type, defaultValue, description);
 }

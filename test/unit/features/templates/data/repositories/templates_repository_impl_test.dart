@@ -101,9 +101,8 @@ void main() {
 
     test('propaga TemplatesNotFoundFailure sin envolver', () async {
       when(() => ds.listVarDefs('desconocido')).thenAnswer(
-        (_) => Future<List<VariableDef>>.error(
-          const TemplatesNotFoundFailure(),
-        ),
+        (_) =>
+            Future<List<VariableDef>>.error(const TemplatesNotFoundFailure()),
       );
 
       await expectLater(

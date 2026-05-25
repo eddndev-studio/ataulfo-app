@@ -59,9 +59,8 @@ void main() {
       'LoadRequested 404 → Failed(NotFound)',
       build: () {
         when(() => repo.listVarDefs('t1')).thenAnswer(
-          (_) => Future<List<VariableDef>>.error(
-            const TemplatesNotFoundFailure(),
-          ),
+          (_) =>
+              Future<List<VariableDef>>.error(const TemplatesNotFoundFailure()),
         );
         return VarDefsBloc(repo: repo, templateId: 't1');
       },
@@ -100,10 +99,7 @@ void main() {
 
     test('value-equality de los estados', () {
       expect(const VarDefsLoading(), equals(const VarDefsLoading()));
-      expect(
-        const VarDefsLoaded(_defs),
-        equals(const VarDefsLoaded(_defs)),
-      );
+      expect(const VarDefsLoaded(_defs), equals(const VarDefsLoaded(_defs)));
       expect(
         const VarDefsFailed(TemplatesNetworkFailure()),
         equals(const VarDefsFailed(TemplatesNetworkFailure())),

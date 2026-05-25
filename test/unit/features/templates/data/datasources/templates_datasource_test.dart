@@ -379,9 +379,8 @@ void main() {
 
     test('200 con {version, defs[]} → List<VariableDef>', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-        ),
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
       ).thenAnswer(
         (_) async => respMap(
           200,
@@ -405,50 +404,50 @@ void main() {
       expect(defs[1].name, 'edad');
     });
 
-    test('200 con defs vacío → lista vacía (plantilla sin variables)', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-        ),
-      ).thenAnswer(
-        (_) async => respMap(
-          200,
-          body: <String, dynamic>{'version': 1, 'defs': <dynamic>[]},
-          path: '/templates/t1/variable-definitions',
-        ),
-      );
+    test(
+      '200 con defs vacío → lista vacía (plantilla sin variables)',
+      () async {
+        when(
+          () => dio.get<Map<String, dynamic>>(
+            '/templates/t1/variable-definitions',
+          ),
+        ).thenAnswer(
+          (_) async => respMap(
+            200,
+            body: <String, dynamic>{'version': 1, 'defs': <dynamic>[]},
+            path: '/templates/t1/variable-definitions',
+          ),
+        );
 
-      expect(await ds.listVarDefs('t1'), isEmpty);
-    });
+        expect(await ds.listVarDefs('t1'), isEmpty);
+      },
+    );
 
-    test('404 → TemplatesNotFoundFailure (plantilla padre no existe)', () async {
-      // El backend devuelve 404 si la plantilla del path no existe en la
-      // org. Reusa el mismo mapping que /templates/:id.
-      when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/desconocido/variable-definitions',
-        ),
-      ).thenThrow(
-        badResponse(
-          404,
-          path: '/templates/desconocido/variable-definitions',
-        ),
-      );
+    test(
+      '404 → TemplatesNotFoundFailure (plantilla padre no existe)',
+      () async {
+        // El backend devuelve 404 si la plantilla del path no existe en la
+        // org. Reusa el mismo mapping que /templates/:id.
+        when(
+          () => dio.get<Map<String, dynamic>>(
+            '/templates/desconocido/variable-definitions',
+          ),
+        ).thenThrow(
+          badResponse(404, path: '/templates/desconocido/variable-definitions'),
+        );
 
-      await expectLater(
-        ds.listVarDefs('desconocido'),
-        throwsA(isA<TemplatesNotFoundFailure>()),
-      );
-    });
+        await expectLater(
+          ds.listVarDefs('desconocido'),
+          throwsA(isA<TemplatesNotFoundFailure>()),
+        );
+      },
+    );
 
     test('403 → TemplatesForbiddenFailure', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-        ),
-      ).thenThrow(
-        badResponse(403, path: '/templates/t1/variable-definitions'),
-      );
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenThrow(badResponse(403, path: '/templates/t1/variable-definitions'));
 
       await expectLater(
         ds.listVarDefs('t1'),
@@ -458,12 +457,9 @@ void main() {
 
     test('5xx → TemplatesServerFailure', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-        ),
-      ).thenThrow(
-        badResponse(503, path: '/templates/t1/variable-definitions'),
-      );
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenThrow(badResponse(503, path: '/templates/t1/variable-definitions'));
 
       await expectLater(
         ds.listVarDefs('t1'),
@@ -473,9 +469,8 @@ void main() {
 
     test('timeout → TemplatesTimeoutFailure', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-        ),
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(
@@ -493,9 +488,8 @@ void main() {
 
     test('sin conexión → TemplatesNetworkFailure', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-        ),
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(
@@ -513,9 +507,8 @@ void main() {
 
     test('body nulo → UnknownTemplatesFailure (contrato roto)', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-        ),
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
       ).thenAnswer(
         (_) async => respMap(200, path: '/templates/t1/variable-definitions'),
       );
@@ -528,9 +521,8 @@ void main() {
 
     test('body malformado → UnknownTemplatesFailure', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-        ),
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
       ).thenAnswer(
         (_) async => respMap(
           200,
@@ -545,29 +537,25 @@ void main() {
       );
     });
 
-    test(
-      'tipo desconocido en el wire → ArgumentError (fail-loud)',
-      () async {
-        // Drift de contrato: el backend introdujo un tipo nuevo. El
-        // cliente debe romper aquí en boot, no degradar.
-        when(
-          () => dio.get<Map<String, dynamic>>(
-            '/templates/t1/variable-definitions',
-          ),
-        ).thenAnswer(
-          (_) async => respMap(
-            200,
-            body: <String, dynamic>{
-              'version': 1,
-              'defs': <dynamic>[varDefJson(type: 'number')],
-            },
-            path: '/templates/t1/variable-definitions',
-          ),
-        );
+    test('tipo desconocido en el wire → ArgumentError (fail-loud)', () async {
+      // Drift de contrato: el backend introdujo un tipo nuevo. El
+      // cliente debe romper aquí en boot, no degradar.
+      when(
+        () =>
+            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
+      ).thenAnswer(
+        (_) async => respMap(
+          200,
+          body: <String, dynamic>{
+            'version': 1,
+            'defs': <dynamic>[varDefJson(type: 'number')],
+          },
+          path: '/templates/t1/variable-definitions',
+        ),
+      );
 
-        await expectLater(ds.listVarDefs('t1'), throwsArgumentError);
-      },
-    );
+      await expectLater(ds.listVarDefs('t1'), throwsArgumentError);
+    });
   });
 
   group('DioTemplatesDatasource.byId', () {

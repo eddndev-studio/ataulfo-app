@@ -264,10 +264,7 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      expect(
-        find.byKey(const Key('var_defs.loading')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('var_defs.loading')), findsOneWidget);
     });
 
     testWidgets('VarDefsLoaded([]) muestra empty state italic', (tester) async {
@@ -314,9 +311,9 @@ void main() {
     testWidgets('VarDefsFailed muestra mensaje + botón Reintentar', (
       tester,
     ) async {
-      when(() => varDefsBloc.state).thenReturn(
-        const VarDefsFailed(TemplatesServerFailure()),
-      );
+      when(
+        () => varDefsBloc.state,
+      ).thenReturn(const VarDefsFailed(TemplatesServerFailure()));
 
       await tester.pumpWidget(host());
 
@@ -325,17 +322,15 @@ void main() {
     });
 
     testWidgets('tap Reintentar dispara VarDefsLoadRequested', (tester) async {
-      when(() => varDefsBloc.state).thenReturn(
-        const VarDefsFailed(TemplatesNetworkFailure()),
-      );
+      when(
+        () => varDefsBloc.state,
+      ).thenReturn(const VarDefsFailed(TemplatesNetworkFailure()));
 
       await tester.pumpWidget(host());
       await tester.tap(find.widgetWithText(TextButton, 'Reintentar'));
       await tester.pump();
 
-      verify(
-        () => varDefsBloc.add(const VarDefsLoadRequested()),
-      ).called(1);
+      verify(() => varDefsBloc.add(const VarDefsLoadRequested())).called(1);
     });
   });
 }

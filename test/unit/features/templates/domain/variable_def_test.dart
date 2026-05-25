@@ -7,18 +7,15 @@ void main() {
       expect(VarType.fromWire('text'), VarType.text);
     });
 
-    test(
-      'tipo desconocido en el wire → ArgumentError (fail-loud)',
-      () {
-        // El backend v1 sólo conoce "text"; cualquier extensión futura
-        // (number/date/etc.) tiene que aterrizar primero como entrada
-        // explícita aquí. Degradar a un "unknown" cosmético escondería
-        // drift de contrato.
-        expect(() => VarType.fromWire('number'), throwsArgumentError);
-        expect(() => VarType.fromWire(''), throwsArgumentError);
-        expect(() => VarType.fromWire('TEXT'), throwsArgumentError);
-      },
-    );
+    test('tipo desconocido en el wire → ArgumentError (fail-loud)', () {
+      // El backend v1 sólo conoce "text"; cualquier extensión futura
+      // (number/date/etc.) tiene que aterrizar primero como entrada
+      // explícita aquí. Degradar a un "unknown" cosmético escondería
+      // drift de contrato.
+      expect(() => VarType.fromWire('number'), throwsArgumentError);
+      expect(() => VarType.fromWire(''), throwsArgumentError);
+      expect(() => VarType.fromWire('TEXT'), throwsArgumentError);
+    });
   });
 
   group('VariableDef value-equality', () {
