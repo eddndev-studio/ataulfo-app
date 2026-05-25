@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
 import '../../domain/entities/template.dart';
 import '../bloc/templates_bloc.dart';
 
@@ -28,8 +31,11 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator());
+  Widget build(BuildContext context) => const Center(
+    child: CircularProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
 }
 
 class _LoadedView extends StatelessWidget {
@@ -55,8 +61,13 @@ class _LoadedView extends StatelessWidget {
           ? const _EmptyView()
           : ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.sp4,
+                vertical: AppTokens.sp4,
+              ),
               itemCount: items.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: AppTokens.cardGap),
               itemBuilder: (_, i) => _TemplateTile(template: items[i]),
             ),
     );
@@ -72,19 +83,21 @@ class _EmptyView extends StatelessWidget {
     // funcionando porque el viewport es scrollable aunque la lista esté
     // vacía. Sin esto, AlwaysScrollableScrollPhysics no alcanza para que
     // el operador pueda jalar a refrescar sobre el empty state.
+    final textTheme = Theme.of(context).textTheme;
     return LayoutBuilder(
       builder: (context, c) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: <Widget>[
           ConstrainedBox(
             constraints: BoxConstraints(minHeight: c.maxHeight),
-            child: const Center(
-              key: Key('templates.empty'),
+            child: Center(
+              key: const Key('templates.empty'),
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppTokens.sp6),
                 child: Text(
                   'Todavía no tienes plantillas aquí',
                   textAlign: TextAlign.center,
+                  style: textTheme.bodyLarge,
                 ),
               ),
             ),
@@ -100,23 +113,25 @@ class _FailedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Center(
       key: const Key('templates.error'),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppTokens.sp6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Text(
+            Text(
               'No pudimos cargar tus plantillas',
               textAlign: TextAlign.center,
+              style: textTheme.bodyLarge,
             ),
-            const SizedBox(height: 12),
-            FilledButton(
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
               onPressed: () => context.read<TemplatesBloc>().add(
                 const TemplatesLoadRequested(),
               ),
-              child: const Text('Reintentar'),
             ),
           ],
         ),
@@ -132,15 +147,33 @@ class _TemplateTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(child: Text(_initial(template.name))),
-      title: Text(template.name),
-      subtitle: Text(_providerLabel(template.ai.provider)),
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
       // push (no go): el detalle se APILA sobre el listado. Así el back
       // físico de Android y la flecha del AppBar de detalle vuelven al
       // shell. context.go() reemplaza la pila y deja al usuario sin back,
       // sacándolo de la app al primer tap del sistema.
       onTap: () => context.push('/templates/${template.id}'),
+      child: Row(
+        children: <Widget>[
+          _Avatar(initial: _initial(template.name)),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(template.name, style: textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  _providerLabel(template.ai.provider),
+                  style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -156,4 +189,35 @@ class _TemplateTile extends StatelessWidget {
     AIProvider.minimax => 'MiniMax',
     AIProvider.deepseek => 'DeepSeek',
   };
+}
+
+/// Avatar circular del tile con la inicial del nombre. Es local al tile
+/// hasta que un segundo callsite (BotsList, probablemente) pida el mismo
+/// patrón — ahí extraemos a `core/design/widgets/app_avatar.dart`.
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.initial});
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: const BoxDecoration(
+        color: AppTokens.surface3,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(
+          fontFamily: AppTokens.fontSans,
+          fontSize: AppTokens.bodyLSize,
+          fontWeight: FontWeight.w600,
+          color: AppTokens.text1,
+        ),
+      ),
+    );
+  }
 }

@@ -1,3 +1,7 @@
+import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/tokens.dart';
+import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_card.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
 import 'package:agentic/features/templates/presentation/bloc/templates_bloc.dart';
@@ -50,6 +54,7 @@ void main() {
   });
 
   Widget host() => MaterialApp(
+    theme: AppDesignTheme.dark(),
     home: BlocProvider<TemplatesBloc>.value(
       value: bloc,
       // TemplatesListPage es content-only; el shell aporta Scaffold/AppBar.
@@ -58,15 +63,18 @@ void main() {
     ),
   );
 
-  testWidgets('Loading muestra spinner', (tester) async {
+  testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
     when(() => bloc.state).thenReturn(const TemplatesLoading());
 
     await tester.pumpWidget(host());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    final spinner = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('Loaded con N templates renderiza un tile por cada uno', (
+  testWidgets('Loaded con N templates renderiza una AppCard por cada uno', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(
@@ -77,6 +85,9 @@ void main() {
 
     expect(find.text('Soporte'), findsOneWidget);
     expect(find.text('Ventas'), findsOneWidget);
+    expect(find.byType(AppCard), findsNWidgets(2));
+    // Los ListTile M3 ya no deben aparecer.
+    expect(find.byType(ListTile), findsNothing);
   });
 
   testWidgets('Loaded vacío muestra empty state (sin tiles)', (tester) async {
@@ -100,7 +111,8 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('templates.error')), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Reintentar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
+    expect(find.byType(FilledButton), findsNothing);
   });
 
   testWidgets('tap Reintentar dispara TemplatesLoadRequested', (tester) async {
@@ -109,7 +121,7 @@ void main() {
     ).thenReturn(const TemplatesFailed(TemplatesServerFailure()));
 
     await tester.pumpWidget(host());
-    await tester.tap(find.widgetWithText(FilledButton, 'Reintentar'));
+    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
 
     verify(() => bloc.add(const TemplatesLoadRequested())).called(1);
