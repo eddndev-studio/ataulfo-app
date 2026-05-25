@@ -195,10 +195,7 @@ void main() {
       // que NO podemos hacer es interpolar el nombre crudo, porque el `?`,
       // `&`, `=` o `#` dentro del nombre romperían el query. Consistente
       // con el otro entry point (template_detail_page).
-      expect(
-        navigated,
-        <String>['/templates/t1/bots/new?name=Soporte+ventas'],
-      );
+      expect(navigated, <String>['/templates/t1/bots/new?name=Soporte+ventas']);
       expect(
         canPopAtDestination,
         <bool>[true],

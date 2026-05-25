@@ -59,17 +59,14 @@ class _EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      key: const Key('bot_template_picker.empty'),
+    return const Center(
+      key: Key('bot_template_picker.empty'),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const <Widget>[
-            Text(
-              'No tienes plantillas todavía.',
-              textAlign: TextAlign.center,
-            ),
+          children: <Widget>[
+            Text('No tienes plantillas todavía.', textAlign: TextAlign.center),
             SizedBox(height: 8),
             Text(
               'Crea una desde la tab Plantillas para poder crear bots.',
