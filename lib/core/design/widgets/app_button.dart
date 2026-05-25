@@ -14,6 +14,10 @@ enum _AppButtonVariant { filled, tonal, text, danger }
 /// 14, label en DM Sans weight 600). `text` y `danger` reducen el padding
 /// horizontal — viven inline (header de card, footer de modal) y no como
 /// botones independientes.
+///
+/// El estado `loading` reemplaza el label por un spinner inline y bloquea
+/// el tap internamente sin nullificar `onPressed` — los formularios pueden
+/// pasar el callback sin gate manual `!submitting` en cada page.
 class AppButton extends StatelessWidget {
   const AppButton.filled({
     super.key,
@@ -21,6 +25,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.fullWidth = false,
     this.icon,
+    this.loading = false,
   }) : _variant = _AppButtonVariant.filled;
 
   const AppButton.tonal({
@@ -29,6 +34,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.fullWidth = false,
     this.icon,
+    this.loading = false,
   }) : _variant = _AppButtonVariant.tonal;
 
   const AppButton.text({
@@ -37,6 +43,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.fullWidth = false,
     this.icon,
+    this.loading = false,
   }) : _variant = _AppButtonVariant.text;
 
   const AppButton.danger({
@@ -45,6 +52,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.fullWidth = false,
     this.icon,
+    this.loading = false,
   }) : _variant = _AppButtonVariant.danger;
 
   final String label;
@@ -52,6 +60,7 @@ class AppButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool fullWidth;
   final IconData? icon;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -60,32 +69,49 @@ class AppButton extends StatelessWidget {
     final padding = _paddingFor(_variant);
     final radius = BorderRadius.circular(AppTokens.radiusButton);
 
-    final content = Row(
-      mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        if (icon != null) ...<Widget>[
-          Icon(icon, size: 20, color: colors.foreground),
-          const SizedBox(width: 8),
-        ],
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: AppTokens.fontSans,
-            fontSize: AppTokens.bodyLSize,
-            fontWeight: FontWeight.w600,
-            color: colors.foreground,
-          ),
-        ),
-      ],
-    );
+    final content = loading
+        ? Row(
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(colors.foreground),
+                ),
+              ),
+            ],
+          )
+        : Row(
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              if (icon != null) ...<Widget>[
+                Icon(icon, size: 20, color: colors.foreground),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: AppTokens.fontSans,
+                  fontSize: AppTokens.bodyLSize,
+                  fontWeight: FontWeight.w600,
+                  color: colors.foreground,
+                ),
+              ),
+            ],
+          );
 
     final button = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 48),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: disabled ? null : onPressed,
+          // loading bloquea el tap sin nullificar onPressed externo — el
+          // consumer pasa el callback inalterado y el botón decide.
+          onTap: (disabled || loading) ? null : onPressed,
           borderRadius: radius,
           splashColor: Colors.white.withValues(alpha: 0.06),
           highlightColor: Colors.white.withValues(alpha: 0.04),
@@ -102,6 +128,8 @@ class AppButton extends StatelessWidget {
       ),
     );
 
+    // Loading conserva opacity 1.0: el spinner ya comunica el estado y
+    // bajar el tinte agregaría ruido visual sobre algo que ya se ve.
     return Opacity(opacity: disabled ? 0.4 : 1.0, child: button);
   }
 

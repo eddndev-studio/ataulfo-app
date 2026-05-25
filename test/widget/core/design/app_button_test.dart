@@ -231,7 +231,9 @@ void main() {
         ),
       );
       await tester.tap(find.byType(AppButton));
-      await tester.pumpAndSettle();
+      // pumpAndSettle nunca termina con el spinner animado en pantalla;
+      // un pump es suficiente para que el tap se procese si lo fuera.
+      await tester.pump();
       expect(taps, 0);
     });
 
