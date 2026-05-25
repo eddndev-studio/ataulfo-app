@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../bloc/template_create_bloc.dart';
 
@@ -60,41 +63,35 @@ class _TemplateCreatePageState extends State<TemplateCreatePage> {
       },
       builder: (context, state) {
         final submitting = state is TemplateCreateSubmitting;
-        final canTap = _canSubmit && !submitting;
         return Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppTokens.sp6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              TextField(
+              AppTextField(
                 key: const Key('template_create.field.name'),
+                label: 'Nombre de la plantilla',
+                hint: 'Ej. Soporte ventas',
                 controller: _ctrl,
                 enabled: !submitting,
                 autofocus: true,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre de la plantilla',
-                  hintText: 'Ej. Soporte ventas',
-                  border: OutlineInputBorder(),
-                ),
                 onSubmitted: (_) {
-                  if (canTap) _submit();
+                  if (_canSubmit) _submit();
                 },
               ),
-              const SizedBox(height: 16),
-              FilledButton(
+              const SizedBox(height: AppTokens.sp4),
+              AppButton.filled(
                 key: const Key('template_create.submit'),
-                onPressed: canTap ? _submit : null,
-                child: submitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Crear'),
+                label: 'Crear',
+                // El primitivo bloquea el tap cuando loading=true sin
+                // nullificar onPressed: pasamos el callback inalterado
+                // y dejamos el gate de submitting al primitivo.
+                onPressed: _canSubmit ? _submit : null,
+                loading: submitting,
               ),
               if (state is TemplateCreateFailed) ...<Widget>[
-                const SizedBox(height: 16),
+                const SizedBox(height: AppTokens.sp4),
                 _FailedView(failure: state.failure),
               ],
             ],
@@ -116,7 +113,7 @@ class _FailedView extends StatelessWidget {
     return Text(
       copy,
       key: Key(key),
-      style: TextStyle(color: Theme.of(context).colorScheme.error),
+      style: const TextStyle(color: AppTokens.danger),
     );
   }
 

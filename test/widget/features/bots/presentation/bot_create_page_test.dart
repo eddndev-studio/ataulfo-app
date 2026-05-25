@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_text_field.dart';
 import 'package:agentic/features/bots/domain/entities/bot.dart';
 import 'package:agentic/features/bots/domain/failures/bots_failure.dart';
 import 'package:agentic/features/bots/presentation/bloc/bot_create_bloc.dart';
@@ -45,6 +48,7 @@ void main() {
   });
 
   Widget host({String? templateName = 'Soporte ventas'}) => MaterialApp(
+    theme: AppDesignTheme.dark(),
     home: BlocProvider<BotCreateBloc>.value(
       value: bloc,
       // Página content-only: el shell de la ruta aporta Scaffold/AppBar.
@@ -54,19 +58,27 @@ void main() {
     ),
   );
 
-  testWidgets('Initial muestra chip con nombre de plantilla y submit OFF', (
-    tester,
-  ) async {
-    await tester.pumpWidget(host());
+  AppButton submitButton(WidgetTester tester) =>
+      tester.widget<AppButton>(find.byKey(const Key('bot_create.submit')));
 
-    expect(find.byKey(const Key('bot_create.template_chip')), findsOneWidget);
-    expect(find.text('Soporte ventas'), findsOneWidget);
-    expect(find.byKey(const Key('bot_create.field.name')), findsOneWidget);
-    final btn = tester.widget<FilledButton>(
-      find.byKey(const Key('bot_create.submit')),
-    );
-    expect(btn.onPressed, isNull, reason: 'name vacío deshabilita el submit');
-  });
+  testWidgets(
+    'Initial muestra chip con nombre de plantilla, AppTextField y submit OFF',
+    (tester) async {
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('bot_create.template_chip')), findsOneWidget);
+      expect(find.text('Soporte ventas'), findsOneWidget);
+      // El icono description_outlined del chip sobrevive a la migración:
+      // sigue siendo el indicador visual de "plantilla seleccionada".
+      expect(find.byIcon(Icons.description_outlined), findsOneWidget);
+      // El form usa AppTextField (no TextField raw) y la key se conserva.
+      expect(find.byType(AppTextField), findsOneWidget);
+      expect(find.byKey(const Key('bot_create.field.name')), findsOneWidget);
+      final btn = submitButton(tester);
+      expect(btn.onPressed, isNull, reason: 'name vacío deshabilita el submit');
+      expect(btn.loading, false);
+    },
+  );
 
   testWidgets(
     'chip muestra "Plantilla seleccionada" cuando templateName es null',
@@ -89,10 +101,7 @@ void main() {
     );
     await tester.pump();
 
-    final btn = tester.widget<FilledButton>(
-      find.byKey(const Key('bot_create.submit')),
-    );
-    expect(btn.onPressed, isNotNull);
+    expect(submitButton(tester).onPressed, isNotNull);
   });
 
   testWidgets(
@@ -121,19 +130,17 @@ void main() {
     },
   );
 
-  testWidgets('Submitting muestra spinner y deshabilita el botón', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(const BotCreateSubmitting());
+  testWidgets(
+    'Submitting pone el AppButton en loading=true (spinner + tap bloqueado)',
+    (tester) async {
+      when(() => bloc.state).thenReturn(const BotCreateSubmitting());
 
-    await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    final btn = tester.widget<FilledButton>(
-      find.byKey(const Key('bot_create.submit')),
-    );
-    expect(btn.onPressed, isNull);
-  });
+      expect(submitButton(tester).loading, true);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    },
+  );
 
   testWidgets('Failed(InvalidCreate) muestra error específico', (tester) async {
     when(
@@ -247,7 +254,9 @@ void main() {
         ],
       );
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+      );
       unawaited(router.push<void>('/templates/t1/bots/new'));
       await tester.pumpAndSettle();
 
@@ -297,7 +306,9 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpWidget(
+      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+    );
     await tester.pumpAndSettle();
 
     expect(navigated, <String>['/bots/b9']);
