@@ -10,9 +10,9 @@
 /// access renovado también falló — colapsa a la lógica global de logout
 /// vía onUnrecoverable, no a un estado local de la lista.
 ///
-/// NotFound NO aparece en este slice: `GET /templates` responde 200 con
-/// `[]` cuando la org no tiene templates, nunca 404. La variante se sumará
-/// con el endpoint de detalle por id en un slice posterior.
+/// `GET /templates` nunca devuelve 404 (lista vacía es 200 con `[]`);
+/// `GET /templates/:id` sí devuelve 404 si el id no existe en la org,
+/// y mapea a TemplatesNotFoundFailure.
 sealed class TemplatesFailure implements Exception {
   const TemplatesFailure();
 }
@@ -32,6 +32,13 @@ final class TemplatesTimeoutFailure extends TemplatesFailure {
 /// (CRUD de Template = ADMIN+ según S03). No se reintenta solo.
 final class TemplatesForbiddenFailure extends TemplatesFailure {
   const TemplatesForbiddenFailure();
+}
+
+/// 404 contra `/templates/:id`: el id pedido no existe en la org del
+/// operador (o fue borrado). La UI debe mostrar un estado terminal sin
+/// reintento — reintentar el mismo id volverá a fallar.
+final class TemplatesNotFoundFailure extends TemplatesFailure {
+  const TemplatesNotFoundFailure();
 }
 
 /// 5xx del backend. El servidor respondió pero rompió — distinto de red.
