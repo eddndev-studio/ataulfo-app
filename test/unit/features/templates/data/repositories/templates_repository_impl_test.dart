@@ -1,6 +1,7 @@
 import 'package:agentic/features/templates/data/datasources/templates_datasource.dart';
 import 'package:agentic/features/templates/data/repositories/templates_repository_impl.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
+import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -74,6 +75,40 @@ void main() {
       await expectLater(
         repo.create(''),
         throwsA(isA<TemplatesInvalidNameFailure>()),
+      );
+    });
+  });
+
+  group('TemplatesRepositoryImpl.listVarDefs (delegate trivial)', () {
+    const defs = <VariableDef>[
+      VariableDef(
+        id: 'v1',
+        name: 'nombre',
+        type: VarType.text,
+        defaultValue: 'cliente',
+        description: '',
+      ),
+    ];
+
+    test('forwarda el id y devuelve la lista del datasource', () async {
+      when(() => ds.listVarDefs('t1')).thenAnswer((_) async => defs);
+
+      final got = await repo.listVarDefs('t1');
+
+      expect(got, defs);
+      verify(() => ds.listVarDefs('t1')).called(1);
+    });
+
+    test('propaga TemplatesNotFoundFailure sin envolver', () async {
+      when(() => ds.listVarDefs('desconocido')).thenAnswer(
+        (_) => Future<List<VariableDef>>.error(
+          const TemplatesNotFoundFailure(),
+        ),
+      );
+
+      await expectLater(
+        repo.listVarDefs('desconocido'),
+        throwsA(isA<TemplatesNotFoundFailure>()),
       );
     });
   });
