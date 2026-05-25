@@ -15,6 +15,13 @@ enum BotChannel {
     'WABA' => BotChannel.waba,
     _ => throw ArgumentError.value(raw, 'BotChannel.fromWire'),
   };
+
+  /// Serializa al literal exacto del contrato. Inversa de `fromWire`: la
+  /// presentación nunca toca strings del wire.
+  String toWire() => switch (this) {
+    BotChannel.waUnofficial => 'WA_UNOFFICIAL',
+    BotChannel.waba => 'WABA',
+  };
 }
 
 /// Entidad de dominio del Bot (S04). Espeja el `botResp` del backend
