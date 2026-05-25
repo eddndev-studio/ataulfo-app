@@ -102,9 +102,7 @@ void main() {
             name: 'Soporte',
             channel: BotChannel.waUnofficial,
           ),
-        ).thenAnswer(
-          (_) => Future<Bot>.error(const BotsForbiddenFailure()),
-        );
+        ).thenAnswer((_) => Future<Bot>.error(const BotsForbiddenFailure()));
         return BotCreateBloc(repo: repo);
       },
       act: (bloc) => bloc.add(
@@ -166,10 +164,7 @@ void main() {
 
     test('value-equality de los estados', () {
       expect(const BotCreateInitial(), equals(const BotCreateInitial()));
-      expect(
-        const BotCreateSubmitting(),
-        equals(const BotCreateSubmitting()),
-      );
+      expect(const BotCreateSubmitting(), equals(const BotCreateSubmitting()));
       expect(
         const BotCreateSucceeded(_bot),
         equals(const BotCreateSucceeded(_bot)),

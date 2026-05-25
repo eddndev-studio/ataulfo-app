@@ -251,34 +251,37 @@ void main() {
     // El cliente sólo crea bots WA_UNOFFICIAL en v1; WABA viajará cuando
     // aterrice el flujo de verificación. La firma toma BotChannel para que
     // la decisión esté en presentación, no acá.
-    test('201 con botResp → Bot (envía {template_id, name, channel})', () async {
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          '/bots',
-          data: any<Object?>(named: 'data'),
-        ),
-      ).thenAnswer((_) async => respMap(201, body: botJson(), path: '/bots'));
+    test(
+      '201 con botResp → Bot (envía {template_id, name, channel})',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            '/bots',
+            data: any<Object?>(named: 'data'),
+          ),
+        ).thenAnswer((_) async => respMap(201, body: botJson(), path: '/bots'));
 
-      final bot = await ds.create(
-        templateId: 't1',
-        name: 'Soporte',
-        channel: BotChannel.waUnofficial,
-      );
+        final bot = await ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        );
 
-      expect(bot.id, 'b1');
-      expect(bot.templateId, 't1');
-      expect(bot.channel, BotChannel.waUnofficial);
-      verify(
-        () => dio.post<Map<String, dynamic>>(
-          '/bots',
-          data: <String, dynamic>{
-            'template_id': 't1',
-            'name': 'Soporte',
-            'channel': 'WA_UNOFFICIAL',
-          },
-        ),
-      ).called(1);
-    });
+        expect(bot.id, 'b1');
+        expect(bot.templateId, 't1');
+        expect(bot.channel, BotChannel.waUnofficial);
+        verify(
+          () => dio.post<Map<String, dynamic>>(
+            '/bots',
+            data: <String, dynamic>{
+              'template_id': 't1',
+              'name': 'Soporte',
+              'channel': 'WA_UNOFFICIAL',
+            },
+          ),
+        ).called(1);
+      },
+    );
 
     test('422 → BotsInvalidCreateFailure', () async {
       // 422 colapsa varias causas del backend (name vacío, channel
@@ -292,11 +295,7 @@ void main() {
       ).thenThrow(badResponse(422, path: '/bots'));
 
       await expectLater(
-        ds.create(
-          templateId: 't1',
-          name: '',
-          channel: BotChannel.waUnofficial,
-        ),
+        ds.create(templateId: 't1', name: '', channel: BotChannel.waUnofficial),
         throwsA(isA<BotsInvalidCreateFailure>()),
       );
     });

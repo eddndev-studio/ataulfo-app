@@ -15,11 +15,7 @@ import '../bloc/bot_create_bloc.dart';
 /// template-detail; en un deep-link directo a la URL sin el param, el
 /// chip muestra un copy neutro en lugar del UUID.
 class BotCreatePage extends StatefulWidget {
-  const BotCreatePage({
-    super.key,
-    required this.templateId,
-    this.templateName,
-  });
+  const BotCreatePage({super.key, required this.templateId, this.templateName});
 
   final String templateId;
   final String? templateName;
@@ -175,9 +171,7 @@ class _FailedView extends StatelessWidget {
       'bot_create.error.network',
       'Sin conexión con el servidor. Revisa tu red y reintenta.',
     ),
-    BotsNotFoundFailure() ||
-    BotsServerFailure() ||
-    UnknownBotsFailure() => (
+    BotsNotFoundFailure() || BotsServerFailure() || UnknownBotsFailure() => (
       'bot_create.error.generic',
       'No pudimos crear el bot. Inténtalo de nuevo.',
     ),

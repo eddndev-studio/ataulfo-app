@@ -49,10 +49,7 @@ void main() {
       value: bloc,
       // Página content-only: el shell de la ruta aporta Scaffold/AppBar.
       child: Scaffold(
-        body: BotCreatePage(
-          templateId: 't1',
-          templateName: templateName,
-        ),
+        body: BotCreatePage(templateId: 't1', templateName: templateName),
       ),
     ),
   );
@@ -138,9 +135,7 @@ void main() {
     expect(btn.onPressed, isNull);
   });
 
-  testWidgets('Failed(InvalidCreate) muestra error específico', (
-    tester,
-  ) async {
+  testWidgets('Failed(InvalidCreate) muestra error específico', (tester) async {
     when(
       () => bloc.state,
     ).thenReturn(const BotCreateFailed(BotsInvalidCreateFailure()));
