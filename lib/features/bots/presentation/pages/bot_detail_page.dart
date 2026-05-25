@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_avatar.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_detail_bloc.dart';
@@ -28,8 +32,11 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator());
+  Widget build(BuildContext context) => const Center(
+    child: CircularProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
 }
 
 class _LoadedView extends StatelessWidget {
@@ -39,71 +46,76 @@ class _LoadedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppTokens.sp6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              CircleAvatar(radius: 32, child: Text(_initial(bot.name))),
-              const SizedBox(width: 16),
+              AppAvatar(name: bot.name, size: 64),
+              const SizedBox(width: AppTokens.sp4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
+                    Text(bot.name, style: textTheme.titleLarge),
+                    const SizedBox(height: 2),
                     Text(
-                      bot.name,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                      _channelLabel(bot.channel),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.text2,
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(_channelLabel(bot.channel)),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppTokens.sp6),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: AppTokens.sp2,
+            runSpacing: AppTokens.sp2,
             children: <Widget>[
-              Chip(label: Text('v${bot.version}')),
+              AppPill.outline(label: 'v${bot.version}'),
               if (bot.paused)
-                const Chip(
-                  avatar: Icon(Icons.pause_circle, size: 18),
-                  label: Text('En pausa'),
+                const AppPill.neutral(
+                  label: 'Pausado',
+                  dot: AppPillDot.paused,
+                )
+              else
+                const AppPill.primary(
+                  label: 'Activo',
+                  dot: AppPillDot.active,
                 ),
+              // IA off es estado de configuración, no error → neutral.
+              // El pill solo aparece cuando aiDisabled=true; el caso default
+              // (IA habilitada) no se verbaliza para no saturar el header.
               if (bot.aiDisabled)
-                const Chip(
-                  avatar: Icon(Icons.psychology_alt_outlined, size: 18),
-                  label: Text('IA deshabilitada'),
+                const AppPill.neutral(
+                  label: 'IA deshabilitada',
+                  dot: AppPillDot.paused,
                 ),
             ],
           ),
           if (bot.identifier != null) ...<Widget>[
-            const SizedBox(height: 24),
-            const Text('Identificador'),
-            const SizedBox(height: 4),
-            SelectableText(
-              bot.identifier!,
-              style: Theme.of(context).textTheme.bodyMedium,
+            const SizedBox(height: AppTokens.sp6),
+            Text(
+              'Identificador',
+              style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
             ),
+            const SizedBox(height: AppTokens.sp1),
+            SelectableText(bot.identifier!, style: textTheme.bodyMedium),
           ],
         ],
       ),
     );
   }
 
-  static String _initial(String s) {
-    final trimmed = s.trim();
-    if (trimmed.isEmpty) return '?';
-    return trimmed.substring(0, 1).toUpperCase();
-  }
-
   // Duplicado intencional con BotsListPage._BotTile._channelLabel: regla
   // de 3 — al tercer consumidor extraer a un helper compartido en
-  // `core/bots/` o similar (hoy no aplica, son dos lugares).
+  // `core/bots/` o similar (hoy son dos lugares).
   static String _channelLabel(BotChannel c) => switch (c) {
     BotChannel.waUnofficial => 'WhatsApp',
     BotChannel.waba => 'WhatsApp Business',
@@ -118,12 +130,13 @@ class _FailedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isNotFound = failure is BotsNotFoundFailure;
+    final textTheme = Theme.of(context).textTheme;
     return Center(
       key: isNotFound
           ? const Key('bot_detail.error.not_found')
           : const Key('bot_detail.error.generic'),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppTokens.sp6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -132,13 +145,14 @@ class _FailedView extends StatelessWidget {
                   ? 'Este bot ya no existe en tu organización'
                   : 'No pudimos cargar el detalle del bot',
               textAlign: TextAlign.center,
+              style: textTheme.bodyLarge,
             ),
-            const SizedBox(height: 12),
-            FilledButton(
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
               onPressed: () => context.read<BotDetailBloc>().add(
                 const BotDetailLoadRequested(),
               ),
-              child: const Text('Reintentar'),
             ),
           ],
         ),
