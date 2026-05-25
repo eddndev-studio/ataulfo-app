@@ -12,4 +12,13 @@ abstract interface class BotsRepository {
   /// alcanza (403), o las variantes de red/timeout/server si el transporte
   /// falla. El bloc traduce a estado de UI.
   Future<Bot> byId(String id);
+
+  /// Crea un Bot ligado a una Template existente de la org activa.
+  /// `BotsInvalidCreateFailure` (422) cuando el backend rechaza la
+  /// construcción; el bloc decide cómo mostrarlo al operador.
+  Future<Bot> create({
+    required String templateId,
+    required String name,
+    required BotChannel channel,
+  });
 }

@@ -16,4 +16,11 @@ class BotsRepositoryImpl implements BotsRepository {
 
   @override
   Future<Bot> byId(String id) => _ds.byId(id);
+
+  @override
+  Future<Bot> create({
+    required String templateId,
+    required String name,
+    required BotChannel channel,
+  }) => _ds.create(templateId: templateId, name: name, channel: channel);
 }
