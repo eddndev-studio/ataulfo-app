@@ -16,23 +16,24 @@ void main() {
     repo = TemplatesRepositoryImpl(datasource: ds);
   });
 
+  const tpl = Template(
+    id: 't1',
+    orgId: 'o1',
+    name: 'Soporte',
+    version: 1,
+    ai: AIConfig(
+      enabled: false,
+      provider: AIProvider.gemini,
+      model: 'gemini-3.1-pro-preview',
+      temperature: 0.7,
+      thinkingLevel: ThinkingLevel.low,
+      systemPrompt: '',
+      contextMessages: 20,
+    ),
+  );
+
   group('TemplatesRepositoryImpl.list (delegate trivial)', () {
     test('forwarda al datasource y devuelve su lista', () async {
-      const tpl = Template(
-        id: 't1',
-        orgId: 'o1',
-        name: 'Soporte',
-        version: 1,
-        ai: AIConfig(
-          enabled: false,
-          provider: AIProvider.gemini,
-          model: 'gemini-3.1-pro-preview',
-          temperature: 0.7,
-          thinkingLevel: ThinkingLevel.low,
-          systemPrompt: '',
-          contextMessages: 20,
-        ),
-      );
       when(() => ds.list()).thenAnswer((_) async => const <Template>[tpl]);
 
       final items = await repo.list();
@@ -52,6 +53,28 @@ void main() {
       );
 
       await expectLater(repo.list(), throwsA(isA<TemplatesNetworkFailure>()));
+    });
+  });
+
+  group('TemplatesRepositoryImpl.byId (delegate trivial)', () {
+    test('forwarda el id y devuelve el Template del datasource', () async {
+      when(() => ds.byId('t1')).thenAnswer((_) async => tpl);
+
+      final got = await repo.byId('t1');
+
+      expect(got, tpl);
+      verify(() => ds.byId('t1')).called(1);
+    });
+
+    test('propaga TemplatesNotFoundFailure sin envolver', () async {
+      when(() => ds.byId('desconocido')).thenAnswer(
+        (_) => Future<Template>.error(const TemplatesNotFoundFailure()),
+      );
+
+      await expectLater(
+        repo.byId('desconocido'),
+        throwsA(isA<TemplatesNotFoundFailure>()),
+      );
     });
   });
 }
