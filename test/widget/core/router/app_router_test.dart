@@ -5,6 +5,7 @@ import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:agentic/features/auth/presentation/pages/login_page.dart';
 import 'package:agentic/features/bots/domain/entities/bot.dart';
 import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
+import 'package:agentic/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
@@ -275,4 +276,61 @@ void main() {
     expect(find.byType(LoginPage), findsOneWidget);
     expect(find.byType(TemplateDetailPage), findsNothing);
   });
+
+  testWidgets(
+    'AuthAuthenticated → /templates/:templateId/bots/new monta BotCreatePage '
+    'con templateId del path y templateName del query',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/templates/t1/bots/new?name=Soporte%20ventas');
+      await tester.pumpAndSettle();
+
+      final page = tester.widget<BotCreatePage>(find.byType(BotCreatePage));
+      expect(page.templateId, 't1');
+      expect(page.templateName, 'Soporte ventas');
+    },
+  );
+
+  testWidgets(
+    'AuthAuthenticated → /templates/:templateId/bots/new sin query name → '
+    'BotCreatePage con templateName null (deep-link sin nombre)',
+    (tester) async {
+      // Permite la entrada deep-link directa por URL: el page muestra
+      // el copy fallback en el chip en lugar de exponer el UUID.
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/templates/t1/bots/new');
+      await tester.pumpAndSettle();
+
+      final page = tester.widget<BotCreatePage>(find.byType(BotCreatePage));
+      expect(page.templateId, 't1');
+      expect(page.templateName, isNull);
+    },
+  );
+
+  testWidgets(
+    'AuthUnauthenticated + deep-link a /templates/:id/bots/new → /login',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+      router = AppRouter(
+        authBloc: authBloc,
+        authRepository: _MockAuthRepo(),
+        botsRepository: botsRepo,
+        templatesRepository: templatesRepo,
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/templates/t1/bots/new?name=X');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(find.byType(BotCreatePage), findsNothing);
+    },
+  );
 }

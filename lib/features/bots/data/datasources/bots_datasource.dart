@@ -18,6 +18,19 @@ abstract interface class BotsDatasource {
   /// `GET /bots/:id` org-scoped. 404 si el ID no existe en la org activa;
   /// 403 si el rol no alcanza (típicamente WORKER sin asignación al bot).
   Future<Bot> byId(String id);
+
+  /// `POST /bots` body `{template_id, name, channel}`. 422 colapsa las
+  /// cuatro variantes del dominio del backend (`ErrInvalidBot`,
+  /// `ErrInvalidChannel`, `ErrTemplateNotFound`, `ErrVariableNotInDefs`)
+  /// en un único `BotsInvalidCreateFailure`: el operador no puede
+  /// accionar distinto entre ellas sin instrumentación adicional. El
+  /// `identifier` (label libre opcional v1) no viaja — aterrizará con
+  /// el flujo de pareado.
+  Future<Bot> create({
+    required String templateId,
+    required String name,
+    required BotChannel channel,
+  });
 }
 
 class DioBotsDatasource implements BotsDatasource {
@@ -71,6 +84,37 @@ class DioBotsDatasource implements BotsDatasource {
     }
   }
 
+  @override
+  Future<Bot> create({
+    required String templateId,
+    required String name,
+    required BotChannel channel,
+  }) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/bots',
+        data: <String, dynamic>{
+          'template_id': templateId,
+          'name': name,
+          'channel': channel.toWire(),
+        },
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownBotsFailure();
+      }
+      return BotsMapper.botRespToEntity(BotResp.fromJson(body));
+    } on BotsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownBotsFailure();
+    } on TypeError {
+      throw const UnknownBotsFailure();
+    }
+  }
+
   /// Traduce DioException a la jerarquía sellada de BotsFailure. Duplica el
   /// patrón de AuthFailure._mapDioException con los códigos de S04 (403 vs
   /// 401-de-login). Regla de tres: refactor a un helper compartido en el
@@ -87,6 +131,7 @@ class DioBotsDatasource implements BotsDatasource {
         final status = e.response?.statusCode ?? 0;
         if (status == 403) return const BotsForbiddenFailure();
         if (status == 404) return const BotsNotFoundFailure();
+        if (status == 422) return const BotsInvalidCreateFailure();
         if (status >= 500 && status < 600) return const BotsServerFailure();
         return const UnknownBotsFailure();
       case DioExceptionType.cancel:

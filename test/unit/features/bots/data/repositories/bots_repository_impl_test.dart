@@ -79,4 +79,62 @@ void main() {
       );
     });
   });
+
+  group('BotsRepositoryImpl.create', () {
+    const created = Bot(
+      id: 'b9',
+      orgId: 'o1',
+      templateId: 't1',
+      name: 'Soporte',
+      channel: BotChannel.waUnofficial,
+      identifier: null,
+      version: 0,
+      paused: false,
+      aiDisabled: false,
+    );
+
+    test('delega al datasource y devuelve el Bot creado', () async {
+      when(
+        () => ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+      ).thenAnswer((_) async => created);
+
+      final result = await repo.create(
+        templateId: 't1',
+        name: 'Soporte',
+        channel: BotChannel.waUnofficial,
+      );
+
+      expect(result, created);
+      verify(
+        () => ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+      ).called(1);
+    });
+
+    test('propaga BotsInvalidCreateFailure', () async {
+      when(
+        () => ds.create(
+          templateId: 't1',
+          name: '',
+          channel: BotChannel.waUnofficial,
+        ),
+      ).thenAnswer((_) => Future<Bot>.error(const BotsInvalidCreateFailure()));
+
+      await expectLater(
+        repo.create(
+          templateId: 't1',
+          name: '',
+          channel: BotChannel.waUnofficial,
+        ),
+        throwsA(isA<BotsInvalidCreateFailure>()),
+      );
+    });
+  });
 }

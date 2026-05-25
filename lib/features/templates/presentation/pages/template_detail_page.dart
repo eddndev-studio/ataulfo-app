@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/template.dart';
 import '../../domain/entities/variable_def.dart';
@@ -113,6 +114,8 @@ class _LoadedView extends StatelessWidget {
           const _SectionTitle('Variables'),
           const SizedBox(height: 8),
           const _VarDefsSection(),
+          const SizedBox(height: 32),
+          _CreateBotButton(template: template),
         ],
       ),
     );
@@ -293,6 +296,29 @@ class _VarDefsFailedView extends StatelessWidget {
           child: const Text('Reintentar'),
         ),
       ],
+    );
+  }
+}
+
+class _CreateBotButton extends StatelessWidget {
+  const _CreateBotButton({required this.template});
+
+  final Template template;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      key: const Key('template_detail.create_bot_button'),
+      onPressed: () {
+        // El nombre viaja como query param URL-encoded para que el form
+        // pueda mostrar el chip de plantilla sin pedirla otra vez al
+        // backend. push (no go) apila el form sobre el shell + detalle,
+        // así el back físico de Android vuelve a este detalle.
+        final name = Uri.encodeQueryComponent(template.name);
+        context.push('/templates/${template.id}/bots/new?name=$name');
+      },
+      icon: const Icon(Icons.smart_toy_outlined),
+      label: const Text('Crear bot'),
     );
   }
 }

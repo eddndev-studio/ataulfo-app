@@ -246,4 +246,199 @@ void main() {
       await expectLater(ds.byId('b1'), throwsA(isA<UnknownBotsFailure>()));
     });
   });
+
+  group('DioBotsDatasource.create', () {
+    // El cliente sólo crea bots WA_UNOFFICIAL en v1; WABA viajará cuando
+    // aterrice el flujo de verificación. La firma toma BotChannel para que
+    // la decisión esté en presentación, no acá.
+    test(
+      '201 con botResp → Bot (envía {template_id, name, channel})',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            '/bots',
+            data: any<Object?>(named: 'data'),
+          ),
+        ).thenAnswer((_) async => respMap(201, body: botJson(), path: '/bots'));
+
+        final bot = await ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        );
+
+        expect(bot.id, 'b1');
+        expect(bot.templateId, 't1');
+        expect(bot.channel, BotChannel.waUnofficial);
+        verify(
+          () => dio.post<Map<String, dynamic>>(
+            '/bots',
+            data: <String, dynamic>{
+              'template_id': 't1',
+              'name': 'Soporte',
+              'channel': 'WA_UNOFFICIAL',
+            },
+          ),
+        ).called(1);
+      },
+    );
+
+    test('422 → BotsInvalidCreateFailure', () async {
+      // 422 colapsa varias causas del backend (name vacío, channel
+      // desconocido, template inexistente, variables inválidas). Un solo
+      // cubo "Revisa los datos del bot".
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse(422, path: '/bots'));
+
+      await expectLater(
+        ds.create(templateId: 't1', name: '', channel: BotChannel.waUnofficial),
+        throwsA(isA<BotsInvalidCreateFailure>()),
+      );
+    });
+
+    test('403 → BotsForbiddenFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse(403, path: '/bots'));
+
+      await expectLater(
+        ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+        throwsA(isA<BotsForbiddenFailure>()),
+      );
+    });
+
+    test('500 → BotsServerFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse(500, path: '/bots'));
+
+      await expectLater(
+        ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+        throwsA(isA<BotsServerFailure>()),
+      );
+    });
+
+    test('timeout → BotsTimeoutFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/bots'),
+          type: DioExceptionType.sendTimeout,
+        ),
+      );
+
+      await expectLater(
+        ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+        throwsA(isA<BotsTimeoutFailure>()),
+      );
+    });
+
+    test('sin conexión → BotsNetworkFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/bots'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+        throwsA(isA<BotsNetworkFailure>()),
+      );
+    });
+
+    test('409 (sin org activa, caso raro) → UnknownBotsFailure', () async {
+      // El handler responde 409 si el Bearer no trae org activa; en flujo
+      // normal (post-login + /auth/me) no ocurre. Colapsa a Unknown.
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse(409, path: '/bots'));
+
+      await expectLater(
+        ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+        throwsA(isA<UnknownBotsFailure>()),
+      );
+    });
+
+    test('body nulo → UnknownBotsFailure (contrato roto)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer((_) async => respMap(201, path: '/bots'));
+
+      await expectLater(
+        ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+        throwsA(isA<UnknownBotsFailure>()),
+      );
+    });
+
+    test('body malformado → UnknownBotsFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            respMap(201, body: <String, dynamic>{'id': 'x'}, path: '/bots'),
+      );
+
+      await expectLater(
+        ds.create(
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+        throwsA(isA<UnknownBotsFailure>()),
+      );
+    });
+  });
 }

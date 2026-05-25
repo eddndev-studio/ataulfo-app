@@ -9,8 +9,10 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
+import '../../features/bots/presentation/bloc/bot_create_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
+import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
@@ -138,6 +140,30 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Detalle de plantilla')),
               body: const TemplateDetailPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Crear bot dentro del namespace de su Template padre. Forzar el
+        // templateId como path param es la garantía estructural de que el
+        // form siempre nace ligado a una plantilla concreta — un deep-link
+        // a `/bots/new` suelto no es posible. El templateName viaja como
+        // query opcional para que el chip pueda mostrar el nombre real
+        // sin reconsultar el backend; en su ausencia, el page exhibe un
+        // copy fallback.
+        path: '/templates/:templateId/bots/new',
+        builder: (context, state) {
+          final templateId = state.pathParameters['templateId']!;
+          final templateName = state.uri.queryParameters['name'];
+          return BlocProvider<BotCreateBloc>(
+            create: (_) => BotCreateBloc(repo: _botsRepo),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Crear bot')),
+              body: BotCreatePage(
+                templateId: templateId,
+                templateName: templateName,
+              ),
             ),
           );
         },

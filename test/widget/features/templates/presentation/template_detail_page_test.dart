@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
@@ -8,6 +10,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockBloc extends MockBloc<TemplateDetailEvent, TemplateDetailState>
@@ -332,5 +335,89 @@ void main() {
 
       verify(() => varDefsBloc.add(const VarDefsLoadRequested())).called(1);
     });
+  });
+
+  // ── Botón "Crear bot" (mini-S04a) ──────────────────────────────────────────
+  group('botón Crear bot', () {
+    setUp(() {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+    });
+
+    testWidgets('Loaded expone botón con key contractual', (tester) async {
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('template_detail.create_bot_button')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'tap navega a /templates/:id/bots/new?name=... preservando el shell '
+      '(canPop=true en destino)',
+      (tester) async {
+        // El nombre de la plantilla viaja en query param para que el form
+        // pueda mostrar el chip sin volver a golpear el backend.
+        // La aserción canPop() == true en el destino es el guard
+        // contractual que detecta regresiones a context.go() sin pasar por
+        // device — política de navegación aterrizada en fixes post-T3.
+        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+
+        final canPopAtDestination = <bool>[];
+        String? destinationUri;
+        final router = GoRouter(
+          initialLocation: '/',
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/',
+              builder: (_, _) => MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<TemplateDetailBloc>.value(value: bloc),
+                  BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+                ],
+                child: const Scaffold(body: TemplateDetailPage()),
+              ),
+            ),
+            GoRoute(
+              path: '/templates/:templateId/bots/new',
+              builder: (_, state) {
+                destinationUri = state.uri.toString();
+                return Scaffold(
+                  body: Builder(
+                    builder: (ctx) {
+                      canPopAtDestination.add(Navigator.of(ctx).canPop());
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('template_detail.create_bot_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          destinationUri,
+          '/templates/t1/bots/new?name=Soporte',
+          reason:
+              'la URL debe llevar templateId como path y templateName como '
+              'query param URL-encoded',
+        );
+        expect(
+          canPopAtDestination,
+          <bool>[true],
+          reason:
+              'el botón debe usar push (no go) para que el back físico '
+              'vuelva al detalle de plantilla en lugar de salir de la app',
+        );
+        unawaited(Future<void>.value());
+      },
+    );
   });
 }
