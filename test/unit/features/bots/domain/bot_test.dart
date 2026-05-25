@@ -21,6 +21,28 @@ void main() {
     });
   });
 
+  group('BotChannel.toWire', () {
+    // Inversa de fromWire: el cliente envía el canal al backend como string
+    // exacto del contrato. Sin esta función la UI tendría que conocer los
+    // literales del wire al construir el body del POST, acoplando la
+    // presentación al protocolo.
+    test('waUnofficial → "WA_UNOFFICIAL"', () {
+      expect(BotChannel.waUnofficial.toWire(), 'WA_UNOFFICIAL');
+    });
+
+    test('waba → "WABA"', () {
+      expect(BotChannel.waba.toWire(), 'WABA');
+    });
+
+    test('roundtrip fromWire ∘ toWire es identidad para todo el enum', () {
+      // Garantía estructural: nunca podrá haber un valor del enum que
+      // toWire serialice a algo que fromWire no acepte de vuelta.
+      for (final c in BotChannel.values) {
+        expect(BotChannel.fromWire(c.toWire()), c);
+      }
+    });
+  });
+
   group('Bot', () {
     Bot make({
       String id = 'b1',
