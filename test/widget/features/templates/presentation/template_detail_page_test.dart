@@ -446,6 +446,13 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        // El detalle migrado al DS es más alto que el test surface (800×600);
+        // el botón vive después del scroll. ensureVisible scrollea el
+        // SingleChildScrollView hasta que el botón sea hit-testable.
+        await tester.ensureVisible(
+          find.byKey(const Key('template_detail.create_bot_button')),
+        );
+        await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const Key('template_detail.create_bot_button')),
         );
