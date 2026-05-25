@@ -12,6 +12,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
@@ -196,6 +197,95 @@ void main() {
       // El cambio de tab NO debe reconstruir el bloc — el provider está
       // en el route builder, no dentro de cada tab.
       expect(identical(blocBefore, blocAfter), isTrue);
+    });
+
+    testWidgets('tab Bots no expone FAB (sin acción de creación por ahora)', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
+      expect(find.byType(FloatingActionButton), findsNothing);
+    });
+
+    testWidgets(
+      'tab Plantillas expone FAB de crear plantilla (phone y tablet)',
+      (tester) async {
+        useViewport(tester, widthDp: 420);
+
+        await tester.pumpWidget(host());
+        await tester.tap(find.text('Plantillas'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('shell.fab.template_create')),
+          findsOneWidget,
+        );
+
+        // Mismo comportamiento en tablet.
+        useViewport(tester, widthDp: 800);
+        await tester.pumpWidget(host());
+        await tester.tap(find.text('Plantillas'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('shell.fab.template_create')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('tab Ajustes no expone FAB', (tester) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.text('Ajustes'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
+    });
+
+    testWidgets('tap FAB en tab Plantillas navega a /templates/new', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      // GoRouter local para capturar la navegación sin depender del
+      // AppRouter real (que necesitaría AuthBloc + repos en el redirect).
+      final navigated = <String>[];
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                BlocProvider<BotsBloc>.value(value: botsBloc),
+                BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+              ],
+              child: const ShellPage(),
+            ),
+          ),
+          GoRoute(
+            path: '/templates/new',
+            builder: (_, _) {
+              navigated.add('/templates/new');
+              return const Scaffold(body: SizedBox.shrink());
+            },
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.tap(find.text('Plantillas'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('shell.fab.template_create')));
+      await tester.pumpAndSettle();
+
+      expect(navigated, <String>['/templates/new']);
     });
 
     testWidgets(
