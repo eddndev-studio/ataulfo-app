@@ -199,15 +199,31 @@ void main() {
       expect(identical(blocBefore, blocAfter), isTrue);
     });
 
-    testWidgets('tab Bots no expone FAB (sin acción de creación por ahora)', (
+    testWidgets('tab Bots (phone) expone FAB de selector de plantilla', (
       tester,
     ) async {
       useViewport(tester, widthDp: 420);
 
       await tester.pumpWidget(host());
 
+      expect(
+        find.byKey(const Key('shell.fab.bot_template_picker')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
-      expect(find.byType(FloatingActionButton), findsNothing);
+    });
+
+    testWidgets('tab Bots (tablet) expone FAB de selector de plantilla', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 800);
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('shell.fab.bot_template_picker')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('tab Plantillas (phone) expone FAB de crear plantilla', (
@@ -258,6 +274,67 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
+      expect(
+        find.byKey(const Key('shell.fab.bot_template_picker')),
+        findsNothing,
+      );
+      expect(find.byType(FloatingActionButton), findsNothing);
+    });
+
+    testWidgets('tap FAB en tab Bots apila /bots/new sobre el shell '
+        '(back desde el picker vuelve al shell, NO sale de la app)', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      // Mismo contrato que el FAB de plantillas: push (no go) para que
+      // canPop()==true en el destino. Si el FAB usara go() el back físico
+      // sacaría al operador de la app en lugar de cancelar la selección.
+      final navigated = <String>[];
+      final canPopAtDestination = <bool>[];
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                BlocProvider<BotsBloc>.value(value: botsBloc),
+                BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+              ],
+              child: const ShellPage(),
+            ),
+          ),
+          GoRoute(
+            path: '/bots/new',
+            builder: (_, _) {
+              navigated.add('/bots/new');
+              return Scaffold(
+                body: Builder(
+                  builder: (ctx) {
+                    canPopAtDestination.add(Navigator.of(ctx).canPop());
+                    return const SizedBox.shrink();
+                  },
+                ),
+              );
+            },
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.tap(find.byKey(const Key('shell.fab.bot_template_picker')));
+      await tester.pumpAndSettle();
+
+      expect(navigated, <String>['/bots/new']);
+      expect(
+        canPopAtDestination,
+        <bool>[true],
+        reason:
+            'el selector debe quedar apilado sobre el shell para que el '
+            'back físico cancele la elección y vuelva al listado',
+      );
     });
 
     testWidgets('tap FAB en tab Plantillas apila /templates/new sobre el shell '

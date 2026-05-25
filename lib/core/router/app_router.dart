@@ -14,6 +14,7 @@ import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
+import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
 import '../../features/templates/presentation/bloc/template_create_bloc.dart';
@@ -92,6 +93,29 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        // Selector de plantilla para arrancar la creación de un bot desde
+        // la tab Bots (sin plantilla previa). El `TemplatesBloc` se monta
+        // page-scoped aquí -- no reusamos el del shell porque la ruta vive
+        // fuera del subárbol de `/home`, así que el provider ascendente
+        // no llega. Esto significa una segunda llamada GET /templates al
+        // entrar al selector; la cache de RFC-0001 lo absorberá cuando
+        // aterrice.
+        //
+        // DEBE ir antes de `/bots/:id` -- GoRouter matchea en orden de
+        // declaración y `:id` capturaría `new` como ID válido, montando
+        // el detalle con id="new" en lugar del selector.
+        path: '/bots/new',
+        builder: (context, _) => BlocProvider<TemplatesBloc>(
+          create: (_) =>
+              TemplatesBloc(_templatesRepo)
+                ..add(const TemplatesLoadRequested()),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Elegir plantilla')),
+            body: const BotTemplatePickerPage(),
+          ),
+        ),
+      ),
+      GoRoute(
         path: '/bots/:id',
         builder: (context, state) {
           // El ID lo aporta el path param; el BotDetailBloc se construye
@@ -147,11 +171,13 @@ class AppRouter {
       GoRoute(
         // Crear bot dentro del namespace de su Template padre. Forzar el
         // templateId como path param es la garantía estructural de que el
-        // form siempre nace ligado a una plantilla concreta — un deep-link
-        // a `/bots/new` suelto no es posible. El templateName viaja como
-        // query opcional para que el chip pueda mostrar el nombre real
-        // sin reconsultar el backend; en su ausencia, el page exhibe un
-        // copy fallback.
+        // formulario (`BotCreatePage`) siempre nace ligado a una plantilla
+        // concreta. La entrada sin plantilla previa vive en `/bots/new`,
+        // que monta el selector y -- una vez elegida -- hace
+        // pushReplacement a esta ruta. El templateName viaja como query
+        // opcional para que el chip pueda mostrar el nombre real sin
+        // reconsultar el backend; en su ausencia (deep-link directo a
+        // la URL), el page exhibe un copy fallback.
         path: '/templates/:templateId/bots/new',
         builder: (context, state) {
           final templateId = state.pathParameters['templateId']!;

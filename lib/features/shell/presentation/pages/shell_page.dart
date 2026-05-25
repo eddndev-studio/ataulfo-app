@@ -94,15 +94,19 @@ class _TabSpec {
   final IconData icon;
 }
 
-/// FAB por tab. Hoy sólo la tab Plantillas tiene acción de creación; el FAB
-/// de "Crear bot" aterriza con su propio slice y reusará este slot.
+/// FAB por tab. La tab Bots arranca el flujo "crear bot" abriendo el
+/// selector de plantilla; la tab Plantillas arranca el formulario de
+/// creación. Ambos usan push (no go) para preservar el shell debajo de
+/// la pila: el back físico cancela la operación y vuelve al listado.
 Widget? _fab(BuildContext context, int index) => switch (index) {
+  0 => FloatingActionButton(
+    key: const Key('shell.fab.bot_template_picker'),
+    onPressed: () => context.push('/bots/new'),
+    tooltip: 'Crear bot',
+    child: const Icon(Icons.add),
+  ),
   1 => FloatingActionButton(
     key: const Key('shell.fab.template_create'),
-    // push (no go): el formulario se apila sobre el shell. Back sin
-    // crear vuelve al listado en lugar de salir de la app. Cuando el
-    // formulario completa, su listener hace pushReplacement al detalle
-    // — el shell permanece debajo en cualquier caso.
     onPressed: () => context.push('/templates/new'),
     tooltip: 'Crear plantilla',
     child: const Icon(Icons.add),

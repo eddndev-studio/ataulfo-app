@@ -7,6 +7,7 @@ import 'package:agentic/features/bots/domain/entities/bot.dart';
 import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_detail_page.dart';
+import 'package:agentic/features/bots/presentation/pages/bot_template_picker_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/entities/variable_def.dart';
@@ -333,4 +334,61 @@ void main() {
       expect(find.byType(BotCreatePage), findsNothing);
     },
   );
+
+  testWidgets('AuthAuthenticated → /bots/new monta BotTemplatePickerPage', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/bots/new');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BotTemplatePickerPage), findsOneWidget);
+  });
+
+  testWidgets(
+    'AuthAuthenticated → /bots/new expone TemplatesBloc page-scoped y '
+    'dispara TemplatesLoadRequested al construirse',
+    (tester) async {
+      // Bloc page-scoped (no reusa el del shell): si lo movieran a un
+      // ámbito superior, el test del bloc sigue verde pero el contador
+      // de list() en `setUp` se mantiene en una sola llamada -- aquí
+      // exigimos una llamada adicional disparada por el route builder.
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      // Tras /home el repo ya recibió una llamada (TemplatesBloc del shell).
+      // Limpiamos para verificar exactamente la llamada del picker.
+      clearInteractions(templatesRepo);
+      router.router.go('/bots/new');
+      await tester.pumpAndSettle();
+
+      final picker = tester.element(find.byType(BotTemplatePickerPage));
+      expect(picker.read<TemplatesBloc>(), isNotNull);
+      verify(templatesRepo.list).called(1);
+    },
+  );
+
+  testWidgets('AuthUnauthenticated + deep-link a /bots/new → /login', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+    router = AppRouter(
+      authBloc: authBloc,
+      authRepository: _MockAuthRepo(),
+      botsRepository: botsRepo,
+      templatesRepository: templatesRepo,
+    );
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/bots/new');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(BotTemplatePickerPage), findsNothing);
+  });
 }
