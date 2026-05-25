@@ -17,6 +17,10 @@ abstract interface class TemplatesDatasource {
   /// aquí no se gestiona. RBAC del backend rechaza con 403 si el rol no
   /// alcanza (CRUD de Template = ADMIN+).
   Future<List<Template>> list();
+
+  /// `GET /templates/:id` org-scoped. 404 si el id no existe en la org
+  /// del operador — mapea a `TemplatesNotFoundFailure`.
+  Future<Template> byId(String id);
 }
 
 class DioTemplatesDatasource implements TemplatesDatasource {
@@ -50,6 +54,26 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     }
   }
 
+  @override
+  Future<Template> byId(String id) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/templates/$id');
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownTemplatesFailure();
+      }
+      return TemplatesMapper.templateRespToEntity(TemplateResp.fromJson(body));
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
   /// Traduce DioException a la jerarquía sellada de TemplatesFailure.
   /// Duplica el patrón de BotsFailure._mapDioException; cuando aterrice
   /// la tercera feature con el mismo patrón, extraer a un helper
@@ -65,6 +89,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
       case DioExceptionType.badResponse:
         final status = e.response?.statusCode ?? 0;
         if (status == 403) return const TemplatesForbiddenFailure();
+        if (status == 404) return const TemplatesNotFoundFailure();
         if (status >= 500 && status < 600) {
           return const TemplatesServerFailure();
         }
