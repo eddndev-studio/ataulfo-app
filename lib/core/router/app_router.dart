@@ -14,7 +14,9 @@ import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
+import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
 import '../../features/templates/presentation/bloc/templates_bloc.dart';
+import '../../features/templates/presentation/pages/template_detail_page.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -99,6 +101,21 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Detalle del bot')),
               body: const BotDetailPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/templates/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<TemplateDetailBloc>(
+            create: (_) =>
+                TemplateDetailBloc(repo: _templatesRepo, id: id)
+                  ..add(const TemplateDetailLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Detalle de plantilla')),
+              body: const TemplateDetailPage(),
             ),
           );
         },
