@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_avatar.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/template.dart';
 import '../../domain/entities/variable_def.dart';
 import '../../domain/failures/templates_failure.dart';
@@ -30,8 +35,11 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator());
+  Widget build(BuildContext context) => const Center(
+    child: CircularProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
 }
 
 class _LoadedView extends StatelessWidget {
@@ -44,87 +52,78 @@ class _LoadedView extends StatelessWidget {
     final ai = template.ai;
     final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppTokens.sp6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              CircleAvatar(radius: 32, child: Text(_initial(template.name))),
-              const SizedBox(width: 16),
+              AppAvatar(name: template.name, size: 64),
+              const SizedBox(width: AppTokens.sp4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(template.name, style: textTheme.headlineSmall),
-                    const SizedBox(height: 4),
-                    Text(_providerLabel(ai.provider)),
+                    Text(template.name, style: textTheme.titleLarge),
+                    const SizedBox(height: 2),
+                    Text(
+                      _providerLabel(ai.provider),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.text2,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppTokens.sp6),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: AppTokens.sp2,
+            runSpacing: AppTokens.sp2,
             children: <Widget>[
-              Chip(label: Text('v${template.version}')),
-              Chip(
-                avatar: Icon(
-                  ai.enabled
-                      ? Icons.psychology_outlined
-                      : Icons.psychology_alt_outlined,
-                  size: 18,
+              AppPill.outline(label: 'v${template.version}'),
+              // IA on/off es estado de configuración, no error: primary
+              // cuando está habilitada, neutral cuando no — danger queda
+              // reservado para fallos reales (load errors, destructive).
+              if (ai.enabled)
+                const AppPill.primary(
+                  label: 'IA habilitada',
+                  dot: AppPillDot.active,
+                )
+              else
+                const AppPill.neutral(
+                  label: 'IA deshabilitada',
+                  dot: AppPillDot.paused,
                 ),
-                label: Text(ai.enabled ? 'IA habilitada' : 'IA deshabilitada'),
-              ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppTokens.sp6),
           const _SectionTitle('Motor IA'),
-          const SizedBox(height: 8),
-          _FieldRow(label: 'Modelo', value: ai.model),
-          _FieldRow(
-            label: 'Temperatura',
-            value: ai.temperature.toStringAsFixed(1),
-          ),
-          _FieldRow(
-            label: 'Razonamiento',
-            value: _thinkingLabel(ai.thinkingLevel),
-          ),
-          _FieldRow(
-            label: 'Mensajes de contexto',
-            value: ai.contextMessages.toString(),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppTokens.sp3),
+          _StatGrid(ai: ai),
+          const SizedBox(height: AppTokens.sp6),
           const _SectionTitle('Prompt del sistema'),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppTokens.sp3),
           if (ai.systemPrompt.isEmpty)
             Text(
               'Sin prompt definido',
               style: textTheme.bodyMedium?.copyWith(
                 fontStyle: FontStyle.italic,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: AppTokens.text2,
               ),
             )
           else
             SelectableText(ai.systemPrompt, style: textTheme.bodyMedium),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppTokens.sp6),
           const _SectionTitle('Variables'),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppTokens.sp3),
           const _VarDefsSection(),
-          const SizedBox(height: 32),
+          const SizedBox(height: AppTokens.sp7),
           _CreateBotButton(template: template),
         ],
       ),
     );
-  }
-
-  static String _initial(String s) {
-    final trimmed = s.trim();
-    if (trimmed.isEmpty) return '?';
-    return trimmed.substring(0, 1).toUpperCase();
   }
 
   static String _providerLabel(AIProvider p) => switch (p) {
@@ -132,12 +131,6 @@ class _LoadedView extends StatelessWidget {
     AIProvider.gemini => 'Gemini',
     AIProvider.minimax => 'MiniMax',
     AIProvider.deepseek => 'DeepSeek',
-  };
-
-  static String _thinkingLabel(ThinkingLevel t) => switch (t) {
-    ThinkingLevel.low => 'Bajo',
-    ThinkingLevel.medium => 'Medio',
-    ThinkingLevel.high => 'Alto',
   };
 }
 
@@ -148,38 +141,96 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
     return Text(
       text,
-      style: t.textTheme.titleMedium?.copyWith(
-        color: t.colorScheme.onSurfaceVariant,
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(color: AppTokens.text2),
     );
   }
 }
 
-class _FieldRow extends StatelessWidget {
-  const _FieldRow({required this.label, required this.value});
+class _StatGrid extends StatelessWidget {
+  const _StatGrid({required this.ai});
+
+  final AIConfig ai;
+
+  @override
+  Widget build(BuildContext context) {
+    // 2×2 stats — la sección Motor IA cabe en una grilla compacta en
+    // mobile sin scroll horizontal y deja respirar el system prompt
+    // debajo. IntrinsicHeight iguala la altura de las dos cards de cada
+    // fila cuando un modelo largo (p.ej. 'gemini-3.1-pro-preview')
+    // estira una columna pero no la otra.
+    return Column(
+      children: <Widget>[
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Expanded(
+                child: _StatTile(label: 'Modelo', value: ai.model),
+              ),
+              const SizedBox(width: AppTokens.cardGap),
+              Expanded(
+                child: _StatTile(
+                  label: 'Temperatura',
+                  value: ai.temperature.toStringAsFixed(1),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppTokens.cardGap),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Expanded(
+                child: _StatTile(
+                  label: 'Razonamiento',
+                  value: _thinkingLabel(ai.thinkingLevel),
+                ),
+              ),
+              const SizedBox(width: AppTokens.cardGap),
+              Expanded(
+                child: _StatTile(
+                  label: 'Mensajes de contexto',
+                  value: ai.contextMessages.toString(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _thinkingLabel(ThinkingLevel t) => switch (t) {
+    ThinkingLevel.low => 'Bajo',
+    ThinkingLevel.medium => 'Medio',
+    ThinkingLevel.high => 'Alto',
+  };
+}
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({required this.label, required this.value});
 
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
+      padding: AppTokens.sp4,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          SizedBox(width: 180, child: Text(label)),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
+          Text(label, style: textTheme.labelSmall),
+          const SizedBox(height: AppTokens.sp1),
+          Text(value, style: textTheme.titleMedium),
         ],
       ),
     );
@@ -195,7 +246,7 @@ class _VarDefsSection extends StatelessWidget {
       builder: (context, state) => switch (state) {
         VarDefsLoading() => const Padding(
           key: Key('var_defs.loading'),
-          padding: EdgeInsets.symmetric(vertical: 8),
+          padding: EdgeInsets.symmetric(vertical: AppTokens.sp2),
           child: SizedBox(
             width: 20,
             height: 20,
@@ -207,7 +258,7 @@ class _VarDefsSection extends StatelessWidget {
           key: const Key('var_defs.empty'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontStyle: FontStyle.italic,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: AppTokens.text2,
           ),
         ),
         VarDefsLoaded(defs: final defs) => Column(
@@ -227,7 +278,7 @@ class _VarDefRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
+    final t = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
@@ -242,7 +293,7 @@ class _VarDefRow extends StatelessWidget {
                 // mostrarla así es más útil que el name pelado.
                 child: SelectableText(
                   '{{${def.name}}}',
-                  style: t.textTheme.bodyMedium?.copyWith(
+                  style: t.bodyMedium?.copyWith(
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.w600,
                   ),
@@ -251,10 +302,8 @@ class _VarDefRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   def.defaultValue.isEmpty ? '—' : def.defaultValue,
-                  style: t.textTheme.bodyMedium?.copyWith(
-                    color: def.defaultValue.isEmpty
-                        ? t.colorScheme.onSurfaceVariant
-                        : null,
+                  style: t.bodyMedium?.copyWith(
+                    color: def.defaultValue.isEmpty ? AppTokens.text2 : null,
                   ),
                 ),
               ),
@@ -265,9 +314,7 @@ class _VarDefRow extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 def.description,
-                style: t.textTheme.bodySmall?.copyWith(
-                  color: t.colorScheme.onSurfaceVariant,
-                ),
+                style: t.bodySmall?.copyWith(color: AppTokens.text2),
               ),
             ),
         ],
@@ -284,16 +331,16 @@ class _VarDefsFailedView extends StatelessWidget {
     return Row(
       key: const Key('var_defs.failed'),
       children: <Widget>[
-        Expanded(
+        const Expanded(
           child: Text(
             'No pudimos cargar las variables.',
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+            style: TextStyle(color: AppTokens.danger),
           ),
         ),
-        TextButton(
+        AppButton.text(
+          label: 'Reintentar',
           onPressed: () =>
               context.read<VarDefsBloc>().add(const VarDefsLoadRequested()),
-          child: const Text('Reintentar'),
         ),
       ],
     );
@@ -307,8 +354,10 @@ class _CreateBotButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.icon(
+    return AppButton.filled(
       key: const Key('template_detail.create_bot_button'),
+      label: 'Crear bot',
+      icon: Icons.smart_toy_outlined,
       onPressed: () {
         // El nombre viaja como query param URL-encoded para que el form
         // pueda mostrar el chip de plantilla sin pedirla otra vez al
@@ -317,8 +366,6 @@ class _CreateBotButton extends StatelessWidget {
         final name = Uri.encodeQueryComponent(template.name);
         context.push('/templates/${template.id}/bots/new?name=$name');
       },
-      icon: const Icon(Icons.smart_toy_outlined),
-      label: const Text('Crear bot'),
     );
   }
 }
@@ -331,12 +378,13 @@ class _FailedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isNotFound = failure is TemplatesNotFoundFailure;
+    final textTheme = Theme.of(context).textTheme;
     return Center(
       key: isNotFound
           ? const Key('template_detail.error.not_found')
           : const Key('template_detail.error.generic'),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppTokens.sp6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -345,13 +393,14 @@ class _FailedView extends StatelessWidget {
                   ? 'Esta plantilla ya no existe en tu organización'
                   : 'No pudimos cargar el detalle de la plantilla',
               textAlign: TextAlign.center,
+              style: textTheme.bodyLarge,
             ),
-            const SizedBox(height: 12),
-            FilledButton(
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
               onPressed: () => context.read<TemplateDetailBloc>().add(
                 const TemplateDetailLoadRequested(),
               ),
-              child: const Text('Reintentar'),
             ),
           ],
         ),

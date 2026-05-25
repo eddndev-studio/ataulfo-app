@@ -1,5 +1,11 @@
 import 'dart:async';
 
+import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/tokens.dart';
+import 'package:agentic/core/design/widgets/app_avatar.dart';
+import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_card.dart';
+import 'package:agentic/core/design/widgets/app_pill.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
@@ -56,91 +62,117 @@ void main() {
   });
 
   Widget host() => MaterialApp(
+    theme: AppDesignTheme.dark(),
     home: MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<TemplateDetailBloc>.value(value: bloc),
         BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
       ],
       // TemplateDetailPage es content-only; el host envuelve en Scaffold
-      // para dar Material upstream a Chip/FilledButton/etc.
+      // para dar Material upstream a los widgets internos.
       child: const Scaffold(body: TemplateDetailPage()),
     ),
   );
 
-  testWidgets('Loading muestra spinner', (tester) async {
+  testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
     when(() => bloc.state).thenReturn(const TemplateDetailLoading());
 
     await tester.pumpWidget(host());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-  });
-
-  testWidgets('Loaded muestra name + version + provider humanizado', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-
-    await tester.pumpWidget(host());
-
-    expect(find.text('Soporte'), findsOneWidget);
-    expect(find.text('v3'), findsOneWidget);
-    expect(find.text('Gemini'), findsOneWidget);
+    final spinner = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
   testWidgets(
-    'Loaded muestra todos los campos AIConfig (provider/model/temp/think/ctx)',
+    'Loaded muestra header con AppAvatar(size: 64), nombre y provider',
     (tester) async {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
 
       await tester.pumpWidget(host());
 
-      // Provider y modelo (texto crudo del wire — es identificador técnico,
-      // no se humaniza).
-      expect(find.text('gemini-3.1-pro-preview'), findsOneWidget);
-      // Temperatura con un decimal.
-      expect(find.textContaining('0.7'), findsWidgets);
-      // Thinking level humanizado.
-      expect(find.text('Medio'), findsOneWidget);
-      // Mensajes de contexto.
-      expect(find.textContaining('20'), findsWidgets);
+      expect(find.text('Soporte'), findsOneWidget);
+      expect(find.text('Gemini'), findsOneWidget);
+      final avatar = tester.widget<AppAvatar>(find.byType(AppAvatar));
+      expect(avatar.size, 64);
+      expect(avatar.name, 'Soporte');
+      expect(find.byType(CircleAvatar), findsNothing);
     },
   );
 
-  testWidgets('Loaded(enabled=true) muestra estado "IA habilitada"', (
+  testWidgets('Loaded muestra versión como AppPill.outline', (tester) async {
+    when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+
+    await tester.pumpWidget(host());
+
+    expect(find.widgetWithText(AppPill, 'v3'), findsOneWidget);
+    expect(find.byType(Chip), findsNothing);
+  });
+
+  testWidgets('Loaded(enabled=true) muestra AppPill primary "IA habilitada"', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
 
     await tester.pumpWidget(host());
 
-    expect(find.text('IA habilitada'), findsOneWidget);
+    expect(find.widgetWithText(AppPill, 'IA habilitada'), findsOneWidget);
   });
 
-  testWidgets('Loaded(enabled=false) muestra estado "IA deshabilitada"', (
-    tester,
-  ) async {
-    const tplOff = Template(
-      id: 't2',
-      orgId: 'o1',
-      name: 'Marketing',
-      version: 1,
-      ai: AIConfig(
-        enabled: false,
-        provider: AIProvider.openai,
-        model: 'gpt-5-pro',
-        temperature: 1.0,
-        thinkingLevel: ThinkingLevel.low,
-        systemPrompt: '',
-        contextMessages: 10,
-      ),
-    );
-    when(() => bloc.state).thenReturn(const TemplateDetailLoaded(tplOff));
+  testWidgets(
+    'Loaded(enabled=false) muestra AppPill neutral "IA deshabilitada"',
+    (tester) async {
+      const tplOff = Template(
+        id: 't2',
+        orgId: 'o1',
+        name: 'Marketing',
+        version: 1,
+        ai: AIConfig(
+          enabled: false,
+          provider: AIProvider.openai,
+          model: 'gpt-5-pro',
+          temperature: 1.0,
+          thinkingLevel: ThinkingLevel.low,
+          systemPrompt: '',
+          contextMessages: 10,
+        ),
+      );
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(tplOff));
+
+      await tester.pumpWidget(host());
+
+      // IA off es estado de configuración, no error → neutral (no danger).
+      expect(find.widgetWithText(AppPill, 'IA deshabilitada'), findsOneWidget);
+      expect(find.text('OpenAI'), findsOneWidget);
+      expect(find.text('Bajo'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Loaded muestra los 4 stats AIConfig en AppCard individuales '
+      '(modelo/temp/razonamiento/contexto)', (tester) async {
+    when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
 
     await tester.pumpWidget(host());
 
-    expect(find.text('IA deshabilitada'), findsOneWidget);
-    expect(find.text('OpenAI'), findsOneWidget);
-    expect(find.text('Bajo'), findsOneWidget);
+    // Cuatro stat tiles, uno por campo. Cada uno es un AppCard con
+    // label caption + valor titleM — reemplaza al _FieldRow del shape
+    // pre-DS (label 180px fijo).
+    expect(find.byType(AppCard), findsNWidgets(4));
+    expect(find.widgetWithText(AppCard, 'Modelo'), findsOneWidget);
+    expect(
+      find.widgetWithText(AppCard, 'gemini-3.1-pro-preview'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(AppCard, 'Temperatura'), findsOneWidget);
+    expect(find.widgetWithText(AppCard, '0.7'), findsOneWidget);
+    expect(find.widgetWithText(AppCard, 'Razonamiento'), findsOneWidget);
+    expect(find.widgetWithText(AppCard, 'Medio'), findsOneWidget);
+    expect(
+      find.widgetWithText(AppCard, 'Mensajes de contexto'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(AppCard, '20'), findsOneWidget);
   });
 
   testWidgets('Loaded con systemPrompt no vacío lo muestra (SelectableText)', (
@@ -155,7 +187,7 @@ void main() {
     expect(find.text('Eres un asistente de soporte amable.'), findsOneWidget);
   });
 
-  testWidgets('Failed(NotFound) muestra mensaje específico + retry', (
+  testWidgets('Failed(NotFound) preserva key y usa AppButton "Reintentar"', (
     tester,
   ) async {
     when(
@@ -168,10 +200,11 @@ void main() {
       find.byKey(const Key('template_detail.error.not_found')),
       findsOneWidget,
     );
-    expect(find.text('Reintentar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
+    expect(find.byType(FilledButton), findsNothing);
   });
 
-  testWidgets('Failed(Network) muestra mensaje genérico + retry', (
+  testWidgets('Failed(Network) preserva key genérica + AppButton', (
     tester,
   ) async {
     when(
@@ -184,7 +217,7 @@ void main() {
       find.byKey(const Key('template_detail.error.generic')),
       findsOneWidget,
     );
-    expect(find.text('Reintentar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
   });
 
   testWidgets('tap en Reintentar dispara TemplateDetailLoadRequested', (
@@ -195,7 +228,7 @@ void main() {
     ).thenReturn(const TemplateDetailFailed(TemplatesServerFailure()));
 
     await tester.pumpWidget(host());
-    await tester.tap(find.text('Reintentar'));
+    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
 
     verify(() => bloc.add(const TemplateDetailLoadRequested())).called(1);
@@ -248,7 +281,7 @@ void main() {
     expect(find.text('DeepSeek'), findsOneWidget);
   });
 
-  // ── Sección Variables (T2.5) ───────────────────────────────────────────────
+  // ── Sección Variables ──────────────────────────────────────────────────────
   group('sección Variables', () {
     setUp(() {
       // Sin Template no se renderiza el resto de la página; las pruebas de
@@ -311,7 +344,7 @@ void main() {
       },
     );
 
-    testWidgets('VarDefsFailed muestra mensaje + botón Reintentar', (
+    testWidgets('VarDefsFailed muestra mensaje + AppButton "Reintentar"', (
       tester,
     ) async {
       when(
@@ -321,7 +354,10 @@ void main() {
       await tester.pumpWidget(host());
 
       expect(find.byKey(const Key('var_defs.failed')), findsOneWidget);
-      expect(find.widgetWithText(TextButton, 'Reintentar'), findsOneWidget);
+      // El retry inline usa AppButton.text (consistente con DS); el
+      // TextButton de Material desaparece de la página.
+      expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
+      expect(find.byType(TextButton), findsNothing);
     });
 
     testWidgets('tap Reintentar dispara VarDefsLoadRequested', (tester) async {
@@ -330,7 +366,7 @@ void main() {
       ).thenReturn(const VarDefsFailed(TemplatesNetworkFailure()));
 
       await tester.pumpWidget(host());
-      await tester.tap(find.widgetWithText(TextButton, 'Reintentar'));
+      await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
       await tester.pump();
 
       verify(() => varDefsBloc.add(const VarDefsLoadRequested())).called(1);
@@ -343,13 +379,18 @@ void main() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
-    testWidgets('Loaded expone botón con key contractual', (tester) async {
+    testWidgets('Loaded expone botón con key contractual y AppButton', (
+      tester,
+    ) async {
       await tester.pumpWidget(host());
 
-      expect(
-        find.byKey(const Key('template_detail.create_bot_button')),
-        findsOneWidget,
+      final keyFinder = find.byKey(
+        const Key('template_detail.create_bot_button'),
       );
+      expect(keyFinder, findsOneWidget);
+      // El botón es AppButton.filled (no FilledButton.icon Material).
+      expect(find.widgetWithText(AppButton, 'Crear bot'), findsOneWidget);
+      expect(find.byType(FilledButton), findsNothing);
     });
 
     testWidgets(
@@ -360,7 +401,7 @@ void main() {
         // pueda mostrar el chip sin volver a golpear el backend.
         // La aserción canPop() == true en el destino es el guard
         // contractual que detecta regresiones a context.go() sin pasar por
-        // device — política de navegación aterrizada en fixes post-T3.
+        // device.
         when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
 
         final canPopAtDestination = <bool>[];
@@ -395,7 +436,19 @@ void main() {
           ],
         );
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            theme: AppDesignTheme.dark(),
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        // El detalle migrado al DS es más alto que el test surface (800×600);
+        // el botón vive después del scroll. ensureVisible scrollea el
+        // SingleChildScrollView hasta que el botón sea hit-testable.
+        await tester.ensureVisible(
+          find.byKey(const Key('template_detail.create_bot_button')),
+        );
         await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const Key('template_detail.create_bot_button')),
