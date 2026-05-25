@@ -165,4 +165,93 @@ void main() {
       expect(icon.color, Colors.white);
     });
   });
+
+  group('AppButton — loading state', () {
+    testWidgets('loading: false (default) renderiza el label como hasta hoy', (
+      tester,
+    ) async {
+      await pumpButton(
+        tester,
+        AppButton.filled(label: 'Crear', onPressed: () {}),
+      );
+      expect(find.text('Crear'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets(
+      'loading: true muestra spinner inline y oculta label e icon',
+      (tester) async {
+        await pumpButton(
+          tester,
+          AppButton.filled(
+            label: 'Crear',
+            icon: Icons.add,
+            onPressed: () {},
+            loading: true,
+          ),
+        );
+        // El spinner comunica el estado de submitting; label + icon se
+        // ocultan para no competir con el feedback visual.
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        expect(find.text('Crear'), findsNothing);
+        expect(find.byIcon(Icons.add), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'loading: true con foreground primary (variante filled) tinte el '
+      'spinner con onPrimary (blanco)',
+      (tester) async {
+        // El spinner toma el foreground de la variante — coherente con el
+        // color del label que reemplaza. En filled, foreground = white.
+        await pumpButton(
+          tester,
+          AppButton.filled(label: 'X', onPressed: () {}, loading: true),
+        );
+        final spinner = tester.widget<CircularProgressIndicator>(
+          find.byType(CircularProgressIndicator),
+        );
+        expect(spinner.valueColor?.value, Colors.white);
+      },
+    );
+
+    testWidgets('loading: true bloquea el tap sin nullificar onPressed', (
+      tester,
+    ) async {
+      // Contrato del API: el consumidor pasa onPressed: _submit sin gate
+      // !submitting; el botón ignora el tap internamente cuando loading
+      // es true. Así los formularios no replican la rama en cada page.
+      var taps = 0;
+      await pumpButton(
+        tester,
+        AppButton.filled(
+          label: 'X',
+          onPressed: () => taps++,
+          loading: true,
+        ),
+      );
+      await tester.tap(find.byType(AppButton));
+      await tester.pumpAndSettle();
+      expect(taps, 0);
+    });
+
+    testWidgets(
+      'loading: true mantiene opacity 1.0 (el spinner ya comunica el estado)',
+      (tester) async {
+        await pumpButton(
+          tester,
+          AppButton.filled(label: 'X', onPressed: () {}, loading: true),
+        );
+        final opacity = tester.widget<Opacity>(
+          find.descendant(
+            of: find.byType(AppButton),
+            matching: find.byType(Opacity),
+          ),
+        );
+        // Opacity baja a 0.4 solo cuando el botón está realmente disabled
+        // (onPressed=null). Loading conserva el botón en su tinte pleno.
+        expect(opacity.opacity, 1.0);
+      },
+    );
+  });
 }
