@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../domain/entities/template.dart';
@@ -156,7 +157,7 @@ class _TemplateTile extends StatelessWidget {
       onTap: () => context.push('/templates/${template.id}'),
       child: Row(
         children: <Widget>[
-          _Avatar(initial: _initial(template.name)),
+          AppAvatar(name: template.name),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(
@@ -177,47 +178,10 @@ class _TemplateTile extends StatelessWidget {
     );
   }
 
-  static String _initial(String s) {
-    final trimmed = s.trim();
-    if (trimmed.isEmpty) return '?';
-    return trimmed.substring(0, 1).toUpperCase();
-  }
-
   static String _providerLabel(AIProvider p) => switch (p) {
     AIProvider.openai => 'OpenAI',
     AIProvider.gemini => 'Gemini',
     AIProvider.minimax => 'MiniMax',
     AIProvider.deepseek => 'DeepSeek',
   };
-}
-
-/// Avatar circular del tile con la inicial del nombre. Es local al tile
-/// hasta que un segundo callsite (BotsList, probablemente) pida el mismo
-/// patrón — ahí extraemos a `core/design/widgets/app_avatar.dart`.
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initial});
-
-  final String initial;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: const BoxDecoration(
-        color: AppTokens.surface3,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: const TextStyle(
-          fontFamily: AppTokens.fontSans,
-          fontSize: AppTokens.bodyLSize,
-          fontWeight: FontWeight.w600,
-          color: AppTokens.text1,
-        ),
-      ),
-    );
-  }
 }
