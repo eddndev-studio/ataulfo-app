@@ -99,7 +99,11 @@ class _TabSpec {
 Widget? _fab(BuildContext context, int index) => switch (index) {
   1 => FloatingActionButton(
     key: const Key('shell.fab.template_create'),
-    onPressed: () => context.go('/templates/new'),
+    // push (no go): el formulario se apila sobre el shell. Back sin
+    // crear vuelve al listado en lugar de salir de la app. Cuando el
+    // formulario completa, su listener hace pushReplacement al detalle
+    // — el shell permanece debajo en cualquier caso.
+    onPressed: () => context.push('/templates/new'),
     tooltip: 'Crear plantilla',
     child: const Icon(Icons.add),
   ),

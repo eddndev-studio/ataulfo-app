@@ -260,64 +260,61 @@ void main() {
       expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
     });
 
-    testWidgets(
-      'tap FAB en tab Plantillas apila /templates/new sobre el shell '
-      '(back sin crear vuelve al shell, NO sale de la app)',
-      (tester) async {
-        useViewport(tester, widthDp: 420);
+    testWidgets('tap FAB en tab Plantillas apila /templates/new sobre el shell '
+        '(back sin crear vuelve al shell, NO sale de la app)', (tester) async {
+      useViewport(tester, widthDp: 420);
 
-        // Reproducción del bug del smoke device V2314: con context.go()
-        // el shell se aplasta y back sin crear sale de la app. Con push()
-        // el shell queda debajo (canPop = true en el destino).
-        final navigated = <String>[];
-        final canPopAtDestination = <bool>[];
-        final router = GoRouter(
-          initialLocation: '/',
-          routes: <RouteBase>[
-            GoRoute(
-              path: '/',
-              builder: (_, _) => MultiBlocProvider(
-                providers: <BlocProvider<dynamic>>[
-                  BlocProvider<AuthBloc>.value(value: authBloc),
-                  BlocProvider<BotsBloc>.value(value: botsBloc),
-                  BlocProvider<TemplatesBloc>.value(value: templatesBloc),
-                ],
-                child: const ShellPage(),
-              ),
+      // Reproducción del bug del smoke device V2314: con context.go()
+      // el shell se aplasta y back sin crear sale de la app. Con push()
+      // el shell queda debajo (canPop = true en el destino).
+      final navigated = <String>[];
+      final canPopAtDestination = <bool>[];
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                BlocProvider<BotsBloc>.value(value: botsBloc),
+                BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+              ],
+              child: const ShellPage(),
             ),
-            GoRoute(
-              path: '/templates/new',
-              builder: (_, _) {
-                navigated.add('/templates/new');
-                return Scaffold(
-                  body: Builder(
-                    builder: (ctx) {
-                      canPopAtDestination.add(Navigator.of(ctx).canPop());
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                );
-              },
-            ),
-          ],
-        );
+          ),
+          GoRoute(
+            path: '/templates/new',
+            builder: (_, _) {
+              navigated.add('/templates/new');
+              return Scaffold(
+                body: Builder(
+                  builder: (ctx) {
+                    canPopAtDestination.add(Navigator.of(ctx).canPop());
+                    return const SizedBox.shrink();
+                  },
+                ),
+              );
+            },
+          ),
+        ],
+      );
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-        await tester.tap(find.text('Plantillas'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('shell.fab.template_create')));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.tap(find.text('Plantillas'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('shell.fab.template_create')));
+      await tester.pumpAndSettle();
 
-        expect(navigated, <String>['/templates/new']);
-        expect(
-          canPopAtDestination,
-          <bool>[true],
-          reason:
-              'el formulario debe quedar apilado sobre el shell para que '
-              'el back físico cancele la creación y vuelva al listado',
-        );
-      },
-    );
+      expect(navigated, <String>['/templates/new']);
+      expect(
+        canPopAtDestination,
+        <bool>[true],
+        reason:
+            'el formulario debe quedar apilado sobre el shell para que '
+            'el back físico cancele la creación y vuelva al listado',
+      );
+    });
 
     testWidgets(
       'cambiar tab preserva el TemplatesBloc del shell (mismo instance)',
