@@ -104,10 +104,7 @@ void main() {
         const TemplateDetailLoadRequested(),
       );
       expect(const TemplateDetailLoading(), const TemplateDetailLoading());
-      expect(
-        const TemplateDetailLoaded(_t1),
-        const TemplateDetailLoaded(_t1),
-      );
+      expect(const TemplateDetailLoaded(_t1), const TemplateDetailLoaded(_t1));
       expect(
         const TemplateDetailFailed(TemplatesServerFailure()),
         const TemplateDetailFailed(TemplatesServerFailure()),

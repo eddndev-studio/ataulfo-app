@@ -253,10 +253,7 @@ void main() {
         () => dio.get<Map<String, dynamic>>('/templates/t1'),
       ).thenThrow(badResponse(500, path: '/templates/t1'));
 
-      await expectLater(
-        ds.byId('t1'),
-        throwsA(isA<TemplatesServerFailure>()),
-      );
+      await expectLater(ds.byId('t1'), throwsA(isA<TemplatesServerFailure>()));
     });
 
     test('timeout → TemplatesTimeoutFailure', () async {
@@ -267,10 +264,7 @@ void main() {
         ),
       );
 
-      await expectLater(
-        ds.byId('t1'),
-        throwsA(isA<TemplatesTimeoutFailure>()),
-      );
+      await expectLater(ds.byId('t1'), throwsA(isA<TemplatesTimeoutFailure>()));
     });
 
     test('sin conexión → TemplatesNetworkFailure', () async {
@@ -281,10 +275,7 @@ void main() {
         ),
       );
 
-      await expectLater(
-        ds.byId('t1'),
-        throwsA(isA<TemplatesNetworkFailure>()),
-      );
+      await expectLater(ds.byId('t1'), throwsA(isA<TemplatesNetworkFailure>()));
     });
 
     test('418 (no contemplado) → UnknownTemplatesFailure', () async {
@@ -292,10 +283,7 @@ void main() {
         () => dio.get<Map<String, dynamic>>('/templates/t1'),
       ).thenThrow(badResponse(418, path: '/templates/t1'));
 
-      await expectLater(
-        ds.byId('t1'),
-        throwsA(isA<UnknownTemplatesFailure>()),
-      );
+      await expectLater(ds.byId('t1'), throwsA(isA<UnknownTemplatesFailure>()));
     });
 
     test('body nulo → UnknownTemplatesFailure (contrato roto)', () async {
@@ -303,10 +291,7 @@ void main() {
         () => dio.get<Map<String, dynamic>>('/templates/t1'),
       ).thenAnswer((_) async => respMap(200));
 
-      await expectLater(
-        ds.byId('t1'),
-        throwsA(isA<UnknownTemplatesFailure>()),
-      );
+      await expectLater(ds.byId('t1'), throwsA(isA<UnknownTemplatesFailure>()));
     });
 
     test('body malformado → UnknownTemplatesFailure', () async {
@@ -314,10 +299,7 @@ void main() {
         (_) async => respMap(200, body: <String, dynamic>{'id': 'x'}),
       );
 
-      await expectLater(
-        ds.byId('t1'),
-        throwsA(isA<UnknownTemplatesFailure>()),
-      );
+      await expectLater(ds.byId('t1'), throwsA(isA<UnknownTemplatesFailure>()));
     });
 
     test(

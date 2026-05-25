@@ -214,24 +214,23 @@ void main() {
     verify(() => templatesRepo.byId('t1')).called(1);
   });
 
-  testWidgets(
-    'AuthUnauthenticated + deep-link a /templates/:id → /login',
-    (tester) async {
-      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
-      router = AppRouter(
-        authBloc: authBloc,
-        authRepository: _MockAuthRepo(),
-        botsRepository: botsRepo,
-        templatesRepository: templatesRepo,
-      );
+  testWidgets('AuthUnauthenticated + deep-link a /templates/:id → /login', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+    router = AppRouter(
+      authBloc: authBloc,
+      authRepository: _MockAuthRepo(),
+      botsRepository: botsRepo,
+      templatesRepository: templatesRepo,
+    );
 
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      router.router.go('/templates/t1');
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/templates/t1');
+    await tester.pumpAndSettle();
 
-      expect(find.byType(LoginPage), findsOneWidget);
-      expect(find.byType(TemplateDetailPage), findsNothing);
-    },
-  );
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(TemplateDetailPage), findsNothing);
+  });
 }

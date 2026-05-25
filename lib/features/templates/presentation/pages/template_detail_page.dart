@@ -74,14 +74,12 @@ class _LoadedView extends StatelessWidget {
                       : Icons.psychology_alt_outlined,
                   size: 18,
                 ),
-                label: Text(
-                  ai.enabled ? 'IA habilitada' : 'IA deshabilitada',
-                ),
+                label: Text(ai.enabled ? 'IA habilitada' : 'IA deshabilitada'),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          _SectionTitle('Motor IA'),
+          const _SectionTitle('Motor IA'),
           const SizedBox(height: 8),
           _FieldRow(label: 'Modelo', value: ai.model),
           _FieldRow(
@@ -97,7 +95,7 @@ class _LoadedView extends StatelessWidget {
             value: ai.contextMessages.toString(),
           ),
           const SizedBox(height: 24),
-          _SectionTitle('Prompt del sistema'),
+          const _SectionTitle('Prompt del sistema'),
           const SizedBox(height: 8),
           if (ai.systemPrompt.isEmpty)
             Text(
@@ -168,9 +166,9 @@ class _FieldRow extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ],

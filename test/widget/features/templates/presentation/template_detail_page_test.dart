@@ -133,10 +133,7 @@ void main() {
 
     // El system prompt es contenido del usuario; debe ser seleccionable
     // para que se pueda copiar.
-    expect(
-      find.text('Eres un asistente de soporte amable.'),
-      findsOneWidget,
-    );
+    expect(find.text('Eres un asistente de soporte amable.'), findsOneWidget);
   });
 
   testWidgets('Failed(NotFound) muestra mensaje específico + retry', (
