@@ -28,3 +28,5 @@ flutter:
     - family: DMSans
       fonts:
         - asset: assets/fonts/DMSans-VariableFont.ttf
+        - asset: assets/fonts/DMSans-Italic-VariableFont.ttf
+          style: italic
