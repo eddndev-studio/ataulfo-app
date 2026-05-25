@@ -6,4 +6,8 @@ abstract interface class TemplatesRepository {
   /// Listado de templates de la org activa. RBAC del backend (CRUD de
   /// Template = ADMIN+) rechaza con 403 si el rol no alcanza.
   Future<List<Template>> list();
+
+  /// Detalle por id; 404 → `TemplatesNotFoundFailure`. Lanza el id es
+  /// stale o pertenece a otra org.
+  Future<Template> byId(String id);
 }

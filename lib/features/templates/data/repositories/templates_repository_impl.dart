@@ -14,4 +14,7 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
 
   @override
   Future<List<Template>> list() => _ds.list();
+
+  @override
+  Future<Template> byId(String id) => _ds.byId(id);
 }
