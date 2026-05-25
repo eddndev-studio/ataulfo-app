@@ -27,14 +27,25 @@ void main() {
         data: body,
       );
 
-  DioException badResponse(int status) => DioException(
-    requestOptions: RequestOptions(path: '/templates'),
-    response: Response<dynamic>(
-      requestOptions: RequestOptions(path: '/templates'),
-      statusCode: status,
-    ),
-    type: DioExceptionType.badResponse,
+  Response<Map<String, dynamic>> respMap(
+    int status, {
+    Map<String, dynamic>? body,
+    String path = '/templates/t1',
+  }) => Response<Map<String, dynamic>>(
+    requestOptions: RequestOptions(path: path),
+    statusCode: status,
+    data: body,
   );
+
+  DioException badResponse(int status, {String path = '/templates'}) =>
+      DioException(
+        requestOptions: RequestOptions(path: path),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: path),
+          statusCode: status,
+        ),
+        type: DioExceptionType.badResponse,
+      );
 
   Map<String, dynamic> aiJson({
     String provider = 'GEMINI',
@@ -187,6 +198,139 @@ void main() {
         );
 
         await expectLater(ds.list(), throwsArgumentError);
+      },
+    );
+  });
+
+  group('DioTemplatesDatasource.byId', () {
+    test('200 con templateResp → Template (con AIConfig completa)', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1'),
+      ).thenAnswer((_) async => respMap(200, body: tplJson()));
+
+      final tpl = await ds.byId('t1');
+
+      expect(tpl.id, 't1');
+      expect(tpl.orgId, 'o1');
+      expect(tpl.name, 'Soporte');
+      expect(tpl.version, 1);
+      expect(tpl.ai.provider, AIProvider.gemini);
+      expect(tpl.ai.model, 'gemini-3.1-pro-preview');
+      expect(tpl.ai.temperature, 0.7);
+      expect(tpl.ai.thinkingLevel, ThinkingLevel.low);
+      expect(tpl.ai.enabled, false);
+      expect(tpl.ai.systemPrompt, '');
+      expect(tpl.ai.contextMessages, 20);
+      verify(() => dio.get<Map<String, dynamic>>('/templates/t1')).called(1);
+    });
+
+    test('404 → TemplatesNotFoundFailure', () async {
+      // El backend devuelve 404 si el id no existe o no pertenece a la org;
+      // el cliente no distingue (ambos son "no hay nada que mostrar").
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/desconocido'),
+      ).thenThrow(badResponse(404, path: '/templates/desconocido'));
+
+      await expectLater(
+        ds.byId('desconocido'),
+        throwsA(isA<TemplatesNotFoundFailure>()),
+      );
+    });
+
+    test('403 → TemplatesForbiddenFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1'),
+      ).thenThrow(badResponse(403, path: '/templates/t1'));
+
+      await expectLater(
+        ds.byId('t1'),
+        throwsA(isA<TemplatesForbiddenFailure>()),
+      );
+    });
+
+    test('500 → TemplatesServerFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1'),
+      ).thenThrow(badResponse(500, path: '/templates/t1'));
+
+      await expectLater(
+        ds.byId('t1'),
+        throwsA(isA<TemplatesServerFailure>()),
+      );
+    });
+
+    test('timeout → TemplatesTimeoutFailure', () async {
+      when(() => dio.get<Map<String, dynamic>>('/templates/t1')).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/templates/t1'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+
+      await expectLater(
+        ds.byId('t1'),
+        throwsA(isA<TemplatesTimeoutFailure>()),
+      );
+    });
+
+    test('sin conexión → TemplatesNetworkFailure', () async {
+      when(() => dio.get<Map<String, dynamic>>('/templates/t1')).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/templates/t1'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        ds.byId('t1'),
+        throwsA(isA<TemplatesNetworkFailure>()),
+      );
+    });
+
+    test('418 (no contemplado) → UnknownTemplatesFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1'),
+      ).thenThrow(badResponse(418, path: '/templates/t1'));
+
+      await expectLater(
+        ds.byId('t1'),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+
+    test('body nulo → UnknownTemplatesFailure (contrato roto)', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1'),
+      ).thenAnswer((_) async => respMap(200));
+
+      await expectLater(
+        ds.byId('t1'),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+
+    test('body malformado → UnknownTemplatesFailure', () async {
+      when(() => dio.get<Map<String, dynamic>>('/templates/t1')).thenAnswer(
+        (_) async => respMap(200, body: <String, dynamic>{'id': 'x'}),
+      );
+
+      await expectLater(
+        ds.byId('t1'),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+
+    test(
+      'proveedor desconocido en el wire → ArgumentError (fail-loud)',
+      () async {
+        when(() => dio.get<Map<String, dynamic>>('/templates/t1')).thenAnswer(
+          (_) async => respMap(
+            200,
+            body: tplJson(ai: aiJson(provider: 'ANTHROPIC')),
+          ),
+        );
+
+        await expectLater(ds.byId('t1'), throwsArgumentError);
       },
     );
   });
