@@ -7,6 +7,9 @@ import 'package:agentic/features/bots/domain/entities/bot.dart';
 import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bots_list_page.dart';
+import 'package:agentic/features/templates/domain/entities/template.dart';
+import 'package:agentic/features/templates/domain/repositories/templates_repository.dart';
+import 'package:agentic/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -20,6 +23,8 @@ class _MockAuthRepo extends Mock implements AuthRepository {}
 
 class _MockBotsRepo extends Mock implements BotsRepository {}
 
+class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
+
 const _identity = Identity(userId: 'u1', orgId: 'o1', role: 'OWNER');
 
 Widget _host(AppRouter router, AuthBloc authBloc) =>
@@ -31,19 +36,23 @@ Widget _host(AppRouter router, AuthBloc authBloc) =>
 void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsRepo botsRepo;
+  late _MockTemplatesRepo templatesRepo;
   late AppRouter router;
 
   setUp(() {
     authBloc = _MockAuthBloc();
     botsRepo = _MockBotsRepo();
-    // El BotsBloc de la ruta /home arranca con LoadRequested al construirse;
-    // el repo mock devuelve una lista vacía para que el load termine sin
-    // colgar el pumpAndSettle.
+    templatesRepo = _MockTemplatesRepo();
+    // Los blocs page-scoped del shell arrancan con LoadRequested al
+    // construirse; los repos mock devuelven listas vacías para que los
+    // loads terminen sin colgar el pumpAndSettle.
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
+    when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      templatesRepository: templatesRepo,
     );
   });
 
@@ -65,6 +74,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(BotsListPage), findsOneWidget);
+  });
+
+  testWidgets('AuthAuthenticated → /home expone TemplatesBloc al árbol', (
+    tester,
+  ) async {
+    // El provider del TemplatesBloc vive en el route builder de /home (no
+    // dentro de cada tab) para preservarlo entre cambios de tab. Si lo
+    // mueven adentro del shell, este test rompe — guarda el contrato.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+
+    // Leer el bloc desde el árbol del BotsListPage (tab activa por
+    // default) confirma que el provider está aguas arriba del shell.
+    final templatesBloc = tester
+        .element(find.byType(BotsListPage))
+        .read<TemplatesBloc>();
+    expect(templatesBloc, isNotNull);
+    // El bloc dispara LoadRequested al construirse; el repo mock responde
+    // con [] y el bloc termina en Loaded(empty). pumpAndSettle ya esperó
+    // la transición.
+    verify(templatesRepo.list).called(1);
   });
 
   testWidgets('AuthUnauthenticated → redirige a LoginPage', (tester) async {
@@ -135,6 +167,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      templatesRepository: templatesRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));

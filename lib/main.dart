@@ -14,6 +14,8 @@ import 'features/auth/data/repositories/token_storage.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/bots/data/datasources/bots_datasource.dart';
 import 'features/bots/data/repositories/bots_repository_impl.dart';
+import 'features/templates/data/datasources/templates_datasource.dart';
+import 'features/templates/data/repositories/templates_repository_impl.dart';
 
 /// Punto de entrada. Composición manual de dependencias — sin DI framework
 /// hasta que un slice futuro lo justifique.
@@ -75,10 +77,15 @@ void main() {
     datasource: DioBotsDatasource(mainDio),
   );
 
+  final templatesRepository = TemplatesRepositoryImpl(
+    datasource: DioTemplatesDatasource(mainDio),
+  );
+
   final router = AppRouter(
     authBloc: authBloc,
     authRepository: authRepository,
     botsRepository: botsRepository,
+    templatesRepository: templatesRepository,
   );
 
   // Dispara el check inicial: lee storage, si hay tokens valida con
