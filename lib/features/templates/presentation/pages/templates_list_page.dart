@@ -167,9 +167,7 @@ class _TemplateTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   _providerLabel(template.ai.provider),
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: AppTokens.text2,
-                  ),
+                  style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
                 ),
               ],
             ),
