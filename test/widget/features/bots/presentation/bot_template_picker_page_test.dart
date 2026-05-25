@@ -1,5 +1,11 @@
 import 'dart:async';
 
+import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/tokens.dart';
+import 'package:agentic/core/design/widgets/app_avatar.dart';
+import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_card.dart';
+import 'package:agentic/core/design/widgets/provider_badge.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_template_picker_page.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
@@ -52,23 +58,26 @@ void main() {
   });
 
   Widget host() => MaterialApp(
+    theme: AppDesignTheme.dark(),
     home: BlocProvider<TemplatesBloc>.value(
       value: bloc,
       child: const Scaffold(body: BotTemplatePickerPage()),
     ),
   );
 
-  testWidgets('Loading muestra spinner', (tester) async {
+  testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
     when(() => bloc.state).thenReturn(const TemplatesLoading());
 
     await tester.pumpWidget(host());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    final spinner = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('Loaded con N templates renderiza un tile por cada uno', (
-    tester,
-  ) async {
+  testWidgets('Loaded con N templates renderiza una AppCard con AppAvatar y '
+      'ProviderBadge por cada uno', (tester) async {
     when(() => bloc.state).thenReturn(
       const TemplatesLoaded(items: <Template>[_t1, _t2], isRefreshing: false),
     );
@@ -77,6 +86,15 @@ void main() {
 
     expect(find.text('Soporte ventas'), findsOneWidget);
     expect(find.text('Ventas R&D / nivel 1'), findsOneWidget);
+    // Tile = AppCard con AppAvatar + ProviderBadge — converge visualmente
+    // con templates_list aunque la navegación diverja (push vs
+    // pushReplacement).
+    expect(find.byType(AppCard), findsNWidgets(2));
+    expect(find.byType(AppAvatar), findsNWidgets(2));
+    expect(find.byType(ProviderBadge), findsNWidgets(2));
+    // El ListTile + CircleAvatar legacy desaparecen.
+    expect(find.byType(ListTile), findsNothing);
+    expect(find.byType(CircleAvatar), findsNothing);
   });
 
   testWidgets(
@@ -100,7 +118,9 @@ void main() {
     },
   );
 
-  testWidgets('Failed muestra mensaje y botón Reintentar', (tester) async {
+  testWidgets('Failed muestra mensaje y AppButton "Reintentar"', (
+    tester,
+  ) async {
     when(
       () => bloc.state,
     ).thenReturn(const TemplatesFailed(TemplatesNetworkFailure()));
@@ -108,7 +128,8 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('bot_template_picker.error')), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Reintentar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
+    expect(find.byType(FilledButton), findsNothing);
   });
 
   testWidgets('tap Reintentar dispara TemplatesLoadRequested', (tester) async {
@@ -117,7 +138,7 @@ void main() {
     ).thenReturn(const TemplatesFailed(TemplatesServerFailure()));
 
     await tester.pumpWidget(host());
-    await tester.tap(find.widgetWithText(FilledButton, 'Reintentar'));
+    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
 
     verify(() => bloc.add(const TemplatesLoadRequested())).called(1);
@@ -183,7 +204,9 @@ void main() {
         ],
       );
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+      );
       unawaited(router.push<void>('/bots/new'));
       await tester.pumpAndSettle();
 
@@ -239,7 +262,9 @@ void main() {
         ],
       );
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+      );
       await tester.tap(find.text('Ventas R&D / nivel 1'));
       await tester.pumpAndSettle();
 

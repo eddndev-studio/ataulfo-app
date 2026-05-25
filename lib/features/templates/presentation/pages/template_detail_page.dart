@@ -7,6 +7,7 @@ import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/provider_badge.dart';
 import '../../domain/entities/template.dart';
 import '../../domain/entities/variable_def.dart';
 import '../../domain/failures/templates_failure.dart';
@@ -66,12 +67,7 @@ class _LoadedView extends StatelessWidget {
                   children: <Widget>[
                     Text(template.name, style: textTheme.titleLarge),
                     const SizedBox(height: 2),
-                    Text(
-                      _providerLabel(ai.provider),
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: AppTokens.text2,
-                      ),
-                    ),
+                    ProviderBadge(provider: ai.provider),
                   ],
                 ),
               ),
@@ -125,13 +121,6 @@ class _LoadedView extends StatelessWidget {
       ),
     );
   }
-
-  static String _providerLabel(AIProvider p) => switch (p) {
-    AIProvider.openai => 'OpenAI',
-    AIProvider.gemini => 'Gemini',
-    AIProvider.minimax => 'MiniMax',
-    AIProvider.deepseek => 'DeepSeek',
-  };
 }
 
 class _SectionTitle extends StatelessWidget {

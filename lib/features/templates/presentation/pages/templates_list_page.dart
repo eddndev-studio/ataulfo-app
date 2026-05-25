@@ -6,6 +6,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/provider_badge.dart';
 import '../../domain/entities/template.dart';
 import '../bloc/templates_bloc.dart';
 
@@ -166,10 +167,7 @@ class _TemplateTile extends StatelessWidget {
               children: <Widget>[
                 Text(template.name, style: textTheme.titleMedium),
                 const SizedBox(height: 2),
-                Text(
-                  _providerLabel(template.ai.provider),
-                  style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-                ),
+                ProviderBadge(provider: template.ai.provider),
               ],
             ),
           ),
@@ -177,11 +175,4 @@ class _TemplateTile extends StatelessWidget {
       ),
     );
   }
-
-  static String _providerLabel(AIProvider p) => switch (p) {
-    AIProvider.openai => 'OpenAI',
-    AIProvider.gemini => 'Gemini',
-    AIProvider.minimax => 'MiniMax',
-    AIProvider.deepseek => 'DeepSeek',
-  };
 }
