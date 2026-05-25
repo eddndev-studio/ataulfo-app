@@ -190,9 +190,14 @@ void main() {
       await tester.tap(find.text('Soporte ventas'));
       await tester.pumpAndSettle();
 
+      // `encodeQueryComponent` (form-urlencoded) codifica espacios como `+`,
+      // no `%20`. El decoder (`state.uri.queryParameters`) lo revierte; lo
+      // que NO podemos hacer es interpolar el nombre crudo, porque el `?`,
+      // `&`, `=` o `#` dentro del nombre romperían el query. Consistente
+      // con el otro entry point (template_detail_page).
       expect(
         navigated,
-        <String>['/templates/t1/bots/new?name=Soporte%20ventas'],
+        <String>['/templates/t1/bots/new?name=Soporte+ventas'],
       );
       expect(
         canPopAtDestination,
