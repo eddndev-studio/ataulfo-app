@@ -13,6 +13,8 @@ import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
+import '../../features/templates/domain/repositories/templates_repository.dart';
+import '../../features/templates/presentation/bloc/templates_bloc.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -30,13 +32,16 @@ class AppRouter {
     required AuthBloc authBloc,
     required AuthRepository authRepository,
     required BotsRepository botsRepository,
+    required TemplatesRepository templatesRepository,
   }) : _authBloc = authBloc,
        _authRepo = authRepository,
-       _botsRepo = botsRepository;
+       _botsRepo = botsRepository,
+       _templatesRepo = templatesRepository;
 
   final AuthBloc _authBloc;
   final AuthRepository _authRepo;
   final BotsRepository _botsRepo;
+  final TemplatesRepository _templatesRepo;
 
   late final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -61,11 +66,20 @@ class AppRouter {
       ),
       GoRoute(
         path: '/home',
-        builder: (context, _) => BlocProvider<BotsBloc>(
-          create: (_) => BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
-          // BotsBloc vive a nivel del shell: cambiar de tab no rebuildea
-          // el provider y la lista preserva estado (Loaded, refresh,
-          // failures) entre Bots ⇄ Ajustes.
+        builder: (context, _) => MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<BotsBloc>(
+              create: (_) =>
+                  BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+            ),
+            BlocProvider<TemplatesBloc>(
+              create: (_) => TemplatesBloc(_templatesRepo)
+                ..add(const TemplatesLoadRequested()),
+            ),
+          ],
+          // Blocs page-scoped a nivel del shell: cambiar de tab no
+          // rebuildea los providers y cada lista preserva estado
+          // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
           child: const ShellPage(),
         ),
       ),

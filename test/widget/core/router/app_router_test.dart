@@ -167,6 +167,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      templatesRepository: templatesRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
