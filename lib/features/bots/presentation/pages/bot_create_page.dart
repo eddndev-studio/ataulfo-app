@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_create_bloc.dart';
@@ -78,43 +81,37 @@ class _BotCreatePageState extends State<BotCreatePage> {
       },
       builder: (context, state) {
         final submitting = state is BotCreateSubmitting;
-        final canTap = _canSubmit && !submitting;
         return Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppTokens.sp6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               _TemplateChip(name: widget.templateName),
-              const SizedBox(height: 24),
-              TextField(
+              const SizedBox(height: AppTokens.sp6),
+              AppTextField(
                 key: const Key('bot_create.field.name'),
+                label: 'Nombre del bot',
+                hint: 'Ej. Bot soporte ventas',
                 controller: _ctrl,
                 enabled: !submitting,
                 autofocus: true,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del bot',
-                  hintText: 'Ej. Bot soporte ventas',
-                  border: OutlineInputBorder(),
-                ),
                 onSubmitted: (_) {
-                  if (canTap) _submit();
+                  if (_canSubmit) _submit();
                 },
               ),
-              const SizedBox(height: 16),
-              FilledButton(
+              const SizedBox(height: AppTokens.sp4),
+              AppButton.filled(
                 key: const Key('bot_create.submit'),
-                onPressed: canTap ? _submit : null,
-                child: submitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Crear'),
+                label: 'Crear',
+                // El primitivo bloquea el tap cuando loading=true sin
+                // nullificar onPressed: pasamos el callback inalterado
+                // y dejamos el gate de submitting al primitivo.
+                onPressed: _canSubmit ? _submit : null,
+                loading: submitting,
               ),
               if (state is BotCreateFailed) ...<Widget>[
-                const SizedBox(height: 16),
+                const SizedBox(height: AppTokens.sp4),
                 _FailedView(failure: state.failure),
               ],
             ],
@@ -132,12 +129,39 @@ class _TemplateChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Align(
       key: const Key('bot_create.template_chip'),
       alignment: Alignment.centerLeft,
-      child: Chip(
-        avatar: const Icon(Icons.description_outlined, size: 18),
-        label: Text(name ?? 'Plantilla seleccionada'),
+      // Wrapper local: single callsite. Cuando un segundo page necesite
+      // una etiqueta tipo "entidad seleccionada" con icono + label el
+      // patrón sube a un primitivo (regla de 3). Hoy basta con un
+      // Container con outline divider + fill surface2 + padding ~AppPill.
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp3,
+          vertical: AppTokens.sp1,
+        ),
+        decoration: BoxDecoration(
+          color: AppTokens.surface2,
+          borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+          border: Border.all(color: AppTokens.divider),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.description_outlined,
+              size: 18,
+              color: AppTokens.text2,
+            ),
+            const SizedBox(width: AppTokens.sp2),
+            Text(
+              name ?? 'Plantilla seleccionada',
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -154,7 +178,7 @@ class _FailedView extends StatelessWidget {
     return Text(
       copy,
       key: Key(key),
-      style: TextStyle(color: Theme.of(context).colorScheme.error),
+      style: const TextStyle(color: AppTokens.danger),
     );
   }
 
