@@ -50,7 +50,12 @@ class _TemplateCreatePageState extends State<TemplateCreatePage> {
     return BlocConsumer<TemplateCreateBloc, TemplateCreateState>(
       listener: (context, state) {
         if (state is TemplateCreateSucceeded) {
-          context.go('/templates/${state.template.id}');
+          // pushReplacement: reemplaza /templates/new con el detalle
+          // (back del detalle NO vuelve al formulario que ya cumplió su
+          // función) pero preserva el shell debajo, así el back físico
+          // de Android vuelve al listado. context.go() aplastaría la
+          // pila y sacaría al usuario de la app.
+          context.pushReplacement('/templates/${state.template.id}');
         }
       },
       builder: (context, state) {
