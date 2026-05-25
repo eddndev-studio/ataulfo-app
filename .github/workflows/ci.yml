@@ -9,6 +9,12 @@ on:
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    env:
+      # GitHub deprecó Node.js 20 en sep/2025; jun/2026 lo fuerza a Node 24.
+      # Algunas actions (p. ej. actions/upload-artifact@v5) todavía declaran
+      # Node 20 en su action.yml — este flag las obliga a correr en Node 24
+      # ya, sin esperar a la migración upstream.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     steps:
       - uses: actions/checkout@v5
 
