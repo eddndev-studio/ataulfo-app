@@ -260,14 +260,15 @@ void main() {
       expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
     });
 
-    testWidgets('tap FAB en tab Plantillas navega a /templates/new', (
-      tester,
-    ) async {
+    testWidgets('tap FAB en tab Plantillas apila /templates/new sobre el shell '
+        '(back sin crear vuelve al shell, NO sale de la app)', (tester) async {
       useViewport(tester, widthDp: 420);
 
-      // GoRouter local para capturar la navegación sin depender del
-      // AppRouter real (que necesitaría AuthBloc + repos en el redirect).
+      // Reproducción del bug del smoke device V2314: con context.go()
+      // el shell se aplasta y back sin crear sale de la app. Con push()
+      // el shell queda debajo (canPop = true en el destino).
       final navigated = <String>[];
+      final canPopAtDestination = <bool>[];
       final router = GoRouter(
         initialLocation: '/',
         routes: <RouteBase>[
@@ -286,7 +287,14 @@ void main() {
             path: '/templates/new',
             builder: (_, _) {
               navigated.add('/templates/new');
-              return const Scaffold(body: SizedBox.shrink());
+              return Scaffold(
+                body: Builder(
+                  builder: (ctx) {
+                    canPopAtDestination.add(Navigator.of(ctx).canPop());
+                    return const SizedBox.shrink();
+                  },
+                ),
+              );
             },
           ),
         ],
@@ -299,6 +307,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(navigated, <String>['/templates/new']);
+      expect(
+        canPopAtDestination,
+        <bool>[true],
+        reason:
+            'el formulario debe quedar apilado sobre el shell para que '
+            'el back físico cancele la creación y vuelva al listado',
+      );
     });
 
     testWidgets(
