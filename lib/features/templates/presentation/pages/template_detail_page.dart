@@ -121,7 +121,6 @@ class _LoadedView extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _SectionTitle extends StatelessWidget {

@@ -76,32 +76,26 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets(
-    'Loaded con N templates renderiza una AppCard con AppAvatar y '
-    'ProviderBadge por cada uno',
-    (tester) async {
-      when(() => bloc.state).thenReturn(
-        const TemplatesLoaded(
-          items: <Template>[_t1, _t2],
-          isRefreshing: false,
-        ),
-      );
+  testWidgets('Loaded con N templates renderiza una AppCard con AppAvatar y '
+      'ProviderBadge por cada uno', (tester) async {
+    when(() => bloc.state).thenReturn(
+      const TemplatesLoaded(items: <Template>[_t1, _t2], isRefreshing: false),
+    );
 
-      await tester.pumpWidget(host());
+    await tester.pumpWidget(host());
 
-      expect(find.text('Soporte ventas'), findsOneWidget);
-      expect(find.text('Ventas R&D / nivel 1'), findsOneWidget);
-      // Tile = AppCard con AppAvatar + ProviderBadge — converge visualmente
-      // con templates_list aunque la navegación diverja (push vs
-      // pushReplacement).
-      expect(find.byType(AppCard), findsNWidgets(2));
-      expect(find.byType(AppAvatar), findsNWidgets(2));
-      expect(find.byType(ProviderBadge), findsNWidgets(2));
-      // El ListTile + CircleAvatar legacy desaparecen.
-      expect(find.byType(ListTile), findsNothing);
-      expect(find.byType(CircleAvatar), findsNothing);
-    },
-  );
+    expect(find.text('Soporte ventas'), findsOneWidget);
+    expect(find.text('Ventas R&D / nivel 1'), findsOneWidget);
+    // Tile = AppCard con AppAvatar + ProviderBadge — converge visualmente
+    // con templates_list aunque la navegación diverja (push vs
+    // pushReplacement).
+    expect(find.byType(AppCard), findsNWidgets(2));
+    expect(find.byType(AppAvatar), findsNWidgets(2));
+    expect(find.byType(ProviderBadge), findsNWidgets(2));
+    // El ListTile + CircleAvatar legacy desaparecen.
+    expect(find.byType(ListTile), findsNothing);
+    expect(find.byType(CircleAvatar), findsNothing);
+  });
 
   testWidgets(
     'Loaded vacío muestra empty state con copy que apunta a la tab Plantillas',
@@ -211,10 +205,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppDesignTheme.dark(),
-          routerConfig: router,
-        ),
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
       );
       unawaited(router.push<void>('/bots/new'));
       await tester.pumpAndSettle();
@@ -272,10 +263,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppDesignTheme.dark(),
-          routerConfig: router,
-        ),
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
       );
       await tester.tap(find.text('Ventas R&D / nivel 1'));
       await tester.pumpAndSettle();
