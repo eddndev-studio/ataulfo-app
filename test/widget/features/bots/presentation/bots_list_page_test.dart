@@ -128,39 +128,59 @@ void main() {
     expect(find.text('Soporte'), findsOneWidget);
   });
 
-  testWidgets('tap en un tile navega al detalle vía /bots/:id', (tester) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+  testWidgets(
+    'tap en un tile apila el detalle: navega Y deja back disponible',
+    (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
 
-    // Capturamos la ubicación efectiva del router para verificar el go.
-    // Un GoRouter local con un destino dummy en /bots/:id permite no
-    // depender del provider real del BotDetailBloc en este test.
-    final navigated = <String>[];
-    final router = GoRouter(
-      initialLocation: '/',
-      routes: <RouteBase>[
-        GoRoute(
-          path: '/',
-          builder: (_, _) => BlocProvider<BotsBloc>.value(
-            value: bloc,
-            child: const Scaffold(body: BotsListPage()),
+      // Espejo del test del listado de Templates: además de verificar la
+      // navegación, el destino observa Navigator.canPop() para detectar
+      // si la fuente apiló (push) o reemplazó la pila (go). go() saca
+      // al usuario de la app con el back físico — el bug del smoke
+      // device en V2314.
+      final navigated = <String>[];
+      final canPopAtDestination = <bool>[];
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => BlocProvider<BotsBloc>.value(
+              value: bloc,
+              child: const Scaffold(body: BotsListPage()),
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/bots/:id',
-          builder: (_, state) {
-            navigated.add('/bots/${state.pathParameters['id']}');
-            return const Scaffold(body: SizedBox.shrink());
-          },
-        ),
-      ],
-    );
+          GoRoute(
+            path: '/bots/:id',
+            builder: (_, state) {
+              navigated.add('/bots/${state.pathParameters['id']}');
+              return Scaffold(
+                body: Builder(
+                  builder: (ctx) {
+                    canPopAtDestination.add(Navigator.of(ctx).canPop());
+                    return const SizedBox.shrink();
+                  },
+                ),
+              );
+            },
+          ),
+        ],
+      );
 
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-    await tester.tap(find.text('Soporte'));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.tap(find.text('Soporte'));
+      await tester.pumpAndSettle();
 
-    expect(navigated, <String>['/bots/b1']);
-  });
+      expect(navigated, <String>['/bots/b1']);
+      expect(
+        canPopAtDestination,
+        <bool>[true],
+        reason:
+            'el detalle debe quedar apilado sobre el listado para que el '
+            'back físico (o el AppBar back arrow) vuelva al shell',
+      );
+    },
+  );
 }
