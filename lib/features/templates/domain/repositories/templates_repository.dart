@@ -10,4 +10,9 @@ abstract interface class TemplatesRepository {
   /// Detalle por id; 404 → `TemplatesNotFoundFailure`. Lanza el id es
   /// stale o pertenece a otra org.
   Future<Template> byId(String id);
+
+  /// Crea una Template con el `name` dado. 422 (nombre inválido) →
+  /// `TemplatesInvalidNameFailure`. Devuelve la entidad ya persistida con
+  /// la AIConfig default que asigna el backend.
+  Future<Template> create(String name);
 }

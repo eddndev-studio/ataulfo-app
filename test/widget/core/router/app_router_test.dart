@@ -10,6 +10,7 @@ import 'package:agentic/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/repositories/templates_repository.dart';
 import 'package:agentic/features/templates/presentation/bloc/templates_bloc.dart';
+import 'package:agentic/features/templates/presentation/pages/template_create_page.dart';
 import 'package:agentic/features/templates/presentation/pages/template_detail_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -212,6 +213,39 @@ void main() {
 
     expect(find.byType(TemplateDetailPage), findsOneWidget);
     verify(() => templatesRepo.byId('t1')).called(1);
+  });
+
+  testWidgets('AuthAuthenticated → /templates/new muestra TemplateCreatePage', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/templates/new');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TemplateCreatePage), findsOneWidget);
+  });
+
+  testWidgets('AuthUnauthenticated + deep-link a /templates/new → /login', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+    router = AppRouter(
+      authBloc: authBloc,
+      authRepository: _MockAuthRepo(),
+      botsRepository: botsRepo,
+      templatesRepository: templatesRepo,
+    );
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/templates/new');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(TemplateCreatePage), findsNothing);
   });
 
   testWidgets('AuthUnauthenticated + deep-link a /templates/:id → /login', (

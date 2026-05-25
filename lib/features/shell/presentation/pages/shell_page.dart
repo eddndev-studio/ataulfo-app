@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../bots/presentation/pages/bots_list_page.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -67,6 +68,7 @@ class _ShellPageState extends State<ShellPage> {
                   ],
                 )
               : body,
+          floatingActionButton: _fab(context, _index),
           bottomNavigationBar: useRail
               ? null
               : BottomNavigationBar(
@@ -91,3 +93,15 @@ class _TabSpec {
   final String label;
   final IconData icon;
 }
+
+/// FAB por tab. Hoy sólo la tab Plantillas tiene acción de creación; el FAB
+/// de "Crear bot" aterriza con su propio slice y reusará este slot.
+Widget? _fab(BuildContext context, int index) => switch (index) {
+  1 => FloatingActionButton(
+    key: const Key('shell.fab.template_create'),
+    onPressed: () => context.go('/templates/new'),
+    tooltip: 'Crear plantilla',
+    child: const Icon(Icons.add),
+  ),
+  _ => null,
+};

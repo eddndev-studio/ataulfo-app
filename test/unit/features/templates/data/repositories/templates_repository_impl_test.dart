@@ -56,6 +56,28 @@ void main() {
     });
   });
 
+  group('TemplatesRepositoryImpl.create (delegate trivial)', () {
+    test('forwarda el name y devuelve el Template del datasource', () async {
+      when(() => ds.create('Soporte')).thenAnswer((_) async => tpl);
+
+      final got = await repo.create('Soporte');
+
+      expect(got, tpl);
+      verify(() => ds.create('Soporte')).called(1);
+    });
+
+    test('propaga TemplatesInvalidNameFailure sin envolver', () async {
+      when(() => ds.create('')).thenAnswer(
+        (_) => Future<Template>.error(const TemplatesInvalidNameFailure()),
+      );
+
+      await expectLater(
+        repo.create(''),
+        throwsA(isA<TemplatesInvalidNameFailure>()),
+      );
+    });
+  });
+
   group('TemplatesRepositoryImpl.byId (delegate trivial)', () {
     test('forwarda el id y devuelve el Template del datasource', () async {
       when(() => ds.byId('t1')).thenAnswer((_) async => tpl);

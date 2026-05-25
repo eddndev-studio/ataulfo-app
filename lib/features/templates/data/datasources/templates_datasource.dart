@@ -21,6 +21,11 @@ abstract interface class TemplatesDatasource {
   /// `GET /templates/:id` org-scoped. 404 si el id no existe en la org
   /// del operador — mapea a `TemplatesNotFoundFailure`.
   Future<Template> byId(String id);
+
+  /// `POST /templates` body `{name}`. 422 si el nombre viola la validación
+  /// del dominio (vacío, longitud) — mapea a `TemplatesInvalidNameFailure`.
+  /// El backend devuelve la Template ya creada con la AIConfig default.
+  Future<Template> create(String name);
 }
 
 class DioTemplatesDatasource implements TemplatesDatasource {
@@ -74,6 +79,29 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     }
   }
 
+  @override
+  Future<Template> create(String name) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/templates',
+        data: <String, dynamic>{'name': name},
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownTemplatesFailure();
+      }
+      return TemplatesMapper.templateRespToEntity(TemplateResp.fromJson(body));
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
   /// Traduce DioException a la jerarquía sellada de TemplatesFailure.
   /// Duplica el patrón de BotsFailure._mapDioException; cuando aterrice
   /// la tercera feature con el mismo patrón, extraer a un helper
@@ -90,6 +118,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
         final status = e.response?.statusCode ?? 0;
         if (status == 403) return const TemplatesForbiddenFailure();
         if (status == 404) return const TemplatesNotFoundFailure();
+        if (status == 422) return const TemplatesInvalidNameFailure();
         if (status >= 500 && status < 600) {
           return const TemplatesServerFailure();
         }
