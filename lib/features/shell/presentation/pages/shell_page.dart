@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../bots/presentation/pages/bots_list_page.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
+import '../../../templates/presentation/pages/templates_list_page.dart';
 
 /// Shell adaptable de la app autenticada. Hospeda los tabs del producto y
 /// resuelve la navegación lateral según el ancho disponible (M3: compact
@@ -24,10 +25,15 @@ class _ShellPageState extends State<ShellPage> {
 
   static const List<_TabSpec> _tabs = <_TabSpec>[
     _TabSpec(label: 'Bots', icon: Icons.smart_toy_outlined),
+    _TabSpec(label: 'Plantillas', icon: Icons.description_outlined),
     _TabSpec(label: 'Ajustes', icon: Icons.settings_outlined),
   ];
 
-  static const List<Widget> _bodies = <Widget>[BotsListPage(), SettingsPage()];
+  static const List<Widget> _bodies = <Widget>[
+    BotsListPage(),
+    TemplatesListPage(),
+    SettingsPage(),
+  ];
 
   void _select(int i) => setState(() => _index = i);
 

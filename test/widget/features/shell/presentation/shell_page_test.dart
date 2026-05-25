@@ -112,9 +112,17 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      expect(find.text('Bots'), findsOneWidget);
-      expect(find.text('Plantillas'), findsOneWidget);
-      expect(find.text('Ajustes'), findsOneWidget);
+      // Texto "Bots" aparece también en el AppBar (título dinámico de la
+      // tab activa). Filtramos por descendiente del BottomNavigationBar
+      // para verificar la presencia de cada label dentro del nav.
+      Finder inNav(String label) => find.descendant(
+        of: find.byType(BottomNavigationBar),
+        matching: find.text(label),
+      );
+
+      expect(inNav('Bots'), findsOneWidget);
+      expect(inNav('Plantillas'), findsOneWidget);
+      expect(inNav('Ajustes'), findsOneWidget);
     });
 
     testWidgets('tap Plantillas (phone) muestra TemplatesListPage', (
