@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_avatar.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/presentation/bloc/templates_bloc.dart';
 
@@ -33,8 +38,11 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator());
+  Widget build(BuildContext context) => const Center(
+    child: CircularProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
 }
 
 class _LoadedView extends StatelessWidget {
@@ -47,8 +55,12 @@ class _LoadedView extends StatelessWidget {
     if (items.isEmpty) return const _EmptyView();
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.sp4,
+        vertical: AppTokens.sp4,
+      ),
       itemCount: items.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
       itemBuilder: (_, i) => _TemplateTile(template: items[i]),
     );
   }
@@ -59,18 +71,24 @@ class _EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      key: Key('bot_template_picker.empty'),
+    final textTheme = Theme.of(context).textTheme;
+    return Center(
+      key: const Key('bot_template_picker.empty'),
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppTokens.sp6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text('No tienes plantillas todavía.', textAlign: TextAlign.center),
-            SizedBox(height: 8),
+            Text(
+              'No tienes plantillas todavía.',
+              textAlign: TextAlign.center,
+              style: textTheme.bodyLarge,
+            ),
+            const SizedBox(height: AppTokens.sp2),
             Text(
               'Crea una desde la tab Plantillas para poder crear bots.',
               textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
             ),
           ],
         ),
@@ -84,23 +102,25 @@ class _FailedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Center(
       key: const Key('bot_template_picker.error'),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppTokens.sp6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Text(
+            Text(
               'No pudimos cargar tus plantillas',
               textAlign: TextAlign.center,
+              style: textTheme.bodyLarge,
             ),
-            const SizedBox(height: 12),
-            FilledButton(
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
               onPressed: () => context.read<TemplatesBloc>().add(
                 const TemplatesLoadRequested(),
               ),
-              child: const Text('Reintentar'),
             ),
           ],
         ),
@@ -116,32 +136,34 @@ class _TemplateTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(child: Text(_initial(template.name))),
-      title: Text(template.name),
-      subtitle: Text(_providerLabel(template.ai.provider)),
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
+      // `encodeQueryComponent` (no `encodeFull`): el nombre va dentro
+      // de un par clave=valor, así que `&` y `=` también deben
+      // escaparse — encodeFull los preservaría y rompería el query.
       onTap: () {
-        // `encodeQueryComponent` (no `encodeFull`): el nombre va dentro
-        // de un par clave=valor, así que `&` y `=` también deben
-        // escaparse — encodeFull los preservaría y rompería el query.
         final name = Uri.encodeQueryComponent(template.name);
         context.pushReplacement(
           '/templates/${template.id}/bots/new?name=$name',
         );
       },
+      child: Row(
+        children: <Widget>[
+          AppAvatar(name: template.name),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(template.name, style: textTheme.titleMedium),
+                const SizedBox(height: 2),
+                ProviderBadge(provider: template.ai.provider),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
-
-  static String _initial(String s) {
-    final trimmed = s.trim();
-    if (trimmed.isEmpty) return '?';
-    return trimmed.substring(0, 1).toUpperCase();
-  }
-
-  static String _providerLabel(AIProvider p) => switch (p) {
-    AIProvider.openai => 'OpenAI',
-    AIProvider.gemini => 'Gemini',
-    AIProvider.minimax => 'MiniMax',
-    AIProvider.deepseek => 'DeepSeek',
-  };
 }
