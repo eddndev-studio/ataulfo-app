@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_avatar.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/bot.dart';
 import '../bloc/bots_bloc.dart';
 
@@ -27,8 +32,11 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator());
+  Widget build(BuildContext context) => const Center(
+    child: CircularProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
 }
 
 class _LoadedView extends StatelessWidget {
@@ -53,8 +61,13 @@ class _LoadedView extends StatelessWidget {
           ? const _EmptyView()
           : ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.sp4,
+                vertical: AppTokens.sp4,
+              ),
               itemCount: items.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: AppTokens.cardGap),
               itemBuilder: (_, i) => _BotTile(bot: items[i]),
             ),
     );
@@ -70,19 +83,21 @@ class _EmptyView extends StatelessWidget {
     // funcionando porque el viewport es scrollable aunque la lista esté
     // vacía. Sin esto, AlwaysScrollableScrollPhysics no alcanza para que
     // el operador pueda jalar a refrescar sobre el empty state.
+    final textTheme = Theme.of(context).textTheme;
     return LayoutBuilder(
       builder: (context, c) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: <Widget>[
           ConstrainedBox(
             constraints: BoxConstraints(minHeight: c.maxHeight),
-            child: const Center(
-              key: Key('bots.empty'),
+            child: Center(
+              key: const Key('bots.empty'),
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppTokens.sp6),
                 child: Text(
                   'Todavía no tienes bots aquí',
                   textAlign: TextAlign.center,
+                  style: textTheme.bodyLarge,
                 ),
               ),
             ),
@@ -98,25 +113,24 @@ class _FailedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mensaje único + retry: la diferencia entre red/forbidden/server/unknown
-    // se nombrará cuando producto pida copy fino. Por hoy: el operador ve
-    // que falló y puede reintentar.
+    final textTheme = Theme.of(context).textTheme;
     return Center(
       key: const Key('bots.error'),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppTokens.sp6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Text(
+            Text(
               'No pudimos cargar tus bots',
               textAlign: TextAlign.center,
+              style: textTheme.bodyLarge,
             ),
-            const SizedBox(height: 12),
-            FilledButton(
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
               onPressed: () =>
                   context.read<BotsBloc>().add(const BotsLoadRequested()),
-              child: const Text('Reintentar'),
             ),
           ],
         ),
@@ -132,28 +146,57 @@ class _BotTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(child: Text(_initial(bot.name))),
-      title: Text(bot.name),
-      subtitle: Text(_channelLabel(bot.channel)),
-      trailing: bot.paused
-          ? const Icon(Icons.pause_circle, semanticLabel: 'En pausa')
-          : null,
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
       // push (no go): el detalle se apila sobre el listado para que el
       // back físico y la flecha del AppBar vuelvan al shell con la tab
       // Bots activa. Ver narrativa del fix en templates_list_page.
       onTap: () => context.push('/bots/${bot.id}'),
+      child: Row(
+        children: <Widget>[
+          AppAvatar(name: bot.name),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(bot.name, style: textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  _channelLabel(bot.channel),
+                  style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppTokens.sp3),
+          _StatusPill(paused: bot.paused),
+        ],
+      ),
     );
-  }
-
-  static String _initial(String s) {
-    final trimmed = s.trim();
-    if (trimmed.isEmpty) return '?';
-    return trimmed.substring(0, 1).toUpperCase();
   }
 
   static String _channelLabel(BotChannel c) => switch (c) {
     BotChannel.waUnofficial => 'WhatsApp',
     BotChannel.waba => 'WhatsApp Business',
   };
+}
+
+/// Pill de estado del bot. paused → neutral con dot gris;
+/// activo → primary con dot verde. La pill verbaliza el estado al
+/// operador (mejor que el icono pause_circle previo, que no decía nada
+/// sobre los bots no pausados).
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.paused});
+
+  final bool paused;
+
+  @override
+  Widget build(BuildContext context) {
+    if (paused) {
+      return const AppPill.neutral(label: 'Pausado', dot: AppPillDot.paused);
+    }
+    return const AppPill.primary(label: 'Activo', dot: AppPillDot.active);
+  }
 }
