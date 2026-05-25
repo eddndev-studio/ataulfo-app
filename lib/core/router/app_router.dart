@@ -14,8 +14,10 @@ import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
+import '../../features/templates/presentation/bloc/template_create_bloc.dart';
 import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
 import '../../features/templates/presentation/bloc/templates_bloc.dart';
+import '../../features/templates/presentation/pages/template_create_page.dart';
 import '../../features/templates/presentation/pages/template_detail_page.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
@@ -104,6 +106,16 @@ class AppRouter {
             ),
           );
         },
+      ),
+      GoRoute(
+        path: '/templates/new',
+        builder: (context, _) => BlocProvider<TemplateCreateBloc>(
+          create: (_) => TemplateCreateBloc(repo: _templatesRepo),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Crear plantilla')),
+            body: const TemplateCreatePage(),
+          ),
+        ),
       ),
       GoRoute(
         path: '/templates/:id',
