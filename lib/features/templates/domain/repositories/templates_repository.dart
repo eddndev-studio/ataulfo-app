@@ -1,4 +1,5 @@
 import '../entities/template.dart';
+import '../entities/variable_def.dart';
 
 /// Puerto de dominio para Templates (S03). Define los verbos que el bloc
 /// puede pedir; las implementaciones viven en `data/`.
@@ -15,4 +16,8 @@ abstract interface class TemplatesRepository {
   /// `TemplatesInvalidNameFailure`. Devuelve la entidad ya persistida con
   /// la AIConfig default que asigna el backend.
   Future<Template> create(String name);
+
+  /// Lista las definiciones de variables de una Template. 404 si la
+  /// plantilla padre no existe en la org. Lista vacía es válida.
+  Future<List<VariableDef>> listVarDefs(String id);
 }
