@@ -16,6 +16,7 @@ import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
+import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
 import '../../features/templates/presentation/bloc/template_create_bloc.dart';
 import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
@@ -56,7 +57,7 @@ class AppRouter {
     refreshListenable: _AuthBlocListenable(_authBloc),
     redirect: _redirect,
     routes: <RouteBase>[
-      GoRoute(path: '/', builder: (_, _) => const _Splash()),
+      GoRoute(path: '/', builder: (_, _) => const SplashPage()),
       GoRoute(
         path: '/login',
         builder: (context, _) => BlocProvider<LoginBloc>(
@@ -230,14 +231,4 @@ class _AuthBlocListenable extends ChangeNotifier {
     _sub.cancel();
     super.dispose();
   }
-}
-
-/// Splash dumb: el AuthBloc decide la ruta vía redirect. Mientras tanto,
-/// se muestra un spinner — no hay lógica aquí.
-class _Splash extends StatelessWidget {
-  const _Splash();
-
-  @override
-  Widget build(BuildContext context) =>
-      const Scaffold(body: Center(child: CircularProgressIndicator()));
 }

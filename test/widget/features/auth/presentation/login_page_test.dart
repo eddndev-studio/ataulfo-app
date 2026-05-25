@@ -1,3 +1,6 @@
+import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/tokens.dart';
+import 'package:agentic/core/design/widgets/app_button.dart';
 import 'package:agentic/features/auth/domain/entities/auth_tokens.dart';
 import 'package:agentic/features/auth/presentation/bloc/login_bloc.dart';
 import 'package:agentic/features/auth/presentation/pages/login_page.dart';
@@ -22,18 +25,35 @@ void main() {
     when(() => bloc.state).thenReturn(const LoginInitial());
   });
 
-  Widget host() => MaterialApp(
-    home: BlocProvider<LoginBloc>.value(value: bloc, child: const LoginPage()),
+  Widget host({void Function(AuthTokens)? onSucceeded}) => MaterialApp(
+    theme: AppDesignTheme.dark(),
+    home: BlocProvider<LoginBloc>.value(
+      value: bloc,
+      child: LoginPage(onSucceeded: onSucceeded),
+    ),
   );
 
-  testWidgets('renderiza campos email + password + botón Entrar', (
+  testWidgets('renderiza campos email + password + AppButton Entrar', (
     tester,
   ) async {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('login.email')), findsOneWidget);
     expect(find.byKey(const Key('login.password')), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Entrar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Entrar'), findsOneWidget);
+    // El botón del login pasa al primitivo del DS — el FilledButton M3
+    // legado no debe quedar en el árbol.
+    expect(find.byType(FilledButton), findsNothing);
+  });
+
+  testWidgets('wordmark "Agentic" usa displayLarge del textTheme', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    final word = tester.widget<Text>(find.text('Agentic'));
+    expect(word.style?.fontSize, AppTokens.displaySize);
+    expect(word.style?.fontWeight, AppTokens.displayWeight);
   });
 
   testWidgets('submit con datos válidos dispara LoginSubmitted', (
@@ -49,7 +69,7 @@ void main() {
       find.byKey(const Key('login.password')),
       'hunter2-secret',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
+    await tester.tap(find.widgetWithText(AppButton, 'Entrar'));
     await tester.pump();
 
     verify(
@@ -126,16 +146,29 @@ void main() {
     );
 
     AuthTokens? captured;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: BlocProvider<LoginBloc>.value(
-          value: bloc,
-          child: LoginPage(onSucceeded: (t) => captured = t),
-        ),
-      ),
-    );
+    await tester.pumpWidget(host(onSucceeded: (t) => captured = t));
     await tester.pump();
 
     expect(captured, tokens);
+  });
+
+  testWidgets('estado Failed pinta el mensaje en AppTokens.danger', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      Stream<LoginState>.fromIterable(const <LoginState>[
+        LoginFailed(LoginFailureKind.unknown),
+      ]),
+      initialState: const LoginInitial(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    final t = tester.widget<Text>(
+      find.text('Algo salió mal, intenta de nuevo'),
+    );
+    expect(t.style?.color, AppTokens.danger);
   });
 }

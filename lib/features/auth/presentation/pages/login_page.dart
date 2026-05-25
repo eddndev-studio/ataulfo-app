@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
 import '../../domain/entities/auth_tokens.dart';
 import '../bloc/login_bloc.dart';
 
@@ -37,6 +39,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       body: SafeArea(
         child: BlocConsumer<LoginBloc, LoginState>(
@@ -55,7 +58,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 32),
                   Text(
                     'Agentic',
-                    style: Theme.of(context).textTheme.displaySmall,
+                    style: textTheme.displayLarge,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
@@ -82,24 +85,30 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  FilledButton(
+                  AppButton.filled(
+                    label: 'Entrar',
+                    fullWidth: true,
                     onPressed: submitting ? null : _submit,
-                    child: submitting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Entrar'),
                   ),
                   const SizedBox(height: 16),
+                  if (submitting)
+                    const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTokens.primary,
+                          ),
+                        ),
+                      ),
+                    ),
                   if (state is LoginFailed)
                     Text(
                       _messageFor(state.kind),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                      style: const TextStyle(color: AppTokens.danger),
                     ),
                 ],
               ),

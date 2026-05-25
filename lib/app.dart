@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'core/design/app_design_theme.dart';
 import 'core/router/app_router.dart';
-import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Widget raíz. Recibe el router y el AuthBloc ya construidos (composición
@@ -11,6 +11,10 @@ import 'features/auth/presentation/bloc/auth_bloc.dart';
 /// El AuthBloc se provee globalmente para que cualquier feature (logout
 /// desde un menú, indicador de sesión en la app bar, etc.) lo lea sin
 /// depender del router.
+///
+/// Tema dark-only: el producto no expone modo claro. `theme` actúa como
+/// el ThemeData universal porque `darkTheme` queda en null y MaterialApp
+/// usa `theme` como fallback cuando no hay variante dark separada.
 class AgenticApp extends StatelessWidget {
   const AgenticApp({super.key, required this.router, required this.authBloc});
 
@@ -24,9 +28,7 @@ class AgenticApp extends StatelessWidget {
       child: MaterialApp.router(
         title: 'Agentic',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        themeMode: ThemeMode.system,
+        theme: AppDesignTheme.dark(),
         routerConfig: router.router,
       ),
     );
