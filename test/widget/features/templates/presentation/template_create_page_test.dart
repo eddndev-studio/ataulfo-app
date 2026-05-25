@@ -9,8 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockBloc
-    extends MockBloc<TemplateCreateEvent, TemplateCreateState>
+class _MockBloc extends MockBloc<TemplateCreateEvent, TemplateCreateState>
     implements TemplateCreateBloc {}
 
 const _tpl = Template(
@@ -91,8 +90,7 @@ void main() {
     await tester.pump();
 
     verify(
-      () =>
-          bloc.add(const TemplateCreateSubmitted(name: 'Soporte')),
+      () => bloc.add(const TemplateCreateSubmitted(name: 'Soporte')),
     ).called(1);
   });
 
@@ -113,9 +111,9 @@ void main() {
   testWidgets('Failed(InvalidName) muestra error con copy específico', (
     tester,
   ) async {
-    when(() => bloc.state).thenReturn(
-      const TemplateCreateFailed(TemplatesInvalidNameFailure()),
-    );
+    when(
+      () => bloc.state,
+    ).thenReturn(const TemplateCreateFailed(TemplatesInvalidNameFailure()));
 
     await tester.pumpWidget(host());
 
@@ -131,9 +129,9 @@ void main() {
   });
 
   testWidgets('Failed(Forbidden) muestra error de permisos', (tester) async {
-    when(() => bloc.state).thenReturn(
-      const TemplateCreateFailed(TemplatesForbiddenFailure()),
-    );
+    when(
+      () => bloc.state,
+    ).thenReturn(const TemplateCreateFailed(TemplatesForbiddenFailure()));
 
     await tester.pumpWidget(host());
 
@@ -144,9 +142,9 @@ void main() {
   });
 
   testWidgets('Failed(Network) muestra error de red', (tester) async {
-    when(() => bloc.state).thenReturn(
-      const TemplateCreateFailed(TemplatesNetworkFailure()),
-    );
+    when(
+      () => bloc.state,
+    ).thenReturn(const TemplateCreateFailed(TemplatesNetworkFailure()));
 
     await tester.pumpWidget(host());
 
@@ -157,9 +155,9 @@ void main() {
   });
 
   testWidgets('Failed(Server) colapsa al copy genérico', (tester) async {
-    when(() => bloc.state).thenReturn(
-      const TemplateCreateFailed(TemplatesServerFailure()),
-    );
+    when(
+      () => bloc.state,
+    ).thenReturn(const TemplateCreateFailed(TemplatesServerFailure()));
 
     await tester.pumpWidget(host());
 

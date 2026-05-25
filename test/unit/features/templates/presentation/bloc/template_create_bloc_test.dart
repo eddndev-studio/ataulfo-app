@@ -44,8 +44,7 @@ void main() {
         when(() => repo.create('Soporte')).thenAnswer((_) async => _tpl);
         return TemplateCreateBloc(repo: repo);
       },
-      act: (bloc) =>
-          bloc.add(const TemplateCreateSubmitted(name: 'Soporte')),
+      act: (bloc) => bloc.add(const TemplateCreateSubmitted(name: 'Soporte')),
       expect: () => const <TemplateCreateState>[
         TemplateCreateSubmitting(),
         TemplateCreateSucceeded(_tpl),

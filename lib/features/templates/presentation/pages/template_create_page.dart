@@ -42,9 +42,7 @@ class _TemplateCreatePageState extends State<TemplateCreatePage> {
   void _submit() {
     final name = _ctrl.text.trim();
     if (name.isEmpty) return;
-    context.read<TemplateCreateBloc>().add(
-      TemplateCreateSubmitted(name: name),
-    );
+    context.read<TemplateCreateBloc>().add(TemplateCreateSubmitted(name: name));
   }
 
   @override
@@ -117,26 +115,24 @@ class _FailedView extends StatelessWidget {
     );
   }
 
-  static (String key, String copy) _resolve(TemplatesFailure f) =>
-      switch (f) {
-        TemplatesInvalidNameFailure() => (
-          'template_create.error.invalid_name',
-          'Revisa el nombre: no puede estar vacío ni exceder el límite.',
-        ),
-        TemplatesForbiddenFailure() => (
-          'template_create.error.forbidden',
-          'Tu rol no permite crear plantillas. Pide acceso a un admin.',
-        ),
-        TemplatesNetworkFailure() ||
-        TemplatesTimeoutFailure() => (
-          'template_create.error.network',
-          'Sin conexión con el servidor. Revisa tu red y reintenta.',
-        ),
-        TemplatesNotFoundFailure() ||
-        TemplatesServerFailure() ||
-        UnknownTemplatesFailure() => (
-          'template_create.error.generic',
-          'No pudimos crear la plantilla. Inténtalo de nuevo.',
-        ),
-      };
+  static (String key, String copy) _resolve(TemplatesFailure f) => switch (f) {
+    TemplatesInvalidNameFailure() => (
+      'template_create.error.invalid_name',
+      'Revisa el nombre: no puede estar vacío ni exceder el límite.',
+    ),
+    TemplatesForbiddenFailure() => (
+      'template_create.error.forbidden',
+      'Tu rol no permite crear plantillas. Pide acceso a un admin.',
+    ),
+    TemplatesNetworkFailure() || TemplatesTimeoutFailure() => (
+      'template_create.error.network',
+      'Sin conexión con el servidor. Revisa tu red y reintenta.',
+    ),
+    TemplatesNotFoundFailure() ||
+    TemplatesServerFailure() ||
+    UnknownTemplatesFailure() => (
+      'template_create.error.generic',
+      'No pudimos crear la plantilla. Inténtalo de nuevo.',
+    ),
+  };
 }
