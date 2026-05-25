@@ -6,6 +6,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
@@ -124,5 +125,43 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.text('Soporte'), findsOneWidget);
+  });
+
+  testWidgets('tap en un tile navega al detalle vía /templates/:id', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const TemplatesLoaded(items: <Template>[_t1], isRefreshing: false),
+    );
+
+    // Capturamos la ubicación efectiva del router para verificar el go.
+    // Un GoRouter local con un destino dummy en /templates/:id permite no
+    // depender del provider real del TemplateDetailBloc en este test.
+    final navigated = <String>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<TemplatesBloc>.value(
+            value: bloc,
+            child: const Scaffold(body: TemplatesListPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/templates/:id',
+          builder: (_, state) {
+            navigated.add('/templates/${state.pathParameters['id']}');
+            return const Scaffold(body: SizedBox.shrink());
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.text('Soporte'));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/templates/t1']);
   });
 }
