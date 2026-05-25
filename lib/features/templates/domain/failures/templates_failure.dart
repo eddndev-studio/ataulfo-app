@@ -41,6 +41,13 @@ final class TemplatesNotFoundFailure extends TemplatesFailure {
   const TemplatesNotFoundFailure();
 }
 
+/// 422 contra `POST /templates`: el backend rechazó el nombre por la
+/// validación del dominio (vacío, demasiado largo, formato). La UI debe
+/// pedir al usuario corregir el campo y reintentar.
+final class TemplatesInvalidNameFailure extends TemplatesFailure {
+  const TemplatesInvalidNameFailure();
+}
+
 /// 5xx del backend. El servidor respondió pero rompió — distinto de red.
 final class TemplatesServerFailure extends TemplatesFailure {
   const TemplatesServerFailure();
