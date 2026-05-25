@@ -32,6 +32,17 @@ final class BotsForbiddenFailure extends BotsFailure {
   const BotsForbiddenFailure();
 }
 
+/// 422 contra `POST /bots`: el dominio del backend rechaza la construcción
+/// del bot. El handler colapsa varias causas en el mismo status (name
+/// vacío vía ErrInvalidBot, channel desconocido vía ErrInvalidChannel,
+/// template_id ajeno o inexistente vía ErrTemplateNotFound, variables
+/// fuera del set de defs vía ErrVariableNotInDefs). El cliente las agrupa
+/// en un solo cubo porque el operador no puede accionar distinto entre
+/// ellas sin instrumentación adicional del backend.
+final class BotsInvalidCreateFailure extends BotsFailure {
+  const BotsInvalidCreateFailure();
+}
+
 /// 5xx del backend. Distinto de red: el servidor respondió, pero rompió.
 final class BotsServerFailure extends BotsFailure {
   const BotsServerFailure();
