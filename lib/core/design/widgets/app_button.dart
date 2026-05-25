@@ -21,7 +21,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.fullWidth = false,
     this.icon,
-  }) : variant = _AppButtonVariant.filled;
+  }) : _variant = _AppButtonVariant.filled;
 
   const AppButton.tonal({
     super.key,
@@ -29,7 +29,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.fullWidth = false,
     this.icon,
-  }) : variant = _AppButtonVariant.tonal;
+  }) : _variant = _AppButtonVariant.tonal;
 
   const AppButton.text({
     super.key,
@@ -37,7 +37,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.fullWidth = false,
     this.icon,
-  }) : variant = _AppButtonVariant.text;
+  }) : _variant = _AppButtonVariant.text;
 
   const AppButton.danger({
     super.key,
@@ -45,10 +45,10 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.fullWidth = false,
     this.icon,
-  }) : variant = _AppButtonVariant.danger;
+  }) : _variant = _AppButtonVariant.danger;
 
   final String label;
-  final _AppButtonVariant variant;
+  final _AppButtonVariant _variant;
   final VoidCallback? onPressed;
   final bool fullWidth;
   final IconData? icon;
@@ -56,8 +56,8 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onPressed == null;
-    final colors = _colorsFor(variant);
-    final padding = _paddingFor(variant);
+    final colors = _colorsFor(_variant);
+    final padding = _paddingFor(_variant);
     final radius = BorderRadius.circular(AppTokens.radiusButton);
 
     final content = Row(

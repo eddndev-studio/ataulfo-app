@@ -13,7 +13,7 @@ class AppDesignTheme {
   const AppDesignTheme._();
 
   static ThemeData dark() {
-    final colorScheme = const ColorScheme.dark(
+    const colorScheme = ColorScheme.dark(
       brightness: Brightness.dark,
       primary: AppTokens.primary,
       onPrimary: Colors.white,

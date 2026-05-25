@@ -9,7 +9,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: button)));
   }
 
-  Container _root(WidgetTester tester) {
+  Container rootContainer(WidgetTester tester) {
     return tester.widget<Container>(
       find.descendant(
         of: find.byType(AppButton),
@@ -24,7 +24,7 @@ void main() {
         tester,
         AppButton.filled(label: 'Crear', onPressed: () {}),
       );
-      final c = _root(tester);
+      final c = rootContainer(tester);
       final d = c.decoration as BoxDecoration;
       expect(d.color, AppTokens.primary);
       final label = tester.widget<Text>(find.text('Crear'));
@@ -36,7 +36,7 @@ void main() {
         tester,
         AppButton.tonal(label: 'Pausar', onPressed: () {}),
       );
-      final c = _root(tester);
+      final c = rootContainer(tester);
       final d = c.decoration as BoxDecoration;
       expect(d.color, AppTokens.surface2);
       final label = tester.widget<Text>(find.text('Pausar'));
@@ -48,7 +48,7 @@ void main() {
         tester,
         AppButton.text(label: 'Copiar', onPressed: () {}),
       );
-      final c = _root(tester);
+      final c = rootContainer(tester);
       final d = c.decoration as BoxDecoration;
       expect(d.color, Colors.transparent);
       final label = tester.widget<Text>(find.text('Copiar'));
@@ -60,7 +60,7 @@ void main() {
         tester,
         AppButton.danger(label: 'Eliminar', onPressed: () {}),
       );
-      final c = _root(tester);
+      final c = rootContainer(tester);
       final d = c.decoration as BoxDecoration;
       expect(d.color, Colors.transparent);
       final label = tester.widget<Text>(find.text('Eliminar'));
@@ -70,11 +70,8 @@ void main() {
 
   group('AppButton — geometría', () {
     testWidgets('altura mínima 48 + radio 14', (tester) async {
-      await pumpButton(
-        tester,
-        AppButton.filled(label: 'X', onPressed: () {}),
-      );
-      final c = _root(tester);
+      await pumpButton(tester, AppButton.filled(label: 'X', onPressed: () {}));
+      final c = rootContainer(tester);
       final d = c.decoration as BoxDecoration;
       expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusButton));
       // height de 48 lo enforce un ConstrainedBox con minHeight.
@@ -116,15 +113,15 @@ void main() {
 
   group('AppButton — estados', () {
     testWidgets('onPressed null: opacity 0.4 y no tappable', (tester) async {
-      var taps = 0;
       await pumpButton(
         tester,
-        AppButton.filled(label: 'X', onPressed: null),
+        const AppButton.filled(label: 'X', onPressed: null),
       );
-      // Tap no debe disparar nada (onPressed null).
+      // onPressed null bloquea el tap; verificación visual es la opacity
+      // descrita abajo. No hace falta un contador porque no hay callback
+      // que pudiera ser llamado.
       await tester.tap(find.byType(AppButton));
       await tester.pumpAndSettle();
-      expect(taps, 0);
       // Opacity widget alrededor.
       final opacity = tester.widget<Opacity>(
         find.descendant(
@@ -161,11 +158,7 @@ void main() {
     ) async {
       await pumpButton(
         tester,
-        AppButton.filled(
-          label: 'Crear',
-          icon: Icons.add,
-          onPressed: () {},
-        ),
+        AppButton.filled(label: 'Crear', icon: Icons.add, onPressed: () {}),
       );
       expect(find.byIcon(Icons.add), findsOneWidget);
       final icon = tester.widget<Icon>(find.byIcon(Icons.add));

@@ -39,10 +39,7 @@ void main() {
     });
 
     testWidgets('padding default = AppTokens.cardPadding (20)', (tester) async {
-      await pumpCard(
-        tester,
-        const AppCard(child: SizedBox.shrink()),
-      );
+      await pumpCard(tester, const AppCard(child: SizedBox.shrink()));
       final container = tester.widget<Container>(
         find.descendant(
           of: find.byType(AppCard),

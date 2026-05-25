@@ -9,7 +9,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: pill)));
   }
 
-  Container _container(WidgetTester tester) {
+  Container pillContainer(WidgetTester tester) {
     return tester.widget<Container>(
       find.descendant(
         of: find.byType(AppPill),
@@ -18,53 +18,53 @@ void main() {
     );
   }
 
-  TextStyle? _labelStyle(WidgetTester tester, String text) {
+  TextStyle? labelStyle(WidgetTester tester, String text) {
     return tester.widget<Text>(find.text(text)).style;
   }
 
   group('AppPill — variantes (fondo + color de label)', () {
     testWidgets('primary: tint verde + fg primaryHover', (tester) async {
       await pumpPill(tester, const AppPill.primary(label: 'Activo'));
-      final c = _container(tester);
+      final c = pillContainer(tester);
       final d = c.decoration as BoxDecoration;
       // primary-tint-18 == primary @ 18% alpha
       expect(d.color, AppTokens.primary.withValues(alpha: 0.18));
-      expect(_labelStyle(tester, 'Activo')?.color, AppTokens.primaryHover);
+      expect(labelStyle(tester, 'Activo')?.color, AppTokens.primaryHover);
     });
 
     testWidgets('neutral: fondo surface3 + fg text2', (tester) async {
       await pumpPill(tester, const AppPill.neutral(label: 'Pausado'));
-      final c = _container(tester);
+      final c = pillContainer(tester);
       final d = c.decoration as BoxDecoration;
       expect(d.color, AppTokens.surface3);
-      expect(_labelStyle(tester, 'Pausado')?.color, AppTokens.text2);
+      expect(labelStyle(tester, 'Pausado')?.color, AppTokens.text2);
     });
 
     testWidgets('danger: tint rojo + fg danger', (tester) async {
       await pumpPill(tester, const AppPill.danger(label: 'Error'));
-      final c = _container(tester);
+      final c = pillContainer(tester);
       final d = c.decoration as BoxDecoration;
       expect(d.color, AppTokens.danger.withValues(alpha: 0.16));
-      expect(_labelStyle(tester, 'Error')?.color, AppTokens.danger);
+      expect(labelStyle(tester, 'Error')?.color, AppTokens.danger);
     });
 
     testWidgets('outline: transparent + border 1px divider + fg text2', (
       tester,
     ) async {
       await pumpPill(tester, const AppPill.outline(label: 'v 1.2'));
-      final c = _container(tester);
+      final c = pillContainer(tester);
       final d = c.decoration as BoxDecoration;
       expect(d.color, Colors.transparent);
       expect(d.border?.top.color, AppTokens.divider);
       expect(d.border?.top.width, 1);
-      expect(_labelStyle(tester, 'v 1.2')?.color, AppTokens.text2);
+      expect(labelStyle(tester, 'v 1.2')?.color, AppTokens.text2);
     });
   });
 
   group('AppPill — geometría', () {
     testWidgets('padding 4/10 y radio 10', (tester) async {
       await pumpPill(tester, const AppPill.neutral(label: 'x'));
-      final c = _container(tester);
+      final c = pillContainer(tester);
       expect(
         c.padding,
         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -75,18 +75,18 @@ void main() {
 
     testWidgets('label en caption 12/16 weight 500', (tester) async {
       await pumpPill(tester, const AppPill.neutral(label: 'caption'));
-      final s = _labelStyle(tester, 'caption')!;
+      final s = labelStyle(tester, 'caption')!;
       expect(s.fontSize, AppTokens.captionSize);
       expect(s.fontWeight, AppTokens.captionWeight);
     });
   });
 
   group('AppPill — dot opcional', () {
-    Finder _dotFinder() => find.byKey(const ValueKey('app_pill.dot'));
+    Finder dotFinder() => find.byKey(const ValueKey('app_pill.dot'));
 
     testWidgets('sin dot: no se renderiza', (tester) async {
       await pumpPill(tester, const AppPill.primary(label: 'sin dot'));
-      expect(_dotFinder(), findsNothing);
+      expect(dotFinder(), findsNothing);
     });
 
     testWidgets('dot active: círculo color accent', (tester) async {
@@ -94,7 +94,7 @@ void main() {
         tester,
         const AppPill.primary(label: 'Activo', dot: AppPillDot.active),
       );
-      final dot = tester.widget<Container>(_dotFinder());
+      final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
       expect(d.color, AppTokens.accent);
       expect(d.shape, BoxShape.circle);
@@ -105,7 +105,7 @@ void main() {
         tester,
         const AppPill.neutral(label: 'Pausado', dot: AppPillDot.paused),
       );
-      final dot = tester.widget<Container>(_dotFinder());
+      final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
       expect(d.color, AppTokens.text2);
     });
@@ -115,7 +115,7 @@ void main() {
         tester,
         const AppPill.danger(label: 'Error', dot: AppPillDot.danger),
       );
-      final dot = tester.widget<Container>(_dotFinder());
+      final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
       expect(d.color, AppTokens.danger);
     });

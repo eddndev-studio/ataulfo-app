@@ -17,24 +17,24 @@ enum _AppPillVariant { primary, neutral, danger, outline }
 /// del label sin necesidad de iconos extra.
 class AppPill extends StatelessWidget {
   const AppPill.primary({super.key, required this.label, this.dot})
-    : variant = _AppPillVariant.primary;
+    : _variant = _AppPillVariant.primary;
 
   const AppPill.neutral({super.key, required this.label, this.dot})
-    : variant = _AppPillVariant.neutral;
+    : _variant = _AppPillVariant.neutral;
 
   const AppPill.danger({super.key, required this.label, this.dot})
-    : variant = _AppPillVariant.danger;
+    : _variant = _AppPillVariant.danger;
 
   const AppPill.outline({super.key, required this.label, this.dot})
-    : variant = _AppPillVariant.outline;
+    : _variant = _AppPillVariant.outline;
 
   final String label;
-  final _AppPillVariant variant;
+  final _AppPillVariant _variant;
   final AppPillDot? dot;
 
   @override
   Widget build(BuildContext context) {
-    final colors = _colorsFor(variant);
+    final colors = _colorsFor(_variant);
     return IntrinsicWidth(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
