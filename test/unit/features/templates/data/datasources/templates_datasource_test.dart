@@ -202,6 +202,165 @@ void main() {
     );
   });
 
+  group('DioTemplatesDatasource.create', () {
+    test('201 con templateResp → Template (envía {name})', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => respMap(201, body: tplJson(), path: '/templates'),
+      );
+
+      final tpl = await ds.create('Soporte');
+
+      expect(tpl.id, 't1');
+      expect(tpl.name, 'Soporte');
+      expect(tpl.ai.provider, AIProvider.gemini);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: <String, dynamic>{'name': 'Soporte'},
+        ),
+      ).called(1);
+    });
+
+    test('422 → TemplatesInvalidNameFailure', () async {
+      // POST /templates devuelve 422 cuando el nombre viola la validación
+      // del dominio (vacío, demasiado largo). El cliente lo distingue del
+      // genérico para mostrar copy útil ("revisa el nombre").
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse(422, path: '/templates'));
+
+      await expectLater(
+        ds.create(''),
+        throwsA(isA<TemplatesInvalidNameFailure>()),
+      );
+    });
+
+    test('403 → TemplatesForbiddenFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse(403, path: '/templates'));
+
+      await expectLater(
+        ds.create('Soporte'),
+        throwsA(isA<TemplatesForbiddenFailure>()),
+      );
+    });
+
+    test('500 → TemplatesServerFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse(500, path: '/templates'));
+
+      await expectLater(
+        ds.create('Soporte'),
+        throwsA(isA<TemplatesServerFailure>()),
+      );
+    });
+
+    test('timeout → TemplatesTimeoutFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/templates'),
+          type: DioExceptionType.sendTimeout,
+        ),
+      );
+
+      await expectLater(
+        ds.create('Soporte'),
+        throwsA(isA<TemplatesTimeoutFailure>()),
+      );
+    });
+
+    test('sin conexión → TemplatesNetworkFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/templates'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        ds.create('Soporte'),
+        throwsA(isA<TemplatesNetworkFailure>()),
+      );
+    });
+
+    test('409 (sin org activa, caso raro) → UnknownTemplatesFailure', () async {
+      // El handler devuelve 409 si el Bearer no trae org activa; en flujo
+      // normal (post-login + /auth/me) esto no ocurre. Colapsa a Unknown
+      // sin variante propia hasta que tengamos UI de switch-org.
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse(409, path: '/templates'));
+
+      await expectLater(
+        ds.create('Soporte'),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+
+    test('body nulo → UnknownTemplatesFailure (contrato roto)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer((_) async => respMap(201, path: '/templates'));
+
+      await expectLater(
+        ds.create('Soporte'),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+
+    test('body malformado → UnknownTemplatesFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/templates',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => respMap(
+          201,
+          body: <String, dynamic>{'id': 'x'},
+          path: '/templates',
+        ),
+      );
+
+      await expectLater(
+        ds.create('Soporte'),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+  });
+
   group('DioTemplatesDatasource.byId', () {
     test('200 con templateResp → Template (con AIConfig completa)', () async {
       when(
