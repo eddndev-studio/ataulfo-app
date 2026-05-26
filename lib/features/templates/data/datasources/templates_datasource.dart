@@ -38,6 +38,32 @@ abstract interface class TemplatesDatasource {
   /// que cada mutación termina con un refetch del listado).
   Future<({int version, List<VariableDef> defs})> listVarDefs(String id);
 
+  /// `POST /templates/:id/variable-definitions` body
+  /// `{name, type, default, description, version}` con CAS optimista
+  /// sobre el Template padre. Devuelve la VariableDef recién creada
+  /// (con id opaco del servidor). El backend NO devuelve la nueva
+  /// version del Template — el llamador debe refetchar el listado para
+  /// el siguiente CAS.
+  ///
+  /// 409 (`ErrTemplateConflict`/`ErrVariableNameDuplicated`/`ErrVariableInUse`)
+  /// ⇒ `TemplatesConflictFailure`. El backend no discrimina entre
+  /// version stale y duplicate name; el cliente trata todos como
+  /// "recarga y vuelve a intentar".
+  ///
+  /// 422 (`ErrInvalidVariableName`/`ErrInvalidVariableType`) ⇒
+  /// `TemplatesInvalidUpdateFailure`. Aterriza cuando un nombre rompe
+  /// la regex del backend o cuando el tipo no es válido (v1 sólo `text`,
+  /// pero si el cliente avanza con un tipo nuevo antes que el backend
+  /// el 422 lo atrapa).
+  Future<VariableDef> addVarDef({
+    required String templateId,
+    required String name,
+    required VarType type,
+    required String defaultValue,
+    required String description,
+    required int version,
+  });
+
   /// `PUT /templates/:id` body `{name, version, ai?}` con concurrencia
   /// optimista (CAS). 409 (`ErrTemplateConflict`) ⇒ `TemplatesConflictFailure`
   /// — la version del cliente está desfasada; el operador debe recargar el
@@ -193,6 +219,49 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
+  @override
+  Future<VariableDef> addVarDef({
+    required String templateId,
+    required String name,
+    required VarType type,
+    required String defaultValue,
+    required String description,
+    required int version,
+  }) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/templates/$templateId/variable-definitions',
+        data: <String, dynamic>{
+          'name': name,
+          'type': type.toWire(),
+          'default': defaultValue,
+          'description': description,
+          'version': version,
+        },
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownTemplatesFailure();
+      }
+      return VarDefsMapper.varDefRespToEntity(VarDefResp.fromJson(body));
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      // Mismo patrón del PUT: las mutaciones tienen cubos distintos a los
+      // GET para 409 (Conflict) y 422 (InvalidUpdate, no InvalidName).
+      if (e.type == DioExceptionType.badResponse) {
+        final status = e.response?.statusCode;
+        if (status == 409) throw const TemplatesConflictFailure();
+        if (status == 422) throw const TemplatesInvalidUpdateFailure();
+      }
       throw _mapDioException(e);
     } on FormatException {
       throw const UnknownTemplatesFailure();

@@ -10,6 +10,11 @@ enum VarType {
     'text' => VarType.text,
     _ => throw ArgumentError.value(raw, 'VarType.fromWire'),
   };
+
+  /// Serializa al token canónico del wire (mismo cardinal que fromWire).
+  String toWire() => switch (this) {
+    VarType.text => 'text',
+  };
 }
 
 /// Definición de una variable de plantilla. Value object: dos instancias
