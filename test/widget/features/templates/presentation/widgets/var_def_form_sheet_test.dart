@@ -330,4 +330,127 @@ void main() {
       },
     );
   });
+
+  group('VarDefFormSheet — modo edit', () {
+    const editing = VariableDef(
+      id: 'v1',
+      name: 'nombre',
+      type: VarType.text,
+      defaultValue: 'cliente',
+      description: 'Saludo personalizado',
+    );
+
+    Widget editHost({Set<String>? existingNames}) => MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: Scaffold(
+        body: BlocProvider<VarDefsBloc>.value(
+          value: bloc,
+          child: VarDefFormSheet(
+            existingNames: existingNames ?? <String>{'nombre', 'edad'},
+            editing: editing,
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('pre-fillados con los valores del editing', (tester) async {
+      await tester.pumpWidget(editHost());
+
+      expect(find.text('nombre'), findsOneWidget);
+      expect(find.text('cliente'), findsOneWidget);
+      expect(find.text('Saludo personalizado'), findsOneWidget);
+    });
+
+    testWidgets('title del sheet refleja modo edit', (tester) async {
+      await tester.pumpWidget(editHost());
+      expect(find.text('Editar variable'), findsOneWidget);
+      expect(find.text('Nueva variable'), findsNothing);
+    });
+
+    testWidgets(
+      'dup hint NO se dispara cuando el name coincide con el editing original',
+      (tester) async {
+        // Sheet arranca con name pre-fillado = 'nombre'; aunque 'nombre'
+        // está en existingNames, no es "duplicado" — es el mismo def.
+        await tester.pumpWidget(editHost());
+
+        expect(find.byKey(const Key('var_def_form.dup_hint')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'dup hint sí se dispara al cambiar a un name que ya existe en otro def',
+      (tester) async {
+        await tester.pumpWidget(editHost());
+
+        await tester.enterText(
+          find.byKey(const Key('var_def_form.name')),
+          'edad',
+        );
+        await tester.pump();
+
+        expect(find.byKey(const Key('var_def_form.dup_hint')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'submit dispatcha VarDefsUpdateRequested only-changed (campos sin cambio = null)',
+      (tester) async {
+        await tester.pumpWidget(editHost());
+
+        // Sólo cambiar el name; los otros campos quedan iguales y
+        // deben viajar como null (no-op del backend).
+        await tester.enterText(
+          find.byKey(const Key('var_def_form.name')),
+          'nombre_x',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('var_def_form.submit')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const VarDefsUpdateRequested(varDefId: 'v1', name: 'nombre_x'),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'submit con cambio en description: viaja sólo description',
+      (tester) async {
+        await tester.pumpWidget(editHost());
+
+        await tester.enterText(
+          find.byKey(const Key('var_def_form.description')),
+          'Saludo nuevo',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('var_def_form.submit')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const VarDefsUpdateRequested(
+              varDefId: 'v1',
+              description: 'Saludo nuevo',
+            ),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'submit sin cambios es no-op (no dispatcha — UI evita request inútil)',
+      (tester) async {
+        await tester.pumpWidget(editHost());
+        await tester.tap(find.byKey(const Key('var_def_form.submit')));
+        await tester.pump();
+
+        verifyNever(
+          () => bloc.add(any(that: isA<VarDefsUpdateRequested>())),
+        );
+      },
+    );
+  });
 }
