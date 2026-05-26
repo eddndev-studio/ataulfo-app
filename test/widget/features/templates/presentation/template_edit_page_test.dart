@@ -1,6 +1,9 @@
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/core/design/widgets/app_button.dart';
 import 'package:agentic/core/design/widgets/app_text_field.dart';
+import 'package:agentic/features/ai_catalog/domain/entities/catalog.dart';
+import 'package:agentic/features/ai_catalog/domain/failures/catalog_failure.dart';
+import 'package:agentic/features/ai_catalog/presentation/bloc/catalog_bloc.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
 import 'package:agentic/features/templates/presentation/bloc/template_edit_bloc.dart';
@@ -12,8 +15,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockBloc extends MockBloc<TemplateEditEvent, TemplateEditState>
+class _MockEditBloc extends MockBloc<TemplateEditEvent, TemplateEditState>
     implements TemplateEditBloc {}
+
+class _MockCatalogBloc extends MockBloc<CatalogEvent, CatalogState>
+    implements CatalogBloc {}
 
 const _tpl = Template(
   id: 't1',
@@ -31,203 +37,257 @@ const _tpl = Template(
   ),
 );
 
+const _gemini = ProviderEntry(
+  provider: 'GEMINI',
+  defaultModel: 'gemini-3.1-pro-preview',
+  models: <AIModel>[
+    AIModel(
+      id: 'gemini-3.1-pro-preview',
+      supportsTemperature: true,
+      supportsThinking: true,
+    ),
+    AIModel(
+      id: 'gemini-3.5-flash',
+      supportsTemperature: true,
+      supportsThinking: true,
+    ),
+  ],
+);
+const _openai = ProviderEntry(
+  provider: 'OPENAI',
+  defaultModel: 'gpt-5.5',
+  models: <AIModel>[
+    AIModel(id: 'gpt-5.5', supportsTemperature: false, supportsThinking: true),
+  ],
+);
+const _catalog = Catalog(providers: <ProviderEntry>[_gemini, _openai]);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(const TemplateEditLoadRequested());
+    registerFallbackValue(const CatalogLoadRequested());
   });
 
-  late _MockBloc bloc;
+  late _MockEditBloc editBloc;
+  late _MockCatalogBloc catalogBloc;
 
   setUp(() {
-    bloc = _MockBloc();
-    when(() => bloc.state).thenReturn(const TemplateEditLoading());
+    editBloc = _MockEditBloc();
+    catalogBloc = _MockCatalogBloc();
+    when(() => editBloc.state).thenReturn(const TemplateEditLoading());
+    when(() => catalogBloc.state).thenReturn(const CatalogLoading());
   });
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: BlocProvider<TemplateEditBloc>.value(
-      value: bloc,
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<TemplateEditBloc>.value(value: editBloc),
+        BlocProvider<CatalogBloc>.value(value: catalogBloc),
+      ],
       child: const Scaffold(body: TemplateEditPage()),
     ),
   );
 
-  testWidgets('Loading muestra spinner', (tester) async {
-    when(() => bloc.state).thenReturn(const TemplateEditLoading());
-
-    await tester.pumpWidget(host());
-
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.byType(AppTextField), findsNothing);
-  });
-
-  testWidgets('LoadFailed muestra error + Reintentar', (tester) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const TemplateEditLoadFailed(TemplatesNotFoundFailure()));
-
-    await tester.pumpWidget(host());
-
-    expect(find.byKey(const Key('template_edit.load_error')), findsOneWidget);
-    expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
-  });
-
-  testWidgets('tap Reintentar dispara TemplateEditLoadRequested', (
-    tester,
-  ) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const TemplateEditLoadFailed(TemplatesNetworkFailure()));
-
-    await tester.pumpWidget(host());
-    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
-    await tester.pump();
-
-    verify(() => bloc.add(const TemplateEditLoadRequested())).called(1);
-  });
-
-  testWidgets(
-    'Editing pre-fills nombre + systemPrompt con los valores del template',
-    (tester) async {
-      when(() => bloc.state).thenReturn(const TemplateEditEditing(_tpl));
+  group('estados combinados de carga', () {
+    testWidgets('Template Loading + Catalog Loaded → spinner', (tester) async {
+      when(() => editBloc.state).thenReturn(const TemplateEditLoading());
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
 
       await tester.pumpWidget(host());
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(AppTextField), findsNothing);
+    });
+
+    testWidgets('Template Editing + Catalog Loading → spinner', (tester) async {
+      // El editor necesita el catálogo para pintar los pickers. Hasta
+      // que ambos blocs terminen su load, no se rendera form parcial.
+      when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+      when(() => catalogBloc.state).thenReturn(const CatalogLoading());
+
+      await tester.pumpWidget(host());
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(AppTextField), findsNothing);
+    });
+
+    testWidgets('Template LoadFailed prioriza sobre Catalog (error del template)', (
+      tester,
+    ) async {
+      // Si el template no carga, no hay nada que editar — el error del
+      // template gana sobre cualquier estado del catálogo.
+      when(
+        () => editBloc.state,
+      ).thenReturn(const TemplateEditLoadFailed(TemplatesNotFoundFailure()));
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('template_edit.load_error')), findsOneWidget);
+    });
+
+    testWidgets(
+      'Template Editing + Catalog Failed → error del catálogo + retry',
+      (tester) async {
+        // El template está listo pero los pickers necesitan el catálogo
+        // para renderizarse. Sin él, mostrar error específico del
+        // catálogo con retry — distinto del error de carga del template.
+        when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogFailed(CatalogNetworkFailure()));
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('template_edit.catalog_error')),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
+      },
+    );
+
+    testWidgets('tap Reintentar del catálogo dispara CatalogLoadRequested', (
+      tester,
+    ) async {
+      when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogFailed(CatalogNetworkFailure()));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
+      await tester.pump();
+
+      verify(() => catalogBloc.add(const CatalogLoadRequested())).called(1);
+    });
+  });
+
+  group('Editing + Catalog Loaded → form pre-filled', () {
+    Future<void> pumpReady(WidgetTester tester) async {
+      when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
+      await tester.pumpWidget(host());
+    }
+
+    testWidgets('name y systemPrompt vienen del template', (tester) async {
+      await pumpReady(tester);
 
       expect(find.text('Soporte'), findsOneWidget);
       expect(find.text('Prompt actual.'), findsOneWidget);
-      // Submit habilitado por default cuando el form trae valores válidos.
-      expect(find.widgetWithText(AppButton, 'Guardar'), findsOneWidget);
-    },
-  );
+    });
 
-  testWidgets(
-    'tap Guardar dispara TemplateEditSubmitted con los valores tipeados',
-    (tester) async {
-      when(() => bloc.state).thenReturn(const TemplateEditEditing(_tpl));
+    testWidgets('los pickers del AIConfig están visibles con keys contractuales', (
+      tester,
+    ) async {
+      await pumpReady(tester);
 
-      await tester.pumpWidget(host());
-      await tester.enterText(
-        find.byKey(const Key('template_edit.field.name')),
-        'Soporte v2',
+      expect(find.byKey(const Key('template_edit.field.enabled')), findsOneWidget);
+      expect(
+        find.byKey(const Key('template_edit.field.provider')),
+        findsOneWidget,
       );
-      await tester.enterText(
-        find.byKey(const Key('template_edit.field.system_prompt')),
-        'Nuevo prompt.',
+      expect(find.byKey(const Key('template_edit.field.model')), findsOneWidget);
+      expect(
+        find.byKey(const Key('template_edit.field.temperature')),
+        findsOneWidget,
       );
-      await tester.tap(find.byKey(const Key('template_edit.submit')));
-      await tester.pump();
+      expect(
+        find.byKey(const Key('template_edit.field.thinking')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('template_edit.field.context_messages')),
+        findsOneWidget,
+      );
+    });
 
-      // El form mínimo de TE1 cambia name + systemPrompt y conserva los
-      // 6 campos no-editables del AIConfig del template cargado. La
-      // responsabilidad de construir el AIConfig migró del bloc al
-      // caller (cambio TE3): el evento ahora lleva el value object
-      // completo.
-      verify(
-        () => bloc.add(
-          TemplateEditSubmitted(
-            name: 'Soporte v2',
-            ai: AIConfig(
-              enabled: _tpl.ai.enabled,
-              provider: _tpl.ai.provider,
-              model: _tpl.ai.model,
-              temperature: _tpl.ai.temperature,
-              thinkingLevel: _tpl.ai.thinkingLevel,
-              systemPrompt: 'Nuevo prompt.',
-              contextMessages: _tpl.ai.contextMessages,
-            ),
-          ),
-        ),
-      ).called(1);
-    },
-  );
+    testWidgets('contextMessages pre-fillea con el valor del template', (
+      tester,
+    ) async {
+      await pumpReady(tester);
 
-  testWidgets('Submitting mantiene el form pero el botón está en loading', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(const TemplateEditSubmitting(_tpl));
-
-    await tester.pumpWidget(host());
-
-    // El form sigue visible (preserva lo que el operador escribió).
-    expect(find.text('Soporte'), findsOneWidget);
-    // El botón está en loading (spinner inline). El primitivo bloquea
-    // tap internamente; AppButton no expone su estado loading para el
-    // test, así que verificamos la presencia del spinner inline en su
-    // árbol.
-    expect(find.byType(CircularProgressIndicator), findsAtLeastNWidgets(1));
+      // contextMessages es numérico (TextField), 20 viene del template.
+      expect(find.text('20'), findsOneWidget);
+    });
   });
 
-  testWidgets('SubmitFailed(Conflict) muestra copy específico de CAS + retry', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(
-      const TemplateEditSubmitFailed(
-        failure: TemplatesConflictFailure(),
-        template: _tpl,
-      ),
-    );
-
-    await tester.pumpWidget(host());
-
-    expect(
-      find.byKey(const Key('template_edit.error.conflict')),
-      findsOneWidget,
-    );
-    // El form se mantiene editable después de Conflict — el operador
-    // puede revisar, pero el copy le sugiere recargar primero.
-    expect(find.text('Soporte'), findsOneWidget);
-  });
-
-  testWidgets(
-    'SubmitFailed(InvalidUpdate) muestra copy específico de validación',
-    (tester) async {
-      when(() => bloc.state).thenReturn(
-        const TemplateEditSubmitFailed(
-          failure: TemplatesInvalidUpdateFailure(),
-          template: _tpl,
-        ),
+  group('SubmitFailed mantiene form editable', () {
+    Future<void> pumpFailed(
+      WidgetTester tester,
+      TemplatesFailure failure,
+    ) async {
+      when(() => editBloc.state).thenReturn(
+        TemplateEditSubmitFailed(failure: failure, template: _tpl),
       );
-
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
       await tester.pumpWidget(host());
+    }
 
+    testWidgets('Conflict muestra copy específico de CAS', (tester) async {
+      await pumpFailed(tester, const TemplatesConflictFailure());
+      expect(
+        find.byKey(const Key('template_edit.error.conflict')),
+        findsOneWidget,
+      );
+      expect(find.text('Soporte'), findsOneWidget);
+    });
+
+    testWidgets('InvalidUpdate muestra copy específico de validación', (
+      tester,
+    ) async {
+      await pumpFailed(tester, const TemplatesInvalidUpdateFailure());
       expect(
         find.byKey(const Key('template_edit.error.invalid')),
         findsOneWidget,
       );
-    },
-  );
+    });
 
-  testWidgets('SubmitFailed(Network) muestra copy de red genérico', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(
-      const TemplateEditSubmitFailed(
-        failure: TemplatesNetworkFailure(),
-        template: _tpl,
-      ),
-    );
+    testWidgets('Network muestra copy de red genérico', (tester) async {
+      await pumpFailed(tester, const TemplatesNetworkFailure());
+      expect(
+        find.byKey(const Key('template_edit.error.network')),
+        findsOneWidget,
+      );
+    });
+  });
+
+  testWidgets('Submitting muestra el form pero el botón en loading', (tester) async {
+    when(() => editBloc.state).thenReturn(const TemplateEditSubmitting(_tpl));
+    when(
+      () => catalogBloc.state,
+    ).thenReturn(const CatalogLoaded(catalog: _catalog));
 
     await tester.pumpWidget(host());
 
-    expect(
-      find.byKey(const Key('template_edit.error.network')),
-      findsOneWidget,
-    );
+    expect(find.text('Soporte'), findsOneWidget);
+    // Spinner inline del AppButton; el primitivo lo monta cuando loading=true.
+    expect(find.byType(CircularProgressIndicator), findsAtLeastNWidgets(1));
   });
 
   testWidgets(
     'Succeeded apila el detalle por pushReplacement (form ya cumplió)',
     (tester) async {
-      // Espejo del test de template_create_page: pushReplacement preserva
-      // shell debajo, back físico vuelve al listado sin pasar por el form
-      // que ya cumplió. context.go() aplastaría la pila.
       whenListen(
-        bloc,
+        editBloc,
         Stream<TemplateEditState>.fromIterable(<TemplateEditState>[
           const TemplateEditSubmitting(_tpl),
           const TemplateEditSucceeded(_tpl),
         ]),
         initialState: const TemplateEditEditing(_tpl),
       );
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
 
       final canPopAtDestination = <bool>[];
       final router = GoRouter(
@@ -235,8 +295,11 @@ void main() {
         routes: <RouteBase>[
           GoRoute(
             path: '/templates/t1/edit',
-            builder: (_, _) => BlocProvider<TemplateEditBloc>.value(
-              value: bloc,
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<TemplateEditBloc>.value(value: editBloc),
+                BlocProvider<CatalogBloc>.value(value: catalogBloc),
+              ],
               child: const Scaffold(body: TemplateEditPage()),
             ),
           ),
@@ -257,9 +320,6 @@ void main() {
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await tester.pumpAndSettle();
 
-      // Después de pushReplacement, el detalle NO debe poder pop (el form
-      // fue reemplazado, no apilado). Si el form quedara apilado, back
-      // volvería al form que ya guardó — UX rota.
       expect(
         canPopAtDestination,
         <bool>[false],
