@@ -24,7 +24,12 @@ class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
 class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
     implements TemplatesBloc {}
 
-const _identity = Identity(userId: 'u1', orgId: 'o1', role: 'OWNER');
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
 
 void main() {
   late _MockAuthBloc authBloc;

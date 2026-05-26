@@ -13,7 +13,12 @@ import 'package:mocktail/mocktail.dart';
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
 
-const _identity = Identity(userId: 'u1', orgId: 'o1', role: 'OWNER');
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
 
 void main() {
   setUpAll(() {

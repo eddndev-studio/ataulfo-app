@@ -30,7 +30,12 @@ class _MockBotsRepo extends Mock implements BotsRepository {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
-const _identity = Identity(userId: 'u1', orgId: 'o1', role: 'OWNER');
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
 
 Widget _host(AppRouter router, AuthBloc authBloc) =>
     BlocProvider<AuthBloc>.value(

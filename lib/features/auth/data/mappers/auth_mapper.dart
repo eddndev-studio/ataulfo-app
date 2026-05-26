@@ -17,6 +17,10 @@ class AuthMapper {
     expiresInSeconds: resp.expiresIn,
   );
 
-  static Identity meRespToEntity(MeResp resp) =>
-      Identity(userId: resp.userId, orgId: resp.orgId, role: resp.role);
+  static Identity meRespToEntity(MeResp resp) => Identity(
+    userId: resp.userId,
+    orgId: resp.orgId,
+    role: resp.role,
+    email: resp.email,
+  );
 }
