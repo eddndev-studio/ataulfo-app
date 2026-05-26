@@ -8,12 +8,18 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
 
-const _identity = Identity(userId: 'u1', orgId: 'o1', role: 'OWNER');
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
 
 void main() {
   setUpAll(() {
@@ -37,19 +43,90 @@ void main() {
     ),
   );
 
-  testWidgets('Authenticated muestra el rol como AppPill + AppButton.danger', (
-    tester,
-  ) async {
+  testWidgets(
+    'Authenticated muestra email vivo + rol como AppPill + AppButton.danger',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(host());
+
+      // Email vivo del backend (post-S02: /auth/me lo trae). Antes Settings
+      // sólo exponía el rol porque el UUID era ruido; ahora el operador
+      // ve quién está logueado.
+      expect(find.text('op@example.com'), findsOneWidget);
+      expect(find.widgetWithText(AppPill, 'OWNER'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Cerrar sesión'), findsOneWidget);
+      // UUIDs siguen sin mostrarse — el user_id/org_id NO entra a la UI.
+      expect(find.text('u1'), findsNothing);
+      expect(find.text('o1'), findsNothing);
+      // Los M3 baseline ya no deben aparecer.
+      expect(find.byType(Chip), findsNothing);
+      expect(find.byType(FilledButton), findsNothing);
+    },
+  );
+
+  testWidgets('Authenticated expone tile "Tus organizaciones"', (tester) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(host());
 
-    expect(find.byType(AppPill), findsOneWidget);
-    expect(find.widgetWithText(AppPill, 'OWNER'), findsOneWidget);
-    expect(find.widgetWithText(AppButton, 'Cerrar sesión'), findsOneWidget);
-    // Los M3 baseline ya no deben aparecer.
-    expect(find.byType(Chip), findsNothing);
-    expect(find.byType(FilledButton), findsNothing);
+    // Key contractual para que el test de navegación lo localice sin
+    // acoplarse al copy y para que smoke tests futuros lo encuentren
+    // rápido en device.
+    expect(find.byKey(const Key('settings.memberships_tile')), findsOneWidget);
+    expect(find.text('Tus organizaciones'), findsOneWidget);
+  });
+
+  testWidgets('tap "Tus organizaciones" apila /memberships (push, no go)', (
+    tester,
+  ) async {
+    // Mismo patrón que el test del tile de Templates/Bots: el destino
+    // observa Navigator.canPop() para detectar si la fuente apiló
+    // (push) o reemplazó la pila (go). go() saca al usuario de la app
+    // con el back físico — guard contractual contra esa regresión.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    final navigated = <String>[];
+    final canPopAtDestination = <bool>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<AuthBloc>.value(
+            value: authBloc,
+            child: const Scaffold(body: SettingsPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/memberships',
+          builder: (_, _) {
+            navigated.add('/memberships');
+            return Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  canPopAtDestination.add(Navigator.of(ctx).canPop());
+                  return const SizedBox.shrink();
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.byKey(const Key('settings.memberships_tile')));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/memberships']);
+    expect(
+      canPopAtDestination,
+      <bool>[true],
+      reason:
+          'el listado de memberships debe quedar apilado sobre Settings '
+          'para que el back físico vuelva al shell',
+    );
   });
 
   testWidgets('tap Cerrar sesión dispara AuthLoggedOut en el bloc', (

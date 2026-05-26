@@ -70,7 +70,12 @@ void main() {
 
   group('me', () {
     test('OK devuelve la identidad del datasource sin tocar storage', () async {
-      const identity = Identity(userId: 'u1', orgId: 'o1', role: 'OWNER');
+      const identity = Identity(
+        userId: 'u1',
+        orgId: 'o1',
+        role: 'OWNER',
+        email: 'op@example.com',
+      );
       when(() => ds.me()).thenAnswer((_) async => identity);
 
       final got = await repo.me();

@@ -15,6 +15,9 @@ import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
+import '../../features/memberships/domain/repositories/memberships_repository.dart';
+import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
+import '../../features/memberships/presentation/pages/memberships_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
@@ -42,15 +45,18 @@ class AppRouter {
     required AuthRepository authRepository,
     required BotsRepository botsRepository,
     required TemplatesRepository templatesRepository,
+    required MembershipsRepository membershipsRepository,
   }) : _authBloc = authBloc,
        _authRepo = authRepository,
        _botsRepo = botsRepository,
-       _templatesRepo = templatesRepository;
+       _templatesRepo = templatesRepository,
+       _membershipsRepo = membershipsRepository;
 
   final AuthBloc _authBloc;
   final AuthRepository _authRepo;
   final BotsRepository _botsRepo;
   final TemplatesRepository _templatesRepo;
+  final MembershipsRepository _membershipsRepo;
 
   late final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -168,6 +174,22 @@ class AppRouter {
             ),
           );
         },
+      ),
+      GoRoute(
+        // Listado de orgs del operador. Entry point único hoy: tile en
+        // SettingsPage. Page-scoped: el bloc se construye y dispara
+        // LoadRequested aquí; cuando aterrice cache RFC-0001, esta capa
+        // sobrevive y la repo orquesta verdad local vs. remota.
+        path: '/memberships',
+        builder: (context, _) => BlocProvider<MembershipsBloc>(
+          create: (_) =>
+              MembershipsBloc(_membershipsRepo)
+                ..add(const MembershipsLoadRequested()),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Tus organizaciones')),
+            body: const MembershipsPage(),
+          ),
+        ),
       ),
       GoRoute(
         // Crear bot dentro del namespace de su Template padre. Forzar el

@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
-/// Pantalla de Settings mínima del shell: muestra el rol del operador
-/// (pill primary) y un botón para cerrar sesión (botón danger). Otras
-/// opciones (tema, idioma, perfil) aterrizan en su propio slice.
+/// Pantalla de Settings mínima del shell: muestra el perfil real del
+/// operador (email + rol vía pill primary) y dos acciones (tile a
+/// /memberships, logout). Otras opciones (tema, idioma, perfil editable)
+/// aterrizan en su propio slice.
 ///
-/// No muestra `userId` ni `orgId` crudos: hasta que `/auth/me` exponga
-/// email/nombre, esos UUIDs no aportan al operador. Mostrarlos sería
-/// ruido — el rol sí orienta al menos sobre privilegios efectivos.
+/// Sin UUIDs visibles: el operador no acciona sobre `userId`/`orgId`;
+/// `orgId` se interpreta al humano en `/memberships` (badge "Activa"
+/// sobre el nombre legible).
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
@@ -25,17 +28,37 @@ class SettingsPage extends StatelessWidget {
           // mostramos nada para evitar parpadeos UI durante transiciones.
           return const SizedBox.shrink();
         }
+        final identity = state.identity;
         return Padding(
           padding: const EdgeInsets.all(AppTokens.sp6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              Text(identity.email),
+              const SizedBox(height: AppTokens.sp4),
               Row(
                 children: <Widget>[
                   const Text('Rol'),
                   const SizedBox(width: AppTokens.sp3),
-                  AppPill.primary(label: state.identity.role),
+                  AppPill.primary(label: identity.role),
                 ],
+              ),
+              const SizedBox(height: AppTokens.sp6),
+              AppCard(
+                key: const Key('settings.memberships_tile'),
+                // push (no go): apila /memberships sobre Settings para
+                // que el back físico de Android vuelva al shell sin sacar
+                // al operador de la app. Mismo guard que tiles y FABs
+                // del resto del repo.
+                onTap: () => context.push('/memberships'),
+                child: const Row(
+                  children: <Widget>[
+                    Icon(Icons.business_outlined, color: AppTokens.text2),
+                    SizedBox(width: AppTokens.sp4),
+                    Expanded(child: Text('Tus organizaciones')),
+                    Icon(Icons.chevron_right, color: AppTokens.text2),
+                  ],
+                ),
               ),
               const SizedBox(height: AppTokens.sp7),
               AppButton.danger(

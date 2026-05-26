@@ -9,6 +9,9 @@ import 'package:agentic/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_template_picker_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bots_list_page.dart';
+import 'package:agentic/features/memberships/domain/entities/membership.dart';
+import 'package:agentic/features/memberships/domain/repositories/memberships_repository.dart';
+import 'package:agentic/features/memberships/presentation/pages/memberships_page.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/repositories/templates_repository.dart';
@@ -30,7 +33,14 @@ class _MockBotsRepo extends Mock implements BotsRepository {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
-const _identity = Identity(userId: 'u1', orgId: 'o1', role: 'OWNER');
+class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
+
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
 
 Widget _host(AppRouter router, AuthBloc authBloc) =>
     BlocProvider<AuthBloc>.value(
@@ -42,22 +52,26 @@ void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsRepo botsRepo;
   late _MockTemplatesRepo templatesRepo;
+  late _MockMembershipsRepo membershipsRepo;
   late AppRouter router;
 
   setUp(() {
     authBloc = _MockAuthBloc();
     botsRepo = _MockBotsRepo();
     templatesRepo = _MockTemplatesRepo();
+    membershipsRepo = _MockMembershipsRepo();
     // Los blocs page-scoped del shell arrancan con LoadRequested al
     // construirse; los repos mock devuelven listas vacías para que los
     // loads terminen sin colgar el pumpAndSettle.
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
+    when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      membershipsRepository: membershipsRepo,
     );
   });
 
@@ -173,6 +187,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      membershipsRepository: membershipsRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -247,6 +262,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      membershipsRepository: membershipsRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -267,6 +283,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      membershipsRepository: membershipsRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -323,6 +340,7 @@ void main() {
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
+        membershipsRepository: membershipsRepo,
       );
 
       await tester.pumpWidget(_host(router, authBloc));
@@ -381,6 +399,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      membershipsRepository: membershipsRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -390,5 +409,45 @@ void main() {
 
     expect(find.byType(LoginPage), findsOneWidget);
     expect(find.byType(BotTemplatePickerPage), findsNothing);
+  });
+
+  testWidgets(
+    'AuthAuthenticated → /memberships monta MembershipsPage y dispara '
+    'MembershipsLoadRequested al construirse',
+    (tester) async {
+      // El bloc page-scoped vive en el route builder de /memberships; el
+      // verify garantiza que el load arranca solo, sin que la página tenga
+      // que conocer el ciclo de vida (igual que TemplateDetail/BotDetail).
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/memberships');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MembershipsPage), findsOneWidget);
+      verify(membershipsRepo.list).called(1);
+    },
+  );
+
+  testWidgets('AuthUnauthenticated + deep-link a /memberships → /login', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+    router = AppRouter(
+      authBloc: authBloc,
+      authRepository: _MockAuthRepo(),
+      botsRepository: botsRepo,
+      templatesRepository: templatesRepo,
+      membershipsRepository: membershipsRepo,
+    );
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/memberships');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(MembershipsPage), findsNothing);
   });
 }

@@ -43,11 +43,12 @@ void main() {
   });
 
   group('MeResp', () {
-    test('parsea las 3 claves del contrato S02 /auth/me', () {
+    test('parsea las 4 claves del contrato S02 /auth/me', () {
       final json = <String, dynamic>{
         'user_id': 'u-123',
         'org_id': 'o-456',
         'role': 'OWNER',
+        'email': 'op@example.com',
       };
 
       final resp = MeResp.fromJson(json);
@@ -55,13 +56,28 @@ void main() {
       expect(resp.userId, 'u-123');
       expect(resp.orgId, 'o-456');
       expect(resp.role, 'OWNER');
+      expect(resp.email, 'op@example.com');
     });
 
-    test('lanza FormatException si falta una clave obligatoria', () {
+    test('lanza FormatException si falta role', () {
       final incomplete = <String, dynamic>{
         'user_id': 'u-1',
         'org_id': 'o-1',
+        'email': 'op@example.com',
         // role ausente
+      };
+
+      expect(() => MeResp.fromJson(incomplete), throwsFormatException);
+    });
+
+    test('lanza FormatException si falta email', () {
+      // El backend post-S02 SIEMPRE devuelve email vivo (paga SELECT por
+      // request). Email ausente es contrato roto, no estado vacío.
+      final incomplete = <String, dynamic>{
+        'user_id': 'u-1',
+        'org_id': 'o-1',
+        'role': 'OWNER',
+        // email ausente
       };
 
       expect(() => MeResp.fromJson(incomplete), throwsFormatException);
@@ -72,6 +88,7 @@ void main() {
         'user_id': 'u-1',
         'org_id': 42, // debería ser String
         'role': 'ADMIN',
+        'email': 'op@example.com',
       };
 
       expect(() => MeResp.fromJson(wrongType), throwsFormatException);

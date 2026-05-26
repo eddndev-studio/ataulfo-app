@@ -287,6 +287,7 @@ void main() {
             'user_id': 'u-123',
             'org_id': 'o-456',
             'role': 'OWNER',
+            'email': 'op@example.com',
           },
         ),
       );
@@ -295,7 +296,12 @@ void main() {
 
       expect(
         identity,
-        const Identity(userId: 'u-123', orgId: 'o-456', role: 'OWNER'),
+        const Identity(
+          userId: 'u-123',
+          orgId: 'o-456',
+          role: 'OWNER',
+          email: 'op@example.com',
+        ),
       );
       verify(() => dio.get<Map<String, dynamic>>('/auth/me')).called(1);
     });
