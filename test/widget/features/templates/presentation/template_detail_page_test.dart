@@ -374,6 +374,75 @@ void main() {
 
       verify(() => varDefsBloc.add(const VarDefsLoadRequested())).called(1);
     });
+
+    testWidgets(
+      'VarDefsMutating conserva la lista visible (no flash a Loading)',
+      (tester) async {
+        when(() => varDefsBloc.state).thenReturn(
+          const VarDefsMutating(
+            <VariableDef>[
+              VariableDef(
+                id: 'v1',
+                name: 'nombre',
+                type: VarType.text,
+                defaultValue: 'cliente',
+                description: '',
+              ),
+            ],
+            2,
+          ),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(find.text('{{nombre}}'), findsOneWidget);
+        // El spinner inline NO debe aparecer durante la mutación — el
+        // contexto del operador se conserva; el overlay/disable del
+        // botón lo gestiona el form que disparó la mutación.
+        expect(find.byKey(const Key('var_defs.loading')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'VarDefsMutationFailed mantiene lista visible (feedback va por listener)',
+      (tester) async {
+        when(() => varDefsBloc.state).thenReturn(
+          const VarDefsMutationFailed(
+            <VariableDef>[
+              VariableDef(
+                id: 'v1',
+                name: 'nombre',
+                type: VarType.text,
+                defaultValue: 'cliente',
+                description: '',
+              ),
+            ],
+            2,
+            TemplatesConflictFailure(),
+          ),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(find.text('{{nombre}}'), findsOneWidget);
+        // No es el terminal de Failed (que apaga la lista) — el snapshot
+        // sigue intacto y el operador puede reintentar sin perder
+        // contexto.
+        expect(find.byKey(const Key('var_defs.failed')), findsNothing);
+      },
+    );
+
+    testWidgets('VarDefsMutating con lista vacía muestra empty state', (
+      tester,
+    ) async {
+      when(() => varDefsBloc.state).thenReturn(
+        const VarDefsMutating(<VariableDef>[], 1),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('var_defs.empty')), findsOneWidget);
+    });
   });
 
   // ── Botón "Crear bot" (mini-S04a) ──────────────────────────────────────────
