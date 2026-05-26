@@ -68,14 +68,24 @@ class VarDefsBloc extends Bloc<VarDefsEvent, VarDefsState> {
         description: event.description,
         version: snapshot.version,
       );
-      // Re-list para refrescar la nueva version del Template padre y la
-      // posición real del nuevo def en el orden del backend. El POST
-      // sólo devolvió la def, no el snapshot completo.
-      emit(const VarDefsLoading());
+    } on TemplatesFailure catch (f) {
+      emit(VarDefsMutationFailed(snapshot.defs, snapshot.version, f));
+      return;
+    }
+    // Re-list para refrescar la nueva version del Template padre y la
+    // posición real del nuevo def en el orden del backend. El POST
+    // sólo devolvió la def, no el snapshot completo.
+    //
+    // Crítico: NO enmascarar success del POST si el refetch falla. La
+    // mutación YA se persistió en el servidor; el snapshot local está
+    // stale. Failed es el terminal honesto — el operador puede
+    // reintentar el Load para refrescar.
+    emit(const VarDefsLoading());
+    try {
       final res = await _repo.listVarDefs(_templateId);
       emit(VarDefsLoaded(res.defs, res.version));
     } on TemplatesFailure catch (f) {
-      emit(VarDefsMutationFailed(snapshot.defs, snapshot.version, f));
+      emit(VarDefsFailed(f));
     }
   }
 }
