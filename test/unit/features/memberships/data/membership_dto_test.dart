@@ -18,28 +18,19 @@ void main() {
     });
 
     test('lanza FormatException si falta org_id', () {
-      final incomplete = <String, dynamic>{
-        'org_name': 'Acme',
-        'role': 'ADMIN',
-      };
+      final incomplete = <String, dynamic>{'org_name': 'Acme', 'role': 'ADMIN'};
 
       expect(() => MembershipResp.fromJson(incomplete), throwsFormatException);
     });
 
     test('lanza FormatException si falta org_name', () {
-      final incomplete = <String, dynamic>{
-        'org_id': 'o1',
-        'role': 'ADMIN',
-      };
+      final incomplete = <String, dynamic>{'org_id': 'o1', 'role': 'ADMIN'};
 
       expect(() => MembershipResp.fromJson(incomplete), throwsFormatException);
     });
 
     test('lanza FormatException si falta role', () {
-      final incomplete = <String, dynamic>{
-        'org_id': 'o1',
-        'org_name': 'Acme',
-      };
+      final incomplete = <String, dynamic>{'org_id': 'o1', 'org_name': 'Acme'};
 
       expect(() => MembershipResp.fromJson(incomplete), throwsFormatException);
     });

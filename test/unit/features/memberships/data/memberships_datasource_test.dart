@@ -39,11 +39,7 @@ void main() {
     String orgId = 'o1',
     String orgName = 'Acme',
     String role = 'OWNER',
-  }) => <String, dynamic>{
-    'org_id': orgId,
-    'org_name': orgName,
-    'role': role,
-  };
+  }) => <String, dynamic>{'org_id': orgId, 'org_name': orgName, 'role': role};
 
   group('DioMembershipsDatasource.list', () {
     test('200 con [membershipResp...] → List<Membership>', () async {
@@ -88,10 +84,7 @@ void main() {
         ),
       );
 
-      await expectLater(
-        ds.list(),
-        throwsA(isA<MembershipsTimeoutFailure>()),
-      );
+      await expectLater(ds.list(), throwsA(isA<MembershipsTimeoutFailure>()));
     });
 
     test('sin conexión → MembershipsNetworkFailure', () async {
@@ -102,10 +95,7 @@ void main() {
         ),
       );
 
-      await expectLater(
-        ds.list(),
-        throwsA(isA<MembershipsNetworkFailure>()),
-      );
+      await expectLater(ds.list(), throwsA(isA<MembershipsNetworkFailure>()));
     });
 
     test('403 → MembershipsForbiddenFailure', () async {
@@ -113,10 +103,7 @@ void main() {
         () => dio.get<List<dynamic>>('/auth/memberships'),
       ).thenThrow(badResponse(403));
 
-      await expectLater(
-        ds.list(),
-        throwsA(isA<MembershipsForbiddenFailure>()),
-      );
+      await expectLater(ds.list(), throwsA(isA<MembershipsForbiddenFailure>()));
     });
 
     test('500 → MembershipsServerFailure', () async {
@@ -124,10 +111,7 @@ void main() {
         () => dio.get<List<dynamic>>('/auth/memberships'),
       ).thenThrow(badResponse(500));
 
-      await expectLater(
-        ds.list(),
-        throwsA(isA<MembershipsServerFailure>()),
-      );
+      await expectLater(ds.list(), throwsA(isA<MembershipsServerFailure>()));
     });
 
     test('body nulo → UnknownMembershipsFailure', () async {
@@ -135,28 +119,25 @@ void main() {
         () => dio.get<List<dynamic>>('/auth/memberships'),
       ).thenAnswer((_) async => resp(200, body: null));
 
-      await expectLater(
-        ds.list(),
-        throwsA(isA<UnknownMembershipsFailure>()),
-      );
+      await expectLater(ds.list(), throwsA(isA<UnknownMembershipsFailure>()));
     });
 
-    test('body malformado (clave faltante) → UnknownMembershipsFailure', () async {
-      // Sin org_name -> MembershipResp.fromJson lanza FormatException, el
-      // datasource lo colapsa a Unknown.
-      when(() => dio.get<List<dynamic>>('/auth/memberships')).thenAnswer(
-        (_) async => resp(
-          200,
-          body: <dynamic>[
-            <String, dynamic>{'org_id': 'o1', 'role': 'OWNER'},
-          ],
-        ),
-      );
+    test(
+      'body malformado (clave faltante) → UnknownMembershipsFailure',
+      () async {
+        // Sin org_name -> MembershipResp.fromJson lanza FormatException, el
+        // datasource lo colapsa a Unknown.
+        when(() => dio.get<List<dynamic>>('/auth/memberships')).thenAnswer(
+          (_) async => resp(
+            200,
+            body: <dynamic>[
+              <String, dynamic>{'org_id': 'o1', 'role': 'OWNER'},
+            ],
+          ),
+        );
 
-      await expectLater(
-        ds.list(),
-        throwsA(isA<UnknownMembershipsFailure>()),
-      );
-    });
+        await expectLater(ds.list(), throwsA(isA<UnknownMembershipsFailure>()));
+      },
+    );
   });
 }

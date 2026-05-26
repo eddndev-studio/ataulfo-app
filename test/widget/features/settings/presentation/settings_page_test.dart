@@ -46,9 +46,7 @@ void main() {
   testWidgets(
     'Authenticated muestra email vivo + rol como AppPill + AppButton.danger',
     (tester) async {
-      when(
-        () => authBloc.state,
-      ).thenReturn(const AuthAuthenticated(_identity));
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
       await tester.pumpWidget(host());
 
@@ -67,9 +65,7 @@ void main() {
     },
   );
 
-  testWidgets('Authenticated expone tile "Tus organizaciones"', (
-    tester,
-  ) async {
+  testWidgets('Authenticated expone tile "Tus organizaciones"', (tester) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(host());
@@ -81,60 +77,57 @@ void main() {
     expect(find.text('Tus organizaciones'), findsOneWidget);
   });
 
-  testWidgets(
-    'tap "Tus organizaciones" apila /memberships (push, no go)',
-    (tester) async {
-      // Mismo patrón que el test del tile de Templates/Bots: el destino
-      // observa Navigator.canPop() para detectar si la fuente apiló
-      // (push) o reemplazó la pila (go). go() saca al usuario de la app
-      // con el back físico — guard contractual contra esa regresión.
-      when(
-        () => authBloc.state,
-      ).thenReturn(const AuthAuthenticated(_identity));
+  testWidgets('tap "Tus organizaciones" apila /memberships (push, no go)', (
+    tester,
+  ) async {
+    // Mismo patrón que el test del tile de Templates/Bots: el destino
+    // observa Navigator.canPop() para detectar si la fuente apiló
+    // (push) o reemplazó la pila (go). go() saca al usuario de la app
+    // con el back físico — guard contractual contra esa regresión.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
-      final navigated = <String>[];
-      final canPopAtDestination = <bool>[];
-      final router = GoRouter(
-        initialLocation: '/',
-        routes: <RouteBase>[
-          GoRoute(
-            path: '/',
-            builder: (_, _) => BlocProvider<AuthBloc>.value(
-              value: authBloc,
-              child: const Scaffold(body: SettingsPage()),
-            ),
+    final navigated = <String>[];
+    final canPopAtDestination = <bool>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<AuthBloc>.value(
+            value: authBloc,
+            child: const Scaffold(body: SettingsPage()),
           ),
-          GoRoute(
-            path: '/memberships',
-            builder: (_, _) {
-              navigated.add('/memberships');
-              return Scaffold(
-                body: Builder(
-                  builder: (ctx) {
-                    canPopAtDestination.add(Navigator.of(ctx).canPop());
-                    return const SizedBox.shrink();
-                  },
-                ),
-              );
-            },
-          ),
-        ],
-      );
+        ),
+        GoRoute(
+          path: '/memberships',
+          builder: (_, _) {
+            navigated.add('/memberships');
+            return Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  canPopAtDestination.add(Navigator.of(ctx).canPop());
+                  return const SizedBox.shrink();
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-      await tester.tap(find.byKey(const Key('settings.memberships_tile')));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.byKey(const Key('settings.memberships_tile')));
+    await tester.pumpAndSettle();
 
-      expect(navigated, <String>['/memberships']);
-      expect(
-        canPopAtDestination,
-        <bool>[true],
-        reason:
-            'el listado de memberships debe quedar apilado sobre Settings '
-            'para que el back físico vuelva al shell',
-      );
-    },
-  );
+    expect(navigated, <String>['/memberships']);
+    expect(
+      canPopAtDestination,
+      <bool>[true],
+      reason:
+          'el listado de memberships debe quedar apilado sobre Settings '
+          'para que el back físico vuelva al shell',
+    );
+  });
 
   testWidgets('tap Cerrar sesión dispara AuthLoggedOut en el bloc', (
     tester,

@@ -15,8 +15,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockMembershipsBloc
-    extends MockBloc<MembershipsEvent, MembershipsState>
+class _MockMembershipsBloc extends MockBloc<MembershipsEvent, MembershipsState>
     implements MembershipsBloc {}
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
@@ -80,22 +79,21 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets(
-    'Loaded con N memberships renderiza una AppCard por cada uno',
-    (tester) async {
-      when(() => membershipsBloc.state).thenReturn(
-        const MembershipsLoaded(
-          items: <Membership>[_activeMembership, _otherMembership],
-        ),
-      );
+  testWidgets('Loaded con N memberships renderiza una AppCard por cada uno', (
+    tester,
+  ) async {
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(
+        items: <Membership>[_activeMembership, _otherMembership],
+      ),
+    );
 
-      await tester.pumpWidget(host());
+    await tester.pumpWidget(host());
 
-      expect(find.text('Acme'), findsOneWidget);
-      expect(find.text('Bravo'), findsOneWidget);
-      expect(find.byType(AppCard), findsNWidgets(2));
-    },
-  );
+    expect(find.text('Acme'), findsOneWidget);
+    expect(find.text('Bravo'), findsOneWidget);
+    expect(find.byType(AppCard), findsNWidgets(2));
+  });
 
   testWidgets('Loaded vacío muestra empty state (sin tiles)', (tester) async {
     when(
@@ -132,9 +130,9 @@ void main() {
   testWidgets('Failed muestra mensaje y botón Reintentar tonal', (
     tester,
   ) async {
-    when(() => membershipsBloc.state).thenReturn(
-      const MembershipsFailed(MembershipsNetworkFailure()),
-    );
+    when(
+      () => membershipsBloc.state,
+    ).thenReturn(const MembershipsFailed(MembershipsNetworkFailure()));
 
     await tester.pumpWidget(host());
 
@@ -146,9 +144,9 @@ void main() {
   testWidgets('tap Reintentar dispara MembershipsLoadRequested', (
     tester,
   ) async {
-    when(() => membershipsBloc.state).thenReturn(
-      const MembershipsFailed(MembershipsNetworkFailure()),
-    );
+    when(
+      () => membershipsBloc.state,
+    ).thenReturn(const MembershipsFailed(MembershipsNetworkFailure()));
 
     await tester.pumpWidget(host());
     await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));

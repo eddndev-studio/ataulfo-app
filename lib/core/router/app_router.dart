@@ -182,8 +182,9 @@ class AppRouter {
         // sobrevive y la repo orquesta verdad local vs. remota.
         path: '/memberships',
         builder: (context, _) => BlocProvider<MembershipsBloc>(
-          create: (_) => MembershipsBloc(_membershipsRepo)
-            ..add(const MembershipsLoadRequested()),
+          create: (_) =>
+              MembershipsBloc(_membershipsRepo)
+                ..add(const MembershipsLoadRequested()),
           child: Scaffold(
             appBar: AppBar(title: const Text('Tus organizaciones')),
             body: const MembershipsPage(),

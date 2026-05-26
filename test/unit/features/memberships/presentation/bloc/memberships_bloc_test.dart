@@ -23,9 +23,7 @@ void main() {
         'list() ok → [Loading, Loaded(items)]',
         build: () {
           final repo = _MockRepo();
-          when(
-            repo.list,
-          ).thenAnswer((_) async => const <Membership>[_m1, _m2]);
+          when(repo.list).thenAnswer((_) async => const <Membership>[_m1, _m2]);
           return MembershipsBloc(repo);
         },
         act: (bloc) => bloc.add(const MembershipsLoadRequested()),
@@ -89,9 +87,7 @@ void main() {
         'retry desde Failed re-emite Loading visible',
         build: () {
           final repo = _MockRepo();
-          when(
-            repo.list,
-          ).thenAnswer((_) async => const <Membership>[_m1]);
+          when(repo.list).thenAnswer((_) async => const <Membership>[_m1]);
           return MembershipsBloc(repo);
         },
         // El primer load lo emite el caller; este test simula el segundo

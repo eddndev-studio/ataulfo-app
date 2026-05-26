@@ -4,11 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('Membership', () {
     test('expone los 3 campos decorados de GET /auth/memberships', () {
-      const m = Membership(
-        orgId: 'o1',
-        orgName: 'Acme Inc.',
-        role: 'OWNER',
-      );
+      const m = Membership(orgId: 'o1', orgName: 'Acme Inc.', role: 'OWNER');
 
       expect(m.orgId, 'o1');
       expect(m.orgName, 'Acme Inc.');
@@ -25,9 +21,17 @@ void main() {
 
     test('difieren si cambia cualquiera de los 3 campos', () {
       const base = Membership(orgId: 'o1', orgName: 'Acme', role: 'ADMIN');
-      const otherOrgId = Membership(orgId: 'o2', orgName: 'Acme', role: 'ADMIN');
+      const otherOrgId = Membership(
+        orgId: 'o2',
+        orgName: 'Acme',
+        role: 'ADMIN',
+      );
       const otherName = Membership(orgId: 'o1', orgName: 'Otra', role: 'ADMIN');
-      const otherRole = Membership(orgId: 'o1', orgName: 'Acme', role: 'WORKER');
+      const otherRole = Membership(
+        orgId: 'o1',
+        orgName: 'Acme',
+        role: 'WORKER',
+      );
 
       expect(base, isNot(otherOrgId));
       expect(base, isNot(otherName));
