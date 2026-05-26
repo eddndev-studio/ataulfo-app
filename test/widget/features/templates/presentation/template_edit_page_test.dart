@@ -274,6 +274,109 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsAtLeastNWidgets(1));
   });
 
+  group('visibility por flags supportsTemperature / supportsThinking', () {
+    // GPT-5.5: supportsTemperature=false (modelo de razonamiento), pero
+    // supportsThinking=true. Esto fuerza al editor a esconder SOLO el
+    // slider de temperature — el dropdown de thinking sigue visible.
+    const tplOnOpenAi = Template(
+      id: 't1',
+      orgId: 'o1',
+      name: 'Soporte',
+      version: 1,
+      ai: AIConfig(
+        enabled: true,
+        provider: AIProvider.openai,
+        model: 'gpt-5.5',
+        temperature: 0.7,
+        thinkingLevel: ThinkingLevel.medium,
+        systemPrompt: 'Prompt.',
+        contextMessages: 20,
+      ),
+    );
+
+    // Catálogo extendido para cubrir el caso supportsThinking=false sin
+    // afectar al resto de los tests. MINIMAX nativo razona sin perilla.
+    const catalogWithMinimax = Catalog(
+      providers: <ProviderEntry>[
+        _gemini,
+        _openai,
+        ProviderEntry(
+          provider: 'MINIMAX',
+          defaultModel: 'MiniMax-M2.7',
+          models: <AIModel>[
+            AIModel(
+              id: 'MiniMax-M2.7',
+              supportsTemperature: true,
+              supportsThinking: false,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    const tplOnMinimax = Template(
+      id: 't1',
+      orgId: 'o1',
+      name: 'Soporte',
+      version: 1,
+      ai: AIConfig(
+        enabled: true,
+        provider: AIProvider.minimax,
+        model: 'MiniMax-M2.7',
+        temperature: 0.9,
+        thinkingLevel: ThinkingLevel.high,
+        systemPrompt: 'Prompt.',
+        contextMessages: 20,
+      ),
+    );
+
+    testWidgets(
+      'modelo con supportsTemperature=false esconde el slider de temperature',
+      (tester) async {
+        when(() => editBloc.state).thenReturn(const TemplateEditEditing(tplOnOpenAi));
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('template_edit.field.temperature')),
+          findsNothing,
+        );
+        // El dropdown de thinking SIGUE visible (GPT-5.5 sí lo soporta).
+        expect(
+          find.byKey(const Key('template_edit.field.thinking')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'modelo con supportsThinking=false esconde el dropdown de thinking',
+      (tester) async {
+        when(
+          () => editBloc.state,
+        ).thenReturn(const TemplateEditEditing(tplOnMinimax));
+        when(() => catalogBloc.state).thenReturn(
+          const CatalogLoaded(catalog: catalogWithMinimax),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('template_edit.field.thinking')),
+          findsNothing,
+        );
+        // El slider de temperature SIGUE visible (MiniMax sí lo soporta).
+        expect(
+          find.byKey(const Key('template_edit.field.temperature')),
+          findsOneWidget,
+        );
+      },
+    );
+  });
+
   group('drift: modelo o provider retirado entre releases', () {
     const tplWithRetiredModel = Template(
       id: 't1',
