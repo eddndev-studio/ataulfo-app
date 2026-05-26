@@ -1146,4 +1146,172 @@ void main() {
       );
     });
   });
+
+  group('DioTemplatesDatasource.updateVarDef', () {
+    test('200: serializa SOLO campos provistos + version (omit-others)', () async {
+      // Body capturado: contrato del backend usa *string nullable. Campos
+      // ausentes ⇒ no-op (no `null` explícito). Cliente respeta el patrón.
+      final captured = <Map<String, dynamic>>[];
+      when(
+        () => dio.patch<dynamic>(
+          '/variable-definitions/vd_x',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer((invocation) async {
+        captured.add(
+          invocation.namedArguments[#data] as Map<String, dynamic>,
+        );
+        return Response<dynamic>(
+          requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
+          statusCode: 200,
+        );
+      });
+
+      await ds.updateVarDef(
+        varDefId: 'vd_x',
+        name: 'saldo',
+        defaultValue: '100',
+        version: 2,
+      );
+
+      expect(captured.single, <String, dynamic>{
+        'name': 'saldo',
+        'default': '100',
+        'version': 2,
+      });
+      expect(captured.single.containsKey('description'), isFalse);
+      expect(captured.single.containsKey('type'), isFalse);
+    });
+
+    test('200: body con sólo version es válido (no-op intencional)', () async {
+      // El backend acepta un PATCH "sin campos" — todos los pointers null.
+      // El cliente puede mandarlo para confirmar la version sin cambiar
+      // nada (uso raro pero legítimo).
+      final captured = <Map<String, dynamic>>[];
+      when(
+        () => dio.patch<dynamic>(
+          '/variable-definitions/vd_x',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer((invocation) async {
+        captured.add(
+          invocation.namedArguments[#data] as Map<String, dynamic>,
+        );
+        return Response<dynamic>(
+          requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
+          statusCode: 200,
+        );
+      });
+
+      await ds.updateVarDef(varDefId: 'vd_x', version: 2);
+
+      expect(captured.single, <String, dynamic>{'version': 2});
+    });
+
+    test('200: cadena vacía es set explícito (no se confunde con null)', () async {
+      // description: '' es set válido ("borrar descripción"). El cliente
+      // distingue null (no-op) de '' (clear).
+      final captured = <Map<String, dynamic>>[];
+      when(
+        () => dio.patch<dynamic>(
+          '/variable-definitions/vd_x',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer((invocation) async {
+        captured.add(
+          invocation.namedArguments[#data] as Map<String, dynamic>,
+        );
+        return Response<dynamic>(
+          requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
+          statusCode: 200,
+        );
+      });
+
+      await ds.updateVarDef(
+        varDefId: 'vd_x',
+        description: '',
+        version: 2,
+      );
+
+      expect(captured.single, <String, dynamic>{
+        'description': '',
+        'version': 2,
+      });
+    });
+
+    test('409 → TemplatesConflictFailure (rename in-use o stale CAS)', () async {
+      when(
+        () => dio.patch<dynamic>(
+          '/variable-definitions/vd_x',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(409, path: '/variable-definitions/vd_x'));
+
+      await expectLater(
+        () => ds.updateVarDef(varDefId: 'vd_x', name: 'otro', version: 1),
+        throwsA(isA<TemplatesConflictFailure>()),
+      );
+    });
+
+    test('422 → TemplatesInvalidUpdateFailure', () async {
+      when(
+        () => dio.patch<dynamic>(
+          '/variable-definitions/vd_x',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(422, path: '/variable-definitions/vd_x'));
+
+      await expectLater(
+        () => ds.updateVarDef(varDefId: 'vd_x', name: ' ', version: 1),
+        throwsA(isA<TemplatesInvalidUpdateFailure>()),
+      );
+    });
+
+    test('404 → TemplatesNotFoundFailure (var-def no existe)', () async {
+      when(
+        () => dio.patch<dynamic>(
+          '/variable-definitions/vd_nope',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(404, path: '/variable-definitions/vd_nope'));
+
+      await expectLater(
+        () => ds.updateVarDef(varDefId: 'vd_nope', name: 'x', version: 1),
+        throwsA(isA<TemplatesNotFoundFailure>()),
+      );
+    });
+
+    test('500 → TemplatesServerFailure', () async {
+      when(
+        () => dio.patch<dynamic>(
+          '/variable-definitions/vd_x',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(500, path: '/variable-definitions/vd_x'));
+
+      await expectLater(
+        () => ds.updateVarDef(varDefId: 'vd_x', version: 1),
+        throwsA(isA<TemplatesServerFailure>()),
+      );
+    });
+
+    test('sin conexión → TemplatesNetworkFailure', () async {
+      when(
+        () => dio.patch<dynamic>(
+          '/variable-definitions/vd_x',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.updateVarDef(varDefId: 'vd_x', version: 1),
+        throwsA(isA<TemplatesNetworkFailure>()),
+      );
+    });
+  });
 }
