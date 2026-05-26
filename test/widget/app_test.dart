@@ -5,6 +5,8 @@ import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
 import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:agentic/features/bots/domain/entities/bot.dart';
 import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
+import 'package:agentic/features/memberships/domain/entities/membership.dart';
+import 'package:agentic/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/repositories/templates_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -21,6 +23,8 @@ class _MockBotsRepo extends Mock implements BotsRepository {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
+class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
+
 void main() {
   late _MockAuthBloc authBloc;
   late AppRouter router;
@@ -30,13 +34,16 @@ void main() {
     when(() => authBloc.state).thenReturn(const AuthInitial());
     final botsRepo = _MockBotsRepo();
     final templatesRepo = _MockTemplatesRepo();
+    final membershipsRepo = _MockMembershipsRepo();
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
+    when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      membershipsRepository: membershipsRepo,
     );
   });
 

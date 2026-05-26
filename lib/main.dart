@@ -14,6 +14,8 @@ import 'features/auth/data/repositories/token_storage.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/bots/data/datasources/bots_datasource.dart';
 import 'features/bots/data/repositories/bots_repository_impl.dart';
+import 'features/memberships/data/datasources/memberships_datasource.dart';
+import 'features/memberships/data/repositories/memberships_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
 import 'features/templates/data/repositories/templates_repository_impl.dart';
 
@@ -81,11 +83,16 @@ void main() {
     datasource: DioTemplatesDatasource(mainDio),
   );
 
+  final membershipsRepository = MembershipsRepositoryImpl(
+    datasource: DioMembershipsDatasource(mainDio),
+  );
+
   final router = AppRouter(
     authBloc: authBloc,
     authRepository: authRepository,
     botsRepository: botsRepository,
     templatesRepository: templatesRepository,
+    membershipsRepository: membershipsRepository,
   );
 
   // Dispara el check inicial: lee storage, si hay tokens valida con
