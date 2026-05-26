@@ -13,6 +13,7 @@ import '../../domain/entities/variable_def.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../bloc/template_detail_bloc.dart';
 import '../bloc/var_defs_bloc.dart';
+import '../widgets/var_def_form_sheet.dart';
 
 /// Detalle de una Template (S03). Consume el `TemplateDetailBloc` del scope;
 /// el cableado del provider y del ID lo hace el router en `/templates/:id`.
@@ -22,12 +23,32 @@ class TemplateDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<TemplateDetailBloc, TemplateDetailState>(
-      builder: (context, state) => switch (state) {
-        TemplateDetailLoading() => const _LoadingView(),
-        TemplateDetailLoaded(template: final tpl) => _LoadedView(template: tpl),
-        TemplateDetailFailed(failure: final f) => _FailedView(failure: f),
+    return BlocListener<VarDefsBloc, VarDefsState>(
+      // Feedback global de mutaciones de var-defs. El sheet sigue
+      // montado tras una MutationFailed (operador corrige y reintenta);
+      // el snackbar verbalízale el fallo sin tirar contexto.
+      listener: (context, state) {
+        if (state is VarDefsMutationFailed) {
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'La plantilla cambió. Recarga para ver los últimos datos.',
+                ),
+              ),
+            );
+        }
       },
+      child: BlocBuilder<TemplateDetailBloc, TemplateDetailState>(
+        builder: (context, state) => switch (state) {
+          TemplateDetailLoading() => const _LoadingView(),
+          TemplateDetailLoaded(template: final tpl) => _LoadedView(
+            template: tpl,
+          ),
+          TemplateDetailFailed(failure: final f) => _FailedView(failure: f),
+        },
+      ),
     );
   }
 }
@@ -295,10 +316,28 @@ class _VarDefsList extends StatelessWidget {
             key: const Key('var_defs.add_button'),
             label: 'Agregar variable',
             icon: Icons.add,
-            onPressed: () {},
+            onPressed: () => _openAddSheet(context, defs),
           ),
         ],
       ],
+    );
+  }
+
+  /// Monta el sheet de creación. El sheet vive sobre el bloc del detail
+  /// page; usamos `.value` para pasarle la misma instancia (el modal
+  /// crea un nuevo context que no hereda de los BlocProviders del padre
+  /// por default).
+  void _openAddSheet(BuildContext context, List<VariableDef> defs) {
+    final bloc = context.read<VarDefsBloc>();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider<VarDefsBloc>.value(
+        value: bloc,
+        child: VarDefFormSheet(
+          existingNames: defs.map((d) => d.name).toSet(),
+        ),
+      ),
     );
   }
 }
