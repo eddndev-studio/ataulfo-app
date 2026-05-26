@@ -131,6 +131,8 @@ class _FailedView extends StatelessWidget {
       'Sin conexión con el servidor. Revisa tu red y reintenta.',
     ),
     TemplatesNotFoundFailure() ||
+    TemplatesInvalidUpdateFailure() ||
+    TemplatesConflictFailure() ||
     TemplatesServerFailure() ||
     UnknownTemplatesFailure() => (
       'template_create.error.generic',

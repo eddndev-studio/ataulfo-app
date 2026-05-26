@@ -35,6 +35,21 @@ abstract interface class TemplatesDatasource {
   /// lista plana en el orden del backend; el `version` del wrapper se
   /// descarta (sólo lo necesita el CRUD, todavía no implementado).
   Future<List<VariableDef>> listVarDefs(String id);
+
+  /// `PUT /templates/:id` body `{name, version, ai?}` con concurrencia
+  /// optimista (CAS). 409 (`ErrTemplateConflict`) ⇒ `TemplatesConflictFailure`
+  /// — la version del cliente está desfasada; el operador debe recargar el
+  /// detalle y reintentar (mismo PUT con misma version vuelve a fallar).
+  /// 422 (`ErrInvalidTemplate`/`ErrInvalidAIConfig`) ⇒
+  /// `TemplatesInvalidUpdateFailure`. `ai==null` omite la clave en el wire
+  /// (omitempty del backend ⇒ config IA intacta). Devuelve la Template
+  /// actualizada con la version nueva.
+  Future<Template> update({
+    required String id,
+    required String name,
+    required int version,
+    required AIConfig? ai,
+  });
 }
 
 class DioTemplatesDatasource implements TemplatesDatasource {
@@ -103,6 +118,57 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
+  @override
+  Future<Template> update({
+    required String id,
+    required String name,
+    required int version,
+    required AIConfig? ai,
+  }) async {
+    try {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/templates/$id',
+        data: <String, dynamic>{
+          'name': name,
+          'version': version,
+          if (ai != null)
+            'ai': <String, dynamic>{
+              'enabled': ai.enabled,
+              'provider': ai.provider.toWire(),
+              'model': ai.model,
+              'temperature': ai.temperature,
+              'thinking_level': ai.thinkingLevel.toWire(),
+              'system_prompt': ai.systemPrompt,
+              'context_messages': ai.contextMessages,
+            },
+        },
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownTemplatesFailure();
+      }
+      return TemplatesMapper.templateRespToEntity(TemplateResp.fromJson(body));
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      // PUT necesita override del mapeo de 422 (InvalidUpdate, no
+      // InvalidName) y de 409 (Conflict, no aplica a otros métodos).
+      // Override inline mantiene `_mapDioException` simple para los demás
+      // callers; refactor a mapper parametrizado entra cuando un cuarto
+      // método con cubos distintos lo justifique.
+      if (e.type == DioExceptionType.badResponse) {
+        final status = e.response?.statusCode;
+        if (status == 409) throw const TemplatesConflictFailure();
+        if (status == 422) throw const TemplatesInvalidUpdateFailure();
+      }
       throw _mapDioException(e);
     } on FormatException {
       throw const UnknownTemplatesFailure();

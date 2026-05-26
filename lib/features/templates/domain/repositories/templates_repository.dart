@@ -20,4 +20,15 @@ abstract interface class TemplatesRepository {
   /// Lista las definiciones de variables de una Template. 404 si la
   /// plantilla padre no existe en la org. Lista vacía es válida.
   Future<List<VariableDef>> listVarDefs(String id);
+
+  /// Edita la Template (PUT /templates/:id con CAS optimista). 409 ⇒
+  /// `TemplatesConflictFailure` (version stale: recargar antes de
+  /// reintentar). 422 ⇒ `TemplatesInvalidUpdateFailure`. `ai==null` deja
+  /// la config IA intacta.
+  Future<Template> update({
+    required String id,
+    required String name,
+    required int version,
+    required AIConfig? ai,
+  });
 }

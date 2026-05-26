@@ -116,6 +116,8 @@ class _LoadedView extends StatelessWidget {
           const SizedBox(height: AppTokens.sp3),
           const _VarDefsSection(),
           const SizedBox(height: AppTokens.sp7),
+          _EditButton(template: template),
+          const SizedBox(height: AppTokens.sp3),
           _CreateBotButton(template: template),
         ],
       ),
@@ -332,6 +334,26 @@ class _VarDefsFailedView extends StatelessWidget {
               context.read<VarDefsBloc>().add(const VarDefsLoadRequested()),
         ),
       ],
+    );
+  }
+}
+
+class _EditButton extends StatelessWidget {
+  const _EditButton({required this.template});
+
+  final Template template;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppButton.tonal(
+      key: const Key('template_detail.edit_button'),
+      label: 'Editar plantilla',
+      icon: Icons.edit_outlined,
+      onPressed: () {
+        // push apila el editor sobre el detalle; el back físico vuelve al
+        // detalle (no sale de la app, no aplasta pila).
+        context.push('/templates/${template.id}/edit');
+      },
     );
   }
 }

@@ -473,4 +473,88 @@ void main() {
       },
     );
   });
+
+  // ── Botón "Editar plantilla" (TE1) ─────────────────────────────────────────
+  group('botón Editar plantilla', () {
+    setUp(() {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+    });
+
+    testWidgets('Loaded expone botón con key contractual y AppButton', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('template_detail.edit_button')),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(AppButton, 'Editar plantilla'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'tap apila /templates/:id/edit preservando el detalle (canPop=true)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+
+        final canPopAtDestination = <bool>[];
+        String? destinationUri;
+        final router = GoRouter(
+          initialLocation: '/',
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/',
+              builder: (_, _) => MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<TemplateDetailBloc>.value(value: bloc),
+                  BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+                ],
+                child: const Scaffold(body: TemplateDetailPage()),
+              ),
+            ),
+            GoRoute(
+              path: '/templates/:id/edit',
+              builder: (_, state) {
+                destinationUri = state.uri.toString();
+                return Scaffold(
+                  body: Builder(
+                    builder: (ctx) {
+                      canPopAtDestination.add(Navigator.of(ctx).canPop());
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          MaterialApp.router(
+            theme: AppDesignTheme.dark(),
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('template_detail.edit_button')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('template_detail.edit_button')));
+        await tester.pumpAndSettle();
+
+        expect(destinationUri, '/templates/t1/edit');
+        expect(
+          canPopAtDestination,
+          <bool>[true],
+          reason:
+              'el botón debe usar push (no go) para que el back físico '
+              'vuelva al detalle de plantilla, no salga de la app',
+        );
+      },
+    );
+  });
 }

@@ -672,4 +672,234 @@ void main() {
       },
     );
   });
+
+  group('DioTemplatesDatasource.update', () {
+    const ai = AIConfig(
+      enabled: false,
+      provider: AIProvider.gemini,
+      model: 'gemini-3.1-pro-preview',
+      temperature: 0.7,
+      thinkingLevel: ThinkingLevel.low,
+      systemPrompt: 'Eres un asistente útil.',
+      contextMessages: 20,
+    );
+
+    test(
+      '200: serializa {name, version, ai} y devuelve la Template actualizada',
+      () async {
+        // Body capturado para validar la forma exacta del wire: el backend
+        // espera snake_case en todos los campos del AIConfig anidado.
+        final captured = <Map<String, dynamic>>[];
+        when(
+          () => dio.put<Map<String, dynamic>>(
+            '/templates/t1',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((invocation) async {
+          captured.add(
+            invocation.namedArguments[#data] as Map<String, dynamic>,
+          );
+          return respMap(200, body: tplJson(version: 2));
+        });
+
+        final got = await ds.update(
+          id: 't1',
+          name: 'Soporte v2',
+          version: 1,
+          ai: ai,
+        );
+
+        expect(got.id, 't1');
+        expect(got.version, 2);
+        expect(captured.single, <String, dynamic>{
+          'name': 'Soporte v2',
+          'version': 1,
+          'ai': <String, dynamic>{
+            'enabled': false,
+            'provider': 'GEMINI',
+            'model': 'gemini-3.1-pro-preview',
+            'temperature': 0.7,
+            'thinking_level': 'LOW',
+            'system_prompt': 'Eres un asistente útil.',
+            'context_messages': 20,
+          },
+        });
+      },
+    );
+
+    test(
+      'ai=null omite la clave `ai` del body (no toca config IA en backend)',
+      () async {
+        // Contrato del backend (putReq.AI con omitempty): clave ausente ⇒
+        // config IA intacta. Distinto a enviar `ai: null` (que sería null
+        // explícito y aún así el handler lo trata igual, pero el cliente
+        // se mantiene fiel al patrón del wire).
+        final captured = <Map<String, dynamic>>[];
+        when(
+          () => dio.put<Map<String, dynamic>>(
+            '/templates/t1',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((invocation) async {
+          captured.add(
+            invocation.namedArguments[#data] as Map<String, dynamic>,
+          );
+          return respMap(200, body: tplJson(version: 2));
+        });
+
+        await ds.update(id: 't1', name: 'Otro', version: 1, ai: null);
+
+        expect(captured.single.containsKey('ai'), isFalse);
+        expect(captured.single, <String, dynamic>{
+          'name': 'Otro',
+          'version': 1,
+        });
+      },
+    );
+
+    test('409 → TemplatesConflictFailure (CAS — version stale)', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(409, path: '/templates/t1'));
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<TemplatesConflictFailure>()),
+      );
+    });
+
+    test('422 → TemplatesInvalidUpdateFailure (no InvalidName)', () async {
+      // PUT 422 puede ser ErrInvalidTemplate (name) o ErrInvalidAIConfig
+      // (ai). El cubo InvalidUpdate los agrupa y NO se confunde con el
+      // InvalidName de POST (operador del form de edit tiene varios
+      // campos, no sabe a priori cuál disparó el 422).
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(422, path: '/templates/t1'));
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<TemplatesInvalidUpdateFailure>()),
+      );
+    });
+
+    test('404 → TemplatesNotFoundFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(404, path: '/templates/t1'));
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<TemplatesNotFoundFailure>()),
+      );
+    });
+
+    test('403 → TemplatesForbiddenFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(403, path: '/templates/t1'));
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<TemplatesForbiddenFailure>()),
+      );
+    });
+
+    test('500 → TemplatesServerFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(badResponse(500, path: '/templates/t1'));
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<TemplatesServerFailure>()),
+      );
+    });
+
+    test('timeout → TemplatesTimeoutFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/templates/t1'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<TemplatesTimeoutFailure>()),
+      );
+    });
+
+    test('sin conexión → TemplatesNetworkFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/templates/t1'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<TemplatesNetworkFailure>()),
+      );
+    });
+
+    test('body nulo → UnknownTemplatesFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer((_) async => respMap(200, body: null));
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+
+    test('body malformado → UnknownTemplatesFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/templates/t1',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => respMap(
+          200,
+          body: <String, dynamic>{'id': 't1'}, // faltan claves obligatorias
+        ),
+      );
+
+      await expectLater(
+        () => ds.update(id: 't1', name: 'x', version: 1, ai: ai),
+        throwsA(isA<UnknownTemplatesFailure>()),
+      );
+    });
+  });
 }

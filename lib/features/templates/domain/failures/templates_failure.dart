@@ -48,6 +48,24 @@ final class TemplatesInvalidNameFailure extends TemplatesFailure {
   const TemplatesInvalidNameFailure();
 }
 
+/// 422 contra `PUT /templates/:id`: el backend rechazó el body de la
+/// edición (`ErrInvalidTemplate` por name, `ErrInvalidAIConfig` por la
+/// config IA). Separado de `TemplatesInvalidNameFailure` porque el copy
+/// de la UI difiere: el form de edit muestra varios campos editables y
+/// el operador no sabe a priori cuál disparó el 422.
+final class TemplatesInvalidUpdateFailure extends TemplatesFailure {
+  const TemplatesInvalidUpdateFailure();
+}
+
+/// 409 contra `PUT /templates/:id` (CAS): la Template fue editada en
+/// otro lugar entre el GET y el PUT. Reintentar con la misma `version`
+/// vuelve a fallar — la UI debe pedir recargar el detalle (que trae la
+/// nueva version) antes de re-editar. Distinto de `Network`/`Server`:
+/// el operador NO puede resolverlo con un retry ciego.
+final class TemplatesConflictFailure extends TemplatesFailure {
+  const TemplatesConflictFailure();
+}
+
 /// 5xx del backend. El servidor respondió pero rompió — distinto de red.
 final class TemplatesServerFailure extends TemplatesFailure {
   const TemplatesServerFailure();

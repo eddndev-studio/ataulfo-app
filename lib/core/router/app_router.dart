@@ -23,10 +23,12 @@ import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
 import '../../features/templates/presentation/bloc/template_create_bloc.dart';
 import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
+import '../../features/templates/presentation/bloc/template_edit_bloc.dart';
 import '../../features/templates/presentation/bloc/templates_bloc.dart';
 import '../../features/templates/presentation/bloc/var_defs_bloc.dart';
 import '../../features/templates/presentation/pages/template_create_page.dart';
 import '../../features/templates/presentation/pages/template_detail_page.dart';
+import '../../features/templates/presentation/pages/template_edit_page.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -171,6 +173,27 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Detalle de plantilla')),
               body: const TemplateDetailPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Editor mínimo (TE1): name + systemPrompt. Page-scoped: el bloc
+        // carga el template al construirse (Loading inicial). Tras
+        // Succeeded, la página hace pushReplacement a /templates/:id, así
+        // el back físico vuelve al listado sin pasar por el form que ya
+        // cumplió. Subruta del id (path /templates/:id/edit), no compite
+        // con /templates/new ni con /templates/:id por orden de match.
+        path: '/templates/:id/edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<TemplateEditBloc>(
+            create: (_) =>
+                TemplateEditBloc(repo: _templatesRepo, id: id)
+                  ..add(const TemplateEditLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Editar plantilla')),
+              body: const TemplateEditPage(),
             ),
           );
         },

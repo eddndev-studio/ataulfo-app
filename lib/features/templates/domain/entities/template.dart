@@ -15,6 +15,16 @@ enum AIProvider {
     'DEEPSEEK' => AIProvider.deepseek,
     _ => throw ArgumentError.value(raw, 'AIProvider.fromWire'),
   };
+
+  /// Inversa de `fromWire`: la presentación nunca toca strings del wire.
+  /// Round-trip estructural: `AIProvider.fromWire(p.toWire()) == p` para
+  /// todo `p` (mismo invariante que `BotChannel`).
+  String toWire() => switch (this) {
+    AIProvider.openai => 'OPENAI',
+    AIProvider.gemini => 'GEMINI',
+    AIProvider.minimax => 'MINIMAX',
+    AIProvider.deepseek => 'DEEPSEEK',
+  };
 }
 
 /// Nivel de razonamiento del modelo (S12). Cada proveedor lo mapea a su
@@ -30,6 +40,12 @@ enum ThinkingLevel {
     'MEDIUM' => ThinkingLevel.medium,
     'HIGH' => ThinkingLevel.high,
     _ => throw ArgumentError.value(raw, 'ThinkingLevel.fromWire'),
+  };
+
+  String toWire() => switch (this) {
+    ThinkingLevel.low => 'LOW',
+    ThinkingLevel.medium => 'MEDIUM',
+    ThinkingLevel.high => 'HIGH',
   };
 }
 
