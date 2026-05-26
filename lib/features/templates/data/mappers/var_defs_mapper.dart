@@ -16,10 +16,15 @@ class VarDefsMapper {
     description: resp.description,
   );
 
-  /// Aplana el wrapper {version, defs[]} a la lista de entidades. El
-  /// `version` del response NO se expone hoy — sólo lo necesitará el CRUD
-  /// (optimistic concurrency en PATCH/DELETE) cuando aterrice. Hasta
-  /// entonces, mantenerlo fuera del dominio evita ruido en el consumer.
-  static List<VariableDef> listToEntities(ListVarDefsResp resp) =>
-      resp.defs.map(varDefRespToEntity).toList(growable: false);
+  /// Traduce el wrapper {version, defs[]} a una tupla `(version, defs)`.
+  /// La version vigente del Template padre la necesita el editor para
+  /// mandar el CAS optimista en POST/PATCH/DELETE de var-defs; el wire
+  /// no la devuelve en las mutaciones, así que cada refresh del listado
+  /// la propaga junto al snapshot de defs.
+  static ({int version, List<VariableDef> defs}) listToLoaded(
+    ListVarDefsResp resp,
+  ) => (
+    version: resp.version,
+    defs: resp.defs.map(varDefRespToEntity).toList(growable: false),
+  );
 }

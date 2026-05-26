@@ -238,9 +238,9 @@ void main() {
         ),
       ),
     );
-    when(
-      () => templatesRepo.listVarDefs('t1'),
-    ).thenAnswer((_) async => const <VariableDef>[]);
+    when(() => templatesRepo.listVarDefs('t1')).thenAnswer(
+      (_) async => (version: 1, defs: const <VariableDef>[]),
+    );
 
     await tester.pumpWidget(_host(router, authBloc));
     await tester.pumpAndSettle();

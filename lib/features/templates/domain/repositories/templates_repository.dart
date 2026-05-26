@@ -17,9 +17,11 @@ abstract interface class TemplatesRepository {
   /// la AIConfig default que asigna el backend.
   Future<Template> create(String name);
 
-  /// Lista las definiciones de variables de una Template. 404 si la
-  /// plantilla padre no existe en la org. Lista vacía es válida.
-  Future<List<VariableDef>> listVarDefs(String id);
+  /// Lista las definiciones de variables de una Template junto con la
+  /// `version` vigente del Template padre (CAS para las mutaciones de
+  /// var-defs). 404 si la plantilla padre no existe en la org. Lista
+  /// vacía es válida.
+  Future<({int version, List<VariableDef> defs})> listVarDefs(String id);
 
   /// Edita la Template (PUT /templates/:id con CAS optimista). 409 ⇒
   /// `TemplatesConflictFailure` (version stale: recargar antes de

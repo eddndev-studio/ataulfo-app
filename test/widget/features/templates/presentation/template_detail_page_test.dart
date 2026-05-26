@@ -58,7 +58,7 @@ void main() {
     // Tests específicos de la sección Variables sobreescriben este stub.
     when(
       () => varDefsBloc.state,
-    ).thenReturn(const VarDefsLoaded(<VariableDef>[]));
+    ).thenReturn(const VarDefsLoaded(<VariableDef>[], 1));
   });
 
   Widget host() => MaterialApp(
@@ -306,7 +306,7 @@ void main() {
     testWidgets('VarDefsLoaded([]) muestra empty state italic', (tester) async {
       when(
         () => varDefsBloc.state,
-      ).thenReturn(const VarDefsLoaded(<VariableDef>[]));
+      ).thenReturn(const VarDefsLoaded(<VariableDef>[], 1));
 
       await tester.pumpWidget(host());
 
@@ -317,22 +317,25 @@ void main() {
       'VarDefsLoaded con defs muestra una fila por variable (name + default)',
       (tester) async {
         when(() => varDefsBloc.state).thenReturn(
-          const VarDefsLoaded(<VariableDef>[
-            VariableDef(
-              id: 'v1',
-              name: 'nombre',
-              type: VarType.text,
-              defaultValue: 'cliente',
-              description: 'Saludo personalizado',
-            ),
-            VariableDef(
-              id: 'v2',
-              name: 'edad',
-              type: VarType.text,
-              defaultValue: '',
-              description: '',
-            ),
-          ]),
+          const VarDefsLoaded(
+            <VariableDef>[
+              VariableDef(
+                id: 'v1',
+                name: 'nombre',
+                type: VarType.text,
+                defaultValue: 'cliente',
+                description: 'Saludo personalizado',
+              ),
+              VariableDef(
+                id: 'v2',
+                name: 'edad',
+                type: VarType.text,
+                defaultValue: '',
+                description: '',
+              ),
+            ],
+            2,
+          ),
         );
 
         await tester.pumpWidget(host());

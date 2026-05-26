@@ -31,8 +31,8 @@ class VarDefsBloc extends Bloc<VarDefsEvent, VarDefsState> {
       emit(const VarDefsLoading());
     }
     try {
-      final defs = await _repo.listVarDefs(_templateId);
-      emit(VarDefsLoaded(defs));
+      final res = await _repo.listVarDefs(_templateId);
+      emit(VarDefsLoaded(res.defs, res.version));
     } on TemplatesFailure catch (f) {
       emit(VarDefsFailed(f));
     }
@@ -68,14 +68,22 @@ class VarDefsLoading extends VarDefsState {
 }
 
 class VarDefsLoaded extends VarDefsState {
-  const VarDefsLoaded(this.defs);
+  const VarDefsLoaded(this.defs, this.version);
 
   final List<VariableDef> defs;
+
+  /// Version vigente de la Template padre (CAS optimista). El editor CRUD
+  /// la lee de aquí para mandarla en POST/PATCH/DELETE de var-defs. Sólo
+  /// se refresca con un nuevo `LoadRequested` — el backend NO la devuelve
+  /// en las mutaciones de var-defs, así que cada mutación termina con un
+  /// refetch del listado.
+  final int version;
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! VarDefsLoaded) return false;
+    if (other.version != version) return false;
     if (other.defs.length != defs.length) return false;
     for (var i = 0; i < defs.length; i++) {
       if (other.defs[i] != defs[i]) return false;
@@ -84,7 +92,7 @@ class VarDefsLoaded extends VarDefsState {
   }
 
   @override
-  int get hashCode => Object.hashAll(defs);
+  int get hashCode => Object.hash(version, Object.hashAll(defs));
 }
 
 class VarDefsFailed extends VarDefsState {

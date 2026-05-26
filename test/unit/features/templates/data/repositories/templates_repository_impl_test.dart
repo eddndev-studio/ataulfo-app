@@ -90,19 +90,23 @@ void main() {
       ),
     ];
 
-    test('forwarda el id y devuelve la lista del datasource', () async {
-      when(() => ds.listVarDefs('t1')).thenAnswer((_) async => defs);
+    test('forwarda el id y devuelve (version, defs) del datasource', () async {
+      when(
+        () => ds.listVarDefs('t1'),
+      ).thenAnswer((_) async => (version: 5, defs: defs));
 
       final got = await repo.listVarDefs('t1');
 
-      expect(got, defs);
+      expect(got.version, 5);
+      expect(got.defs, defs);
       verify(() => ds.listVarDefs('t1')).called(1);
     });
 
     test('propaga TemplatesNotFoundFailure sin envolver', () async {
       when(() => ds.listVarDefs('desconocido')).thenAnswer(
-        (_) =>
-            Future<List<VariableDef>>.error(const TemplatesNotFoundFailure()),
+        (_) => Future<({int version, List<VariableDef> defs})>.error(
+          const TemplatesNotFoundFailure(),
+        ),
       );
 
       await expectLater(

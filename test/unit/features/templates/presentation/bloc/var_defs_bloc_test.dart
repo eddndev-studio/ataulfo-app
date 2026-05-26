@@ -33,34 +33,37 @@ void main() {
     });
 
     blocTest<VarDefsBloc, VarDefsState>(
-      'LoadRequested ok → Loaded(defs) (no re-emite Loading post-construcción)',
+      'LoadRequested ok → Loaded(defs, version) (no re-emite Loading post-construcción)',
       build: () {
-        when(() => repo.listVarDefs('t1')).thenAnswer((_) async => _defs);
+        when(
+          () => repo.listVarDefs('t1'),
+        ).thenAnswer((_) async => (version: 3, defs: _defs));
         return VarDefsBloc(repo: repo, templateId: 't1');
       },
       act: (bloc) => bloc.add(const VarDefsLoadRequested()),
-      expect: () => const <VarDefsState>[VarDefsLoaded(_defs)],
+      expect: () => const <VarDefsState>[VarDefsLoaded(_defs, 3)],
       verify: (_) => verify(() => repo.listVarDefs('t1')).called(1),
     );
 
     blocTest<VarDefsBloc, VarDefsState>(
-      'LoadRequested ok con lista vacía → Loaded([]) (plantilla sin vars)',
+      'LoadRequested ok con lista vacía → Loaded([], v) (plantilla sin vars)',
       build: () {
-        when(
-          () => repo.listVarDefs('t1'),
-        ).thenAnswer((_) async => const <VariableDef>[]);
+        when(() => repo.listVarDefs('t1')).thenAnswer(
+          (_) async => (version: 1, defs: const <VariableDef>[]),
+        );
         return VarDefsBloc(repo: repo, templateId: 't1');
       },
       act: (bloc) => bloc.add(const VarDefsLoadRequested()),
-      expect: () => const <VarDefsState>[VarDefsLoaded(<VariableDef>[])],
+      expect: () => const <VarDefsState>[VarDefsLoaded(<VariableDef>[], 1)],
     );
 
     blocTest<VarDefsBloc, VarDefsState>(
       'LoadRequested 404 → Failed(NotFound)',
       build: () {
         when(() => repo.listVarDefs('t1')).thenAnswer(
-          (_) =>
-              Future<List<VariableDef>>.error(const TemplatesNotFoundFailure()),
+          (_) => Future<({int version, List<VariableDef> defs})>.error(
+            const TemplatesNotFoundFailure(),
+          ),
         );
         return VarDefsBloc(repo: repo, templateId: 't1');
       },
@@ -77,11 +80,13 @@ void main() {
         when(() => repo.listVarDefs('t1')).thenAnswer((_) {
           calls++;
           if (calls == 1) {
-            return Future<List<VariableDef>>.error(
+            return Future<({int version, List<VariableDef> defs})>.error(
               const TemplatesServerFailure(),
             );
           }
-          return Future<List<VariableDef>>.value(_defs);
+          return Future<({int version, List<VariableDef> defs})>.value(
+            (version: 4, defs: _defs),
+          );
         });
         return VarDefsBloc(repo: repo, templateId: 't1');
       },
@@ -93,13 +98,16 @@ void main() {
       expect: () => const <VarDefsState>[
         VarDefsFailed(TemplatesServerFailure()),
         VarDefsLoading(),
-        VarDefsLoaded(_defs),
+        VarDefsLoaded(_defs, 4),
       ],
     );
 
     test('value-equality de los estados', () {
       expect(const VarDefsLoading(), equals(const VarDefsLoading()));
-      expect(const VarDefsLoaded(_defs), equals(const VarDefsLoaded(_defs)));
+      expect(
+        const VarDefsLoaded(_defs, 1),
+        equals(const VarDefsLoaded(_defs, 1)),
+      );
       expect(
         const VarDefsFailed(TemplatesNetworkFailure()),
         equals(const VarDefsFailed(TemplatesNetworkFailure())),
@@ -107,10 +115,6 @@ void main() {
     });
 
     test('Loaded expone la version vigente de la Template padre', () {
-      // El editor CRUD necesita la version del Template para mandar el
-      // CAS en POST/PATCH/DELETE de var-defs. La fuente de verdad es el
-      // wrapper `listVarDefsResp.version` que viaja en el GET del
-      // listado; el bloc lo expone como parte del Loaded.
       const loaded = VarDefsLoaded(_defs, 7);
       expect(loaded.version, 7);
       expect(

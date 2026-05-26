@@ -23,7 +23,8 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
   Future<Template> create(String name) => _ds.create(name);
 
   @override
-  Future<List<VariableDef>> listVarDefs(String id) => _ds.listVarDefs(id);
+  Future<({int version, List<VariableDef> defs})> listVarDefs(String id) =>
+      _ds.listVarDefs(id);
 
   @override
   Future<Template> update({

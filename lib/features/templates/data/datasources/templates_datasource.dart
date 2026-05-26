@@ -32,9 +32,11 @@ abstract interface class TemplatesDatasource {
 
   /// `GET /templates/:id/variable-definitions` org-scoped. 404 si la
   /// Template padre no existe en la org (mapea a NotFound). Devuelve la
-  /// lista plana en el orden del backend; el `version` del wrapper se
-  /// descarta (sólo lo necesita el CRUD, todavía no implementado).
-  Future<List<VariableDef>> listVarDefs(String id);
+  /// lista en el orden del backend junto con la `version` vigente del
+  /// Template — el CRUD de var-defs la usa como CAS optimista en las
+  /// mutaciones (POST/PATCH/DELETE no devuelven la nueva version, así
+  /// que cada mutación termina con un refetch del listado).
+  Future<({int version, List<VariableDef> defs})> listVarDefs(String id);
 
   /// `PUT /templates/:id` body `{name, version, ai?}` con concurrencia
   /// optimista (CAS). 409 (`ErrTemplateConflict`) ⇒ `TemplatesConflictFailure`
@@ -178,7 +180,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
   }
 
   @override
-  Future<List<VariableDef>> listVarDefs(String id) async {
+  Future<({int version, List<VariableDef> defs})> listVarDefs(String id) async {
     try {
       final res = await _dio.get<Map<String, dynamic>>(
         '/templates/$id/variable-definitions',
@@ -187,7 +189,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
       if (body == null) {
         throw const UnknownTemplatesFailure();
       }
-      return VarDefsMapper.listToEntities(ListVarDefsResp.fromJson(body));
+      return VarDefsMapper.listToLoaded(ListVarDefsResp.fromJson(body));
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {

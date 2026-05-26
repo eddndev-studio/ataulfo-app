@@ -395,17 +395,18 @@ void main() {
         ),
       );
 
-      final defs = await ds.listVarDefs('t1');
+      final res = await ds.listVarDefs('t1');
 
-      expect(defs, hasLength(2));
-      expect(defs[0].name, 'nombre');
-      expect(defs[0].defaultValue, 'cliente');
-      expect(defs[0].type, VarType.text);
-      expect(defs[1].name, 'edad');
+      expect(res.version, 3);
+      expect(res.defs, hasLength(2));
+      expect(res.defs[0].name, 'nombre');
+      expect(res.defs[0].defaultValue, 'cliente');
+      expect(res.defs[0].type, VarType.text);
+      expect(res.defs[1].name, 'edad');
     });
 
     test(
-      '200 con defs vacío → lista vacía (plantilla sin variables)',
+      '200 con defs vacío → (version, lista vacía) (plantilla sin variables)',
       () async {
         when(
           () => dio.get<Map<String, dynamic>>(
@@ -419,7 +420,9 @@ void main() {
           ),
         );
 
-        expect(await ds.listVarDefs('t1'), isEmpty);
+        final res = await ds.listVarDefs('t1');
+        expect(res.version, 1);
+        expect(res.defs, isEmpty);
       },
     );
 

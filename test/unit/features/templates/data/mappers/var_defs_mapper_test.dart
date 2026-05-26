@@ -38,7 +38,7 @@ void main() {
       expect(() => VarDefsMapper.varDefRespToEntity(resp), throwsArgumentError);
     });
 
-    test('listToEntities mapea cada def y preserva el orden', () {
+    test('listToLoaded expone version + defs en el orden del wire', () {
       const resp = ListVarDefsResp(
         version: 2,
         defs: <VarDefResp>[
@@ -59,12 +59,13 @@ void main() {
         ],
       );
 
-      final defs = VarDefsMapper.listToEntities(resp);
+      final res = VarDefsMapper.listToLoaded(resp);
 
-      expect(defs, hasLength(2));
-      expect(defs[0].name, 'nombre');
-      expect(defs[1].name, 'edad');
-      expect(defs[1].defaultValue, '0');
+      expect(res.version, 2);
+      expect(res.defs, hasLength(2));
+      expect(res.defs[0].name, 'nombre');
+      expect(res.defs[1].name, 'edad');
+      expect(res.defs[1].defaultValue, '0');
     });
   });
 }
