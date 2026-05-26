@@ -1,4 +1,6 @@
-import 'package:agentic/core/design/theme.dart';
+import 'dart:async';
+
+import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/core/design/widgets/app_button.dart';
 import 'package:agentic/core/design/widgets/app_text_field.dart';
 import 'package:agentic/features/templates/domain/entities/variable_def.dart';
@@ -14,8 +16,6 @@ import 'package:mocktail/mocktail.dart';
 class _MockBloc extends MockBloc<VarDefsEvent, VarDefsState>
     implements VarDefsBloc {}
 
-class _FakeEvent extends Fake implements VarDefsEvent {}
-
 const _defs = <VariableDef>[
   VariableDef(
     id: 'v1',
@@ -28,7 +28,10 @@ const _defs = <VariableDef>[
 
 void main() {
   setUpAll(() {
-    registerFallbackValue(_FakeEvent());
+    // mocktail necesita un fallback de VarDefsEvent para `verify(() => bloc.add(any()))`
+    // y para `whenListen` con default state. Como VarDefsEvent es sealed, usamos un
+    // miembro concreto del set.
+    registerFallbackValue(const VarDefsLoadRequested());
   });
 
   late _MockBloc bloc;
@@ -209,16 +212,13 @@ void main() {
     testWidgets(
       'Loaded post-submit cierra el sheet automáticamente',
       (tester) async {
-        // Patrón: el sheet se monta sobre una página host. Tras un Add
-        // success el bloc emite Mutating → Loading → Loaded. El sheet
-        // escucha y hace Navigator.pop. Verificamos con whenListen.
+        // StreamController permite emitir estados DESPUÉS del tap submit
+        // (Stream.fromIterable los entrega de golpe al subscribirse).
+        final controller = StreamController<VarDefsState>.broadcast();
+        addTearDown(controller.close);
         whenListen<VarDefsState>(
           bloc,
-          Stream<VarDefsState>.fromIterable(const <VarDefsState>[
-            VarDefsMutating(_defs, 2),
-            VarDefsLoading(),
-            VarDefsLoaded(_defs, 3),
-          ]),
+          controller.stream,
           initialState: const VarDefsLoaded(_defs, 2),
         );
 
@@ -227,19 +227,25 @@ void main() {
           MaterialApp(
             theme: AppDesignTheme.dark(),
             home: Scaffold(
-              body: Builder(
-                builder: (context) => AppButton.text(
-                  label: 'Open',
-                  onPressed: () async {
-                    await showModalBottomSheet<void>(
-                      context: context,
-                      builder: (_) => BlocProvider<VarDefsBloc>.value(
-                        value: bloc,
-                        child: const VarDefFormSheet(existingNames: <String>{}),
-                      ),
-                    );
-                    didPop = true;
-                  },
+              // Resizable: el sheet expandido con teclado oculto cabe
+              // en cualquier altura sin overflow.
+              body: SingleChildScrollView(
+                child: Builder(
+                  builder: (context) => AppButton.text(
+                    label: 'Open',
+                    onPressed: () async {
+                      await showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => BlocProvider<VarDefsBloc>.value(
+                          value: bloc,
+                          child:
+                              const VarDefFormSheet(existingNames: <String>{}),
+                        ),
+                      );
+                      didPop = true;
+                    },
+                  ),
                 ),
               ),
             ),
@@ -248,20 +254,24 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
 
-        // El sheet ya está montado. Disparar `bloc.add(Add)` no es
-        // necesario — whenListen entrega los estados desde el initial.
-        // Pero como el sheet sólo cierra DESPUÉS de un Mutating (flag
-        // didSubmit interno), simulo el flow: tap submit primero.
+        // Tap submit (didSubmit=true). Recién después emitimos los
+        // estados del flow.
         await tester.enterText(
           find.byKey(const Key('var_def_form.name')),
           'saldo',
         );
         await tester.pump();
         await tester.tap(find.byKey(const Key('var_def_form.submit')));
+        await tester.pump();
+
+        controller.add(const VarDefsMutating(_defs, 2));
+        await tester.pump();
+        controller.add(const VarDefsLoading());
+        await tester.pump();
+        controller.add(const VarDefsLoaded(_defs, 3));
         await tester.pumpAndSettle();
 
         expect(didPop, isTrue, reason: 'el sheet debe cerrarse en Loaded');
-        // El sheet ya no está montado.
         expect(find.byType(VarDefFormSheet), findsNothing);
       },
     );
@@ -269,12 +279,11 @@ void main() {
     testWidgets(
       'MutationFailed NO cierra el sheet (operador corrige y reintenta)',
       (tester) async {
+        final controller = StreamController<VarDefsState>.broadcast();
+        addTearDown(controller.close);
         whenListen<VarDefsState>(
           bloc,
-          Stream<VarDefsState>.fromIterable(const <VarDefsState>[
-            VarDefsMutating(_defs, 2),
-            VarDefsMutationFailed(_defs, 2, TemplatesConflictFailure()),
-          ]),
+          controller.stream,
           initialState: const VarDefsLoaded(_defs, 2),
         );
 
@@ -286,9 +295,15 @@ void main() {
         );
         await tester.pump();
         await tester.tap(find.byKey(const Key('var_def_form.submit')));
+        await tester.pump();
+
+        controller.add(const VarDefsMutating(_defs, 2));
+        await tester.pump();
+        controller.add(
+          const VarDefsMutationFailed(_defs, 2, TemplatesConflictFailure()),
+        );
         await tester.pumpAndSettle();
 
-        // Sheet sigue en el árbol.
         expect(find.byType(VarDefFormSheet), findsOneWidget);
       },
     );
@@ -296,18 +311,19 @@ void main() {
     testWidgets(
       'Loaded sin haber sometido NO cierra (rebuilds incidentales)',
       (tester) async {
-        // Un rebuild del bloc sin que el sheet haya disparado submit
-        // (p.ej. un refetch externo) no debe cerrar el sheet — el
-        // flag didSubmit lo evita.
+        // Un rebuild del bloc a Loaded sin que el sheet haya disparado
+        // submit (p.ej. un refetch externo) no debe cerrar — el flag
+        // didSubmit lo evita.
+        final controller = StreamController<VarDefsState>.broadcast();
+        addTearDown(controller.close);
         whenListen<VarDefsState>(
           bloc,
-          Stream<VarDefsState>.fromIterable(const <VarDefsState>[
-            VarDefsLoaded(_defs, 3),
-          ]),
+          controller.stream,
           initialState: const VarDefsLoaded(_defs, 2),
         );
 
         await tester.pumpWidget(host(existingNames: <String>{}));
+        controller.add(const VarDefsLoaded(_defs, 3));
         await tester.pumpAndSettle();
 
         expect(find.byType(VarDefFormSheet), findsOneWidget);
