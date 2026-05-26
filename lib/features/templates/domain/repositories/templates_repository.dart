@@ -33,4 +33,20 @@ abstract interface class TemplatesRepository {
     required int version,
     required AIConfig? ai,
   });
+
+  /// Agrega una variable-definition a la Template (POST /templates/:id/
+  /// variable-definitions con CAS optimista sobre el Template padre).
+  /// Devuelve la def recién creada con su id opaco. 409 (duplicado o
+  /// version stale) ⇒ `TemplatesConflictFailure`; 422 (nombre o tipo
+  /// inválido) ⇒ `TemplatesInvalidUpdateFailure`; 404 (Template padre)
+  /// ⇒ `TemplatesNotFoundFailure`. La nueva version del Template padre
+  /// NO viaja en la respuesta — el llamador refetchea el listado.
+  Future<VariableDef> addVarDef({
+    required String templateId,
+    required String name,
+    required VarType type,
+    required String defaultValue,
+    required String description,
+    required int version,
+  });
 }

@@ -33,4 +33,21 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
     required int version,
     required AIConfig? ai,
   }) => _ds.update(id: id, name: name, version: version, ai: ai);
+
+  @override
+  Future<VariableDef> addVarDef({
+    required String templateId,
+    required String name,
+    required VarType type,
+    required String defaultValue,
+    required String description,
+    required int version,
+  }) => _ds.addVarDef(
+    templateId: templateId,
+    name: name,
+    type: type,
+    defaultValue: defaultValue,
+    description: description,
+    version: version,
+  );
 }
