@@ -443,6 +443,61 @@ void main() {
 
       expect(find.byKey(const Key('var_defs.empty')), findsOneWidget);
     });
+
+    testWidgets(
+      'Loaded muestra botón "Agregar variable" con key contractual',
+      (tester) async {
+        when(() => varDefsBloc.state).thenReturn(
+          const VarDefsLoaded(<VariableDef>[], 1),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('var_defs.add_button')),
+          findsOneWidget,
+        );
+        expect(find.text('Agregar variable'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'MutationFailed mantiene visible el botón "Agregar variable"',
+      (tester) async {
+        // Tras un 409, el operador puede corregir el form y reintentar
+        // desde el mismo sheet; el botón debe seguir visible.
+        when(() => varDefsBloc.state).thenReturn(
+          const VarDefsMutationFailed(
+            <VariableDef>[],
+            1,
+            TemplatesConflictFailure(),
+          ),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('var_defs.add_button')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'Mutating oculta el botón "Agregar variable" (no doble dispatch)',
+      (tester) async {
+        when(() => varDefsBloc.state).thenReturn(
+          const VarDefsMutating(<VariableDef>[], 1),
+        );
+
+        await tester.pumpWidget(host());
+
+        // El sheet está abierto y mostrando su propio spinner; el botón
+        // del detail page no debe coexistir o el operador puede
+        // dispararlo dos veces.
+        expect(find.byKey(const Key('var_defs.add_button')), findsNothing);
+      },
+    );
   });
 
   // ── Botón "Crear bot" (mini-S04a) ──────────────────────────────────────────
