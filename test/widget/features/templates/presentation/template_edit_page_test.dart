@@ -479,6 +479,52 @@ void main() {
       );
     });
 
+    testWidgets(
+      'al abrir el dropdown del modelo, el item Retirado aparece disabled',
+      (tester) async {
+        // Coverage del contrato visual del dropdown bajo drift: el item
+        // "Retirado: <id>" se inyecta como entrada deshabilitada para que
+        // el dropdown pueda renderear con su `value` actual sin perderlo.
+        // Sin este assert, el flag de drift podía desconectarse del item
+        // disabled y el path quedaba silencioso (warning fuera, item
+        // habilitado dentro → el operador "guarda" el modelo retirado).
+        when(
+          () => editBloc.state,
+        ).thenReturn(const TemplateEditEditing(tplWithRetiredModel));
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+        await tester.pumpWidget(host());
+
+        await tester.ensureVisible(
+          find.byKey(const Key('template_edit.field.model')),
+        );
+        await tester.tap(find.byKey(const Key('template_edit.field.model')));
+        await tester.pumpAndSettle();
+
+        // El item con label "Retirado: <id>" aparece en el menú abierto.
+        final retiredFinder = find.text(
+          'Retirado: gemini-2.0-pro-retirado',
+          findRichText: true,
+        );
+        expect(retiredFinder, findsWidgets);
+
+        // El DropdownMenuItem ancestro está marcado enabled: false. La
+        // librería de Material lo respeta atenuando el item y bloqueando
+        // el callback onTap del menú.
+        final menuItem = tester.widget<DropdownMenuItem<String>>(
+          find
+              .ancestor(
+                of: retiredFinder,
+                matching: find.byType(DropdownMenuItem<String>),
+              )
+              .first,
+        );
+        expect(menuItem.enabled, isFalse);
+      },
+    );
+
     testWidgets('modelo retirado deshabilita el submit (no se puede guardar)', (
       tester,
     ) async {
