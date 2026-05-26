@@ -124,4 +124,167 @@ void main() {
       );
     });
   });
+
+  group('VarDefsBloc.AddRequested', () {
+    const addedDef = VariableDef(
+      id: 'vd_new',
+      name: 'saldo',
+      type: VarType.text,
+      defaultValue: 'x',
+      description: '',
+    );
+
+    const newDefs = <VariableDef>[..._defs, addedDef];
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'success: Mutating → Loading → Loaded(newDefs, newVersion) (refetch tras add)',
+      build: () {
+        // El primer listVarDefs es el load inicial; el segundo es el
+        // refetch que el bloc dispara tras el POST success.
+        var listCalls = 0;
+        when(() => repo.listVarDefs('t1')).thenAnswer((_) async {
+          listCalls++;
+          return listCalls == 1
+              ? (version: 2, defs: _defs)
+              : (version: 3, defs: newDefs);
+        });
+        when(
+          () => repo.addVarDef(
+            templateId: 't1',
+            name: 'saldo',
+            type: VarType.text,
+            defaultValue: 'x',
+            description: '',
+            version: 2,
+          ),
+        ).thenAnswer((_) async => addedDef);
+        return VarDefsBloc(repo: repo, templateId: 't1')
+          ..add(const VarDefsLoadRequested());
+      },
+      act: (bloc) async {
+        // Esperar al Loaded inicial antes de pedir el Add (necesita la
+        // version del Template para CAS).
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(
+          const VarDefsAddRequested(
+            name: 'saldo',
+            type: VarType.text,
+            defaultValue: 'x',
+            description: '',
+          ),
+        );
+      },
+      expect: () => const <VarDefsState>[
+        VarDefsLoaded(_defs, 2),
+        VarDefsMutating(_defs, 2),
+        VarDefsLoading(),
+        VarDefsLoaded(newDefs, 3),
+      ],
+      verify: (_) {
+        verify(
+          () => repo.addVarDef(
+            templateId: 't1',
+            name: 'saldo',
+            type: VarType.text,
+            defaultValue: 'x',
+            description: '',
+            version: 2,
+          ),
+        ).called(1);
+        // El refetch corre tras success ⇒ 2 calls a listVarDefs (load
+        // inicial + refetch post-add).
+        verify(() => repo.listVarDefs('t1')).called(2);
+      },
+    );
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'failure 409: Mutating → MutationFailed(prev, Conflict) (no se pierde el snapshot)',
+      build: () {
+        when(
+          () => repo.listVarDefs('t1'),
+        ).thenAnswer((_) async => (version: 2, defs: _defs));
+        when(
+          () => repo.addVarDef(
+            templateId: 't1',
+            name: 'dup',
+            type: VarType.text,
+            defaultValue: '',
+            description: '',
+            version: 2,
+          ),
+        ).thenAnswer(
+          (_) => Future<VariableDef>.error(const TemplatesConflictFailure()),
+        );
+        return VarDefsBloc(repo: repo, templateId: 't1')
+          ..add(const VarDefsLoadRequested());
+      },
+      act: (bloc) async {
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(
+          const VarDefsAddRequested(
+            name: 'dup',
+            type: VarType.text,
+            defaultValue: '',
+            description: '',
+          ),
+        );
+      },
+      expect: () => const <VarDefsState>[
+        VarDefsLoaded(_defs, 2),
+        VarDefsMutating(_defs, 2),
+        VarDefsMutationFailed(_defs, 2, TemplatesConflictFailure()),
+      ],
+    );
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'AddRequested desde Loading se ignora (defensive: no hay version para CAS)',
+      build: () => VarDefsBloc(repo: repo, templateId: 't1'),
+      act: (bloc) => bloc.add(
+        const VarDefsAddRequested(
+          name: 'x',
+          type: VarType.text,
+          defaultValue: '',
+          description: '',
+        ),
+      ),
+      expect: () => const <VarDefsState>[],
+      verify: (_) {
+        verifyNever(
+          () => repo.addVarDef(
+            templateId: any(named: 'templateId'),
+            name: any(named: 'name'),
+            type: any(named: 'type'),
+            defaultValue: any(named: 'defaultValue'),
+            description: any(named: 'description'),
+            version: any(named: 'version'),
+          ),
+        );
+      },
+    );
+
+    test('equality de Mutating y MutationFailed incluye defs+version', () {
+      expect(
+        const VarDefsMutating(_defs, 2),
+        equals(const VarDefsMutating(_defs, 2)),
+      );
+      expect(
+        const VarDefsMutating(_defs, 2),
+        isNot(equals(const VarDefsMutating(_defs, 3))),
+      );
+      expect(
+        const VarDefsMutationFailed(_defs, 2, TemplatesConflictFailure()),
+        equals(
+          const VarDefsMutationFailed(_defs, 2, TemplatesConflictFailure()),
+        ),
+      );
+      expect(
+        const VarDefsMutationFailed(_defs, 2, TemplatesConflictFailure()),
+        isNot(
+          equals(
+            const VarDefsMutationFailed(_defs, 2, TemplatesServerFailure()),
+          ),
+        ),
+      );
+    });
+  });
 }
