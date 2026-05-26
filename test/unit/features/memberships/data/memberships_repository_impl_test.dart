@@ -32,8 +32,10 @@ void main() {
     test('propaga la failure del datasource sin envolverla', () async {
       when(() => ds.list()).thenThrow(const MembershipsNetworkFailure());
 
+      // Closure: mocktail.thenThrow lanza sync al invocarse; expectLater
+      // necesita una función para atrapar sync-throws igual que async.
       await expectLater(
-        repo.list(),
+        () => repo.list(),
         throwsA(isA<MembershipsNetworkFailure>()),
       );
     });
