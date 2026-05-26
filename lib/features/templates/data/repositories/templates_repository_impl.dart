@@ -24,4 +24,12 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
 
   @override
   Future<List<VariableDef>> listVarDefs(String id) => _ds.listVarDefs(id);
+
+  @override
+  Future<Template> update({
+    required String id,
+    required String name,
+    required int version,
+    required AIConfig? ai,
+  }) => _ds.update(id: id, name: name, version: version, ai: ai);
 }
