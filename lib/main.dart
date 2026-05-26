@@ -7,6 +7,8 @@ import 'core/network/dio_client.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/device_id_provider.dart';
 import 'core/storage/secure_kv_store.dart';
+import 'features/ai_catalog/data/datasources/catalog_datasource.dart';
+import 'features/ai_catalog/data/repositories/catalog_repository_impl.dart';
 import 'features/auth/data/datasources/auth_datasource.dart';
 import 'features/auth/data/interceptors/auth_interceptor.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
@@ -87,12 +89,17 @@ void main() {
     datasource: DioMembershipsDatasource(mainDio),
   );
 
+  final catalogRepository = CatalogRepositoryImpl(
+    datasource: DioCatalogDatasource(mainDio),
+  );
+
   final router = AppRouter(
     authBloc: authBloc,
     authRepository: authRepository,
     botsRepository: botsRepository,
     templatesRepository: templatesRepository,
     membershipsRepository: membershipsRepository,
+    catalogRepository: catalogRepository,
   );
 
   // Dispara el check inicial: lee storage, si hay tokens valida con

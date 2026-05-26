@@ -1,6 +1,8 @@
 import 'package:agentic/app.dart';
 import 'package:agentic/core/design/tokens.dart';
 import 'package:agentic/core/router/app_router.dart';
+import 'package:agentic/features/ai_catalog/domain/entities/catalog.dart';
+import 'package:agentic/features/ai_catalog/domain/repositories/catalog_repository.dart';
 import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
 import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:agentic/features/bots/domain/entities/bot.dart';
@@ -25,6 +27,8 @@ class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
+class _MockCatalogRepo extends Mock implements CatalogRepository {}
+
 void main() {
   late _MockAuthBloc authBloc;
   late AppRouter router;
@@ -35,15 +39,20 @@ void main() {
     final botsRepo = _MockBotsRepo();
     final templatesRepo = _MockTemplatesRepo();
     final membershipsRepo = _MockMembershipsRepo();
+    final catalogRepo = _MockCatalogRepo();
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
+    when(catalogRepo.fetch).thenAnswer(
+      (_) async => const Catalog(providers: <ProviderEntry>[]),
+    );
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
     );
   });
 

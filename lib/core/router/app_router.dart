@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/ai_catalog/domain/repositories/catalog_repository.dart';
+import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
@@ -48,17 +50,20 @@ class AppRouter {
     required BotsRepository botsRepository,
     required TemplatesRepository templatesRepository,
     required MembershipsRepository membershipsRepository,
+    required CatalogRepository catalogRepository,
   }) : _authBloc = authBloc,
        _authRepo = authRepository,
        _botsRepo = botsRepository,
        _templatesRepo = templatesRepository,
-       _membershipsRepo = membershipsRepository;
+       _membershipsRepo = membershipsRepository,
+       _catalogRepo = catalogRepository;
 
   final AuthBloc _authBloc;
   final AuthRepository _authRepo;
   final BotsRepository _botsRepo;
   final TemplatesRepository _templatesRepo;
   final MembershipsRepository _membershipsRepo;
+  final CatalogRepository _catalogRepo;
 
   late final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -178,19 +183,32 @@ class AppRouter {
         },
       ),
       GoRoute(
-        // Editor mínimo (TE1): name + systemPrompt. Page-scoped: el bloc
-        // carga el template al construirse (Loading inicial). Tras
-        // Succeeded, la página hace pushReplacement a /templates/:id, así
-        // el back físico vuelve al listado sin pasar por el form que ya
-        // cumplió. Subruta del id (path /templates/:id/edit), no compite
-        // con /templates/new ni con /templates/:id por orden de match.
+        // Editor completo: name + systemPrompt + AIConfig (provider,
+        // model, temperature, thinking, contextMessages, enabled).
+        // Page-scoped: dos blocs montados en paralelo — TemplateEditBloc
+        // carga el template y CatalogBloc carga la tabla de modelos del
+        // backend. Ambos disparan load al construirse; el form espera
+        // a que ambos terminen antes de renderizar (Loading combinado).
+        // Tras Succeeded, la página hace pushReplacement a
+        // /templates/:id, así el back físico vuelve al listado sin
+        // pasar por el form que ya cumplió. Subruta del id (path
+        // /templates/:id/edit), no compite con /templates/new ni con
+        // /templates/:id por orden de match.
         path: '/templates/:id/edit',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return BlocProvider<TemplateEditBloc>(
-            create: (_) =>
-                TemplateEditBloc(repo: _templatesRepo, id: id)
-                  ..add(const TemplateEditLoadRequested()),
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TemplateEditBloc>(
+                create: (_) =>
+                    TemplateEditBloc(repo: _templatesRepo, id: id)
+                      ..add(const TemplateEditLoadRequested()),
+              ),
+              BlocProvider<CatalogBloc>(
+                create: (_) =>
+                    CatalogBloc(_catalogRepo)..add(const CatalogLoadRequested()),
+              ),
+            ],
             child: Scaffold(
               appBar: AppBar(title: const Text('Editar plantilla')),
               body: const TemplateEditPage(),

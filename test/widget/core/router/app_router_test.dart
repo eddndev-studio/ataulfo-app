@@ -1,4 +1,6 @@
 import 'package:agentic/core/router/app_router.dart';
+import 'package:agentic/features/ai_catalog/domain/entities/catalog.dart';
+import 'package:agentic/features/ai_catalog/domain/repositories/catalog_repository.dart';
 import 'package:agentic/features/auth/domain/entities/identity.dart';
 import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
 import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
@@ -36,6 +38,8 @@ class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
+class _MockCatalogRepo extends Mock implements CatalogRepository {}
+
 const _identity = Identity(
   userId: 'u1',
   orgId: 'o1',
@@ -54,6 +58,7 @@ void main() {
   late _MockBotsRepo botsRepo;
   late _MockTemplatesRepo templatesRepo;
   late _MockMembershipsRepo membershipsRepo;
+  late _MockCatalogRepo catalogRepo;
   late AppRouter router;
 
   setUp(() {
@@ -61,18 +66,26 @@ void main() {
     botsRepo = _MockBotsRepo();
     templatesRepo = _MockTemplatesRepo();
     membershipsRepo = _MockMembershipsRepo();
+    catalogRepo = _MockCatalogRepo();
     // Los blocs page-scoped del shell arrancan con LoadRequested al
     // construirse; los repos mock devuelven listas vacías para que los
-    // loads terminen sin colgar el pumpAndSettle.
+    // loads terminen sin colgar el pumpAndSettle. El CatalogBloc se
+    // monta en /templates/:id/edit (TE3) — un catálogo vacío basta
+    // para los smoke tests del router (los tests del editor están en
+    // su propio widget test).
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
+    when(catalogRepo.fetch).thenAnswer(
+      (_) async => const Catalog(providers: <ProviderEntry>[]),
+    );
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
     );
   });
 
@@ -189,6 +202,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -264,6 +278,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -285,6 +300,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -342,6 +358,7 @@ void main() {
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
         membershipsRepository: membershipsRepo,
+        catalogRepository: catalogRepo,
       );
 
       await tester.pumpWidget(_host(router, authBloc));
@@ -401,6 +418,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -476,6 +494,7 @@ void main() {
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
         membershipsRepository: membershipsRepo,
+        catalogRepository: catalogRepo,
       );
 
       await tester.pumpWidget(_host(router, authBloc));
@@ -498,6 +517,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
