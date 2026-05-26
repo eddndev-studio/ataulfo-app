@@ -49,7 +49,9 @@ class TemplateEditPage extends StatelessWidget {
         // sólo importan si el template ya cargó.
         return switch (editState) {
           TemplateEditLoading() => const _LoadingView(),
-          TemplateEditLoadFailed(failure: final f) => _LoadFailedView(failure: f),
+          TemplateEditLoadFailed(failure: final f) => _LoadFailedView(
+            failure: f,
+          ),
           TemplateEditEditing(template: final t) => _RequireCatalog(
             template: t,
             submitting: false,
@@ -176,9 +178,8 @@ class _CatalogFailedView extends StatelessWidget {
             const SizedBox(height: AppTokens.sp3),
             AppButton.tonal(
               label: 'Reintentar',
-              onPressed: () => context.read<CatalogBloc>().add(
-                const CatalogLoadRequested(),
-              ),
+              onPressed: () =>
+                  context.read<CatalogBloc>().add(const CatalogLoadRequested()),
             ),
           ],
         ),
@@ -581,7 +582,8 @@ class _ModelField extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final providerWire = provider.toWire();
     final entry = catalogProvider(catalog, providerWire);
-    final modelIds = entry?.models.map((m) => m.id).toList(growable: false) ??
+    final modelIds =
+        entry?.models.map((m) => m.id).toList(growable: false) ??
         const <String>[];
     // Si el modelo actual no está en el catálogo (drift), lo añadimos
     // como item disabled con label "Retirado:" para que el dropdown
@@ -633,9 +635,9 @@ class _DriftWarning extends StatelessWidget {
     return Text(
       copy,
       key: Key(keyValue),
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: AppTokens.danger,
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.bodySmall?.copyWith(color: AppTokens.danger),
     );
   }
 }

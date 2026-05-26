@@ -43,13 +43,16 @@ void main() {
       expect(entry.defaultModel, 'gemini-3.1-pro-preview');
     });
 
-    test('devuelve null si el provider del template no está en el catálogo', () {
-      // Caso real de drift: el cliente todavía conoce MINIMAX en el enum
-      // AIProvider, pero el backend retiró MINIMAX del catálogo (la enum
-      // del wire es fail-loud para nuevas altas; las bajas del catálogo
-      // sí pueden divergir hasta que el cliente se actualice).
-      expect(catalogProvider(_catalog, 'MINIMAX'), isNull);
-    });
+    test(
+      'devuelve null si el provider del template no está en el catálogo',
+      () {
+        // Caso real de drift: el cliente todavía conoce MINIMAX en el enum
+        // AIProvider, pero el backend retiró MINIMAX del catálogo (la enum
+        // del wire es fail-loud para nuevas altas; las bajas del catálogo
+        // sí pueden divergir hasta que el cliente se actualice).
+        expect(catalogProvider(_catalog, 'MINIMAX'), isNull);
+      },
+    );
   });
 
   group('catalogModel(catalog, providerWire, modelId)', () {

@@ -190,37 +190,40 @@ void main() {
         ],
       );
 
-      test('submit pasa el AIConfig provisto al repo sin modificarlo', () async {
-        // El caller (form de edit en TE3) construye el AIConfig completo
-        // a partir del estado del form; el bloc lo reenvía intacto al
-        // repo. Un bug que reconstruyera el AIConfig (como hacía TE1
-        // cuando el form sólo editaba systemPrompt) borraría las
-        // ediciones del operador en provider/model/temp/etc.
-        final repo = _MockRepo();
-        AIConfig? capturedAi;
-        when(
-          () => repo.update(
-            id: 't1',
-            name: 'Soporte v2',
-            version: 1,
-            ai: any(named: 'ai'),
-          ),
-        ).thenAnswer((invocation) async {
-          capturedAi = invocation.namedArguments[#ai] as AIConfig?;
-          return _tplUpdated;
-        });
-        final bloc = TemplateEditBloc(repo: repo, id: 't1');
-        bloc.emit(const TemplateEditEditing(_tpl));
+      test(
+        'submit pasa el AIConfig provisto al repo sin modificarlo',
+        () async {
+          // El caller (form de edit en TE3) construye el AIConfig completo
+          // a partir del estado del form; el bloc lo reenvía intacto al
+          // repo. Un bug que reconstruyera el AIConfig (como hacía TE1
+          // cuando el form sólo editaba systemPrompt) borraría las
+          // ediciones del operador en provider/model/temp/etc.
+          final repo = _MockRepo();
+          AIConfig? capturedAi;
+          when(
+            () => repo.update(
+              id: 't1',
+              name: 'Soporte v2',
+              version: 1,
+              ai: any(named: 'ai'),
+            ),
+          ).thenAnswer((invocation) async {
+            capturedAi = invocation.namedArguments[#ai] as AIConfig?;
+            return _tplUpdated;
+          });
+          final bloc = TemplateEditBloc(repo: repo, id: 't1');
+          bloc.emit(const TemplateEditEditing(_tpl));
 
-        bloc.add(
-          const TemplateEditSubmitted(name: 'Soporte v2', ai: _aiEdited),
-        );
-        await bloc.stream.firstWhere(
-          (s) => s is TemplateEditSucceeded || s is TemplateEditSubmitFailed,
-        );
+          bloc.add(
+            const TemplateEditSubmitted(name: 'Soporte v2', ai: _aiEdited),
+          );
+          await bloc.stream.firstWhere(
+            (s) => s is TemplateEditSucceeded || s is TemplateEditSubmitFailed,
+          );
 
-        expect(capturedAi, equals(_aiEdited));
-      });
+          expect(capturedAi, equals(_aiEdited));
+        },
+      );
     });
   });
 }

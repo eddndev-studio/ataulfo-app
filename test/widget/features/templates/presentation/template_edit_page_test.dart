@@ -114,22 +114,26 @@ void main() {
       expect(find.byType(AppTextField), findsNothing);
     });
 
-    testWidgets('Template LoadFailed prioriza sobre Catalog (error del template)', (
-      tester,
-    ) async {
-      // Si el template no carga, no hay nada que editar — el error del
-      // template gana sobre cualquier estado del catálogo.
-      when(
-        () => editBloc.state,
-      ).thenReturn(const TemplateEditLoadFailed(TemplatesNotFoundFailure()));
-      when(
-        () => catalogBloc.state,
-      ).thenReturn(const CatalogLoaded(catalog: _catalog));
+    testWidgets(
+      'Template LoadFailed prioriza sobre Catalog (error del template)',
+      (tester) async {
+        // Si el template no carga, no hay nada que editar — el error del
+        // template gana sobre cualquier estado del catálogo.
+        when(
+          () => editBloc.state,
+        ).thenReturn(const TemplateEditLoadFailed(TemplatesNotFoundFailure()));
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogLoaded(catalog: _catalog));
 
-      await tester.pumpWidget(host());
+        await tester.pumpWidget(host());
 
-      expect(find.byKey(const Key('template_edit.load_error')), findsOneWidget);
-    });
+        expect(
+          find.byKey(const Key('template_edit.load_error')),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets(
       'Template Editing + Catalog Failed → error del catálogo + retry',
@@ -184,30 +188,37 @@ void main() {
       expect(find.text('Prompt actual.'), findsOneWidget);
     });
 
-    testWidgets('los pickers del AIConfig están visibles con keys contractuales', (
-      tester,
-    ) async {
-      await pumpReady(tester);
+    testWidgets(
+      'los pickers del AIConfig están visibles con keys contractuales',
+      (tester) async {
+        await pumpReady(tester);
 
-      expect(find.byKey(const Key('template_edit.field.enabled')), findsOneWidget);
-      expect(
-        find.byKey(const Key('template_edit.field.provider')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('template_edit.field.model')), findsOneWidget);
-      expect(
-        find.byKey(const Key('template_edit.field.temperature')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('template_edit.field.thinking')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('template_edit.field.context_messages')),
-        findsOneWidget,
-      );
-    });
+        expect(
+          find.byKey(const Key('template_edit.field.enabled')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('template_edit.field.provider')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('template_edit.field.model')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('template_edit.field.temperature')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('template_edit.field.thinking')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('template_edit.field.context_messages')),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('contextMessages pre-fillea con el valor del template', (
       tester,
@@ -224,9 +235,9 @@ void main() {
       WidgetTester tester,
       TemplatesFailure failure,
     ) async {
-      when(() => editBloc.state).thenReturn(
-        TemplateEditSubmitFailed(failure: failure, template: _tpl),
-      );
+      when(
+        () => editBloc.state,
+      ).thenReturn(TemplateEditSubmitFailed(failure: failure, template: _tpl));
       when(
         () => catalogBloc.state,
       ).thenReturn(const CatalogLoaded(catalog: _catalog));
@@ -261,7 +272,9 @@ void main() {
     });
   });
 
-  testWidgets('Submitting muestra el form pero el botón en loading', (tester) async {
+  testWidgets('Submitting muestra el form pero el botón en loading', (
+    tester,
+  ) async {
     when(() => editBloc.state).thenReturn(const TemplateEditSubmitting(_tpl));
     when(
       () => catalogBloc.state,
@@ -333,7 +346,9 @@ void main() {
     testWidgets(
       'modelo con supportsTemperature=false esconde el slider de temperature',
       (tester) async {
-        when(() => editBloc.state).thenReturn(const TemplateEditEditing(tplOnOpenAi));
+        when(
+          () => editBloc.state,
+        ).thenReturn(const TemplateEditEditing(tplOnOpenAi));
         when(
           () => catalogBloc.state,
         ).thenReturn(const CatalogLoaded(catalog: _catalog));
@@ -358,9 +373,9 @@ void main() {
         when(
           () => editBloc.state,
         ).thenReturn(const TemplateEditEditing(tplOnMinimax));
-        when(() => catalogBloc.state).thenReturn(
-          const CatalogLoaded(catalog: catalogWithMinimax),
-        );
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogLoaded(catalog: catalogWithMinimax));
 
         await tester.pumpWidget(host());
 

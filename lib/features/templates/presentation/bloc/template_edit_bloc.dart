@@ -104,9 +104,7 @@ class TemplateEditSubmitted extends TemplateEditEvent {
 
   @override
   bool operator ==(Object other) =>
-      other is TemplateEditSubmitted &&
-      other.name == name &&
-      other.ai == ai;
+      other is TemplateEditSubmitted && other.name == name && other.ai == ai;
 
   @override
   int get hashCode => Object.hash(name, ai);

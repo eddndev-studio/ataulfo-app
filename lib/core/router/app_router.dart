@@ -206,7 +206,8 @@ class AppRouter {
               ),
               BlocProvider<CatalogBloc>(
                 create: (_) =>
-                    CatalogBloc(_catalogRepo)..add(const CatalogLoadRequested()),
+                    CatalogBloc(_catalogRepo)
+                      ..add(const CatalogLoadRequested()),
               ),
             ],
             child: Scaffold(

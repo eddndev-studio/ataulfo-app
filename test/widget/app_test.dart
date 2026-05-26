@@ -43,9 +43,9 @@ void main() {
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
-    when(catalogRepo.fetch).thenAnswer(
-      (_) async => const Catalog(providers: <ProviderEntry>[]),
-    );
+    when(
+      catalogRepo.fetch,
+    ).thenAnswer((_) async => const Catalog(providers: <ProviderEntry>[]));
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
