@@ -266,6 +266,51 @@ void main() {
       },
     );
 
+    blocTest<VarDefsBloc, VarDefsState>(
+      'refetch falla tras add success: emit Failed (no enmascarar el success)',
+      build: () {
+        var listCalls = 0;
+        when(() => repo.listVarDefs('t1')).thenAnswer((_) async {
+          listCalls++;
+          if (listCalls == 1) return (version: 2, defs: _defs);
+          throw const TemplatesNetworkFailure();
+        });
+        when(
+          () => repo.addVarDef(
+            templateId: 't1',
+            name: 'saldo',
+            type: VarType.text,
+            defaultValue: 'x',
+            description: '',
+            version: 2,
+          ),
+        ).thenAnswer((_) async => addedDef);
+        return VarDefsBloc(repo: repo, templateId: 't1')
+          ..add(const VarDefsLoadRequested());
+      },
+      act: (bloc) async {
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(
+          const VarDefsAddRequested(
+            name: 'saldo',
+            type: VarType.text,
+            defaultValue: 'x',
+            description: '',
+          ),
+        );
+      },
+      expect: () => const <VarDefsState>[
+        VarDefsLoaded(_defs, 2),
+        VarDefsMutating(_defs, 2),
+        VarDefsLoading(),
+        // El POST tuvo éxito pero el snapshot local quedó stale (no
+        // sabemos la nueva version ni si el server tiene más cambios).
+        // Failed es el terminal honesto — el operador puede reintentar
+        // el Load.
+        VarDefsFailed(TemplatesNetworkFailure()),
+      ],
+    );
+
     test('equality de Mutating y MutationFailed incluye defs+version', () {
       expect(
         const VarDefsMutating(_defs, 2),
