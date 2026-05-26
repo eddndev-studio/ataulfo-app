@@ -117,12 +117,7 @@ void main() {
       'forwarda los named args y devuelve el Template del datasource',
       () async {
         when(
-          () => ds.update(
-            id: 't1',
-            name: 'Soporte v2',
-            version: 1,
-            ai: tpl.ai,
-          ),
+          () => ds.update(id: 't1', name: 'Soporte v2', version: 1, ai: tpl.ai),
         ).thenAnswer((_) async => tpl);
 
         final got = await repo.update(
@@ -134,12 +129,7 @@ void main() {
 
         expect(got, tpl);
         verify(
-          () => ds.update(
-            id: 't1',
-            name: 'Soporte v2',
-            version: 1,
-            ai: tpl.ai,
-          ),
+          () => ds.update(id: 't1', name: 'Soporte v2', version: 1, ai: tpl.ai),
         ).called(1);
       },
     );

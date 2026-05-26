@@ -489,7 +489,10 @@ void main() {
         find.byKey(const Key('template_detail.edit_button')),
         findsOneWidget,
       );
-      expect(find.widgetWithText(AppButton, 'Editar plantilla'), findsOneWidget);
+      expect(
+        find.widgetWithText(AppButton, 'Editar plantilla'),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
@@ -540,9 +543,7 @@ void main() {
           find.byKey(const Key('template_detail.edit_button')),
         );
         await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const Key('template_detail.edit_button')),
-        );
+        await tester.tap(find.byKey(const Key('template_detail.edit_button')));
         await tester.pumpAndSettle();
 
         expect(destinationUri, '/templates/t1/edit');

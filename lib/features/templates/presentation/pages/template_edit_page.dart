@@ -125,7 +125,9 @@ class _EditFormState extends State<_EditForm> {
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.template.name);
-    _systemPrompt = TextEditingController(text: widget.template.ai.systemPrompt);
+    _systemPrompt = TextEditingController(
+      text: widget.template.ai.systemPrompt,
+    );
   }
 
   @override

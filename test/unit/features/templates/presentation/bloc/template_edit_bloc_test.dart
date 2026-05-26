@@ -81,8 +81,7 @@ void main() {
           when(() => repo.byId('t1')).thenAnswer((_) async => _tpl);
           return TemplateEditBloc(repo: repo, id: 't1');
         },
-        seed: () =>
-            const TemplateEditLoadFailed(TemplatesNetworkFailure()),
+        seed: () => const TemplateEditLoadFailed(TemplatesNetworkFailure()),
         act: (bloc) => bloc.add(const TemplateEditLoadRequested()),
         expect: () => const <TemplateEditState>[
           TemplateEditLoading(),
@@ -136,9 +135,8 @@ void main() {
           return TemplateEditBloc(repo: repo, id: 't1');
         },
         seed: () => const TemplateEditEditing(_tpl),
-        act: (bloc) => bloc.add(
-          const TemplateEditSubmitted(name: 'x', systemPrompt: 'y'),
-        ),
+        act: (bloc) =>
+            bloc.add(const TemplateEditSubmitted(name: 'x', systemPrompt: 'y')),
         expect: () => const <TemplateEditState>[
           TemplateEditSubmitting(_tpl),
           TemplateEditSubmitFailed(
@@ -166,9 +164,8 @@ void main() {
           return TemplateEditBloc(repo: repo, id: 't1');
         },
         seed: () => const TemplateEditEditing(_tpl),
-        act: (bloc) => bloc.add(
-          const TemplateEditSubmitted(name: 'x', systemPrompt: 'y'),
-        ),
+        act: (bloc) =>
+            bloc.add(const TemplateEditSubmitted(name: 'x', systemPrompt: 'y')),
         expect: () => const <TemplateEditState>[
           TemplateEditSubmitting(_tpl),
           TemplateEditSubmitFailed(

@@ -104,10 +104,7 @@ class TemplateEditLoadRequested extends TemplateEditEvent {
 }
 
 class TemplateEditSubmitted extends TemplateEditEvent {
-  const TemplateEditSubmitted({
-    required this.name,
-    required this.systemPrompt,
-  });
+  const TemplateEditSubmitted({required this.name, required this.systemPrompt});
 
   final String name;
   final String systemPrompt;

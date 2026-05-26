@@ -143,27 +143,26 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsAtLeastNWidgets(1));
   });
 
-  testWidgets(
-    'SubmitFailed(Conflict) muestra copy específico de CAS + retry',
-    (tester) async {
-      when(() => bloc.state).thenReturn(
-        const TemplateEditSubmitFailed(
-          failure: TemplatesConflictFailure(),
-          template: _tpl,
-        ),
-      );
+  testWidgets('SubmitFailed(Conflict) muestra copy específico de CAS + retry', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const TemplateEditSubmitFailed(
+        failure: TemplatesConflictFailure(),
+        template: _tpl,
+      ),
+    );
 
-      await tester.pumpWidget(host());
+    await tester.pumpWidget(host());
 
-      expect(
-        find.byKey(const Key('template_edit.error.conflict')),
-        findsOneWidget,
-      );
-      // El form se mantiene editable después de Conflict — el operador
-      // puede revisar, pero el copy le sugiere recargar primero.
-      expect(find.text('Soporte'), findsOneWidget);
-    },
-  );
+    expect(
+      find.byKey(const Key('template_edit.error.conflict')),
+      findsOneWidget,
+    );
+    // El form se mantiene editable después de Conflict — el operador
+    // puede revisar, pero el copy le sugiere recargar primero.
+    expect(find.text('Soporte'), findsOneWidget);
+  });
 
   testWidgets(
     'SubmitFailed(InvalidUpdate) muestra copy específico de validación',
@@ -184,24 +183,23 @@ void main() {
     },
   );
 
-  testWidgets(
-    'SubmitFailed(Network) muestra copy de red genérico',
-    (tester) async {
-      when(() => bloc.state).thenReturn(
-        const TemplateEditSubmitFailed(
-          failure: TemplatesNetworkFailure(),
-          template: _tpl,
-        ),
-      );
+  testWidgets('SubmitFailed(Network) muestra copy de red genérico', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const TemplateEditSubmitFailed(
+        failure: TemplatesNetworkFailure(),
+        template: _tpl,
+      ),
+    );
 
-      await tester.pumpWidget(host());
+    await tester.pumpWidget(host());
 
-      expect(
-        find.byKey(const Key('template_edit.error.network')),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(
+      find.byKey(const Key('template_edit.error.network')),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
     'Succeeded apila el detalle por pushReplacement (form ya cumplió)',
