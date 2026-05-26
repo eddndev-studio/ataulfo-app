@@ -173,4 +173,75 @@ void main() {
       );
     });
   });
+
+  group('TemplatesRepositoryImpl.addVarDef (delegate trivial)', () {
+    const newDef = VariableDef(
+      id: 'vd_new',
+      name: 'saldo',
+      type: VarType.text,
+      defaultValue: 'x',
+      description: 'saldo del cliente',
+    );
+
+    test('forwarda named args y devuelve la def del datasource', () async {
+      when(
+        () => ds.addVarDef(
+          templateId: 't1',
+          name: 'saldo',
+          type: VarType.text,
+          defaultValue: 'x',
+          description: 'saldo del cliente',
+          version: 1,
+        ),
+      ).thenAnswer((_) async => newDef);
+
+      final got = await repo.addVarDef(
+        templateId: 't1',
+        name: 'saldo',
+        type: VarType.text,
+        defaultValue: 'x',
+        description: 'saldo del cliente',
+        version: 1,
+      );
+
+      expect(got, newDef);
+      verify(
+        () => ds.addVarDef(
+          templateId: 't1',
+          name: 'saldo',
+          type: VarType.text,
+          defaultValue: 'x',
+          description: 'saldo del cliente',
+          version: 1,
+        ),
+      ).called(1);
+    });
+
+    test('propaga TemplatesConflictFailure (409) sin envolver', () async {
+      when(
+        () => ds.addVarDef(
+          templateId: 't1',
+          name: 'dup',
+          type: VarType.text,
+          defaultValue: '',
+          description: '',
+          version: 1,
+        ),
+      ).thenAnswer(
+        (_) => Future<VariableDef>.error(const TemplatesConflictFailure()),
+      );
+
+      await expectLater(
+        () => repo.addVarDef(
+          templateId: 't1',
+          name: 'dup',
+          type: VarType.text,
+          defaultValue: '',
+          description: '',
+          version: 1,
+        ),
+        throwsA(isA<TemplatesConflictFailure>()),
+      );
+    });
+  });
 }
