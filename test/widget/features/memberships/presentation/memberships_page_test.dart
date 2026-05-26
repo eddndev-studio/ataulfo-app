@@ -122,6 +122,24 @@ void main() {
       // El badge tiene una key contractual para que los smoke tests futuros
       // (y este test) lo encuentren sin acoplarse a copy.
       expect(find.byKey(const Key('memberships.active_badge')), findsOneWidget);
+      // El badge debe estar dentro del tile de la org ACTIVA (Acme), no de
+      // la otra (Bravo). Sin este assert un bug "siempre activa" sólo se
+      // cazaría visualmente: ambas filas tendrían el badge y el contador
+      // global seguiría correcto si la regresión clonara el widget.
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('memberships.active_badge')),
+          matching: find.widgetWithText(AppCard, 'Acme'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('memberships.active_badge')),
+          matching: find.widgetWithText(AppCard, 'Bravo'),
+        ),
+        findsNothing,
+      );
       // El rol siempre se muestra como pill, en ambas filas.
       expect(find.byType(AppPill), findsAtLeastNWidgets(2));
     },
