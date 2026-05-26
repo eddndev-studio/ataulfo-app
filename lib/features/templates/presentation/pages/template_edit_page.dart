@@ -5,22 +5,31 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../ai_catalog/domain/entities/catalog.dart';
+import '../../../ai_catalog/domain/failures/catalog_failure.dart';
+import '../../../ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../domain/entities/template.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../bloc/template_edit_bloc.dart';
 
-/// Página para editar nombre + system prompt de una Template (TE1).
+/// Página para editar una Template completa: name + systemPrompt +
+/// AIConfig (enabled + provider + model + temperature + thinkingLevel +
+/// contextMessages).
 ///
-/// Content-only: el Scaffold y el AppBar los aporta la ruta. El bloc se
-/// monta page-scoped en `/templates/:id/edit` y arranca cargando el
-/// template (Loading sin flash de Initial); la página se re-construye
-/// con un form pre-filled cuando el bloc entra en Editing.
+/// Content-only: el Scaffold y el AppBar los aporta la ruta. Dos blocs
+/// page-scoped: `TemplateEditBloc` carga el template, `CatalogBloc`
+/// carga la tabla de modelos. El form no renderea hasta que ambos
+/// terminen (loading combinado prioriza el spinner por encima del form
+/// parcial).
+///
+/// Cuando el template falla en cargar, gana sobre cualquier estado del
+/// catálogo (no hay nada que editar). Cuando el template carga pero el
+/// catálogo falla, mostramos el error específico del catálogo con su
+/// retry — los pickers no pueden renderearse sin él.
 ///
 /// Al persistir cambios (Succeeded), `pushReplacement` reemplaza la
-/// ruta del editor con el detalle: el back físico vuelve al listado sin
-/// pasar por el form que ya cumplió. El AIConfig se preserva entero
-/// (TE1 no edita provider/model/temp/etc.); el bloc lo serializa con
-/// los campos no-editables del template cargado.
+/// ruta del editor con el detalle: el back físico vuelve al listado
+/// sin pasar por el form que ya cumplió.
 class TemplateEditPage extends StatelessWidget {
   const TemplateEditPage({super.key});
 
@@ -33,25 +42,61 @@ class TemplateEditPage extends StatelessWidget {
           context.pushReplacement('/templates/${state.template.id}');
         }
       },
-      builder: (context, state) => switch (state) {
-        TemplateEditLoading() => const _LoadingView(),
-        TemplateEditLoadFailed(failure: final f) => _LoadFailedView(failure: f),
-        TemplateEditEditing(template: final t) => _EditForm(
-          template: t,
-          submitting: false,
-          submitFailure: null,
-        ),
-        TemplateEditSubmitting(template: final t) => _EditForm(
-          template: t,
-          submitting: true,
-          submitFailure: null,
-        ),
-        TemplateEditSubmitFailed(failure: final f, template: final t) =>
-          _EditForm(template: t, submitting: false, submitFailure: f),
-        TemplateEditSucceeded(template: final t) => _EditForm(
-          template: t,
-          submitting: true, // mantiene el botón en loading hasta la navegación
-          submitFailure: null,
+      builder: (context, editState) {
+        // El template gana sobre el catálogo en los estados terminales:
+        // sin template no hay nada que editar; las fallas del catálogo
+        // sólo importan si el template ya cargó.
+        return switch (editState) {
+          TemplateEditLoading() => const _LoadingView(),
+          TemplateEditLoadFailed(failure: final f) => _LoadFailedView(failure: f),
+          TemplateEditEditing(template: final t) => _RequireCatalog(
+            template: t,
+            submitting: false,
+            submitFailure: null,
+          ),
+          TemplateEditSubmitting(template: final t) => _RequireCatalog(
+            template: t,
+            submitting: true,
+            submitFailure: null,
+          ),
+          TemplateEditSubmitFailed(failure: final f, template: final t) =>
+            _RequireCatalog(template: t, submitting: false, submitFailure: f),
+          TemplateEditSucceeded(template: final t) => _RequireCatalog(
+            template: t,
+            submitting: true,
+            submitFailure: null,
+          ),
+        };
+      },
+    );
+  }
+}
+
+/// Gate del catálogo: render el form sólo cuando ambos blocs estén listos.
+/// Aislado para mantener el switch de estados de edit legible y centralizar
+/// las combinaciones template-loaded × catalog-{loading,failed,loaded}.
+class _RequireCatalog extends StatelessWidget {
+  const _RequireCatalog({
+    required this.template,
+    required this.submitting,
+    required this.submitFailure,
+  });
+
+  final Template template;
+  final bool submitting;
+  final TemplatesFailure? submitFailure;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CatalogBloc, CatalogState>(
+      builder: (context, catState) => switch (catState) {
+        CatalogInitial() || CatalogLoading() => const _LoadingView(),
+        CatalogFailed(failure: final f) => _CatalogFailedView(failure: f),
+        CatalogLoaded(catalog: final c) => _EditForm(
+          template: template,
+          catalog: c,
+          submitting: submitting,
+          submitFailure: submitFailure,
         ),
       },
     );
@@ -102,14 +147,101 @@ class _LoadFailedView extends StatelessWidget {
   }
 }
 
+class _CatalogFailedView extends StatelessWidget {
+  const _CatalogFailedView({required this.failure});
+
+  final CatalogFailure failure;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final copy = switch (failure) {
+      CatalogForbiddenFailure() =>
+        'Tu rol no permite leer el catálogo de modelos. Pide acceso a un admin.',
+      CatalogNetworkFailure() || CatalogTimeoutFailure() =>
+        'Sin conexión para leer el catálogo de modelos. Revisa tu red y '
+            'reintenta.',
+      CatalogServerFailure() || UnknownCatalogFailure() =>
+        'No pudimos leer el catálogo de modelos. Inténtalo de nuevo.',
+    };
+    return Center(
+      key: const Key('template_edit.catalog_error'),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.sp6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(copy, textAlign: TextAlign.center, style: textTheme.bodyLarge),
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
+              onPressed: () => context.read<CatalogBloc>().add(
+                const CatalogLoadRequested(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Estado inmutable del AIConfig editado por el operador.
+///
+/// El form mantiene este value object en setState y lo copia con
+/// `copyWith` por cada interacción. Los controllers viven sólo para
+/// los campos de texto libre (name, systemPrompt) y el numérico
+/// (contextMessages, que necesita formato/teclado específico). El
+/// resto (toggle, dropdowns, slider) usa el state directo.
+@immutable
+class _AIConfigFormState {
+  const _AIConfigFormState({
+    required this.enabled,
+    required this.provider,
+    required this.model,
+    required this.temperature,
+    required this.thinkingLevel,
+  });
+
+  factory _AIConfigFormState.fromAi(AIConfig ai) => _AIConfigFormState(
+    enabled: ai.enabled,
+    provider: ai.provider,
+    model: ai.model,
+    temperature: ai.temperature,
+    thinkingLevel: ai.thinkingLevel,
+  );
+
+  final bool enabled;
+  final AIProvider provider;
+  final String model;
+  final double temperature;
+  final ThinkingLevel thinkingLevel;
+
+  _AIConfigFormState copyWith({
+    bool? enabled,
+    AIProvider? provider,
+    String? model,
+    double? temperature,
+    ThinkingLevel? thinkingLevel,
+  }) => _AIConfigFormState(
+    enabled: enabled ?? this.enabled,
+    provider: provider ?? this.provider,
+    model: model ?? this.model,
+    temperature: temperature ?? this.temperature,
+    thinkingLevel: thinkingLevel ?? this.thinkingLevel,
+  );
+}
+
 class _EditForm extends StatefulWidget {
   const _EditForm({
     required this.template,
+    required this.catalog,
     required this.submitting,
     required this.submitFailure,
   });
 
   final Template template;
+  final Catalog catalog;
   final bool submitting;
   final TemplatesFailure? submitFailure;
 
@@ -120,6 +252,8 @@ class _EditForm extends StatefulWidget {
 class _EditFormState extends State<_EditForm> {
   late final TextEditingController _name;
   late final TextEditingController _systemPrompt;
+  late final TextEditingController _contextMessages;
+  late _AIConfigFormState _ai;
 
   @override
   void initState() {
@@ -128,31 +262,34 @@ class _EditFormState extends State<_EditForm> {
     _systemPrompt = TextEditingController(
       text: widget.template.ai.systemPrompt,
     );
+    _contextMessages = TextEditingController(
+      text: widget.template.ai.contextMessages.toString(),
+    );
+    _ai = _AIConfigFormState.fromAi(widget.template.ai);
   }
 
   @override
   void dispose() {
     _name.dispose();
     _systemPrompt.dispose();
+    _contextMessages.dispose();
     super.dispose();
   }
 
   void _submit() {
     final name = _name.text.trim();
     if (name.isEmpty) return;
-    // TE1 sólo edita name + systemPrompt; los 6 campos restantes del
-    // AIConfig se conservan tal cual desde el template cargado. El bloc
-    // ya no reconstruye AIConfig (cambio TE3) — el caller construye el
-    // value object entero a partir del estado del form. Aquí, el form
-    // mínimo cambia un único campo y propaga el resto.
+    final contextMessages =
+        int.tryParse(_contextMessages.text.trim()) ??
+        widget.template.ai.contextMessages;
     final ai = AIConfig(
-      enabled: widget.template.ai.enabled,
-      provider: widget.template.ai.provider,
-      model: widget.template.ai.model,
-      temperature: widget.template.ai.temperature,
-      thinkingLevel: widget.template.ai.thinkingLevel,
+      enabled: _ai.enabled,
+      provider: _ai.provider,
+      model: _ai.model,
+      temperature: _ai.temperature,
+      thinkingLevel: _ai.thinkingLevel,
       systemPrompt: _systemPrompt.text,
-      contextMessages: widget.template.ai.contextMessages,
+      contextMessages: contextMessages,
     );
     context.read<TemplateEditBloc>().add(
       TemplateEditSubmitted(name: name, ai: ai),
@@ -161,6 +298,7 @@ class _EditFormState extends State<_EditForm> {
 
   @override
   Widget build(BuildContext context) {
+    final disabled = widget.submitting;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppTokens.sp6),
       child: Column(
@@ -171,7 +309,7 @@ class _EditFormState extends State<_EditForm> {
             label: 'Nombre de la plantilla',
             hint: 'Ej. Soporte ventas',
             controller: _name,
-            enabled: !widget.submitting,
+            enabled: !disabled,
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: AppTokens.sp4),
@@ -180,11 +318,57 @@ class _EditFormState extends State<_EditForm> {
             label: 'Instrucción del sistema',
             hint: 'Define el rol y el tono del asistente…',
             controller: _systemPrompt,
-            enabled: !widget.submitting,
+            enabled: !disabled,
             minLines: 4,
             maxLines: 12,
           ),
+          const SizedBox(height: AppTokens.sp6),
+          const _SectionHeader(label: 'Configuración IA'),
           const SizedBox(height: AppTokens.sp4),
+          _EnabledField(
+            value: _ai.enabled,
+            enabled: !disabled,
+            onChanged: (v) => setState(() => _ai = _ai.copyWith(enabled: v)),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          _ProviderField(
+            value: _ai.provider,
+            catalog: widget.catalog,
+            enabled: !disabled,
+            onChanged: (p) => setState(() => _ai = _ai.copyWith(provider: p)),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          _ModelField(
+            value: _ai.model,
+            provider: _ai.provider,
+            catalog: widget.catalog,
+            enabled: !disabled,
+            onChanged: (m) => setState(() => _ai = _ai.copyWith(model: m)),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          _TemperatureField(
+            value: _ai.temperature,
+            enabled: !disabled,
+            onChanged: (t) =>
+                setState(() => _ai = _ai.copyWith(temperature: t)),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          _ThinkingField(
+            value: _ai.thinkingLevel,
+            enabled: !disabled,
+            onChanged: (l) =>
+                setState(() => _ai = _ai.copyWith(thinkingLevel: l)),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          AppTextField(
+            key: const Key('template_edit.field.context_messages'),
+            label: 'Mensajes de contexto',
+            hint: 'Cuántos turnos previos enviar al modelo',
+            controller: _contextMessages,
+            enabled: !disabled,
+            textInputAction: TextInputAction.done,
+          ),
+          const SizedBox(height: AppTokens.sp6),
           AppButton.filled(
             key: const Key('template_edit.submit'),
             label: 'Guardar',
@@ -197,6 +381,264 @@ class _EditFormState extends State<_EditForm> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    style: Theme.of(
+      context,
+    ).textTheme.titleMedium?.copyWith(color: AppTokens.text1),
+  );
+}
+
+class _EnabledField extends StatelessWidget {
+  const _EnabledField({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Activar IA',
+                style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+              ),
+              const SizedBox(height: AppTokens.sp1),
+              Text(
+                'El operador decide si los bots con esta plantilla usan IA.',
+                style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+              ),
+            ],
+          ),
+        ),
+        Switch(
+          key: const Key('template_edit.field.enabled'),
+          value: value,
+          onChanged: enabled ? onChanged : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _ProviderField extends StatelessWidget {
+  const _ProviderField({
+    required this.value,
+    required this.catalog,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final AIProvider value;
+  final Catalog catalog;
+  final bool enabled;
+  final ValueChanged<AIProvider> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    // El catálogo expone providers como String del wire; el cliente los
+    // proyecta al enum cerrado AIProvider. Un provider del wire que no
+    // mapee a la enum se omite del dropdown (fail-loud futuro: si el
+    // backend agrega un provider antes que el cliente lo conozca, no
+    // aparece — el cliente debe actualizarse).
+    final items = <AIProvider>[];
+    for (final entry in catalog.providers) {
+      try {
+        items.add(AIProvider.fromWire(entry.provider));
+      } on ArgumentError {
+        // Provider del wire desconocido por el cliente.
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Proveedor',
+          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+        ),
+        const SizedBox(height: AppTokens.sp1),
+        DropdownButtonFormField<AIProvider>(
+          key: const Key('template_edit.field.provider'),
+          initialValue: items.contains(value) ? value : null,
+          onChanged: enabled
+              ? (v) {
+                  if (v != null) onChanged(v);
+                }
+              : null,
+          items: items
+              .map(
+                (p) => DropdownMenuItem<AIProvider>(
+                  value: p,
+                  child: Text(p.toWire()),
+                ),
+              )
+              .toList(growable: false),
+        ),
+      ],
+    );
+  }
+}
+
+class _ModelField extends StatelessWidget {
+  const _ModelField({
+    required this.value,
+    required this.provider,
+    required this.catalog,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String value;
+  final AIProvider provider;
+  final Catalog catalog;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final providerWire = provider.toWire();
+    final entry = catalog.providers.firstWhere(
+      (e) => e.provider == providerWire,
+      orElse: () => const ProviderEntry(
+        provider: '',
+        defaultModel: '',
+        models: <AIModel>[],
+      ),
+    );
+    final modelIds = entry.models.map((m) => m.id).toList(growable: false);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Modelo',
+          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+        ),
+        const SizedBox(height: AppTokens.sp1),
+        DropdownButtonFormField<String>(
+          key: const Key('template_edit.field.model'),
+          initialValue: modelIds.contains(value) ? value : null,
+          onChanged: enabled
+              ? (v) {
+                  if (v != null) onChanged(v);
+                }
+              : null,
+          items: modelIds
+              .map(
+                (id) => DropdownMenuItem<String>(value: id, child: Text(id)),
+              )
+              .toList(growable: false),
+        ),
+      ],
+    );
+  }
+}
+
+class _TemperatureField extends StatelessWidget {
+  const _TemperatureField({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final double value;
+  final bool enabled;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                'Temperatura',
+                style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+              ),
+            ),
+            Text(
+              value.toStringAsFixed(2),
+              style: textTheme.labelSmall?.copyWith(color: AppTokens.text1),
+            ),
+          ],
+        ),
+        Slider(
+          key: const Key('template_edit.field.temperature'),
+          value: value.clamp(0.0, 2.0),
+          min: 0.0,
+          max: 2.0,
+          divisions: 40,
+          onChanged: enabled ? onChanged : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _ThinkingField extends StatelessWidget {
+  const _ThinkingField({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final ThinkingLevel value;
+  final bool enabled;
+  final ValueChanged<ThinkingLevel> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Nivel de razonamiento',
+          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+        ),
+        const SizedBox(height: AppTokens.sp1),
+        DropdownButtonFormField<ThinkingLevel>(
+          key: const Key('template_edit.field.thinking'),
+          initialValue: value,
+          onChanged: enabled
+              ? (v) {
+                  if (v != null) onChanged(v);
+                }
+              : null,
+          items: ThinkingLevel.values
+              .map(
+                (l) => DropdownMenuItem<ThinkingLevel>(
+                  value: l,
+                  child: Text(l.toWire()),
+                ),
+              )
+              .toList(growable: false),
+        ),
+      ],
     );
   }
 }
