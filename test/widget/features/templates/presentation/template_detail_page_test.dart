@@ -12,6 +12,7 @@ import 'package:agentic/features/templates/domain/failures/templates_failure.dar
 import 'package:agentic/features/templates/presentation/bloc/template_detail_bloc.dart';
 import 'package:agentic/features/templates/presentation/bloc/var_defs_bloc.dart';
 import 'package:agentic/features/templates/presentation/pages/template_detail_page.dart';
+import 'package:agentic/features/templates/presentation/widgets/var_def_form_sheet.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -496,6 +497,70 @@ void main() {
         // del detail page no debe coexistir o el operador puede
         // dispararlo dos veces.
         expect(find.byKey(const Key('var_defs.add_button')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'tap "Agregar variable" abre el VarDefFormSheet (modal bottom sheet)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+        when(() => varDefsBloc.state).thenReturn(
+          const VarDefsLoaded(
+            <VariableDef>[
+              VariableDef(
+                id: 'v1',
+                name: 'nombre',
+                type: VarType.text,
+                defaultValue: 'cliente',
+                description: '',
+              ),
+            ],
+            2,
+          ),
+        );
+
+        await tester.pumpWidget(host());
+        await tester.tap(find.byKey(const Key('var_defs.add_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(VarDefFormSheet), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'MutationFailed muestra SnackBar con copy de "intenta recargar"',
+      (tester) async {
+        // El parent del sheet es quien muestra feedback de error — el
+        // sheet sigue montado para permitir reintento, pero el operador
+        // necesita verbalización del fallo. Genérico cubre los 3 buckets
+        // del 409 (duplicate / stale CAS / in-use) sin precisión que no
+        // tenemos.
+        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+        final controller = StreamController<VarDefsState>.broadcast();
+        addTearDown(controller.close);
+        whenListen<VarDefsState>(
+          varDefsBloc,
+          controller.stream,
+          initialState: const VarDefsLoaded(<VariableDef>[], 1),
+        );
+
+        await tester.pumpWidget(host());
+        controller.add(
+          const VarDefsMutationFailed(
+            <VariableDef>[],
+            1,
+            TemplatesConflictFailure(),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byType(SnackBar), findsOneWidget);
+        // Copy genérico: no se distingue duplicado/stale/in-use porque
+        // el backend conflación 409.
+        expect(
+          find.textContaining('plantilla cambió', findRichText: true),
+          findsOneWidget,
+        );
       },
     );
   });
