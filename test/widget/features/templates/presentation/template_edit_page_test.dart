@@ -10,6 +10,7 @@ import 'package:agentic/features/templates/presentation/bloc/template_edit_bloc.
 import 'package:agentic/features/templates/presentation/pages/template_edit_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -655,4 +656,72 @@ void main() {
       );
     },
   );
+
+  group('hardening: contextMessages numeric input', () {
+    Future<void> pumpReady(WidgetTester tester) async {
+      when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
+      await tester.pumpWidget(host());
+    }
+
+    testWidgets('el campo solicita teclado numérico (keyboardType: number)', (
+      tester,
+    ) async {
+      // Control suave: el SO muestra el teclado numérico. No bloquea paste
+      // ni teclado físico — la red de seguridad es el formatter (siguiente
+      // assert). Pero pedirlo es el primer eslabón: el operador típico no
+      // tropieza con teclas alfabéticas si nunca las ve.
+      await pumpReady(tester);
+      final field = tester.widget<AppTextField>(
+        find.byKey(const Key('template_edit.field.context_messages')),
+      );
+      expect(field.keyboardType, TextInputType.number);
+    });
+
+    testWidgets(
+      'el campo filtra letras con FilteringTextInputFormatter.digitsOnly',
+      (tester) async {
+        // Red de seguridad: aunque algún path entregue letras (paste,
+        // teclado físico, swipe-input), el formatter las descarta antes
+        // de tocar el controller. Antes de este hardening "abc" caía en
+        // el `int.tryParse(...) ?? widget.template.ai.contextMessages` y
+        // se tragaba silencioso al valor original — el operador no se
+        // enteraba de por qué su edición no se guardó.
+        await pumpReady(tester);
+
+        // Pre-condición: el campo viene pre-fillado con "20" del template.
+        expect(find.text('20'), findsOneWidget);
+
+        await tester.enterText(
+          find.byKey(const Key('template_edit.field.context_messages')),
+          'abc',
+        );
+        await tester.pump();
+
+        // El formatter rechaza "abc" entero: el controller queda vacío
+        // (no se mantiene el "20" anterior — `enterText` reemplaza el
+        // contenido entero, y el formatter filtra de "abc" → "").
+        expect(find.text('20'), findsNothing);
+        expect(find.text('abc'), findsNothing);
+      },
+    );
+
+    testWidgets('input mixto "1a2b3" deja sólo dígitos en el controller', (
+      tester,
+    ) async {
+      // Caso intermedio: el formatter no descarta toda la cadena, sino
+      // cada char no-dígito uno por uno. "1a2b3" llega como "123".
+      await pumpReady(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('template_edit.field.context_messages')),
+        '1a2b3',
+      );
+      await tester.pump();
+
+      expect(find.text('123'), findsOneWidget);
+    });
+  });
 }
