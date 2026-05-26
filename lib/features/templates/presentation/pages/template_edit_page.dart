@@ -308,6 +308,13 @@ class _EditFormState extends State<_EditForm> {
   bool get _isModelRetired =>
       catalogModel(widget.catalog, _ai.provider.toWire(), _ai.model) == null;
 
+  /// Modelo actual en el catálogo, o `null` si retirado/inexistente. Las
+  /// flags `supportsTemperature` y `supportsThinking` deciden qué controles
+  /// renderea el form — modelos como GPT-5 (razonamiento puro) rechazan
+  /// temperatura no-default; MiniMax/DeepSeek razonan nativos sin perilla.
+  AIModel? get _currentModel =>
+      catalogModel(widget.catalog, _ai.provider.toWire(), _ai.model);
+
   /// Cambia el provider del state y auto-selecciona el `defaultModel` del
   /// catálogo del nuevo provider. El modelo previo casi nunca existe en
   /// el catálogo del nuevo proveedor (IDs son específicos por vendor);
@@ -386,20 +393,29 @@ class _EditFormState extends State<_EditForm> {
                   'catálogo antes de guardar.',
             ),
           ],
-          const SizedBox(height: AppTokens.sp4),
-          _TemperatureField(
-            value: _ai.temperature,
-            enabled: !disabled,
-            onChanged: (t) =>
-                setState(() => _ai = _ai.copyWith(temperature: t)),
-          ),
-          const SizedBox(height: AppTokens.sp4),
-          _ThinkingField(
-            value: _ai.thinkingLevel,
-            enabled: !disabled,
-            onChanged: (l) =>
-                setState(() => _ai = _ai.copyWith(thinkingLevel: l)),
-          ),
+          // Visibility por flag del modelo actual: el slider/dropdown
+          // se ocultan si el modelo no soporta el parámetro. El valor
+          // del state se PRESERVA aunque el control esté escondido —
+          // volver a un modelo que sí lo soporta restaura la tuning
+          // del operador sin que tenga que re-introducirla.
+          if (_currentModel?.supportsTemperature ?? true) ...<Widget>[
+            const SizedBox(height: AppTokens.sp4),
+            _TemperatureField(
+              value: _ai.temperature,
+              enabled: !disabled,
+              onChanged: (t) =>
+                  setState(() => _ai = _ai.copyWith(temperature: t)),
+            ),
+          ],
+          if (_currentModel?.supportsThinking ?? true) ...<Widget>[
+            const SizedBox(height: AppTokens.sp4),
+            _ThinkingField(
+              value: _ai.thinkingLevel,
+              enabled: !disabled,
+              onChanged: (l) =>
+                  setState(() => _ai = _ai.copyWith(thinkingLevel: l)),
+            ),
+          ],
           const SizedBox(height: AppTokens.sp4),
           AppTextField(
             key: const Key('template_edit.field.context_messages'),
