@@ -19,6 +19,10 @@ const _defs = <VariableDef>[
 ];
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(VarType.text);
+  });
+
   late _MockRepo repo;
 
   setUp(() {

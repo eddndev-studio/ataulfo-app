@@ -256,6 +256,35 @@ class _VarDefsSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[for (final d in defs) _VarDefRow(def: d)],
         ),
+        // Durante una mutación seguimos mostrando el snapshot previo;
+        // el spinner overlay lo dispara el form (no esta sección).
+        VarDefsMutating(defs: final defs) when defs.isEmpty => Text(
+          'Esta plantilla aún no tiene variables.',
+          key: const Key('var_defs.empty'),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontStyle: FontStyle.italic,
+            color: AppTokens.text2,
+          ),
+        ),
+        VarDefsMutating(defs: final defs) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[for (final d in defs) _VarDefRow(def: d)],
+        ),
+        // MutationFailed mantiene la lista visible para no perder
+        // contexto del operador; el feedback de error lo gestiona el
+        // form que disparó la mutación (snackbar/inline).
+        VarDefsMutationFailed(defs: final defs) when defs.isEmpty => Text(
+          'Esta plantilla aún no tiene variables.',
+          key: const Key('var_defs.empty'),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontStyle: FontStyle.italic,
+            color: AppTokens.text2,
+          ),
+        ),
+        VarDefsMutationFailed(defs: final defs) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[for (final d in defs) _VarDefRow(def: d)],
+        ),
         VarDefsFailed() => const _VarDefsFailedView(),
       },
     );
