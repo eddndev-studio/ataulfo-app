@@ -19,12 +19,14 @@ void main() {
     ds = DioCatalogDatasource(dio);
   });
 
-  Response<Map<String, dynamic>> resp(int status, {Map<String, dynamic>? body}) =>
-      Response<Map<String, dynamic>>(
-        requestOptions: RequestOptions(path: '/ai/catalog'),
-        statusCode: status,
-        data: body,
-      );
+  Response<Map<String, dynamic>> resp(
+    int status, {
+    Map<String, dynamic>? body,
+  }) => Response<Map<String, dynamic>>(
+    requestOptions: RequestOptions(path: '/ai/catalog'),
+    statusCode: status,
+    data: body,
+  );
 
   DioException badResponse(int status) => DioException(
     requestOptions: RequestOptions(path: '/ai/catalog'),
@@ -92,7 +94,10 @@ void main() {
         ),
       );
 
-      await expectLater(() => ds.fetch(), throwsA(isA<CatalogTimeoutFailure>()));
+      await expectLater(
+        () => ds.fetch(),
+        throwsA(isA<CatalogTimeoutFailure>()),
+      );
     });
 
     test('sin conexión → CatalogNetworkFailure', () async {
@@ -103,7 +108,10 @@ void main() {
         ),
       );
 
-      await expectLater(() => ds.fetch(), throwsA(isA<CatalogNetworkFailure>()));
+      await expectLater(
+        () => ds.fetch(),
+        throwsA(isA<CatalogNetworkFailure>()),
+      );
     });
 
     test('403 → CatalogForbiddenFailure', () async {
@@ -143,7 +151,10 @@ void main() {
         () => dio.get<Map<String, dynamic>>('/ai/catalog'),
       ).thenThrow(badResponse(400));
 
-      await expectLater(() => ds.fetch(), throwsA(isA<UnknownCatalogFailure>()));
+      await expectLater(
+        () => ds.fetch(),
+        throwsA(isA<UnknownCatalogFailure>()),
+      );
     });
 
     test('body nulo → UnknownCatalogFailure', () async {
@@ -151,7 +162,10 @@ void main() {
         () => dio.get<Map<String, dynamic>>('/ai/catalog'),
       ).thenAnswer((_) async => resp(200, body: null));
 
-      await expectLater(() => ds.fetch(), throwsA(isA<UnknownCatalogFailure>()));
+      await expectLater(
+        () => ds.fetch(),
+        throwsA(isA<UnknownCatalogFailure>()),
+      );
     });
 
     test('body malformado (sin providers) → UnknownCatalogFailure', () async {
@@ -159,7 +173,10 @@ void main() {
         () => dio.get<Map<String, dynamic>>('/ai/catalog'),
       ).thenAnswer((_) async => resp(200, body: <String, dynamic>{}));
 
-      await expectLater(() => ds.fetch(), throwsA(isA<UnknownCatalogFailure>()));
+      await expectLater(
+        () => ds.fetch(),
+        throwsA(isA<UnknownCatalogFailure>()),
+      );
     });
 
     test('cancel → UnknownCatalogFailure', () async {
@@ -170,7 +187,10 @@ void main() {
         ),
       );
 
-      await expectLater(() => ds.fetch(), throwsA(isA<UnknownCatalogFailure>()));
+      await expectLater(
+        () => ds.fetch(),
+        throwsA(isA<UnknownCatalogFailure>()),
+      );
     });
   });
 }

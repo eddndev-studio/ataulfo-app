@@ -56,7 +56,8 @@ class ProviderEntry {
   }
 
   @override
-  int get hashCode => Object.hash(provider, defaultModel, Object.hashAll(models));
+  int get hashCode =>
+      Object.hash(provider, defaultModel, Object.hashAll(models));
 }
 
 /// Un modelo concreto del catálogo. Las dos flags de capacidad determinan
