@@ -336,4 +336,171 @@ void main() {
       );
     });
   });
+
+  group('VarDefsBloc.UpdateRequested', () {
+    const updatedDef = VariableDef(
+      id: 'v1',
+      name: 'nombre_x',
+      type: VarType.text,
+      defaultValue: 'cliente',
+      description: '',
+    );
+    const updatedDefs = <VariableDef>[updatedDef];
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'success: Mutating → Loading → Loaded con la lista refrescada',
+      build: () {
+        var listCalls = 0;
+        when(() => repo.listVarDefs('t1')).thenAnswer((_) async {
+          listCalls++;
+          return listCalls == 1
+              ? (version: 2, defs: _defs)
+              : (version: 3, defs: updatedDefs);
+        });
+        when(
+          () => repo.updateVarDef(
+            varDefId: 'v1',
+            version: 2,
+            name: 'nombre_x',
+            defaultValue: null,
+            description: null,
+          ),
+        ).thenAnswer((_) async {});
+        return VarDefsBloc(repo: repo, templateId: 't1')
+          ..add(const VarDefsLoadRequested());
+      },
+      act: (bloc) async {
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(
+          const VarDefsUpdateRequested(varDefId: 'v1', name: 'nombre_x'),
+        );
+      },
+      expect: () => const <VarDefsState>[
+        VarDefsLoaded(_defs, 2),
+        VarDefsMutating(_defs, 2),
+        VarDefsLoading(),
+        VarDefsLoaded(updatedDefs, 3),
+      ],
+      verify: (_) {
+        verify(
+          () => repo.updateVarDef(
+            varDefId: 'v1',
+            version: 2,
+            name: 'nombre_x',
+            defaultValue: null,
+            description: null,
+          ),
+        ).called(1);
+        verify(() => repo.listVarDefs('t1')).called(2);
+      },
+    );
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'failure 409 (rename in-use): Mutating → MutationFailed (snapshot intacto)',
+      build: () {
+        when(
+          () => repo.listVarDefs('t1'),
+        ).thenAnswer((_) async => (version: 2, defs: _defs));
+        when(
+          () => repo.updateVarDef(
+            varDefId: 'v1',
+            version: 2,
+            name: 'otro',
+            defaultValue: null,
+            description: null,
+          ),
+        ).thenAnswer(
+          (_) => Future<void>.error(const TemplatesConflictFailure()),
+        );
+        return VarDefsBloc(repo: repo, templateId: 't1')
+          ..add(const VarDefsLoadRequested());
+      },
+      act: (bloc) async {
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(
+          const VarDefsUpdateRequested(varDefId: 'v1', name: 'otro'),
+        );
+      },
+      expect: () => const <VarDefsState>[
+        VarDefsLoaded(_defs, 2),
+        VarDefsMutating(_defs, 2),
+        VarDefsMutationFailed(_defs, 2, TemplatesConflictFailure()),
+      ],
+    );
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'refetch falla tras update success: emit Failed (no enmascarar)',
+      build: () {
+        var listCalls = 0;
+        when(() => repo.listVarDefs('t1')).thenAnswer((_) async {
+          listCalls++;
+          if (listCalls == 1) return (version: 2, defs: _defs);
+          throw const TemplatesNetworkFailure();
+        });
+        when(
+          () => repo.updateVarDef(
+            varDefId: 'v1',
+            version: 2,
+            name: 'nombre_x',
+            defaultValue: null,
+            description: null,
+          ),
+        ).thenAnswer((_) async {});
+        return VarDefsBloc(repo: repo, templateId: 't1')
+          ..add(const VarDefsLoadRequested());
+      },
+      act: (bloc) async {
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(
+          const VarDefsUpdateRequested(varDefId: 'v1', name: 'nombre_x'),
+        );
+      },
+      expect: () => const <VarDefsState>[
+        VarDefsLoaded(_defs, 2),
+        VarDefsMutating(_defs, 2),
+        VarDefsLoading(),
+        VarDefsFailed(TemplatesNetworkFailure()),
+      ],
+    );
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'UpdateRequested desde Loading se ignora (no version para CAS)',
+      build: () => VarDefsBloc(repo: repo, templateId: 't1'),
+      act: (bloc) => bloc.add(
+        const VarDefsUpdateRequested(varDefId: 'v1', name: 'x'),
+      ),
+      expect: () => const <VarDefsState>[],
+      verify: (_) {
+        verifyNever(
+          () => repo.updateVarDef(
+            varDefId: any(named: 'varDefId'),
+            version: any(named: 'version'),
+            name: any(named: 'name'),
+            defaultValue: any(named: 'defaultValue'),
+            description: any(named: 'description'),
+          ),
+        );
+      },
+    );
+
+    test('equality de VarDefsUpdateRequested', () {
+      expect(
+        const VarDefsUpdateRequested(varDefId: 'v1', name: 'x'),
+        equals(const VarDefsUpdateRequested(varDefId: 'v1', name: 'x')),
+      );
+      expect(
+        const VarDefsUpdateRequested(varDefId: 'v1', name: 'x'),
+        isNot(
+          equals(const VarDefsUpdateRequested(varDefId: 'v2', name: 'x')),
+        ),
+      );
+      expect(
+        const VarDefsUpdateRequested(varDefId: 'v1', defaultValue: ''),
+        isNot(
+          // null vs '' debe ser distinguible (clear vs no-op).
+          equals(const VarDefsUpdateRequested(varDefId: 'v1')),
+        ),
+      );
+    });
+  });
 }
