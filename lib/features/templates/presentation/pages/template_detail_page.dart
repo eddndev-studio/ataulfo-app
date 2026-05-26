@@ -244,49 +244,61 @@ class _VarDefsSection extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
-        VarDefsLoaded(defs: final defs) when defs.isEmpty => Text(
-          'Esta plantilla aún no tiene variables.',
-          key: const Key('var_defs.empty'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontStyle: FontStyle.italic,
-            color: AppTokens.text2,
-          ),
-        ),
-        VarDefsLoaded(defs: final defs) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[for (final d in defs) _VarDefRow(def: d)],
+        VarDefsLoaded(defs: final defs) => _VarDefsList(
+          defs: defs,
+          showAddButton: true,
         ),
         // Durante una mutación seguimos mostrando el snapshot previo;
-        // el spinner overlay lo dispara el form (no esta sección).
-        VarDefsMutating(defs: final defs) when defs.isEmpty => Text(
-          'Esta plantilla aún no tiene variables.',
-          key: const Key('var_defs.empty'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontStyle: FontStyle.italic,
-            color: AppTokens.text2,
-          ),
+        // el botón de Agregar se oculta para no permitir doble dispatch
+        // mientras el sheet ya está abierto con su propio submit.
+        VarDefsMutating(defs: final defs) => _VarDefsList(
+          defs: defs,
+          showAddButton: false,
         ),
-        VarDefsMutating(defs: final defs) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[for (final d in defs) _VarDefRow(def: d)],
-        ),
-        // MutationFailed mantiene la lista visible para no perder
-        // contexto del operador; el feedback de error lo gestiona el
-        // form que disparó la mutación (snackbar/inline).
-        VarDefsMutationFailed(defs: final defs) when defs.isEmpty => Text(
-          'Esta plantilla aún no tiene variables.',
-          key: const Key('var_defs.empty'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontStyle: FontStyle.italic,
-            color: AppTokens.text2,
-          ),
-        ),
-        VarDefsMutationFailed(defs: final defs) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[for (final d in defs) _VarDefRow(def: d)],
+        // MutationFailed: lista intacta y botón visible para reintentar.
+        VarDefsMutationFailed(defs: final defs) => _VarDefsList(
+          defs: defs,
+          showAddButton: true,
         ),
         VarDefsFailed() => const _VarDefsFailedView(),
       },
+    );
+  }
+}
+
+class _VarDefsList extends StatelessWidget {
+  const _VarDefsList({required this.defs, required this.showAddButton});
+
+  final List<VariableDef> defs;
+  final bool showAddButton;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = defs.isEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (empty)
+          Text(
+            'Esta plantilla aún no tiene variables.',
+            key: const Key('var_defs.empty'),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppTokens.text2,
+            ),
+          )
+        else
+          for (final d in defs) _VarDefRow(def: d),
+        if (showAddButton) ...<Widget>[
+          const SizedBox(height: AppTokens.sp3),
+          AppButton.text(
+            key: const Key('var_defs.add_button'),
+            label: 'Agregar variable',
+            icon: Icons.add,
+            onPressed: () {},
+          ),
+        ],
+      ],
     );
   }
 }
