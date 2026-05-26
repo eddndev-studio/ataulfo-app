@@ -22,7 +22,7 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
     emit(const CatalogLoading());
     try {
       final catalog = await _repo.fetch();
-      emit(CatalogLoaded(catalog));
+      emit(CatalogLoaded(catalog: catalog));
     } on CatalogFailure catch (f) {
       emit(CatalogFailed(f));
     }
@@ -67,7 +67,7 @@ class CatalogLoading extends CatalogState {
 }
 
 class CatalogLoaded extends CatalogState {
-  const CatalogLoaded(this.catalog);
+  const CatalogLoaded({required this.catalog});
 
   final Catalog catalog;
 

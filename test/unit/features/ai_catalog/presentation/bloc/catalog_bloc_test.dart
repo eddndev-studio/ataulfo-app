@@ -46,7 +46,7 @@ void main() {
         act: (bloc) => bloc.add(const CatalogLoadRequested()),
         expect: () => const <CatalogState>[
           CatalogLoading(),
-          CatalogLoaded(_catalog),
+          CatalogLoaded(catalog: _catalog),
         ],
       );
 
@@ -95,7 +95,7 @@ void main() {
         act: (bloc) => bloc.add(const CatalogLoadRequested()),
         expect: () => const <CatalogState>[
           CatalogLoading(),
-          CatalogLoaded(_catalog),
+          CatalogLoaded(catalog: _catalog),
         ],
       );
     });
