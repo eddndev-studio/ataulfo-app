@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../ai_catalog/domain/catalog_drift.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
 import '../../../ai_catalog/domain/failures/catalog_failure.dart';
 import '../../../ai_catalog/presentation/bloc/catalog_bloc.dart';
@@ -279,6 +280,11 @@ class _EditFormState extends State<_EditForm> {
   void _submit() {
     final name = _name.text.trim();
     if (name.isEmpty) return;
+    // Submit gate: si el provider o modelo seleccionados no están en
+    // el catálogo (drift por release del backend), bloqueamos en
+    // cliente con copy visible (no se llega a este branch porque el
+    // botón también va deshabilitado). Defensa en profundidad.
+    if (_isProviderRetired || _isModelRetired) return;
     final contextMessages =
         int.tryParse(_contextMessages.text.trim()) ??
         widget.template.ai.contextMessages;
@@ -294,6 +300,23 @@ class _EditFormState extends State<_EditForm> {
     context.read<TemplateEditBloc>().add(
       TemplateEditSubmitted(name: name, ai: ai),
     );
+  }
+
+  bool get _isProviderRetired =>
+      catalogProvider(widget.catalog, _ai.provider.toWire()) == null;
+
+  bool get _isModelRetired =>
+      catalogModel(widget.catalog, _ai.provider.toWire(), _ai.model) == null;
+
+  /// Cambia el provider del state y auto-selecciona el `defaultModel` del
+  /// catálogo del nuevo provider. El modelo previo casi nunca existe en
+  /// el catálogo del nuevo proveedor (IDs son específicos por vendor);
+  /// dejarlo apuntando al modelo viejo lo marcaría como "Retirado" tras
+  /// un cambio voluntario, que confunde la causa raíz.
+  void _changeProvider(AIProvider next) {
+    final entry = catalogProvider(widget.catalog, next.toWire());
+    final nextModel = entry?.defaultModel ?? _ai.model;
+    setState(() => _ai = _ai.copyWith(provider: next, model: nextModel));
   }
 
   @override
@@ -335,8 +358,17 @@ class _EditFormState extends State<_EditForm> {
             value: _ai.provider,
             catalog: widget.catalog,
             enabled: !disabled,
-            onChanged: (p) => setState(() => _ai = _ai.copyWith(provider: p)),
+            onChanged: _changeProvider,
           ),
+          if (_isProviderRetired) ...<Widget>[
+            const SizedBox(height: AppTokens.sp2),
+            const _DriftWarning(
+              keyValue: 'template_edit.drift.provider_retired',
+              copy:
+                  'El proveedor guardado ya no está disponible. Elige uno '
+                  'del catálogo antes de guardar.',
+            ),
+          ],
           const SizedBox(height: AppTokens.sp4),
           _ModelField(
             value: _ai.model,
@@ -345,6 +377,15 @@ class _EditFormState extends State<_EditForm> {
             enabled: !disabled,
             onChanged: (m) => setState(() => _ai = _ai.copyWith(model: m)),
           ),
+          if (!_isProviderRetired && _isModelRetired) ...<Widget>[
+            const SizedBox(height: AppTokens.sp2),
+            const _DriftWarning(
+              keyValue: 'template_edit.drift.model_retired',
+              copy:
+                  'El modelo guardado ya no está disponible. Elige uno del '
+                  'catálogo antes de guardar.',
+            ),
+          ],
           const SizedBox(height: AppTokens.sp4),
           _TemperatureField(
             value: _ai.temperature,
@@ -372,7 +413,11 @@ class _EditFormState extends State<_EditForm> {
           AppButton.filled(
             key: const Key('template_edit.submit'),
             label: 'Guardar',
-            onPressed: _submit,
+            // Submit gate ante drift: el operador NO puede subir un
+            // template con provider/modelo retirado del catálogo. El
+            // backend probablemente lo rechazaría con 422, pero
+            // bloquearlo en cliente con copy específico es mejor UX.
+            onPressed: (_isProviderRetired || _isModelRetired) ? null : _submit,
             loading: widget.submitting,
           ),
           if (widget.submitFailure != null) ...<Widget>[
@@ -519,15 +564,25 @@ class _ModelField extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final providerWire = provider.toWire();
-    final entry = catalog.providers.firstWhere(
-      (e) => e.provider == providerWire,
-      orElse: () => const ProviderEntry(
-        provider: '',
-        defaultModel: '',
-        models: <AIModel>[],
+    final entry = catalogProvider(catalog, providerWire);
+    final modelIds = entry?.models.map((m) => m.id).toList(growable: false) ??
+        const <String>[];
+    // Si el modelo actual no está en el catálogo (drift), lo añadimos
+    // como item disabled con label "Retirado:" para que el dropdown
+    // pueda renderearse con el value actual. El warning visible vive
+    // afuera del dropdown.
+    final retired = !modelIds.contains(value) && value.isNotEmpty;
+    final items = <DropdownMenuItem<String>>[
+      if (retired)
+        DropdownMenuItem<String>(
+          value: value,
+          enabled: false,
+          child: Text('Retirado: $value'),
+        ),
+      ...modelIds.map(
+        (id) => DropdownMenuItem<String>(value: id, child: Text(id)),
       ),
-    );
-    final modelIds = entry.models.map((m) => m.id).toList(growable: false);
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -538,19 +593,33 @@ class _ModelField extends StatelessWidget {
         const SizedBox(height: AppTokens.sp1),
         DropdownButtonFormField<String>(
           key: const Key('template_edit.field.model'),
-          initialValue: modelIds.contains(value) ? value : null,
+          initialValue: items.any((m) => m.value == value) ? value : null,
           onChanged: enabled
               ? (v) {
                   if (v != null) onChanged(v);
                 }
               : null,
-          items: modelIds
-              .map(
-                (id) => DropdownMenuItem<String>(value: id, child: Text(id)),
-              )
-              .toList(growable: false),
+          items: items,
         ),
       ],
+    );
+  }
+}
+
+class _DriftWarning extends StatelessWidget {
+  const _DriftWarning({required this.keyValue, required this.copy});
+
+  final String keyValue;
+  final String copy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      copy,
+      key: Key(keyValue),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: AppTokens.danger,
+      ),
     );
   }
 }
