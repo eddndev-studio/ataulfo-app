@@ -409,6 +409,54 @@ void main() {
       ),
     );
 
+    const tplWithRetiredProvider = Template(
+      id: 't1',
+      orgId: 'o1',
+      name: 'Soporte',
+      version: 1,
+      ai: AIConfig(
+        enabled: true,
+        // MINIMAX no está en _catalog (sólo GEMINI + OPENAI).
+        provider: AIProvider.minimax,
+        model: 'MiniMax-M2.7',
+        temperature: 0.5,
+        thinkingLevel: ThinkingLevel.low,
+        systemPrompt: 'Prompt.',
+        contextMessages: 20,
+      ),
+    );
+
+    testWidgets(
+      'provider retirado muestra warning específico + deshabilita submit',
+      (tester) async {
+        // El backend bajó MINIMAX del catálogo entre releases del cliente.
+        // El enum AIProvider sigue conociéndolo (fromWire sigue mapeando),
+        // así que el Template carga; pero el editor debe bloquear el
+        // submit y guiar al operador a elegir un provider disponible.
+        when(
+          () => editBloc.state,
+        ).thenReturn(const TemplateEditEditing(tplWithRetiredProvider));
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('template_edit.drift.provider_retired')),
+          findsOneWidget,
+        );
+
+        await tester.ensureVisible(
+          find.byKey(const Key('template_edit.submit')),
+        );
+        await tester.tap(find.byKey(const Key('template_edit.submit')));
+        await tester.pump();
+
+        verifyNever(() => editBloc.add(any()));
+      },
+    );
+
     testWidgets('modelo retirado muestra badge "Retirado" + warning visible', (
       tester,
     ) async {
@@ -475,6 +523,13 @@ void main() {
 
         // Post-condición: modelo cambió al defaultModel de OPENAI.
         expect(find.text('gpt-5.5'), findsOneWidget);
+        // Y el slider de temperature desaparece — gpt-5.5 lo rechaza.
+        // El value sigue vivo en _ai.temperature; si el operador vuelve
+        // a Gemini, reaparece con la tuning original.
+        expect(
+          find.byKey(const Key('template_edit.field.temperature')),
+          findsNothing,
+        );
       },
     );
   });
