@@ -112,6 +112,52 @@ void main() {
     });
   });
 
+  group('TemplatesRepositoryImpl.update (delegate trivial)', () {
+    test(
+      'forwarda los named args y devuelve el Template del datasource',
+      () async {
+        when(
+          () => ds.update(
+            id: 't1',
+            name: 'Soporte v2',
+            version: 1,
+            ai: tpl.ai,
+          ),
+        ).thenAnswer((_) async => tpl);
+
+        final got = await repo.update(
+          id: 't1',
+          name: 'Soporte v2',
+          version: 1,
+          ai: tpl.ai,
+        );
+
+        expect(got, tpl);
+        verify(
+          () => ds.update(
+            id: 't1',
+            name: 'Soporte v2',
+            version: 1,
+            ai: tpl.ai,
+          ),
+        ).called(1);
+      },
+    );
+
+    test('propaga TemplatesConflictFailure (CAS) sin envolver', () async {
+      when(
+        () => ds.update(id: 't1', name: 'x', version: 99, ai: null),
+      ).thenAnswer(
+        (_) => Future<Template>.error(const TemplatesConflictFailure()),
+      );
+
+      await expectLater(
+        () => repo.update(id: 't1', name: 'x', version: 99, ai: null),
+        throwsA(isA<TemplatesConflictFailure>()),
+      );
+    });
+  });
+
   group('TemplatesRepositoryImpl.byId (delegate trivial)', () {
     test('forwarda el id y devuelve el Template del datasource', () async {
       when(() => ds.byId('t1')).thenAnswer((_) async => tpl);
