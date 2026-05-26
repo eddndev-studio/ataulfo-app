@@ -21,6 +21,8 @@ class AppTextField extends StatelessWidget {
     this.autofocus = false,
     this.textInputAction,
     this.onSubmitted,
+    this.minLines,
+    this.maxLines = 1,
   });
 
   final String label;
@@ -30,6 +32,16 @@ class AppTextField extends StatelessWidget {
   final bool autofocus;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+
+  /// Línea mínima visible (alinea con el contrato de `TextField.minLines`).
+  /// `null` ⇒ se ajusta a `maxLines`. Útil con `maxLines > 1` para campos
+  /// que crecen con el contenido pero arrancan ocupando varias líneas.
+  final int? minLines;
+
+  /// Líneas máximas visibles. `1` ⇒ single-line clásico (default). Mayor a 1
+  /// ⇒ multiline (systemPrompt y similares). `null` ⇒ ilimitado (raro;
+  /// preferir un valor explícito para que el layout sea predecible).
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +71,8 @@ class AppTextField extends StatelessWidget {
           autofocus: autofocus,
           textInputAction: textInputAction,
           onSubmitted: onSubmitted,
+          minLines: minLines,
+          maxLines: maxLines,
           style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
           decoration: InputDecoration(
             hintText: hint,
