@@ -18,6 +18,8 @@ void main() {
         TemplatesForbiddenFailure(),
         TemplatesNotFoundFailure(),
         TemplatesInvalidNameFailure(),
+        TemplatesInvalidUpdateFailure(),
+        TemplatesConflictFailure(),
         TemplatesServerFailure(),
         UnknownTemplatesFailure(),
       ];
@@ -26,6 +28,22 @@ void main() {
         expect(f, isA<TemplatesFailure>());
         expect(f, isA<Exception>());
       }
+    });
+
+    test('cada variante es su propio tipo (no se cruzan en isA)', () {
+      // Endurece la separación de cubos: un bug que mapeara 409 a 422 (o
+      // viceversa) en el datasource pasaría el test del listado pero no
+      // este — los dos failures comparten sealed pero deben permanecer
+      // distinguibles en el switch del bloc.
+      const conflict = TemplatesConflictFailure();
+      const invalidUpdate = TemplatesInvalidUpdateFailure();
+      const invalidName = TemplatesInvalidNameFailure();
+
+      expect(conflict, isA<TemplatesConflictFailure>());
+      expect(conflict, isNot(isA<TemplatesInvalidUpdateFailure>()));
+      expect(invalidUpdate, isA<TemplatesInvalidUpdateFailure>());
+      expect(invalidUpdate, isNot(isA<TemplatesInvalidNameFailure>()));
+      expect(invalidName, isNot(isA<TemplatesInvalidUpdateFailure>()));
     });
   });
 }
