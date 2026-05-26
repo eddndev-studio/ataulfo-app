@@ -564,6 +564,133 @@ void main() {
     );
 
     testWidgets(
+      'cada row expone un trash icon con key contractual',
+      (tester) async {
+        const defs = <VariableDef>[
+          VariableDef(
+            id: 'v1',
+            name: 'nombre',
+            type: VarType.text,
+            defaultValue: '',
+            description: '',
+          ),
+          VariableDef(
+            id: 'v2',
+            name: 'edad',
+            type: VarType.text,
+            defaultValue: '',
+            description: '',
+          ),
+        ];
+        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('var_defs.row.v1.delete')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('var_defs.row.v2.delete')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'tap trash icon abre confirm dialog (no dispatch inmediato)',
+      (tester) async {
+        const defs = <VariableDef>[
+          VariableDef(
+            id: 'v1',
+            name: 'nombre',
+            type: VarType.text,
+            defaultValue: '',
+            description: '',
+          ),
+        ];
+        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
+
+        await tester.pumpWidget(host());
+        await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
+        await tester.pumpAndSettle();
+
+        // Confirm dialog visible — operador debe confirmar la acción
+        // destructiva. Key contractual del dialog.
+        expect(
+          find.byKey(const Key('var_defs.delete_confirm')),
+          findsOneWidget,
+        );
+        // No se dispatchó nada todavía.
+        verifyNever(() => varDefsBloc.add(any()));
+      },
+    );
+
+    testWidgets(
+      'tap Cancelar en confirm dialog: no dispatcha, cierra el dialog',
+      (tester) async {
+        const defs = <VariableDef>[
+          VariableDef(
+            id: 'v1',
+            name: 'nombre',
+            type: VarType.text,
+            defaultValue: '',
+            description: '',
+          ),
+        ];
+        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
+
+        await tester.pumpWidget(host());
+        await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancelar'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('var_defs.delete_confirm')),
+          findsNothing,
+        );
+        verifyNever(() => varDefsBloc.add(any()));
+      },
+    );
+
+    testWidgets(
+      'tap Eliminar en confirm dialog: dispatcha VarDefsDeleteRequested + cierra',
+      (tester) async {
+        const defs = <VariableDef>[
+          VariableDef(
+            id: 'v1',
+            name: 'nombre',
+            type: VarType.text,
+            defaultValue: '',
+            description: '',
+          ),
+        ];
+        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
+
+        await tester.pumpWidget(host());
+        await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Eliminar'));
+        await tester.pumpAndSettle();
+
+        verify(
+          () => varDefsBloc.add(
+            const VarDefsDeleteRequested(varDefId: 'v1'),
+          ),
+        ).called(1);
+        expect(
+          find.byKey(const Key('var_defs.delete_confirm')),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
       'MutationFailed muestra SnackBar con copy de "intenta recargar"',
       (tester) async {
         // El parent del sheet es quien muestra feedback de error — el
