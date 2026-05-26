@@ -18,6 +18,7 @@ import 'package:agentic/features/templates/domain/repositories/templates_reposit
 import 'package:agentic/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:agentic/features/templates/presentation/pages/template_create_page.dart';
 import 'package:agentic/features/templates/presentation/pages/template_detail_page.dart';
+import 'package:agentic/features/templates/presentation/pages/template_edit_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -429,6 +430,62 @@ void main() {
       verify(membershipsRepo.list).called(1);
     },
   );
+
+  testWidgets(
+    'AuthAuthenticated → /templates/:id/edit monta TemplateEditPage y carga',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      when(() => templatesRepo.byId('t1')).thenAnswer(
+        (_) async => const Template(
+          id: 't1',
+          orgId: 'o1',
+          name: 'Soporte',
+          version: 1,
+          ai: AIConfig(
+            enabled: false,
+            provider: AIProvider.gemini,
+            model: 'gemini-3.1-pro-preview',
+            temperature: 0.7,
+            thinkingLevel: ThinkingLevel.low,
+            systemPrompt: '',
+            contextMessages: 20,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      // /templates/:id/edit DEBE declararse antes que /templates/:id en
+      // el router para que `:id` no capture "new" o "edit" como id
+      // literal (mismo orden contractual que /templates/new).
+      router.router.go('/templates/t1/edit');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TemplateEditPage), findsOneWidget);
+      verify(() => templatesRepo.byId('t1')).called(1);
+    },
+  );
+
+  testWidgets('AuthUnauthenticated + deep-link a /templates/:id/edit → /login', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+    router = AppRouter(
+      authBloc: authBloc,
+      authRepository: _MockAuthRepo(),
+      botsRepository: botsRepo,
+      templatesRepository: templatesRepo,
+      membershipsRepository: membershipsRepo,
+    );
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/templates/t1/edit');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(TemplateEditPage), findsNothing);
+  });
 
   testWidgets('AuthUnauthenticated + deep-link a /memberships → /login', (
     tester,
