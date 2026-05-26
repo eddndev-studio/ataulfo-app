@@ -465,6 +465,72 @@ void main() {
   });
 
   testWidgets(
+    'tap Guardar dispatchea TemplateEditSubmitted con AIConfig editado',
+    (tester) async {
+      // Recorre el happy path completo del editor: el operador toca
+      // varios campos (name, systemPrompt, provider con auto-switch del
+      // modelo, contextMessages) y verifica que el AIConfig dispatchado
+      // refleja TODO el estado editado, no sólo lo cosmético del form.
+      when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+      await tester.pumpWidget(host());
+
+      await tester.enterText(
+        find.byKey(const Key('template_edit.field.name')),
+        'Soporte v2',
+      );
+      await tester.enterText(
+        find.byKey(const Key('template_edit.field.system_prompt')),
+        'Nuevo prompt.',
+      );
+
+      // Cambio de provider gemini → openai dispara auto-switch del
+      // modelo al defaultModel de OPENAI (gpt-5.5). Hacerlo antes del
+      // resto evita que el form crezca/decrezca por la visibility de
+      // los flags del nuevo modelo mientras tapeamos.
+      await tester.ensureVisible(
+        find.byKey(const Key('template_edit.field.provider')),
+      );
+      await tester.tap(find.byKey(const Key('template_edit.field.provider')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OPENAI').last);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('template_edit.field.context_messages')),
+      );
+      await tester.enterText(
+        find.byKey(const Key('template_edit.field.context_messages')),
+        '30',
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('template_edit.submit')));
+      await tester.tap(find.byKey(const Key('template_edit.submit')));
+      await tester.pump();
+
+      verify(
+        () => editBloc.add(
+          TemplateEditSubmitted(
+            name: 'Soporte v2',
+            ai: AIConfig(
+              enabled: _tpl.ai.enabled, // toggle no tocado
+              provider: AIProvider.openai, // cambiado por el operador
+              model: 'gpt-5.5', // auto-switch a defaultModel
+              temperature: _tpl.ai.temperature, // preservado aunque oculto
+              thinkingLevel: _tpl.ai.thinkingLevel,
+              systemPrompt: 'Nuevo prompt.',
+              contextMessages: 30,
+            ),
+          ),
+        ),
+      ).called(1);
+    },
+  );
+
+  testWidgets(
     'Succeeded apila el detalle por pushReplacement (form ya cumplió)',
     (tester) async {
       whenListen(
