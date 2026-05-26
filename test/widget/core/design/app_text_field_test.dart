@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:agentic/core/design/app_design_theme.dart';
@@ -93,6 +94,65 @@ void main() {
       final inner = tester.widget<TextField>(find.byType(TextField));
       expect(inner.enabled, false);
     });
+
+    testWidgets('keyboardType se propaga al TextField interno', (tester) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'X',
+          hint: 'h',
+          controller: TextEditingController(),
+          keyboardType: TextInputType.number,
+        ),
+      );
+      final inner = tester.widget<TextField>(find.byType(TextField));
+      expect(inner.keyboardType, TextInputType.number);
+    });
+
+    testWidgets('inputFormatters se propagan al TextField interno', (
+      tester,
+    ) async {
+      final formatters = <TextInputFormatter>[
+        FilteringTextInputFormatter.digitsOnly,
+      ];
+      await pump(
+        tester,
+        AppTextField(
+          label: 'X',
+          hint: 'h',
+          controller: TextEditingController(),
+          inputFormatters: formatters,
+        ),
+      );
+      final inner = tester.widget<TextField>(find.byType(TextField));
+      expect(inner.inputFormatters, formatters);
+    });
+
+    testWidgets(
+      'digitsOnly formatter filtra letras y deja sólo dígitos en el controller',
+      (tester) async {
+        // Verificación end-to-end del contrato: aunque el envío del teclado
+        // virtual incluya letras, el formatter las descarta antes de que
+        // lleguen al controller. La página que pone `keyboardType: number`
+        // ya bloquea visualmente, pero el formatter es la red de seguridad
+        // ante teclado físico, paste, o métodos de input alternos.
+        final c = TextEditingController();
+        await pump(
+          tester,
+          AppTextField(
+            label: 'X',
+            hint: 'h',
+            controller: c,
+            keyboardType: TextInputType.number,
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly,
+            ],
+          ),
+        );
+        await tester.enterText(find.byType(TextField), 'abc42');
+        expect(c.text, '42');
+      },
+    );
   });
 
   group('AppTextField — estilo del field', () {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -425,6 +426,15 @@ class _EditFormState extends State<_EditForm> {
             controller: _contextMessages,
             enabled: !disabled,
             textInputAction: TextInputAction.done,
+            // Teclado numérico (control suave) + formatter digits-only (red
+            // de seguridad ante paste, teclado físico o swipe-input). Sin
+            // esto, el `int.tryParse(...) ?? template.ai.contextMessages`
+            // del submit se tragaba input no numérico al valor original y
+            // el operador no entendía por qué no se guardó su edición.
+            keyboardType: TextInputType.number,
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly,
+            ],
           ),
           const SizedBox(height: AppTokens.sp6),
           AppButton.filled(

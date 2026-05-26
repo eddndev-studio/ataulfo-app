@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../tokens.dart';
 
@@ -23,6 +24,8 @@ class AppTextField extends StatelessWidget {
     this.onSubmitted,
     this.minLines,
     this.maxLines = 1,
+    this.keyboardType,
+    this.inputFormatters,
   });
 
   final String label;
@@ -42,6 +45,16 @@ class AppTextField extends StatelessWidget {
   /// ⇒ multiline (systemPrompt y similares). `null` ⇒ ilimitado (raro;
   /// preferir un valor explícito para que el layout sea predecible).
   final int? maxLines;
+
+  /// Tipo de teclado virtual que se solicita al sistema operativo. `null`
+  /// usa el default del platform (texto). `TextInputType.number` muestra el
+  /// teclado numérico — control suave, no impide pegado ni teclado físico.
+  final TextInputType? keyboardType;
+
+  /// Formatters aplicados al input antes de propagar al controller. Son la
+  /// red de seguridad de validación (ej. `digitsOnly`), independiente del
+  /// teclado solicitado.
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +86,8 @@ class AppTextField extends StatelessWidget {
           onSubmitted: onSubmitted,
           minLines: minLines,
           maxLines: maxLines,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
           decoration: InputDecoration(
             hintText: hint,
