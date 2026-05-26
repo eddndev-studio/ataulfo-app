@@ -274,6 +274,93 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsAtLeastNWidgets(1));
   });
 
+  group('drift: modelo o provider retirado entre releases', () {
+    const tplWithRetiredModel = Template(
+      id: 't1',
+      orgId: 'o1',
+      name: 'Soporte',
+      version: 1,
+      ai: AIConfig(
+        enabled: true,
+        provider: AIProvider.gemini,
+        model: 'gemini-2.0-pro-retirado',
+        temperature: 0.7,
+        thinkingLevel: ThinkingLevel.low,
+        systemPrompt: 'Prompt.',
+        contextMessages: 20,
+      ),
+    );
+
+    testWidgets('modelo retirado muestra badge "Retirado" + warning visible', (
+      tester,
+    ) async {
+      // El template guardado refiere a un modelo que el backend retiró
+      // del catálogo entre releases. El editor debe marcarlo visible
+      // para que el operador entienda por qué no puede guardar tal cual.
+      when(
+        () => editBloc.state,
+      ).thenReturn(const TemplateEditEditing(tplWithRetiredModel));
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('template_edit.drift.model_retired')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('modelo retirado deshabilita el submit (no se puede guardar)', (
+      tester,
+    ) async {
+      // Submit gate: dejar que el operador suba un modelo retirado le
+      // ahorra el 422 del backend pero pierde contexto sobre el porqué.
+      // Mejor bloquearlo en cliente con copy claro.
+      when(
+        () => editBloc.state,
+      ).thenReturn(const TemplateEditEditing(tplWithRetiredModel));
+      when(
+        () => catalogBloc.state,
+      ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('template_edit.submit')));
+      await tester.pump();
+
+      verifyNever(() => editBloc.add(any()));
+    });
+
+    testWidgets(
+      'cambio de provider auto-selecciona defaultModel del nuevo provider',
+      (tester) async {
+        // UX: cuando el operador cambia provider (Gemini → OpenAI), el
+        // modelo actual probablemente no existe en el nuevo catálogo.
+        // Auto-seleccionar el defaultModel del nuevo provider es lo
+        // más usable (vs. dejar el modelo en estado "Retirado" después
+        // de un cambio voluntario, que confunde la causa).
+        when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+        await tester.pumpWidget(host());
+
+        // Pre-condición: modelo actual es de Gemini.
+        expect(find.text('gemini-3.1-pro-preview'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('template_edit.field.provider')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('OPENAI').last);
+        await tester.pumpAndSettle();
+
+        // Post-condición: modelo cambió al defaultModel de OPENAI.
+        expect(find.text('gpt-5.5'), findsOneWidget);
+      },
+    );
+  });
+
   testWidgets(
     'Succeeded apila el detalle por pushReplacement (form ya cumplió)',
     (tester) async {
