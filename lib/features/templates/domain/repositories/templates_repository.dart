@@ -64,4 +64,14 @@ abstract interface class TemplatesRepository {
     String? defaultValue,
     String? description,
   });
+
+  /// Elimina una variable-definition (DELETE /variable-definitions/:id
+  /// con CAS sobre el Template padre). 409 incluye in-use (algún bot
+  /// tiene un valor asignado a esta variable — el dominio la trata
+  /// como inmutable). 404 si la def no existe. El backend devuelve
+  /// 204 sin body.
+  Future<void> removeVarDef({
+    required String varDefId,
+    required int version,
+  });
 }

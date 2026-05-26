@@ -292,4 +292,27 @@ void main() {
       );
     });
   });
+
+  group('TemplatesRepositoryImpl.removeVarDef (delegate trivial)', () {
+    test('forwarda named args al datasource', () async {
+      when(
+        () => ds.removeVarDef(varDefId: 'vd_x', version: 3),
+      ).thenAnswer((_) async {});
+
+      await repo.removeVarDef(varDefId: 'vd_x', version: 3);
+
+      verify(() => ds.removeVarDef(varDefId: 'vd_x', version: 3)).called(1);
+    });
+
+    test('propaga TemplatesConflictFailure (in-use) sin envolver', () async {
+      when(
+        () => ds.removeVarDef(varDefId: 'vd_x', version: 1),
+      ).thenAnswer((_) => Future<void>.error(const TemplatesConflictFailure()));
+
+      await expectLater(
+        () => repo.removeVarDef(varDefId: 'vd_x', version: 1),
+        throwsA(isA<TemplatesConflictFailure>()),
+      );
+    });
+  });
 }

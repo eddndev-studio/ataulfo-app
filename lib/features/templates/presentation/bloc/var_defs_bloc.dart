@@ -20,6 +20,7 @@ class VarDefsBloc extends Bloc<VarDefsEvent, VarDefsState> {
     on<VarDefsLoadRequested>(_onLoad);
     on<VarDefsAddRequested>(_onAdd);
     on<VarDefsUpdateRequested>(_onUpdate);
+    on<VarDefsDeleteRequested>(_onDelete);
   }
 
   final TemplatesRepository _repo;
@@ -71,6 +72,17 @@ class VarDefsBloc extends Bloc<VarDefsEvent, VarDefsState> {
         defaultValue: event.defaultValue,
         description: event.description,
       ),
+    );
+  }
+
+  Future<void> _onDelete(
+    VarDefsDeleteRequested event,
+    Emitter<VarDefsState> emit,
+  ) async {
+    await _runMutation(
+      emit,
+      (version) =>
+          _repo.removeVarDef(varDefId: event.varDefId, version: version),
     );
   }
 
@@ -187,6 +199,23 @@ class VarDefsUpdateRequested extends VarDefsEvent {
 
   @override
   int get hashCode => Object.hash(varDefId, name, defaultValue, description);
+}
+
+/// Pide eliminar una variable-definition. El backend rechaza con 409
+/// si algún bot ya tiene un valor para esta variable (E2 in-use); el
+/// operador debe limpiar el valor en los bots primero. La UI confirma
+/// antes de dispatchar (acción destructiva).
+class VarDefsDeleteRequested extends VarDefsEvent {
+  const VarDefsDeleteRequested({required this.varDefId});
+
+  final String varDefId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is VarDefsDeleteRequested && other.varDefId == varDefId;
+
+  @override
+  int get hashCode => varDefId.hashCode;
 }
 
 // States --------------------------------------------------------------------

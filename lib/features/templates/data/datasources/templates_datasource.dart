@@ -84,6 +84,16 @@ abstract interface class TemplatesDatasource {
     String? description,
   });
 
+  /// `DELETE /variable-definitions/:id?version=N` (version va como query
+  /// string para que clientes HTTP que no soportan body en DELETE
+  /// funcionen limpio). 204 sin body. 409 incluye `ErrVariableInUse`
+  /// cuando algún bot tiene un valor para esta variable — el dominio
+  /// la trata como inmutable para mantener integridad de las plantillas.
+  Future<void> removeVarDef({
+    required String varDefId,
+    required int version,
+  });
+
   /// `PUT /templates/:id` body `{name, version, ai?}` con concurrencia
   /// optimista (CAS). 409 (`ErrTemplateConflict`) ⇒ `TemplatesConflictFailure`
   /// — la version del cliente está desfasada; el operador debe recargar el
@@ -207,17 +217,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {
-      // PUT necesita override del mapeo de 422 (InvalidUpdate, no
-      // InvalidName) y de 409 (Conflict, no aplica a otros métodos).
-      // Override inline mantiene `_mapDioException` simple para los demás
-      // callers; refactor a mapper parametrizado entra cuando un cuarto
-      // método con cubos distintos lo justifique.
-      if (e.type == DioExceptionType.badResponse) {
-        final status = e.response?.statusCode;
-        if (status == 409) throw const TemplatesConflictFailure();
-        if (status == 422) throw const TemplatesInvalidUpdateFailure();
-      }
-      throw _mapDioException(e);
+      throw _mapMutationDioException(e);
     } on FormatException {
       throw const UnknownTemplatesFailure();
     } on TypeError {
@@ -275,14 +275,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {
-      // Mismo patrón del PUT: las mutaciones tienen cubos distintos a los
-      // GET para 409 (Conflict) y 422 (InvalidUpdate, no InvalidName).
-      if (e.type == DioExceptionType.badResponse) {
-        final status = e.response?.statusCode;
-        if (status == 409) throw const TemplatesConflictFailure();
-        if (status == 422) throw const TemplatesInvalidUpdateFailure();
-      }
-      throw _mapDioException(e);
+      throw _mapMutationDioException(e);
     } on FormatException {
       throw const UnknownTemplatesFailure();
     } on TypeError {
@@ -314,17 +307,51 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.badResponse) {
-        final status = e.response?.statusCode;
-        if (status == 409) throw const TemplatesConflictFailure();
-        if (status == 422) throw const TemplatesInvalidUpdateFailure();
-      }
-      throw _mapDioException(e);
+      throw _mapMutationDioException(e);
     } on FormatException {
       throw const UnknownTemplatesFailure();
     } on TypeError {
       throw const UnknownTemplatesFailure();
     }
+  }
+
+  @override
+  Future<void> removeVarDef({
+    required String varDefId,
+    required int version,
+  }) async {
+    try {
+      await _dio.delete<dynamic>(
+        '/variable-definitions/$varDefId',
+        queryParameters: <String, dynamic>{'version': version},
+      );
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapMutationDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
+  /// Traduce DioException de una mutación (PUT/POST/PATCH/DELETE) que
+  /// usa CAS optimista. Diferencia respecto a `_mapDioException`:
+  /// - 409 ⇒ `TemplatesConflictFailure` (en GET sería UnknownStatus).
+  /// - 422 ⇒ `TemplatesInvalidUpdateFailure` (en GET sería InvalidName,
+  ///   que es de POST /templates con `name`).
+  ///
+  /// Compartido entre `update`, `addVarDef`, `updateVarDef`,
+  /// `removeVarDef`. Cuando aterrice la cuarta mutación con el mismo
+  /// patrón en otra feature, considerar mover a `core/network/`.
+  TemplatesFailure _mapMutationDioException(DioException e) {
+    if (e.type == DioExceptionType.badResponse) {
+      final status = e.response?.statusCode;
+      if (status == 409) return const TemplatesConflictFailure();
+      if (status == 422) return const TemplatesInvalidUpdateFailure();
+    }
+    return _mapDioException(e);
   }
 
   /// Traduce DioException a la jerarquía sellada de TemplatesFailure.

@@ -503,4 +503,82 @@ void main() {
       );
     });
   });
+
+  group('VarDefsBloc.DeleteRequested', () {
+    blocTest<VarDefsBloc, VarDefsState>(
+      'success: Mutating → Loading → Loaded sin el def borrado',
+      build: () {
+        var listCalls = 0;
+        when(() => repo.listVarDefs('t1')).thenAnswer((_) async {
+          listCalls++;
+          return listCalls == 1
+              ? (version: 2, defs: _defs)
+              : (version: 3, defs: const <VariableDef>[]);
+        });
+        when(
+          () => repo.removeVarDef(varDefId: 'v1', version: 2),
+        ).thenAnswer((_) async {});
+        return VarDefsBloc(repo: repo, templateId: 't1')
+          ..add(const VarDefsLoadRequested());
+      },
+      act: (bloc) async {
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const VarDefsDeleteRequested(varDefId: 'v1'));
+      },
+      expect: () => const <VarDefsState>[
+        VarDefsLoaded(_defs, 2),
+        VarDefsMutating(_defs, 2),
+        VarDefsLoading(),
+        VarDefsLoaded(<VariableDef>[], 3),
+      ],
+      verify: (_) {
+        verify(
+          () => repo.removeVarDef(varDefId: 'v1', version: 2),
+        ).called(1);
+      },
+    );
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'failure 409 (in-use): Mutating → MutationFailed(Conflict, snapshot)',
+      build: () {
+        when(
+          () => repo.listVarDefs('t1'),
+        ).thenAnswer((_) async => (version: 2, defs: _defs));
+        when(
+          () => repo.removeVarDef(varDefId: 'v1', version: 2),
+        ).thenAnswer(
+          (_) => Future<void>.error(const TemplatesConflictFailure()),
+        );
+        return VarDefsBloc(repo: repo, templateId: 't1')
+          ..add(const VarDefsLoadRequested());
+      },
+      act: (bloc) async {
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const VarDefsDeleteRequested(varDefId: 'v1'));
+      },
+      expect: () => const <VarDefsState>[
+        VarDefsLoaded(_defs, 2),
+        VarDefsMutating(_defs, 2),
+        VarDefsMutationFailed(_defs, 2, TemplatesConflictFailure()),
+      ],
+    );
+
+    blocTest<VarDefsBloc, VarDefsState>(
+      'DeleteRequested desde Loading se ignora (no version para CAS)',
+      build: () => VarDefsBloc(repo: repo, templateId: 't1'),
+      act: (bloc) => bloc.add(const VarDefsDeleteRequested(varDefId: 'v1')),
+      expect: () => const <VarDefsState>[],
+    );
+
+    test('equality de VarDefsDeleteRequested', () {
+      expect(
+        const VarDefsDeleteRequested(varDefId: 'v1'),
+        equals(const VarDefsDeleteRequested(varDefId: 'v1')),
+      );
+      expect(
+        const VarDefsDeleteRequested(varDefId: 'v1'),
+        isNot(equals(const VarDefsDeleteRequested(varDefId: 'v2'))),
+      );
+    });
+  });
 }
