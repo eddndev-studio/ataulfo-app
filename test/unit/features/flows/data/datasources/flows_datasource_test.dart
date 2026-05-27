@@ -341,4 +341,135 @@ void main() {
       );
     });
   });
+
+  group('DioFlowsDatasource.createFlow happy path', () {
+    test(
+      '201 con body devuelve Flow mapeado y POST al path correcto',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/templates/t1/flows'),
+            statusCode: 201,
+            data: flowJson(id: 'f-new', name: 'Bienvenida'),
+          ),
+        );
+
+        final out = await ds.createFlow(templateId: 't1', name: 'Bienvenida');
+
+        expect(out.id, 'f-new');
+        expect(out.name, 'Bienvenida');
+        expect(out.templateId, 't1');
+        expect(out.version, 1);
+
+        final captured = verify(
+          () => dio.post<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured[0], '/templates/t1/flows');
+        expect(captured[1], <String, dynamic>{
+          'name': 'Bienvenida',
+          'cooldownMs': 0,
+          'usageLimit': 0,
+          'excludesFlows': <String>[],
+        });
+      },
+    );
+  });
+
+  group('DioFlowsDatasource.createFlow failure mapping', () {
+    test('422 → FlowsInvalidCreateFailure (nombre vacío, etc.)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(422));
+
+      await expectLater(
+        () => ds.createFlow(templateId: 't1', name: ''),
+        throwsA(isA<FlowsInvalidCreateFailure>()),
+      );
+    });
+
+    test('403 → FlowsForbiddenFailure (rol no alcanza)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(403));
+
+      await expectLater(
+        () => ds.createFlow(templateId: 't1', name: 'X'),
+        throwsA(isA<FlowsForbiddenFailure>()),
+      );
+    });
+
+    test('404 → FlowsNotFoundFailure (template padre no existe)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(404));
+
+      await expectLater(
+        () => ds.createFlow(templateId: 't1', name: 'X'),
+        throwsA(isA<FlowsNotFoundFailure>()),
+      );
+    });
+
+    test('connectionError → FlowsNetworkFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/templates/t1/flows'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.createFlow(templateId: 't1', name: 'X'),
+        throwsA(isA<FlowsNetworkFailure>()),
+      );
+    });
+
+    test('body null en 201 → UnknownFlowsFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/templates/t1/flows'),
+          statusCode: 201,
+          data: null,
+        ),
+      );
+
+      await expectLater(
+        () => ds.createFlow(templateId: 't1', name: 'X'),
+        throwsA(isA<UnknownFlowsFailure>()),
+      );
+    });
+  });
 }

@@ -138,7 +138,7 @@ class _LoadedView extends StatelessWidget {
           const SizedBox(height: AppTokens.sp6),
           const _SectionTitle('Flujos'),
           const SizedBox(height: AppTokens.sp3),
-          const _FlowsSection(),
+          _FlowsSection(templateId: template.id),
           const SizedBox(height: AppTokens.sp6),
           const _SectionTitle('Disparadores'),
           const SizedBox(height: AppTokens.sp3),
@@ -604,7 +604,9 @@ String? _typePillLabel(VarType t) => switch (t) {
 // ── Sección Flujos (S11 F1, read-only) ───────────────────────────────────────
 
 class _FlowsSection extends StatelessWidget {
-  const _FlowsSection();
+  const _FlowsSection({required this.templateId});
+
+  final String templateId;
 
   @override
   Widget build(BuildContext context) {
@@ -619,7 +621,10 @@ class _FlowsSection extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
-        FlowsLoaded(flows: final fs) => _FlowsList(items: fs),
+        FlowsLoaded(flows: final fs) => _FlowsList(
+          items: fs,
+          templateId: templateId,
+        ),
         FlowsFailed() => const _FlowsFailedView(),
       },
     );
@@ -627,25 +632,39 @@ class _FlowsSection extends StatelessWidget {
 }
 
 class _FlowsList extends StatelessWidget {
-  const _FlowsList({required this.items});
+  const _FlowsList({required this.items, required this.templateId});
 
   final List<fdom.Flow> items;
+  final String templateId;
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return Text(
-        'Esta plantilla aún no tiene flujos.',
-        key: const Key('flows.empty'),
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.text2,
-        ),
-      );
-    }
+    final empty = items.isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[for (final f in items) _FlowRow(flow: f)],
+      children: <Widget>[
+        if (empty)
+          Text(
+            'Esta plantilla aún no tiene flujos.',
+            key: const Key('flows.empty'),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppTokens.text2,
+            ),
+          )
+        else
+          for (final f in items) _FlowRow(flow: f),
+        const SizedBox(height: AppTokens.sp3),
+        AppButton.text(
+          key: const Key('flows.add_button'),
+          label: 'Nuevo flujo',
+          icon: Icons.add,
+          // push apila el form sobre el detalle; back físico vuelve aquí
+          // sin pasar por el form que ya cumplió (Succeeded usa
+          // pushReplacement a /flows/:id).
+          onPressed: () => context.push('/templates/$templateId/flows/new'),
+        ),
+      ],
     );
   }
 }

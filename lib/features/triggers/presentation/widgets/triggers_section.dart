@@ -209,9 +209,9 @@ class _TriggersFailedView extends StatelessWidget {
       return Text(
         'La plantilla padre ya no existe; no hay disparadores que cargar.',
         key: const Key('triggers.failed'),
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: AppTokens.danger,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
       );
     }
     return Row(

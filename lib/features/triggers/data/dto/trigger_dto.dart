@@ -48,7 +48,9 @@ class TriggerResp {
         isActive is! bool ||
         createdAt is! String ||
         updatedAt is! String) {
-      throw const FormatException('triggerResp con campos requeridos faltantes o de tipo incorrecto');
+      throw const FormatException(
+        'triggerResp con campos requeridos faltantes o de tipo incorrecto',
+      );
     }
 
     final rawMatchType = json['matchType'];
@@ -87,21 +89,23 @@ class TriggerResp {
 
   /// Atajo para tests: instancia el DTO sin timestamps en el const
   /// constructor y los anexa después.
-  TriggerResp withTimestamps({required DateTime createdAt, required DateTime updatedAt}) =>
-      TriggerResp(
-        id: id,
-        templateId: templateId,
-        flowId: flowId,
-        type: type,
-        matchType: matchType,
-        keyword: keyword,
-        labelId: labelId,
-        labelAction: labelAction,
-        scope: scope,
-        isActive: isActive,
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-      );
+  TriggerResp withTimestamps({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) => TriggerResp(
+    id: id,
+    templateId: templateId,
+    flowId: flowId,
+    type: type,
+    matchType: matchType,
+    keyword: keyword,
+    labelId: labelId,
+    labelAction: labelAction,
+    scope: scope,
+    isActive: isActive,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }
 
 /// Wrapper del listado `{items: [...]}` que el backend devuelve. El

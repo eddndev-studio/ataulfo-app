@@ -1174,9 +1174,81 @@ void main() {
         );
       },
     );
+
+    testWidgets('expone botón "Nuevo flujo" con key contractual en Loaded', (
+      tester,
+    ) async {
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.add_button')));
+      expect(find.byKey(const Key('flows.add_button')), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Nuevo flujo'), findsOneWidget);
+    });
+
+    testWidgets(
+      'tap "Nuevo flujo" apila /templates/:id/flows/new (canPop=true en destino)',
+      (tester) async {
+        when(
+          () => flowsBloc.state,
+        ).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+        final canPopAtDestination = <bool>[];
+        String? destinationUri;
+        final router = GoRouter(
+          initialLocation: '/',
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/',
+              builder: (_, _) => MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<TemplateDetailBloc>.value(value: bloc),
+                  BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
+                ],
+                child: const Scaffold(body: TemplateDetailPage()),
+              ),
+            ),
+            GoRoute(
+              path: '/templates/:templateId/flows/new',
+              builder: (_, st) {
+                destinationUri = st.uri.toString();
+                return Scaffold(
+                  body: Builder(
+                    builder: (ctx) {
+                      canPopAtDestination.add(Navigator.of(ctx).canPop());
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          MaterialApp.router(
+            theme: AppDesignTheme.dark(),
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(const Key('flows.add_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('flows.add_button')));
+        await tester.pumpAndSettle();
+
+        expect(destinationUri, '/templates/t1/flows/new');
+        expect(
+          canPopAtDestination,
+          <bool>[true],
+          reason:
+              'el botón debe usar push (no go) para que el back físico '
+              'vuelva al detalle de plantilla',
+        );
+      },
+    );
   });
 
-  // ── Sección Disparadores ──────────────────────────────────────────────────
   group('sección Disparadores', () {
     setUp(() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));

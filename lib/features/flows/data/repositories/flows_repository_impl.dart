@@ -19,4 +19,8 @@ class FlowsRepositoryImpl implements FlowsRepository {
 
   @override
   Future<List<fdom.Step>> listSteps(String flowId) => _ds.listSteps(flowId);
+
+  @override
+  Future<Flow> createFlow({required String templateId, required String name}) =>
+      _ds.createFlow(templateId: templateId, name: name);
 }

@@ -16,4 +16,10 @@ abstract interface class FlowsRepository {
   /// Lista los steps de un flow ordenados por `order` ASC. Lista vacía
   /// es válida (flow sin steps todavía). 404 si el flow padre no existe.
   Future<List<fdom.Step>> listSteps(String flowId);
+
+  /// Crea un Flow asociado a la Template. Body mínimo (sólo `name`);
+  /// los gates (`cooldownMs`, `usageLimit`, `excludesFlows`) viajan con
+  /// defaults silenciosos y se ajustan después en el Settings tab del
+  /// editor. 422 si el nombre rompe la validación → `FlowsInvalidCreateFailure`.
+  Future<Flow> createFlow({required String templateId, required String name});
 }
