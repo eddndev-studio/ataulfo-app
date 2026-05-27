@@ -59,8 +59,13 @@ Trigger _label({
   updatedAt: DateTime.utc(2026, 5, 1),
 );
 
-fdom.Flow _flow({String id = 'f1', String name = 'Bienvenida'}) =>
-    fdom.Flow(id: id, templateId: 'tpl1', name: name, isActive: true, version: 1);
+fdom.Flow _flow({String id = 'f1', String name = 'Bienvenida'}) => fdom.Flow(
+  id: id,
+  templateId: 'tpl1',
+  name: name,
+  isActive: true,
+  version: 1,
+);
 
 Widget _harness({
   required TriggersBloc triggersBloc,
@@ -90,9 +95,12 @@ void main() {
     // Completer que nunca completa: mantiene el bloc en Loading sin
     // dejar timers pendientes que rompen el invariante post-dispose.
     final pending = Completer<List<Trigger>>();
-    when(() => triggersRepo.listTriggers('tpl1')).thenAnswer((_) => pending.future);
-    when(() => flowsRepo.listFlows('tpl1'))
-        .thenAnswer((_) async => <fdom.Flow>[_flow()]);
+    when(
+      () => triggersRepo.listTriggers('tpl1'),
+    ).thenAnswer((_) => pending.future);
+    when(
+      () => flowsRepo.listFlows('tpl1'),
+    ).thenAnswer((_) async => <fdom.Flow>[_flow()]);
 
     final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1');
     final fBloc = FlowsBloc(repo: flowsRepo, templateId: 'tpl1')
@@ -107,10 +115,12 @@ void main() {
   });
 
   testWidgets('Loaded vacío muestra empty state inline', (tester) async {
-    when(() => triggersRepo.listTriggers('tpl1'))
-        .thenAnswer((_) async => const <Trigger>[]);
-    when(() => flowsRepo.listFlows('tpl1'))
-        .thenAnswer((_) async => <fdom.Flow>[_flow()]);
+    when(
+      () => triggersRepo.listTriggers('tpl1'),
+    ).thenAnswer((_) async => const <Trigger>[]);
+    when(
+      () => flowsRepo.listFlows('tpl1'),
+    ).thenAnswer((_) async => <fdom.Flow>[_flow()]);
 
     final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1')
       ..add(const TriggersLoadRequested());
@@ -131,12 +141,16 @@ void main() {
     (tester) async {
       when(() => triggersRepo.listTriggers('tpl1')).thenAnswer(
         (_) async => <Trigger>[
-          _text(keyword: 'comprar', match: MatchType.exact, scope: TriggerScope.incoming),
+          _text(
+            keyword: 'comprar',
+            match: MatchType.exact,
+            scope: TriggerScope.incoming,
+          ),
         ],
       );
-      when(() => flowsRepo.listFlows('tpl1')).thenAnswer(
-        (_) async => <fdom.Flow>[_flow(name: 'Bienvenida')],
-      );
+      when(
+        () => flowsRepo.listFlows('tpl1'),
+      ).thenAnswer((_) async => <fdom.Flow>[_flow(name: 'Bienvenida')]);
 
       final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1')
         ..add(const TriggersLoadRequested());
@@ -153,7 +167,10 @@ void main() {
       expect(find.text('Entrante'), findsOneWidget);
       // flow target resuelto por nombre (con prefijo de flecha), no por id
       expect(find.textContaining('Bienvenida'), findsOneWidget);
-      expect(find.byKey(const Key('triggers.row.t1.flow_fallback')), findsNothing);
+      expect(
+        find.byKey(const Key('triggers.row.t1.flow_fallback')),
+        findsNothing,
+      );
 
       unawaited(tBloc.close());
       unawaited(fBloc.close());
@@ -164,11 +181,13 @@ void main() {
     'Loaded con LABEL trigger renderiza labelId + labelAction humanizada',
     (tester) async {
       when(() => triggersRepo.listTriggers('tpl1')).thenAnswer(
-        (_) async => <Trigger>[_label(labelId: 'lbl_vip', action: LabelAction.remove)],
+        (_) async => <Trigger>[
+          _label(labelId: 'lbl_vip', action: LabelAction.remove),
+        ],
       );
-      when(() => flowsRepo.listFlows('tpl1')).thenAnswer(
-        (_) async => <fdom.Flow>[_flow(name: 'Bienvenida')],
-      );
+      when(
+        () => flowsRepo.listFlows('tpl1'),
+      ).thenAnswer((_) async => <fdom.Flow>[_flow(name: 'Bienvenida')]);
 
       final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1')
         ..add(const TriggersLoadRequested());
@@ -190,9 +209,9 @@ void main() {
   testWidgets(
     'flowId no resuelto (FlowsBloc todavía Loading) muestra id truncado en monospace',
     (tester) async {
-      when(() => triggersRepo.listTriggers('tpl1')).thenAnswer(
-        (_) async => <Trigger>[_text(flowId: 'flow-xyz-9999')],
-      );
+      when(
+        () => triggersRepo.listTriggers('tpl1'),
+      ).thenAnswer((_) async => <Trigger>[_text(flowId: 'flow-xyz-9999')]);
       final pendingFlows = Completer<List<fdom.Flow>>();
       when(
         () => flowsRepo.listFlows('tpl1'),
@@ -209,7 +228,10 @@ void main() {
       await tester.pump();
 
       // El widget muestra el id del flow como fallback (sin nombre resuelto)
-      expect(find.byKey(const Key('triggers.row.t1.flow_fallback')), findsOneWidget);
+      expect(
+        find.byKey(const Key('triggers.row.t1.flow_fallback')),
+        findsOneWidget,
+      );
       expect(find.text('flow-xyz-9999'), findsOneWidget);
 
       unawaited(tBloc.close());
@@ -225,8 +247,9 @@ void main() {
       if (calls == 1) throw const TriggersNetworkFailure();
       return <Trigger>[_text()];
     });
-    when(() => flowsRepo.listFlows('tpl1'))
-        .thenAnswer((_) async => <fdom.Flow>[_flow()]);
+    when(
+      () => flowsRepo.listFlows('tpl1'),
+    ).thenAnswer((_) async => <fdom.Flow>[_flow()]);
 
     final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1')
       ..add(const TriggersLoadRequested());
@@ -249,11 +272,15 @@ void main() {
     unawaited(fBloc.close());
   });
 
-  testWidgets('Failed NotFound es terminal — sin botón Reintentar', (tester) async {
-    when(() => triggersRepo.listTriggers('tpl1'))
-        .thenThrow(const TriggersNotFoundFailure());
-    when(() => flowsRepo.listFlows('tpl1'))
-        .thenAnswer((_) async => <fdom.Flow>[_flow()]);
+  testWidgets('Failed NotFound es terminal — sin botón Reintentar', (
+    tester,
+  ) async {
+    when(
+      () => triggersRepo.listTriggers('tpl1'),
+    ).thenThrow(const TriggersNotFoundFailure());
+    when(
+      () => flowsRepo.listFlows('tpl1'),
+    ).thenAnswer((_) async => <fdom.Flow>[_flow()]);
 
     final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1')
       ..add(const TriggersLoadRequested());

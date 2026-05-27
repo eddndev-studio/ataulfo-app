@@ -129,10 +129,7 @@ void main() {
     ).thenReturn(const FlowCreateFailed(FlowsNetworkFailure()));
     await tester.pumpWidget(host());
 
-    expect(
-      find.byKey(const Key('flow_create.error.network')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('flow_create.error.network')), findsOneWidget);
   });
 
   testWidgets('Failed(Server) muestra el copy genérico', (tester) async {
@@ -141,10 +138,7 @@ void main() {
     ).thenReturn(const FlowCreateFailed(FlowsServerFailure()));
     await tester.pumpWidget(host());
 
-    expect(
-      find.byKey(const Key('flow_create.error.generic')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('flow_create.error.generic')), findsOneWidget);
   });
 
   testWidgets(
@@ -184,10 +178,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppDesignTheme.dark(),
-          routerConfig: router,
-        ),
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
       );
       await tester.pumpAndSettle();
 

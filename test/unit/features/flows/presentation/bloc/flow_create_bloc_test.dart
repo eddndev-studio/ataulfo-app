@@ -38,8 +38,7 @@ void main() {
         ).thenAnswer((_) async => _flow);
         return FlowCreateBloc(repo: repo, templateId: 't1');
       },
-      act: (bloc) =>
-          bloc.add(const FlowCreateSubmitted(name: 'Bienvenida')),
+      act: (bloc) => bloc.add(const FlowCreateSubmitted(name: 'Bienvenida')),
       expect: () => const <FlowCreateState>[
         FlowCreateSubmitting(),
         FlowCreateSucceeded(_flow),

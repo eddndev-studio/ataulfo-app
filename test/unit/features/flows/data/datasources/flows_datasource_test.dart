@@ -343,43 +343,46 @@ void main() {
   });
 
   group('DioFlowsDatasource.createFlow happy path', () {
-    test('201 con body devuelve Flow mapeado y POST al path correcto', () async {
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          any(),
-          data: any(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer(
-        (_) async => Response<Map<String, dynamic>>(
-          requestOptions: RequestOptions(path: '/templates/t1/flows'),
-          statusCode: 201,
-          data: flowJson(id: 'f-new', name: 'Bienvenida'),
-        ),
-      );
+    test(
+      '201 con body devuelve Flow mapeado y POST al path correcto',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/templates/t1/flows'),
+            statusCode: 201,
+            data: flowJson(id: 'f-new', name: 'Bienvenida'),
+          ),
+        );
 
-      final out = await ds.createFlow(templateId: 't1', name: 'Bienvenida');
+        final out = await ds.createFlow(templateId: 't1', name: 'Bienvenida');
 
-      expect(out.id, 'f-new');
-      expect(out.name, 'Bienvenida');
-      expect(out.templateId, 't1');
-      expect(out.version, 1);
+        expect(out.id, 'f-new');
+        expect(out.name, 'Bienvenida');
+        expect(out.templateId, 't1');
+        expect(out.version, 1);
 
-      final captured = verify(
-        () => dio.post<Map<String, dynamic>>(
-          captureAny(),
-          data: captureAny(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).captured;
-      expect(captured[0], '/templates/t1/flows');
-      expect(captured[1], <String, dynamic>{
-        'name': 'Bienvenida',
-        'cooldownMs': 0,
-        'usageLimit': 0,
-        'excludesFlows': <String>[],
-      });
-    });
+        final captured = verify(
+          () => dio.post<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured[0], '/templates/t1/flows');
+        expect(captured[1], <String, dynamic>{
+          'name': 'Bienvenida',
+          'cooldownMs': 0,
+          'usageLimit': 0,
+          'excludesFlows': <String>[],
+        });
+      },
+    );
   });
 
   group('DioFlowsDatasource.createFlow failure mapping', () {

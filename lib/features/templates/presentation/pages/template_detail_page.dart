@@ -662,8 +662,7 @@ class _FlowsList extends StatelessWidget {
           // push apila el form sobre el detalle; back físico vuelve aquí
           // sin pasar por el form que ya cumplió (Succeeded usa
           // pushReplacement a /flows/:id).
-          onPressed: () =>
-              context.push('/templates/$templateId/flows/new'),
+          onPressed: () => context.push('/templates/$templateId/flows/new'),
         ),
       ],
     );

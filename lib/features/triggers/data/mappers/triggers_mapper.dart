@@ -18,7 +18,9 @@ class TriggersMapper {
     final createdAt = r.createdAt;
     final updatedAt = r.updatedAt;
     if (createdAt == null || updatedAt == null) {
-      throw const FormatException('triggerResp sin timestamps no es mappable a entidad');
+      throw const FormatException(
+        'triggerResp sin timestamps no es mappable a entidad',
+      );
     }
     return Trigger(
       id: r.id,
@@ -28,7 +30,9 @@ class TriggersMapper {
       matchType: matchType == null ? null : MatchType.fromWire(matchType),
       keyword: r.keyword,
       labelId: r.labelId,
-      labelAction: labelAction == null ? null : LabelAction.fromWire(labelAction),
+      labelAction: labelAction == null
+          ? null
+          : LabelAction.fromWire(labelAction),
       scope: TriggerScope.fromWire(r.scope),
       isActive: r.isActive,
       createdAt: createdAt,

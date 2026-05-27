@@ -1175,30 +1175,22 @@ void main() {
       },
     );
 
-    testWidgets(
-      'expone botón "Nuevo flujo" con key contractual en Loaded',
-      (tester) async {
-        when(() => flowsBloc.state).thenReturn(
-          const FlowsLoaded(<flows.Flow>[]),
-        );
-        await tester.pumpWidget(host());
-        await tester.ensureVisible(
-          find.byKey(const Key('flows.add_button')),
-        );
-        expect(find.byKey(const Key('flows.add_button')), findsOneWidget);
-        expect(
-          find.widgetWithText(AppButton, 'Nuevo flujo'),
-          findsOneWidget,
-        );
-      },
-    );
+    testWidgets('expone botón "Nuevo flujo" con key contractual en Loaded', (
+      tester,
+    ) async {
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.add_button')));
+      expect(find.byKey(const Key('flows.add_button')), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Nuevo flujo'), findsOneWidget);
+    });
 
     testWidgets(
       'tap "Nuevo flujo" apila /templates/:id/flows/new (canPop=true en destino)',
       (tester) async {
-        when(() => flowsBloc.state).thenReturn(
-          const FlowsLoaded(<flows.Flow>[]),
-        );
+        when(
+          () => flowsBloc.state,
+        ).thenReturn(const FlowsLoaded(<flows.Flow>[]));
         final canPopAtDestination = <bool>[];
         String? destinationUri;
         final router = GoRouter(
@@ -1240,9 +1232,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.ensureVisible(
-          find.byKey(const Key('flows.add_button')),
-        );
+        await tester.ensureVisible(find.byKey(const Key('flows.add_button')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('flows.add_button')));
         await tester.pumpAndSettle();
