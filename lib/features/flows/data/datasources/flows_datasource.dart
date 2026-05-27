@@ -1,9 +1,12 @@
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/flow.dart';
+import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../dto/flow_dto.dart';
+import '../dto/step_dto.dart';
 import '../mappers/flows_mapper.dart';
+import '../mappers/steps_mapper.dart';
 
 /// Puerto de datos para los endpoints de Flow (S11).
 ///
@@ -15,6 +18,16 @@ abstract interface class FlowsDatasource {
   /// con 403 si el rol no alcanza. 404 si la Template no existe en la
   /// org del operador (o fue borrada).
   Future<List<Flow>> listFlows(String templateId);
+
+  /// `GET /flows/:id` org-scoped. Devuelve sólo la cabecera del flow
+  /// (sin steps — los steps viven en `listSteps`). 404 si el flow
+  /// no existe en la org del operador.
+  Future<Flow> flowById(String id);
+
+  /// `GET /flows/:flowId/steps` org-scoped. Devuelve `{items:[...]}`
+  /// ordenado por `order` ASC (el backend lo garantiza en SQL). 404 si
+  /// el flow padre no existe en la org.
+  Future<List<fdom.Step>> listSteps(String flowId);
 }
 
 class DioFlowsDatasource implements FlowsDatasource {
@@ -33,6 +46,48 @@ class DioFlowsDatasource implements FlowsDatasource {
         throw const UnknownFlowsFailure();
       }
       return FlowsMapper.listToFlows(ListFlowsResp.fromJson(body));
+    } on FlowsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownFlowsFailure();
+    } on TypeError {
+      throw const UnknownFlowsFailure();
+    }
+  }
+
+  @override
+  Future<Flow> flowById(String id) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/flows/$id');
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownFlowsFailure();
+      }
+      return FlowsMapper.flowRespToEntity(FlowResp.fromJson(body));
+    } on FlowsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownFlowsFailure();
+    } on TypeError {
+      throw const UnknownFlowsFailure();
+    }
+  }
+
+  @override
+  Future<List<fdom.Step>> listSteps(String flowId) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/flows/$flowId/steps',
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownFlowsFailure();
+      }
+      return StepsMapper.listToSteps(ListStepsResp.fromJson(body));
     } on FlowsFailure {
       rethrow;
     } on DioException catch (e) {

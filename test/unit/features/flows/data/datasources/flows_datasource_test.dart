@@ -1,4 +1,5 @@
 import 'package:agentic/features/flows/data/datasources/flows_datasource.dart';
+import 'package:agentic/features/flows/domain/entities/step.dart' as fdom;
 import 'package:agentic/features/flows/domain/failures/flows_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -197,6 +198,158 @@ void main() {
       await expectLater(
         ds.listFlows('t1'),
         throwsA(isA<UnknownFlowsFailure>()),
+      );
+    });
+  });
+
+  group('DioFlowsDatasource.flowById', () {
+    Map<String, dynamic> flowBody({
+      String id = 'f1',
+      String name = 'Bienvenida',
+      bool isActive = true,
+      int version = 1,
+    }) => <String, dynamic>{
+      'id': id,
+      'templateId': 't1',
+      'name': name,
+      'isActive': isActive,
+      'cooldownMs': 0,
+      'usageLimit': 0,
+      'excludesFlows': <dynamic>[],
+      'version': version,
+      'createdAt': '2026-05-26T10:00:00Z',
+      'updatedAt': '2026-05-26T10:00:00Z',
+    };
+
+    test('200 con flowResp → Flow', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/flows/f1'),
+      ).thenAnswer((_) async => respMap(200, path: '/flows/f1', body: flowBody()));
+
+      final flow = await ds.flowById('f1');
+
+      expect(flow.id, 'f1');
+      expect(flow.name, 'Bienvenida');
+      expect(flow.isActive, isTrue);
+      verify(() => dio.get<Map<String, dynamic>>('/flows/f1')).called(1);
+    });
+
+    test('404 (flow ajeno o inexistente) → FlowsNotFoundFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/flows/missing'),
+      ).thenThrow(badResponse(404, path: '/flows/missing'));
+
+      await expectLater(
+        ds.flowById('missing'),
+        throwsA(isA<FlowsNotFoundFailure>()),
+      );
+    });
+
+    test('5xx → FlowsServerFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/flows/f1'),
+      ).thenThrow(badResponse(500, path: '/flows/f1'));
+
+      await expectLater(
+        ds.flowById('f1'),
+        throwsA(isA<FlowsServerFailure>()),
+      );
+    });
+
+    test('body null → UnknownFlowsFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/flows/f1'),
+      ).thenAnswer((_) async => respMap(200, path: '/flows/f1'));
+
+      await expectLater(
+        ds.flowById('f1'),
+        throwsA(isA<UnknownFlowsFailure>()),
+      );
+    });
+  });
+
+  group('DioFlowsDatasource.listSteps', () {
+    Map<String, dynamic> stepBody({
+      String id = 's1',
+      String type = 'TEXT',
+      int order = 0,
+    }) => <String, dynamic>{
+      'id': id,
+      'flowId': 'f1',
+      'type': type,
+      'order': order,
+      'content': 'Hola',
+      'mediaRef': '',
+      'metadata': <String, dynamic>{},
+      'delayMs': 0,
+      'jitterPct': 0,
+      'aiOnly': false,
+      'createdAt': '2026-05-26T10:00:00Z',
+      'updatedAt': '2026-05-26T10:00:00Z',
+    };
+
+    test('200 con {items:[...]} → List<Step>', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/flows/f1/steps'),
+      ).thenAnswer(
+        (_) async => respMap(
+          200,
+          path: '/flows/f1/steps',
+          body: <String, dynamic>{
+            'items': <dynamic>[
+              stepBody(),
+              stepBody(id: 's2', type: 'IMAGE', order: 1),
+            ],
+          },
+        ),
+      );
+
+      final steps = await ds.listSteps('f1');
+
+      expect(steps, hasLength(2));
+      expect(steps[0].id, 's1');
+      expect(steps[0].type, fdom.StepType.text);
+      expect(steps[1].type, fdom.StepType.image);
+    });
+
+    test('200 con items vacío → List<Step> vacía', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/flows/f1/steps'),
+      ).thenAnswer(
+        (_) async => respMap(
+          200,
+          path: '/flows/f1/steps',
+          body: <String, dynamic>{'items': <dynamic>[]},
+        ),
+      );
+
+      expect(await ds.listSteps('f1'), isEmpty);
+    });
+
+    test('404 → FlowsNotFoundFailure (flow padre no existe)', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/flows/missing/steps'),
+      ).thenThrow(badResponse(404, path: '/flows/missing/steps'));
+
+      await expectLater(
+        ds.listSteps('missing'),
+        throwsA(isA<FlowsNotFoundFailure>()),
+      );
+    });
+
+    test('timeout → FlowsTimeoutFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/flows/f1/steps'),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1/steps'),
+          type: DioExceptionType.receiveTimeout,
+        ),
+      );
+
+      await expectLater(
+        ds.listSteps('f1'),
+        throwsA(isA<FlowsTimeoutFailure>()),
       );
     });
   });
