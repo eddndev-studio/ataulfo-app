@@ -154,6 +154,10 @@ TimeWindow _parseWindow(Object? raw, int index) {
     }
     days.add(d);
   }
+  // Normalizamos a orden ascendente para que `==` por valor sea robusto
+  // independiente de quién serializó el JSON (Flutter ordena, pero un
+  // script de seed o un escritor terceros podría no hacerlo).
+  days.sort();
   final from = raw['from'];
   final to = raw['to'];
   if (from is! String || to is! String) {
