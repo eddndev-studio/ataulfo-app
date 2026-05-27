@@ -618,9 +618,8 @@ void main() {
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       seed: () => const FlowStepsLoaded(seedSteps),
-      act: (bloc) => bloc.add(
-        const FlowStepsReorderRequested(<String>['s1', 's3', 's2']),
-      ),
+      act: (bloc) =>
+          bloc.add(const FlowStepsReorderRequested(<String>['s1', 's3', 's2'])),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(seedSteps),
         FlowStepsLoading(),
@@ -643,9 +642,8 @@ void main() {
       },
       seed: () => const FlowStepsLoaded(seedSteps),
       // Mismos ids en el mismo orden que el snapshot vigente.
-      act: (bloc) => bloc.add(
-        const FlowStepsReorderRequested(<String>['s1', 's2', 's3']),
-      ),
+      act: (bloc) =>
+          bloc.add(const FlowStepsReorderRequested(<String>['s1', 's2', 's3'])),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(seedSteps),
         FlowStepsLoading(),
@@ -675,9 +673,8 @@ void main() {
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       seed: () => const FlowStepsLoaded(seedSteps),
-      act: (bloc) => bloc.add(
-        const FlowStepsReorderRequested(<String>['s3', 's1', 's2']),
-      ),
+      act: (bloc) =>
+          bloc.add(const FlowStepsReorderRequested(<String>['s3', 's1', 's2'])),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(seedSteps),
         FlowStepsMutationFailed(seedSteps, FlowsStepNotFoundFailure()),
@@ -693,9 +690,8 @@ void main() {
       'ReorderRequested desde Loading → no-op',
       build: () => FlowStepsBloc(repo: repo, flowId: 'f1'),
       seed: () => const FlowStepsLoading(),
-      act: (bloc) => bloc.add(
-        const FlowStepsReorderRequested(<String>['s3', 's1', 's2']),
-      ),
+      act: (bloc) =>
+          bloc.add(const FlowStepsReorderRequested(<String>['s3', 's1', 's2'])),
       expect: () => const <FlowStepsState>[],
       verify: (_) {
         verifyNever(

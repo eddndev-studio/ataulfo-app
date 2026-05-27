@@ -1,3 +1,9 @@
+// Pesa >400 LOC porque agrupa el shell del editor + helpers cohesivos
+// del tab Pasos (lista, drag&drop, StepCard, body por tipo). Cualquier
+// split implicaría compartir varias estructuras privadas entre archivos
+// hermanos sin ganancia real de reutilización — los widgets viven solo
+// aquí. Si el shell crece más con los tabs Triggers/Settings, extraer
+// _StepCard + _StepBody a `widgets/step_card.dart` será el primer corte.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 

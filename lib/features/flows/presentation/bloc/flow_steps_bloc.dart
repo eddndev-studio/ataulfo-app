@@ -107,9 +107,7 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
     Emitter<FlowStepsState> emit,
   ) async {
     await _runMutation(emit, (snapshot) async {
-      final byId = <String, fdom.Step>{
-        for (final s in snapshot) s.id: s,
-      };
+      final byId = <String, fdom.Step>{for (final s in snapshot) s.id: s};
       for (var i = 0; i < event.ids.length; i++) {
         final id = event.ids[i];
         final original = byId[id];
