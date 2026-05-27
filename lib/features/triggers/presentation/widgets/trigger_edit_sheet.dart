@@ -172,124 +172,126 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
       child: BlocBuilder<TriggersBloc, TriggersState>(
         builder: (context, state) {
           final isMutating = state is TriggersMutating;
-          final failure = state is TriggersMutationFailed ? state.failure : null;
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(AppTokens.sp6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      widget.editing == null
-                          ? 'Nuevo disparador'
-                          : 'Editar disparador',
-                      style: textTheme.titleLarge,
-                    ),
-                  ),
-                  if (widget.editing != null)
-                    IconButton(
-                      key: const Key('trigger_edit.delete'),
-                      tooltip: 'Eliminar disparador',
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: AppTokens.danger,
-                      ),
-                      onPressed: isMutating ? null : _confirmDelete,
-                    ),
-                ],
-              ),
-              const SizedBox(height: AppTokens.sp4),
-              _TypePicker(
-                selected: _triggerType,
-                enabled: !isMutating && widget.editing == null,
-                onSelected: (t) => setState(() => _triggerType = t),
-              ),
-              const SizedBox(height: AppTokens.sp4),
-              if (_isText) ...<Widget>[
-                AppTextField(
-                  key: const Key('trigger_edit.keyword'),
-                  label: 'Palabra clave',
-                  hint: 'Texto que dispara el flow',
-                  controller: _keywordCtrl,
-                  enabled: !isMutating,
-                  autofocus: true,
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                _MatchPicker(
-                  selected: _matchType,
-                  enabled: !isMutating,
-                  onSelected: (m) => setState(() => _matchType = m),
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                _ScopePicker(
-                  selected: _scope,
-                  enabled: !isMutating,
-                  onSelected: (s) => setState(() => _scope = s),
-                ),
-              ] else ...<Widget>[
-                AppTextField(
-                  key: const Key('trigger_edit.label_id'),
-                  label: 'Etiqueta (id)',
-                  hint: 'id de la SessionLabel',
-                  controller: _labelIdCtrl,
-                  enabled: !isMutating,
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                _LabelActionPicker(
-                  selected: _labelAction,
-                  enabled: !isMutating,
-                  onSelected: (a) => setState(() => _labelAction = a),
-                ),
-              ],
-              const SizedBox(height: AppTokens.sp4),
-              _FlowSelector(
-                editing: widget.editing,
-                selectedFlowId: _flowId,
-                enabled: !isMutating,
-                onSelected: (id) => setState(() => _flowId = id),
-              ),
-              const SizedBox(height: AppTokens.sp4),
-              Row(
-                key: const Key('trigger_edit.active_switch'),
-                children: <Widget>[
-                  Switch(
-                    value: _isActive,
-                    onChanged: isMutating
-                        ? null
-                        : (v) => setState(() => _isActive = v),
-                  ),
-                  const SizedBox(width: AppTokens.sp2),
-                  Expanded(
-                    child: Text(
-                      'Activo — el disparador evalúa mensajes nuevos.',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppTokens.text2,
+          final failure = state is TriggersMutationFailed
+              ? state.failure
+              : null;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(AppTokens.sp6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        widget.editing == null
+                            ? 'Nuevo disparador'
+                            : 'Editar disparador',
+                        style: textTheme.titleLarge,
                       ),
                     ),
+                    if (widget.editing != null)
+                      IconButton(
+                        key: const Key('trigger_edit.delete'),
+                        tooltip: 'Eliminar disparador',
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: AppTokens.danger,
+                        ),
+                        onPressed: isMutating ? null : _confirmDelete,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppTokens.sp4),
+                _TypePicker(
+                  selected: _triggerType,
+                  enabled: !isMutating && widget.editing == null,
+                  onSelected: (t) => setState(() => _triggerType = t),
+                ),
+                const SizedBox(height: AppTokens.sp4),
+                if (_isText) ...<Widget>[
+                  AppTextField(
+                    key: const Key('trigger_edit.keyword'),
+                    label: 'Palabra clave',
+                    hint: 'Texto que dispara el flow',
+                    controller: _keywordCtrl,
+                    enabled: !isMutating,
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  _MatchPicker(
+                    selected: _matchType,
+                    enabled: !isMutating,
+                    onSelected: (m) => setState(() => _matchType = m),
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  _ScopePicker(
+                    selected: _scope,
+                    enabled: !isMutating,
+                    onSelected: (s) => setState(() => _scope = s),
+                  ),
+                ] else ...<Widget>[
+                  AppTextField(
+                    key: const Key('trigger_edit.label_id'),
+                    label: 'Etiqueta (id)',
+                    hint: 'id de la SessionLabel',
+                    controller: _labelIdCtrl,
+                    enabled: !isMutating,
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  _LabelActionPicker(
+                    selected: _labelAction,
+                    enabled: !isMutating,
+                    onSelected: (a) => setState(() => _labelAction = a),
                   ),
                 ],
-              ),
-              if (failure != null) ...<Widget>[
                 const SizedBox(height: AppTokens.sp4),
-                _FailureCopy(
-                  failure: failure,
-                  isEdit: widget.editing != null,
+                _FlowSelector(
+                  editing: widget.editing,
+                  selectedFlowId: _flowId,
+                  enabled: !isMutating,
+                  onSelected: (id) => setState(() => _flowId = id),
+                ),
+                const SizedBox(height: AppTokens.sp4),
+                Row(
+                  key: const Key('trigger_edit.active_switch'),
+                  children: <Widget>[
+                    Switch(
+                      value: _isActive,
+                      onChanged: isMutating
+                          ? null
+                          : (v) => setState(() => _isActive = v),
+                    ),
+                    const SizedBox(width: AppTokens.sp2),
+                    Expanded(
+                      child: Text(
+                        'Activo — el disparador evalúa mensajes nuevos.',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppTokens.text2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (failure != null) ...<Widget>[
+                  const SizedBox(height: AppTokens.sp4),
+                  _FailureCopy(
+                    failure: failure,
+                    isEdit: widget.editing != null,
+                  ),
+                ],
+                const SizedBox(height: AppTokens.sp6),
+                AppButton.filled(
+                  key: const Key('trigger_edit.submit'),
+                  label: 'Guardar',
+                  onPressed: _isSubmittable ? _submit : null,
+                  loading: isMutating,
+                  fullWidth: true,
                 ),
               ],
-              const SizedBox(height: AppTokens.sp6),
-              AppButton.filled(
-                key: const Key('trigger_edit.submit'),
-                label: 'Guardar',
-                onPressed: _isSubmittable ? _submit : null,
-                loading: isMutating,
-                fullWidth: true,
-              ),
-            ],
-          ),
-        );
+            ),
+          );
         },
       ),
     );
@@ -469,9 +471,9 @@ class _LabelActionPicker extends StatelessWidget {
 
 /// Selector de flow destino. En modo create es un dropdown con la
 /// lista del FlowsBloc del scope. En modo edit es una línea read-only
-/// con el nombre del flow ("→ Flujo: <nombre>") — el backend no
-/// acepta cambio de flowId en PUT (decisión nombrada), así que ni
-/// siquiera pintamos un widget interactivo.
+/// con el nombre del flow ("→ Flujo: ...") — el backend no acepta
+/// cambio de flowId en PUT (decisión nombrada), así que ni siquiera
+/// pintamos un widget interactivo.
 class _FlowSelector extends StatelessWidget {
   const _FlowSelector({
     required this.editing,

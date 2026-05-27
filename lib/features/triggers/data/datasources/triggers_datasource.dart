@@ -140,9 +140,7 @@ class DioTriggersDatasource implements TriggersDatasource {
       if (respBody == null) {
         throw const UnknownTriggersFailure();
       }
-      return TriggersMapper.triggerRespToEntity(
-        TriggerResp.fromJson(respBody),
-      );
+      return TriggersMapper.triggerRespToEntity(TriggerResp.fromJson(respBody));
     } on TriggersFailure {
       rethrow;
     } on DioException catch (e) {
@@ -186,9 +184,7 @@ class DioTriggersDatasource implements TriggersDatasource {
       if (respBody == null) {
         throw const UnknownTriggersFailure();
       }
-      return TriggersMapper.triggerRespToEntity(
-        TriggerResp.fromJson(respBody),
-      );
+      return TriggersMapper.triggerRespToEntity(TriggerResp.fromJson(respBody));
     } on TriggersFailure {
       rethrow;
     } on DioException catch (e) {

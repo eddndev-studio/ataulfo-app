@@ -210,7 +210,9 @@ void main() {
       ),
       expect: () => <TriggersState>[
         TriggersMutating(<Trigger>[_text()]),
-        TriggersMutationFailed(<Trigger>[_text()], const TriggersInvalidFailure()),
+        TriggersMutationFailed(<Trigger>[
+          _text(),
+        ], const TriggersInvalidFailure()),
       ],
     );
 
@@ -219,9 +221,7 @@ void main() {
       build: () {
         when(
           () => repo.listTriggers('tpl1'),
-        ).thenAnswer(
-          (_) async => <Trigger>[_text(keyword: 'editado')],
-        );
+        ).thenAnswer((_) async => <Trigger>[_text(keyword: 'editado')]);
         when(
           () => repo.updateTrigger(
             triggerId: any(named: 'triggerId'),
@@ -288,7 +288,9 @@ void main() {
       ),
       expect: () => <TriggersState>[
         TriggersMutating(<Trigger>[_text()]),
-        TriggersMutationFailed(<Trigger>[_text()], const TriggersNotFoundFailure()),
+        TriggersMutationFailed(<Trigger>[
+          _text(),
+        ], const TriggersNotFoundFailure()),
       ],
     );
 
@@ -302,8 +304,7 @@ void main() {
         return TriggersBloc(repo: repo, templateId: 'tpl1');
       },
       seed: () => TriggersLoaded(<Trigger>[_text(), _label()]),
-      act: (bloc) =>
-          bloc.add(const TriggersDeleteRequested(triggerId: 't1')),
+      act: (bloc) => bloc.add(const TriggersDeleteRequested(triggerId: 't1')),
       expect: () => <TriggersState>[
         TriggersMutating(<Trigger>[_text(), _label()]),
         const TriggersLoading(),
@@ -366,10 +367,9 @@ void main() {
         ).thenAnswer((_) async => _text(keyword: 'reintento'));
         return TriggersBloc(repo: repo, templateId: 'tpl1');
       },
-      seed: () => TriggersMutationFailed(
-        <Trigger>[_text()],
-        const TriggersInvalidFailure(),
-      ),
+      seed: () => TriggersMutationFailed(<Trigger>[
+        _text(),
+      ], const TriggersInvalidFailure()),
       act: (bloc) => bloc.add(
         const TriggersUpdateRequested(
           triggerId: 't1',

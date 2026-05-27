@@ -125,11 +125,23 @@ void main() {
 
       expect(find.text('Nuevo disparador'), findsOneWidget);
       expect(find.byKey(const Key('trigger_edit.type_picker')), findsOneWidget);
-      expect(find.byKey(const Key('trigger_edit.match_picker')), findsOneWidget);
-      expect(find.byKey(const Key('trigger_edit.scope_picker')), findsOneWidget);
+      expect(
+        find.byKey(const Key('trigger_edit.match_picker')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('trigger_edit.scope_picker')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('trigger_edit.keyword')), findsOneWidget);
-      expect(find.byKey(const Key('trigger_edit.flow_dropdown')), findsOneWidget);
-      expect(find.byKey(const Key('trigger_edit.active_switch')), findsOneWidget);
+      expect(
+        find.byKey(const Key('trigger_edit.flow_dropdown')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('trigger_edit.active_switch')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('trigger_edit.submit')), findsOneWidget);
     });
 
@@ -207,8 +219,14 @@ void main() {
         await tester.pump();
 
         expect(find.byKey(const Key('trigger_edit.keyword')), findsNothing);
-        expect(find.byKey(const Key('trigger_edit.match_picker')), findsNothing);
-        expect(find.byKey(const Key('trigger_edit.scope_picker')), findsNothing);
+        expect(
+          find.byKey(const Key('trigger_edit.match_picker')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('trigger_edit.scope_picker')),
+          findsNothing,
+        );
         expect(find.byKey(const Key('trigger_edit.label_id')), findsOneWidget);
         expect(
           find.byKey(const Key('trigger_edit.label_action_picker')),
@@ -284,8 +302,14 @@ void main() {
         );
         // Picker de type NO se cambia en edit: deshabilitado.
         // El flow dropdown NO debe aparecer; en su lugar va el read-only.
-        expect(find.byKey(const Key('trigger_edit.flow_dropdown')), findsNothing);
-        expect(find.byKey(const Key('trigger_edit.flow_readonly')), findsOneWidget);
+        expect(
+          find.byKey(const Key('trigger_edit.flow_dropdown')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('trigger_edit.flow_readonly')),
+          findsOneWidget,
+        );
         expect(find.text('→ Flujo: Bienvenida'), findsOneWidget);
       },
     );
@@ -314,7 +338,10 @@ void main() {
       await tester.tap(find.byKey(const Key('trigger_edit.delete')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('trigger_edit.delete_confirm')), findsOneWidget);
+      expect(
+        find.byKey(const Key('trigger_edit.delete_confirm')),
+        findsOneWidget,
+      );
 
       // Confirma.
       await tester.tap(find.byKey(const Key('trigger_edit.delete_confirm.ok')));
@@ -386,7 +413,7 @@ void main() {
         whenListen(
           triggers,
           Stream<TriggersState>.fromIterable(<TriggersState>[
-            TriggersMutationFailed(<Trigger>[], const TriggersInvalidFailure()),
+            const TriggersMutationFailed(<Trigger>[], TriggersInvalidFailure()),
           ]),
           initialState: const TriggersLoaded(<Trigger>[]),
         );
@@ -400,25 +427,22 @@ void main() {
       },
     );
 
-    testWidgets(
-      'MutationFailed(Network) muestra copy de red',
-      (tester) async {
-        whenListen(
-          triggers,
-          Stream<TriggersState>.fromIterable(<TriggersState>[
-            TriggersMutationFailed(<Trigger>[], const TriggersNetworkFailure()),
-          ]),
-          initialState: const TriggersLoaded(<Trigger>[]),
-        );
-        await pumpHost(tester);
-        await tester.pump();
+    testWidgets('MutationFailed(Network) muestra copy de red', (tester) async {
+      whenListen(
+        triggers,
+        Stream<TriggersState>.fromIterable(<TriggersState>[
+          const TriggersMutationFailed(<Trigger>[], TriggersNetworkFailure()),
+        ]),
+        initialState: const TriggersLoaded(<Trigger>[]),
+      );
+      await pumpHost(tester);
+      await tester.pump();
 
-        expect(
-          find.byKey(const Key('trigger_edit.error.network')),
-          findsOneWidget,
-        );
-      },
-    );
+      expect(
+        find.byKey(const Key('trigger_edit.error.network')),
+        findsOneWidget,
+      );
+    });
 
     testWidgets(
       'MutationFailed(NotFound) en edit muestra copy "ya no existe"',
@@ -426,7 +450,10 @@ void main() {
         whenListen(
           triggers,
           Stream<TriggersState>.fromIterable(<TriggersState>[
-            TriggersMutationFailed(<Trigger>[], const TriggersNotFoundFailure()),
+            const TriggersMutationFailed(
+              <Trigger>[],
+              TriggersNotFoundFailure(),
+            ),
           ]),
           initialState: const TriggersLoaded(<Trigger>[]),
         );
@@ -442,41 +469,40 @@ void main() {
   });
 
   group('TriggerEditSheet · auto-pop on success', () {
-    testWidgets(
-      'tras submit exitoso → estado Loaded pop-ea el sheet',
-      (tester) async {
-        // Controlamos el stream del bloc manualmente para emitir
-        // estados en el orden y momento que el test pida — usar
-        // Stream.fromIterable los emite todos antes de que el sheet
-        // monte y _didSubmit alcance a quedar en true.
-        final controller = StreamController<TriggersState>.broadcast();
-        addTearDown(controller.close);
-        var current = const TriggersLoaded(<Trigger>[]) as TriggersState;
-        when(() => triggers.state).thenAnswer((_) => current);
-        whenListen(triggers, controller.stream, initialState: current);
+    testWidgets('tras submit exitoso → estado Loaded pop-ea el sheet', (
+      tester,
+    ) async {
+      // Controlamos el stream del bloc manualmente para emitir
+      // estados en el orden y momento que el test pida — usar
+      // Stream.fromIterable los emite todos antes de que el sheet
+      // monte y _didSubmit alcance a quedar en true.
+      final controller = StreamController<TriggersState>.broadcast();
+      addTearDown(controller.close);
+      var current = const TriggersLoaded(<Trigger>[]) as TriggersState;
+      when(() => triggers.state).thenAnswer((_) => current);
+      whenListen(triggers, controller.stream, initialState: current);
 
-        tester.view.physicalSize = const Size(800, 2000);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppDesignTheme.dark(),
-            home: MultiBlocProvider(
-              providers: <BlocProvider<dynamic>>[
-                BlocProvider<TriggersBloc>.value(value: triggers),
-                BlocProvider<FlowsBloc>.value(value: flows),
-              ],
-              child: Navigator(
-                onGenerateRoute: (_) => MaterialPageRoute<void>(
-                  builder: (rootCtx) => Scaffold(
-                    body: Builder(
-                      builder: (innerCtx) => ElevatedButton(
-                        child: const Text('open'),
-                        onPressed: () => showModalBottomSheet<void>(
-                          context: innerCtx,
-                          builder: (_) => const TriggerEditSheet(),
-                        ),
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TriggersBloc>.value(value: triggers),
+              BlocProvider<FlowsBloc>.value(value: flows),
+            ],
+            child: Navigator(
+              onGenerateRoute: (_) => MaterialPageRoute<void>(
+                builder: (rootCtx) => Scaffold(
+                  body: Builder(
+                    builder: (innerCtx) => ElevatedButton(
+                      child: const Text('open'),
+                      onPressed: () => showModalBottomSheet<void>(
+                        context: innerCtx,
+                        builder: (_) => const TriggerEditSheet(),
                       ),
                     ),
                   ),
@@ -484,50 +510,49 @@ void main() {
               ),
             ),
           ),
-        );
+        ),
+      );
 
-        await tester.tap(find.text('open'));
-        await tester.pumpAndSettle();
-        expect(find.text('Nuevo disparador'), findsOneWidget);
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nuevo disparador'), findsOneWidget);
 
-        // Llena keyword + selecciona flow + submit (dispara _didSubmit).
-        await tester.enterText(
-          find.byKey(const Key('trigger_edit.keyword')),
-          'hola',
-        );
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Bienvenida').last);
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
-        await tester.pump();
+      // Llena keyword + selecciona flow + submit (dispara _didSubmit).
+      await tester.enterText(
+        find.byKey(const Key('trigger_edit.keyword')),
+        'hola',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bienvenida').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('trigger_edit.submit')));
+      await tester.pump();
 
-        // Ahora simulo la cadena Mutating → Loading → Loaded del bloc.
-        current = TriggersMutating(<Trigger>[]);
-        controller.add(current);
-        await tester.pump();
-        current = const TriggersLoading();
-        controller.add(current);
-        await tester.pump();
-        current = TriggersLoaded(<Trigger>[
-          _textTrigger(id: 'new', keyword: 'hola'),
-        ]);
-        controller.add(current);
-        await tester.pumpAndSettle();
+      // Ahora simulo la cadena Mutating → Loading → Loaded del bloc.
+      current = const TriggersMutating(<Trigger>[]);
+      controller.add(current);
+      await tester.pump();
+      current = const TriggersLoading();
+      controller.add(current);
+      await tester.pump();
+      current = TriggersLoaded(<Trigger>[
+        _textTrigger(id: 'new', keyword: 'hola'),
+      ]);
+      controller.add(current);
+      await tester.pumpAndSettle();
 
-        expect(find.text('Nuevo disparador'), findsNothing);
-      },
-    );
+      expect(find.text('Nuevo disparador'), findsNothing);
+    });
 
-    testWidgets(
-      'Loaded ANTES del submit NO cierra el sheet (sin _didSubmit)',
-      (tester) async {
-        // El sheet arranca con estado Loaded vigente; si popeara siempre
-        // con Loaded, no podría ni montarse. _didSubmit gate-a el pop.
-        await pumpHost(tester);
-        expect(find.text('Nuevo disparador'), findsOneWidget);
-      },
-    );
+    testWidgets('Loaded ANTES del submit NO cierra el sheet (sin _didSubmit)', (
+      tester,
+    ) async {
+      // El sheet arranca con estado Loaded vigente; si popeara siempre
+      // con Loaded, no podría ni montarse. _didSubmit gate-a el pop.
+      await pumpHost(tester);
+      expect(find.text('Nuevo disparador'), findsOneWidget);
+    });
   });
 }
