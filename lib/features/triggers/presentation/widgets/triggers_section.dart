@@ -38,6 +38,15 @@ class TriggersSection extends StatelessWidget {
           ),
         ),
         TriggersLoaded(triggers: final ts) => _TriggersList(items: ts),
+        // Mutating preserva la lista visible mientras corre la mutación
+        // — el sheet abierto ya muestra su propio spinner. La sección no
+        // refleja el in-flight para no oscurecer la página entera.
+        TriggersMutating(triggers: final ts) => _TriggersList(items: ts),
+        // MutationFailed también preserva la lista; el error se propaga
+        // al sheet vía el BlocListener que ahí escucha. Si no hay sheet
+        // abierto (caso raro: la mutación cerró el sheet antes del
+        // failure), la sección queda muda — la lista vigente sigue ahí.
+        TriggersMutationFailed(triggers: final ts) => _TriggersList(items: ts),
         TriggersFailed(failure: final f) => _TriggersFailedView(failure: f),
       },
     );
