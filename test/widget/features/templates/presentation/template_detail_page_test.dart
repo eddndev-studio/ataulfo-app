@@ -1290,6 +1290,24 @@ void main() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
+    testWidgets('vive dentro de AppCard con key contractual', (tester) async {
+      await tester.pumpWidget(host());
+
+      final cardFinder = find.byKey(const Key('template_detail.card.triggers'));
+      expect(cardFinder, findsOneWidget);
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Disparadores')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.byKey(const Key('triggers.empty')),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('siempre muestra el título "Disparadores"', (tester) async {
       await tester.pumpWidget(host());
       expect(find.text('Disparadores'), findsOneWidget);
