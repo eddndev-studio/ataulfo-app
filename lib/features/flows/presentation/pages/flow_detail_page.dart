@@ -58,6 +58,18 @@ class _FlowDetailPageState extends State<FlowDetailPage>
       builder: (context, state) => switch (state) {
         FlowDetailLoading() => const _LoadingView(),
         FlowDetailLoaded(flow: final f) => _LoadedShell(tab: _tab, flow: f),
+        // Mientras la mutación de Settings está en vuelo o falló, el
+        // shell sigue visible con el flow del snapshot: el tab Pasos
+        // y Triggers ven la misma cabecera; el tab Configuración lee
+        // el estado directamente y actualiza su UX.
+        FlowDetailSettingsSaving(flow: final f) => _LoadedShell(
+          tab: _tab,
+          flow: f,
+        ),
+        FlowDetailSettingsSaveFailed(flow: final f) => _LoadedShell(
+          tab: _tab,
+          flow: f,
+        ),
         FlowDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );

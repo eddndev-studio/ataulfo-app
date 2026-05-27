@@ -171,7 +171,7 @@ void main() {
   });
 
   group('FlowDetailBloc — update settings', () {
-    const _flowV4 = Flow(
+    const flowV4 = Flow(
       id: 'f1',
       templateId: 't1',
       name: 'Bienvenida',
@@ -185,10 +185,10 @@ void main() {
     blocTest<FlowDetailBloc, FlowDetailState>(
       'UpdateSettingsRequested desde Loaded ok → Saving → Loading → Loaded(refrescado)',
       build: () {
-        when(() => repo.flowById('f1')).thenAnswer((_) async => _flowV4);
+        when(() => repo.flowById('f1')).thenAnswer((_) async => flowV4);
         when(
           () => repo.listFlows('t1'),
-        ).thenAnswer((_) async => const <Flow>[_flowV4, _sibling1]);
+        ).thenAnswer((_) async => const <Flow>[flowV4, _sibling1]);
         when(
           () => repo.updateFlow(
             flowId: any(named: 'flowId'),
@@ -199,7 +199,7 @@ void main() {
             usageLimit: any(named: 'usageLimit'),
             excludesFlows: any(named: 'excludesFlows'),
           ),
-        ).thenAnswer((_) async => _flowV4);
+        ).thenAnswer((_) async => flowV4);
         return FlowDetailBloc(repo: repo, id: 'f1');
       },
       seed: () => const FlowDetailLoaded(
@@ -221,7 +221,7 @@ void main() {
           siblingsFailed: false,
         ),
         FlowDetailLoading(),
-        FlowDetailLoaded(_flowV4, <Flow>[_sibling1], siblingsFailed: false),
+        FlowDetailLoaded(flowV4, <Flow>[_sibling1], siblingsFailed: false),
       ],
       verify: (_) {
         // El PUT recibe name + isActive + version del snapshot, no del evento.
@@ -350,10 +350,10 @@ void main() {
     blocTest<FlowDetailBloc, FlowDetailState>(
       'UpdateSettings desde SettingsSaveFailed reusa el snapshot (segundo intento)',
       build: () {
-        when(() => repo.flowById('f1')).thenAnswer((_) async => _flowV4);
+        when(() => repo.flowById('f1')).thenAnswer((_) async => flowV4);
         when(
           () => repo.listFlows('t1'),
-        ).thenAnswer((_) async => const <Flow>[_flowV4]);
+        ).thenAnswer((_) async => const <Flow>[flowV4]);
         when(
           () => repo.updateFlow(
             flowId: any(named: 'flowId'),
@@ -364,7 +364,7 @@ void main() {
             usageLimit: any(named: 'usageLimit'),
             excludesFlows: any(named: 'excludesFlows'),
           ),
-        ).thenAnswer((_) async => _flowV4);
+        ).thenAnswer((_) async => flowV4);
         return FlowDetailBloc(repo: repo, id: 'f1');
       },
       seed: () => const FlowDetailSettingsSaveFailed(
@@ -383,7 +383,7 @@ void main() {
       expect: () => const <FlowDetailState>[
         FlowDetailSettingsSaving(_flow, <Flow>[], siblingsFailed: false),
         FlowDetailLoading(),
-        FlowDetailLoaded(_flowV4, <Flow>[], siblingsFailed: false),
+        FlowDetailLoaded(flowV4, <Flow>[], siblingsFailed: false),
       ],
     );
   });
