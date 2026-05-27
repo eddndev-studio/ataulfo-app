@@ -31,15 +31,26 @@ void main() {
     when(() => bloc.state).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
   });
 
-  Widget host({fdom.Step? editing}) => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: BlocProvider<FlowStepsBloc>.value(
-      value: bloc,
-      child: Scaffold(
-        body: SafeArea(child: StepEditSheet(editing: editing)),
+  // Surface 800x600 (default de flutter_test) deja el submit fuera del
+  // viewport tras añadir el picker de tipo en F6. `pumpHost` agranda el
+  // viewport para que tap(submit) conecte y restaura al final del test.
+  Future<void> pumpHost(WidgetTester tester, {fdom.Step? editing}) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: BlocProvider<FlowStepsBloc>.value(
+          value: bloc,
+          child: Scaffold(
+            body: SafeArea(child: StepEditSheet(editing: editing)),
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   const editingStep = fdom.Step(
     id: 's1',
@@ -58,7 +69,7 @@ void main() {
     testWidgets('renderiza título "Nuevo paso", campo content y sliders', (
       tester,
     ) async {
-      await tester.pumpWidget(host());
+      await pumpHost(tester);
 
       expect(find.text('Nuevo paso'), findsOneWidget);
       expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
@@ -71,7 +82,7 @@ void main() {
     testWidgets(
       'submit con content vacío es no-op (no dispatcha AddRequested)',
       (tester) async {
-        await tester.pumpWidget(host());
+        await pumpHost(tester);
 
         await tester.tap(find.byKey(const Key('step_edit.submit')));
         await tester.pump();
@@ -83,7 +94,7 @@ void main() {
     testWidgets(
       'submit con content válido dispatcha AddRequested con los valores ingresados',
       (tester) async {
-        await tester.pumpWidget(host());
+        await pumpHost(tester);
 
         await tester.enterText(
           find.byKey(const Key('step_edit.content')),
@@ -113,7 +124,7 @@ void main() {
           () => bloc.state,
         ).thenReturn(const FlowStepsMutating(<fdom.Step>[]));
 
-        await tester.pumpWidget(host());
+        await pumpHost(tester);
         await tester.enterText(find.byKey(const Key('step_edit.content')), 'X');
         await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.submit')));
@@ -133,7 +144,7 @@ void main() {
           ),
         );
 
-        await tester.pumpWidget(host());
+        await pumpHost(tester);
 
         expect(
           find.byKey(const Key('step_edit.error.invalid_step')),
@@ -149,7 +160,7 @@ void main() {
         const FlowStepsMutationFailed(<fdom.Step>[], FlowsNetworkFailure()),
       );
 
-      await tester.pumpWidget(host());
+      await pumpHost(tester);
 
       expect(find.byKey(const Key('step_edit.error.network')), findsOneWidget);
     });
@@ -159,7 +170,7 @@ void main() {
     testWidgets(
       'renderiza picker con 7 chips (text + 6 multimedia); default TEXT',
       (tester) async {
-        await tester.pumpWidget(host());
+        await pumpHost(tester);
 
         for (final id in const <String>[
           'text',
@@ -199,7 +210,7 @@ void main() {
     testWidgets('renderiza título "Editar paso" y prefilling del content', (
       tester,
     ) async {
-      await tester.pumpWidget(host(editing: editingStep));
+      await pumpHost(tester, editing: editingStep);
 
       expect(find.text('Editar paso'), findsOneWidget);
       // El TextField está prefilled con el content del editing.
@@ -215,7 +226,7 @@ void main() {
     testWidgets('edit con cambios dispatcha UpdateRequested con only-changed', (
       tester,
     ) async {
-      await tester.pumpWidget(host(editing: editingStep));
+      await pumpHost(tester, editing: editingStep);
       // Cambia solo el content; los sliders/switch quedan iguales.
       await tester.enterText(
         find.byKey(const Key('step_edit.content')),
@@ -235,7 +246,7 @@ void main() {
     testWidgets('edit sin cambios es no-op (no dispatcha UpdateRequested)', (
       tester,
     ) async {
-      await tester.pumpWidget(host(editing: editingStep));
+      await pumpHost(tester, editing: editingStep);
       // Sin tocar nada — sólo tap submit.
       await tester.tap(find.byKey(const Key('step_edit.submit')));
       await tester.pump();
@@ -246,7 +257,7 @@ void main() {
     testWidgets('edit con content vacío es no-op (gate del trim().isEmpty)', (
       tester,
     ) async {
-      await tester.pumpWidget(host(editing: editingStep));
+      await pumpHost(tester, editing: editingStep);
       await tester.enterText(find.byKey(const Key('step_edit.content')), '   ');
       await tester.pump();
       await tester.tap(find.byKey(const Key('step_edit.submit')));
@@ -260,7 +271,7 @@ void main() {
       (tester) async {
         registerFallbackValue(const FlowStepsDeleteRequested('s'));
 
-        await tester.pumpWidget(host(editing: editingStep));
+        await pumpHost(tester, editing: editingStep);
         expect(find.byKey(const Key('step_edit.delete')), findsOneWidget);
 
         await tester.tap(find.byKey(const Key('step_edit.delete')));
@@ -280,7 +291,7 @@ void main() {
     );
 
     testWidgets('modo add no muestra botón eliminar', (tester) async {
-      await tester.pumpWidget(host());
+      await pumpHost(tester);
 
       expect(find.byKey(const Key('step_edit.delete')), findsNothing);
     });
@@ -288,7 +299,7 @@ void main() {
     testWidgets('tap en cancelar del dialog NO dispatcha DeleteRequested', (
       tester,
     ) async {
-      await tester.pumpWidget(host(editing: editingStep));
+      await pumpHost(tester, editing: editingStep);
       await tester.tap(find.byKey(const Key('step_edit.delete')));
       await tester.pumpAndSettle();
       await tester.tap(

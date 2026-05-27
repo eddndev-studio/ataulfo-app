@@ -9,6 +9,7 @@ import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_steps_bloc.dart';
+import 'step_type_label.dart';
 
 /// Modal sheet de creación/edición de un step TEXT (S11 F5a). Cuenta
 /// con tres controles: `content` (TextField multiline), `delayMs` y
@@ -42,11 +43,25 @@ class StepEditSheet extends StatefulWidget {
   State<StepEditSheet> createState() => _StepEditSheetState();
 }
 
+/// Tipos que el picker del sheet expone. CONDITIONAL_TIME se excluye:
+/// vive en su propio slice (F7) con un form específico (ventanas
+/// horarias + ramificación), no por chip.
+const List<fdom.StepType> _pickableTypes = <fdom.StepType>[
+  fdom.StepType.text,
+  fdom.StepType.image,
+  fdom.StepType.video,
+  fdom.StepType.document,
+  fdom.StepType.audio,
+  fdom.StepType.ptt,
+  fdom.StepType.sticker,
+];
+
 class _StepEditSheetState extends State<StepEditSheet> {
   static const int _maxDelayMs = 5 * 60 * 1000;
   static const int _maxJitterPct = 100;
 
   late final TextEditingController _contentCtrl;
+  late fdom.StepType _type;
   late int _delayMs;
   late int _jitterPct;
   late bool _aiOnly;
@@ -57,6 +72,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
     super.initState();
     final ed = widget.editing;
     _contentCtrl = TextEditingController(text: ed?.content ?? '');
+    _type = ed?.type ?? fdom.StepType.text;
     _delayMs = ed?.delayMs ?? 0;
     _jitterPct = ed?.jitterPct ?? 0;
     _aiOnly = ed?.aiOnly ?? false;
@@ -195,6 +211,12 @@ class _StepEditSheetState extends State<StepEditSheet> {
                           onPressed: isMutating ? null : _confirmDelete,
                         ),
                     ],
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  _TypePicker(
+                    selected: _type,
+                    enabled: !isMutating,
+                    onSelected: (t) => setState(() => _type = t),
                   ),
                   const SizedBox(height: AppTokens.sp4),
                   AppTextField(
@@ -375,6 +397,46 @@ class _FailureCopy extends StatelessWidget {
       'No pudimos guardar el paso. Inténtalo de nuevo.',
     ),
   };
+}
+
+class _TypePicker extends StatelessWidget {
+  const _TypePicker({
+    required this.selected,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  final fdom.StepType selected;
+  final bool enabled;
+  final ValueChanged<fdom.StepType> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Tipo',
+          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+        ),
+        const SizedBox(height: AppTokens.sp2),
+        Wrap(
+          spacing: AppTokens.sp2,
+          runSpacing: AppTokens.sp2,
+          children: <Widget>[
+            for (final t in _pickableTypes)
+              ChoiceChip(
+                key: Key('step_edit.type.${t.name}'),
+                label: Text(stepTypeLabel(t)),
+                selected: selected == t,
+                onSelected: enabled ? (_) => onSelected(t) : null,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 /// Convierte ms a un label legible. <60s muestra "Xs"; 60s+ muestra
