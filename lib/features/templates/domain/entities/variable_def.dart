@@ -1,19 +1,40 @@
-/// Tipo de una variable de plantilla (S03). v1 sólo `text` — espejo del
-/// set mínimo del backend (`internal/domain/template/variable_def.go`).
-/// Cualquier extensión futura (number/date) aterriza primero aquí como
-/// entrada explícita; un valor desconocido en el wire es bug de contrato
-/// y debe romper en boot, no degradar.
+/// Tipo de una variable de plantilla (S03). Set v1 espejo del backend
+/// (`agentic-go/internal/domain/template/variable_def.go`): text + label
+/// + 4 multimedia. El interpolador del engine trata el valor como string
+/// en runtime; el type es metadata semántica para el editor.
+///
+/// Política de wire: tokens lower-case canonical (el backend normaliza
+/// al guardar). Cualquier token con casing distinto o fuera del set es
+/// drift de contrato y rompe fail-loud — no se degrada a un "unknown"
+/// cosmético, que escondería el bug del backend o de una versión del
+/// cliente desactualizada.
 enum VarType {
-  text;
+  text,
+  label,
+  image,
+  video,
+  audio,
+  document;
 
   static VarType fromWire(String raw) => switch (raw) {
     'text' => VarType.text,
+    'label' => VarType.label,
+    'image' => VarType.image,
+    'video' => VarType.video,
+    'audio' => VarType.audio,
+    'document' => VarType.document,
     _ => throw ArgumentError.value(raw, 'VarType.fromWire'),
   };
 
-  /// Serializa al token canónico del wire (mismo cardinal que fromWire).
+  /// Serializa al token canónico del wire. Switch exhaustivo: añadir un
+  /// valor al enum sin extender este switch falla en compile-time.
   String toWire() => switch (this) {
     VarType.text => 'text',
+    VarType.label => 'label',
+    VarType.image => 'image',
+    VarType.video => 'video',
+    VarType.audio => 'audio',
+    VarType.document => 'document',
   };
 }
 
