@@ -1,3 +1,12 @@
+// Archivo > 400 LOC justificado: el form CT es un solo widget cohesivo
+// con tres bloques (tz selector, lista de ventanas día/hora, dropdowns
+// onMatch/onElse) que comparten estado mutable (`_EditableWindow`) y
+// callback canónico (`_emit` → `onChanged(metadataJson?)`). Separar los
+// sub-widgets (`_WindowBlock`, `_TimeButton`, `_OrderDropdown`) a otros
+// archivos los desacoplaría del estado del padre — duplicaría callbacks
+// y constructors sin mejorar cohesión. Cuando aterrice una segunda
+// representación (ej. preview gráfico de la ventana semanal) el split
+// será natural; hoy no aporta.
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
@@ -65,11 +74,7 @@ const ConditionalTimeMetadata _defaultSeed = ConditionalTimeMetadata(
 /// `Set<int>` de días UI (0..6, L→D), TimeOfDay para from/to. Al
 /// validar se serializa a `TimeWindow` con días wire ordenados.
 class _EditableWindow {
-  _EditableWindow({
-    required this.daysUi,
-    required this.from,
-    required this.to,
-  });
+  _EditableWindow({required this.daysUi, required this.from, required this.to});
 
   factory _EditableWindow.fromWire(TimeWindow w) => _EditableWindow(
     daysUi: w.days.map(wireDayToUi).toSet(),

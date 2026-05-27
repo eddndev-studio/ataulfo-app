@@ -1,11 +1,12 @@
 // Archivo > 400 LOC justificado: el sheet es un único modal cohesionado
-// que cubre create/edit + 7 step types (TEXT + 6 multimedia) + gating
-// por estado del bloc. Los helpers privados (_TypePicker, _SliderField,
-// _FailureCopy) están acoplados al estado de _StepEditSheetState (gates
-// `enabled`, copy del failure) — extraerlos a archivos sueltos sólo
-// movería ruido sin mejorar cohesión. Cuando CONDITIONAL_TIME aterrice
-// con su form propio (ventanas horarias + ramificación) será momento de
-// partir el modal — no antes.
+// que orquesta los 8 step types — TEXT/multimedia comparten controles
+// (content + opcional media_url), CONDITIONAL_TIME swap-ea el cuerpo
+// por `ConditionalTimeForm` (su widget propio). El sheet sigue siendo
+// quien gestiona el ciclo de create/edit, gates de submit, only-changed
+// del PATCH y el _FailureCopy contextual. Los helpers privados
+// (_TypePicker, _SliderField, _FailureCopy) están acoplados al estado
+// de _StepEditSheetState — extraerlos a archivos sueltos movería ruido
+// sin mejorar cohesión.
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -500,17 +501,20 @@ class _FailureCopy extends StatelessWidget {
     );
   }
 
-  static (String key, String copy) _resolve(FlowsFailure f, bool isCT) =>
-      switch (f) {
-    FlowsInvalidStepFailure() => isCT
-        ? (
-            'step_edit.error.invalid_step.conditional',
-            'Revisa horario o destinos del condicional.',
-          )
-        : (
-            'step_edit.error.invalid_step',
-            'Revisa los campos del paso: el mensaje no puede estar vacío.',
-          ),
+  static (String key, String copy) _resolve(
+    FlowsFailure f,
+    bool isCT,
+  ) => switch (f) {
+    FlowsInvalidStepFailure() =>
+      isCT
+          ? (
+              'step_edit.error.invalid_step.conditional',
+              'Revisa horario o destinos del condicional.',
+            )
+          : (
+              'step_edit.error.invalid_step',
+              'Revisa los campos del paso: el mensaje no puede estar vacío.',
+            ),
     FlowsForbiddenFailure() => (
       'step_edit.error.forbidden',
       'Tu rol no permite editar pasos. Pide acceso a un admin.',
@@ -589,10 +593,7 @@ List<int> _availableOrdersFromStateImpl(FlowStepsState s, String? editingId) {
   } else {
     return const <int>[];
   }
-  return steps
-      .where((st) => st.id != editingId)
-      .map((st) => st.order)
-      .toList();
+  return steps.where((st) => st.id != editingId).map((st) => st.order).toList();
 }
 
 /// Convierte ms a un label legible. <60s muestra "Xs"; 60s+ muestra

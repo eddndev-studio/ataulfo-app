@@ -143,9 +143,7 @@ TimeWindow _parseWindow(Object? raw, int index) {
   }
   final daysRaw = raw['days'];
   if (daysRaw is! List || daysRaw.isEmpty) {
-    throw FormatException(
-      'conditional_time metadata: window $index sin days',
-    );
+    throw FormatException('conditional_time metadata: window $index sin days');
   }
   final days = <int>[];
   for (final d in daysRaw) {

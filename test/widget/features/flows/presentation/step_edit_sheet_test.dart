@@ -501,32 +501,24 @@ void main() {
       },
     );
 
-    testWidgets(
-      'MutationFailed con InvalidStepFailure en modo CT muestra copy '
-      'específico de horario/destinos',
-      (tester) async {
-        when(() => bloc.state).thenReturn(
-          const FlowStepsMutationFailed(
-            <fdom.Step>[],
-            FlowsInvalidStepFailure(),
-          ),
-        );
-        await pumpHost(tester);
-        await tester.tap(
-          find.byKey(const Key('step_edit.type.conditionalTime')),
-        );
-        await tester.pumpAndSettle();
+    testWidgets('MutationFailed con InvalidStepFailure en modo CT muestra copy '
+        'específico de horario/destinos', (tester) async {
+      when(() => bloc.state).thenReturn(
+        const FlowStepsMutationFailed(<fdom.Step>[], FlowsInvalidStepFailure()),
+      );
+      await pumpHost(tester);
+      await tester.tap(find.byKey(const Key('step_edit.type.conditionalTime')));
+      await tester.pumpAndSettle();
 
-        expect(
-          find.byKey(const Key('step_edit.error.invalid_step.conditional')),
-          findsOneWidget,
-        );
-        expect(
-          find.text('Revisa horario o destinos del condicional.'),
-          findsOneWidget,
-        );
-      },
-    );
+      expect(
+        find.byKey(const Key('step_edit.error.invalid_step.conditional')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Revisa horario o destinos del condicional.'),
+        findsOneWidget,
+      );
+    });
   });
 
   group('StepEditSheet (Edit mode · conditionalTime)', () {
@@ -548,9 +540,9 @@ void main() {
     testWidgets(
       'edit CT hidrata el form con metadataJson del step (tz UTC visible)',
       (tester) async {
-        when(() => bloc.state).thenReturn(
-          const FlowStepsLoaded(<fdom.Step>[ctStep]),
-        );
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
         await pumpHost(tester, editing: ctStep);
 
         // El form CT está montado (no el content/media_url).
@@ -561,9 +553,9 @@ void main() {
     );
 
     testWidgets('edit CT sin cambios → submit es no-op', (tester) async {
-      when(() => bloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[ctStep]),
-      );
+      when(
+        () => bloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
       await pumpHost(tester, editing: ctStep);
       await tester.pumpAndSettle();
 
@@ -573,35 +565,32 @@ void main() {
       verifyNever(() => bloc.add(any()));
     });
 
-    testWidgets(
-      'edit CT con cambio (deselect día) → submit dispatcha '
-      'UpdateRequested(metadataJson)',
-      (tester) async {
-        when(() => bloc.state).thenReturn(
-          const FlowStepsLoaded(<fdom.Step>[ctStep]),
-        );
-        await pumpHost(tester, editing: ctStep);
-        await tester.pumpAndSettle();
+    testWidgets('edit CT con cambio (deselect día) → submit dispatcha '
+        'UpdateRequested(metadataJson)', (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
+      await pumpHost(tester, editing: ctStep);
+      await tester.pumpAndSettle();
 
-        // El step original tiene days [1,2] (Lun+Mar). uiIndex 0=Lun.
-        // Destildo Lunes — quedan solo Martes (wireDay 2).
-        await tester.tap(find.byKey(const Key('ct_form.window.0.day.0')));
-        await tester.pump();
+      // El step original tiene days [1,2] (Lun+Mar). uiIndex 0=Lun.
+      // Destildo Lunes — quedan solo Martes (wireDay 2).
+      await tester.tap(find.byKey(const Key('ct_form.window.0.day.0')));
+      await tester.pump();
 
-        await tester.tap(find.byKey(const Key('step_edit.submit')));
-        await tester.pump();
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
 
-        final captured = verify(() => bloc.add(captureAny())).captured;
-        expect(captured, hasLength(1));
-        final ev = captured.single as FlowStepsUpdateRequested;
-        expect(ev.stepId, 's-ct');
-        expect(ev.metadataJson, isNotNull);
-        // Después del cambio, days = [2] solamente.
-        expect(ev.metadataJson, contains('"days":[2]'));
-        // Otros campos no van al PATCH.
-        expect(ev.content, isNull);
-        expect(ev.delayMs, isNull);
-      },
-    );
+      final captured = verify(() => bloc.add(captureAny())).captured;
+      expect(captured, hasLength(1));
+      final ev = captured.single as FlowStepsUpdateRequested;
+      expect(ev.stepId, 's-ct');
+      expect(ev.metadataJson, isNotNull);
+      // Después del cambio, days = [2] solamente.
+      expect(ev.metadataJson, contains('"days":[2]'));
+      // Otros campos no van al PATCH.
+      expect(ev.content, isNull);
+      expect(ev.delayMs, isNull);
+    });
   });
 }
