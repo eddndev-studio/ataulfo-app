@@ -1,4 +1,5 @@
 import '../../domain/entities/flow.dart';
+import '../../domain/entities/step.dart' as fdom;
 import '../../domain/repositories/flows_repository.dart';
 import '../datasources/flows_datasource.dart';
 
@@ -12,4 +13,10 @@ class FlowsRepositoryImpl implements FlowsRepository {
 
   @override
   Future<List<Flow>> listFlows(String templateId) => _ds.listFlows(templateId);
+
+  @override
+  Future<Flow> flowById(String id) => _ds.flowById(id);
+
+  @override
+  Future<List<fdom.Step>> listSteps(String flowId) => _ds.listSteps(flowId);
 }
