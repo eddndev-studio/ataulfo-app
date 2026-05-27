@@ -61,6 +61,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
   static const int _maxJitterPct = 100;
 
   late final TextEditingController _contentCtrl;
+  late final TextEditingController _mediaCtrl;
   late fdom.StepType _type;
   late int _delayMs;
   late int _jitterPct;
@@ -72,11 +73,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
     super.initState();
     final ed = widget.editing;
     _contentCtrl = TextEditingController(text: ed?.content ?? '');
+    _mediaCtrl = TextEditingController(text: ed?.mediaRef ?? '');
     _type = ed?.type ?? fdom.StepType.text;
     _delayMs = ed?.delayMs ?? 0;
     _jitterPct = ed?.jitterPct ?? 0;
     _aiOnly = ed?.aiOnly ?? false;
     _contentCtrl.addListener(_onContentChanged);
+    _mediaCtrl.addListener(_onContentChanged);
   }
 
   void _onContentChanged() => setState(() {});
@@ -84,9 +87,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
   @override
   void dispose() {
     _contentCtrl.removeListener(_onContentChanged);
+    _mediaCtrl.removeListener(_onContentChanged);
     _contentCtrl.dispose();
+    _mediaCtrl.dispose();
     super.dispose();
   }
+
+  bool get _isMultimedia => _type != fdom.StepType.text;
 
   Future<void> _confirmDelete() async {
     final ed = widget.editing;
@@ -218,14 +225,26 @@ class _StepEditSheetState extends State<StepEditSheet> {
                     enabled: !isMutating,
                     onSelected: (t) => setState(() => _type = t),
                   ),
+                  if (_isMultimedia) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    AppTextField(
+                      key: const Key('step_edit.media_url'),
+                      label: 'URL o id del recurso',
+                      hint: 'https://… o id opaco del archivo subido',
+                      controller: _mediaCtrl,
+                      enabled: !isMutating,
+                    ),
+                  ],
                   const SizedBox(height: AppTokens.sp4),
                   AppTextField(
                     key: const Key('step_edit.content'),
-                    label: 'Mensaje',
-                    hint: 'Lo que el bot enviará al usuario',
+                    label: _isMultimedia ? 'Caption (opcional)' : 'Mensaje',
+                    hint: _isMultimedia
+                        ? 'Texto que acompaña al recurso (opcional)'
+                        : 'Lo que el bot enviará al usuario',
                     controller: _contentCtrl,
                     enabled: !isMutating,
-                    autofocus: true,
+                    autofocus: !_isMultimedia,
                     maxLines: 4,
                   ),
                   const SizedBox(height: AppTokens.sp4),
