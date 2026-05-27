@@ -6,6 +6,9 @@ import 'package:agentic/core/design/widgets/app_avatar.dart';
 import 'package:agentic/core/design/widgets/app_button.dart';
 import 'package:agentic/core/design/widgets/app_card.dart';
 import 'package:agentic/core/design/widgets/app_pill.dart';
+import 'package:agentic/features/flows/domain/entities/flow.dart' as flows;
+import 'package:agentic/features/flows/domain/failures/flows_failure.dart';
+import 'package:agentic/features/flows/presentation/bloc/flows_bloc.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
 import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
@@ -25,6 +28,9 @@ class _MockBloc extends MockBloc<TemplateDetailEvent, TemplateDetailState>
 
 class _MockVarDefsBloc extends MockBloc<VarDefsEvent, VarDefsState>
     implements VarDefsBloc {}
+
+class _MockFlowsBloc extends MockBloc<FlowsEvent, FlowsState>
+    implements FlowsBloc {}
 
 const _tpl = Template(
   id: 't1',
@@ -46,20 +52,28 @@ void main() {
   setUpAll(() {
     registerFallbackValue(const TemplateDetailLoadRequested());
     registerFallbackValue(const VarDefsLoadRequested());
+    registerFallbackValue(const FlowsLoadRequested());
   });
 
   late _MockBloc bloc;
   late _MockVarDefsBloc varDefsBloc;
+  late _MockFlowsBloc flowsBloc;
 
   setUp(() {
     bloc = _MockBloc();
     varDefsBloc = _MockVarDefsBloc();
+    flowsBloc = _MockFlowsBloc();
     when(() => bloc.state).thenReturn(const TemplateDetailLoading());
     // Default: var-defs Loaded vacío (estado terminal sin animaciones).
     // Tests específicos de la sección Variables sobreescriben este stub.
     when(
       () => varDefsBloc.state,
     ).thenReturn(const VarDefsLoaded(<VariableDef>[], 1));
+    // Default: flows Loaded vacío para que la sección Flujos no flashee
+    // Loading en los tests que no la ejercen.
+    when(
+      () => flowsBloc.state,
+    ).thenReturn(const FlowsLoaded(<flows.Flow>[]));
   });
 
   Widget host() => MaterialApp(
@@ -68,6 +82,7 @@ void main() {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<TemplateDetailBloc>.value(value: bloc),
         BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+        BlocProvider<FlowsBloc>.value(value: flowsBloc),
       ],
       // TemplateDetailPage es content-only; el host envuelve en Scaffold
       // para dar Material upstream a los widgets internos.
@@ -431,6 +446,7 @@ void main() {
       ).thenReturn(const VarDefsFailed(TemplatesNetworkFailure()));
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('var_defs.failed')));
       await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
       await tester.pump();
 
@@ -598,6 +614,7 @@ void main() {
         // El row del var-def es tappeable. Cualquier descendant
         // tappable que arranque el flujo está bien — clave: end-to-end
         // el sheet se monta con el editing pre-fillado.
+        await tester.ensureVisible(find.text('{{nombre}}'));
         await tester.tap(find.text('{{nombre}}'));
         await tester.pumpAndSettle();
 
@@ -659,6 +676,9 @@ void main() {
       when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(
+        find.byKey(const Key('var_defs.row.v1.delete')),
+      );
       await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
       await tester.pumpAndSettle();
 
@@ -685,6 +705,9 @@ void main() {
         when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
 
         await tester.pumpWidget(host());
+        await tester.ensureVisible(
+          find.byKey(const Key('var_defs.row.v1.delete')),
+        );
         await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Cancelar'));
@@ -711,6 +734,9 @@ void main() {
         when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
 
         await tester.pumpWidget(host());
+        await tester.ensureVisible(
+          find.byKey(const Key('var_defs.row.v1.delete')),
+        );
         await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Eliminar'));
@@ -803,6 +829,7 @@ void main() {
                 providers: <BlocProvider<dynamic>>[
                   BlocProvider<TemplateDetailBloc>.value(value: bloc),
                   BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
                 ],
                 child: const Scaffold(body: TemplateDetailPage()),
               ),
@@ -899,6 +926,7 @@ void main() {
                 providers: <BlocProvider<dynamic>>[
                   BlocProvider<TemplateDetailBloc>.value(value: bloc),
                   BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
                 ],
                 child: const Scaffold(body: TemplateDetailPage()),
               ),
@@ -940,6 +968,197 @@ void main() {
           <bool>[true],
           reason:
               'el botón debe usar push (no go) para que el back físico '
+              'vuelva al detalle de plantilla, no salga de la app',
+        );
+      },
+    );
+  });
+
+  // ── Sección Flujos (F1) ────────────────────────────────────────────────────
+  group('sección Flujos', () {
+    setUp(() {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+    });
+
+    testWidgets('siempre muestra el título "Flujos"', (tester) async {
+      await tester.pumpWidget(host());
+      expect(find.text('Flujos'), findsOneWidget);
+    });
+
+    testWidgets('FlowsLoading muestra spinner inline', (tester) async {
+      when(() => flowsBloc.state).thenReturn(const FlowsLoading());
+
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.loading')));
+
+      expect(find.byKey(const Key('flows.loading')), findsOneWidget);
+    });
+
+    testWidgets('FlowsLoaded([]) muestra empty state italic', (tester) async {
+      when(
+        () => flowsBloc.state,
+      ).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.empty')));
+
+      expect(find.byKey(const Key('flows.empty')), findsOneWidget);
+    });
+
+    testWidgets(
+      'FlowsLoaded con flows muestra una fila por flow (name visible)',
+      (tester) async {
+        when(() => flowsBloc.state).thenReturn(
+          const FlowsLoaded(<flows.Flow>[
+            flows.Flow(
+              id: 'f1',
+              templateId: 't1',
+              name: 'Bienvenida',
+              isActive: true,
+              version: 1,
+            ),
+            flows.Flow(
+              id: 'f2',
+              templateId: 't1',
+              name: 'Despedida',
+              isActive: false,
+              version: 2,
+            ),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+        await tester.ensureVisible(find.byKey(const Key('flows.row.f1')));
+
+        expect(find.byKey(const Key('flows.row.f1')), findsOneWidget);
+        expect(find.byKey(const Key('flows.row.f2')), findsOneWidget);
+        expect(find.text('Bienvenida'), findsOneWidget);
+        expect(find.text('Despedida'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'row de flow activo muestra pill primary; pausado muestra pill neutral',
+      (tester) async {
+        when(() => flowsBloc.state).thenReturn(
+          const FlowsLoaded(<flows.Flow>[
+            flows.Flow(
+              id: 'f1',
+              templateId: 't1',
+              name: 'Bienvenida',
+              isActive: true,
+              version: 1,
+            ),
+            flows.Flow(
+              id: 'f2',
+              templateId: 't1',
+              name: 'Despedida',
+              isActive: false,
+              version: 2,
+            ),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+        await tester.ensureVisible(find.byKey(const Key('flows.row.f1')));
+
+        expect(
+          find.byKey(const Key('flows.row.f1.status_pill')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('flows.row.f2.status_pill')),
+          findsOneWidget,
+        );
+        expect(find.text('Activo'), findsOneWidget);
+        expect(find.text('Pausado'), findsOneWidget);
+      },
+    );
+
+    testWidgets('FlowsFailed muestra fila de error con botón Reintentar',
+        (tester) async {
+      when(
+        () => flowsBloc.state,
+      ).thenReturn(const FlowsFailed(FlowsServerFailure()));
+
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.failed')));
+
+      expect(find.byKey(const Key('flows.failed')), findsOneWidget);
+      // Tap del Reintentar dispatcha LoadRequested al bloc.
+      await tester.tap(find.widgetWithText(AppButton, 'Reintentar').last);
+      await tester.pump();
+      verify(
+        () => flowsBloc.add(const FlowsLoadRequested()),
+      ).called(1);
+    });
+
+    testWidgets(
+      'tap del row apila /flows/:id preservando el detalle (canPop=true)',
+      (tester) async {
+        when(() => flowsBloc.state).thenReturn(
+          const FlowsLoaded(<flows.Flow>[
+            flows.Flow(
+              id: 'f1',
+              templateId: 't1',
+              name: 'Bienvenida',
+              isActive: true,
+              version: 1,
+            ),
+          ]),
+        );
+
+        final canPopAtDestination = <bool>[];
+        String? destinationUri;
+        final router = GoRouter(
+          initialLocation: '/',
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/',
+              builder: (_, _) => MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<TemplateDetailBloc>.value(value: bloc),
+                  BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                ],
+                child: const Scaffold(body: TemplateDetailPage()),
+              ),
+            ),
+            GoRoute(
+              path: '/flows/:id',
+              builder: (_, state) {
+                destinationUri = state.uri.toString();
+                return Scaffold(
+                  body: Builder(
+                    builder: (ctx) {
+                      canPopAtDestination.add(Navigator.of(ctx).canPop());
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          MaterialApp.router(
+            theme: AppDesignTheme.dark(),
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(const Key('flows.row.f1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('flows.row.f1')));
+        await tester.pumpAndSettle();
+
+        expect(destinationUri, '/flows/f1');
+        expect(
+          canPopAtDestination,
+          <bool>[true],
+          reason:
+              'el row debe usar push (no go) para que el back físico '
               'vuelva al detalle de plantilla, no salga de la app',
         );
       },
