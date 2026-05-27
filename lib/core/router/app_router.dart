@@ -35,6 +35,8 @@ import '../../features/templates/presentation/bloc/var_defs_bloc.dart';
 import '../../features/templates/presentation/pages/template_create_page.dart';
 import '../../features/templates/presentation/pages/template_detail_page.dart';
 import '../../features/templates/presentation/pages/template_edit_page.dart';
+import '../../features/triggers/domain/repositories/triggers_repository.dart';
+import '../../features/triggers/presentation/bloc/triggers_bloc.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -54,6 +56,7 @@ class AppRouter {
     required BotsRepository botsRepository,
     required TemplatesRepository templatesRepository,
     required FlowsRepository flowsRepository,
+    required TriggersRepository triggersRepository,
     required MembershipsRepository membershipsRepository,
     required CatalogRepository catalogRepository,
   }) : _authBloc = authBloc,
@@ -61,6 +64,7 @@ class AppRouter {
        _botsRepo = botsRepository,
        _templatesRepo = templatesRepository,
        _flowsRepo = flowsRepository,
+       _triggersRepo = triggersRepository,
        _membershipsRepo = membershipsRepository,
        _catalogRepo = catalogRepository;
 
@@ -69,6 +73,7 @@ class AppRouter {
   final BotsRepository _botsRepo;
   final TemplatesRepository _templatesRepo;
   final FlowsRepository _flowsRepo;
+  final TriggersRepository _triggersRepo;
   final MembershipsRepository _membershipsRepo;
   final CatalogRepository _catalogRepo;
 
@@ -196,6 +201,11 @@ class AppRouter {
                 create: (_) =>
                     FlowsBloc(repo: _flowsRepo, templateId: id)
                       ..add(const FlowsLoadRequested()),
+              ),
+              BlocProvider<TriggersBloc>(
+                create: (_) =>
+                    TriggersBloc(repo: _triggersRepo, templateId: id)
+                      ..add(const TriggersLoadRequested()),
               ),
             ],
             child: Scaffold(

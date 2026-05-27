@@ -10,6 +10,7 @@ import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../../flows/presentation/bloc/flows_bloc.dart';
+import '../../../triggers/presentation/widgets/triggers_section.dart';
 import '../../domain/entities/template.dart';
 import '../../domain/entities/variable_def.dart';
 import '../../domain/failures/templates_failure.dart';
@@ -138,6 +139,10 @@ class _LoadedView extends StatelessWidget {
           const _SectionTitle('Flujos'),
           const SizedBox(height: AppTokens.sp3),
           const _FlowsSection(),
+          const SizedBox(height: AppTokens.sp6),
+          const _SectionTitle('Disparadores'),
+          const SizedBox(height: AppTokens.sp3),
+          const TriggersSection(),
           const SizedBox(height: AppTokens.sp6),
           const _SectionTitle('Variables'),
           const SizedBox(height: AppTokens.sp3),
