@@ -182,4 +182,109 @@ void main() {
       verify(() => bloc.add(const FlowDetailLoadRequested())).called(1);
     },
   );
+
+  testWidgets('Loaded monta TabBar con 3 tabs: Pasos / Disparadores / Configuración', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const FlowDetailLoaded(_flow, <fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(TabBar), findsOneWidget);
+    final tabBar = find.byType(TabBar);
+    expect(
+      find.descendant(of: tabBar, matching: find.text('Pasos')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tabBar, matching: find.text('Disparadores')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tabBar, matching: find.text('Configuración')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Loaded tab inicial muestra contenido de Pasos (header + steps)', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const FlowDetailLoaded(_flow, <fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+
+    // El tab por defecto (Pasos) muestra el header del flow y el empty state.
+    expect(find.text('Bienvenida'), findsOneWidget);
+    expect(find.byKey(const Key('flow_detail.steps.empty')), findsOneWidget);
+  });
+
+  testWidgets('Tap en tab Disparadores muestra placeholder "Próximamente"', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const FlowDetailLoaded(_flow, <fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text('Disparadores'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('flow_detail.tab.triggers.coming_soon')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Tap en tab Configuración muestra placeholder "Próximamente"', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const FlowDetailLoaded(_flow, <fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text('Configuración'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('flow_detail.tab.settings.coming_soon')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Loading no monta TabBar (UX irrelevante hasta resolver)', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(const FlowDetailLoading());
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(TabBar), findsNothing);
+  });
+
+  testWidgets('Failed no monta TabBar (UX irrelevante en error)', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const FlowDetailFailed(FlowsServerFailure()));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(TabBar), findsNothing);
+  });
 }
