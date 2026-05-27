@@ -128,6 +128,51 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Loaded agrupa header + acciones en AppCard con key contractual',
+    (tester) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+
+      await tester.pumpWidget(host());
+
+      final cardFinder = find.byKey(const Key('template_detail.card.header'));
+      expect(cardFinder, findsOneWidget);
+      // Avatar + name viven dentro de la header card.
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Soporte')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cardFinder, matching: find.byType(AppAvatar)),
+        findsOneWidget,
+      );
+      // La pill de versión y la pill de estado IA están en el header.
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.widgetWithText(AppPill, 'v3'),
+        ),
+        findsOneWidget,
+      );
+      // Las acciones (Editar plantilla / Crear bot) viven en el header,
+      // no en el bottom-stack del scroll.
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.byKey(const Key('template_detail.edit_button')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.byKey(const Key('template_detail.create_bot_button')),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('Loaded muestra versión como AppPill.outline', (tester) async {
     when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
 
@@ -184,8 +229,9 @@ void main() {
 
     // Cuatro stat tiles, uno por campo. Cada uno es un AppCard con
     // label caption + valor titleM — reemplaza al _FieldRow del shape
-    // pre-DS (label 180px fijo).
-    expect(find.byType(AppCard), findsNWidgets(4));
+    // pre-DS (label 180px fijo). El page tiene además cards de sección
+    // (Flujos / Disparadores / Variables / etc.), así que verificamos
+    // las tarjetas de stats por contenido y no por conteo global.
     expect(find.widgetWithText(AppCard, 'Modelo'), findsOneWidget);
     expect(
       find.widgetWithText(AppCard, 'gemini-3.1-pro-preview'),
@@ -213,6 +259,49 @@ void main() {
     // para que se pueda copiar.
     expect(find.text('Eres un asistente de soporte amable.'), findsOneWidget);
   });
+
+  testWidgets(
+    'Loaded agrupa stats + prompt en card Configuración IA con key contractual',
+    (tester) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+
+      await tester.pumpWidget(host());
+
+      final cardFinder = find.byKey(
+        const Key('template_detail.card.ai_config'),
+      );
+      expect(cardFinder, findsOneWidget);
+
+      // La card combina el grid de stats + el system prompt: ambos deben
+      // estar dentro del mismo ancestro AppCard.
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Modelo')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Temperatura')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Razonamiento')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.text('Mensajes de contexto'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.text('Eres un asistente de soporte amable.'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('Failed(NotFound) preserva key y usa AppButton "Reintentar"', (
     tester,
@@ -315,6 +404,26 @@ void main() {
       // var-defs necesitan el detalle ya en Loaded para que la sección sea
       // visible debajo del prompt.
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+    });
+
+    testWidgets('vive dentro de AppCard con key contractual', (tester) async {
+      await tester.pumpWidget(host());
+
+      final cardFinder = find.byKey(
+        const Key('template_detail.card.variables'),
+      );
+      expect(cardFinder, findsOneWidget);
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Variables')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.byKey(const Key('var_defs.add_button')),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('siempre muestra el título "Variables"', (tester) async {
@@ -993,6 +1102,26 @@ void main() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
+    testWidgets('vive dentro de AppCard con key contractual', (tester) async {
+      await tester.pumpWidget(host());
+
+      final cardFinder = find.byKey(const Key('template_detail.card.flows'));
+      expect(cardFinder, findsOneWidget);
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Flujos')),
+        findsOneWidget,
+      );
+      // El AppCard debe contener la sección Flujos completa, incluyendo
+      // el botón de "Nuevo flujo" que es el affordance de creación.
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.byKey(const Key('flows.add_button')),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('siempre muestra el título "Flujos"', (tester) async {
       await tester.pumpWidget(host());
       expect(find.text('Flujos'), findsOneWidget);
@@ -1267,6 +1396,24 @@ void main() {
   group('sección Disparadores', () {
     setUp(() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+    });
+
+    testWidgets('vive dentro de AppCard con key contractual', (tester) async {
+      await tester.pumpWidget(host());
+
+      final cardFinder = find.byKey(const Key('template_detail.card.triggers'));
+      expect(cardFinder, findsOneWidget);
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Disparadores')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.byKey(const Key('triggers.empty')),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('siempre muestra el título "Disparadores"', (tester) async {

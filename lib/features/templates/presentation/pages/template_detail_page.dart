@@ -81,76 +81,116 @@ class _LoadedView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              AppAvatar(name: template.name, size: 64),
-              const SizedBox(width: AppTokens.sp4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          AppCard(
+            key: const Key('template_detail.card.header'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
                   children: <Widget>[
-                    Text(template.name, style: textTheme.titleLarge),
-                    const SizedBox(height: 2),
-                    ProviderBadge(provider: ai.provider),
+                    AppAvatar(name: template.name, size: 64),
+                    const SizedBox(width: AppTokens.sp4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(template.name, style: textTheme.titleLarge),
+                          const SizedBox(height: 2),
+                          ProviderBadge(provider: ai.provider),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp6),
-          Wrap(
-            spacing: AppTokens.sp2,
-            runSpacing: AppTokens.sp2,
-            children: <Widget>[
-              AppPill.outline(label: 'v${template.version}'),
-              // IA on/off es estado de configuración, no error: primary
-              // cuando está habilitada, neutral cuando no — danger queda
-              // reservado para fallos reales (load errors, destructive).
-              if (ai.enabled)
-                const AppPill.primary(
-                  label: 'IA habilitada',
-                  dot: AppPillDot.active,
-                )
-              else
-                const AppPill.neutral(
-                  label: 'IA deshabilitada',
-                  dot: AppPillDot.paused,
+                const SizedBox(height: AppTokens.sp4),
+                Wrap(
+                  spacing: AppTokens.sp2,
+                  runSpacing: AppTokens.sp2,
+                  children: <Widget>[
+                    AppPill.outline(label: 'v${template.version}'),
+                    // IA on/off es estado de configuración, no error: primary
+                    // cuando está habilitada, neutral cuando no — danger queda
+                    // reservado para fallos reales (load errors, destructive).
+                    if (ai.enabled)
+                      const AppPill.primary(
+                        label: 'IA habilitada',
+                        dot: AppPillDot.active,
+                      )
+                    else
+                      const AppPill.neutral(
+                        label: 'IA deshabilitada',
+                        dot: AppPillDot.paused,
+                      ),
+                  ],
                 ),
-            ],
+                const SizedBox(height: AppTokens.sp5),
+                _EditButton(template: template),
+                const SizedBox(height: AppTokens.sp3),
+                _CreateBotButton(template: template),
+              ],
+            ),
           ),
           const SizedBox(height: AppTokens.sp6),
-          const _SectionTitle('Motor IA'),
-          const SizedBox(height: AppTokens.sp3),
-          _StatGrid(ai: ai),
+          AppCard(
+            key: const Key('template_detail.card.flows'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Flujos'),
+                const SizedBox(height: AppTokens.sp3),
+                _FlowsSection(templateId: template.id),
+              ],
+            ),
+          ),
           const SizedBox(height: AppTokens.sp6),
-          const _SectionTitle('Prompt del sistema'),
-          const SizedBox(height: AppTokens.sp3),
-          if (ai.systemPrompt.isEmpty)
-            Text(
-              'Sin prompt definido',
-              style: textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            )
-          else
-            SelectableText(ai.systemPrompt, style: textTheme.bodyMedium),
+          const AppCard(
+            key: Key('template_detail.card.triggers'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _SectionTitle('Disparadores'),
+                SizedBox(height: AppTokens.sp3),
+                TriggersSection(),
+              ],
+            ),
+          ),
           const SizedBox(height: AppTokens.sp6),
-          const _SectionTitle('Flujos'),
-          const SizedBox(height: AppTokens.sp3),
-          _FlowsSection(templateId: template.id),
+          const AppCard(
+            key: Key('template_detail.card.variables'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _SectionTitle('Variables'),
+                SizedBox(height: AppTokens.sp3),
+                _VarDefsSection(),
+              ],
+            ),
+          ),
           const SizedBox(height: AppTokens.sp6),
-          const _SectionTitle('Disparadores'),
-          const SizedBox(height: AppTokens.sp3),
-          const TriggersSection(),
-          const SizedBox(height: AppTokens.sp6),
-          const _SectionTitle('Variables'),
-          const SizedBox(height: AppTokens.sp3),
-          const _VarDefsSection(),
-          const SizedBox(height: AppTokens.sp7),
-          _EditButton(template: template),
-          const SizedBox(height: AppTokens.sp3),
-          _CreateBotButton(template: template),
+          AppCard(
+            key: const Key('template_detail.card.ai_config'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Configuración IA'),
+                const SizedBox(height: AppTokens.sp3),
+                _StatGrid(ai: ai),
+                const SizedBox(height: AppTokens.sp5),
+                const _SectionTitle('Prompt del sistema'),
+                const SizedBox(height: AppTokens.sp2),
+                if (ai.systemPrompt.isEmpty)
+                  Text(
+                    'Sin prompt definido',
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontStyle: FontStyle.italic,
+                      color: AppTokens.text2,
+                    ),
+                  )
+                else
+                  SelectableText(ai.systemPrompt, style: textTheme.bodyMedium),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -245,8 +285,15 @@ class _StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return AppCard(
-      padding: AppTokens.sp4,
+    // Tile plano (no AppCard) — vive dentro de la AppCard outer de
+    // Configuración IA, así que se diferencia visualmente con surface3
+    // sobre el surface2 de la card padre, sin doble shell.
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.sp4),
+      decoration: BoxDecoration(
+        color: AppTokens.surface3,
+        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
