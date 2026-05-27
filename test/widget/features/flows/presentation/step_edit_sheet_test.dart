@@ -155,6 +155,40 @@ void main() {
     });
   });
 
+  group('StepEditSheet (Add mode · multimedia)', () {
+    testWidgets(
+      'renderiza picker con 7 chips (text + 6 multimedia); default TEXT',
+      (tester) async {
+        await tester.pumpWidget(host());
+
+        for (final id in const <String>[
+          'text',
+          'image',
+          'video',
+          'document',
+          'audio',
+          'ptt',
+          'sticker',
+        ]) {
+          expect(
+            find.byKey(Key('step_edit.type.$id')),
+            findsOneWidget,
+            reason: 'falta chip step_edit.type.$id',
+          );
+        }
+
+        final textChip = tester.widget<ChoiceChip>(
+          find.byKey(const Key('step_edit.type.text')),
+        );
+        expect(textChip.selected, isTrue);
+        final imageChip = tester.widget<ChoiceChip>(
+          find.byKey(const Key('step_edit.type.image')),
+        );
+        expect(imageChip.selected, isFalse);
+      },
+    );
+  });
+
   group('StepEditSheet (Edit mode)', () {
     setUpAll(() {
       registerFallbackValue(
