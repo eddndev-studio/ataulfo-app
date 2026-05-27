@@ -376,4 +376,66 @@ void main() {
       },
     );
   });
+
+  group('TriggerEditSheet · failure copy', () {
+    testWidgets(
+      'MutationFailed(Invalid) muestra copy específico para revisar datos',
+      (tester) async {
+        whenListen(
+          triggers,
+          Stream<TriggersState>.fromIterable(<TriggersState>[
+            TriggersMutationFailed(<Trigger>[], const TriggersInvalidFailure()),
+          ]),
+          initialState: const TriggersLoaded(<Trigger>[]),
+        );
+        await pumpHost(tester);
+        await tester.pump();
+
+        expect(
+          find.byKey(const Key('trigger_edit.error.invalid')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'MutationFailed(Network) muestra copy de red',
+      (tester) async {
+        whenListen(
+          triggers,
+          Stream<TriggersState>.fromIterable(<TriggersState>[
+            TriggersMutationFailed(<Trigger>[], const TriggersNetworkFailure()),
+          ]),
+          initialState: const TriggersLoaded(<Trigger>[]),
+        );
+        await pumpHost(tester);
+        await tester.pump();
+
+        expect(
+          find.byKey(const Key('trigger_edit.error.network')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'MutationFailed(NotFound) en edit muestra copy "ya no existe"',
+      (tester) async {
+        whenListen(
+          triggers,
+          Stream<TriggersState>.fromIterable(<TriggersState>[
+            TriggersMutationFailed(<Trigger>[], const TriggersNotFoundFailure()),
+          ]),
+          initialState: const TriggersLoaded(<Trigger>[]),
+        );
+        await pumpHost(tester, editing: _textTrigger());
+        await tester.pump();
+
+        expect(
+          find.byKey(const Key('trigger_edit.error.notfound')),
+          findsOneWidget,
+        );
+      },
+    );
+  });
 }
