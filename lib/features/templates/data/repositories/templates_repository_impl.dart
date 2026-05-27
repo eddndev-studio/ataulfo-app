@@ -56,12 +56,14 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
     required String varDefId,
     required int version,
     String? name,
+    VarType? type,
     String? defaultValue,
     String? description,
   }) => _ds.updateVarDef(
     varDefId: varDefId,
     version: version,
     name: name,
+    type: type,
     defaultValue: defaultValue,
     description: description,
   );

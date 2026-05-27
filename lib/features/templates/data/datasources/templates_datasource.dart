@@ -80,6 +80,7 @@ abstract interface class TemplatesDatasource {
     required String varDefId,
     required int version,
     String? name,
+    VarType? type,
     String? defaultValue,
     String? description,
   });
@@ -285,6 +286,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     required String varDefId,
     required int version,
     String? name,
+    VarType? type,
     String? defaultValue,
     String? description,
   }) async {
@@ -294,6 +296,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
       // nil del backend). Cadena vacía es set explícito.
       final body = <String, dynamic>{'version': version};
       if (name != null) body['name'] = name;
+      if (type != null) body['type'] = type.toWire();
       if (defaultValue != null) body['default'] = defaultValue;
       if (description != null) body['description'] = description;
 

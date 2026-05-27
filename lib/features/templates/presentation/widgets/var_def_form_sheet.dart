@@ -53,6 +53,7 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _defaultCtrl;
   late final TextEditingController _descCtrl;
+  late VarType _type;
 
   /// Flag de "ya disparé un submit, esperando el Loaded final".
   /// Sin esto, cualquier rebuild del bloc a Loaded cerraría el sheet
@@ -66,6 +67,9 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
     _nameCtrl = TextEditingController(text: ed?.name ?? '');
     _defaultCtrl = TextEditingController(text: ed?.defaultValue ?? '');
     _descCtrl = TextEditingController(text: ed?.description ?? '');
+    // Default para nuevas variables: text. En edit toma el tipo del
+    // editing. El tipo es state plano (no necesita TextEditingController).
+    _type = ed?.type ?? VarType.text;
     // Re-build el sheet cuando el name cambia: gate del submit + hint
     // de duplicado dependen de `_nameCtrl.text`. Listener sobre los
     // otros dos controllers no aporta nada al render.
@@ -94,7 +98,7 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
       context.read<VarDefsBloc>().add(
         VarDefsAddRequested(
           name: name,
-          type: VarType.text,
+          type: _type,
           defaultValue: _defaultCtrl.text,
           description: _descCtrl.text,
         ),
@@ -107,11 +111,16 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
     // (la UI evita request inútil; el server-side ya sería no-op de
     // todos modos pero gasta round-trip).
     final newName = name != ed.name ? name : null;
+    final newType = _type != ed.type ? _type : null;
     final newDefault = _defaultCtrl.text != ed.defaultValue
         ? _defaultCtrl.text
         : null;
     final newDesc = _descCtrl.text != ed.description ? _descCtrl.text : null;
-    final isNoOp = newName == null && newDefault == null && newDesc == null;
+    final isNoOp =
+        newName == null &&
+        newType == null &&
+        newDefault == null &&
+        newDesc == null;
     if (isNoOp) return;
 
     _didSubmit = true;
@@ -119,6 +128,7 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
       VarDefsUpdateRequested(
         varDefId: ed.id,
         name: newName,
+        type: newType,
         defaultValue: newDefault,
         description: newDesc,
       ),
@@ -192,6 +202,36 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
                       ),
                     ),
                   const SizedBox(height: AppTokens.sp4),
+                  // Picker del tipo. Wrap soporta layouts angostos
+                  // sin overflow (los 6 chips se acomodan en 2-3 filas).
+                  // ChoiceChip por chip permite reuso del componente Material
+                  // sin forzar un selector custom — el contrato hacia el test
+                  // es la key + el flag .selected, no la apariencia.
+                  Text(
+                    'Tipo',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: AppTokens.text2,
+                    ),
+                  ),
+                  const SizedBox(height: AppTokens.sp1),
+                  Wrap(
+                    spacing: AppTokens.sp2,
+                    runSpacing: AppTokens.sp2,
+                    children: <Widget>[
+                      for (final t in VarType.values)
+                        ChoiceChip(
+                          key: Key('var_def_form.type.${t.toWire()}'),
+                          label: Text(_humanLabelFor(t)),
+                          selected: _type == t,
+                          onSelected: isMutating
+                              ? null
+                              : (sel) {
+                                  if (sel) setState(() => _type = t);
+                                },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
                   AppTextField(
                     key: const Key('var_def_form.default'),
                     label: 'Valor por defecto',
@@ -224,3 +264,14 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
     );
   }
 }
+
+/// Texto humanizado de un VarType para el chip picker. Compatible con la
+/// audiencia del operador (mayúscula inicial, sin caps lock).
+String _humanLabelFor(VarType t) => switch (t) {
+  VarType.text => 'Texto',
+  VarType.label => 'Etiqueta',
+  VarType.image => 'Imagen',
+  VarType.video => 'Video',
+  VarType.audio => 'Audio',
+  VarType.document => 'Documento',
+};

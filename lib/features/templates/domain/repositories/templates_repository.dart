@@ -61,6 +61,7 @@ abstract interface class TemplatesRepository {
     required String varDefId,
     required int version,
     String? name,
+    VarType? type,
     String? defaultValue,
     String? description,
   });
