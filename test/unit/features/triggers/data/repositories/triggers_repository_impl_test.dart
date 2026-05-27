@@ -50,5 +50,92 @@ void main() {
         throwsA(isA<TriggersForbiddenFailure>()),
       );
     });
+
+    test('createTrigger delega 1:1 al datasource', () async {
+      when(
+        () => ds.createTrigger(
+          templateId: any(named: 'templateId'),
+          flowId: any(named: 'flowId'),
+          triggerType: any(named: 'triggerType'),
+          matchType: any(named: 'matchType'),
+          keyword: any(named: 'keyword'),
+          labelId: any(named: 'labelId'),
+          labelAction: any(named: 'labelAction'),
+          scope: any(named: 'scope'),
+          isActive: any(named: 'isActive'),
+        ),
+      ).thenAnswer((_) async => _sample());
+
+      final out = await repo.createTrigger(
+        templateId: 'tpl1',
+        flowId: 'f1',
+        triggerType: TriggerType.text,
+        matchType: MatchType.exact,
+        keyword: 'menu',
+        labelId: '',
+        labelAction: null,
+        scope: TriggerScope.both,
+        isActive: true,
+      );
+      expect(out.id, 't1');
+      verify(
+        () => ds.createTrigger(
+          templateId: 'tpl1',
+          flowId: 'f1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: 'menu',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+      ).called(1);
+    });
+
+    test('updateTrigger delega 1:1 al datasource', () async {
+      when(
+        () => ds.updateTrigger(
+          triggerId: any(named: 'triggerId'),
+          triggerType: any(named: 'triggerType'),
+          matchType: any(named: 'matchType'),
+          keyword: any(named: 'keyword'),
+          labelId: any(named: 'labelId'),
+          labelAction: any(named: 'labelAction'),
+          scope: any(named: 'scope'),
+          isActive: any(named: 'isActive'),
+        ),
+      ).thenAnswer((_) async => _sample());
+
+      final out = await repo.updateTrigger(
+        triggerId: 't1',
+        triggerType: TriggerType.text,
+        matchType: MatchType.contains,
+        keyword: 'hola',
+        labelId: '',
+        labelAction: null,
+        scope: TriggerScope.incoming,
+        isActive: false,
+      );
+      expect(out.id, 't1');
+      verify(
+        () => ds.updateTrigger(
+          triggerId: 't1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.contains,
+          keyword: 'hola',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.incoming,
+          isActive: false,
+        ),
+      ).called(1);
+    });
+
+    test('deleteTrigger delega 1:1 al datasource', () async {
+      when(() => ds.deleteTrigger('t1')).thenAnswer((_) async {});
+      await repo.deleteTrigger('t1');
+      verify(() => ds.deleteTrigger('t1')).called(1);
+    });
   });
 }
