@@ -15,7 +15,14 @@ import '../../../templates/presentation/pages/templates_list_page.dart';
 /// sub-rutas por tab obligaría a reabrir esa lógica sin ganar nada
 /// (los tabs no son destinos compartibles por URL en este producto).
 class ShellPage extends StatefulWidget {
-  const ShellPage({super.key});
+  const ShellPage({super.key, this.routeObserver});
+
+  /// Observer compartido con el GoRouter del AppRouter. ShellPage no lo
+  /// usa directamente: se lo entrega a Bots/TemplatesListPage para que
+  /// se suscriban y dispatchen su refresh tras pop. `null` ⇒ los list
+  /// pages siguen funcionando, sólo sin auto-refresh — útil en tests
+  /// aislados que no necesitan el cableado completo.
+  final RouteObserver<PageRoute<dynamic>>? routeObserver;
 
   @override
   State<ShellPage> createState() => _ShellPageState();
@@ -30,10 +37,13 @@ class _ShellPageState extends State<ShellPage> {
     _TabSpec(label: 'Ajustes', icon: Icons.settings_outlined),
   ];
 
-  static const List<Widget> _bodies = <Widget>[
-    BotsListPage(),
-    TemplatesListPage(),
-    SettingsPage(),
+  // Los bodies ya no son `static const` porque BotsListPage/TemplatesListPage
+  // reciben el routeObserver del widget. Late + final mantiene el mismo
+  // requisito de "se construye una sola vez al primer build".
+  late final List<Widget> _bodies = <Widget>[
+    BotsListPage(routeObserver: widget.routeObserver),
+    TemplatesListPage(routeObserver: widget.routeObserver),
+    const SettingsPage(),
   ];
 
   void _select(int i) => setState(() => _index = i);

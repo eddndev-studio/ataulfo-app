@@ -421,4 +421,48 @@ void main() {
       },
     );
   });
+
+  group('propagación del RouteObserver', () {
+    // Para que el auto-refresh tras pop funcione, el shell tiene que
+    // entregarle el observer a las dos list pages. El cableado vive en
+    // el route builder del router (AppRouter), pero la prop se atraviesa
+    // por ShellPage — éste test ancla esa prop como contrato del shell.
+    testWidgets('ShellPage propaga el routeObserver a ambos list pages', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+      final observer = RouteObserver<PageRoute<dynamic>>();
+
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<AuthBloc>.value(value: authBloc),
+            BlocProvider<BotsBloc>.value(value: botsBloc),
+            BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+          ],
+          child: MaterialApp(home: ShellPage(routeObserver: observer)),
+        ),
+      );
+
+      final botsList = tester.widget<BotsListPage>(find.byType(BotsListPage));
+      expect(
+        botsList.routeObserver,
+        same(observer),
+        reason:
+            'BotsListPage debe recibir el mismo observer que ShellPage, '
+            'sin esto el auto-refresh tras pop no se cabla.',
+      );
+
+      // Cambiar a la tab Plantillas para que TemplatesListPage materialice.
+      // IndexedStack mantiene todas las tabs montadas, pero el find debe
+      // resolver inequívoco — Plantillas es la segunda tab.
+      await tester.tap(find.text('Plantillas'));
+      await tester.pumpAndSettle();
+
+      final templatesList = tester.widget<TemplatesListPage>(
+        find.byType(TemplatesListPage),
+      );
+      expect(templatesList.routeObserver, same(observer));
+    });
+  });
 }

@@ -65,10 +65,19 @@ class AppRouter {
   final MembershipsRepository _membershipsRepo;
   final CatalogRepository _catalogRepo;
 
+  /// Observer compartido entre el Navigator del GoRouter y los list pages
+  /// del shell. El GoRouter notifica push/pop sobre este observer; las
+  /// list pages (Bots, Templates) se suscriben en didChangeDependencies
+  /// y dispatchan su refresh cuando una sub-ruta encima cierra. Sin esto
+  /// el operador tiene que pull-to-refresh tras crear/editar.
+  final RouteObserver<PageRoute<dynamic>> _routeObserver =
+      RouteObserver<PageRoute<dynamic>>();
+
   late final GoRouter router = GoRouter(
     initialLocation: '/',
     refreshListenable: _AuthBlocListenable(_authBloc),
     redirect: _redirect,
+    observers: <NavigatorObserver>[_routeObserver],
     routes: <RouteBase>[
       GoRoute(path: '/', builder: (_, _) => const SplashPage()),
       GoRoute(
@@ -103,7 +112,9 @@ class AppRouter {
           // Blocs page-scoped a nivel del shell: cambiar de tab no
           // rebuildea los providers y cada lista preserva estado
           // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
-          child: const ShellPage(),
+          // El routeObserver se atraviesa al shell para que ambos list
+          // pages disparen su refresh al volver de una sub-ruta.
+          child: ShellPage(routeObserver: _routeObserver),
         ),
       ),
       GoRoute(

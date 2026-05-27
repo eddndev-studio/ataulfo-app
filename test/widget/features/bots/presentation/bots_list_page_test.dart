@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/core/design/tokens.dart';
 import 'package:agentic/core/design/widgets/app_avatar.dart';
@@ -218,4 +220,71 @@ void main() {
       );
     },
   );
+
+  group('auto-refresh al volver al listado (RouteAware)', () {
+    // Mismo patrón que TemplatesListPage: tras pop de una sub-ruta
+    // (e.g. /bots/new, /bots/:id), el shell vuelve al foreground y la
+    // page dispara BotsRefreshRequested para alinear el bloc con el
+    // backend sin pull-to-refresh manual.
+    testWidgets(
+      'al popear la ruta encima del listado, dispatcha BotsRefreshRequested',
+      (tester) async {
+        final observer = RouteObserver<PageRoute<dynamic>>();
+        when(
+          () => bloc.state,
+        ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            navigatorObservers: <NavigatorObserver>[observer],
+            home: BlocProvider<BotsBloc>.value(
+              value: bloc,
+              child: Scaffold(body: BotsListPage(routeObserver: observer)),
+            ),
+          ),
+        );
+        verifyNever(() => bloc.add(const BotsRefreshRequested()));
+
+        final nav = tester.state<NavigatorState>(find.byType(Navigator));
+        unawaited(
+          nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        nav.pop();
+        await tester.pumpAndSettle();
+
+        verify(() => bloc.add(const BotsRefreshRequested())).called(1);
+      },
+    );
+
+    testWidgets(
+      'sin routeObserver (default null), no observa ni dispatcha — composición opcional',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+
+        await tester.pumpWidget(host());
+
+        final nav = tester.state<NavigatorState>(find.byType(Navigator));
+        unawaited(
+          nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        nav.pop();
+        await tester.pumpAndSettle();
+
+        verifyNever(() => bloc.add(const BotsRefreshRequested()));
+      },
+    );
+  });
 }

@@ -13,8 +13,44 @@ import '../bloc/bots_bloc.dart';
 /// Listado de Bots (S04). Consume el BotsBloc del scope; el cableado del
 /// provider lo hace el shell. Es content-only: el Scaffold y el AppBar los
 /// aporta el ShellPage, que también orquesta el título dinámico por tab.
-class BotsListPage extends StatelessWidget {
-  const BotsListPage({super.key});
+///
+/// Si recibe un `routeObserver`, se suscribe como `RouteAware` y dispara
+/// `BotsRefreshRequested` cuando una sub-ruta (create/edit) vuelve al
+/// stack tras un pop. Sin observer, la page funciona idéntico — la
+/// dependencia es composición opcional, no contrato obligatorio.
+class BotsListPage extends StatefulWidget {
+  const BotsListPage({super.key, this.routeObserver});
+
+  final RouteObserver<PageRoute<dynamic>>? routeObserver;
+
+  @override
+  State<BotsListPage> createState() => _BotsListPageState();
+}
+
+class _BotsListPageState extends State<BotsListPage> with RouteAware {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final observer = widget.routeObserver;
+    if (observer == null) return;
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) observer.subscribe(this, route);
+  }
+
+  @override
+  void dispose() {
+    widget.routeObserver?.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Sub-ruta encima del listado (e.g. /bots/new, /bots/:id) acaba de
+    // popear y el listado vuelve al foreground. Refetch transparente
+    // alinea el bloc con la verdad del backend sin pull-to-refresh
+    // manual del operador.
+    context.read<BotsBloc>().add(const BotsRefreshRequested());
+  }
 
   @override
   Widget build(BuildContext context) {

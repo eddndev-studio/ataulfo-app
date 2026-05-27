@@ -14,8 +14,46 @@ import '../bloc/templates_bloc.dart';
 /// cableado del provider lo hace el route builder de `/home`. Es
 /// content-only: el Scaffold y el AppBar los aporta el ShellPage, que
 /// también orquesta el título dinámico por tab.
-class TemplatesListPage extends StatelessWidget {
-  const TemplatesListPage({super.key});
+///
+/// Si recibe un `routeObserver`, se suscribe como `RouteAware` y dispara
+/// `TemplatesRefreshRequested` cuando una sub-ruta pusheada encima
+/// (create/edit) vuelve al stack tras un pop. Sin observer (tests
+/// aislados, host alternativo) el listado sigue funcionando — la
+/// dependencia es composición opcional, no contrato obligatorio.
+class TemplatesListPage extends StatefulWidget {
+  const TemplatesListPage({super.key, this.routeObserver});
+
+  final RouteObserver<PageRoute<dynamic>>? routeObserver;
+
+  @override
+  State<TemplatesListPage> createState() => _TemplatesListPageState();
+}
+
+class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final observer = widget.routeObserver;
+    if (observer == null) return;
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) observer.subscribe(this, route);
+  }
+
+  @override
+  void dispose() {
+    widget.routeObserver?.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Una sub-ruta (e.g. /templates/new, /templates/:id, /templates/:id/edit)
+    // acaba de hacer pop y este listado vuelve al foreground. Cualquier
+    // mutación que hizo el operador podría no estar reflejada todavía;
+    // un refetch transparente alinea el bloc con la verdad del backend
+    // sin que el operador tenga que pull-to-refresh manual.
+    context.read<TemplatesBloc>().add(const TemplatesRefreshRequested());
+  }
 
   @override
   Widget build(BuildContext context) {
