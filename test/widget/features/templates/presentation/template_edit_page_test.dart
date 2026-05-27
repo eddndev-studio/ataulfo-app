@@ -769,4 +769,76 @@ void main() {
       expect(find.text('123'), findsOneWidget);
     });
   });
+
+  group('safe-area inferior (gesture-nav)', () {
+    // Android 15 (edge-to-edge default) reporta viewPadding.bottom ~30dp
+    // por la gesture-nav. El scroll del form respeta sp6 de padding
+    // interno pero NO sumaba el system inset — el botón Guardar queda
+    // detrás de la barra del sistema incluso tras scrollear al fondo.
+    // El fix suma viewPadding.bottom al padding inferior del scroll.
+    Widget hostWithViewPadding(double viewPaddingBottom) => MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<TemplateEditBloc>.value(value: editBloc),
+          BlocProvider<CatalogBloc>.value(value: catalogBloc),
+        ],
+        child: MediaQuery(
+          data: MediaQueryData(
+            viewPadding: EdgeInsets.only(bottom: viewPaddingBottom),
+          ),
+          child: const Scaffold(body: TemplateEditPage()),
+        ),
+      ),
+    );
+
+    testWidgets(
+      'con viewPadding.bottom > 0, SingleChildScrollView suma el inset al padding inferior',
+      (tester) async {
+        when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+        await tester.pumpWidget(hostWithViewPadding(48));
+        await tester.pump();
+
+        final scrollView = tester.widget<SingleChildScrollView>(
+          find.byType(SingleChildScrollView),
+        );
+        final padding = scrollView.padding! as EdgeInsets;
+
+        // sp6 (24) es el padding base de diseño; +48 por la gesture-nav
+        // sintética. El fix lee MediaQuery.viewPaddingOf y suma.
+        expect(
+          padding.bottom,
+          greaterThanOrEqualTo(24 + 48),
+          reason:
+              'Sin sumar viewPadding.bottom el botón Guardar queda detrás '
+              'de la gesture-nav del sistema en Android 15.',
+        );
+      },
+    );
+
+    testWidgets(
+      'sin viewPadding (devices sin gesture-nav o tests por default), padding inferior es sólo sp6',
+      (tester) async {
+        when(() => editBloc.state).thenReturn(const TemplateEditEditing(_tpl));
+        when(
+          () => catalogBloc.state,
+        ).thenReturn(const CatalogLoaded(catalog: _catalog));
+
+        await tester.pumpWidget(hostWithViewPadding(0));
+        await tester.pump();
+
+        final scrollView = tester.widget<SingleChildScrollView>(
+          find.byType(SingleChildScrollView),
+        );
+        final padding = scrollView.padding! as EdgeInsets;
+
+        // sp6 == 24. Sin gesture-nav no introducimos gap espurio.
+        expect(padding.bottom, 24);
+      },
+    );
+  });
 }
