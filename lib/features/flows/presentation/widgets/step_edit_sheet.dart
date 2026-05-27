@@ -51,8 +51,9 @@ class StepEditSheet extends StatefulWidget {
   State<StepEditSheet> createState() => _StepEditSheetState();
 }
 
-/// Tipos que el picker del sheet expone. CONDITIONAL_TIME se excluye:
-/// no se elige por chip — su edición requiere un form propio con
+/// Tipos que el picker del sheet expone — el set completo de StepType.
+/// TEXT y multimedia comparten controles (content + opcional media_url);
+/// CONDITIONAL_TIME swap-ea el cuerpo del sheet por un form propio con
 /// ventanas horarias y ramificación.
 const List<fdom.StepType> _pickableTypes = <fdom.StepType>[
   fdom.StepType.text,
@@ -62,6 +63,7 @@ const List<fdom.StepType> _pickableTypes = <fdom.StepType>[
   fdom.StepType.audio,
   fdom.StepType.ptt,
   fdom.StepType.sticker,
+  fdom.StepType.conditionalTime,
 ];
 
 class _StepEditSheetState extends State<StepEditSheet> {
