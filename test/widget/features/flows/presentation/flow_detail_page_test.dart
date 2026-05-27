@@ -337,4 +337,34 @@ void main() {
 
     expect(find.byType(TabBar), findsNothing);
   });
+
+  testWidgets('Tab Pasos muestra botón "Nuevo paso"', (tester) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('flow_detail.steps.add_button')), findsOneWidget);
+  });
+
+  testWidgets(
+    'Tap del botón "Nuevo paso" abre el StepEditSheet (modal)',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
+      await tester.pumpAndSettle();
+
+      // El sheet del paso aparece (campo content confirma su presencia;
+      // el título "Nuevo paso" choca con el label del botón).
+      expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
+      expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
+    },
+  );
 }

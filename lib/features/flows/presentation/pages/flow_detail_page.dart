@@ -10,6 +10,7 @@ import '../../domain/entities/step.dart' as sdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
 import '../bloc/flow_steps_bloc.dart';
+import '../widgets/step_edit_sheet.dart';
 
 /// Detalle de un Flow (S11). Stateful para sostener el TabController de
 /// las 3 secciones del editor: Pasos / Disparadores / Configuración. El
@@ -158,8 +159,34 @@ class _StepsTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppTokens.sp6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppButton.text(
+              key: const Key('flow_detail.steps.add_button'),
+              label: 'Nuevo paso',
+              icon: Icons.add,
+              onPressed: () => _openStepSheet(context),
+            ),
+          ),
+          const SizedBox(height: AppTokens.sp3),
           const _StepsList(),
         ],
+      ),
+    );
+  }
+
+  /// Abre el sheet de creación de step pasando el `FlowStepsBloc` del
+  /// scope al subtree del modal — `showModalBottomSheet` crea un
+  /// Navigator hijo que no hereda los providers, así que hay que
+  /// re-proveerlos vía `BlocProvider.value`.
+  void _openStepSheet(BuildContext context) {
+    final bloc = context.read<FlowStepsBloc>();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetCtx) => BlocProvider<FlowStepsBloc>.value(
+        value: bloc,
+        child: const StepEditSheet(),
       ),
     );
   }
