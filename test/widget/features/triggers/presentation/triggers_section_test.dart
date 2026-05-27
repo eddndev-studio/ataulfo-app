@@ -296,4 +296,95 @@ void main() {
     unawaited(tBloc.close());
     unawaited(fBloc.close());
   });
+
+  group('Edición CRUD desde la sección', () {
+    testWidgets('Loaded muestra botón "+ Disparador"', (tester) async {
+      when(
+        () => triggersRepo.listTriggers('tpl1'),
+      ).thenAnswer((_) async => const <Trigger>[]);
+      when(
+        () => flowsRepo.listFlows('tpl1'),
+      ).thenAnswer((_) async => <fdom.Flow>[_flow()]);
+
+      final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1')
+        ..add(const TriggersLoadRequested());
+      final fBloc = FlowsBloc(repo: flowsRepo, templateId: 'tpl1')
+        ..add(const FlowsLoadRequested());
+
+      await tester.pumpWidget(_harness(triggersBloc: tBloc, flowsBloc: fBloc));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('triggers.add_button')), findsOneWidget);
+
+      unawaited(tBloc.close());
+      unawaited(fBloc.close());
+    });
+
+    testWidgets('tap del "+ Disparador" abre el sheet en add-mode', (
+      tester,
+    ) async {
+      // Necesitamos viewport amplio porque el sheet completo es alto.
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      when(
+        () => triggersRepo.listTriggers('tpl1'),
+      ).thenAnswer((_) async => const <Trigger>[]);
+      when(
+        () => flowsRepo.listFlows('tpl1'),
+      ).thenAnswer((_) async => <fdom.Flow>[_flow()]);
+
+      final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1')
+        ..add(const TriggersLoadRequested());
+      final fBloc = FlowsBloc(repo: flowsRepo, templateId: 'tpl1')
+        ..add(const FlowsLoadRequested());
+
+      await tester.pumpWidget(_harness(triggersBloc: tBloc, flowsBloc: fBloc));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('triggers.add_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nuevo disparador'), findsOneWidget);
+
+      unawaited(tBloc.close());
+      unawaited(fBloc.close());
+    });
+
+    testWidgets('tap sobre row abre el sheet en edit-mode hidratado', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      when(
+        () => triggersRepo.listTriggers('tpl1'),
+      ).thenAnswer((_) async => <Trigger>[_text(keyword: 'menu')]);
+      when(
+        () => flowsRepo.listFlows('tpl1'),
+      ).thenAnswer((_) async => <fdom.Flow>[_flow(name: 'Bienvenida')]);
+
+      final tBloc = TriggersBloc(repo: triggersRepo, templateId: 'tpl1')
+        ..add(const TriggersLoadRequested());
+      final fBloc = FlowsBloc(repo: flowsRepo, templateId: 'tpl1')
+        ..add(const FlowsLoadRequested());
+
+      await tester.pumpWidget(_harness(triggersBloc: tBloc, flowsBloc: fBloc));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('triggers.row.t1')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Editar disparador'), findsOneWidget);
+      // El campo keyword se hidrata con "menu".
+      expect(find.widgetWithText(TextField, 'menu'), findsOneWidget);
+
+      unawaited(tBloc.close());
+      unawaited(fBloc.close());
+    });
+  });
 }
