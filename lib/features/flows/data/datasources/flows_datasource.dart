@@ -93,6 +93,30 @@ abstract interface class FlowsDatasource {
   /// (existía o no). 404 se trata como éxito (defensa por si llegara —
   /// el backend canónico siempre responde 204). 403 → Forbidden.
   Future<void> deleteStep(String stepId);
+
+  /// `PUT /flows/:flowId` con replace-completo (semántica PUT, no PATCH).
+  /// El body lleva el documento entero — omitir un campo reaplica su
+  /// default en el service (isActive ⇒ true, gates ⇒ 0), lo que
+  /// reescribiría silenciosamente el flow. El editor del Settings tab
+  /// es responsable de propagar `name` e `isActive` desde la cabecera
+  /// loaded aunque no los edite.
+  ///
+  /// `version` es la observada por el cliente (CAS optimista): el
+  /// service rechaza con 409 si la fila ya avanzó.
+  ///
+  /// 200 con el flow resultante (incluye `version` incrementada). 409
+  /// ⇒ `FlowsConflictFailure` (version stale o UNIQUE name colisión).
+  /// 422 ⇒ `FlowsInvalidSettingsFailure` (gate fuera de rango).
+  /// 403 ⇒ Forbidden, 404 ⇒ NotFound, 5xx ⇒ Server, red ⇒ Network.
+  Future<Flow> updateFlow({
+    required String flowId,
+    required int version,
+    required String name,
+    required bool isActive,
+    required int cooldownMs,
+    required int usageLimit,
+    required List<String> excludesFlows,
+  });
 }
 
 class DioFlowsDatasource implements FlowsDatasource {
@@ -253,6 +277,19 @@ class DioFlowsDatasource implements FlowsDatasource {
     return _mapDioException(e);
   }
 
+  /// Traduce DioException del PUT /flows/:id (settings tab). 409 ⇒
+  /// ConflictFailure (CAS stale o duplicate name); 422 ⇒
+  /// InvalidSettingsFailure (cooldown/usageLimit fuera de rango). El
+  /// resto pasa al genérico.
+  FlowsFailure _mapSettingsMutationDioException(DioException e) {
+    if (e.type == DioExceptionType.badResponse) {
+      final status = e.response?.statusCode;
+      if (status == 409) return const FlowsConflictFailure();
+      if (status == 422) return const FlowsInvalidSettingsFailure();
+    }
+    return _mapDioException(e);
+  }
+
   /// Traduce DioException de mutaciones que viven directo sobre el
   /// recurso step (PATCH/DELETE /steps/:id). 422 ⇒ InvalidStepFailure y
   /// 404 ⇒ StepNotFoundFailure (distinto del NotFound del flow padre).
@@ -274,6 +311,44 @@ class DioFlowsDatasource implements FlowsDatasource {
       return const FlowsInvalidStepFailure();
     }
     return _mapDioException(e);
+  }
+
+  @override
+  Future<Flow> updateFlow({
+    required String flowId,
+    required int version,
+    required String name,
+    required bool isActive,
+    required int cooldownMs,
+    required int usageLimit,
+    required List<String> excludesFlows,
+  }) async {
+    try {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/flows/$flowId',
+        data: <String, dynamic>{
+          'version': version,
+          'name': name,
+          'isActive': isActive,
+          'cooldownMs': cooldownMs,
+          'usageLimit': usageLimit,
+          'excludesFlows': excludesFlows,
+        },
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownFlowsFailure();
+      }
+      return FlowsMapper.flowRespToEntity(FlowResp.fromJson(body));
+    } on FlowsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapSettingsMutationDioException(e);
+    } on FormatException {
+      throw const UnknownFlowsFailure();
+    } on TypeError {
+      throw const UnknownFlowsFailure();
+    }
   }
 
   @override
