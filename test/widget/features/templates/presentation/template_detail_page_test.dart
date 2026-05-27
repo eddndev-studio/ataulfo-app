@@ -184,8 +184,9 @@ void main() {
 
     // Cuatro stat tiles, uno por campo. Cada uno es un AppCard con
     // label caption + valor titleM — reemplaza al _FieldRow del shape
-    // pre-DS (label 180px fijo).
-    expect(find.byType(AppCard), findsNWidgets(4));
+    // pre-DS (label 180px fijo). El page tiene además cards de sección
+    // (Flujos / Disparadores / Variables / etc.), así que verificamos
+    // las tarjetas de stats por contenido y no por conteo global.
     expect(find.widgetWithText(AppCard, 'Modelo'), findsOneWidget);
     expect(
       find.widgetWithText(AppCard, 'gemini-3.1-pro-preview'),

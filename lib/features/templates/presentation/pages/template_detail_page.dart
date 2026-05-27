@@ -136,9 +136,17 @@ class _LoadedView extends StatelessWidget {
           else
             SelectableText(ai.systemPrompt, style: textTheme.bodyMedium),
           const SizedBox(height: AppTokens.sp6),
-          const _SectionTitle('Flujos'),
-          const SizedBox(height: AppTokens.sp3),
-          _FlowsSection(templateId: template.id),
+          AppCard(
+            key: const Key('template_detail.card.flows'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _SectionTitle('Flujos'),
+                const SizedBox(height: AppTokens.sp3),
+                _FlowsSection(templateId: template.id),
+              ],
+            ),
+          ),
           const SizedBox(height: AppTokens.sp6),
           const _SectionTitle('Disparadores'),
           const SizedBox(height: AppTokens.sp3),
