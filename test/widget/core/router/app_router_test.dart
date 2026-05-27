@@ -370,7 +370,7 @@ void main() {
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
-      flowsRepository: flowsRepo,
+        flowsRepository: flowsRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
       );
@@ -508,7 +508,7 @@ void main() {
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
-      flowsRepository: flowsRepo,
+        flowsRepository: flowsRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
       );

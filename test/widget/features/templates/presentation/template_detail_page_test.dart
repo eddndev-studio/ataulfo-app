@@ -71,9 +71,7 @@ void main() {
     ).thenReturn(const VarDefsLoaded(<VariableDef>[], 1));
     // Default: flows Loaded vacío para que la sección Flujos no flashee
     // Loading en los tests que no la ejercen.
-    when(
-      () => flowsBloc.state,
-    ).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+    when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
   });
 
   Widget host() => MaterialApp(
@@ -995,9 +993,7 @@ void main() {
     });
 
     testWidgets('FlowsLoaded([]) muestra empty state italic', (tester) async {
-      when(
-        () => flowsBloc.state,
-      ).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
 
       await tester.pumpWidget(host());
       await tester.ensureVisible(find.byKey(const Key('flows.empty')));
@@ -1075,8 +1071,9 @@ void main() {
       },
     );
 
-    testWidgets('FlowsFailed muestra fila de error con botón Reintentar',
-        (tester) async {
+    testWidgets('FlowsFailed muestra fila de error con botón Reintentar', (
+      tester,
+    ) async {
       when(
         () => flowsBloc.state,
       ).thenReturn(const FlowsFailed(FlowsServerFailure()));
@@ -1088,9 +1085,7 @@ void main() {
       // Tap del Reintentar dispatcha LoadRequested al bloc.
       await tester.tap(find.widgetWithText(AppButton, 'Reintentar').last);
       await tester.pump();
-      verify(
-        () => flowsBloc.add(const FlowsLoadRequested()),
-      ).called(1);
+      verify(() => flowsBloc.add(const FlowsLoadRequested())).called(1);
     });
 
     testWidgets(

@@ -29,17 +29,15 @@ void main() {
     data: body,
   );
 
-  DioException badResponse(
-    int status, {
-    String path = '/templates/t1/flows',
-  }) => DioException(
-    requestOptions: RequestOptions(path: path),
-    response: Response<dynamic>(
-      requestOptions: RequestOptions(path: path),
-      statusCode: status,
-    ),
-    type: DioExceptionType.badResponse,
-  );
+  DioException badResponse(int status, {String path = '/templates/t1/flows'}) =>
+      DioException(
+        requestOptions: RequestOptions(path: path),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: path),
+          statusCode: status,
+        ),
+        type: DioExceptionType.badResponse,
+      );
 
   Map<String, dynamic> flowJson({
     String id = 'f1',
@@ -98,7 +96,8 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>('/templates/t1/flows'),
       ).thenAnswer(
-        (_) async => respMap(200, body: <String, dynamic>{'items': <dynamic>[]}),
+        (_) async =>
+            respMap(200, body: <String, dynamic>{'items': <dynamic>[]}),
       );
 
       expect(await ds.listFlows('t1'), isEmpty);
@@ -116,8 +115,9 @@ void main() {
     });
 
     test('timeout → FlowsTimeoutFailure', () async {
-      when(() => dio.get<Map<String, dynamic>>('/templates/t1/flows'))
-          .thenThrow(
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1/flows'),
+      ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/templates/t1/flows'),
           type: DioExceptionType.receiveTimeout,
@@ -131,8 +131,9 @@ void main() {
     });
 
     test('sin conexión → FlowsNetworkFailure', () async {
-      when(() => dio.get<Map<String, dynamic>>('/templates/t1/flows'))
-          .thenThrow(
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1/flows'),
+      ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/templates/t1/flows'),
           type: DioExceptionType.connectionError,
@@ -146,8 +147,9 @@ void main() {
     });
 
     test('403 → FlowsForbiddenFailure', () async {
-      when(() => dio.get<Map<String, dynamic>>('/templates/t1/flows'))
-          .thenThrow(badResponse(403));
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1/flows'),
+      ).thenThrow(badResponse(403));
 
       await expectLater(
         ds.listFlows('t1'),
@@ -155,10 +157,10 @@ void main() {
       );
     });
 
-    test('404 (template ajeno o inexistente) → FlowsNotFoundFailure',
-        () async {
-      when(() => dio.get<Map<String, dynamic>>('/templates/t1/flows'))
-          .thenThrow(badResponse(404));
+    test('404 (template ajeno o inexistente) → FlowsNotFoundFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1/flows'),
+      ).thenThrow(badResponse(404));
 
       await expectLater(
         ds.listFlows('t1'),
@@ -167,18 +169,17 @@ void main() {
     });
 
     test('5xx → FlowsServerFailure', () async {
-      when(() => dio.get<Map<String, dynamic>>('/templates/t1/flows'))
-          .thenThrow(badResponse(503));
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1/flows'),
+      ).thenThrow(badResponse(503));
 
-      await expectLater(
-        ds.listFlows('t1'),
-        throwsA(isA<FlowsServerFailure>()),
-      );
+      await expectLater(ds.listFlows('t1'), throwsA(isA<FlowsServerFailure>()));
     });
 
     test('status no contemplado → UnknownFlowsFailure', () async {
-      when(() => dio.get<Map<String, dynamic>>('/templates/t1/flows'))
-          .thenThrow(badResponse(418));
+      when(
+        () => dio.get<Map<String, dynamic>>('/templates/t1/flows'),
+      ).thenThrow(badResponse(418));
 
       await expectLater(
         ds.listFlows('t1'),

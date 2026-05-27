@@ -665,9 +665,7 @@ class _FlowRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            Expanded(
-              child: Text(flow.name, style: t.bodyMedium),
-            ),
+            Expanded(child: Text(flow.name, style: t.bodyMedium)),
             if (flow.isActive)
               AppPill.primary(
                 key: Key('flows.row.${flow.id}.status_pill'),
