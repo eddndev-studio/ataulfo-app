@@ -195,4 +195,86 @@ void main() {
       );
     },
   );
+
+  group('auto-refresh al volver al listado (RouteAware)', () {
+    // Cuando el operador crea o edita una plantilla desde una sub-ruta
+    // (push), al hacer pop el shell vuelve al foreground. Sin el
+    // RouteObserver, el TemplatesBloc del shell sigue mostrando el
+    // estado pre-mutación. La page se suscribe al observer y dispara
+    // TemplatesRefreshRequested en didPopNext.
+    testWidgets(
+      'al popear la ruta encima del listado, dispatcha TemplatesRefreshRequested',
+      (tester) async {
+        final observer = RouteObserver<PageRoute<dynamic>>();
+        when(
+          () => bloc.state,
+        ).thenReturn(
+          const TemplatesLoaded(items: <Template>[_t1], isRefreshing: false),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            navigatorObservers: <NavigatorObserver>[observer],
+            home: BlocProvider<TemplatesBloc>.value(
+              value: bloc,
+              child: Scaffold(
+                body: TemplatesListPage(routeObserver: observer),
+              ),
+            ),
+          ),
+        );
+        // pump inicial: didChangeDependencies corre, subscribe ya está.
+        // verifyNever para asegurar que el subscribe NO dispara refresh
+        // por sí solo (sólo didPopNext debe).
+        verifyNever(() => bloc.add(const TemplatesRefreshRequested()));
+
+        // Push una ruta encima del listado (simula /templates/new o
+        // /templates/:id/edit). El observer notifica didPushNext al
+        // listado, pero ahí no hacemos nada.
+        final nav = tester.state<NavigatorState>(find.byType(Navigator));
+        nav.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Pop la sub-ruta: el listado vuelve al foreground y el observer
+        // notifica didPopNext → refresh.
+        nav.pop();
+        await tester.pumpAndSettle();
+
+        verify(
+          () => bloc.add(const TemplatesRefreshRequested()),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'sin routeObserver (default null), no observa ni dispatcha — composición opcional',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(
+          const TemplatesLoaded(items: <Template>[_t1], isRefreshing: false),
+        );
+
+        await tester.pumpWidget(host());
+        // host() construye TemplatesListPage sin routeObserver.
+
+        final nav = tester.state<NavigatorState>(find.byType(Navigator));
+        nav.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+          ),
+        );
+        await tester.pumpAndSettle();
+        nav.pop();
+        await tester.pumpAndSettle();
+
+        verifyNever(() => bloc.add(const TemplatesRefreshRequested()));
+      },
+    );
+  });
 }
