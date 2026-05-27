@@ -366,50 +366,101 @@ class _VarDefRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppTokens.radiusField),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                SizedBox(
-                  width: 180,
-                  // El placeholder de interpolación `{{name}}` es la forma
-                  // en que el operador referencia la variable desde el
-                  // prompt; mostrarla así es más útil que el name pelado.
-                  // No usamos SelectableText: el row es tap-target del
-                  // edit sheet y el gesture detector interno del Selectable
-                  // ganaría el tap. La copia se puede agregar via
-                  // long-press menu en un slice futuro si se pide.
-                  child: Text(
-                    '{{${def.name}}}',
-                    style: t.bodyMedium?.copyWith(
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.w600,
-                    ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: 180,
+                        // El placeholder de interpolación `{{name}}` es la
+                        // forma en que el operador referencia la variable
+                        // desde el prompt; mostrarla así es más útil que el
+                        // name pelado. No usamos SelectableText: el row es
+                        // tap-target del edit sheet y el gesture detector
+                        // interno del Selectable ganaría el tap. La copia
+                        // puede agregarse via long-press menu en un slice
+                        // futuro si se pide.
+                        child: Text(
+                          '{{${def.name}}}',
+                          style: t.bodyMedium?.copyWith(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          def.defaultValue.isEmpty ? '—' : def.defaultValue,
+                          style: t.bodyMedium?.copyWith(
+                            color: def.defaultValue.isEmpty
+                                ? AppTokens.text2
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Expanded(
-                  child: Text(
-                    def.defaultValue.isEmpty ? '—' : def.defaultValue,
-                    style: t.bodyMedium?.copyWith(
-                      color: def.defaultValue.isEmpty ? AppTokens.text2 : null,
+                  if (def.description.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        def.description,
+                        style: t.bodySmall?.copyWith(color: AppTokens.text2),
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-            if (def.description.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  def.description,
-                  style: t.bodySmall?.copyWith(color: AppTokens.text2),
-                ),
+                ],
               ),
+            ),
+            // Trash icon como acción destructiva. Tap apunta y abre
+            // confirm dialog — no compite con el tap del row (InkWell
+            // padre) porque el IconButton tiene su propio gesture detector
+            // y "absorbe" su área (Flutter usa hit-testing por proximidad).
+            IconButton(
+              key: Key('var_defs.row.${def.id}.delete'),
+              icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
+              tooltip: 'Eliminar variable',
+              onPressed: () => _confirmDelete(context, def),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, VariableDef def) async {
+    final bloc = context.read<VarDefsBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('var_defs.delete_confirm'),
+        title: const Text('Eliminar variable'),
+        content: Text(
+          '¿Eliminar la variable {{${def.name}}}? '
+          'Los bots que ya tengan un valor asignado bloquearán esta acción.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppTokens.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      bloc.add(VarDefsDeleteRequested(varDefId: def.id));
+    }
   }
 }
 

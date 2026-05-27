@@ -520,6 +520,9 @@ void main() {
         );
 
         await tester.pumpWidget(host());
+        // ensureVisible: con var-defs en la lista + trash icon el botón
+        // puede caer fuera del viewport en el tester.
+        await tester.ensureVisible(find.byKey(const Key('var_defs.add_button')));
         await tester.tap(find.byKey(const Key('var_defs.add_button')));
         await tester.pumpAndSettle();
 
