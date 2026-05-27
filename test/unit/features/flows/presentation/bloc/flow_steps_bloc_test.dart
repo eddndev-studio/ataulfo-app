@@ -141,7 +141,7 @@ void main() {
   });
 
   group('FlowStepsBloc.AddRequested', () {
-    const _newStep = fdom.Step(
+    const newStep = fdom.Step(
       id: 's-new',
       flowId: 'f1',
       type: fdom.StepType.text,
@@ -153,12 +153,12 @@ void main() {
       jitterPct: 0,
       aiOnly: false,
     );
-    const _afterAdd = <fdom.Step>[..._steps, _newStep];
+    const afterAdd = <fdom.Step>[..._steps, newStep];
 
     blocTest<FlowStepsBloc, FlowStepsState>(
       'AddRequested ok desde Loaded → Mutating + Loading + Loaded(refrescado)',
       build: () {
-        when(() => repo.listSteps('f1')).thenAnswer((_) async => _afterAdd);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => afterAdd);
         when(
           () => repo.createStep(
             flowId: 'f1',
@@ -170,7 +170,7 @@ void main() {
             jitterPct: 0,
             aiOnly: false,
           ),
-        ).thenAnswer((_) async => _newStep);
+        ).thenAnswer((_) async => newStep);
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       seed: () => const FlowStepsLoaded(_steps),
@@ -185,7 +185,7 @@ void main() {
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(_steps),
         FlowStepsLoading(),
-        FlowStepsLoaded(_afterAdd),
+        FlowStepsLoaded(afterAdd),
       ],
       verify: (_) {
         verify(
@@ -221,7 +221,7 @@ void main() {
             jitterPct: 0,
             aiOnly: false,
           ),
-        ).thenAnswer((_) async => _newStep.copyWith(order: 0, content: 'X'));
+        ).thenAnswer((_) async => newStep.copyWith(order: 0, content: 'X'));
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       seed: () => const FlowStepsLoaded(<fdom.Step>[]),
@@ -298,8 +298,8 @@ void main() {
             jitterPct: any(named: 'jitterPct'),
             aiOnly: any(named: 'aiOnly'),
           ),
-        ).thenAnswer((_) async => _newStep);
-        when(() => repo.listSteps('f1')).thenAnswer((_) async => _afterAdd);
+        ).thenAnswer((_) async => newStep);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => afterAdd);
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       seed: () => const FlowStepsMutationFailed(
@@ -317,7 +317,7 @@ void main() {
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(_steps),
         FlowStepsLoading(),
-        FlowStepsLoaded(_afterAdd),
+        FlowStepsLoaded(afterAdd),
       ],
     );
 
@@ -364,7 +364,7 @@ void main() {
             jitterPct: any(named: 'jitterPct'),
             aiOnly: any(named: 'aiOnly'),
           ),
-        ).thenAnswer((_) async => _newStep);
+        ).thenAnswer((_) async => newStep);
         when(() => repo.listSteps('f1')).thenAnswer(
           (_) => Future<List<fdom.Step>>.error(const FlowsServerFailure()),
         );

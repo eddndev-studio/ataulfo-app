@@ -185,27 +185,90 @@ class _StepsList extends StatelessWidget {
             ),
           ),
         ),
-        FlowStepsLoaded(steps: final ss) when ss.isEmpty => Text(
-          'Este flujo aún no tiene pasos.',
-          key: const Key('flow_detail.steps.empty'),
-          style: textTheme.bodyMedium?.copyWith(
-            fontStyle: FontStyle.italic,
-            color: AppTokens.text2,
-          ),
+        FlowStepsLoaded(steps: final ss) => _StepsListView(
+          steps: ss,
+          textTheme: textTheme,
         ),
-        FlowStepsLoaded(steps: final ss) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            for (final s in ss) ...<Widget>[
-              _StepCard(step: s),
-              const SizedBox(height: AppTokens.sp3),
-            ],
-          ],
+        // Mutating y MutationFailed mantienen la lista visible (snapshot
+        // preservado) para que el operador no pierda contexto mientras la
+        // mutación está en curso o tras un fallo recuperable.
+        FlowStepsMutating(steps: final ss) => _StepsListView(
+          steps: ss,
+          textTheme: textTheme,
+          isMutating: true,
+        ),
+        FlowStepsMutationFailed(steps: final ss) => _StepsListView(
+          steps: ss,
+          textTheme: textTheme,
         ),
         FlowStepsFailed(failure: final f) => _StepsFailedView(failure: f),
       },
     );
   }
+}
+
+/// Renderiza la lista de StepCards o el empty state. `isMutating` agrega
+/// un spinner inline al inicio (no overlay) para indicar que una
+/// mutación está en curso sin tapar la lista existente.
+class _StepsListView extends StatelessWidget {
+  const _StepsListView({
+    required this.steps,
+    required this.textTheme,
+    this.isMutating = false,
+  });
+
+  final List<sdom.Step> steps;
+  final TextTheme textTheme;
+  final bool isMutating;
+
+  @override
+  Widget build(BuildContext context) {
+    if (steps.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (isMutating) ...<Widget>[
+            const _MutatingInlineSpinner(),
+            const SizedBox(height: AppTokens.sp3),
+          ],
+          Text(
+            'Este flujo aún no tiene pasos.',
+            key: const Key('flow_detail.steps.empty'),
+            style: textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppTokens.text2,
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (isMutating) ...<Widget>[
+          const _MutatingInlineSpinner(),
+          const SizedBox(height: AppTokens.sp3),
+        ],
+        for (final s in steps) ...<Widget>[
+          _StepCard(step: s),
+          const SizedBox(height: AppTokens.sp3),
+        ],
+      ],
+    );
+  }
+}
+
+class _MutatingInlineSpinner extends StatelessWidget {
+  const _MutatingInlineSpinner();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+    key: Key('flow_detail.steps.mutating'),
+    height: 2,
+    child: LinearProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
 }
 
 class _StepsFailedView extends StatelessWidget {
