@@ -52,12 +52,14 @@ class FlowsRepositoryImpl implements FlowsRepository {
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    int? order,
   }) => _ds.patchStep(
     stepId: stepId,
     content: content,
     delayMs: delayMs,
     jitterPct: jitterPct,
     aiOnly: aiOnly,
+    order: order,
   );
 
   @override

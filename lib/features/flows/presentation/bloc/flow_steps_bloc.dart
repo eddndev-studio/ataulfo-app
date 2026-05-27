@@ -27,6 +27,7 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
     on<FlowStepsAddRequested>(_onAdd);
     on<FlowStepsUpdateRequested>(_onUpdate);
     on<FlowStepsDeleteRequested>(_onDelete);
+    on<FlowStepsReorderRequested>(_onReorder);
   }
 
   final FlowsRepository _repo;
@@ -86,6 +87,36 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
   ) async {
     await _runMutation(emit, (_) async {
       await _repo.deleteStep(event.stepId);
+    });
+  }
+
+  /// Reorder = N×PATCH /steps/:id cambiando `order`. Sin UNIQUE en
+  /// `(flow_id, order)` no se requiere two-pass: cada patch viaja
+  /// independiente. Se hace skip cuando el step ya estaba en su
+  /// posición destino, para no gastar requests en no-ops (ej. cuando
+  /// la UX dispara reorder con el array entero aunque el operador
+  /// haya soltado el item en su lugar original).
+  ///
+  /// Si una patch a mitad falla, el bloc deja el backend en estado
+  /// parcial y emite MutationFailed(snapshot original, failure) — la
+  /// UI puede ofrecer reload manual. No se refetch automático porque
+  /// enmascarar el orden parcial con un Loaded "como si nada" engaña
+  /// al operador.
+  Future<void> _onReorder(
+    FlowStepsReorderRequested event,
+    Emitter<FlowStepsState> emit,
+  ) async {
+    await _runMutation(emit, (snapshot) async {
+      final byId = <String, fdom.Step>{
+        for (final s in snapshot) s.id: s,
+      };
+      for (var i = 0; i < event.ids.length; i++) {
+        final id = event.ids[i];
+        final original = byId[id];
+        if (original == null) continue;
+        if (original.order == i) continue;
+        await _repo.patchStep(stepId: id, order: i);
+      }
     });
   }
 
@@ -217,6 +248,31 @@ class FlowStepsDeleteRequested extends FlowStepsEvent {
 
   @override
   int get hashCode => stepId.hashCode;
+}
+
+/// Pide reordenar la lista de steps. `ids` es el array completo de
+/// ids de step en el orden destino — el bloc compara contra el
+/// snapshot vigente y dispara PATCH solo para los que cambiaron de
+/// posición (skip de no-ops). La UX típica (`ReorderableListView`)
+/// reconstruye este array al soltar el drag.
+class FlowStepsReorderRequested extends FlowStepsEvent {
+  const FlowStepsReorderRequested(this.ids);
+
+  final List<String> ids;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! FlowStepsReorderRequested) return false;
+    if (other.ids.length != ids.length) return false;
+    for (var i = 0; i < ids.length; i++) {
+      if (other.ids[i] != ids[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll(ids);
 }
 
 // States --------------------------------------------------------------------

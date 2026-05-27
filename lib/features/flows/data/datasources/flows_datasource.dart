@@ -67,6 +67,11 @@ abstract interface class FlowsDatasource {
   /// `content` — para mantener simetría con el contrato Go (pointers +
   /// omitempty), el datasource no envía null.
   ///
+  /// `order` viaja cuando el cliente reordena steps por drag&drop. El
+  /// reorder es N×PATCH (uno por step que cambió de posición); sin
+  /// UNIQUE en `(flow_id, order)` no requiere two-pass — cada patch
+  /// va independiente y el listado posterior se ordena por `order` ASC.
+  ///
   /// 200 con el step resultante completo. 422
   /// → `FlowsInvalidStepFailure`. 404 → `FlowsStepNotFoundFailure`
   /// (distinto del NotFound del flow padre: aquí el step en sí no
@@ -77,6 +82,7 @@ abstract interface class FlowsDatasource {
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    int? order,
   });
 
   /// `DELETE /steps/:stepId` idempotente. 204 sin body en ambos casos
@@ -281,12 +287,14 @@ class DioFlowsDatasource implements FlowsDatasource {
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    int? order,
   }) async {
     final body = <String, dynamic>{};
     if (content != null) body['content'] = content;
     if (delayMs != null) body['delayMs'] = delayMs;
     if (jitterPct != null) body['jitterPct'] = jitterPct;
     if (aiOnly != null) body['aiOnly'] = aiOnly;
+    if (order != null) body['order'] = order;
     try {
       final res = await _dio.patch<Map<String, dynamic>>(
         '/steps/$stepId',

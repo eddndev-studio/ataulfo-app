@@ -42,12 +42,18 @@ abstract interface class FlowsRepository {
   /// backend preserva su valor actual. 422 → `FlowsInvalidStepFailure`;
   /// 404 → `FlowsStepNotFoundFailure` (el step ya no existe — el
   /// listado en pantalla está obsoleto).
+  ///
+  /// `order` se envía cuando el cliente reordena steps (drag&drop): el
+  /// reorder es N×PATCH cambiando solo `order`. Sin UNIQUE en
+  /// `(flow_id, order)`, no hace falta two-pass; cada patch viaja
+  /// independiente y el listado posterior se ordena por `order` ASC.
   Future<fdom.Step> patchStep({
     required String stepId,
     String? content,
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    int? order,
   });
 
   /// Elimina un Step. Operación idempotente: si el step no existe, no
