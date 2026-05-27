@@ -325,6 +325,85 @@ void main() {
     });
   });
 
+  group('VarDefFormSheet — padding inferior (teclado + system-nav)', () {
+    // El sheet flota sobre el teclado virtual cuando el operador edita,
+    // pero al cerrar el teclado en devices con gesture-nav (Android 15
+    // típicamente reporta viewPadding.bottom ~30-40dp) el botón Guardar
+    // queda parcialmente oculto detrás de la barra del sistema si el
+    // padding solo cubre viewInsets.bottom (== 0 con teclado cerrado).
+    // El padding inferior efectivo debe ser max(viewInsets, viewPadding)
+    // para cubrir ambos escenarios sin doble-contar.
+    Widget hostWithInsets({
+      double viewPaddingBottom = 0,
+      double viewInsetsBottom = 0,
+    }) => MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: Scaffold(
+        body: MediaQuery(
+          data: MediaQueryData(
+            viewPadding: EdgeInsets.only(bottom: viewPaddingBottom),
+            viewInsets: EdgeInsets.only(bottom: viewInsetsBottom),
+          ),
+          child: BlocProvider<VarDefsBloc>.value(
+            value: bloc,
+            child: const VarDefFormSheet(existingNames: <String>{}),
+          ),
+        ),
+      ),
+    );
+
+    double sheetBottomPadding(WidgetTester tester) {
+      // El sheet wrappea su Container interno en un Padding cuyo único
+      // propósito es respetar el inset inferior. Lo identificamos como
+      // el Padding ancestro inmediato del Container con padding.all.
+      final padding = tester.widget<Padding>(
+        find.ancestor(
+          of: find.byType(AppButton),
+          matching: find.byWidgetPredicate(
+            (w) => w is Padding && w.child is Container,
+          ),
+        ),
+      );
+      return (padding.padding as EdgeInsets).bottom;
+    }
+
+    testWidgets(
+      'con teclado cerrado y system-nav presente, padding inferior cubre la system-nav',
+      (tester) async {
+        await tester.pumpWidget(hostWithInsets(viewPaddingBottom: 32));
+        expect(
+          sheetBottomPadding(tester),
+          greaterThanOrEqualTo(32),
+          reason:
+              'Sin sumar viewPadding.bottom el botón Guardar queda detrás de '
+              'la gesture-nav al cerrar el teclado.',
+        );
+      },
+    );
+
+    testWidgets('con teclado abierto, padding inferior cubre el teclado', (
+      tester,
+    ) async {
+      // 100dp es suficiente para verificar max(viewInsets, viewPadding)
+      // sin colapsar la Column del sheet en el viewport por default
+      // del test (600dp de alto). Lo que se valida es que viewInsets
+      // domina sobre viewPadding cuando el teclado abre — el valor
+      // exacto del keyboard real (~280) es irrelevante para la lógica.
+      await tester.pumpWidget(
+        hostWithInsets(viewInsetsBottom: 100, viewPaddingBottom: 32),
+      );
+      expect(sheetBottomPadding(tester), greaterThanOrEqualTo(100));
+    });
+
+    testWidgets(
+      'sin teclado ni system-nav, padding inferior es 0 (no introduce gap espurio)',
+      (tester) async {
+        await tester.pumpWidget(hostWithInsets());
+        expect(sheetBottomPadding(tester), 0);
+      },
+    );
+  });
+
   group('VarDefFormSheet — modo edit', () {
     const editing = VariableDef(
       id: 'v1',
