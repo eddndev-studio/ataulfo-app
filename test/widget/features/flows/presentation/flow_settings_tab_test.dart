@@ -132,7 +132,10 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      expect(find.text('Sin límite'), findsOneWidget);
+      expect(
+        find.byKey(const Key('flow_settings.usage_limit.unlimited_label')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('siblings vacía (única flow de la template) muestra empty state inline', (

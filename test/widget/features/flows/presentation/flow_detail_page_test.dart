@@ -436,7 +436,7 @@ void main() {
     );
   });
 
-  testWidgets('Tap en tab Configuración muestra placeholder "Próximamente"', (
+  testWidgets('Tap en tab Configuración monta FlowSettingsTab', (
     tester,
   ) async {
     when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false));
@@ -454,7 +454,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const Key('flow_detail.tab.settings.coming_soon')),
+      find.byKey(const Key('flow_detail.tab.settings')),
+      findsOneWidget,
+    );
+    // El form del settings tab debe estar renderizado.
+    expect(
+      find.byKey(const Key('flow_settings.cooldown.slider')),
       findsOneWidget,
     );
   });
