@@ -1,7 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/flow.dart';
-import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../../domain/repositories/flows_repository.dart';
 
@@ -9,12 +8,10 @@ import '../../domain/repositories/flows_repository.dart';
 /// se construye con el id y arranca en `Loading` para no flashear
 /// Initial.
 ///
-/// Paraleliza dos GETs (`flowById` + `listSteps`) con `Future.wait` —
-/// el wire del backend NO anida los steps en el flow, así que en F2
-/// hay dos endpoints. Si cualquiera falla, el bloc emite Failed con
-/// ese failure y descarta el progreso del otro: la página no puede
-/// mostrar half-state (cabecera sin steps o viceversa) sin confundir
-/// al operador.
+/// Sostiene únicamente la cabecera del flow. La lista de Steps vive en
+/// `FlowStepsBloc` (tab Pasos), Triggers vivirán en `TriggersBloc` y
+/// la configuración en su propio bloc — cada tab del editor administra
+/// su propio fetch y sus mutaciones de forma independiente.
 class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
   FlowDetailBloc({required FlowsRepository repo, required String id})
     : _repo = repo,
@@ -34,13 +31,8 @@ class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
       emit(const FlowDetailLoading());
     }
     try {
-      final results = await Future.wait<dynamic>([
-        _repo.flowById(_id),
-        _repo.listSteps(_id),
-      ]);
-      final flow = results[0] as Flow;
-      final steps = results[1] as List<fdom.Step>;
-      emit(FlowDetailLoaded(flow, steps));
+      final flow = await _repo.flowById(_id);
+      emit(FlowDetailLoaded(flow));
     } on FlowsFailure catch (f) {
       emit(FlowDetailFailed(f));
     }
@@ -76,25 +68,16 @@ class FlowDetailLoading extends FlowDetailState {
 }
 
 class FlowDetailLoaded extends FlowDetailState {
-  const FlowDetailLoaded(this.flow, this.steps);
+  const FlowDetailLoaded(this.flow);
 
   final Flow flow;
-  final List<fdom.Step> steps;
 
   @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! FlowDetailLoaded) return false;
-    if (other.flow != flow) return false;
-    if (other.steps.length != steps.length) return false;
-    for (var i = 0; i < steps.length; i++) {
-      if (other.steps[i] != steps[i]) return false;
-    }
-    return true;
-  }
+  bool operator ==(Object other) =>
+      other is FlowDetailLoaded && other.flow == flow;
 
   @override
-  int get hashCode => Object.hash(flow, Object.hashAll(steps));
+  int get hashCode => flow.hashCode;
 }
 
 class FlowDetailFailed extends FlowDetailState {

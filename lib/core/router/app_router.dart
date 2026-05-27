@@ -20,6 +20,7 @@ import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
 import '../../features/flows/domain/repositories/flows_repository.dart';
 import '../../features/flows/presentation/bloc/flow_create_bloc.dart';
 import '../../features/flows/presentation/bloc/flow_detail_bloc.dart';
+import '../../features/flows/presentation/bloc/flow_steps_bloc.dart';
 import '../../features/flows/presentation/bloc/flows_bloc.dart';
 import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
@@ -282,10 +283,19 @@ class AppRouter {
         path: '/flows/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return BlocProvider<FlowDetailBloc>(
-            create: (_) =>
-                FlowDetailBloc(repo: _flowsRepo, id: id)
-                  ..add(const FlowDetailLoadRequested()),
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<FlowDetailBloc>(
+                create: (_) =>
+                    FlowDetailBloc(repo: _flowsRepo, id: id)
+                      ..add(const FlowDetailLoadRequested()),
+              ),
+              BlocProvider<FlowStepsBloc>(
+                create: (_) =>
+                    FlowStepsBloc(repo: _flowsRepo, flowId: id)
+                      ..add(const FlowStepsLoadRequested()),
+              ),
+            ],
             child: Scaffold(
               appBar: AppBar(title: const Text('Detalle de flujo')),
               body: const FlowDetailPage(),

@@ -9,6 +9,7 @@ import '../../domain/entities/flow.dart' as fdom;
 import '../../domain/entities/step.dart' as sdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
+import '../bloc/flow_steps_bloc.dart';
 
 /// Detalle de un Flow (S11). Stateful para sostener el TabController de
 /// las 3 secciones del editor: Pasos / Disparadores / Configuración. El
@@ -46,11 +47,7 @@ class _FlowDetailPageState extends State<FlowDetailPage>
     return BlocBuilder<FlowDetailBloc, FlowDetailState>(
       builder: (context, state) => switch (state) {
         FlowDetailLoading() => const _LoadingView(),
-        FlowDetailLoaded(flow: final f, steps: final ss) => _LoadedShell(
-          tab: _tab,
-          flow: f,
-          steps: ss,
-        ),
+        FlowDetailLoaded(flow: final f) => _LoadedShell(tab: _tab, flow: f),
         FlowDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );
@@ -73,15 +70,10 @@ class _LoadingView extends StatelessWidget {
 /// sobreviva a los rebuilds del bloc; los tabs son fijos (3 secciones
 /// estables del editor).
 class _LoadedShell extends StatelessWidget {
-  const _LoadedShell({
-    required this.tab,
-    required this.flow,
-    required this.steps,
-  });
+  const _LoadedShell({required this.tab, required this.flow});
 
   final TabController tab;
   final fdom.Flow flow;
-  final List<sdom.Step> steps;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +94,7 @@ class _LoadedShell extends StatelessWidget {
           child: TabBarView(
             controller: tab,
             children: <Widget>[
-              _StepsTab(flow: flow, steps: steps),
+              _StepsTab(flow: flow),
               const _ComingSoonTab(
                 tabKey: Key('flow_detail.tab.triggers.coming_soon'),
                 title: 'Disparadores',
@@ -125,15 +117,18 @@ class _LoadedShell extends StatelessWidget {
   }
 }
 
-/// Tab de Pasos: header del flow (nombre + pills v/status) y lista de
-/// StepCards (o empty state). En F5a queda read-only — los slices de
-/// CRUD del step (add/edit/delete) aterrizan el botón "+ Step" y el
-/// sheet de edición sobre este mismo tab.
+/// Tab de Pasos. El header del flow (nombre + pills v/status) se renderiza
+/// siempre — viene de `FlowDetailBloc.Loaded`, que ya está resuelto cuando
+/// el shell se monta. La lista de StepCards depende del `FlowStepsBloc`
+/// propio del tab, con sus tres estados (Loading/Loaded/Failed).
+///
+/// Que el header viva fuera del estado del listado permite mostrar
+/// progresivamente: el operador ve qué flujo está editando aunque la
+/// llamada a `/flows/:id/steps` aún esté en vuelo o haya fallado.
 class _StepsTab extends StatelessWidget {
-  const _StepsTab({required this.flow, required this.steps});
+  const _StepsTab({required this.flow});
 
   final fdom.Flow flow;
-  final List<sdom.Step> steps;
 
   @override
   Widget build(BuildContext context) {
@@ -163,20 +158,88 @@ class _StepsTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppTokens.sp6),
-          if (steps.isEmpty)
-            Text(
-              'Este flujo aún no tiene pasos.',
-              key: const Key('flow_detail.steps.empty'),
-              style: textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            )
-          else
-            for (final s in steps) ...<Widget>[
+          const _StepsList(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Lista de StepCards atada al `FlowStepsBloc`. Loading muestra spinner
+/// inline (no centrado en pantalla, ya que el header vive arriba).
+/// Failed muestra mensaje + retry; NotFound se trata como mensaje
+/// terminal sin botón.
+class _StepsList extends StatelessWidget {
+  const _StepsList();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return BlocBuilder<FlowStepsBloc, FlowStepsState>(
+      builder: (context, state) => switch (state) {
+        FlowStepsLoading() => const Padding(
+          padding: EdgeInsets.symmetric(vertical: AppTokens.sp4),
+          child: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+            ),
+          ),
+        ),
+        FlowStepsLoaded(steps: final ss) when ss.isEmpty => Text(
+          'Este flujo aún no tiene pasos.',
+          key: const Key('flow_detail.steps.empty'),
+          style: textTheme.bodyMedium?.copyWith(
+            fontStyle: FontStyle.italic,
+            color: AppTokens.text2,
+          ),
+        ),
+        FlowStepsLoaded(steps: final ss) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            for (final s in ss) ...<Widget>[
               _StepCard(step: s),
               const SizedBox(height: AppTokens.sp3),
             ],
+          ],
+        ),
+        FlowStepsFailed(failure: final f) => _StepsFailedView(failure: f),
+      },
+    );
+  }
+}
+
+class _StepsFailedView extends StatelessWidget {
+  const _StepsFailedView({required this.failure});
+
+  final FlowsFailure failure;
+
+  @override
+  Widget build(BuildContext context) {
+    final isNotFound = failure is FlowsNotFoundFailure;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      key: isNotFound
+          ? const Key('flow_detail.steps.error.not_found')
+          : const Key('flow_detail.steps.error.generic'),
+      padding: const EdgeInsets.symmetric(vertical: AppTokens.sp4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            isNotFound
+                ? 'No pudimos encontrar los pasos de este flujo.'
+                : 'No pudimos cargar los pasos.',
+            style: textTheme.bodyMedium,
+          ),
+          if (!isNotFound) ...<Widget>[
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
+              onPressed: () => context.read<FlowStepsBloc>().add(
+                const FlowStepsLoadRequested(),
+              ),
+            ),
+          ],
         ],
       ),
     );
