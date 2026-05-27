@@ -23,6 +23,13 @@ Trigger _sample({String id = 't1'}) => Trigger(
 );
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(TriggerType.text);
+    registerFallbackValue(MatchType.exact);
+    registerFallbackValue(LabelAction.add);
+    registerFallbackValue(TriggerScope.both);
+  });
+
   late _MockDatasource ds;
   late TriggersRepositoryImpl repo;
 
