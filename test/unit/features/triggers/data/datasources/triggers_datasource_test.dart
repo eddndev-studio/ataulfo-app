@@ -243,4 +243,142 @@ void main() {
       );
     });
   });
+
+  group('DioTriggersDatasource.createTrigger happy path', () {
+    test('POST /templates/:templateId/triggers TEXT con body completo', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/templates/tpl1/triggers'),
+          statusCode: 201,
+          data: triggerJson(),
+        ),
+      );
+
+      final t = await ds.createTrigger(
+        templateId: 'tpl1',
+        flowId: 'f1',
+        triggerType: TriggerType.text,
+        matchType: MatchType.contains,
+        keyword: 'hola',
+        labelId: '',
+        labelAction: null,
+        scope: TriggerScope.both,
+        isActive: true,
+      );
+
+      expect(t.id, 't1');
+      expect(t.triggerType, TriggerType.text);
+      expect(t.keyword, 'hola');
+
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      expect(captured[0], '/templates/tpl1/triggers');
+      final body = captured[1] as Map<String, dynamic>;
+      expect(body['flowId'], 'f1');
+      expect(body['type'], 'TEXT');
+      expect(body['matchType'], 'CONTAINS');
+      expect(body['keyword'], 'hola');
+      expect(body['scope'], 'BOTH');
+      expect(body['isActive'], true);
+      // El backend espeja TEXT triggers sin labelId/labelAction — el
+      // cliente no manda esos campos en modo TEXT (omitempty del backend
+      // los limpia de todos modos, pero ser explícito acota el contrato).
+      expect(body.containsKey('labelId'), isFalse);
+      expect(body.containsKey('labelAction'), isFalse);
+    });
+
+    test('POST LABEL no manda keyword/matchType', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/templates/tpl1/triggers'),
+          statusCode: 201,
+          data: triggerJson(
+            id: 't2',
+            type: 'LABEL',
+            matchType: null,
+            keyword: '',
+            labelId: 'vip',
+            labelAction: 'ADD',
+          ),
+        ),
+      );
+
+      final t = await ds.createTrigger(
+        templateId: 'tpl1',
+        flowId: 'f1',
+        triggerType: TriggerType.label,
+        matchType: null,
+        keyword: '',
+        labelId: 'vip',
+        labelAction: LabelAction.add,
+        scope: TriggerScope.both,
+        isActive: true,
+      );
+
+      expect(t.triggerType, TriggerType.label);
+      expect(t.labelAction, LabelAction.add);
+
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      final body = captured[1] as Map<String, dynamic>;
+      expect(body['type'], 'LABEL');
+      expect(body['labelId'], 'vip');
+      expect(body['labelAction'], 'ADD');
+      expect(body.containsKey('keyword'), isFalse);
+      expect(body.containsKey('matchType'), isFalse);
+    });
+  });
+
+  group('DioTriggersDatasource.createTrigger failure mapping', () {
+    Future<void> expectMappedTo<F>(int status) async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(status));
+      await expectLater(
+        () => ds.createTrigger(
+          templateId: 'tpl1',
+          flowId: 'f1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.contains,
+          keyword: 'hola',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+        throwsA(isA<F>()),
+      );
+    }
+
+    test('422 → TriggersInvalidFailure', () => expectMappedTo<TriggersInvalidFailure>(422));
+    test('403 → TriggersForbiddenFailure', () => expectMappedTo<TriggersForbiddenFailure>(403));
+    test('404 → TriggersNotFoundFailure (template padre)', () => expectMappedTo<TriggersNotFoundFailure>(404));
+    test('503 → TriggersServerFailure', () => expectMappedTo<TriggersServerFailure>(503));
+  });
 }
