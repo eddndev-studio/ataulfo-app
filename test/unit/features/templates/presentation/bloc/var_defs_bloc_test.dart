@@ -52,9 +52,9 @@ void main() {
     blocTest<VarDefsBloc, VarDefsState>(
       'LoadRequested ok con lista vacía → Loaded([], v) (plantilla sin vars)',
       build: () {
-        when(() => repo.listVarDefs('t1')).thenAnswer(
-          (_) async => (version: 1, defs: const <VariableDef>[]),
-        );
+        when(
+          () => repo.listVarDefs('t1'),
+        ).thenAnswer((_) async => (version: 1, defs: const <VariableDef>[]));
         return VarDefsBloc(repo: repo, templateId: 't1');
       },
       act: (bloc) => bloc.add(const VarDefsLoadRequested()),
@@ -88,9 +88,10 @@ void main() {
               const TemplatesServerFailure(),
             );
           }
-          return Future<({int version, List<VariableDef> defs})>.value(
-            (version: 4, defs: _defs),
-          );
+          return Future<({int version, List<VariableDef> defs})>.value((
+            version: 4,
+            defs: _defs,
+          ));
         });
         return VarDefsBloc(repo: repo, templateId: 't1');
       },
@@ -417,9 +418,7 @@ void main() {
       },
       act: (bloc) async {
         await Future<void>.delayed(Duration.zero);
-        bloc.add(
-          const VarDefsUpdateRequested(varDefId: 'v1', name: 'otro'),
-        );
+        bloc.add(const VarDefsUpdateRequested(varDefId: 'v1', name: 'otro'));
       },
       expect: () => const <VarDefsState>[
         VarDefsLoaded(_defs, 2),
@@ -466,9 +465,8 @@ void main() {
     blocTest<VarDefsBloc, VarDefsState>(
       'UpdateRequested desde Loading se ignora (no version para CAS)',
       build: () => VarDefsBloc(repo: repo, templateId: 't1'),
-      act: (bloc) => bloc.add(
-        const VarDefsUpdateRequested(varDefId: 'v1', name: 'x'),
-      ),
+      act: (bloc) =>
+          bloc.add(const VarDefsUpdateRequested(varDefId: 'v1', name: 'x')),
       expect: () => const <VarDefsState>[],
       verify: (_) {
         verifyNever(
@@ -490,9 +488,7 @@ void main() {
       );
       expect(
         const VarDefsUpdateRequested(varDefId: 'v1', name: 'x'),
-        isNot(
-          equals(const VarDefsUpdateRequested(varDefId: 'v2', name: 'x')),
-        ),
+        isNot(equals(const VarDefsUpdateRequested(varDefId: 'v2', name: 'x'))),
       );
       expect(
         const VarDefsUpdateRequested(varDefId: 'v1', defaultValue: ''),
@@ -532,9 +528,7 @@ void main() {
         VarDefsLoaded(<VariableDef>[], 3),
       ],
       verify: (_) {
-        verify(
-          () => repo.removeVarDef(varDefId: 'v1', version: 2),
-        ).called(1);
+        verify(() => repo.removeVarDef(varDefId: 'v1', version: 2)).called(1);
       },
     );
 
@@ -544,9 +538,7 @@ void main() {
         when(
           () => repo.listVarDefs('t1'),
         ).thenAnswer((_) async => (version: 2, defs: _defs));
-        when(
-          () => repo.removeVarDef(varDefId: 'v1', version: 2),
-        ).thenAnswer(
+        when(() => repo.removeVarDef(varDefId: 'v1', version: 2)).thenAnswer(
           (_) => Future<void>.error(const TemplatesConflictFailure()),
         );
         return VarDefsBloc(repo: repo, templateId: 't1')

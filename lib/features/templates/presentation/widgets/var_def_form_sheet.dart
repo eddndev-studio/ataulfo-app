@@ -27,11 +27,7 @@ import '../bloc/var_defs_bloc.dart';
 ///   y reintente desde el mismo form; el snackbar lo monta la página
 ///   padre con su propio BlocListener.
 class VarDefFormSheet extends StatefulWidget {
-  const VarDefFormSheet({
-    super.key,
-    required this.existingNames,
-    this.editing,
-  });
+  const VarDefFormSheet({super.key, required this.existingNames, this.editing});
 
   /// Nombres que ya viven en la Template; usados para el pre-flight
   /// inline. Pasarlos como prop (en vez de leerlos del bloc) mantiene
@@ -109,8 +105,9 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
     // (la UI evita request inútil; el server-side ya sería no-op de
     // todos modos pero gasta round-trip).
     final newName = name != ed.name ? name : null;
-    final newDefault =
-        _defaultCtrl.text != ed.defaultValue ? _defaultCtrl.text : null;
+    final newDefault = _defaultCtrl.text != ed.defaultValue
+        ? _defaultCtrl.text
+        : null;
     final newDesc = _descCtrl.text != ed.description ? _descCtrl.text : null;
     final isNoOp = newName == null && newDefault == null && newDesc == null;
     if (isNoOp) return;

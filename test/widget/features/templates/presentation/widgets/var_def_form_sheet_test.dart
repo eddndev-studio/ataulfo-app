@@ -61,17 +61,11 @@ void main() {
 
       expect(find.byKey(const Key('var_def_form.name')), findsOneWidget);
       expect(find.byKey(const Key('var_def_form.default')), findsOneWidget);
-      expect(
-        find.byKey(const Key('var_def_form.description')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('var_def_form.description')), findsOneWidget);
       expect(find.byKey(const Key('var_def_form.submit')), findsOneWidget);
       // El primitivo del DS, no Material directo.
       expect(find.byType(AppTextField), findsNWidgets(3));
-      expect(
-        find.byKey(const Key('var_def_form.submit')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('var_def_form.submit')), findsOneWidget);
     });
 
     testWidgets('submit está deshabilitado cuando name está vacío', (
@@ -80,8 +74,9 @@ void main() {
       await tester.pumpWidget(host(existingNames: <String>{}));
       // El primitivo es AppButton.filled con onPressed=null cuando
       // name.trim().isEmpty.
-      final submit = tester
-          .widget<AppButton>(find.byKey(const Key('var_def_form.submit')));
+      final submit = tester.widget<AppButton>(
+        find.byKey(const Key('var_def_form.submit')),
+      );
       expect(submit.onPressed, isNull);
     });
   });
@@ -166,8 +161,9 @@ void main() {
         );
         // No deshabilita: el operador puede insistir y el server 409
         // es la fuente de verdad (race con otro operador, etc.).
-        final submit = tester
-            .widget<AppButton>(find.byKey(const Key('var_def_form.submit')));
+        final submit = tester.widget<AppButton>(
+          find.byKey(const Key('var_def_form.submit')),
+        );
         expect(submit.onPressed, isNotNull);
       },
     );
@@ -204,77 +200,76 @@ void main() {
 
       await tester.pumpWidget(host(existingNames: <String>{}));
 
-      final submit = tester
-          .widget<AppButton>(find.byKey(const Key('var_def_form.submit')));
+      final submit = tester.widget<AppButton>(
+        find.byKey(const Key('var_def_form.submit')),
+      );
       expect(submit.loading, isTrue);
     });
 
-    testWidgets(
-      'Loaded post-submit cierra el sheet automáticamente',
-      (tester) async {
-        // StreamController permite emitir estados DESPUÉS del tap submit
-        // (Stream.fromIterable los entrega de golpe al subscribirse).
-        final controller = StreamController<VarDefsState>.broadcast();
-        addTearDown(controller.close);
-        whenListen<VarDefsState>(
-          bloc,
-          controller.stream,
-          initialState: const VarDefsLoaded(_defs, 2),
-        );
+    testWidgets('Loaded post-submit cierra el sheet automáticamente', (
+      tester,
+    ) async {
+      // StreamController permite emitir estados DESPUÉS del tap submit
+      // (Stream.fromIterable los entrega de golpe al subscribirse).
+      final controller = StreamController<VarDefsState>.broadcast();
+      addTearDown(controller.close);
+      whenListen<VarDefsState>(
+        bloc,
+        controller.stream,
+        initialState: const VarDefsLoaded(_defs, 2),
+      );
 
-        var didPop = false;
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppDesignTheme.dark(),
-            home: Scaffold(
-              // Resizable: el sheet expandido con teclado oculto cabe
-              // en cualquier altura sin overflow.
-              body: SingleChildScrollView(
-                child: Builder(
-                  builder: (context) => AppButton.text(
-                    label: 'Open',
-                    onPressed: () async {
-                      await showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => BlocProvider<VarDefsBloc>.value(
-                          value: bloc,
-                          child:
-                              const VarDefFormSheet(existingNames: <String>{}),
-                        ),
-                      );
-                      didPop = true;
-                    },
-                  ),
+      var didPop = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: Scaffold(
+            // Resizable: el sheet expandido con teclado oculto cabe
+            // en cualquier altura sin overflow.
+            body: SingleChildScrollView(
+              child: Builder(
+                builder: (context) => AppButton.text(
+                  label: 'Open',
+                  onPressed: () async {
+                    await showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => BlocProvider<VarDefsBloc>.value(
+                        value: bloc,
+                        child: const VarDefFormSheet(existingNames: <String>{}),
+                      ),
+                    );
+                    didPop = true;
+                  },
                 ),
               ),
             ),
           ),
-        );
-        await tester.tap(find.text('Open'));
-        await tester.pumpAndSettle();
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
 
-        // Tap submit (didSubmit=true). Recién después emitimos los
-        // estados del flow.
-        await tester.enterText(
-          find.byKey(const Key('var_def_form.name')),
-          'saldo',
-        );
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('var_def_form.submit')));
-        await tester.pump();
+      // Tap submit (didSubmit=true). Recién después emitimos los
+      // estados del flow.
+      await tester.enterText(
+        find.byKey(const Key('var_def_form.name')),
+        'saldo',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('var_def_form.submit')));
+      await tester.pump();
 
-        controller.add(const VarDefsMutating(_defs, 2));
-        await tester.pump();
-        controller.add(const VarDefsLoading());
-        await tester.pump();
-        controller.add(const VarDefsLoaded(_defs, 3));
-        await tester.pumpAndSettle();
+      controller.add(const VarDefsMutating(_defs, 2));
+      await tester.pump();
+      controller.add(const VarDefsLoading());
+      await tester.pump();
+      controller.add(const VarDefsLoaded(_defs, 3));
+      await tester.pumpAndSettle();
 
-        expect(didPop, isTrue, reason: 'el sheet debe cerrarse en Loaded');
-        expect(find.byType(VarDefFormSheet), findsNothing);
-      },
-    );
+      expect(didPop, isTrue, reason: 'el sheet debe cerrarse en Loaded');
+      expect(find.byType(VarDefFormSheet), findsNothing);
+    });
 
     testWidgets(
       'MutationFailed NO cierra el sheet (operador corrige y reintenta)',
@@ -308,27 +303,26 @@ void main() {
       },
     );
 
-    testWidgets(
-      'Loaded sin haber sometido NO cierra (rebuilds incidentales)',
-      (tester) async {
-        // Un rebuild del bloc a Loaded sin que el sheet haya disparado
-        // submit (p.ej. un refetch externo) no debe cerrar — el flag
-        // didSubmit lo evita.
-        final controller = StreamController<VarDefsState>.broadcast();
-        addTearDown(controller.close);
-        whenListen<VarDefsState>(
-          bloc,
-          controller.stream,
-          initialState: const VarDefsLoaded(_defs, 2),
-        );
+    testWidgets('Loaded sin haber sometido NO cierra (rebuilds incidentales)', (
+      tester,
+    ) async {
+      // Un rebuild del bloc a Loaded sin que el sheet haya disparado
+      // submit (p.ej. un refetch externo) no debe cerrar — el flag
+      // didSubmit lo evita.
+      final controller = StreamController<VarDefsState>.broadcast();
+      addTearDown(controller.close);
+      whenListen<VarDefsState>(
+        bloc,
+        controller.stream,
+        initialState: const VarDefsLoaded(_defs, 2),
+      );
 
-        await tester.pumpWidget(host(existingNames: <String>{}));
-        controller.add(const VarDefsLoaded(_defs, 3));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(host(existingNames: <String>{}));
+      controller.add(const VarDefsLoaded(_defs, 3));
+      await tester.pumpAndSettle();
 
-        expect(find.byType(VarDefFormSheet), findsOneWidget);
-      },
-    );
+      expect(find.byType(VarDefFormSheet), findsOneWidget);
+    });
   });
 
   group('VarDefFormSheet — modo edit', () {
@@ -416,29 +410,28 @@ void main() {
       },
     );
 
-    testWidgets(
-      'submit con cambio en description: viaja sólo description',
-      (tester) async {
-        await tester.pumpWidget(editHost());
+    testWidgets('submit con cambio en description: viaja sólo description', (
+      tester,
+    ) async {
+      await tester.pumpWidget(editHost());
 
-        await tester.enterText(
-          find.byKey(const Key('var_def_form.description')),
-          'Saludo nuevo',
-        );
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('var_def_form.submit')));
-        await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('var_def_form.description')),
+        'Saludo nuevo',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('var_def_form.submit')));
+      await tester.pump();
 
-        verify(
-          () => bloc.add(
-            const VarDefsUpdateRequested(
-              varDefId: 'v1',
-              description: 'Saludo nuevo',
-            ),
+      verify(
+        () => bloc.add(
+          const VarDefsUpdateRequested(
+            varDefId: 'v1',
+            description: 'Saludo nuevo',
           ),
-        ).called(1);
-      },
-    );
+        ),
+      ).called(1);
+    });
 
     testWidgets(
       'submit sin cambios es no-op (no dispatcha — UI evita request inútil)',
@@ -447,9 +440,7 @@ void main() {
         await tester.tap(find.byKey(const Key('var_def_form.submit')));
         await tester.pump();
 
-        verifyNever(
-          () => bloc.add(any(that: isA<VarDefsUpdateRequested>())),
-        );
+        verifyNever(() => bloc.add(any(that: isA<VarDefsUpdateRequested>())));
       },
     );
   });

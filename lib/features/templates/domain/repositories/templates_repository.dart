@@ -70,8 +70,5 @@ abstract interface class TemplatesRepository {
   /// tiene un valor asignado a esta variable — el dominio la trata
   /// como inmutable). 404 si la def no existe. El backend devuelve
   /// 204 sin body.
-  Future<void> removeVarDef({
-    required String varDefId,
-    required int version,
-  });
+  Future<void> removeVarDef({required String varDefId, required int version});
 }

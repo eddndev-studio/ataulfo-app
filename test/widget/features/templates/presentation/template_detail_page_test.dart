@@ -318,25 +318,22 @@ void main() {
       'VarDefsLoaded con defs muestra una fila por variable (name + default)',
       (tester) async {
         when(() => varDefsBloc.state).thenReturn(
-          const VarDefsLoaded(
-            <VariableDef>[
-              VariableDef(
-                id: 'v1',
-                name: 'nombre',
-                type: VarType.text,
-                defaultValue: 'cliente',
-                description: 'Saludo personalizado',
-              ),
-              VariableDef(
-                id: 'v2',
-                name: 'edad',
-                type: VarType.text,
-                defaultValue: '',
-                description: '',
-              ),
-            ],
-            2,
-          ),
+          const VarDefsLoaded(<VariableDef>[
+            VariableDef(
+              id: 'v1',
+              name: 'nombre',
+              type: VarType.text,
+              defaultValue: 'cliente',
+              description: 'Saludo personalizado',
+            ),
+            VariableDef(
+              id: 'v2',
+              name: 'edad',
+              type: VarType.text,
+              defaultValue: '',
+              description: '',
+            ),
+          ], 2),
         );
 
         await tester.pumpWidget(host());
@@ -380,18 +377,15 @@ void main() {
       'VarDefsMutating conserva la lista visible (no flash a Loading)',
       (tester) async {
         when(() => varDefsBloc.state).thenReturn(
-          const VarDefsMutating(
-            <VariableDef>[
-              VariableDef(
-                id: 'v1',
-                name: 'nombre',
-                type: VarType.text,
-                defaultValue: 'cliente',
-                description: '',
-              ),
-            ],
-            2,
-          ),
+          const VarDefsMutating(<VariableDef>[
+            VariableDef(
+              id: 'v1',
+              name: 'nombre',
+              type: VarType.text,
+              defaultValue: 'cliente',
+              description: '',
+            ),
+          ], 2),
         );
 
         await tester.pumpWidget(host());
@@ -436,60 +430,52 @@ void main() {
     testWidgets('VarDefsMutating con lista vacía muestra empty state', (
       tester,
     ) async {
-      when(() => varDefsBloc.state).thenReturn(
-        const VarDefsMutating(<VariableDef>[], 1),
-      );
+      when(
+        () => varDefsBloc.state,
+      ).thenReturn(const VarDefsMutating(<VariableDef>[], 1));
 
       await tester.pumpWidget(host());
 
       expect(find.byKey(const Key('var_defs.empty')), findsOneWidget);
     });
 
-    testWidgets(
-      'Loaded muestra botón "Agregar variable" con key contractual',
-      (tester) async {
-        when(() => varDefsBloc.state).thenReturn(
-          const VarDefsLoaded(<VariableDef>[], 1),
-        );
+    testWidgets('Loaded muestra botón "Agregar variable" con key contractual', (
+      tester,
+    ) async {
+      when(
+        () => varDefsBloc.state,
+      ).thenReturn(const VarDefsLoaded(<VariableDef>[], 1));
 
-        await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
 
-        expect(
-          find.byKey(const Key('var_defs.add_button')),
-          findsOneWidget,
-        );
-        expect(find.text('Agregar variable'), findsOneWidget);
-      },
-    );
+      expect(find.byKey(const Key('var_defs.add_button')), findsOneWidget);
+      expect(find.text('Agregar variable'), findsOneWidget);
+    });
 
-    testWidgets(
-      'MutationFailed mantiene visible el botón "Agregar variable"',
-      (tester) async {
-        // Tras un 409, el operador puede corregir el form y reintentar
-        // desde el mismo sheet; el botón debe seguir visible.
-        when(() => varDefsBloc.state).thenReturn(
-          const VarDefsMutationFailed(
-            <VariableDef>[],
-            1,
-            TemplatesConflictFailure(),
-          ),
-        );
+    testWidgets('MutationFailed mantiene visible el botón "Agregar variable"', (
+      tester,
+    ) async {
+      // Tras un 409, el operador puede corregir el form y reintentar
+      // desde el mismo sheet; el botón debe seguir visible.
+      when(() => varDefsBloc.state).thenReturn(
+        const VarDefsMutationFailed(
+          <VariableDef>[],
+          1,
+          TemplatesConflictFailure(),
+        ),
+      );
 
-        await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
 
-        expect(
-          find.byKey(const Key('var_defs.add_button')),
-          findsOneWidget,
-        );
-      },
-    );
+      expect(find.byKey(const Key('var_defs.add_button')), findsOneWidget);
+    });
 
     testWidgets(
       'Mutating oculta el botón "Agregar variable" (no doble dispatch)',
       (tester) async {
-        when(() => varDefsBloc.state).thenReturn(
-          const VarDefsMutating(<VariableDef>[], 1),
-        );
+        when(
+          () => varDefsBloc.state,
+        ).thenReturn(const VarDefsMutating(<VariableDef>[], 1));
 
         await tester.pumpWidget(host());
 
@@ -505,24 +491,23 @@ void main() {
       (tester) async {
         when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
         when(() => varDefsBloc.state).thenReturn(
-          const VarDefsLoaded(
-            <VariableDef>[
-              VariableDef(
-                id: 'v1',
-                name: 'nombre',
-                type: VarType.text,
-                defaultValue: 'cliente',
-                description: '',
-              ),
-            ],
-            2,
-          ),
+          const VarDefsLoaded(<VariableDef>[
+            VariableDef(
+              id: 'v1',
+              name: 'nombre',
+              type: VarType.text,
+              defaultValue: 'cliente',
+              description: '',
+            ),
+          ], 2),
         );
 
         await tester.pumpWidget(host());
         // ensureVisible: con var-defs en la lista + trash icon el botón
         // puede caer fuera del viewport en el tester.
-        await tester.ensureVisible(find.byKey(const Key('var_defs.add_button')));
+        await tester.ensureVisible(
+          find.byKey(const Key('var_defs.add_button')),
+        );
         await tester.tap(find.byKey(const Key('var_defs.add_button')));
         await tester.pumpAndSettle();
 
@@ -566,70 +551,59 @@ void main() {
       },
     );
 
-    testWidgets(
-      'cada row expone un trash icon con key contractual',
-      (tester) async {
-        const defs = <VariableDef>[
-          VariableDef(
-            id: 'v1',
-            name: 'nombre',
-            type: VarType.text,
-            defaultValue: '',
-            description: '',
-          ),
-          VariableDef(
-            id: 'v2',
-            name: 'edad',
-            type: VarType.text,
-            defaultValue: '',
-            description: '',
-          ),
-        ];
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
+    testWidgets('cada row expone un trash icon con key contractual', (
+      tester,
+    ) async {
+      const defs = <VariableDef>[
+        VariableDef(
+          id: 'v1',
+          name: 'nombre',
+          type: VarType.text,
+          defaultValue: '',
+          description: '',
+        ),
+        VariableDef(
+          id: 'v2',
+          name: 'edad',
+          type: VarType.text,
+          defaultValue: '',
+          description: '',
+        ),
+      ];
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+      when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
 
-        await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
 
-        expect(
-          find.byKey(const Key('var_defs.row.v1.delete')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const Key('var_defs.row.v2.delete')),
-          findsOneWidget,
-        );
-      },
-    );
+      expect(find.byKey(const Key('var_defs.row.v1.delete')), findsOneWidget);
+      expect(find.byKey(const Key('var_defs.row.v2.delete')), findsOneWidget);
+    });
 
-    testWidgets(
-      'tap trash icon abre confirm dialog (no dispatch inmediato)',
-      (tester) async {
-        const defs = <VariableDef>[
-          VariableDef(
-            id: 'v1',
-            name: 'nombre',
-            type: VarType.text,
-            defaultValue: '',
-            description: '',
-          ),
-        ];
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
+    testWidgets('tap trash icon abre confirm dialog (no dispatch inmediato)', (
+      tester,
+    ) async {
+      const defs = <VariableDef>[
+        VariableDef(
+          id: 'v1',
+          name: 'nombre',
+          type: VarType.text,
+          defaultValue: '',
+          description: '',
+        ),
+      ];
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+      when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
 
-        await tester.pumpWidget(host());
-        await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
+      await tester.pumpAndSettle();
 
-        // Confirm dialog visible — operador debe confirmar la acción
-        // destructiva. Key contractual del dialog.
-        expect(
-          find.byKey(const Key('var_defs.delete_confirm')),
-          findsOneWidget,
-        );
-        // No se dispatchó nada todavía.
-        verifyNever(() => varDefsBloc.add(any()));
-      },
-    );
+      // Confirm dialog visible — operador debe confirmar la acción
+      // destructiva. Key contractual del dialog.
+      expect(find.byKey(const Key('var_defs.delete_confirm')), findsOneWidget);
+      // No se dispatchó nada todavía.
+      verifyNever(() => varDefsBloc.add(any()));
+    });
 
     testWidgets(
       'tap Cancelar en confirm dialog: no dispatcha, cierra el dialog',
@@ -652,10 +626,7 @@ void main() {
         await tester.tap(find.text('Cancelar'));
         await tester.pumpAndSettle();
 
-        expect(
-          find.byKey(const Key('var_defs.delete_confirm')),
-          findsNothing,
-        );
+        expect(find.byKey(const Key('var_defs.delete_confirm')), findsNothing);
         verifyNever(() => varDefsBloc.add(any()));
       },
     );
@@ -682,14 +653,9 @@ void main() {
         await tester.pumpAndSettle();
 
         verify(
-          () => varDefsBloc.add(
-            const VarDefsDeleteRequested(varDefId: 'v1'),
-          ),
+          () => varDefsBloc.add(const VarDefsDeleteRequested(varDefId: 'v1')),
         ).called(1);
-        expect(
-          find.byKey(const Key('var_defs.delete_confirm')),
-          findsNothing,
-        );
+        expect(find.byKey(const Key('var_defs.delete_confirm')), findsNothing);
       },
     );
 

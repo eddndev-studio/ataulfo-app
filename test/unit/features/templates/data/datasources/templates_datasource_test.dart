@@ -921,48 +921,51 @@ void main() {
       'description': description,
     };
 
-    test('201: serializa body completo y devuelve VariableDef parseada', () async {
-      // El backend espera {name, type, default, description, version} y
-      // devuelve el VarDefResp creado (sin la nueva version del Template
-      // padre — el bloc refresca con un re-list después).
-      final captured = <Map<String, dynamic>>[];
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-          data: any(named: 'data'),
-        ),
-      ).thenAnswer((invocation) async {
-        captured.add(
-          invocation.namedArguments[#data] as Map<String, dynamic>,
-        );
-        return respMap(
-          201,
-          body: defJson(),
-          path: '/templates/t1/variable-definitions',
-        );
-      });
+    test(
+      '201: serializa body completo y devuelve VariableDef parseada',
+      () async {
+        // El backend espera {name, type, default, description, version} y
+        // devuelve el VarDefResp creado (sin la nueva version del Template
+        // padre — el bloc refresca con un re-list después).
+        final captured = <Map<String, dynamic>>[];
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            '/templates/t1/variable-definitions',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((invocation) async {
+          captured.add(
+            invocation.namedArguments[#data] as Map<String, dynamic>,
+          );
+          return respMap(
+            201,
+            body: defJson(),
+            path: '/templates/t1/variable-definitions',
+          );
+        });
 
-      final got = await ds.addVarDef(
-        templateId: 't1',
-        name: 'saldo',
-        type: VarType.text,
-        defaultValue: 'x',
-        description: 'saldo del cliente',
-        version: 1,
-      );
+        final got = await ds.addVarDef(
+          templateId: 't1',
+          name: 'saldo',
+          type: VarType.text,
+          defaultValue: 'x',
+          description: 'saldo del cliente',
+          version: 1,
+        );
 
-      expect(got.id, 'vd_new');
-      expect(got.name, 'saldo');
-      expect(got.type, VarType.text);
-      expect(got.defaultValue, 'x');
-      expect(captured.single, <String, dynamic>{
-        'name': 'saldo',
-        'type': 'text',
-        'default': 'x',
-        'description': 'saldo del cliente',
-        'version': 1,
-      });
-    });
+        expect(got.id, 'vd_new');
+        expect(got.name, 'saldo');
+        expect(got.type, VarType.text);
+        expect(got.defaultValue, 'x');
+        expect(captured.single, <String, dynamic>{
+          'name': 'saldo',
+          'type': 'text',
+          'default': 'x',
+          'description': 'saldo del cliente',
+          'version': 1,
+        });
+      },
+    );
 
     test(
       '409 → TemplatesConflictFailure (nombre duplicado o version stale)',
@@ -1048,9 +1051,7 @@ void main() {
           '/templates/t1/variable-definitions',
           data: any(named: 'data'),
         ),
-      ).thenThrow(
-        badResponse(500, path: '/templates/t1/variable-definitions'),
-      );
+      ).thenThrow(badResponse(500, path: '/templates/t1/variable-definitions'));
 
       await expectLater(
         () => ds.addVarDef(
@@ -1100,10 +1101,7 @@ void main() {
           data: any(named: 'data'),
         ),
       ).thenAnswer(
-        (_) async => respMap(
-          201,
-          path: '/templates/t1/variable-definitions',
-        ),
+        (_) async => respMap(201, path: '/templates/t1/variable-definitions'),
       );
 
       await expectLater(
@@ -1148,40 +1146,43 @@ void main() {
   });
 
   group('DioTemplatesDatasource.updateVarDef', () {
-    test('200: serializa SOLO campos provistos + version (omit-others)', () async {
-      // Body capturado: contrato del backend usa *string nullable. Campos
-      // ausentes ⇒ no-op (no `null` explícito). Cliente respeta el patrón.
-      final captured = <Map<String, dynamic>>[];
-      when(
-        () => dio.patch<dynamic>(
-          '/variable-definitions/vd_x',
-          data: any(named: 'data'),
-        ),
-      ).thenAnswer((invocation) async {
-        captured.add(
-          invocation.namedArguments[#data] as Map<String, dynamic>,
-        );
-        return Response<dynamic>(
-          requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
-          statusCode: 200,
-        );
-      });
+    test(
+      '200: serializa SOLO campos provistos + version (omit-others)',
+      () async {
+        // Body capturado: contrato del backend usa *string nullable. Campos
+        // ausentes ⇒ no-op (no `null` explícito). Cliente respeta el patrón.
+        final captured = <Map<String, dynamic>>[];
+        when(
+          () => dio.patch<dynamic>(
+            '/variable-definitions/vd_x',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((invocation) async {
+          captured.add(
+            invocation.namedArguments[#data] as Map<String, dynamic>,
+          );
+          return Response<dynamic>(
+            requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
+            statusCode: 200,
+          );
+        });
 
-      await ds.updateVarDef(
-        varDefId: 'vd_x',
-        name: 'saldo',
-        defaultValue: '100',
-        version: 2,
-      );
+        await ds.updateVarDef(
+          varDefId: 'vd_x',
+          name: 'saldo',
+          defaultValue: '100',
+          version: 2,
+        );
 
-      expect(captured.single, <String, dynamic>{
-        'name': 'saldo',
-        'default': '100',
-        'version': 2,
-      });
-      expect(captured.single.containsKey('description'), isFalse);
-      expect(captured.single.containsKey('type'), isFalse);
-    });
+        expect(captured.single, <String, dynamic>{
+          'name': 'saldo',
+          'default': '100',
+          'version': 2,
+        });
+        expect(captured.single.containsKey('description'), isFalse);
+        expect(captured.single.containsKey('type'), isFalse);
+      },
+    );
 
     test('200: body con sólo version es válido (no-op intencional)', () async {
       // El backend acepta un PATCH "sin campos" — todos los pointers null.
@@ -1194,9 +1195,7 @@ void main() {
           data: any(named: 'data'),
         ),
       ).thenAnswer((invocation) async {
-        captured.add(
-          invocation.namedArguments[#data] as Map<String, dynamic>,
-        );
+        captured.add(invocation.namedArguments[#data] as Map<String, dynamic>);
         return Response<dynamic>(
           requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
           statusCode: 200,
@@ -1208,50 +1207,52 @@ void main() {
       expect(captured.single, <String, dynamic>{'version': 2});
     });
 
-    test('200: cadena vacía es set explícito (no se confunde con null)', () async {
-      // description: '' es set válido ("borrar descripción"). El cliente
-      // distingue null (no-op) de '' (clear).
-      final captured = <Map<String, dynamic>>[];
-      when(
-        () => dio.patch<dynamic>(
-          '/variable-definitions/vd_x',
-          data: any(named: 'data'),
-        ),
-      ).thenAnswer((invocation) async {
-        captured.add(
-          invocation.namedArguments[#data] as Map<String, dynamic>,
+    test(
+      '200: cadena vacía es set explícito (no se confunde con null)',
+      () async {
+        // description: '' es set válido ("borrar descripción"). El cliente
+        // distingue null (no-op) de '' (clear).
+        final captured = <Map<String, dynamic>>[];
+        when(
+          () => dio.patch<dynamic>(
+            '/variable-definitions/vd_x',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((invocation) async {
+          captured.add(
+            invocation.namedArguments[#data] as Map<String, dynamic>,
+          );
+          return Response<dynamic>(
+            requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
+            statusCode: 200,
+          );
+        });
+
+        await ds.updateVarDef(varDefId: 'vd_x', description: '', version: 2);
+
+        expect(captured.single, <String, dynamic>{
+          'description': '',
+          'version': 2,
+        });
+      },
+    );
+
+    test(
+      '409 → TemplatesConflictFailure (rename in-use o stale CAS)',
+      () async {
+        when(
+          () => dio.patch<dynamic>(
+            '/variable-definitions/vd_x',
+            data: any(named: 'data'),
+          ),
+        ).thenThrow(badResponse(409, path: '/variable-definitions/vd_x'));
+
+        await expectLater(
+          () => ds.updateVarDef(varDefId: 'vd_x', name: 'otro', version: 1),
+          throwsA(isA<TemplatesConflictFailure>()),
         );
-        return Response<dynamic>(
-          requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),
-          statusCode: 200,
-        );
-      });
-
-      await ds.updateVarDef(
-        varDefId: 'vd_x',
-        description: '',
-        version: 2,
-      );
-
-      expect(captured.single, <String, dynamic>{
-        'description': '',
-        'version': 2,
-      });
-    });
-
-    test('409 → TemplatesConflictFailure (rename in-use o stale CAS)', () async {
-      when(
-        () => dio.patch<dynamic>(
-          '/variable-definitions/vd_x',
-          data: any(named: 'data'),
-        ),
-      ).thenThrow(badResponse(409, path: '/variable-definitions/vd_x'));
-
-      await expectLater(
-        () => ds.updateVarDef(varDefId: 'vd_x', name: 'otro', version: 1),
-        throwsA(isA<TemplatesConflictFailure>()),
-      );
-    });
+      },
+    );
 
     test('422 → TemplatesInvalidUpdateFailure', () async {
       when(
@@ -1328,8 +1329,7 @@ void main() {
         ),
       ).thenAnswer((invocation) async {
         captured.add(
-          invocation.namedArguments[#queryParameters]
-              as Map<String, dynamic>?,
+          invocation.namedArguments[#queryParameters] as Map<String, dynamic>?,
         );
         return Response<dynamic>(
           requestOptions: RequestOptions(path: '/variable-definitions/vd_x'),

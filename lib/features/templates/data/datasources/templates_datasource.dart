@@ -89,10 +89,7 @@ abstract interface class TemplatesDatasource {
   /// funcionen limpio). 204 sin body. 409 incluye `ErrVariableInUse`
   /// cuando algún bot tiene un valor para esta variable — el dominio
   /// la trata como inmutable para mantener integridad de las plantillas.
-  Future<void> removeVarDef({
-    required String varDefId,
-    required int version,
-  });
+  Future<void> removeVarDef({required String varDefId, required int version});
 
   /// `PUT /templates/:id` body `{name, version, ai?}` con concurrencia
   /// optimista (CAS). 409 (`ErrTemplateConflict`) ⇒ `TemplatesConflictFailure`
@@ -300,10 +297,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
       if (defaultValue != null) body['default'] = defaultValue;
       if (description != null) body['description'] = description;
 
-      await _dio.patch<dynamic>(
-        '/variable-definitions/$varDefId',
-        data: body,
-      );
+      await _dio.patch<dynamic>('/variable-definitions/$varDefId', data: body);
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {

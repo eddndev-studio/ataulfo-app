@@ -67,8 +67,6 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
   );
 
   @override
-  Future<void> removeVarDef({
-    required String varDefId,
-    required int version,
-  }) => _ds.removeVarDef(varDefId: varDefId, version: version);
+  Future<void> removeVarDef({required String varDefId, required int version}) =>
+      _ds.removeVarDef(varDefId: varDefId, version: version);
 }
