@@ -6,8 +6,8 @@ import '../../domain/entities/step.dart';
 /// texto traducido en chips del sheet y pills del card. Centralizar
 /// acá evita drift entre los dos call sites.
 ///
-/// CONDITIONAL_TIME se nombra "Condicional" — F7 lo expone en card y
-/// (eventualmente) en el sheet con un form específico.
+/// CONDITIONAL_TIME se nombra "Condicional" — se muestra en card y,
+/// cuando aterrice su editor, en el sheet con un form específico.
 String stepTypeLabel(StepType t) => switch (t) {
   StepType.text => 'Texto',
   StepType.image => 'Imagen',

@@ -178,7 +178,8 @@ class FlowStepsLoadRequested extends FlowStepsEvent {
 /// `type` y `mediaRef` los elige el sheet: TEXT usa `mediaRef:''`; los
 /// tipos multimedia (IMAGE/VIDEO/DOCUMENT/AUDIO/PTT/STICKER) viajan con
 /// `mediaRef` no vacío y `content` opcional como caption. Defaults
-/// `type:text` + `mediaRef:''` para callers legacy (tests previos a F6).
+/// `type:text` + `mediaRef:''` para callers que no necesitan elegir
+/// (atajo del path TEXT sin tener que repetir los dos campos).
 class FlowStepsAddRequested extends FlowStepsEvent {
   const FlowStepsAddRequested({
     required this.content,

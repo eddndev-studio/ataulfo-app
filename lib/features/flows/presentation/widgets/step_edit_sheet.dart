@@ -1,3 +1,11 @@
+// Archivo > 400 LOC justificado: el sheet es un único modal cohesionado
+// que cubre create/edit + 7 step types (TEXT + 6 multimedia) + gating
+// por estado del bloc. Los helpers privados (_TypePicker, _SliderField,
+// _FailureCopy) están acoplados al estado de _StepEditSheetState (gates
+// `enabled`, copy del failure) — extraerlos a archivos sueltos sólo
+// movería ruido sin mejorar cohesión. Cuando CONDITIONAL_TIME aterrice
+// con su form propio (ventanas horarias + ramificación) será momento de
+// partir el modal — no antes.
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -44,8 +52,8 @@ class StepEditSheet extends StatefulWidget {
 }
 
 /// Tipos que el picker del sheet expone. CONDITIONAL_TIME se excluye:
-/// vive en su propio slice (F7) con un form específico (ventanas
-/// horarias + ramificación), no por chip.
+/// no se elige por chip — su edición requiere un form propio con
+/// ventanas horarias y ramificación.
 const List<fdom.StepType> _pickableTypes = <fdom.StepType>[
   fdom.StepType.text,
   fdom.StepType.image,

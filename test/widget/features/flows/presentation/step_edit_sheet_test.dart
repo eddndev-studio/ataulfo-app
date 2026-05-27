@@ -249,20 +249,19 @@ void main() {
       },
     );
 
-    testWidgets(
-      'submit multimedia sin media_url es no-op (gate del trim)',
-      (tester) async {
-        await pumpHost(tester);
+    testWidgets('submit multimedia sin media_url es no-op (gate del trim)', (
+      tester,
+    ) async {
+      await pumpHost(tester);
 
-        await tester.tap(find.byKey(const Key('step_edit.type.image')));
-        await tester.pump();
-        // Sin enterText en media_url
-        await tester.tap(find.byKey(const Key('step_edit.submit')));
-        await tester.pump();
+      await tester.tap(find.byKey(const Key('step_edit.type.image')));
+      await tester.pump();
+      // Sin enterText en media_url
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
 
-        verifyNever(() => bloc.add(any()));
-      },
-    );
+      verifyNever(() => bloc.add(any()));
+    });
   });
 
   group('StepEditSheet (Edit mode)', () {
@@ -390,28 +389,27 @@ void main() {
       aiOnly: false,
     );
 
-    testWidgets(
-      'editing multimedia oculta el picker (type inmutable)',
-      (tester) async {
-        await pumpHost(tester, editing: imgStep);
+    testWidgets('editing multimedia oculta el picker (type inmutable)', (
+      tester,
+    ) async {
+      await pumpHost(tester, editing: imgStep);
 
-        for (final id in const <String>[
-          'text',
-          'image',
-          'video',
-          'document',
-          'audio',
-          'ptt',
-          'sticker',
-        ]) {
-          expect(
-            find.byKey(Key('step_edit.type.$id')),
-            findsNothing,
-            reason: 'chip step_edit.type.$id no debería aparecer en edit',
-          );
-        }
-      },
-    );
+      for (final id in const <String>[
+        'text',
+        'image',
+        'video',
+        'document',
+        'audio',
+        'ptt',
+        'sticker',
+      ]) {
+        expect(
+          find.byKey(Key('step_edit.type.$id')),
+          findsNothing,
+          reason: 'chip step_edit.type.$id no debería aparecer en edit',
+        );
+      }
+    });
 
     testWidgets(
       'editing multimedia muestra media_url con el valor original (read-only)',

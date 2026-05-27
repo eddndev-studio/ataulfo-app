@@ -403,9 +403,9 @@ void main() {
             aiOnly: false,
           ),
         ).thenAnswer((_) async => imgStep);
-        when(() => repo.listSteps('f1')).thenAnswer(
-          (_) async => <fdom.Step>[..._steps, imgStep],
-        );
+        when(
+          () => repo.listSteps('f1'),
+        ).thenAnswer((_) async => <fdom.Step>[..._steps, imgStep]);
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       seed: () => const FlowStepsLoaded(_steps),
