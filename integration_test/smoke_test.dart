@@ -145,6 +145,186 @@ void main() {
     },
     timeout: const Timeout(Duration(minutes: 2)),
   );
+
+  testWidgets(
+    'detalle: agregar → editar → eliminar variable-definition',
+    (tester) async {
+      app.main();
+
+      // Login — mismo lead-in que el smoke previo. No extraemos helper
+      // mientras sean 2 consumers (la convención del repo extrae con
+      // el tercero).
+      await _pumpUntil(tester, find.byKey(const Key('login.email')));
+      await tester.enterText(
+        find.byKey(const Key('login.email')),
+        'smoke@agentic.local',
+      );
+      await tester.enterText(
+        find.byKey(const Key('login.password')),
+        'smoke-agentic-2026',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.tap(find.text('Entrar'));
+      await _pumpUntil(
+        tester,
+        find.widgetWithText(AppBar, 'Bots'),
+        timeout: const Duration(seconds: 15),
+      );
+
+      // Tab Plantillas + primera tarjeta.
+      await tester.tap(find.text('Plantillas').last);
+      await _pumpUntil(tester, find.widgetWithText(AppBar, 'Plantillas'));
+
+      final emptyFinder = find.byKey(const Key('templates.empty'));
+      final tileFinder = find.byType(InkWell).hitTestable();
+      await _pumpUntilAny(tester, <Finder>[
+        emptyFinder,
+        tileFinder,
+      ], timeout: const Duration(seconds: 15));
+
+      if (emptyFinder.evaluate().isNotEmpty) {
+        // ignore: avoid_print
+        print(
+          'SMOKE TE4: org sin templates — tramo de var-defs saltado. '
+          'Crear al menos un template para cubrir el flujo.',
+        );
+        return;
+      }
+
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(ListView),
+              matching: find.byType(InkWell),
+            )
+            .first,
+      );
+
+      // El detalle quedará listo cuando el botón "Agregar variable" del
+      // bloc de var-defs entre en Loaded. Esa misma key marca el detalle
+      // como completo desde la perspectiva del operador.
+      await _pumpUntil(
+        tester,
+        find.byKey(const Key('var_defs.add_button')),
+        timeout: const Duration(seconds: 15),
+      );
+
+      // Identidad única por corrida para no colisionar con var-defs
+      // creadas por corridas previas que no llegaron al delete.
+      final stamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final varName = 'smoke_var_$stamp';
+      final newDefault = 'editado-$stamp';
+
+      // --- Add ----------------------------------------------------------
+      await tester.ensureVisible(find.byKey(const Key('var_defs.add_button')));
+      await tester.tap(find.byKey(const Key('var_defs.add_button')));
+      await _pumpUntil(
+        tester,
+        find.byKey(const Key('var_def_form.name')),
+        timeout: const Duration(seconds: 5),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('var_def_form.name')),
+        varName,
+      );
+      await tester.enterText(
+        find.byKey(const Key('var_def_form.default')),
+        'pendiente',
+      );
+      await tester.enterText(
+        find.byKey(const Key('var_def_form.description')),
+        'Smoke run @ $stamp',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('var_def_form.submit')));
+
+      // El sheet se auto-cierra al primer Loaded post-submit; el submit
+      // button vive dentro del sheet, así que su desaparición es señal
+      // canónica de "mutación completa + refetch verde".
+      await _pumpUntilGone(
+        tester,
+        find.byKey(const Key('var_def_form.submit')),
+        timeout: const Duration(seconds: 15),
+      );
+
+      await _pumpUntil(
+        tester,
+        find.text('{{$varName}}'),
+        timeout: const Duration(seconds: 10),
+      );
+
+      // --- Edit ---------------------------------------------------------
+      await tester.tap(find.text('{{$varName}}'));
+      await _pumpUntil(
+        tester,
+        find.byKey(const Key('var_def_form.name')),
+        timeout: const Duration(seconds: 5),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('var_def_form.default')),
+        newDefault,
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('var_def_form.submit')));
+
+      await _pumpUntilGone(
+        tester,
+        find.byKey(const Key('var_def_form.submit')),
+        timeout: const Duration(seconds: 15),
+      );
+
+      await _pumpUntil(
+        tester,
+        find.text(newDefault),
+        timeout: const Duration(seconds: 10),
+      );
+
+      // --- Delete -------------------------------------------------------
+      // El trash icon vive dentro de la misma InkWell del row. Cada fila
+      // tiene UN solo IconButton (el delete), así que el descendant es
+      // único y no necesita match por icon ni por tooltip.
+      final rowFinder = find.ancestor(
+        of: find.text('{{$varName}}'),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is InkWell &&
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('var_defs.row.') &&
+              !(w.key! as ValueKey<String>).value.endsWith('.delete'),
+        ),
+      );
+      final deleteBtn = find.descendant(
+        of: rowFinder,
+        matching: find.byType(IconButton),
+      );
+
+      await tester.ensureVisible(deleteBtn);
+      await tester.tap(deleteBtn);
+
+      await _pumpUntil(
+        tester,
+        find.byKey(const Key('var_defs.delete_confirm')),
+        timeout: const Duration(seconds: 5),
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'Eliminar'));
+
+      await _pumpUntilGone(
+        tester,
+        find.text('{{$varName}}'),
+        timeout: const Duration(seconds: 15),
+      );
+
+      expect(
+        find.text('{{$varName}}'),
+        findsNothing,
+        reason: 'Var-def eliminada desaparece tras refetch del listado.',
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }
 
 /// Espera frame a frame hasta que `finder` aparezca o se cumpla `timeout`.
@@ -187,4 +367,24 @@ Future<void> _pumpUntilAny(
     }
   }
   throw TimeoutException('Ningún finder apareció en ${timeout.inSeconds}s');
+}
+
+/// Inversa de `_pumpUntil`: resuelve apenas el finder reporta vacío.
+/// Útil cuando la señal de "ya pasó" es la desaparición de un widget
+/// (sheet auto-pop tras un Loaded, row eliminada tras refetch).
+Future<void> _pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 10),
+  Duration step = const Duration(milliseconds: 250),
+}) async {
+  final end = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(end)) {
+    await tester.pump(step);
+    if (finder.evaluate().isEmpty) return;
+  }
+  throw TimeoutException(
+    '${finder.describeMatch(Plurality.zero)} '
+    'no desapareció en ${timeout.inSeconds}s',
+  );
 }
