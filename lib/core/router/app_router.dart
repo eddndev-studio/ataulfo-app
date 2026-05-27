@@ -18,7 +18,9 @@ import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
 import '../../features/flows/domain/repositories/flows_repository.dart';
+import '../../features/flows/presentation/bloc/flow_detail_bloc.dart';
 import '../../features/flows/presentation/bloc/flows_bloc.dart';
+import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
@@ -234,6 +236,27 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Editar plantilla')),
               body: const TemplateEditPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Detalle de un flow (S11 F2) — read-only. Page-scoped:
+        // `FlowDetailBloc` carga cabecera + steps en paralelo (Future.wait)
+        // y emite Loaded/Failed. La ruta es de primer nivel, deep-linkable
+        // (consistente con /templates/:id, /bots/:id). El back físico
+        // vuelve al detalle de plantilla si se llegó vía tap del row de
+        // Flujos, o al destino previo cuando entre por deep-link.
+        path: '/flows/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<FlowDetailBloc>(
+            create: (_) =>
+                FlowDetailBloc(repo: _flowsRepo, id: id)
+                  ..add(const FlowDetailLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Detalle de flujo')),
+              body: const FlowDetailPage(),
             ),
           );
         },
