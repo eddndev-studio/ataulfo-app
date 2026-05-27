@@ -11,11 +11,13 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../domain/entities/conditional_time_metadata.dart';
 import '../../domain/entities/flow.dart' as fdom;
 import '../../domain/entities/step.dart' as sdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
 import '../bloc/flow_steps_bloc.dart';
+import '../widgets/conditional_time_day_mapping.dart';
 import '../widgets/step_edit_sheet.dart';
 import '../widgets/step_type_label.dart';
 
@@ -533,8 +535,9 @@ void _openStepSheet(BuildContext context, sdom.Step? step) {
 }
 
 /// Cuerpo del step según tipo. TEXT muestra content; multimedia muestra
-/// mediaRef truncado; CONDITIONAL_TIME muestra placeholder ya que F2 no
-/// interpreta metadata (F7 lo hará).
+/// mediaRef truncado; CONDITIONAL_TIME interpreta `metadataJson` y
+/// muestra TZ + ventanas formateadas + destinos onMatch/onElse. Si el
+/// metadata no parsea (corrupto/legacy), cae a un fallback honesto.
 class _StepBody extends StatelessWidget {
   const _StepBody({required this.step, required this.textTheme});
 
@@ -554,13 +557,7 @@ class _StepBody extends StatelessWidget {
       );
     }
     if (t == sdom.StepType.conditionalTime) {
-      return Text(
-        'Condicional por horario (configurable en el editor).',
-        style: textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.text2,
-        ),
-      );
+      return _ConditionalTimeSummary(step: step, textTheme: textTheme);
     }
     // Multimedia: IMAGE / VIDEO / DOCUMENT / AUDIO / PTT / STICKER.
     if (step.mediaRef.isEmpty) {
@@ -590,6 +587,69 @@ class _StepBody extends StatelessWidget {
         ],
       ],
     );
+  }
+}
+
+/// Resumen read-only del shape CONDITIONAL_TIME en la StepCard. Parsea
+/// el metadataJson y formatea: TZ + cada ventana ("L M X J V · 09:00–18:00")
+/// + flechas a los pasos destino (`Paso #{order+1}`). Fallback honesto si
+/// el metadata es inválido — el operador puede entrar al editor a
+/// reconfigurar.
+///
+/// Nota: `onMatchOrder`/`onElseOrder` son enteros que apuntan a la
+/// posición de otro step, no a su id. Si los steps cambian de orden
+/// después de crear el CT, las flechas pueden quedar apuntando a un
+/// paso distinto del esperado — deuda nombrada del slice F7.
+class _ConditionalTimeSummary extends StatelessWidget {
+  const _ConditionalTimeSummary({required this.step, required this.textTheme});
+
+  final sdom.Step step;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final ConditionalTimeMetadata md;
+    try {
+      md = ConditionalTimeMetadata.fromJsonString(step.metadataJson);
+    } on FormatException {
+      return Text(
+        'Condicional con configuración inválida — reabre el paso para corregir.',
+        key: const Key('flow_detail.step.ct_corrupt'),
+        style: textTheme.bodyMedium?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: AppTokens.danger,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Zona ${md.tz}',
+          style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+        ),
+        const SizedBox(height: AppTokens.sp1),
+        for (final w in md.windows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppTokens.sp1),
+            child: Text(
+              '${_formatDays(w.days)} · ${w.from}–${w.to}',
+              style: textTheme.bodyMedium,
+            ),
+          ),
+        const SizedBox(height: AppTokens.sp1),
+        Text(
+          'Si cumple → Paso #${md.onMatchOrder + 1}   ·   '
+          'Si no → Paso #${md.onElseOrder + 1}',
+          style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+        ),
+      ],
+    );
+  }
+
+  String _formatDays(List<int> wireDays) {
+    final uiSorted = wireDays.map(wireDayToUi).toList()..sort();
+    return uiSorted.map(uiDayLabel).join(' ');
   }
 }
 
