@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
@@ -266,12 +267,11 @@ class _StepsListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final viewPaddingBottom = MediaQuery.viewPaddingOf(context).bottom;
     final listPadding = EdgeInsets.fromLTRB(
       AppTokens.sp6,
       0,
       AppTokens.sp6,
-      AppTokens.sp6 + viewPaddingBottom,
+      AppTokens.sp6 + context.safeBottomInset,
     );
     final bloc = context.read<FlowStepsBloc>();
 
