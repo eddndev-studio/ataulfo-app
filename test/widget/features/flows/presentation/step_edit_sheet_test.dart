@@ -31,11 +31,11 @@ void main() {
     when(() => bloc.state).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
   });
 
-  // Surface 800x600 (default de flutter_test) deja el submit fuera del
-  // viewport tras añadir el picker de tipo en F6. `pumpHost` agranda el
-  // viewport para que tap(submit) conecte y restaura al final del test.
+  // El sheet con todos los controles + form CONDITIONAL_TIME (chip
+  // picker + ventanas con time pickers + dropdowns) supera el viewport
+  // default de flutter_test (800x600). `pumpHost` agranda y restaura.
   Future<void> pumpHost(WidgetTester tester, {fdom.Step? editing}) async {
-    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -408,6 +408,7 @@ void main() {
         'audio',
         'ptt',
         'sticker',
+        'conditionalTime',
       ]) {
         expect(
           find.byKey(Key('step_edit.type.$id')),
@@ -448,6 +449,55 @@ void main() {
             ),
           ),
         ).called(1);
+      },
+    );
+  });
+
+  group('StepEditSheet (Add mode · conditionalTime)', () {
+    testWidgets(
+      'pick chip Condicional muestra el form CT y oculta content/media_url',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.tap(
+          find.byKey(const Key('step_edit.type.conditionalTime')),
+        );
+        await tester.pumpAndSettle();
+
+        // El form CT está presente.
+        expect(find.byKey(const Key('ct_form.tz_dropdown')), findsOneWidget);
+        // content y media_url están ocultos.
+        expect(find.byKey(const Key('step_edit.content')), findsNothing);
+        expect(find.byKey(const Key('step_edit.media_url')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'submit con seed default dispatcha AddRequested(conditionalTime, '
+      'metadataJson)',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.tap(
+          find.byKey(const Key('step_edit.type.conditionalTime')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        // Captura el evento despachado y verifica el shape.
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        expect(captured, hasLength(1));
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.type, fdom.StepType.conditionalTime);
+        expect(ev.content, '');
+        expect(ev.mediaRef, '');
+        expect(ev.metadataJson, isNotNull);
+        // Seed default: L-V 09-18 + tz México + onMatch 0/onElse 1.
+        expect(ev.metadataJson, contains('America/Mexico_City'));
+        expect(ev.metadataJson, contains('09:00'));
+        expect(ev.metadataJson, contains('18:00'));
       },
     );
   });
