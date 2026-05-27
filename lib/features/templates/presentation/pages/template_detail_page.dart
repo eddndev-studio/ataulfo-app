@@ -143,11 +143,11 @@ class _LoadedView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppTokens.sp6),
-          AppCard(
-            key: const Key('template_detail.card.triggers'),
+          const AppCard(
+            key: Key('template_detail.card.triggers'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const <Widget>[
+              children: <Widget>[
                 _SectionTitle('Disparadores'),
                 SizedBox(height: AppTokens.sp3),
                 TriggersSection(),
@@ -155,11 +155,11 @@ class _LoadedView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppTokens.sp6),
-          AppCard(
-            key: const Key('template_detail.card.variables'),
+          const AppCard(
+            key: Key('template_detail.card.variables'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const <Widget>[
+              children: <Widget>[
                 _SectionTitle('Variables'),
                 SizedBox(height: AppTokens.sp3),
                 _VarDefsSection(),
@@ -187,10 +187,7 @@ class _LoadedView extends StatelessWidget {
                     ),
                   )
                 else
-                  SelectableText(
-                    ai.systemPrompt,
-                    style: textTheme.bodyMedium,
-                  ),
+                  SelectableText(ai.systemPrompt, style: textTheme.bodyMedium),
               ],
             ),
           ),
