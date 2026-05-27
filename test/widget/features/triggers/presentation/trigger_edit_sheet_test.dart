@@ -303,6 +303,44 @@ void main() {
       },
     );
 
+    testWidgets('delete con confirmación dispatcha DeleteRequested', (
+      tester,
+    ) async {
+      await pumpHost(tester, editing: _textTrigger());
+
+      // Tap del botón delete.
+      await tester.tap(find.byKey(const Key('trigger_edit.delete')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('trigger_edit.delete_confirm')), findsOneWidget);
+
+      // Confirma.
+      await tester.tap(find.byKey(const Key('trigger_edit.delete_confirm.ok')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => triggers.add(const TriggersDeleteRequested(triggerId: 't1')),
+      ).called(1);
+    });
+
+    testWidgets('delete-confirm cancelado NO dispatcha', (tester) async {
+      await pumpHost(tester, editing: _textTrigger());
+
+      await tester.tap(find.byKey(const Key('trigger_edit.delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('trigger_edit.delete_confirm.cancel')),
+      );
+      await tester.pumpAndSettle();
+
+      verifyNever(() => triggers.add(any()));
+    });
+
+    testWidgets('add-mode NO muestra el botón delete', (tester) async {
+      await pumpHost(tester);
+      expect(find.byKey(const Key('trigger_edit.delete')), findsNothing);
+    });
+
     testWidgets(
       'submit edit dispatcha UpdateRequested con documento completo (PUT semantics)',
       (tester) async {
