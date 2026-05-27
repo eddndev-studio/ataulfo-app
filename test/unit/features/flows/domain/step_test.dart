@@ -88,11 +88,7 @@ void main() {
         isNot(equals(base.copyWith(content: 'Adiós'))),
         reason: 'content',
       );
-      expect(
-        base,
-        isNot(equals(base.copyWith(order: 1))),
-        reason: 'order',
-      );
+      expect(base, isNot(equals(base.copyWith(order: 1))), reason: 'order');
       expect(
         base,
         isNot(equals(base.copyWith(type: fdom.StepType.image))),

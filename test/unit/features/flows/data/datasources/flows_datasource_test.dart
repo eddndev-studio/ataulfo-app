@@ -222,9 +222,9 @@ void main() {
     };
 
     test('200 con flowResp → Flow', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>('/flows/f1'),
-      ).thenAnswer((_) async => respMap(200, path: '/flows/f1', body: flowBody()));
+      when(() => dio.get<Map<String, dynamic>>('/flows/f1')).thenAnswer(
+        (_) async => respMap(200, path: '/flows/f1', body: flowBody()),
+      );
 
       final flow = await ds.flowById('f1');
 
@@ -250,10 +250,7 @@ void main() {
         () => dio.get<Map<String, dynamic>>('/flows/f1'),
       ).thenThrow(badResponse(500, path: '/flows/f1'));
 
-      await expectLater(
-        ds.flowById('f1'),
-        throwsA(isA<FlowsServerFailure>()),
-      );
+      await expectLater(ds.flowById('f1'), throwsA(isA<FlowsServerFailure>()));
     });
 
     test('body null → UnknownFlowsFailure', () async {
@@ -261,10 +258,7 @@ void main() {
         () => dio.get<Map<String, dynamic>>('/flows/f1'),
       ).thenAnswer((_) async => respMap(200, path: '/flows/f1'));
 
-      await expectLater(
-        ds.flowById('f1'),
-        throwsA(isA<UnknownFlowsFailure>()),
-      );
+      await expectLater(ds.flowById('f1'), throwsA(isA<UnknownFlowsFailure>()));
     });
   });
 
@@ -289,9 +283,7 @@ void main() {
     };
 
     test('200 con {items:[...]} → List<Step>', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>('/flows/f1/steps'),
-      ).thenAnswer(
+      when(() => dio.get<Map<String, dynamic>>('/flows/f1/steps')).thenAnswer(
         (_) async => respMap(
           200,
           path: '/flows/f1/steps',
@@ -313,9 +305,7 @@ void main() {
     });
 
     test('200 con items vacío → List<Step> vacía', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>('/flows/f1/steps'),
-      ).thenAnswer(
+      when(() => dio.get<Map<String, dynamic>>('/flows/f1/steps')).thenAnswer(
         (_) async => respMap(
           200,
           path: '/flows/f1/steps',
@@ -338,9 +328,7 @@ void main() {
     });
 
     test('timeout → FlowsTimeoutFailure', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>('/flows/f1/steps'),
-      ).thenThrow(
+      when(() => dio.get<Map<String, dynamic>>('/flows/f1/steps')).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/flows/f1/steps'),
           type: DioExceptionType.receiveTimeout,

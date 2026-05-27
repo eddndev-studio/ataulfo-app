@@ -70,15 +70,9 @@ class _LoadedView extends StatelessWidget {
             children: <Widget>[
               AppPill.outline(label: 'v${flow.version}'),
               if (flow.isActive)
-                const AppPill.primary(
-                  label: 'Activo',
-                  dot: AppPillDot.active,
-                )
+                const AppPill.primary(label: 'Activo', dot: AppPillDot.active)
               else
-                const AppPill.neutral(
-                  label: 'Pausado',
-                  dot: AppPillDot.paused,
-                ),
+                const AppPill.neutral(label: 'Pausado', dot: AppPillDot.paused),
             ],
           ),
           const SizedBox(height: AppTokens.sp6),
@@ -132,10 +126,7 @@ class _StepCard extends StatelessWidget {
                 style: textTheme.titleMedium?.copyWith(color: AppTokens.text2),
               ),
               const SizedBox(width: AppTokens.sp2),
-              Text(
-                _humanLabelFor(step.type),
-                style: textTheme.titleMedium,
-              ),
+              Text(_humanLabelFor(step.type), style: textTheme.titleMedium),
             ],
           ),
           const SizedBox(height: AppTokens.sp2),
@@ -209,10 +200,7 @@ class _StepBody extends StatelessWidget {
         ),
         if (step.content.isNotEmpty) ...<Widget>[
           const SizedBox(height: AppTokens.sp1),
-          Text(
-            step.content,
-            style: textTheme.bodyMedium,
-          ),
+          Text(step.content, style: textTheme.bodyMedium),
         ],
       ],
     );

@@ -5,29 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('StepsMapper.stepRespToEntity', () {
-    test('traduce el DTO al shape de la entity preservando todos los campos',
-        () {
-      const resp = StepResp(
-        id: 's1',
-        flowId: 'f1',
-        type: 'IMAGE',
-        order: 2,
-        content: 'caption',
-        mediaRef: 'https://example.com/x.png',
-        metadataJson: '{"alt":"foo"}',
-        delayMs: 1500,
-        jitterPct: 15,
-        aiOnly: true,
-      );
-
-      final entity = StepsMapper.stepRespToEntity(resp);
-
-      expect(
-        entity,
-        const fdom.Step(
+    test(
+      'traduce el DTO al shape de la entity preservando todos los campos',
+      () {
+        const resp = StepResp(
           id: 's1',
           flowId: 'f1',
-          type: fdom.StepType.image,
+          type: 'IMAGE',
           order: 2,
           content: 'caption',
           mediaRef: 'https://example.com/x.png',
@@ -35,9 +19,27 @@ void main() {
           delayMs: 1500,
           jitterPct: 15,
           aiOnly: true,
-        ),
-      );
-    });
+        );
+
+        final entity = StepsMapper.stepRespToEntity(resp);
+
+        expect(
+          entity,
+          const fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.image,
+            order: 2,
+            content: 'caption',
+            mediaRef: 'https://example.com/x.png',
+            metadataJson: '{"alt":"foo"}',
+            delayMs: 1500,
+            jitterPct: 15,
+            aiOnly: true,
+          ),
+        );
+      },
+    );
 
     test('type desconocido propaga ArgumentError (fail-loud)', () {
       const resp = StepResp(

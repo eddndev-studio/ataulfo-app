@@ -55,8 +55,9 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('Loaded muestra header con nombre + pill version + pill status',
-      (tester) async {
+  testWidgets('Loaded muestra header con nombre + pill version + pill status', (
+    tester,
+  ) async {
     when(
       () => bloc.state,
     ).thenReturn(const FlowDetailLoaded(_flow, <fdom.Step>[]));
@@ -133,31 +134,23 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      expect(
-        find.byKey(const Key('flow_detail.step_card.s1')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('flow_detail.step_card.s2')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('flow_detail.step_card.s1')), findsOneWidget);
+      expect(find.byKey(const Key('flow_detail.step_card.s2')), findsOneWidget);
       // Humanización del type (Texto / Imagen).
       expect(find.text('Texto'), findsOneWidget);
       expect(find.text('Imagen'), findsOneWidget);
       // Content del TEXT step.
       expect(find.text('Hola {{name}}'), findsOneWidget);
       // mediaRef del IMAGE step (truncado o completo según logic).
-      expect(
-        find.textContaining('example.com/x.png'),
-        findsWidgets,
-      );
+      expect(find.textContaining('example.com/x.png'), findsWidgets);
       // Pill aiOnly visible sólo para s2.
       expect(find.widgetWithText(AppPill, 'Solo IA'), findsOneWidget);
     },
   );
 
-  testWidgets('Failed(NotFound) muestra mensaje terminal sin Reintentar',
-      (tester) async {
+  testWidgets('Failed(NotFound) muestra mensaje terminal sin Reintentar', (
+    tester,
+  ) async {
     when(
       () => bloc.state,
     ).thenReturn(const FlowDetailFailed(FlowsNotFoundFailure()));

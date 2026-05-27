@@ -69,9 +69,9 @@ void main() {
     });
 
     test('propaga failures sin envolver', () async {
-      when(() => ds.flowById('missing')).thenAnswer(
-        (_) => Future<Flow>.error(const FlowsNotFoundFailure()),
-      );
+      when(
+        () => ds.flowById('missing'),
+      ).thenAnswer((_) => Future<Flow>.error(const FlowsNotFoundFailure()));
       await expectLater(
         repo.flowById('missing'),
         throwsA(isA<FlowsNotFoundFailure>()),

@@ -80,9 +80,7 @@ class DioFlowsDatasource implements FlowsDatasource {
   @override
   Future<List<fdom.Step>> listSteps(String flowId) async {
     try {
-      final res = await _dio.get<Map<String, dynamic>>(
-        '/flows/$flowId/steps',
-      );
+      final res = await _dio.get<Map<String, dynamic>>('/flows/$flowId/steps');
       final body = res.data;
       if (body == null) {
         throw const UnknownFlowsFailure();

@@ -83,16 +83,17 @@ void main() {
         return FlowDetailBloc(repo: repo, id: 'f1');
       },
       act: (bloc) => bloc.add(const FlowDetailLoadRequested()),
-      expect: () =>
-          const <FlowDetailState>[FlowDetailLoaded(_flow, <fdom.Step>[])],
+      expect: () => const <FlowDetailState>[
+        FlowDetailLoaded(_flow, <fdom.Step>[]),
+      ],
     );
 
     blocTest<FlowDetailBloc, FlowDetailState>(
       'flowById falla con NotFound → Failed(NotFound) (no espera a steps)',
       build: () {
-        when(() => repo.flowById('f1')).thenAnswer(
-          (_) => Future<Flow>.error(const FlowsNotFoundFailure()),
-        );
+        when(
+          () => repo.flowById('f1'),
+        ).thenAnswer((_) => Future<Flow>.error(const FlowsNotFoundFailure()));
         // listSteps puede o no resolverse — el bloc no debe colgarse.
         when(
           () => repo.listSteps('f1'),
