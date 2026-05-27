@@ -895,4 +895,100 @@ void main() {
       );
     });
   });
+
+  group('DioFlowsDatasource.deleteStep', () {
+    test('204 OK — request path correcto', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response<void>(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          statusCode: 204,
+        ),
+      );
+
+      await ds.deleteStep('s1');
+
+      final captured = verify(
+        () => dio.delete<void>(captureAny(), options: any(named: 'options')),
+      ).captured;
+      expect(captured[0], '/steps/s1');
+    });
+
+    test('404 NO se mapea a failure — idempotente (servidor responde 204 igual)', () async {
+      // El backend siempre devuelve 204 según handler — el 404 no llega.
+      // Pero defensivamente: si llega 404, lo tratamos como éxido idempotente.
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            statusCode: 404,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      // No debe lanzar — el DELETE es idempotente HTTP.
+      await ds.deleteStep('s1');
+    });
+
+    test('403 → FlowsForbiddenFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            statusCode: 403,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteStep('s1'),
+        throwsA(isA<FlowsForbiddenFailure>()),
+      );
+    });
+
+    test('connectionError → FlowsNetworkFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteStep('s1'),
+        throwsA(isA<FlowsNetworkFailure>()),
+      );
+    });
+
+    test('5xx → FlowsServerFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            statusCode: 500,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteStep('s1'),
+        throwsA(isA<FlowsServerFailure>()),
+      );
+    });
+  });
 }

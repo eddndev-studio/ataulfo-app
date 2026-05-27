@@ -49,4 +49,9 @@ abstract interface class FlowsRepository {
     int? jitterPct,
     bool? aiOnly,
   });
+
+  /// Elimina un Step. Operación idempotente: si el step no existe, no
+  /// falla — el bloc puede asumir que tras éxito el step ya no está en
+  /// el servidor.
+  Future<void> deleteStep(String stepId);
 }

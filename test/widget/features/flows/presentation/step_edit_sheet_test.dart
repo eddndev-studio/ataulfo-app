@@ -245,5 +245,55 @@ void main() {
         verifyNever(() => bloc.add(any()));
       },
     );
+
+    testWidgets(
+      'modo edit muestra botón eliminar; tap → confirm → DeleteRequested',
+      (tester) async {
+        registerFallbackValue(const FlowStepsDeleteRequested('s'));
+
+        await tester.pumpWidget(host(editing: editingStep));
+        expect(find.byKey(const Key('step_edit.delete')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('step_edit.delete')));
+        await tester.pumpAndSettle();
+
+        // El dialog de confirmación aparece.
+        expect(
+          find.byKey(const Key('step_edit.delete_confirm')),
+          findsOneWidget,
+        );
+        // Tap en confirmar.
+        await tester.tap(find.byKey(const Key('step_edit.delete_confirm.ok')));
+        await tester.pumpAndSettle();
+
+        verify(
+          () => bloc.add(const FlowStepsDeleteRequested('s1')),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'modo add no muestra botón eliminar',
+      (tester) async {
+        await tester.pumpWidget(host());
+
+        expect(find.byKey(const Key('step_edit.delete')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'tap en cancelar del dialog NO dispatcha DeleteRequested',
+      (tester) async {
+        await tester.pumpWidget(host(editing: editingStep));
+        await tester.tap(find.byKey(const Key('step_edit.delete')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('step_edit.delete_confirm.cancel')),
+        );
+        await tester.pumpAndSettle();
+
+        verifyNever(() => bloc.add(any()));
+      },
+    );
   });
 }

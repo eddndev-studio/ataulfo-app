@@ -72,6 +72,37 @@ class _StepEditSheetState extends State<StepEditSheet> {
     super.dispose();
   }
 
+  Future<void> _confirmDelete() async {
+    final ed = widget.editing;
+    if (ed == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        key: const Key('step_edit.delete_confirm'),
+        title: const Text('Eliminar paso'),
+        content: const Text(
+          '¿Eliminar este paso? La acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            key: const Key('step_edit.delete_confirm.cancel'),
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('step_edit.delete_confirm.ok'),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+    _didSubmit = true;
+    context.read<FlowStepsBloc>().add(FlowStepsDeleteRequested(ed.id));
+  }
+
   void _submit() {
     final content = _contentCtrl.text.trim();
     if (content.isEmpty) return;
@@ -145,9 +176,27 @@ class _StepEditSheetState extends State<StepEditSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    widget.editing == null ? 'Nuevo paso' : 'Editar paso',
-                    style: textTheme.titleLarge,
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          widget.editing == null
+                              ? 'Nuevo paso'
+                              : 'Editar paso',
+                          style: textTheme.titleLarge,
+                        ),
+                      ),
+                      if (widget.editing != null)
+                        IconButton(
+                          key: const Key('step_edit.delete'),
+                          tooltip: 'Eliminar paso',
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppTokens.danger,
+                          ),
+                          onPressed: isMutating ? null : _confirmDelete,
+                        ),
+                    ],
                   ),
                   const SizedBox(height: AppTokens.sp4),
                   AppTextField(

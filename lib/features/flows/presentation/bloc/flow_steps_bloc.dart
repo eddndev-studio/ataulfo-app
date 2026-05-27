@@ -26,6 +26,7 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
     on<FlowStepsLoadRequested>(_onLoad);
     on<FlowStepsAddRequested>(_onAdd);
     on<FlowStepsUpdateRequested>(_onUpdate);
+    on<FlowStepsDeleteRequested>(_onDelete);
   }
 
   final FlowsRepository _repo;
@@ -76,6 +77,15 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
         jitterPct: event.jitterPct,
         aiOnly: event.aiOnly,
       );
+    });
+  }
+
+  Future<void> _onDelete(
+    FlowStepsDeleteRequested event,
+    Emitter<FlowStepsState> emit,
+  ) async {
+    await _runMutation(emit, (_) async {
+      await _repo.deleteStep(event.stepId);
     });
   }
 
@@ -192,6 +202,22 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
   @override
   int get hashCode =>
       Object.hash(stepId, content, delayMs, jitterPct, aiOnly);
+}
+
+/// Pide eliminar un step. La operación es idempotente en el backend,
+/// así que el bloc no necesita gates especiales — tras éxito el step
+/// desaparece del refetch.
+class FlowStepsDeleteRequested extends FlowStepsEvent {
+  const FlowStepsDeleteRequested(this.stepId);
+
+  final String stepId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FlowStepsDeleteRequested && other.stepId == stepId;
+
+  @override
+  int get hashCode => stepId.hashCode;
 }
 
 // States --------------------------------------------------------------------

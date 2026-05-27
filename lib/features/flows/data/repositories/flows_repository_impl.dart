@@ -59,4 +59,7 @@ class FlowsRepositoryImpl implements FlowsRepository {
     jitterPct: jitterPct,
     aiOnly: aiOnly,
   );
+
+  @override
+  Future<void> deleteStep(String stepId) => _ds.deleteStep(stepId);
 }

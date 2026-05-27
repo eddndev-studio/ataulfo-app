@@ -78,6 +78,11 @@ abstract interface class FlowsDatasource {
     int? jitterPct,
     bool? aiOnly,
   });
+
+  /// `DELETE /steps/:stepId` idempotente. 204 sin body en ambos casos
+  /// (existía o no). 404 se trata como éxito (defensa por si llegara —
+  /// el backend canónico siempre responde 204). 403 → Forbidden.
+  Future<void> deleteStep(String stepId);
 }
 
 class DioFlowsDatasource implements FlowsDatasource {
@@ -251,6 +256,22 @@ class DioFlowsDatasource implements FlowsDatasource {
       return const FlowsInvalidStepFailure();
     }
     return _mapDioException(e);
+  }
+
+  @override
+  Future<void> deleteStep(String stepId) async {
+    try {
+      await _dio.delete<void>('/steps/$stepId');
+    } on FlowsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      // 404 = idempotente (el step ya no estaba). No es failure.
+      if (e.type == DioExceptionType.badResponse &&
+          e.response?.statusCode == 404) {
+        return;
+      }
+      throw _mapStepRouteDioException(e);
+    }
   }
 
   @override
