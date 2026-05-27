@@ -36,6 +36,10 @@ const _steps = <fdom.Step>[
 ];
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(fdom.StepType.text);
+  });
+
   late _MockRepo repo;
 
   setUp(() {
@@ -133,6 +137,265 @@ void main() {
       const b = FlowStepsLoaded(_steps);
       expect(a, equals(b));
       expect(a.hashCode, b.hashCode);
+    });
+  });
+
+  group('FlowStepsBloc.AddRequested', () {
+    const _newStep = fdom.Step(
+      id: 's-new',
+      flowId: 'f1',
+      type: fdom.StepType.text,
+      order: 2,
+      content: 'Bienvenida v2',
+      mediaRef: '',
+      metadataJson: '{}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+    const _afterAdd = <fdom.Step>[..._steps, _newStep];
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested ok desde Loaded → Mutating + Loading + Loaded(refrescado)',
+      build: () {
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => _afterAdd);
+        when(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 2,
+            content: 'Bienvenida v2',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ).thenAnswer((_) async => _newStep);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          content: 'Bienvenida v2',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
+      expect: () => const <FlowStepsState>[
+        FlowStepsMutating(_steps),
+        FlowStepsLoading(),
+        FlowStepsLoaded(_afterAdd),
+      ],
+      verify: (_) {
+        verify(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 2,
+            content: 'Bienvenida v2',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ).called(1);
+        verify(() => repo.listSteps('f1')).called(1);
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested desde Loaded vacío → order=0',
+      build: () {
+        when(
+          () => repo.listSteps('f1'),
+        ).thenAnswer((_) async => const <fdom.Step>[]);
+        when(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'X',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ).thenAnswer((_) async => _newStep.copyWith(order: 0, content: 'X'));
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(<fdom.Step>[]),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          content: 'X',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
+      verify: (_) {
+        verify(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'X',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested falla 422 → Mutating + MutationFailed(steps intactos)',
+      build: () {
+        when(
+          () => repo.createStep(
+            flowId: any(named: 'flowId'),
+            type: any(named: 'type'),
+            order: any(named: 'order'),
+            content: any(named: 'content'),
+            mediaRef: any(named: 'mediaRef'),
+            delayMs: any(named: 'delayMs'),
+            jitterPct: any(named: 'jitterPct'),
+            aiOnly: any(named: 'aiOnly'),
+          ),
+        ).thenThrow(const FlowsInvalidStepFailure());
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          content: '',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
+      expect: () => const <FlowStepsState>[
+        FlowStepsMutating(_steps),
+        FlowStepsMutationFailed(_steps, FlowsInvalidStepFailure()),
+      ],
+      verify: (_) {
+        verifyNever(() => repo.listSteps('f1'));
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested desde MutationFailed (recovery) → consume snapshot del failed',
+      build: () {
+        when(
+          () => repo.createStep(
+            flowId: any(named: 'flowId'),
+            type: any(named: 'type'),
+            order: any(named: 'order'),
+            content: any(named: 'content'),
+            mediaRef: any(named: 'mediaRef'),
+            delayMs: any(named: 'delayMs'),
+            jitterPct: any(named: 'jitterPct'),
+            aiOnly: any(named: 'aiOnly'),
+          ),
+        ).thenAnswer((_) async => _newStep);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => _afterAdd);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsMutationFailed(
+        _steps,
+        FlowsInvalidStepFailure(),
+      ),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          content: 'Bienvenida v2',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
+      expect: () => const <FlowStepsState>[
+        FlowStepsMutating(_steps),
+        FlowStepsLoading(),
+        FlowStepsLoaded(_afterAdd),
+      ],
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested desde Loading → no-op (sin snapshot no se puede mutar)',
+      build: () => FlowStepsBloc(repo: repo, flowId: 'f1'),
+      seed: () => const FlowStepsLoading(),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          content: 'X',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
+      expect: () => const <FlowStepsState>[],
+      verify: (_) {
+        verifyNever(
+          () => repo.createStep(
+            flowId: any(named: 'flowId'),
+            type: any(named: 'type'),
+            order: any(named: 'order'),
+            content: any(named: 'content'),
+            mediaRef: any(named: 'mediaRef'),
+            delayMs: any(named: 'delayMs'),
+            jitterPct: any(named: 'jitterPct'),
+            aiOnly: any(named: 'aiOnly'),
+          ),
+        );
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested éxito + listSteps falla → Failed (no enmascarar mutación)',
+      build: () {
+        when(
+          () => repo.createStep(
+            flowId: any(named: 'flowId'),
+            type: any(named: 'type'),
+            order: any(named: 'order'),
+            content: any(named: 'content'),
+            mediaRef: any(named: 'mediaRef'),
+            delayMs: any(named: 'delayMs'),
+            jitterPct: any(named: 'jitterPct'),
+            aiOnly: any(named: 'aiOnly'),
+          ),
+        ).thenAnswer((_) async => _newStep);
+        when(() => repo.listSteps('f1')).thenAnswer(
+          (_) => Future<List<fdom.Step>>.error(const FlowsServerFailure()),
+        );
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          content: 'X',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
+      expect: () => const <FlowStepsState>[
+        FlowStepsMutating(_steps),
+        FlowStepsLoading(),
+        FlowStepsFailed(FlowsServerFailure()),
+      ],
+    );
+
+    test('Mutating + MutationFailed value-equality', () {
+      const a = FlowStepsMutating(_steps);
+      const b = FlowStepsMutating(_steps);
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+
+      const f1 = FlowStepsMutationFailed(_steps, FlowsInvalidStepFailure());
+      const f2 = FlowStepsMutationFailed(_steps, FlowsInvalidStepFailure());
+      expect(f1, equals(f2));
+      expect(f1.hashCode, f2.hashCode);
     });
   });
 }
