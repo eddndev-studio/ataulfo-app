@@ -11,6 +11,8 @@ import 'package:agentic/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_template_picker_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bots_list_page.dart';
+import 'package:agentic/features/flows/domain/entities/flow.dart' as fdom;
+import 'package:agentic/features/flows/domain/repositories/flows_repository.dart';
 import 'package:agentic/features/memberships/domain/entities/membership.dart';
 import 'package:agentic/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:agentic/features/memberships/presentation/pages/memberships_page.dart';
@@ -36,6 +38,8 @@ class _MockBotsRepo extends Mock implements BotsRepository {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
+class _MockFlowsRepo extends Mock implements FlowsRepository {}
+
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
@@ -57,6 +61,7 @@ void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsRepo botsRepo;
   late _MockTemplatesRepo templatesRepo;
+  late _MockFlowsRepo flowsRepo;
   late _MockMembershipsRepo membershipsRepo;
   late _MockCatalogRepo catalogRepo;
   late AppRouter router;
@@ -65,6 +70,7 @@ void main() {
     authBloc = _MockAuthBloc();
     botsRepo = _MockBotsRepo();
     templatesRepo = _MockTemplatesRepo();
+    flowsRepo = _MockFlowsRepo();
     membershipsRepo = _MockMembershipsRepo();
     catalogRepo = _MockCatalogRepo();
     // Los blocs page-scoped del shell arrancan con LoadRequested al
@@ -75,6 +81,9 @@ void main() {
     // su propio widget test).
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
+    when(
+      () => flowsRepo.listFlows(any()),
+    ).thenAnswer((_) async => const <fdom.Flow>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
     when(
       catalogRepo.fetch,
@@ -84,6 +93,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      flowsRepository: flowsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -201,6 +211,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      flowsRepository: flowsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -277,6 +288,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      flowsRepository: flowsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -299,6 +311,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      flowsRepository: flowsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -357,6 +370,7 @@ void main() {
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
+        flowsRepository: flowsRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
       );
@@ -417,6 +431,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      flowsRepository: flowsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -493,6 +508,7 @@ void main() {
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
+        flowsRepository: flowsRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
       );
@@ -516,6 +532,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      flowsRepository: flowsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );

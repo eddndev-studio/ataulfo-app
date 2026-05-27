@@ -7,6 +7,7 @@ import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
 import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:agentic/features/bots/domain/entities/bot.dart';
 import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
+import 'package:agentic/features/flows/domain/repositories/flows_repository.dart';
 import 'package:agentic/features/memberships/domain/entities/membership.dart';
 import 'package:agentic/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:agentic/features/templates/domain/entities/template.dart';
@@ -24,6 +25,8 @@ class _MockAuthRepo extends Mock implements AuthRepository {}
 class _MockBotsRepo extends Mock implements BotsRepository {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
+
+class _MockFlowsRepo extends Mock implements FlowsRepository {}
 
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
@@ -51,6 +54,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
+      flowsRepository: _MockFlowsRepo(),
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );

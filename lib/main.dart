@@ -16,6 +16,8 @@ import 'features/auth/data/repositories/token_storage.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/bots/data/datasources/bots_datasource.dart';
 import 'features/bots/data/repositories/bots_repository_impl.dart';
+import 'features/flows/data/datasources/flows_datasource.dart';
+import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/memberships/data/datasources/memberships_datasource.dart';
 import 'features/memberships/data/repositories/memberships_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
@@ -85,6 +87,10 @@ void main() {
     datasource: DioTemplatesDatasource(mainDio),
   );
 
+  final flowsRepository = FlowsRepositoryImpl(
+    datasource: DioFlowsDatasource(mainDio),
+  );
+
   final membershipsRepository = MembershipsRepositoryImpl(
     datasource: DioMembershipsDatasource(mainDio),
   );
@@ -98,6 +104,7 @@ void main() {
     authRepository: authRepository,
     botsRepository: botsRepository,
     templatesRepository: templatesRepository,
+    flowsRepository: flowsRepository,
     membershipsRepository: membershipsRepository,
     catalogRepository: catalogRepository,
   );

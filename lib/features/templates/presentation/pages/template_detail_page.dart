@@ -8,6 +8,8 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
+import '../../../flows/domain/entities/flow.dart' as fdom;
+import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../domain/entities/template.dart';
 import '../../domain/entities/variable_def.dart';
 import '../../domain/failures/templates_failure.dart';
@@ -132,6 +134,10 @@ class _LoadedView extends StatelessWidget {
             )
           else
             SelectableText(ai.systemPrompt, style: textTheme.bodyMedium),
+          const SizedBox(height: AppTokens.sp6),
+          const _SectionTitle('Flujos'),
+          const SizedBox(height: AppTokens.sp3),
+          const _FlowsSection(),
           const SizedBox(height: AppTokens.sp6),
           const _SectionTitle('Variables'),
           const SizedBox(height: AppTokens.sp3),
@@ -589,3 +595,116 @@ String? _typePillLabel(VarType t) => switch (t) {
   VarType.audio => 'Audio',
   VarType.document => 'Documento',
 };
+
+// ── Sección Flujos (S11 F1, read-only) ───────────────────────────────────────
+
+class _FlowsSection extends StatelessWidget {
+  const _FlowsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<FlowsBloc, FlowsState>(
+      builder: (context, state) => switch (state) {
+        FlowsLoading() => const Padding(
+          key: Key('flows.loading'),
+          padding: EdgeInsets.symmetric(vertical: AppTokens.sp2),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        FlowsLoaded(flows: final fs) => _FlowsList(items: fs),
+        FlowsFailed() => const _FlowsFailedView(),
+      },
+    );
+  }
+}
+
+class _FlowsList extends StatelessWidget {
+  const _FlowsList({required this.items});
+
+  final List<fdom.Flow> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return Text(
+        'Esta plantilla aún no tiene flujos.',
+        key: const Key('flows.empty'),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: AppTokens.text2,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[for (final f in items) _FlowRow(flow: f)],
+    );
+  }
+}
+
+class _FlowRow extends StatelessWidget {
+  const _FlowRow({required this.flow});
+
+  final fdom.Flow flow;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return InkWell(
+      key: Key('flows.row.${flow.id}'),
+      // push apila el editor del flow sobre el detalle de plantilla; el
+      // back físico vuelve al detalle. La ruta /flows/:id la monta el
+      // slice del editor de flujos.
+      onTap: () => context.push('/flows/${flow.id}'),
+      borderRadius: BorderRadius.circular(AppTokens.radiusField),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            Expanded(child: Text(flow.name, style: t.bodyMedium)),
+            if (flow.isActive)
+              AppPill.primary(
+                key: Key('flows.row.${flow.id}.status_pill'),
+                label: 'Activo',
+                dot: AppPillDot.active,
+              )
+            else
+              AppPill.neutral(
+                key: Key('flows.row.${flow.id}.status_pill'),
+                label: 'Pausado',
+                dot: AppPillDot.paused,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FlowsFailedView extends StatelessWidget {
+  const _FlowsFailedView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      key: const Key('flows.failed'),
+      children: <Widget>[
+        const Expanded(
+          child: Text(
+            'No pudimos cargar los flujos.',
+            style: TextStyle(color: AppTokens.danger),
+          ),
+        ),
+        AppButton.text(
+          label: 'Reintentar',
+          onPressed: () =>
+              context.read<FlowsBloc>().add(const FlowsLoadRequested()),
+        ),
+      ],
+    );
+  }
+}
