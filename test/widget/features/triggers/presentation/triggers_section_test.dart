@@ -101,8 +101,8 @@ void main() {
     await tester.pumpWidget(_harness(triggersBloc: tBloc, flowsBloc: fBloc));
     expect(find.byKey(const Key('triggers.loading')), findsOneWidget);
 
-    tBloc.close();
-    fBloc.close();
+    unawaited(tBloc.close());
+    unawaited(fBloc.close());
     pending.complete(const <Trigger>[]);
   });
 
@@ -122,8 +122,8 @@ void main() {
 
     expect(find.byKey(const Key('triggers.empty')), findsOneWidget);
 
-    tBloc.close();
-    fBloc.close();
+    unawaited(tBloc.close());
+    unawaited(fBloc.close());
   });
 
   testWidgets(
@@ -155,8 +155,8 @@ void main() {
       expect(find.textContaining('Bienvenida'), findsOneWidget);
       expect(find.byKey(const Key('triggers.row.t1.flow_fallback')), findsNothing);
 
-      tBloc.close();
-      fBloc.close();
+      unawaited(tBloc.close());
+      unawaited(fBloc.close());
     },
   );
 
@@ -182,8 +182,8 @@ void main() {
       // Acción "Quitar etiqueta" en chip
       expect(find.text('Quitar etiqueta'), findsOneWidget);
 
-      tBloc.close();
-      fBloc.close();
+      unawaited(tBloc.close());
+      unawaited(fBloc.close());
     },
   );
 
@@ -212,8 +212,8 @@ void main() {
       expect(find.byKey(const Key('triggers.row.t1.flow_fallback')), findsOneWidget);
       expect(find.text('flow-xyz-9999'), findsOneWidget);
 
-      tBloc.close();
-      fBloc.close();
+      unawaited(tBloc.close());
+      unawaited(fBloc.close());
       pendingFlows.complete(const <fdom.Flow>[]);
     },
   );
@@ -245,8 +245,8 @@ void main() {
     // Tras retry, llega Loaded
     expect(find.byKey(const Key('triggers.row.t1')), findsOneWidget);
 
-    tBloc.close();
-    fBloc.close();
+    unawaited(tBloc.close());
+    unawaited(fBloc.close());
   });
 
   testWidgets('Failed NotFound es terminal — sin botón Reintentar', (tester) async {
@@ -266,7 +266,7 @@ void main() {
     expect(find.byKey(const Key('triggers.failed')), findsOneWidget);
     expect(find.text('Reintentar'), findsNothing);
 
-    tBloc.close();
-    fBloc.close();
+    unawaited(tBloc.close());
+    unawaited(fBloc.close());
   });
 }

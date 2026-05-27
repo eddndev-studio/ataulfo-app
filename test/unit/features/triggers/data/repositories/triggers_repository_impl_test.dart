@@ -33,18 +33,18 @@ void main() {
 
   group('TriggersRepositoryImpl', () {
     test('listTriggers delega 1:1 al datasource', () async {
-      when(() => ds.listTriggers('tpl1')).thenAnswer(
-        (_) async => <Trigger>[_sample(), _sample(id: 't2')],
-      );
+      when(
+        () => ds.listTriggers('tpl1'),
+      ).thenAnswer((_) async => <Trigger>[_sample(), _sample(id: 't2')]);
       final out = await repo.listTriggers('tpl1');
       expect(out.map((t) => t.id), <String>['t1', 't2']);
       verify(() => ds.listTriggers('tpl1')).called(1);
     });
 
     test('relanza TriggersFailure del datasource sin envolver', () async {
-      when(() => ds.listTriggers('tpl1')).thenThrow(
-        const TriggersForbiddenFailure(),
-      );
+      when(
+        () => ds.listTriggers('tpl1'),
+      ).thenThrow(const TriggersForbiddenFailure());
       await expectLater(
         () => repo.listTriggers('tpl1'),
         throwsA(isA<TriggersForbiddenFailure>()),

@@ -30,29 +30,26 @@ void main() {
       expect(r.updatedAt, DateTime.utc(2026, 5, 2, 8, 30));
     });
 
-    test(
-      'LABEL trigger sin matchType/keyword (campos omitempty del wire)',
-      () {
-        final r = TriggerResp.fromJson(<String, dynamic>{
-          'id': 't2',
-          'templateId': 'tpl1',
-          'flowId': 'f1',
-          'type': 'LABEL',
-          'labelId': 'lbl_vip',
-          'labelAction': 'ADD',
-          'scope': 'BOTH',
-          'isActive': false,
-          'createdAt': '2026-05-01T12:00:00Z',
-          'updatedAt': '2026-05-01T12:00:00Z',
-        });
-        expect(r.type, 'LABEL');
-        expect(r.matchType, isNull);
-        expect(r.keyword, '');
-        expect(r.labelId, 'lbl_vip');
-        expect(r.labelAction, 'ADD');
-        expect(r.isActive, isFalse);
-      },
-    );
+    test('LABEL trigger sin matchType/keyword (campos omitempty del wire)', () {
+      final r = TriggerResp.fromJson(<String, dynamic>{
+        'id': 't2',
+        'templateId': 'tpl1',
+        'flowId': 'f1',
+        'type': 'LABEL',
+        'labelId': 'lbl_vip',
+        'labelAction': 'ADD',
+        'scope': 'BOTH',
+        'isActive': false,
+        'createdAt': '2026-05-01T12:00:00Z',
+        'updatedAt': '2026-05-01T12:00:00Z',
+      });
+      expect(r.type, 'LABEL');
+      expect(r.matchType, isNull);
+      expect(r.keyword, '');
+      expect(r.labelId, 'lbl_vip');
+      expect(r.labelAction, 'ADD');
+      expect(r.isActive, isFalse);
+    });
 
     test('campos requeridos faltantes lanzan FormatException', () {
       // sin 'id'

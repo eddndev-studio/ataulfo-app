@@ -3,37 +3,39 @@ import 'package:agentic/features/triggers/data/mappers/triggers_mapper.dart';
 import 'package:agentic/features/triggers/domain/entities/trigger.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-TriggerResp _textResp() => const TriggerResp(
-  id: 't1',
-  templateId: 'tpl1',
-  flowId: 'f1',
-  type: 'TEXT',
-  matchType: 'CONTAINS',
-  keyword: 'hola',
-  labelId: '',
-  labelAction: null,
-  scope: 'BOTH',
-  isActive: true,
-).withTimestamps(
-  createdAt: DateTime.utc(2026, 5, 1),
-  updatedAt: DateTime.utc(2026, 5, 2),
-);
+TriggerResp _textResp() =>
+    const TriggerResp(
+      id: 't1',
+      templateId: 'tpl1',
+      flowId: 'f1',
+      type: 'TEXT',
+      matchType: 'CONTAINS',
+      keyword: 'hola',
+      labelId: '',
+      labelAction: null,
+      scope: 'BOTH',
+      isActive: true,
+    ).withTimestamps(
+      createdAt: DateTime.utc(2026, 5, 1),
+      updatedAt: DateTime.utc(2026, 5, 2),
+    );
 
-TriggerResp _labelResp() => const TriggerResp(
-  id: 't2',
-  templateId: 'tpl1',
-  flowId: 'f1',
-  type: 'LABEL',
-  matchType: null,
-  keyword: '',
-  labelId: 'lbl_vip',
-  labelAction: 'ADD',
-  scope: 'BOTH',
-  isActive: true,
-).withTimestamps(
-  createdAt: DateTime.utc(2026, 5, 1),
-  updatedAt: DateTime.utc(2026, 5, 1),
-);
+TriggerResp _labelResp() =>
+    const TriggerResp(
+      id: 't2',
+      templateId: 'tpl1',
+      flowId: 'f1',
+      type: 'LABEL',
+      matchType: null,
+      keyword: '',
+      labelId: 'lbl_vip',
+      labelAction: 'ADD',
+      scope: 'BOTH',
+      isActive: true,
+    ).withTimestamps(
+      createdAt: DateTime.utc(2026, 5, 1),
+      updatedAt: DateTime.utc(2026, 5, 1),
+    );
 
 void main() {
   group('TriggersMapper.triggerRespToEntity', () {
@@ -81,10 +83,9 @@ void main() {
 
   group('TriggersMapper.listToTriggers', () {
     test('preserva el orden del backend', () {
-      final list = ListTriggersResp(items: <TriggerResp>[
-        _textResp(),
-        _labelResp(),
-      ]);
+      final list = ListTriggersResp(
+        items: <TriggerResp>[_textResp(), _labelResp()],
+      );
       final ts = TriggersMapper.listToTriggers(list);
       expect(ts, hasLength(2));
       expect(ts[0].triggerType, TriggerType.text);

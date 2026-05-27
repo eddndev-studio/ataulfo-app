@@ -30,15 +30,17 @@ void main() {
     data: body,
   );
 
-  DioException badResponse(int status, {String path = '/templates/tpl1/triggers'}) =>
-      DioException(
-        requestOptions: RequestOptions(path: path),
-        response: Response<dynamic>(
-          requestOptions: RequestOptions(path: path),
-          statusCode: status,
-        ),
-        type: DioExceptionType.badResponse,
-      );
+  DioException badResponse(
+    int status, {
+    String path = '/templates/tpl1/triggers',
+  }) => DioException(
+    requestOptions: RequestOptions(path: path),
+    response: Response<dynamic>(
+      requestOptions: RequestOptions(path: path),
+      statusCode: status,
+    ),
+    type: DioExceptionType.badResponse,
+  );
 
   Map<String, dynamic> triggerJson({
     String id = 't1',
@@ -54,10 +56,10 @@ void main() {
     'templateId': 'tpl1',
     'flowId': 'f1',
     'type': type,
-    if (matchType != null) 'matchType': matchType,
+    'matchType': ?matchType,
     if (keyword.isNotEmpty) 'keyword': keyword,
     if (labelId.isNotEmpty) 'labelId': labelId,
-    if (labelAction != null) 'labelAction': labelAction,
+    'labelAction': ?labelAction,
     'scope': scope,
     'isActive': isActive,
     'createdAt': '2026-05-01T12:00:00Z',
@@ -114,7 +116,10 @@ void main() {
           options: any(named: 'options'),
         ),
       ).thenAnswer(
-        (_) async => respMap(200, body: <String, dynamic>{'items': <Map<String, dynamic>>[]}),
+        (_) async => respMap(
+          200,
+          body: <String, dynamic>{'items': <Map<String, dynamic>>[]},
+        ),
       );
       final ts = await ds.listTriggers('tpl1');
       expect(ts, isEmpty);

@@ -136,47 +136,53 @@ void main() {
   });
 
   group('Trigger shape por TriggerType', () {
-    test('TEXT lleva matchType + keyword; labelId/labelAction quedan vacíos', () {
-      final t = Trigger(
-        id: 't1',
-        templateId: 'tpl1',
-        flowId: 'f1',
-        triggerType: TriggerType.text,
-        matchType: MatchType.exact,
-        keyword: 'comprar',
-        labelId: '',
-        labelAction: null,
-        scope: TriggerScope.incoming,
-        isActive: true,
-        createdAt: DateTime.utc(2026, 5, 1),
-        updatedAt: DateTime.utc(2026, 5, 1),
-      );
-      expect(t.triggerType, TriggerType.text);
-      expect(t.keyword, 'comprar');
-      expect(t.labelId, '');
-      expect(t.labelAction, isNull);
-    });
+    test(
+      'TEXT lleva matchType + keyword; labelId/labelAction quedan vacíos',
+      () {
+        final t = Trigger(
+          id: 't1',
+          templateId: 'tpl1',
+          flowId: 'f1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: 'comprar',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.incoming,
+          isActive: true,
+          createdAt: DateTime.utc(2026, 5, 1),
+          updatedAt: DateTime.utc(2026, 5, 1),
+        );
+        expect(t.triggerType, TriggerType.text);
+        expect(t.keyword, 'comprar');
+        expect(t.labelId, '');
+        expect(t.labelAction, isNull);
+      },
+    );
 
-    test('LABEL lleva labelId + labelAction; matchType/keyword quedan vacíos', () {
-      final t = Trigger(
-        id: 't2',
-        templateId: 'tpl1',
-        flowId: 'f1',
-        triggerType: TriggerType.label,
-        matchType: null,
-        keyword: '',
-        labelId: 'lbl_vip',
-        labelAction: LabelAction.add,
-        scope: TriggerScope.both,
-        isActive: true,
-        createdAt: DateTime.utc(2026, 5, 1),
-        updatedAt: DateTime.utc(2026, 5, 1),
-      );
-      expect(t.triggerType, TriggerType.label);
-      expect(t.matchType, isNull);
-      expect(t.keyword, '');
-      expect(t.labelId, 'lbl_vip');
-      expect(t.labelAction, LabelAction.add);
-    });
+    test(
+      'LABEL lleva labelId + labelAction; matchType/keyword quedan vacíos',
+      () {
+        final t = Trigger(
+          id: 't2',
+          templateId: 'tpl1',
+          flowId: 'f1',
+          triggerType: TriggerType.label,
+          matchType: null,
+          keyword: '',
+          labelId: 'lbl_vip',
+          labelAction: LabelAction.add,
+          scope: TriggerScope.both,
+          isActive: true,
+          createdAt: DateTime.utc(2026, 5, 1),
+          updatedAt: DateTime.utc(2026, 5, 1),
+        );
+        expect(t.triggerType, TriggerType.label);
+        expect(t.matchType, isNull);
+        expect(t.keyword, '');
+        expect(t.labelId, 'lbl_vip');
+        expect(t.labelAction, LabelAction.add);
+      },
+    );
   });
 }

@@ -55,9 +55,9 @@ void main() {
     blocTest<TriggersBloc, TriggersState>(
       'LoadRequested ok → Loaded(triggers)',
       build: () {
-        when(() => repo.listTriggers('tpl1')).thenAnswer(
-          (_) async => <Trigger>[_text(), _label()],
-        );
+        when(
+          () => repo.listTriggers('tpl1'),
+        ).thenAnswer((_) async => <Trigger>[_text(), _label()]);
         return TriggersBloc(repo: repo, templateId: 'tpl1');
       },
       act: (bloc) => bloc.add(const TriggersLoadRequested()),
@@ -88,8 +88,9 @@ void main() {
         return TriggersBloc(repo: repo, templateId: 'tpl1');
       },
       act: (bloc) => bloc.add(const TriggersLoadRequested()),
-      expect: () =>
-          const <TriggersState>[TriggersFailed(TriggersNotFoundFailure())],
+      expect: () => const <TriggersState>[
+        TriggersFailed(TriggersNotFoundFailure()),
+      ],
     );
 
     blocTest<TriggersBloc, TriggersState>(

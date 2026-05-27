@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('TriggersFailure', () {
     test('cada subtype es una TriggersFailure y un Exception', () {
-      final List<TriggersFailure> all = const <TriggersFailure>[
+      const List<TriggersFailure> all = <TriggersFailure>[
         TriggersNetworkFailure(),
         TriggersTimeoutFailure(),
         TriggersForbiddenFailure(),
