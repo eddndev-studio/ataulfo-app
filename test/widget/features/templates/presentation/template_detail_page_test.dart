@@ -993,6 +993,26 @@ void main() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
+    testWidgets('vive dentro de AppCard con key contractual', (tester) async {
+      await tester.pumpWidget(host());
+
+      final cardFinder = find.byKey(const Key('template_detail.card.flows'));
+      expect(cardFinder, findsOneWidget);
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Flujos')),
+        findsOneWidget,
+      );
+      // El AppCard debe contener la sección Flujos completa, incluyendo
+      // el botón de "Nuevo flujo" que es el affordance de creación.
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.byKey(const Key('flows.add_button')),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('siempre muestra el título "Flujos"', (tester) async {
       await tester.pumpWidget(host());
       expect(find.text('Flujos'), findsOneWidget);
