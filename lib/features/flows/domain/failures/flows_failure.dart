@@ -48,3 +48,12 @@ final class FlowsServerFailure extends FlowsFailure {
 final class UnknownFlowsFailure extends FlowsFailure {
   const UnknownFlowsFailure();
 }
+
+/// 422 contra `POST /templates/:id/flows`: el nombre violó la validación
+/// del dominio (vacío, fuera de longitud) o algún gate (cooldown/usage
+/// limit) salió del rango aceptado. Reintentable después de corregir el
+/// input — distinto del genérico para que la UI pueda mostrar el copy
+/// "Revisa el nombre" en lugar de un error opaco.
+final class FlowsInvalidCreateFailure extends FlowsFailure {
+  const FlowsInvalidCreateFailure();
+}

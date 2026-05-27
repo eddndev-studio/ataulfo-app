@@ -114,4 +114,33 @@ void main() {
       );
     });
   });
+
+  group('FlowsRepositoryImpl.createFlow', () {
+    test('delega 1:1 al datasource', () async {
+      when(
+        () => ds.createFlow(templateId: 't1', name: 'X'),
+      ).thenAnswer((_) async => const Flow(
+        id: 'f-new',
+        templateId: 't1',
+        name: 'X',
+        isActive: true,
+        version: 1,
+      ));
+      final out = await repo.createFlow(templateId: 't1', name: 'X');
+      expect(out.id, 'f-new');
+      verify(
+        () => ds.createFlow(templateId: 't1', name: 'X'),
+      ).called(1);
+    });
+
+    test('relanza FlowsFailure del datasource sin envolver', () async {
+      when(
+        () => ds.createFlow(templateId: 't1', name: ''),
+      ).thenThrow(const FlowsInvalidCreateFailure());
+      await expectLater(
+        () => repo.createFlow(templateId: 't1', name: ''),
+        throwsA(isA<FlowsInvalidCreateFailure>()),
+      );
+    });
+  });
 }

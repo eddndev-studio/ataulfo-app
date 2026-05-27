@@ -28,6 +28,18 @@ abstract interface class FlowsDatasource {
   /// ordenado por `order` ASC (el backend lo garantiza en SQL). 404 si
   /// el flow padre no existe en la org.
   Future<List<fdom.Step>> listSteps(String flowId);
+
+  /// `POST /templates/:templateId/flows` body `{name, cooldownMs:0,
+  /// usageLimit:0, excludesFlows:[]}`. Defaults silenciosos para los
+  /// gates: `cooldownMs:0` = sin cooldown, `usageLimit:0` = sin límite,
+  /// `excludesFlows:[]` = sin exclusiones. Los gates se ajustan después
+  /// en el Settings tab del editor de flow.
+  ///
+  /// 201 con el flow completo (incluye `version:1` inicial). 422 si el
+  /// nombre rompe la validación del dominio → `FlowsInvalidCreateFailure`.
+  /// 403 si el rol no alcanza (CRUD de Flow = ADMIN+). 404 si la
+  /// Template padre no existe en la org del operador.
+  Future<Flow> createFlow({required String templateId, required String name});
 }
 
 class DioFlowsDatasource implements FlowsDatasource {
@@ -97,9 +109,50 @@ class DioFlowsDatasource implements FlowsDatasource {
     }
   }
 
-  /// Traduce DioException a la jerarquía sellada de FlowsFailure. Espejo
-  /// fiel del `_mapDioException` de TemplatesDatasource pero sin los
-  /// mapeos de 422 (no hay mutaciones en F1).
+  @override
+  Future<Flow> createFlow({
+    required String templateId,
+    required String name,
+  }) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/templates/$templateId/flows',
+        data: <String, dynamic>{
+          'name': name,
+          // Defaults silenciosos: el editor del flow ajusta luego.
+          'cooldownMs': 0,
+          'usageLimit': 0,
+          'excludesFlows': <String>[],
+        },
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownFlowsFailure();
+      }
+      return FlowsMapper.flowRespToEntity(FlowResp.fromJson(body));
+    } on FlowsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapMutationDioException(e);
+    } on FormatException {
+      throw const UnknownFlowsFailure();
+    } on TypeError {
+      throw const UnknownFlowsFailure();
+    }
+  }
+
+  /// Traduce DioException de una mutación. Diferencia respecto a
+  /// `_mapDioException`: 422 ⇒ `FlowsInvalidCreateFailure` (en lectura
+  /// sería UnknownFlowsFailure — 422 sólo aparece en mutaciones).
+  FlowsFailure _mapMutationDioException(DioException e) {
+    if (e.type == DioExceptionType.badResponse &&
+        e.response?.statusCode == 422) {
+      return const FlowsInvalidCreateFailure();
+    }
+    return _mapDioException(e);
+  }
+
+  /// Traduce DioException a la jerarquía sellada de FlowsFailure.
   FlowsFailure _mapDioException(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
