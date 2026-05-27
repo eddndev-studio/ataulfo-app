@@ -55,10 +55,10 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
     await _runMutation(emit, (snapshot) async {
       await _repo.createStep(
         flowId: _flowId,
-        type: fdom.StepType.text,
+        type: event.type,
         order: snapshot.length,
         content: event.content,
-        mediaRef: '',
+        mediaRef: event.mediaRef,
         delayMs: event.delayMs,
         jitterPct: event.jitterPct,
         aiOnly: event.aiOnly,
@@ -173,16 +173,24 @@ class FlowStepsLoadRequested extends FlowStepsEvent {
 
 /// Pide agregar un step nuevo al final de la lista. El bloc resuelve el
 /// `order` (= longitud del snapshot vigente) — el usuario no decide
-/// posición al crear; reorder es una operación distinta. En F5a el tipo
-/// se fija a TEXT; F6 expondrá la selección de tipo al crear.
+/// posición al crear; reorder es una operación distinta.
+///
+/// `type` y `mediaRef` los elige el sheet: TEXT usa `mediaRef:''`; los
+/// tipos multimedia (IMAGE/VIDEO/DOCUMENT/AUDIO/PTT/STICKER) viajan con
+/// `mediaRef` no vacío y `content` opcional como caption. Defaults
+/// `type:text` + `mediaRef:''` para callers legacy (tests previos a F6).
 class FlowStepsAddRequested extends FlowStepsEvent {
   const FlowStepsAddRequested({
     required this.content,
     required this.delayMs,
     required this.jitterPct,
     required this.aiOnly,
+    this.type = fdom.StepType.text,
+    this.mediaRef = '',
   });
 
+  final fdom.StepType type;
+  final String mediaRef;
   final String content;
   final int delayMs;
   final int jitterPct;
@@ -191,13 +199,16 @@ class FlowStepsAddRequested extends FlowStepsEvent {
   @override
   bool operator ==(Object other) =>
       other is FlowStepsAddRequested &&
+      other.type == type &&
+      other.mediaRef == mediaRef &&
       other.content == content &&
       other.delayMs == delayMs &&
       other.jitterPct == jitterPct &&
       other.aiOnly == aiOnly;
 
   @override
-  int get hashCode => Object.hash(content, delayMs, jitterPct, aiOnly);
+  int get hashCode =>
+      Object.hash(type, mediaRef, content, delayMs, jitterPct, aiOnly);
 }
 
 /// Pide editar un step (partial update). Cualquier campo `null` se omite
