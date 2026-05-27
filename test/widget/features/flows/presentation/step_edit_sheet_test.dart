@@ -375,4 +375,76 @@ void main() {
       verifyNever(() => bloc.add(any()));
     });
   });
+
+  group('StepEditSheet (Edit mode · multimedia)', () {
+    const imgStep = fdom.Step(
+      id: 's-img',
+      flowId: 'f1',
+      type: fdom.StepType.image,
+      order: 0,
+      content: 'caption original',
+      mediaRef: 'https://x/orig.png',
+      metadataJson: '{}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+
+    testWidgets(
+      'editing multimedia oculta el picker (type inmutable)',
+      (tester) async {
+        await pumpHost(tester, editing: imgStep);
+
+        for (final id in const <String>[
+          'text',
+          'image',
+          'video',
+          'document',
+          'audio',
+          'ptt',
+          'sticker',
+        ]) {
+          expect(
+            find.byKey(Key('step_edit.type.$id')),
+            findsNothing,
+            reason: 'chip step_edit.type.$id no debería aparecer en edit',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'editing multimedia muestra media_url con el valor original (read-only)',
+      (tester) async {
+        await pumpHost(tester, editing: imgStep);
+
+        expect(find.byKey(const Key('step_edit.media_url')), findsOneWidget);
+        expect(find.text('https://x/orig.png'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'editing multimedia: cambiar caption dispatcha UpdateRequested(content) only-changed',
+      (tester) async {
+        await pumpHost(tester, editing: imgStep);
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'caption nuevo',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const FlowStepsUpdateRequested(
+              stepId: 's-img',
+              content: 'caption nuevo',
+            ),
+          ),
+        ).called(1);
+      },
+    );
+  });
 }
