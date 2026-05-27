@@ -155,6 +155,84 @@ void main() {
     });
   });
 
+  group('FlowsRepositoryImpl.updateFlow', () {
+    test('delega 1:1 al datasource con todos los campos del body', () async {
+      when(
+        () => ds.updateFlow(
+          flowId: any(named: 'flowId'),
+          version: any(named: 'version'),
+          name: any(named: 'name'),
+          isActive: any(named: 'isActive'),
+          cooldownMs: any(named: 'cooldownMs'),
+          usageLimit: any(named: 'usageLimit'),
+          excludesFlows: any(named: 'excludesFlows'),
+        ),
+      ).thenAnswer(
+        (_) async => const Flow(
+          id: 'f1',
+          templateId: 't1',
+          name: 'Bienvenida',
+          isActive: true,
+          version: 4,
+          cooldownMs: 5000,
+          usageLimit: 3,
+          excludesFlows: <String>['f2'],
+        ),
+      );
+
+      final out = await repo.updateFlow(
+        flowId: 'f1',
+        version: 3,
+        name: 'Bienvenida',
+        isActive: true,
+        cooldownMs: 5000,
+        usageLimit: 3,
+        excludesFlows: const <String>['f2'],
+      );
+
+      expect(out.id, 'f1');
+      expect(out.version, 4);
+      verify(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 3,
+          name: 'Bienvenida',
+          isActive: true,
+          cooldownMs: 5000,
+          usageLimit: 3,
+          excludesFlows: const <String>['f2'],
+        ),
+      ).called(1);
+    });
+
+    test('relanza FlowsConflictFailure sin envolver (CAS stale)', () async {
+      when(
+        () => ds.updateFlow(
+          flowId: any(named: 'flowId'),
+          version: any(named: 'version'),
+          name: any(named: 'name'),
+          isActive: any(named: 'isActive'),
+          cooldownMs: any(named: 'cooldownMs'),
+          usageLimit: any(named: 'usageLimit'),
+          excludesFlows: any(named: 'excludesFlows'),
+        ),
+      ).thenThrow(const FlowsConflictFailure());
+
+      await expectLater(
+        () => repo.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<FlowsConflictFailure>()),
+      );
+    });
+  });
+
   group('FlowsRepositoryImpl.createStep', () {
     const newStep = fdom.Step(
       id: 's-new',
