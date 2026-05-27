@@ -1153,4 +1153,306 @@ void main() {
       );
     });
   });
+
+  group('DioFlowsDatasource.updateFlow happy path', () {
+    test(
+      '200 con body devuelve Flow mapeado y PUT al path correcto con documento completo',
+      () async {
+        when(
+          () => dio.put<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/flows/f1'),
+            statusCode: 200,
+            data: <String, dynamic>{
+              'id': 'f1',
+              'templateId': 't1',
+              'name': 'Bienvenida',
+              'isActive': true,
+              'cooldownMs': 5000,
+              'usageLimit': 3,
+              'excludesFlows': <dynamic>['f2', 'f3'],
+              'version': 4,
+              'createdAt': '2026-05-26T10:00:00Z',
+              'updatedAt': '2026-05-26T10:05:00Z',
+            },
+          ),
+        );
+
+        final out = await ds.updateFlow(
+          flowId: 'f1',
+          version: 3,
+          name: 'Bienvenida',
+          isActive: true,
+          cooldownMs: 5000,
+          usageLimit: 3,
+          excludesFlows: const <String>['f2', 'f3'],
+        );
+
+        expect(out.id, 'f1');
+        expect(out.version, 4);
+        expect(out.cooldownMs, 5000);
+        expect(out.usageLimit, 3);
+        expect(out.excludesFlows, <String>['f2', 'f3']);
+
+        final captured = verify(
+          () => dio.put<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured[0], '/flows/f1');
+        expect(captured[1], <String, dynamic>{
+          'version': 3,
+          'name': 'Bienvenida',
+          'isActive': true,
+          'cooldownMs': 5000,
+          'usageLimit': 3,
+          'excludesFlows': <String>['f2', 'f3'],
+        });
+      },
+    );
+
+    test('isActive=false viaja explícito (no omitido)', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          statusCode: 200,
+          data: flowJson(isActive: false, version: 2),
+        ),
+      );
+
+      await ds.updateFlow(
+        flowId: 'f1',
+        version: 1,
+        name: 'Bienvenida',
+        isActive: false,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: const <String>[],
+      );
+
+      final captured = verify(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      expect((captured[0] as Map<String, dynamic>)['isActive'], false);
+    });
+  });
+
+  group('DioFlowsDatasource.updateFlow failure mapping', () {
+    test('409 → FlowsConflictFailure (version stale)', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(409, path: '/flows/f1'));
+
+      await expectLater(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<FlowsConflictFailure>()),
+      );
+    });
+
+    test('422 → FlowsInvalidSettingsFailure (gate fuera de rango)', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(422, path: '/flows/f1'));
+
+      await expectLater(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: -1,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<FlowsInvalidSettingsFailure>()),
+      );
+    });
+
+    test('403 → FlowsForbiddenFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(403, path: '/flows/f1'));
+
+      await expectLater(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<FlowsForbiddenFailure>()),
+      );
+    });
+
+    test('404 → FlowsNotFoundFailure (flow ya no existe)', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(404, path: '/flows/f1'));
+
+      await expectLater(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<FlowsNotFoundFailure>()),
+      );
+    });
+
+    test('5xx → FlowsServerFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(503, path: '/flows/f1'));
+
+      await expectLater(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<FlowsServerFailure>()),
+      );
+    });
+
+    test('connectionError → FlowsNetworkFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<FlowsNetworkFailure>()),
+      );
+    });
+
+    test('timeout → FlowsTimeoutFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          type: DioExceptionType.receiveTimeout,
+        ),
+      );
+
+      await expectLater(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<FlowsTimeoutFailure>()),
+      );
+    });
+
+    test('body null en 200 → UnknownFlowsFailure', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          statusCode: 200,
+          data: null,
+        ),
+      );
+
+      await expectLater(
+        () => ds.updateFlow(
+          flowId: 'f1',
+          version: 1,
+          name: 'X',
+          isActive: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: const <String>[],
+        ),
+        throwsA(isA<UnknownFlowsFailure>()),
+      );
+    });
+  });
 }
