@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -144,12 +146,21 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
               name.isNotEmpty &&
               widget.existingNames.contains(name) &&
               (ed == null || name != ed.name);
-          // El sheet sube con el teclado virtual; padding inferior
-          // dinámico evita que el campo activo quede oculto.
+          // El sheet flota sobre dos insets distintos: el teclado
+          // virtual (viewInsets.bottom, > 0 sólo con teclado abierto) y
+          // la gesture-nav del sistema (viewPadding.bottom, > 0 siempre
+          // en devices con gestos). Tomar max() cubre ambos sin doble
+          // contar: con teclado abierto la nav queda detrás del teclado;
+          // con teclado cerrado el botón Guardar sigue por encima de la
+          // gesture-nav. Sin el max, al cerrar el teclado el botón se
+          // desliza por debajo de la barra del sistema.
+          final media = MediaQuery.of(context);
+          final bottomInset = math.max(
+            media.viewInsets.bottom,
+            media.viewPadding.bottom,
+          );
           return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
+            padding: EdgeInsets.only(bottom: bottomInset),
             child: Container(
               padding: const EdgeInsets.all(AppTokens.sp6),
               child: Column(
