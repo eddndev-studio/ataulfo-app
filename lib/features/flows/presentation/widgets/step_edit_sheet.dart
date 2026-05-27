@@ -14,6 +14,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../domain/entities/conditional_time_metadata.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_steps_bloc.dart';
@@ -84,6 +85,12 @@ class _StepEditSheetState extends State<StepEditSheet> {
   /// etc.). Solo aplica cuando `_type == conditionalTime`.
   String? _ctMetadataJson;
 
+  /// Metadata hidratada del step original al editar un CONDITIONAL_TIME;
+  /// se pasa al form como `initial`. Si el parse falla (legacy/corrupto),
+  /// el form arranca con su seed default — el operador verá un warning
+  /// implícito al notar que el form no refleja la config guardada.
+  ConditionalTimeMetadata? _ctInitial;
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +103,16 @@ class _StepEditSheetState extends State<StepEditSheet> {
     _aiOnly = ed?.aiOnly ?? false;
     _contentCtrl.addListener(_onContentChanged);
     _mediaCtrl.addListener(_onContentChanged);
+
+    if (ed != null && ed.type == fdom.StepType.conditionalTime) {
+      try {
+        _ctInitial = ConditionalTimeMetadata.fromJsonString(ed.metadataJson);
+      } on FormatException {
+        // metadata corrupto: el form arranca con seed default. El
+        // operador puede notar el desajuste y reconfigurar.
+        _ctInitial = null;
+      }
+    }
   }
 
   void _onContentChanged() => setState(() {});
@@ -182,15 +199,39 @@ class _StepEditSheetState extends State<StepEditSheet> {
 
     // Modo edit: only-changed. Diff contra el editing original; si
     // nada cambió, no-op (la UI evita el round-trip).
-    final newContent = content != ed.content ? content : null;
+    final newContent = _isConditionalTime
+        ? null // CT no edita content vía sheet — el form maneja todo.
+        : content != ed.content
+        ? content
+        : null;
     final newDelay = _delayMs != ed.delayMs ? _delayMs : null;
     final newJitter = _jitterPct != ed.jitterPct ? _jitterPct : null;
     final newAiOnly = _aiOnly != ed.aiOnly ? _aiOnly : null;
+
+    String? newMetadata;
+    if (_isConditionalTime && _ctMetadataJson != null) {
+      // Comparación semántica: parseo el JSON original y el actual para
+      // evitar falsos positivos por orden de keys distinto del backend.
+      try {
+        final current = ConditionalTimeMetadata.fromJsonString(
+          _ctMetadataJson!,
+        );
+        if (_ctInitial == null || current != _ctInitial) {
+          newMetadata = _ctMetadataJson;
+        }
+      } on FormatException {
+        // El form gates submit con metadataJson != null, así que un
+        // parse fail aquí sería bug. Lo dejamos pasar como cambio.
+        newMetadata = _ctMetadataJson;
+      }
+    }
+
     final isNoOp =
         newContent == null &&
         newDelay == null &&
         newJitter == null &&
-        newAiOnly == null;
+        newAiOnly == null &&
+        newMetadata == null;
     if (isNoOp) return;
 
     _didSubmit = true;
@@ -201,6 +242,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
         delayMs: newDelay,
         jitterPct: newJitter,
         aiOnly: newAiOnly,
+        metadataJson: newMetadata,
       ),
     );
   }
@@ -275,6 +317,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
                     const SizedBox(height: AppTokens.sp4),
                     ConditionalTimeForm(
                       key: const Key('step_edit.ct_form'),
+                      initial: _ctInitial,
                       availableStepOrders: _availableOrdersFromState(state),
                       enabled: !isMutating,
                       onChanged: (json) =>

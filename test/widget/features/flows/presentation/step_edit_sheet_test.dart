@@ -528,4 +528,80 @@ void main() {
       },
     );
   });
+
+  group('StepEditSheet (Edit mode · conditionalTime)', () {
+    const ctStep = fdom.Step(
+      id: 's-ct',
+      flowId: 'f1',
+      type: fdom.StepType.conditionalTime,
+      order: 2,
+      content: '',
+      mediaRef: '',
+      metadataJson:
+          '{"tz":"UTC","windows":[{"days":[1,2],"from":"08:00",'
+          '"to":"12:00"}],"on_match_order":0,"on_else_order":1}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+
+    testWidgets(
+      'edit CT hidrata el form con metadataJson del step (tz UTC visible)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[ctStep]),
+        );
+        await pumpHost(tester, editing: ctStep);
+
+        // El form CT está montado (no el content/media_url).
+        expect(find.byKey(const Key('ct_form.tz_dropdown')), findsOneWidget);
+        // tz dropdown muestra "UTC" como selección actual.
+        expect(find.text('UTC'), findsWidgets);
+      },
+    );
+
+    testWidgets('edit CT sin cambios → submit es no-op', (tester) async {
+      when(() => bloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[ctStep]),
+      );
+      await pumpHost(tester, editing: ctStep);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      verifyNever(() => bloc.add(any()));
+    });
+
+    testWidgets(
+      'edit CT con cambio (deselect día) → submit dispatcha '
+      'UpdateRequested(metadataJson)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[ctStep]),
+        );
+        await pumpHost(tester, editing: ctStep);
+        await tester.pumpAndSettle();
+
+        // El step original tiene days [1,2] (Lun+Mar). uiIndex 0=Lun.
+        // Destildo Lunes — quedan solo Martes (wireDay 2).
+        await tester.tap(find.byKey(const Key('ct_form.window.0.day.0')));
+        await tester.pump();
+
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        expect(captured, hasLength(1));
+        final ev = captured.single as FlowStepsUpdateRequested;
+        expect(ev.stepId, 's-ct');
+        expect(ev.metadataJson, isNotNull);
+        // Después del cambio, days = [2] solamente.
+        expect(ev.metadataJson, contains('"days":[2]'));
+        // Otros campos no van al PATCH.
+        expect(ev.content, isNull);
+        expect(ev.delayMs, isNull);
+      },
+    );
+  });
 }
