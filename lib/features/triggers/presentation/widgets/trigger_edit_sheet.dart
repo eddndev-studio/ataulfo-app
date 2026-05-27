@@ -87,6 +87,36 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     return true;
   }
 
+  Future<void> _confirmDelete() async {
+    final ed = widget.editing;
+    if (ed == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        key: const Key('trigger_edit.delete_confirm'),
+        title: const Text('Eliminar disparador'),
+        content: const Text(
+          '¿Eliminar este disparador? La acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            key: const Key('trigger_edit.delete_confirm.cancel'),
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('trigger_edit.delete_confirm.ok'),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+    context.read<TriggersBloc>().add(TriggersDeleteRequested(triggerId: ed.id));
+  }
+
   void _submit() {
     if (!_isSubmittable) return;
     final ed = widget.editing;
@@ -131,11 +161,27 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                widget.editing == null
-                    ? 'Nuevo disparador'
-                    : 'Editar disparador',
-                style: textTheme.titleLarge,
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      widget.editing == null
+                          ? 'Nuevo disparador'
+                          : 'Editar disparador',
+                      style: textTheme.titleLarge,
+                    ),
+                  ),
+                  if (widget.editing != null)
+                    IconButton(
+                      key: const Key('trigger_edit.delete'),
+                      tooltip: 'Eliminar disparador',
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: AppTokens.danger,
+                      ),
+                      onPressed: isMutating ? null : _confirmDelete,
+                    ),
+                ],
               ),
               const SizedBox(height: AppTokens.sp4),
               _TypePicker(
