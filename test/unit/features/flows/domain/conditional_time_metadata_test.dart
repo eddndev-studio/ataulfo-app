@@ -19,6 +19,22 @@ void main() {
       expect(md.windows.first.to, '18:00');
     });
 
+    test(
+      'parser normaliza days a orden ascendente (resiliencia a escritores '
+      'no-Flutter)',
+      () {
+        // Backend / scripts pueden persistir days en cualquier orden.
+        // Si el cliente Flutter no normaliza al parsear, el diff de
+        // edit reporta "hay cambio" falso cuando el operador solo
+        // cargó y guardó sin tocar nada.
+        const raw =
+            '{"tz":"UTC","windows":[{"days":[5,1,3],"from":"09:00",'
+            '"to":"10:00"}],"on_match_order":0,"on_else_order":1}';
+        final md = ConditionalTimeMetadata.fromJsonString(raw);
+        expect(md.windows.first.days, <int>[1, 3, 5]);
+      },
+    );
+
     test('múltiples ventanas se preservan en orden', () {
       const raw =
           '{"tz":"UTC","windows":['
