@@ -230,12 +230,18 @@ class _StepEditSheetState extends State<StepEditSheet> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: AppTokens.sp4),
-                  _TypePicker(
-                    selected: _type,
-                    enabled: !isMutating,
-                    onSelected: (t) => setState(() => _type = t),
-                  ),
+                  // El picker solo aparece al crear. En edit el tipo es
+                  // inmutable: el PATCH /steps/:id del backend no acepta
+                  // `type` ni `mediaRef`, así que cambiarlos requeriría
+                  // borrar y recrear. Se difiere a un slice cross-repo.
+                  if (widget.editing == null) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    _TypePicker(
+                      selected: _type,
+                      enabled: !isMutating,
+                      onSelected: (t) => setState(() => _type = t),
+                    ),
+                  ],
                   if (_isMultimedia) ...<Widget>[
                     const SizedBox(height: AppTokens.sp4),
                     AppTextField(
@@ -243,7 +249,9 @@ class _StepEditSheetState extends State<StepEditSheet> {
                       label: 'URL o id del recurso',
                       hint: 'https://… o id opaco del archivo subido',
                       controller: _mediaCtrl,
-                      enabled: !isMutating,
+                      // En edit el mediaRef es read-only por la misma razón
+                      // que el picker se oculta — el PATCH no lo acepta.
+                      enabled: !isMutating && widget.editing == null,
                     ),
                   ],
                   const SizedBox(height: AppTokens.sp4),
