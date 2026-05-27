@@ -282,7 +282,9 @@ void main() {
 
       await repo.patchStep(stepId: 's1', content: 'Solo content');
 
-      verify(() => ds.patchStep(stepId: 's1', content: 'Solo content')).called(1);
+      verify(
+        () => ds.patchStep(stepId: 's1', content: 'Solo content'),
+      ).called(1);
     });
 
     test('relanza FlowsStepNotFoundFailure', () async {

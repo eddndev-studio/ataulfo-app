@@ -200,8 +200,7 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
       other.aiOnly == aiOnly;
 
   @override
-  int get hashCode =>
-      Object.hash(stepId, content, delayMs, jitterPct, aiOnly);
+  int get hashCode => Object.hash(stepId, content, delayMs, jitterPct, aiOnly);
 }
 
 /// Pide eliminar un step. La operación es idempotente en el backend,

@@ -180,9 +180,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          widget.editing == null
-                              ? 'Nuevo paso'
-                              : 'Editar paso',
+                          widget.editing == null ? 'Nuevo paso' : 'Editar paso',
                           style: textTheme.titleLarge,
                         ),
                       ),

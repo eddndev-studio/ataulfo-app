@@ -75,8 +75,7 @@ void main() {
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       act: (bloc) => bloc.add(const FlowStepsLoadRequested()),
-      expect: () =>
-          const <FlowStepsState>[FlowStepsLoaded(<fdom.Step>[])],
+      expect: () => const <FlowStepsState>[FlowStepsLoaded(<fdom.Step>[])],
     );
 
     blocTest<FlowStepsBloc, FlowStepsState>(
@@ -302,10 +301,8 @@ void main() {
         when(() => repo.listSteps('f1')).thenAnswer((_) async => afterAdd);
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
-      seed: () => const FlowStepsMutationFailed(
-        _steps,
-        FlowsInvalidStepFailure(),
-      ),
+      seed: () =>
+          const FlowStepsMutationFailed(_steps, FlowsInvalidStepFailure()),
       act: (bloc) => bloc.add(
         const FlowStepsAddRequested(
           content: 'Bienvenida v2',
@@ -439,10 +436,7 @@ void main() {
       },
       seed: () => const FlowStepsLoaded(_steps),
       act: (bloc) => bloc.add(
-        const FlowStepsUpdateRequested(
-          stepId: 's1',
-          content: 'Hola edited',
-        ),
+        const FlowStepsUpdateRequested(stepId: 's1', content: 'Hola edited'),
       ),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(_steps),
@@ -510,10 +504,7 @@ void main() {
       },
       seed: () => const FlowStepsLoaded(_steps),
       act: (bloc) => bloc.add(
-        const FlowStepsUpdateRequested(
-          stepId: 'gone',
-          content: 'X',
-        ),
+        const FlowStepsUpdateRequested(stepId: 'gone', content: 'X'),
       ),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(_steps),
@@ -525,9 +516,8 @@ void main() {
       'UpdateRequested desde Loading → no-op',
       build: () => FlowStepsBloc(repo: repo, flowId: 'f1'),
       seed: () => const FlowStepsLoading(),
-      act: (bloc) => bloc.add(
-        const FlowStepsUpdateRequested(stepId: 's1', content: 'X'),
-      ),
+      act: (bloc) =>
+          bloc.add(const FlowStepsUpdateRequested(stepId: 's1', content: 'X')),
       expect: () => const <FlowStepsState>[],
       verify: (_) {
         verifyNever(

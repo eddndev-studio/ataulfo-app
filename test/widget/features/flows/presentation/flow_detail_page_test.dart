@@ -248,31 +248,32 @@ void main() {
     },
   );
 
-  testWidgets('Loaded monta TabBar con 3 tabs: Pasos / Disparadores / Configuración', (
-    tester,
-  ) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
-    when(
-      () => stepsBloc.state,
-    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+  testWidgets(
+    'Loaded monta TabBar con 3 tabs: Pasos / Disparadores / Configuración',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
-    await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
 
-    expect(find.byType(TabBar), findsOneWidget);
-    final tabBar = find.byType(TabBar);
-    expect(
-      find.descendant(of: tabBar, matching: find.text('Pasos')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: tabBar, matching: find.text('Disparadores')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: tabBar, matching: find.text('Configuración')),
-      findsOneWidget,
-    );
-  });
+      expect(find.byType(TabBar), findsOneWidget);
+      final tabBar = find.byType(TabBar);
+      expect(
+        find.descendant(of: tabBar, matching: find.text('Pasos')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tabBar, matching: find.text('Disparadores')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tabBar, matching: find.text('Configuración')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('Tap en tab Disparadores muestra placeholder "Próximamente"', (
     tester,
@@ -346,27 +347,29 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.byKey(const Key('flow_detail.steps.add_button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('flow_detail.steps.add_button')),
+      findsOneWidget,
+    );
   });
 
-  testWidgets(
-    'Tap del botón "Nuevo paso" abre el StepEditSheet (modal)',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
-      when(
-        () => stepsBloc.state,
-      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+  testWidgets('Tap del botón "Nuevo paso" abre el StepEditSheet (modal)', (
+    tester,
+  ) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
-      await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(host());
+    await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
+    await tester.pumpAndSettle();
 
-      // El sheet del paso aparece (campo content confirma su presencia;
-      // el título "Nuevo paso" choca con el label del botón).
-      expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
-    },
-  );
+    // El sheet del paso aparece (campo content confirma su presencia;
+    // el título "Nuevo paso" choca con el label del botón).
+    expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
+    expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
+  });
 
   testWidgets(
     'Tap en StepCard abre el StepEditSheet en modo Edit (prefilled)',
