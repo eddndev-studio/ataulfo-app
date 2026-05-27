@@ -18,8 +18,10 @@ import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
 import '../../features/flows/domain/repositories/flows_repository.dart';
+import '../../features/flows/presentation/bloc/flow_create_bloc.dart';
 import '../../features/flows/presentation/bloc/flow_detail_bloc.dart';
 import '../../features/flows/presentation/bloc/flows_bloc.dart';
+import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
@@ -246,6 +248,26 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Editar plantilla')),
               body: const TemplateEditPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Crear flow desde el TemplateDetailPage (S11 F4). Subruta del
+        // template (`/templates/:templateId/flows/new`) — no compite
+        // con `/templates/:id` por orden de match. Page-scoped:
+        // `FlowCreateBloc` se construye con el templateId; Succeeded
+        // hace `pushReplacement('/flows/:id')` para sacar el form de
+        // la pila (back físico vuelve al detalle de plantilla).
+        path: '/templates/:templateId/flows/new',
+        builder: (context, state) {
+          final templateId = state.pathParameters['templateId']!;
+          return BlocProvider<FlowCreateBloc>(
+            create: (_) =>
+                FlowCreateBloc(repo: _flowsRepo, templateId: templateId),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Crear flujo')),
+              body: const FlowCreatePage(),
             ),
           );
         },
