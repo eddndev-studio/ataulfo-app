@@ -150,6 +150,10 @@ void main() {
           'hola',
         );
         await tester.pump();
+        await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Bienvenida').last);
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('trigger_edit.submit')));
         await tester.pump();
 
@@ -167,6 +171,23 @@ void main() {
             ),
           ),
         ).called(1);
+      },
+    );
+
+    testWidgets(
+      'submit con flow no elegido es no-op aunque keyword esté lleno',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('trigger_edit.keyword')),
+          'hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
+        await tester.pump();
+
+        verifyNever(() => triggers.add(any()));
       },
     );
   });
