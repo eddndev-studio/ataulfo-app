@@ -66,4 +66,22 @@ abstract interface class FlowsRepository {
   /// falla — el bloc puede asumir que tras éxito el step ya no está en
   /// el servidor.
   Future<void> deleteStep(String stepId);
+
+  /// Reemplaza un Flow por id (PUT replace-completo). El editor del
+  /// Settings tab debe propagar `name` e `isActive` desde la cabecera
+  /// loaded aunque no los edite — omitir un campo reaplica su default
+  /// silenciosamente.
+  ///
+  /// `version` es CAS optimista: 409 ⇒ `FlowsConflictFailure` (version
+  /// stale o duplicate name). 422 ⇒ `FlowsInvalidSettingsFailure`
+  /// (gates fuera de rango). 404 ⇒ `FlowsNotFoundFailure`.
+  Future<Flow> updateFlow({
+    required String flowId,
+    required int version,
+    required String name,
+    required bool isActive,
+    required int cooldownMs,
+    required int usageLimit,
+    required List<String> excludesFlows,
+  });
 }

@@ -15,6 +15,9 @@ const _flows = <Flow>[
     name: 'Bienvenida',
     isActive: true,
     version: 1,
+    cooldownMs: 0,
+    usageLimit: 0,
+    excludesFlows: <String>[],
   ),
   Flow(
     id: 'f2',
@@ -22,6 +25,9 @@ const _flows = <Flow>[
     name: 'Despedida',
     isActive: false,
     version: 2,
+    cooldownMs: 0,
+    usageLimit: 0,
+    excludesFlows: <String>[],
   ),
 ];
 

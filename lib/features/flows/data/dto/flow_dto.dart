@@ -1,11 +1,14 @@
-/// DTO de un Flow del listado `GET /templates/{id}/flows` (ver
-/// `flowResp` en `agentic-go/internal/adapters/httpflows/dto.go`).
+/// DTO de un Flow del wire (ver `flowResp` en
+/// `agentic-go/internal/adapters/httpflows/dto.go`).
 ///
-/// Sólo modela el subconjunto de campos que la entity consume hoy
-/// (`{id, templateId, name, isActive, version}`). El wire trae además
-/// `cooldownMs`, `usageLimit`, `excludesFlows`, `createdAt`, `updatedAt`
-/// — se ignoran en F1 para no introducir mapeo muerto; los habilitará
-/// el editor de gates cuando los necesite.
+/// Espejo 1:1 del shape canónico: identidad + nombre + gates de
+/// comportamiento (`cooldownMs`, `usageLimit`, `excludesFlows`) +
+/// `version` (CAS optimista). `createdAt` / `updatedAt` quedan fuera
+/// — ninguna superficie de UI los consume hoy.
+///
+/// Fail-loud por campo: si el wire omite un valor canónico, lanzamos
+/// `FormatException`. El backend siempre serializa `excludesFlows`
+/// como `[]` (no null) por contrato; un null aquí es drift.
 class FlowResp {
   const FlowResp({
     required this.id,
@@ -13,6 +16,9 @@ class FlowResp {
     required this.name,
     required this.isActive,
     required this.version,
+    required this.cooldownMs,
+    required this.usageLimit,
+    required this.excludesFlows,
   });
 
   factory FlowResp.fromJson(Map<String, dynamic> json) {
@@ -21,12 +27,27 @@ class FlowResp {
     final name = json['name'];
     final isActive = json['isActive'];
     final version = json['version'];
+    final cooldownMs = json['cooldownMs'];
+    final usageLimit = json['usageLimit'];
+    final excludesRaw = json['excludesFlows'];
     if (id is! String ||
         templateId is! String ||
         name is! String ||
         isActive is! bool ||
-        version is! int) {
+        version is! int ||
+        cooldownMs is! int ||
+        usageLimit is! int ||
+        excludesRaw is! List<dynamic>) {
       throw const FormatException('flowResp: clave obligatoria ausente');
+    }
+    final excludes = <String>[];
+    for (final raw in excludesRaw) {
+      if (raw is! String) {
+        throw const FormatException(
+          'flowResp: excludesFlows debe ser lista de string',
+        );
+      }
+      excludes.add(raw);
     }
     return FlowResp(
       id: id,
@@ -34,6 +55,9 @@ class FlowResp {
       name: name,
       isActive: isActive,
       version: version,
+      cooldownMs: cooldownMs,
+      usageLimit: usageLimit,
+      excludesFlows: excludes,
     );
   }
 
@@ -42,6 +66,9 @@ class FlowResp {
   final String name;
   final bool isActive;
   final int version;
+  final int cooldownMs;
+  final int usageLimit;
+  final List<String> excludesFlows;
 }
 
 /// Wrapper de la lista `GET /templates/{id}/flows` → `{items:[...]}`.

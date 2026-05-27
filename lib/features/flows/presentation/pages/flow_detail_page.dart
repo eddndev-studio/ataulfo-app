@@ -18,6 +18,7 @@ import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
 import '../bloc/flow_steps_bloc.dart';
 import '../widgets/conditional_time_day_mapping.dart';
+import '../widgets/flow_settings_tab.dart';
 import '../widgets/step_edit_sheet.dart';
 import '../widgets/step_type_label.dart';
 
@@ -58,6 +59,18 @@ class _FlowDetailPageState extends State<FlowDetailPage>
       builder: (context, state) => switch (state) {
         FlowDetailLoading() => const _LoadingView(),
         FlowDetailLoaded(flow: final f) => _LoadedShell(tab: _tab, flow: f),
+        // Mientras la mutación de Settings está en vuelo o falló, el
+        // shell sigue visible con el flow del snapshot: el tab Pasos
+        // y Triggers ven la misma cabecera; el tab Configuración lee
+        // el estado directamente y actualiza su UX.
+        FlowDetailSettingsSaving(flow: final f) => _LoadedShell(
+          tab: _tab,
+          flow: f,
+        ),
+        FlowDetailSettingsSaveFailed(flow: final f) => _LoadedShell(
+          tab: _tab,
+          flow: f,
+        ),
         FlowDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );
@@ -112,13 +125,7 @@ class _LoadedShell extends StatelessWidget {
                     'Los disparadores se administran desde la plantilla. '
                     'Próximamente verás aquí los que apuntan a este flujo.',
               ),
-              const _ComingSoonTab(
-                tabKey: Key('flow_detail.tab.settings.coming_soon'),
-                title: 'Configuración',
-                copy:
-                    'Próximamente: cooldown, límite de uso y exclusiones '
-                    'entre flujos.',
-              ),
+              const FlowSettingsTab(key: Key('flow_detail.tab.settings')),
             ],
           ),
         ),

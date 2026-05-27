@@ -26,6 +26,9 @@ const _flow = flows.Flow(
   name: 'Bienvenida',
   isActive: true,
   version: 3,
+  cooldownMs: 0,
+  usageLimit: 0,
+  excludesFlows: <String>[],
 );
 
 void main() {
@@ -69,7 +72,9 @@ void main() {
   testWidgets('Loaded muestra header con nombre + pill version + pill status', (
     tester,
   ) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(() => detailBloc.state).thenReturn(
+      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+    );
     when(
       () => stepsBloc.state,
     ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
@@ -90,8 +95,13 @@ void main() {
         name: 'Off',
         isActive: false,
         version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
       );
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(paused));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(paused, <flows.Flow>[], siblingsFailed: false),
+      );
       when(
         () => stepsBloc.state,
       ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
@@ -104,7 +114,9 @@ void main() {
   );
 
   testWidgets('FlowStepsLoaded vacío muestra empty state', (tester) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(() => detailBloc.state).thenReturn(
+      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+    );
     when(
       () => stepsBloc.state,
     ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
@@ -117,7 +129,9 @@ void main() {
   testWidgets(
     'FlowStepsLoaded con items muestra una card por step con humanización del type',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
@@ -162,7 +176,9 @@ void main() {
   testWidgets(
     'cada StepCard muestra un AppPill con el label humanizado del tipo',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
@@ -215,7 +231,9 @@ void main() {
   testWidgets(
     'CONDITIONAL_TIME card muestra TZ, días/horario, y destinos onMatch/onElse',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
@@ -264,7 +282,9 @@ void main() {
   testWidgets(
     'CONDITIONAL_TIME con metadataJson corrupto cae al fallback honesto',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
@@ -294,7 +314,9 @@ void main() {
   testWidgets(
     'FlowStepsLoading muestra spinner inline en el tab Pasos (header sigue visible)',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(const FlowStepsLoading());
 
       await tester.pumpWidget(host());
@@ -309,7 +331,9 @@ void main() {
   testWidgets(
     'FlowStepsFailed(no NotFound) muestra mensaje genérico + tap Reintentar dispatcha LoadRequested',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(
         () => stepsBloc.state,
       ).thenReturn(const FlowStepsFailed(FlowsServerFailure()));
@@ -329,7 +353,9 @@ void main() {
   testWidgets(
     'FlowStepsFailed(NotFound) muestra mensaje terminal sin Reintentar',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(
         () => stepsBloc.state,
       ).thenReturn(const FlowStepsFailed(FlowsNotFoundFailure()));
@@ -383,7 +409,9 @@ void main() {
   testWidgets(
     'Loaded monta TabBar con 3 tabs: Pasos / Disparadores / Configuración',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(
         () => stepsBloc.state,
       ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
@@ -410,7 +438,9 @@ void main() {
   testWidgets('Tap en tab Disparadores muestra placeholder "Próximamente"', (
     tester,
   ) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(() => detailBloc.state).thenReturn(
+      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+    );
     when(
       () => stepsBloc.state,
     ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
@@ -430,10 +460,10 @@ void main() {
     );
   });
 
-  testWidgets('Tap en tab Configuración muestra placeholder "Próximamente"', (
-    tester,
-  ) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+  testWidgets('Tap en tab Configuración monta FlowSettingsTab', (tester) async {
+    when(() => detailBloc.state).thenReturn(
+      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+    );
     when(
       () => stepsBloc.state,
     ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
@@ -447,8 +477,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('flow_detail.tab.settings')), findsOneWidget);
+    // El form del settings tab debe estar renderizado.
     expect(
-      find.byKey(const Key('flow_detail.tab.settings.coming_soon')),
+      find.byKey(const Key('flow_settings.cooldown.slider')),
       findsOneWidget,
     );
   });
@@ -472,7 +504,9 @@ void main() {
   });
 
   testWidgets('Tab Pasos muestra botón "Nuevo paso"', (tester) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(() => detailBloc.state).thenReturn(
+      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+    );
     when(
       () => stepsBloc.state,
     ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
@@ -488,7 +522,9 @@ void main() {
   testWidgets('Tap del botón "Nuevo paso" abre el StepEditSheet (modal)', (
     tester,
   ) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(() => detailBloc.state).thenReturn(
+      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+    );
     when(
       () => stepsBloc.state,
     ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
@@ -506,7 +542,9 @@ void main() {
   testWidgets(
     'Loaded con N≥2 steps monta ReorderableListView con drag handle por card',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
@@ -553,7 +591,9 @@ void main() {
   testWidgets(
     'Drag de un step dispatcha FlowStepsReorderRequested con ids en orden nuevo',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
@@ -603,7 +643,9 @@ void main() {
   testWidgets(
     'Loaded con 1 step NO monta ReorderableListView (1 item no tiene reorder)',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
@@ -636,7 +678,9 @@ void main() {
   testWidgets(
     'Tap en StepCard abre el StepEditSheet en modo Edit (prefilled)',
     (tester) async {
-      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(

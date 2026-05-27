@@ -1027,6 +1027,9 @@ void main() {
               name: 'Bienvenida',
               isActive: true,
               version: 1,
+              cooldownMs: 0,
+              usageLimit: 0,
+              excludesFlows: <String>[],
             ),
             flows.Flow(
               id: 'f2',
@@ -1034,6 +1037,9 @@ void main() {
               name: 'Despedida',
               isActive: false,
               version: 2,
+              cooldownMs: 0,
+              usageLimit: 0,
+              excludesFlows: <String>[],
             ),
           ]),
         );
@@ -1059,6 +1065,9 @@ void main() {
               name: 'Bienvenida',
               isActive: true,
               version: 1,
+              cooldownMs: 0,
+              usageLimit: 0,
+              excludesFlows: <String>[],
             ),
             flows.Flow(
               id: 'f2',
@@ -1066,6 +1075,9 @@ void main() {
               name: 'Despedida',
               isActive: false,
               version: 2,
+              cooldownMs: 0,
+              usageLimit: 0,
+              excludesFlows: <String>[],
             ),
           ]),
         );
@@ -1114,6 +1126,9 @@ void main() {
               name: 'Bienvenida',
               isActive: true,
               version: 1,
+              cooldownMs: 0,
+              usageLimit: 0,
+              excludesFlows: <String>[],
             ),
           ]),
         );

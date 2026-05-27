@@ -14,6 +14,9 @@ void main() {
           name: 'Bienvenida',
           isActive: true,
           version: 5,
+          cooldownMs: 5000,
+          usageLimit: 3,
+          excludesFlows: <String>['f2', 'f3'],
         );
 
         final entity = FlowsMapper.flowRespToEntity(resp);
@@ -26,6 +29,9 @@ void main() {
             name: 'Bienvenida',
             isActive: true,
             version: 5,
+            cooldownMs: 5000,
+            usageLimit: 3,
+            excludesFlows: <String>['f2', 'f3'],
           ),
         );
       },
@@ -44,6 +50,9 @@ void main() {
               name: 'A',
               isActive: true,
               version: 1,
+              cooldownMs: 0,
+              usageLimit: 0,
+              excludesFlows: <String>[],
             ),
             FlowResp(
               id: 'f2',
@@ -51,6 +60,9 @@ void main() {
               name: 'B',
               isActive: false,
               version: 2,
+              cooldownMs: 1000,
+              usageLimit: 5,
+              excludesFlows: <String>['f1'],
             ),
           ],
         );

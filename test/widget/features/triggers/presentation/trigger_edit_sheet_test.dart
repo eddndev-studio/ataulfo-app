@@ -29,6 +29,9 @@ fdom.Flow _flow({
   name: name,
   isActive: isActive,
   version: 1,
+  cooldownMs: 0,
+  usageLimit: 0,
+  excludesFlows: const <String>[],
 );
 
 Trigger _textTrigger({

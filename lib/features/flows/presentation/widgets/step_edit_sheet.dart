@@ -530,6 +530,8 @@ class _FailureCopy extends StatelessWidget {
     FlowsNotFoundFailure() ||
     FlowsServerFailure() ||
     FlowsInvalidCreateFailure() ||
+    FlowsInvalidSettingsFailure() ||
+    FlowsConflictFailure() ||
     UnknownFlowsFailure() => (
       'step_edit.error.generic',
       'No pudimos guardar el paso. Inténtalo de nuevo.',

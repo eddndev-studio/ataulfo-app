@@ -76,3 +76,22 @@ final class FlowsInvalidStepFailure extends FlowsFailure {
 final class FlowsStepNotFoundFailure extends FlowsFailure {
   const FlowsStepNotFoundFailure();
 }
+
+/// 422 contra `PUT /flows/:id` por settings inválidos: cooldownMs
+/// negativo, usageLimit negativo, o un gate fuera del rango aceptado
+/// por el dominio. Reintentable tras corregir el input; cubo separado
+/// de `FlowsInvalidCreateFailure` para que el copy del Settings tab
+/// apunte a "revisa cooldown / límite" sin confundir con el "revisa
+/// el nombre" del create.
+final class FlowsInvalidSettingsFailure extends FlowsFailure {
+  const FlowsInvalidSettingsFailure();
+}
+
+/// 409 contra `PUT /flows/:id`: la version observada por el cliente
+/// quedó stale (otro operador editó la cabecera) o algún UNIQUE
+/// (template_id, name) chocó. Reintentar con la misma version vuelve
+/// a fallar — la UI debe pedir recargar el detalle antes de reintentar
+/// el guardado.
+final class FlowsConflictFailure extends FlowsFailure {
+  const FlowsConflictFailure();
+}

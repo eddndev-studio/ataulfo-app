@@ -2,14 +2,18 @@
 /// como sub-recursos en sus propios paquetes; aquí sólo vive la cabecera
 /// que la UI necesita para listar y abrir el editor.
 ///
-/// `version` se conserva en la entity (aunque la UI de listado no la
-/// muestra) para que el editor de gates (CAS optimista) la consuma sin
-/// reabrir la cabecera al guardar.
+/// `version` se conserva para que el editor de configuración (CAS
+/// optimista) la consuma sin reabrir la cabecera al guardar.
 ///
-/// `cooldownMs` / `usageLimit` / `excludesFlows` / `createdAt` /
-/// `updatedAt` viven en el wire pero quedan fuera de la entity hasta que
-/// el editor de gates los necesite — leerlos hoy sin uso introduce
-/// drift entre el mapeo y el dominio.
+/// `cooldownMs` / `usageLimit` / `excludesFlows` son los gates de
+/// comportamiento: cooldown en milisegundos entre ejecuciones del flujo,
+/// límite de usos totales (0 ⇒ sin límite, semántica del dominio), y
+/// lista de ids de OTROS flujos cuya ejecución concurrente bloquea a
+/// este. Viven en la entity porque el editor los lee y los reescribe
+/// como un solo documento (PUT replace-completo).
+///
+/// `createdAt` / `updatedAt` viven en el wire pero quedan fuera de la
+/// entity — ninguna superficie de UI los consume hoy.
 class Flow {
   const Flow({
     required this.id,
@@ -17,6 +21,9 @@ class Flow {
     required this.name,
     required this.isActive,
     required this.version,
+    required this.cooldownMs,
+    required this.usageLimit,
+    required this.excludesFlows,
   });
 
   final String id;
@@ -24,18 +31,39 @@ class Flow {
   final String name;
   final bool isActive;
   final int version;
+  final int cooldownMs;
+  final int usageLimit;
+  final List<String> excludesFlows;
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is Flow &&
-        other.id == id &&
-        other.templateId == templateId &&
-        other.name == name &&
-        other.isActive == isActive &&
-        other.version == version;
+    if (other is! Flow) return false;
+    if (other.id != id ||
+        other.templateId != templateId ||
+        other.name != name ||
+        other.isActive != isActive ||
+        other.version != version ||
+        other.cooldownMs != cooldownMs ||
+        other.usageLimit != usageLimit) {
+      return false;
+    }
+    if (other.excludesFlows.length != excludesFlows.length) return false;
+    for (var i = 0; i < excludesFlows.length; i++) {
+      if (other.excludesFlows[i] != excludesFlows[i]) return false;
+    }
+    return true;
   }
 
   @override
-  int get hashCode => Object.hash(id, templateId, name, isActive, version);
+  int get hashCode => Object.hash(
+    id,
+    templateId,
+    name,
+    isActive,
+    version,
+    cooldownMs,
+    usageLimit,
+    Object.hashAll(excludesFlows),
+  );
 }
