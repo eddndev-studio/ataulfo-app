@@ -39,6 +39,13 @@ Trigger _label({String id = 't2', String labelId = 'vip'}) => Trigger(
 );
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(TriggerType.text);
+    registerFallbackValue(MatchType.exact);
+    registerFallbackValue(LabelAction.add);
+    registerFallbackValue(TriggerScope.both);
+  });
+
   late _MockRepo repo;
 
   setUp(() {
@@ -113,6 +120,272 @@ void main() {
         const TriggersFailed(TriggersNetworkFailure()),
         const TriggersLoading(),
         TriggersLoaded(<Trigger>[_text()]),
+      ],
+    );
+
+    blocTest<TriggersBloc, TriggersState>(
+      'AddRequested ok → Mutating(snap) → Loading → Loaded(refrescada)',
+      build: () {
+        when(
+          () => repo.listTriggers('tpl1'),
+        ).thenAnswer((_) async => <Trigger>[_text()]);
+        when(
+          () => repo.createTrigger(
+            templateId: any(named: 'templateId'),
+            flowId: any(named: 'flowId'),
+            triggerType: any(named: 'triggerType'),
+            matchType: any(named: 'matchType'),
+            keyword: any(named: 'keyword'),
+            labelId: any(named: 'labelId'),
+            labelAction: any(named: 'labelAction'),
+            scope: any(named: 'scope'),
+            isActive: any(named: 'isActive'),
+          ),
+        ).thenAnswer((_) async => _text(id: 'new', keyword: 'nuevo'));
+        return TriggersBloc(repo: repo, templateId: 'tpl1');
+      },
+      seed: () => TriggersLoaded(<Trigger>[_text()]),
+      act: (bloc) => bloc.add(
+        const TriggersAddRequested(
+          flowId: 'f1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: 'nuevo',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+      ),
+      expect: () => <TriggersState>[
+        TriggersMutating(<Trigger>[_text()]),
+        const TriggersLoading(),
+        TriggersLoaded(<Trigger>[_text()]),
+      ],
+      verify: (_) => verify(
+        () => repo.createTrigger(
+          templateId: 'tpl1',
+          flowId: 'f1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: 'nuevo',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+      ).called(1),
+    );
+
+    blocTest<TriggersBloc, TriggersState>(
+      'AddRequested 422 → MutationFailed(snap, Invalid) — lista se preserva',
+      build: () {
+        when(
+          () => repo.createTrigger(
+            templateId: any(named: 'templateId'),
+            flowId: any(named: 'flowId'),
+            triggerType: any(named: 'triggerType'),
+            matchType: any(named: 'matchType'),
+            keyword: any(named: 'keyword'),
+            labelId: any(named: 'labelId'),
+            labelAction: any(named: 'labelAction'),
+            scope: any(named: 'scope'),
+            isActive: any(named: 'isActive'),
+          ),
+        ).thenThrow(const TriggersInvalidFailure());
+        return TriggersBloc(repo: repo, templateId: 'tpl1');
+      },
+      seed: () => TriggersLoaded(<Trigger>[_text()]),
+      act: (bloc) => bloc.add(
+        const TriggersAddRequested(
+          flowId: 'f1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: '',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+      ),
+      expect: () => <TriggersState>[
+        TriggersMutating(<Trigger>[_text()]),
+        TriggersMutationFailed(<Trigger>[
+          _text(),
+        ], const TriggersInvalidFailure()),
+      ],
+    );
+
+    blocTest<TriggersBloc, TriggersState>(
+      'UpdateRequested ok → Mutating → Loading → Loaded(refrescada)',
+      build: () {
+        when(
+          () => repo.listTriggers('tpl1'),
+        ).thenAnswer((_) async => <Trigger>[_text(keyword: 'editado')]);
+        when(
+          () => repo.updateTrigger(
+            triggerId: any(named: 'triggerId'),
+            triggerType: any(named: 'triggerType'),
+            matchType: any(named: 'matchType'),
+            keyword: any(named: 'keyword'),
+            labelId: any(named: 'labelId'),
+            labelAction: any(named: 'labelAction'),
+            scope: any(named: 'scope'),
+            isActive: any(named: 'isActive'),
+          ),
+        ).thenAnswer((_) async => _text(keyword: 'editado'));
+        return TriggersBloc(repo: repo, templateId: 'tpl1');
+      },
+      seed: () => TriggersLoaded(<Trigger>[_text()]),
+      act: (bloc) => bloc.add(
+        const TriggersUpdateRequested(
+          triggerId: 't1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: 'editado',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+      ),
+      expect: () => <TriggersState>[
+        TriggersMutating(<Trigger>[_text()]),
+        const TriggersLoading(),
+        TriggersLoaded(<Trigger>[_text(keyword: 'editado')]),
+      ],
+    );
+
+    blocTest<TriggersBloc, TriggersState>(
+      'UpdateRequested 404 → MutationFailed(snap, NotFound)',
+      build: () {
+        when(
+          () => repo.updateTrigger(
+            triggerId: any(named: 'triggerId'),
+            triggerType: any(named: 'triggerType'),
+            matchType: any(named: 'matchType'),
+            keyword: any(named: 'keyword'),
+            labelId: any(named: 'labelId'),
+            labelAction: any(named: 'labelAction'),
+            scope: any(named: 'scope'),
+            isActive: any(named: 'isActive'),
+          ),
+        ).thenThrow(const TriggersNotFoundFailure());
+        return TriggersBloc(repo: repo, templateId: 'tpl1');
+      },
+      seed: () => TriggersLoaded(<Trigger>[_text()]),
+      act: (bloc) => bloc.add(
+        const TriggersUpdateRequested(
+          triggerId: 't1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: 'x',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+      ),
+      expect: () => <TriggersState>[
+        TriggersMutating(<Trigger>[_text()]),
+        TriggersMutationFailed(<Trigger>[
+          _text(),
+        ], const TriggersNotFoundFailure()),
+      ],
+    );
+
+    blocTest<TriggersBloc, TriggersState>(
+      'DeleteRequested ok → Mutating → Loading → Loaded(sin el item)',
+      build: () {
+        when(
+          () => repo.listTriggers('tpl1'),
+        ).thenAnswer((_) async => <Trigger>[_label()]);
+        when(() => repo.deleteTrigger('t1')).thenAnswer((_) async {});
+        return TriggersBloc(repo: repo, templateId: 'tpl1');
+      },
+      seed: () => TriggersLoaded(<Trigger>[_text(), _label()]),
+      act: (bloc) => bloc.add(const TriggersDeleteRequested(triggerId: 't1')),
+      expect: () => <TriggersState>[
+        TriggersMutating(<Trigger>[_text(), _label()]),
+        const TriggersLoading(),
+        TriggersLoaded(<Trigger>[_label()]),
+      ],
+      verify: (_) => verify(() => repo.deleteTrigger('t1')).called(1),
+    );
+
+    blocTest<TriggersBloc, TriggersState>(
+      'AddRequested desde Loading se ignora silenciosamente',
+      build: () => TriggersBloc(repo: repo, templateId: 'tpl1'),
+      // Estado inicial = Loading; no seed.
+      act: (bloc) => bloc.add(
+        const TriggersAddRequested(
+          flowId: 'f1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: 'x',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+      ),
+      expect: () => const <TriggersState>[],
+      verify: (_) {
+        verifyNever(
+          () => repo.createTrigger(
+            templateId: any(named: 'templateId'),
+            flowId: any(named: 'flowId'),
+            triggerType: any(named: 'triggerType'),
+            matchType: any(named: 'matchType'),
+            keyword: any(named: 'keyword'),
+            labelId: any(named: 'labelId'),
+            labelAction: any(named: 'labelAction'),
+            scope: any(named: 'scope'),
+            isActive: any(named: 'isActive'),
+          ),
+        );
+      },
+    );
+
+    blocTest<TriggersBloc, TriggersState>(
+      'UpdateRequested desde MutationFailed reusa el snapshot ahí guardado',
+      build: () {
+        when(
+          () => repo.listTriggers('tpl1'),
+        ).thenAnswer((_) async => <Trigger>[_text(keyword: 'reintento')]);
+        when(
+          () => repo.updateTrigger(
+            triggerId: any(named: 'triggerId'),
+            triggerType: any(named: 'triggerType'),
+            matchType: any(named: 'matchType'),
+            keyword: any(named: 'keyword'),
+            labelId: any(named: 'labelId'),
+            labelAction: any(named: 'labelAction'),
+            scope: any(named: 'scope'),
+            isActive: any(named: 'isActive'),
+          ),
+        ).thenAnswer((_) async => _text(keyword: 'reintento'));
+        return TriggersBloc(repo: repo, templateId: 'tpl1');
+      },
+      seed: () => TriggersMutationFailed(<Trigger>[
+        _text(),
+      ], const TriggersInvalidFailure()),
+      act: (bloc) => bloc.add(
+        const TriggersUpdateRequested(
+          triggerId: 't1',
+          triggerType: TriggerType.text,
+          matchType: MatchType.exact,
+          keyword: 'reintento',
+          labelId: '',
+          labelAction: null,
+          scope: TriggerScope.both,
+          isActive: true,
+        ),
+      ),
+      expect: () => <TriggersState>[
+        TriggersMutating(<Trigger>[_text()]),
+        const TriggersLoading(),
+        TriggersLoaded(<Trigger>[_text(keyword: 'reintento')]),
       ],
     );
   });

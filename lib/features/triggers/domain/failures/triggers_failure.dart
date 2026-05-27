@@ -49,3 +49,14 @@ final class TriggersServerFailure extends TriggersFailure {
 final class UnknownTriggersFailure extends TriggersFailure {
   const UnknownTriggersFailure();
 }
+
+/// 422 contra mutaciones de trigger (`POST /triggers`, `PUT /triggers/:id`):
+/// el body rompió la validación del dominio del backend. Cubre ambos
+/// `ErrInvalidTrigger` (campos incoherentes con el modo TEXT/LABEL, scope
+/// inválido, keyword vacío en TEXT, labelId vacío en LABEL, etc.) y
+/// `ErrInvalidRegex` (matchType=REGEX con sintaxis que no compila o que
+/// el guard anti-ReDoS rechaza). El backend devuelve mismo status para
+/// ambos; la discriminación de copy ocurre en el sheet de edición.
+final class TriggersInvalidFailure extends TriggersFailure {
+  const TriggersInvalidFailure();
+}

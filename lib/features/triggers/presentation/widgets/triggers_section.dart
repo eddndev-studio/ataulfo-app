@@ -9,6 +9,7 @@ import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../domain/entities/trigger.dart';
 import '../../domain/failures/triggers_failure.dart';
 import '../bloc/triggers_bloc.dart';
+import 'trigger_edit_sheet.dart';
 
 /// Sección read-only de Disparadores embebida en `TemplateDetailPage`.
 ///
@@ -38,10 +39,44 @@ class TriggersSection extends StatelessWidget {
           ),
         ),
         TriggersLoaded(triggers: final ts) => _TriggersList(items: ts),
+        // Mutating preserva la lista visible mientras corre la mutación
+        // — el sheet abierto ya muestra su propio spinner. La sección no
+        // refleja el in-flight para no oscurecer la página entera.
+        TriggersMutating(triggers: final ts) => _TriggersList(items: ts),
+        // MutationFailed también preserva la lista; el error se propaga
+        // al sheet vía el BlocListener que ahí escucha. Si no hay sheet
+        // abierto (caso raro: la mutación cerró el sheet antes del
+        // failure), la sección queda muda — la lista vigente sigue ahí.
+        TriggersMutationFailed(triggers: final ts) => _TriggersList(items: ts),
         TriggersFailed(failure: final f) => _TriggersFailedView(failure: f),
       },
     );
   }
+}
+
+/// Monta el sheet de creación/edición de Trigger. Pasa instancias
+/// explícitas de [TriggersBloc] y [FlowsBloc] al sub-tree del modal
+/// (showModalBottomSheet crea un context que no hereda de los
+/// BlocProviders del padre).
+void _openTriggerSheet(BuildContext context, {Trigger? editing}) {
+  final triggersBloc = context.read<TriggersBloc>();
+  final flowsBloc = context.read<FlowsBloc>();
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<TriggersBloc>.value(value: triggersBloc),
+        BlocProvider<FlowsBloc>.value(value: flowsBloc),
+      ],
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: TriggerEditSheet(editing: editing),
+      ),
+    ),
+  );
 }
 
 class _TriggersList extends StatelessWidget {
@@ -51,14 +86,29 @@ class _TriggersList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final addButton = Align(
+      alignment: Alignment.centerLeft,
+      child: AppButton.text(
+        key: const Key('triggers.add_button'),
+        label: '+ Disparador',
+        onPressed: () => _openTriggerSheet(context),
+      ),
+    );
     if (items.isEmpty) {
-      return Text(
-        'Esta plantilla aún no tiene disparadores.',
-        key: const Key('triggers.empty'),
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.text2,
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Esta plantilla aún no tiene disparadores.',
+            key: const Key('triggers.empty'),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppTokens.text2,
+            ),
+          ),
+          const SizedBox(height: AppTokens.sp2),
+          addButton,
+        ],
       );
     }
     return BlocBuilder<FlowsBloc, FlowsState>(
@@ -68,7 +118,16 @@ class _TriggersList extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             for (final t in items)
-              _TriggerRow(trigger: t, resolvedFlowName: flowsById[t.flowId]),
+              InkWell(
+                key: Key('triggers.row.${t.id}.tap'),
+                onTap: () => _openTriggerSheet(context, editing: t),
+                child: _TriggerRow(
+                  trigger: t,
+                  resolvedFlowName: flowsById[t.flowId],
+                ),
+              ),
+            const SizedBox(height: AppTokens.sp2),
+            addButton,
           ],
         );
       },

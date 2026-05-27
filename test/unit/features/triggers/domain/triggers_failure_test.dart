@@ -11,6 +11,7 @@ void main() {
         TriggersNotFoundFailure(),
         TriggersServerFailure(),
         UnknownTriggersFailure(),
+        TriggersInvalidFailure(),
       ];
       for (final f in all) {
         expect(f, isA<TriggersFailure>());
@@ -26,7 +27,9 @@ void main() {
         TriggersNotFoundFailure() => 'notfound',
         TriggersServerFailure() => 'server',
         UnknownTriggersFailure() => 'unknown',
+        TriggersInvalidFailure() => 'invalid',
       };
+      expect(label(const TriggersInvalidFailure()), 'invalid');
       expect(label(const TriggersNetworkFailure()), 'net');
       expect(label(const TriggersNotFoundFailure()), 'notfound');
       expect(label(const UnknownTriggersFailure()), 'unknown');
