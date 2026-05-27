@@ -10,6 +10,9 @@ void main() {
         name: 'Bienvenida',
         isActive: true,
         version: 3,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
       );
       const b = Flow(
         id: 'f1',
@@ -17,6 +20,9 @@ void main() {
         name: 'Bienvenida',
         isActive: true,
         version: 3,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
       );
 
       expect(a, equals(b));
@@ -30,6 +36,9 @@ void main() {
         name: 'Bienvenida',
         isActive: true,
         version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
       );
       const b = Flow(
         id: 'f1',
@@ -37,6 +46,9 @@ void main() {
         name: 'Despedida',
         isActive: true,
         version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
       );
 
       expect(a, isNot(equals(b)));
@@ -49,6 +61,9 @@ void main() {
         name: 'Bienvenida',
         isActive: true,
         version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
       );
       const b = Flow(
         id: 'f1',
@@ -56,6 +71,9 @@ void main() {
         name: 'Bienvenida',
         isActive: false,
         version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
       );
 
       expect(a, isNot(equals(b)));

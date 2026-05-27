@@ -26,6 +26,9 @@ void main() {
             name: 'Bienvenida',
             isActive: true,
             version: 5,
+            cooldownMs: 0,
+            usageLimit: 0,
+            excludesFlows: <String>[],
           ),
         );
       },

@@ -503,6 +503,9 @@ class _FlowSelector extends StatelessWidget {
                         name: ed.flowId,
                         isActive: true,
                         version: 1,
+                        cooldownMs: 0,
+                        usageLimit: 0,
+                        excludesFlows: const <String>[],
                       ),
                     )
                     .name

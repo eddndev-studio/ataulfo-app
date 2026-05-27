@@ -11,6 +11,9 @@ class FlowsMapper {
     name: resp.name,
     isActive: resp.isActive,
     version: resp.version,
+    cooldownMs: 0,
+    usageLimit: 0,
+    excludesFlows: const <String>[],
   );
 
   /// Despliega el wrapper `{items:[...]}` a `List<Flow>` preservando el

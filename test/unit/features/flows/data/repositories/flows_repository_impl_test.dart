@@ -31,6 +31,9 @@ void main() {
             name: 'Bienvenida',
             isActive: true,
             version: 1,
+            cooldownMs: 0,
+            usageLimit: 0,
+            excludesFlows: <String>[],
           ),
         ],
       );
@@ -63,6 +66,9 @@ void main() {
           name: 'Bienvenida',
           isActive: true,
           version: 1,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: <String>[],
         ),
       );
 
@@ -128,6 +134,9 @@ void main() {
           name: 'X',
           isActive: true,
           version: 1,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: <String>[],
         ),
       );
       final out = await repo.createFlow(templateId: 't1', name: 'X');

@@ -14,6 +14,9 @@ const _flow = Flow(
   name: 'Bienvenida',
   isActive: true,
   version: 1,
+  cooldownMs: 0,
+  usageLimit: 0,
+  excludesFlows: <String>[],
 );
 
 void main() {

@@ -26,6 +26,9 @@ const _flow = flows.Flow(
   name: 'Bienvenida',
   isActive: true,
   version: 3,
+  cooldownMs: 0,
+  usageLimit: 0,
+  excludesFlows: <String>[],
 );
 
 void main() {
@@ -90,6 +93,9 @@ void main() {
         name: 'Off',
         isActive: false,
         version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
       );
       when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(paused));
       when(

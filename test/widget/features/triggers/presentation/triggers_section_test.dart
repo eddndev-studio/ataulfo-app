@@ -65,6 +65,9 @@ fdom.Flow _flow({String id = 'f1', String name = 'Bienvenida'}) => fdom.Flow(
   name: name,
   isActive: true,
   version: 1,
+  cooldownMs: 0,
+  usageLimit: 0,
+  excludesFlows: const <String>[],
 );
 
 Widget _harness({
