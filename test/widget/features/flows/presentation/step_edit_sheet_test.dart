@@ -500,5 +500,32 @@ void main() {
         expect(ev.metadataJson, contains('18:00'));
       },
     );
+
+    testWidgets(
+      'MutationFailed con InvalidStepFailure en modo CT muestra copy '
+      'específico de horario/destinos',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          const FlowStepsMutationFailed(
+            <fdom.Step>[],
+            FlowsInvalidStepFailure(),
+          ),
+        );
+        await pumpHost(tester);
+        await tester.tap(
+          find.byKey(const Key('step_edit.type.conditionalTime')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('step_edit.error.invalid_step.conditional')),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Revisa horario o destinos del condicional.'),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }
