@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/core/design/tokens.dart';
 import 'package:agentic/core/design/widgets/app_button.dart';
@@ -206,9 +208,7 @@ void main() {
       'al popear la ruta encima del listado, dispatcha TemplatesRefreshRequested',
       (tester) async {
         final observer = RouteObserver<PageRoute<dynamic>>();
-        when(
-          () => bloc.state,
-        ).thenReturn(
+        when(() => bloc.state).thenReturn(
           const TemplatesLoaded(items: <Template>[_t1], isRefreshing: false),
         );
 
@@ -218,9 +218,7 @@ void main() {
             navigatorObservers: <NavigatorObserver>[observer],
             home: BlocProvider<TemplatesBloc>.value(
               value: bloc,
-              child: Scaffold(
-                body: TemplatesListPage(routeObserver: observer),
-              ),
+              child: Scaffold(body: TemplatesListPage(routeObserver: observer)),
             ),
           ),
         );
@@ -233,9 +231,11 @@ void main() {
         // /templates/:id/edit). El observer notifica didPushNext al
         // listado, pero ahí no hacemos nada.
         final nav = tester.state<NavigatorState>(find.byType(Navigator));
-        nav.push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+        unawaited(
+          nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+            ),
           ),
         );
         await tester.pumpAndSettle();
@@ -245,18 +245,14 @@ void main() {
         nav.pop();
         await tester.pumpAndSettle();
 
-        verify(
-          () => bloc.add(const TemplatesRefreshRequested()),
-        ).called(1);
+        verify(() => bloc.add(const TemplatesRefreshRequested())).called(1);
       },
     );
 
     testWidgets(
       'sin routeObserver (default null), no observa ni dispatcha — composición opcional',
       (tester) async {
-        when(
-          () => bloc.state,
-        ).thenReturn(
+        when(() => bloc.state).thenReturn(
           const TemplatesLoaded(items: <Template>[_t1], isRefreshing: false),
         );
 
@@ -264,9 +260,11 @@ void main() {
         // host() construye TemplatesListPage sin routeObserver.
 
         final nav = tester.state<NavigatorState>(find.byType(Navigator));
-        nav.push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+        unawaited(
+          nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+            ),
           ),
         );
         await tester.pumpAndSettle();

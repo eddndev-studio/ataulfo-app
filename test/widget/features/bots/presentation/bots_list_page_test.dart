@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/core/design/tokens.dart';
 import 'package:agentic/core/design/widgets/app_avatar.dart';
@@ -228,9 +230,9 @@ void main() {
       'al popear la ruta encima del listado, dispatcha BotsRefreshRequested',
       (tester) async {
         final observer = RouteObserver<PageRoute<dynamic>>();
-        when(() => bloc.state).thenReturn(
-          const BotsLoaded(items: <Bot>[_b1], isRefreshing: false),
-        );
+        when(
+          () => bloc.state,
+        ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
 
         await tester.pumpWidget(
           MaterialApp(
@@ -245,9 +247,11 @@ void main() {
         verifyNever(() => bloc.add(const BotsRefreshRequested()));
 
         final nav = tester.state<NavigatorState>(find.byType(Navigator));
-        nav.push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+        unawaited(
+          nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+            ),
           ),
         );
         await tester.pumpAndSettle();
@@ -261,16 +265,18 @@ void main() {
     testWidgets(
       'sin routeObserver (default null), no observa ni dispatcha — composición opcional',
       (tester) async {
-        when(() => bloc.state).thenReturn(
-          const BotsLoaded(items: <Bot>[_b1], isRefreshing: false),
-        );
+        when(
+          () => bloc.state,
+        ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
 
         await tester.pumpWidget(host());
 
         final nav = tester.state<NavigatorState>(find.byType(Navigator));
-        nav.push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+        unawaited(
+          nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('Sub-ruta')),
+            ),
           ),
         );
         await tester.pumpAndSettle();
