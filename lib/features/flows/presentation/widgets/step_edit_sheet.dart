@@ -17,6 +17,7 @@ import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_steps_bloc.dart';
+import 'conditional_time_form.dart';
 import 'step_type_label.dart';
 
 /// Modal sheet de creación/edición de un step TEXT (S11 F5a). Cuenta
@@ -78,6 +79,11 @@ class _StepEditSheetState extends State<StepEditSheet> {
   late bool _aiOnly;
   bool _didSubmit = false;
 
+  /// Último `metadataJson` emitido por el form CONDITIONAL_TIME.
+  /// `null` = el form está inválido localmente (días vacíos, from>=to,
+  /// etc.). Solo aplica cuando `_type == conditionalTime`.
+  String? _ctMetadataJson;
+
   @override
   void initState() {
     super.initState();
@@ -103,7 +109,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
     super.dispose();
   }
 
-  bool get _isMultimedia => _type != fdom.StepType.text;
+  bool get _isMultimedia =>
+      _type != fdom.StepType.text && _type != fdom.StepType.conditionalTime;
+
+  bool get _isConditionalTime => _type == fdom.StepType.conditionalTime;
+
+  List<int> _availableOrdersFromState(FlowStepsState s) =>
+      _availableOrdersFromStateImpl(s, widget.editing?.id);
 
   Future<void> _confirmDelete() async {
     final ed = widget.editing;
@@ -139,7 +151,10 @@ class _StepEditSheetState extends State<StepEditSheet> {
   /// Submit es válido si el campo "principal" del tipo no está vacío:
   /// para TEXT, `content`; para multimedia, `mediaRef`. El campo
   /// secundario (caption en multimedia) puede quedar vacío.
+  /// CONDITIONAL_TIME válida cuando el form local emitió un
+  /// `metadataJson` no-null (sin días vacíos, from<to, etc.).
   bool get _isSubmittable {
+    if (_isConditionalTime) return _ctMetadataJson != null;
     if (_isMultimedia) return _mediaCtrl.text.trim().isNotEmpty;
     return _contentCtrl.text.trim().isNotEmpty;
   }
@@ -155,10 +170,11 @@ class _StepEditSheetState extends State<StepEditSheet> {
         FlowStepsAddRequested(
           type: _type,
           mediaRef: _isMultimedia ? mediaRef : '',
-          content: content,
+          content: _isConditionalTime ? '' : content,
           delayMs: _delayMs,
           jitterPct: _jitterPct,
           aiOnly: _aiOnly,
+          metadataJson: _isConditionalTime ? _ctMetadataJson : null,
         ),
       );
       return;
@@ -255,33 +271,44 @@ class _StepEditSheetState extends State<StepEditSheet> {
                       onSelected: (t) => setState(() => _type = t),
                     ),
                   ],
-                  if (_isMultimedia) ...<Widget>[
+                  if (_isConditionalTime) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    ConditionalTimeForm(
+                      key: const Key('step_edit.ct_form'),
+                      availableStepOrders: _availableOrdersFromState(state),
+                      enabled: !isMutating,
+                      onChanged: (json) =>
+                          setState(() => _ctMetadataJson = json),
+                    ),
+                  ] else ...<Widget>[
+                    if (_isMultimedia) ...<Widget>[
+                      const SizedBox(height: AppTokens.sp4),
+                      AppTextField(
+                        key: const Key('step_edit.media_url'),
+                        label: 'URL o id del recurso',
+                        hint: 'https://… o id opaco del archivo subido',
+                        controller: _mediaCtrl,
+                        // En edit el mediaRef es read-only por la misma
+                        // razón que el picker se oculta: cambiar el recurso
+                        // multimedia equivale a otro step. Edición de
+                        // media (replace de archivo) entra cuando S16
+                        // (media-storage) y file pickers aterricen.
+                        enabled: !isMutating && widget.editing == null,
+                      ),
+                    ],
                     const SizedBox(height: AppTokens.sp4),
                     AppTextField(
-                      key: const Key('step_edit.media_url'),
-                      label: 'URL o id del recurso',
-                      hint: 'https://… o id opaco del archivo subido',
-                      controller: _mediaCtrl,
-                      // En edit el mediaRef es read-only por la misma
-                      // razón que el picker se oculta: cambiar el recurso
-                      // multimedia equivale a otro step. Edición de
-                      // media (replace de archivo) entra cuando S16
-                      // (media-storage) y file pickers aterricen.
-                      enabled: !isMutating && widget.editing == null,
+                      key: const Key('step_edit.content'),
+                      label: _isMultimedia ? 'Caption (opcional)' : 'Mensaje',
+                      hint: _isMultimedia
+                          ? 'Texto que acompaña al recurso (opcional)'
+                          : 'Lo que el bot enviará al usuario',
+                      controller: _contentCtrl,
+                      enabled: !isMutating,
+                      autofocus: !_isMultimedia,
+                      maxLines: 4,
                     ),
                   ],
-                  const SizedBox(height: AppTokens.sp4),
-                  AppTextField(
-                    key: const Key('step_edit.content'),
-                    label: _isMultimedia ? 'Caption (opcional)' : 'Mensaje',
-                    hint: _isMultimedia
-                        ? 'Texto que acompaña al recurso (opcional)'
-                        : 'Lo que el bot enviará al usuario',
-                    controller: _contentCtrl,
-                    enabled: !isMutating,
-                    autofocus: !_isMultimedia,
-                    maxLines: 4,
-                  ),
                   const SizedBox(height: AppTokens.sp4),
                   _SliderField(
                     sliderKey: const Key('step_edit.delay_slider'),
@@ -491,6 +518,28 @@ class _TypePicker extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Extrae los `order` de los steps vigentes del bloc state para los
+/// dropdowns `onMatch`/`onElse` del form CT. Excluye el step propio
+/// cuando se está editando (auto-referencia es un loop trivial).
+/// Loading/Failed iniciales ⇒ lista vacía (los dropdowns muestran
+/// "Sin pasos destino disponibles" hasta que aterricen los datos).
+List<int> _availableOrdersFromStateImpl(FlowStepsState s, String? editingId) {
+  final List<fdom.Step> steps;
+  if (s is FlowStepsLoaded) {
+    steps = s.steps;
+  } else if (s is FlowStepsMutating) {
+    steps = s.steps;
+  } else if (s is FlowStepsMutationFailed) {
+    steps = s.steps;
+  } else {
+    return const <int>[];
+  }
+  return steps
+      .where((st) => st.id != editingId)
+      .map((st) => st.order)
+      .toList();
 }
 
 /// Convierte ms a un label legible. <60s muestra "Xs"; 60s+ muestra
