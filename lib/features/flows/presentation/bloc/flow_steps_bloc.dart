@@ -62,6 +62,7 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
         delayMs: event.delayMs,
         jitterPct: event.jitterPct,
         aiOnly: event.aiOnly,
+        metadataJson: event.metadataJson,
       );
     });
   }
@@ -77,6 +78,7 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
         delayMs: event.delayMs,
         jitterPct: event.jitterPct,
         aiOnly: event.aiOnly,
+        metadataJson: event.metadataJson,
       );
     });
   }
@@ -188,6 +190,7 @@ class FlowStepsAddRequested extends FlowStepsEvent {
     required this.aiOnly,
     this.type = fdom.StepType.text,
     this.mediaRef = '',
+    this.metadataJson,
   });
 
   final fdom.StepType type;
@@ -197,6 +200,11 @@ class FlowStepsAddRequested extends FlowStepsEvent {
   final int jitterPct;
   final bool aiOnly;
 
+  /// Shape literal de `Step.metadata` para el step nuevo. Hoy lo necesita
+  /// solo CONDITIONAL_TIME (ventanas); null para los otros tipos —el
+  /// backend les pone `{}` por defecto.
+  final String? metadataJson;
+
   @override
   bool operator ==(Object other) =>
       other is FlowStepsAddRequested &&
@@ -205,11 +213,19 @@ class FlowStepsAddRequested extends FlowStepsEvent {
       other.content == content &&
       other.delayMs == delayMs &&
       other.jitterPct == jitterPct &&
-      other.aiOnly == aiOnly;
+      other.aiOnly == aiOnly &&
+      other.metadataJson == metadataJson;
 
   @override
-  int get hashCode =>
-      Object.hash(type, mediaRef, content, delayMs, jitterPct, aiOnly);
+  int get hashCode => Object.hash(
+    type,
+    mediaRef,
+    content,
+    delayMs,
+    jitterPct,
+    aiOnly,
+    metadataJson,
+  );
 }
 
 /// Pide editar un step (partial update). Cualquier campo `null` se omite
@@ -223,6 +239,7 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
     this.delayMs,
     this.jitterPct,
     this.aiOnly,
+    this.metadataJson,
   });
 
   final String stepId;
@@ -231,6 +248,10 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
   final int? jitterPct;
   final bool? aiOnly;
 
+  /// Nuevo shape de `Step.metadata` para el step. Null = preservar el
+  /// metadata actual del backend (omitido del PATCH).
+  final String? metadataJson;
+
   @override
   bool operator ==(Object other) =>
       other is FlowStepsUpdateRequested &&
@@ -238,10 +259,12 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
       other.content == content &&
       other.delayMs == delayMs &&
       other.jitterPct == jitterPct &&
-      other.aiOnly == aiOnly;
+      other.aiOnly == aiOnly &&
+      other.metadataJson == metadataJson;
 
   @override
-  int get hashCode => Object.hash(stepId, content, delayMs, jitterPct, aiOnly);
+  int get hashCode =>
+      Object.hash(stepId, content, delayMs, jitterPct, aiOnly, metadataJson);
 }
 
 /// Pide eliminar un step. La operación es idempotente en el backend,

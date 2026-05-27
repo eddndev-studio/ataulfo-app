@@ -31,11 +31,11 @@ void main() {
     when(() => bloc.state).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
   });
 
-  // Surface 800x600 (default de flutter_test) deja el submit fuera del
-  // viewport tras añadir el picker de tipo en F6. `pumpHost` agranda el
-  // viewport para que tap(submit) conecte y restaura al final del test.
+  // El sheet con todos los controles + form CONDITIONAL_TIME (chip
+  // picker + ventanas con time pickers + dropdowns) supera el viewport
+  // default de flutter_test (800x600). `pumpHost` agranda y restaura.
   Future<void> pumpHost(WidgetTester tester, {fdom.Step? editing}) async {
-    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -168,7 +168,8 @@ void main() {
 
   group('StepEditSheet (Add mode · multimedia)', () {
     testWidgets(
-      'renderiza picker con 7 chips (text + 6 multimedia); default TEXT',
+      'renderiza picker con 8 chips (text + 6 multimedia + conditionalTime); '
+      'default TEXT',
       (tester) async {
         await pumpHost(tester);
 
@@ -180,6 +181,7 @@ void main() {
           'audio',
           'ptt',
           'sticker',
+          'conditionalTime',
         ]) {
           expect(
             find.byKey(Key('step_edit.type.$id')),
@@ -196,6 +198,10 @@ void main() {
           find.byKey(const Key('step_edit.type.image')),
         );
         expect(imageChip.selected, isFalse);
+        final ctChip = tester.widget<ChoiceChip>(
+          find.byKey(const Key('step_edit.type.conditionalTime')),
+        );
+        expect(ctChip.selected, isFalse);
       },
     );
 
@@ -402,6 +408,7 @@ void main() {
         'audio',
         'ptt',
         'sticker',
+        'conditionalTime',
       ]) {
         expect(
           find.byKey(Key('step_edit.type.$id')),
@@ -444,5 +451,146 @@ void main() {
         ).called(1);
       },
     );
+  });
+
+  group('StepEditSheet (Add mode · conditionalTime)', () {
+    testWidgets(
+      'pick chip Condicional muestra el form CT y oculta content/media_url',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.tap(
+          find.byKey(const Key('step_edit.type.conditionalTime')),
+        );
+        await tester.pumpAndSettle();
+
+        // El form CT está presente.
+        expect(find.byKey(const Key('ct_form.tz_dropdown')), findsOneWidget);
+        // content y media_url están ocultos.
+        expect(find.byKey(const Key('step_edit.content')), findsNothing);
+        expect(find.byKey(const Key('step_edit.media_url')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'submit con seed default dispatcha AddRequested(conditionalTime, '
+      'metadataJson)',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.tap(
+          find.byKey(const Key('step_edit.type.conditionalTime')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        // Captura el evento despachado y verifica el shape.
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        expect(captured, hasLength(1));
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.type, fdom.StepType.conditionalTime);
+        expect(ev.content, '');
+        expect(ev.mediaRef, '');
+        expect(ev.metadataJson, isNotNull);
+        // Seed default: L-V 09-18 + tz México + onMatch 0/onElse 1.
+        expect(ev.metadataJson, contains('America/Mexico_City'));
+        expect(ev.metadataJson, contains('09:00'));
+        expect(ev.metadataJson, contains('18:00'));
+      },
+    );
+
+    testWidgets('MutationFailed con InvalidStepFailure en modo CT muestra copy '
+        'específico de horario/destinos', (tester) async {
+      when(() => bloc.state).thenReturn(
+        const FlowStepsMutationFailed(<fdom.Step>[], FlowsInvalidStepFailure()),
+      );
+      await pumpHost(tester);
+      await tester.tap(find.byKey(const Key('step_edit.type.conditionalTime')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('step_edit.error.invalid_step.conditional')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Revisa horario o destinos del condicional.'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('StepEditSheet (Edit mode · conditionalTime)', () {
+    const ctStep = fdom.Step(
+      id: 's-ct',
+      flowId: 'f1',
+      type: fdom.StepType.conditionalTime,
+      order: 2,
+      content: '',
+      mediaRef: '',
+      metadataJson:
+          '{"tz":"UTC","windows":[{"days":[1,2],"from":"08:00",'
+          '"to":"12:00"}],"on_match_order":0,"on_else_order":1}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+
+    testWidgets(
+      'edit CT hidrata el form con metadataJson del step (tz UTC visible)',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
+        await pumpHost(tester, editing: ctStep);
+
+        // El form CT está montado (no el content/media_url).
+        expect(find.byKey(const Key('ct_form.tz_dropdown')), findsOneWidget);
+        // tz dropdown muestra "UTC" como selección actual.
+        expect(find.text('UTC'), findsWidgets);
+      },
+    );
+
+    testWidgets('edit CT sin cambios → submit es no-op', (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
+      await pumpHost(tester, editing: ctStep);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      verifyNever(() => bloc.add(any()));
+    });
+
+    testWidgets('edit CT con cambio (deselect día) → submit dispatcha '
+        'UpdateRequested(metadataJson)', (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
+      await pumpHost(tester, editing: ctStep);
+      await tester.pumpAndSettle();
+
+      // El step original tiene days [1,2] (Lun+Mar). uiIndex 0=Lun.
+      // Destildo Lunes — quedan solo Martes (wireDay 2).
+      await tester.tap(find.byKey(const Key('ct_form.window.0.day.0')));
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      final captured = verify(() => bloc.add(captureAny())).captured;
+      expect(captured, hasLength(1));
+      final ev = captured.single as FlowStepsUpdateRequested;
+      expect(ev.stepId, 's-ct');
+      expect(ev.metadataJson, isNotNull);
+      // Después del cambio, days = [2] solamente.
+      expect(ev.metadataJson, contains('"days":[2]'));
+      // Otros campos no van al PATCH.
+      expect(ev.content, isNull);
+      expect(ev.delayMs, isNull);
+    });
   });
 }

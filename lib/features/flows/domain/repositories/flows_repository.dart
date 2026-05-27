@@ -36,6 +36,7 @@ abstract interface class FlowsRepository {
     required int delayMs,
     required int jitterPct,
     required bool aiOnly,
+    String? metadataJson,
   });
 
   /// Edita un Step (partial update). Campos `null` se omiten — el
@@ -47,6 +48,10 @@ abstract interface class FlowsRepository {
   /// reorder es N×PATCH cambiando solo `order`. Sin UNIQUE en
   /// `(flow_id, order)`, no hace falta two-pass; cada patch viaja
   /// independiente y el listado posterior se ordena por `order` ASC.
+  ///
+  /// `metadataJson` viaja con el shape literal de `Step.metadata`. Hoy
+  /// solo CONDITIONAL_TIME lo necesita (ventanas horarias); otros tipos
+  /// no exponen edición de metadata desde la UI.
   Future<fdom.Step> patchStep({
     required String stepId,
     String? content,
@@ -54,6 +59,7 @@ abstract interface class FlowsRepository {
     int? jitterPct,
     bool? aiOnly,
     int? order,
+    String? metadataJson,
   });
 
   /// Elimina un Step. Operación idempotente: si el step no existe, no

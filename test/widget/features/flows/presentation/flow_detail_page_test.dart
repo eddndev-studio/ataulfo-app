@@ -213,6 +213,85 @@ void main() {
   );
 
   testWidgets(
+    'CONDITIONAL_TIME card muestra TZ, días/horario, y destinos onMatch/onElse',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'Hola',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 'ct',
+            flowId: 'f1',
+            type: fdom.StepType.conditionalTime,
+            order: 1,
+            content: '',
+            mediaRef: '',
+            metadataJson:
+                '{"tz":"America/Mexico_City","windows":[{"days":[1,2,3,4,5],'
+                '"from":"09:00","to":"18:00"}],"on_match_order":2,'
+                '"on_else_order":3}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      // TZ visible.
+      expect(find.textContaining('America/Mexico_City'), findsOneWidget);
+      // Ventana visible — días L-V (uiIndex 0..4) + 09:00-18:00.
+      expect(find.textContaining('09:00'), findsOneWidget);
+      expect(find.textContaining('18:00'), findsOneWidget);
+      // Destinos: "Paso #3" y "Paso #4" (order+1 humanizado).
+      expect(find.textContaining('Paso #3'), findsOneWidget);
+      expect(find.textContaining('Paso #4'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'CONDITIONAL_TIME con metadataJson corrupto cae al fallback honesto',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 'ct-bad',
+            flowId: 'f1',
+            type: fdom.StepType.conditionalTime,
+            order: 0,
+            content: '',
+            mediaRef: '',
+            metadataJson: '{"tz":"","windows":[]}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('flow_detail.step.ct_corrupt')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'FlowStepsLoading muestra spinner inline en el tab Pasos (header sigue visible)',
     (tester) async {
       when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));

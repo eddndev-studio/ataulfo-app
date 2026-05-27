@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/flow.dart';
@@ -59,6 +61,7 @@ abstract interface class FlowsDatasource {
     required int delayMs,
     required int jitterPct,
     required bool aiOnly,
+    String? metadataJson,
   });
 
   /// `PATCH /steps/:stepId` con body **only-changed**: cualquier campo
@@ -83,6 +86,7 @@ abstract interface class FlowsDatasource {
     int? jitterPct,
     bool? aiOnly,
     int? order,
+    String? metadataJson,
   });
 
   /// `DELETE /steps/:stepId` idempotente. 204 sin body en ambos casos
@@ -200,25 +204,33 @@ class DioFlowsDatasource implements FlowsDatasource {
     required int delayMs,
     required int jitterPct,
     required bool aiOnly,
+    String? metadataJson,
   }) async {
+    final body = <String, dynamic>{
+      'type': type.toWire(),
+      'order': order,
+      'content': content,
+      'mediaRef': mediaRef,
+      'delayMs': delayMs,
+      'jitterPct': jitterPct,
+      'aiOnly': aiOnly,
+    };
+    if (metadataJson != null) {
+      // Wire del backend espera `metadata` como objeto JSON literal
+      // (json.RawMessage). Decodeamos a Map para que dio re-encodee
+      // como object — mandar el string crudo lo encajaría entre comillas.
+      body['metadata'] = jsonDecode(metadataJson);
+    }
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '/flows/$flowId/steps',
-        data: <String, dynamic>{
-          'type': type.toWire(),
-          'order': order,
-          'content': content,
-          'mediaRef': mediaRef,
-          'delayMs': delayMs,
-          'jitterPct': jitterPct,
-          'aiOnly': aiOnly,
-        },
+        data: body,
       );
-      final body = res.data;
-      if (body == null) {
+      final respBody = res.data;
+      if (respBody == null) {
         throw const UnknownFlowsFailure();
       }
-      return StepsMapper.stepRespToEntity(StepResp.fromJson(body));
+      return StepsMapper.stepRespToEntity(StepResp.fromJson(respBody));
     } on FlowsFailure {
       rethrow;
     } on DioException catch (e) {
@@ -288,6 +300,7 @@ class DioFlowsDatasource implements FlowsDatasource {
     int? jitterPct,
     bool? aiOnly,
     int? order,
+    String? metadataJson,
   }) async {
     final body = <String, dynamic>{};
     if (content != null) body['content'] = content;
@@ -295,6 +308,9 @@ class DioFlowsDatasource implements FlowsDatasource {
     if (jitterPct != null) body['jitterPct'] = jitterPct;
     if (aiOnly != null) body['aiOnly'] = aiOnly;
     if (order != null) body['order'] = order;
+    if (metadataJson != null) {
+      body['metadata'] = jsonDecode(metadataJson);
+    }
     try {
       final res = await _dio.patch<Map<String, dynamic>>(
         '/steps/$stepId',

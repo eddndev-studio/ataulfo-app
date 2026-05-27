@@ -562,6 +562,86 @@ void main() {
         });
       },
     );
+
+    test('metadataJson viaja como objeto JSON bajo `metadata`', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/flows/f1/steps'),
+          statusCode: 201,
+          data: stepJson(id: 's-new'),
+        ),
+      );
+
+      await ds.createStep(
+        flowId: 'f1',
+        type: fdom.StepType.conditionalTime,
+        order: 0,
+        content: '',
+        mediaRef: '',
+        delayMs: 0,
+        jitterPct: 0,
+        aiOnly: false,
+        metadataJson:
+            '{"tz":"UTC","windows":[{"days":[1],"from":"09:00",'
+            '"to":"10:00"}],"on_match_order":0,"on_else_order":1}',
+      );
+
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      final body = captured[1] as Map<String, dynamic>;
+      expect(body['type'], 'CONDITIONAL_TIME');
+      final meta = body['metadata'] as Map<String, dynamic>;
+      expect(meta['tz'], 'UTC');
+      expect(meta['on_match_order'], 0);
+    });
+
+    test('sin metadataJson el body NO incluye `metadata`', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/flows/f1/steps'),
+          statusCode: 201,
+          data: stepJson(id: 's-new'),
+        ),
+      );
+
+      await ds.createStep(
+        flowId: 'f1',
+        type: fdom.StepType.text,
+        order: 0,
+        content: 'Hola',
+        mediaRef: '',
+        delayMs: 0,
+        jitterPct: 0,
+        aiOnly: false,
+      );
+
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      final body = captured[1] as Map<String, dynamic>;
+      expect(body.containsKey('metadata'), isFalse);
+    });
   });
 
   group('DioFlowsDatasource.createStep failure mapping', () {
@@ -802,6 +882,79 @@ void main() {
         'jitterPct': 20,
         'aiOnly': true,
       });
+    });
+
+    test(
+      'metadataJson no-null viaja como objeto JSON bajo `metadata`',
+      () async {
+        when(
+          () => dio.patch<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            statusCode: 200,
+            data: stepJson(id: 's1'),
+          ),
+        );
+
+        await ds.patchStep(
+          stepId: 's1',
+          metadataJson:
+              '{"tz":"UTC","windows":[{"days":[1],"from":"09:00",'
+              '"to":"10:00"}],"on_match_order":0,"on_else_order":1}',
+        );
+
+        final captured = verify(
+          () => dio.patch<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        final body = captured[1] as Map<String, dynamic>;
+        expect(body.keys, contains('metadata'));
+        // El wire del backend espera objeto JSON literal, no string —
+        // el datasource decodea el metadataJson para que dio lo
+        // re-encodee como object.
+        final meta = body['metadata'] as Map<String, dynamic>;
+        expect(meta['tz'], 'UTC');
+        expect(meta['on_match_order'], 0);
+        expect(meta['on_else_order'], 1);
+        final windows = meta['windows'] as List<dynamic>;
+        expect(windows, hasLength(1));
+      },
+    );
+
+    test('metadataJson null se omite del body', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          statusCode: 200,
+          data: stepJson(id: 's1'),
+        ),
+      );
+
+      await ds.patchStep(stepId: 's1', content: 'X');
+
+      final captured = verify(
+        () => dio.patch<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      final body = captured[1] as Map<String, dynamic>;
+      expect(body.containsKey('metadata'), isFalse);
     });
   });
 

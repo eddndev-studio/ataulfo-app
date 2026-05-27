@@ -435,6 +435,70 @@ void main() {
       },
     );
 
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested con type=conditionalTime + metadataJson → createStep '
+      'recibe CONDITIONAL_TIME + metadataJson',
+      build: () {
+        const ctRaw =
+            '{"tz":"UTC","windows":[{"days":[1],"from":"09:00",'
+            '"to":"10:00"}],"on_match_order":0,"on_else_order":1}';
+        final ctStep = newStep.copyWith(
+          type: fdom.StepType.conditionalTime,
+          content: '',
+          mediaRef: '',
+          metadataJson: ctRaw,
+        );
+        when(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.conditionalTime,
+            order: 2,
+            content: '',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+            metadataJson: ctRaw,
+          ),
+        ).thenAnswer((_) async => ctStep);
+        when(
+          () => repo.listSteps('f1'),
+        ).thenAnswer((_) async => <fdom.Step>[..._steps, ctStep]);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          type: fdom.StepType.conditionalTime,
+          content: '',
+          mediaRef: '',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+          metadataJson:
+              '{"tz":"UTC","windows":[{"days":[1],"from":"09:00",'
+              '"to":"10:00"}],"on_match_order":0,"on_else_order":1}',
+        ),
+      ),
+      verify: (_) {
+        verify(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.conditionalTime,
+            order: 2,
+            content: '',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+            metadataJson:
+                '{"tz":"UTC","windows":[{"days":[1],"from":"09:00",'
+                '"to":"10:00"}],"on_match_order":0,"on_else_order":1}',
+          ),
+        ).called(1);
+      },
+    );
+
     test('Mutating + MutationFailed value-equality', () {
       const a = FlowStepsMutating(_steps);
       const b = FlowStepsMutating(_steps);
@@ -535,6 +599,39 @@ void main() {
             delayMs: 2000,
             jitterPct: 10,
             aiOnly: true,
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'UpdateRequested con metadataJson propaga al repo',
+      build: () {
+        const ctRaw =
+            '{"tz":"UTC","windows":[{"days":[2],"from":"10:00",'
+            '"to":"11:00"}],"on_match_order":0,"on_else_order":1}';
+        when(
+          () => repo.patchStep(stepId: 's1', metadataJson: ctRaw),
+        ).thenAnswer((_) async => patched);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => afterPatch);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsUpdateRequested(
+          stepId: 's1',
+          metadataJson:
+              '{"tz":"UTC","windows":[{"days":[2],"from":"10:00",'
+              '"to":"11:00"}],"on_match_order":0,"on_else_order":1}',
+        ),
+      ),
+      verify: (_) {
+        verify(
+          () => repo.patchStep(
+            stepId: 's1',
+            metadataJson:
+                '{"tz":"UTC","windows":[{"days":[2],"from":"10:00",'
+                '"to":"11:00"}],"on_match_order":0,"on_else_order":1}',
           ),
         ).called(1);
       },
