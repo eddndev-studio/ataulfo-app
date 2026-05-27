@@ -168,7 +168,8 @@ void main() {
 
   group('StepEditSheet (Add mode · multimedia)', () {
     testWidgets(
-      'renderiza picker con 7 chips (text + 6 multimedia); default TEXT',
+      'renderiza picker con 8 chips (text + 6 multimedia + conditionalTime); '
+      'default TEXT',
       (tester) async {
         await pumpHost(tester);
 
@@ -180,6 +181,7 @@ void main() {
           'audio',
           'ptt',
           'sticker',
+          'conditionalTime',
         ]) {
           expect(
             find.byKey(Key('step_edit.type.$id')),
@@ -196,6 +198,10 @@ void main() {
           find.byKey(const Key('step_edit.type.image')),
         );
         expect(imageChip.selected, isFalse);
+        final ctChip = tester.widget<ChoiceChip>(
+          find.byKey(const Key('step_edit.type.conditionalTime')),
+        );
+        expect(ctChip.selected, isFalse);
       },
     );
 
