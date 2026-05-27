@@ -218,6 +218,51 @@ void main() {
         expect(find.byKey(const Key('step_edit.media_url')), findsNothing);
       },
     );
+
+    testWidgets(
+      'submit multimedia con media_url y caption vacío dispatcha AddRequested',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.tap(find.byKey(const Key('step_edit.type.image')));
+        await tester.pump();
+        await tester.enterText(
+          find.byKey(const Key('step_edit.media_url')),
+          'http://x.png',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const FlowStepsAddRequested(
+              type: fdom.StepType.image,
+              mediaRef: 'http://x.png',
+              content: '',
+              delayMs: 0,
+              jitterPct: 0,
+              aiOnly: false,
+            ),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'submit multimedia sin media_url es no-op (gate del trim)',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.tap(find.byKey(const Key('step_edit.type.image')));
+        await tester.pump();
+        // Sin enterText en media_url
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verifyNever(() => bloc.add(any()));
+      },
+    );
   });
 
   group('StepEditSheet (Edit mode)', () {
