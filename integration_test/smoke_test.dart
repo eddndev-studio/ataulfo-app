@@ -62,20 +62,16 @@ void main() {
 
       // Cambiar a la tab Plantillas (BottomNavigationBarItem index 1).
       await tester.tap(find.text('Plantillas').last);
-      await _pumpUntil(
-        tester,
-        find.widgetWithText(AppBar, 'Plantillas'),
-      );
+      await _pumpUntil(tester, find.widgetWithText(AppBar, 'Plantillas'));
 
       // La lista se carga con spinner. Espera el primer tile o el
       // empty state — cualquiera de los dos resuelve el smoke.
       final emptyFinder = find.byKey(const Key('templates.empty'));
       final tileFinder = find.byType(InkWell).hitTestable();
-      await _pumpUntilAny(
-        tester,
-        <Finder>[emptyFinder, tileFinder],
-        timeout: const Duration(seconds: 15),
-      );
+      await _pumpUntilAny(tester, <Finder>[
+        emptyFinder,
+        tileFinder,
+      ], timeout: const Duration(seconds: 15));
 
       if (emptyFinder.evaluate().isNotEmpty) {
         // Backend vivo, login OK, pero org sin templates seed. Reportar
@@ -92,10 +88,12 @@ void main() {
       // Tap en la primera tarjeta. Usamos AppCard como ancestro porque
       // ya quedó en el listado (cada tile es un AppCard).
       await tester.tap(
-        find.descendant(
-          of: find.byType(ListView),
-          matching: find.byType(InkWell),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(ListView),
+              matching: find.byType(InkWell),
+            )
+            .first,
       );
 
       // Detalle: esperar el botón de editar.
@@ -188,8 +186,5 @@ Future<void> _pumpUntilAny(
       if (f.evaluate().isNotEmpty) return;
     }
   }
-  throw TimeoutException(
-    'Ningún finder apareció en ${timeout.inSeconds}s',
-  );
+  throw TimeoutException('Ningún finder apareció en ${timeout.inSeconds}s');
 }
-

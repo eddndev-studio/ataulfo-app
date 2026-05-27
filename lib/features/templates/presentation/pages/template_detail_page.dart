@@ -13,6 +13,7 @@ import '../../domain/entities/variable_def.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../bloc/template_detail_bloc.dart';
 import '../bloc/var_defs_bloc.dart';
+import '../widgets/var_def_form_sheet.dart';
 
 /// Detalle de una Template (S03). Consume el `TemplateDetailBloc` del scope;
 /// el cableado del provider y del ID lo hace el router en `/templates/:id`.
@@ -22,12 +23,32 @@ class TemplateDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<TemplateDetailBloc, TemplateDetailState>(
-      builder: (context, state) => switch (state) {
-        TemplateDetailLoading() => const _LoadingView(),
-        TemplateDetailLoaded(template: final tpl) => _LoadedView(template: tpl),
-        TemplateDetailFailed(failure: final f) => _FailedView(failure: f),
+    return BlocListener<VarDefsBloc, VarDefsState>(
+      // Feedback global de mutaciones de var-defs. El sheet sigue
+      // montado tras una MutationFailed (operador corrige y reintenta);
+      // el snackbar verbalízale el fallo sin tirar contexto.
+      listener: (context, state) {
+        if (state is VarDefsMutationFailed) {
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'La plantilla cambió. Recarga para ver los últimos datos.',
+                ),
+              ),
+            );
+        }
       },
+      child: BlocBuilder<TemplateDetailBloc, TemplateDetailState>(
+        builder: (context, state) => switch (state) {
+          TemplateDetailLoading() => const _LoadingView(),
+          TemplateDetailLoaded(template: final tpl) => _LoadedView(
+            template: tpl,
+          ),
+          TemplateDetailFailed(failure: final f) => _FailedView(failure: f),
+        },
+      ),
     );
   }
 }
@@ -244,17 +265,21 @@ class _VarDefsSection extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
-        VarDefsLoaded(defs: final defs) when defs.isEmpty => Text(
-          'Esta plantilla aún no tiene variables.',
-          key: const Key('var_defs.empty'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontStyle: FontStyle.italic,
-            color: AppTokens.text2,
-          ),
+        VarDefsLoaded(defs: final defs) => _VarDefsList(
+          defs: defs,
+          showAddButton: true,
         ),
-        VarDefsLoaded(defs: final defs) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[for (final d in defs) _VarDefRow(def: d)],
+        // Durante una mutación seguimos mostrando el snapshot previo;
+        // el botón de Agregar se oculta para no permitir doble dispatch
+        // mientras el sheet ya está abierto con su propio submit.
+        VarDefsMutating(defs: final defs) => _VarDefsList(
+          defs: defs,
+          showAddButton: false,
+        ),
+        // MutationFailed: lista intacta y botón visible para reintentar.
+        VarDefsMutationFailed(defs: final defs) => _VarDefsList(
+          defs: defs,
+          showAddButton: true,
         ),
         VarDefsFailed() => const _VarDefsFailedView(),
       },
@@ -262,55 +287,180 @@ class _VarDefsSection extends StatelessWidget {
   }
 }
 
+class _VarDefsList extends StatelessWidget {
+  const _VarDefsList({required this.defs, required this.showAddButton});
+
+  final List<VariableDef> defs;
+  final bool showAddButton;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = defs.isEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (empty)
+          Text(
+            'Esta plantilla aún no tiene variables.',
+            key: const Key('var_defs.empty'),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppTokens.text2,
+            ),
+          )
+        else
+          for (final d in defs)
+            _VarDefRow(
+              def: d,
+              onTap: () => _openSheet(context, defs, editing: d),
+            ),
+        if (showAddButton) ...<Widget>[
+          const SizedBox(height: AppTokens.sp3),
+          AppButton.text(
+            key: const Key('var_defs.add_button'),
+            label: 'Agregar variable',
+            icon: Icons.add,
+            onPressed: () => _openSheet(context, defs),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Monta el sheet de creación o edición. El sheet vive sobre el bloc
+  /// del detail page; usamos `.value` para pasarle la misma instancia
+  /// (el modal crea un nuevo context que no hereda de los
+  /// BlocProviders del padre por default).
+  void _openSheet(
+    BuildContext context,
+    List<VariableDef> defs, {
+    VariableDef? editing,
+  }) {
+    final bloc = context.read<VarDefsBloc>();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider<VarDefsBloc>.value(
+        value: bloc,
+        child: VarDefFormSheet(
+          existingNames: defs.map((d) => d.name).toSet(),
+          editing: editing,
+        ),
+      ),
+    );
+  }
+}
+
 class _VarDefRow extends StatelessWidget {
-  const _VarDefRow({required this.def});
+  const _VarDefRow({required this.def, required this.onTap});
 
   final VariableDef def;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              SizedBox(
-                width: 180,
-                // El placeholder de interpolación `{{name}}` es la forma en
-                // que el operador referencia la variable desde el prompt;
-                // mostrarla así es más útil que el name pelado.
-                child: SelectableText(
-                  '{{${def.name}}}',
-                  style: t.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w600,
+    return InkWell(
+      key: Key('var_defs.row.${def.id}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTokens.radiusField),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: 180,
+                        // El placeholder de interpolación `{{name}}` es la
+                        // forma en que el operador referencia la variable
+                        // desde el prompt; mostrarla así es más útil que el
+                        // name pelado. No usamos SelectableText: el row es
+                        // tap-target del edit sheet y el gesture detector
+                        // interno del Selectable ganaría el tap. La copia
+                        // puede agregarse via long-press menu en un slice
+                        // futuro si se pide.
+                        child: Text(
+                          '{{${def.name}}}',
+                          style: t.bodyMedium?.copyWith(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          def.defaultValue.isEmpty ? '—' : def.defaultValue,
+                          style: t.bodyMedium?.copyWith(
+                            color: def.defaultValue.isEmpty
+                                ? AppTokens.text2
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  def.defaultValue.isEmpty ? '—' : def.defaultValue,
-                  style: t.bodyMedium?.copyWith(
-                    color: def.defaultValue.isEmpty ? AppTokens.text2 : null,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (def.description.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                def.description,
-                style: t.bodySmall?.copyWith(color: AppTokens.text2),
+                  if (def.description.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        def.description,
+                        style: t.bodySmall?.copyWith(color: AppTokens.text2),
+                      ),
+                    ),
+                ],
               ),
             ),
+            // Trash icon como acción destructiva. Tap apunta y abre
+            // confirm dialog — no compite con el tap del row (InkWell
+            // padre) porque el IconButton tiene su propio gesture detector
+            // y "absorbe" su área (Flutter usa hit-testing por proximidad).
+            IconButton(
+              key: Key('var_defs.row.${def.id}.delete'),
+              icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
+              tooltip: 'Eliminar variable',
+              onPressed: () => _confirmDelete(context, def),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, VariableDef def) async {
+    final bloc = context.read<VarDefsBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('var_defs.delete_confirm'),
+        title: const Text('Eliminar variable'),
+        content: Text(
+          '¿Eliminar la variable {{${def.name}}}? '
+          'Los bots que ya tengan un valor asignado bloquearán esta acción.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppTokens.danger),
+            ),
+          ),
         ],
       ),
     );
+    if (confirmed == true) {
+      bloc.add(VarDefsDeleteRequested(varDefId: def.id));
+    }
   }
 }
 

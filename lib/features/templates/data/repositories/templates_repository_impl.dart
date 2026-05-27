@@ -23,7 +23,8 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
   Future<Template> create(String name) => _ds.create(name);
 
   @override
-  Future<List<VariableDef>> listVarDefs(String id) => _ds.listVarDefs(id);
+  Future<({int version, List<VariableDef> defs})> listVarDefs(String id) =>
+      _ds.listVarDefs(id);
 
   @override
   Future<Template> update({
@@ -32,4 +33,40 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
     required int version,
     required AIConfig? ai,
   }) => _ds.update(id: id, name: name, version: version, ai: ai);
+
+  @override
+  Future<VariableDef> addVarDef({
+    required String templateId,
+    required String name,
+    required VarType type,
+    required String defaultValue,
+    required String description,
+    required int version,
+  }) => _ds.addVarDef(
+    templateId: templateId,
+    name: name,
+    type: type,
+    defaultValue: defaultValue,
+    description: description,
+    version: version,
+  );
+
+  @override
+  Future<void> updateVarDef({
+    required String varDefId,
+    required int version,
+    String? name,
+    String? defaultValue,
+    String? description,
+  }) => _ds.updateVarDef(
+    varDefId: varDefId,
+    version: version,
+    name: name,
+    defaultValue: defaultValue,
+    description: description,
+  );
+
+  @override
+  Future<void> removeVarDef({required String varDefId, required int version}) =>
+      _ds.removeVarDef(varDefId: varDefId, version: version);
 }

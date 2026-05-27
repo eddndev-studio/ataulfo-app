@@ -32,9 +32,64 @@ abstract interface class TemplatesDatasource {
 
   /// `GET /templates/:id/variable-definitions` org-scoped. 404 si la
   /// Template padre no existe en la org (mapea a NotFound). Devuelve la
-  /// lista plana en el orden del backend; el `version` del wrapper se
-  /// descarta (sólo lo necesita el CRUD, todavía no implementado).
-  Future<List<VariableDef>> listVarDefs(String id);
+  /// lista en el orden del backend junto con la `version` vigente del
+  /// Template — el CRUD de var-defs la usa como CAS optimista en las
+  /// mutaciones (POST/PATCH/DELETE no devuelven la nueva version, así
+  /// que cada mutación termina con un refetch del listado).
+  Future<({int version, List<VariableDef> defs})> listVarDefs(String id);
+
+  /// `POST /templates/:id/variable-definitions` body
+  /// `{name, type, default, description, version}` con CAS optimista
+  /// sobre el Template padre. Devuelve la VariableDef recién creada
+  /// (con id opaco del servidor). El backend NO devuelve la nueva
+  /// version del Template — el llamador debe refetchar el listado para
+  /// el siguiente CAS.
+  ///
+  /// 409 (`ErrTemplateConflict`/`ErrVariableNameDuplicated`/`ErrVariableInUse`)
+  /// ⇒ `TemplatesConflictFailure`. El backend no discrimina entre
+  /// version stale y duplicate name; el cliente trata todos como
+  /// "recarga y vuelve a intentar".
+  ///
+  /// 422 (`ErrInvalidVariableName`/`ErrInvalidVariableType`) ⇒
+  /// `TemplatesInvalidUpdateFailure`. Aterriza cuando un nombre rompe
+  /// la regex del backend o cuando el tipo no es válido (v1 sólo `text`,
+  /// pero si el cliente avanza con un tipo nuevo antes que el backend
+  /// el 422 lo atrapa).
+  Future<VariableDef> addVarDef({
+    required String templateId,
+    required String name,
+    required VarType type,
+    required String defaultValue,
+    required String description,
+    required int version,
+  });
+
+  /// `PATCH /variable-definitions/:id` body con SÓLO los campos a
+  /// cambiar + `version` para CAS optimista sobre el Template padre.
+  /// El path NO lleva templateId — el backend resuelve la Template
+  /// desde el id opaco del var-def en el dominio.
+  ///
+  /// Patch only-changed: argumento `null` ⇒ no aparece en el body
+  /// (no-op del campo). Cadena vacía es set explícito (clear). El
+  /// backend devuelve 200 con body vacío; no hay snapshot que parsear.
+  ///
+  /// Mismos cubos de error que addVarDef. El 409 aquí incluye el
+  /// rename "in use" (renombrar una variable activa con valores
+  /// asignados en algún bot — el dominio lo bloquea con E2).
+  Future<void> updateVarDef({
+    required String varDefId,
+    required int version,
+    String? name,
+    String? defaultValue,
+    String? description,
+  });
+
+  /// `DELETE /variable-definitions/:id?version=N` (version va como query
+  /// string para que clientes HTTP que no soportan body en DELETE
+  /// funcionen limpio). 204 sin body. 409 incluye `ErrVariableInUse`
+  /// cuando algún bot tiene un valor para esta variable — el dominio
+  /// la trata como inmutable para mantener integridad de las plantillas.
+  Future<void> removeVarDef({required String varDefId, required int version});
 
   /// `PUT /templates/:id` body `{name, version, ai?}` con concurrencia
   /// optimista (CAS). 409 (`ErrTemplateConflict`) ⇒ `TemplatesConflictFailure`
@@ -159,17 +214,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {
-      // PUT necesita override del mapeo de 422 (InvalidUpdate, no
-      // InvalidName) y de 409 (Conflict, no aplica a otros métodos).
-      // Override inline mantiene `_mapDioException` simple para los demás
-      // callers; refactor a mapper parametrizado entra cuando un cuarto
-      // método con cubos distintos lo justifique.
-      if (e.type == DioExceptionType.badResponse) {
-        final status = e.response?.statusCode;
-        if (status == 409) throw const TemplatesConflictFailure();
-        if (status == 422) throw const TemplatesInvalidUpdateFailure();
-      }
-      throw _mapDioException(e);
+      throw _mapMutationDioException(e);
     } on FormatException {
       throw const UnknownTemplatesFailure();
     } on TypeError {
@@ -178,7 +223,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
   }
 
   @override
-  Future<List<VariableDef>> listVarDefs(String id) async {
+  Future<({int version, List<VariableDef> defs})> listVarDefs(String id) async {
     try {
       final res = await _dio.get<Map<String, dynamic>>(
         '/templates/$id/variable-definitions',
@@ -187,7 +232,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
       if (body == null) {
         throw const UnknownTemplatesFailure();
       }
-      return VarDefsMapper.listToEntities(ListVarDefsResp.fromJson(body));
+      return VarDefsMapper.listToLoaded(ListVarDefsResp.fromJson(body));
     } on TemplatesFailure {
       rethrow;
     } on DioException catch (e) {
@@ -197,6 +242,110 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     } on TypeError {
       throw const UnknownTemplatesFailure();
     }
+  }
+
+  @override
+  Future<VariableDef> addVarDef({
+    required String templateId,
+    required String name,
+    required VarType type,
+    required String defaultValue,
+    required String description,
+    required int version,
+  }) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/templates/$templateId/variable-definitions',
+        data: <String, dynamic>{
+          'name': name,
+          'type': type.toWire(),
+          'default': defaultValue,
+          'description': description,
+          'version': version,
+        },
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownTemplatesFailure();
+      }
+      return VarDefsMapper.varDefRespToEntity(VarDefResp.fromJson(body));
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapMutationDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
+  @override
+  Future<void> updateVarDef({
+    required String varDefId,
+    required int version,
+    String? name,
+    String? defaultValue,
+    String? description,
+  }) async {
+    try {
+      // Patch only-changed: el body sólo incluye claves para los campos
+      // provistos. Argumento `null` ⇒ no aparece (equivalente al `*string`
+      // nil del backend). Cadena vacía es set explícito.
+      final body = <String, dynamic>{'version': version};
+      if (name != null) body['name'] = name;
+      if (defaultValue != null) body['default'] = defaultValue;
+      if (description != null) body['description'] = description;
+
+      await _dio.patch<dynamic>('/variable-definitions/$varDefId', data: body);
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapMutationDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
+  @override
+  Future<void> removeVarDef({
+    required String varDefId,
+    required int version,
+  }) async {
+    try {
+      await _dio.delete<dynamic>(
+        '/variable-definitions/$varDefId',
+        queryParameters: <String, dynamic>{'version': version},
+      );
+    } on TemplatesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapMutationDioException(e);
+    } on FormatException {
+      throw const UnknownTemplatesFailure();
+    } on TypeError {
+      throw const UnknownTemplatesFailure();
+    }
+  }
+
+  /// Traduce DioException de una mutación (PUT/POST/PATCH/DELETE) que
+  /// usa CAS optimista. Diferencia respecto a `_mapDioException`:
+  /// - 409 ⇒ `TemplatesConflictFailure` (en GET sería UnknownStatus).
+  /// - 422 ⇒ `TemplatesInvalidUpdateFailure` (en GET sería InvalidName,
+  ///   que es de POST /templates con `name`).
+  ///
+  /// Compartido entre `update`, `addVarDef`, `updateVarDef`,
+  /// `removeVarDef`. Cuando aterrice la cuarta mutación con el mismo
+  /// patrón en otra feature, considerar mover a `core/network/`.
+  TemplatesFailure _mapMutationDioException(DioException e) {
+    if (e.type == DioExceptionType.badResponse) {
+      final status = e.response?.statusCode;
+      if (status == 409) return const TemplatesConflictFailure();
+      if (status == 422) return const TemplatesInvalidUpdateFailure();
+    }
+    return _mapDioException(e);
   }
 
   /// Traduce DioException a la jerarquía sellada de TemplatesFailure.
