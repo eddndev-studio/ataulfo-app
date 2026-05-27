@@ -1,3 +1,11 @@
+// Archivo > 400 LOC justificado: el sheet es un único modal cohesionado
+// que cubre create/edit + 7 step types (TEXT + 6 multimedia) + gating
+// por estado del bloc. Los helpers privados (_TypePicker, _SliderField,
+// _FailureCopy) están acoplados al estado de _StepEditSheetState (gates
+// `enabled`, copy del failure) — extraerlos a archivos sueltos sólo
+// movería ruido sin mejorar cohesión. Cuando CONDITIONAL_TIME aterrice
+// con su form propio (ventanas horarias + ramificación) será momento de
+// partir el modal — no antes.
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,6 +17,7 @@ import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_steps_bloc.dart';
+import 'step_type_label.dart';
 
 /// Modal sheet de creación/edición de un step TEXT (S11 F5a). Cuenta
 /// con tres controles: `content` (TextField multiline), `delayMs` y
@@ -42,11 +51,26 @@ class StepEditSheet extends StatefulWidget {
   State<StepEditSheet> createState() => _StepEditSheetState();
 }
 
+/// Tipos que el picker del sheet expone. CONDITIONAL_TIME se excluye:
+/// no se elige por chip — su edición requiere un form propio con
+/// ventanas horarias y ramificación.
+const List<fdom.StepType> _pickableTypes = <fdom.StepType>[
+  fdom.StepType.text,
+  fdom.StepType.image,
+  fdom.StepType.video,
+  fdom.StepType.document,
+  fdom.StepType.audio,
+  fdom.StepType.ptt,
+  fdom.StepType.sticker,
+];
+
 class _StepEditSheetState extends State<StepEditSheet> {
   static const int _maxDelayMs = 5 * 60 * 1000;
   static const int _maxJitterPct = 100;
 
   late final TextEditingController _contentCtrl;
+  late final TextEditingController _mediaCtrl;
+  late fdom.StepType _type;
   late int _delayMs;
   late int _jitterPct;
   late bool _aiOnly;
@@ -57,10 +81,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
     super.initState();
     final ed = widget.editing;
     _contentCtrl = TextEditingController(text: ed?.content ?? '');
+    _mediaCtrl = TextEditingController(text: ed?.mediaRef ?? '');
+    _type = ed?.type ?? fdom.StepType.text;
     _delayMs = ed?.delayMs ?? 0;
     _jitterPct = ed?.jitterPct ?? 0;
     _aiOnly = ed?.aiOnly ?? false;
     _contentCtrl.addListener(_onContentChanged);
+    _mediaCtrl.addListener(_onContentChanged);
   }
 
   void _onContentChanged() => setState(() {});
@@ -68,9 +95,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
   @override
   void dispose() {
     _contentCtrl.removeListener(_onContentChanged);
+    _mediaCtrl.removeListener(_onContentChanged);
     _contentCtrl.dispose();
+    _mediaCtrl.dispose();
     super.dispose();
   }
+
+  bool get _isMultimedia => _type != fdom.StepType.text;
 
   Future<void> _confirmDelete() async {
     final ed = widget.editing;
@@ -103,14 +134,25 @@ class _StepEditSheetState extends State<StepEditSheet> {
     context.read<FlowStepsBloc>().add(FlowStepsDeleteRequested(ed.id));
   }
 
+  /// Submit es válido si el campo "principal" del tipo no está vacío:
+  /// para TEXT, `content`; para multimedia, `mediaRef`. El campo
+  /// secundario (caption en multimedia) puede quedar vacío.
+  bool get _isSubmittable {
+    if (_isMultimedia) return _mediaCtrl.text.trim().isNotEmpty;
+    return _contentCtrl.text.trim().isNotEmpty;
+  }
+
   void _submit() {
+    if (!_isSubmittable) return;
     final content = _contentCtrl.text.trim();
-    if (content.isEmpty) return;
+    final mediaRef = _mediaCtrl.text.trim();
     final ed = widget.editing;
     if (ed == null) {
       _didSubmit = true;
       context.read<FlowStepsBloc>().add(
         FlowStepsAddRequested(
+          type: _type,
+          mediaRef: _isMultimedia ? mediaRef : '',
           content: content,
           delayMs: _delayMs,
           jitterPct: _jitterPct,
@@ -157,7 +199,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
       child: BlocBuilder<FlowStepsBloc, FlowStepsState>(
         builder: (context, state) {
           final isMutating = state is FlowStepsMutating;
-          final content = _contentCtrl.text.trim();
+          final canSubmit = _isSubmittable;
           // viewInsets.bottom > 0 sólo con teclado abierto; viewPadding.bottom
           // > 0 siempre en gestos. max() cubre ambos sin doble contar.
           final media = MediaQuery.of(context);
@@ -196,14 +238,40 @@ class _StepEditSheetState extends State<StepEditSheet> {
                         ),
                     ],
                   ),
+                  // El picker solo aparece al crear. En edit el tipo es
+                  // inmutable: el PATCH /steps/:id del backend no acepta
+                  // `type` ni `mediaRef`, así que cambiarlos requeriría
+                  // borrar y recrear. Se difiere a un slice cross-repo.
+                  if (widget.editing == null) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    _TypePicker(
+                      selected: _type,
+                      enabled: !isMutating,
+                      onSelected: (t) => setState(() => _type = t),
+                    ),
+                  ],
+                  if (_isMultimedia) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    AppTextField(
+                      key: const Key('step_edit.media_url'),
+                      label: 'URL o id del recurso',
+                      hint: 'https://… o id opaco del archivo subido',
+                      controller: _mediaCtrl,
+                      // En edit el mediaRef es read-only por la misma razón
+                      // que el picker se oculta — el PATCH no lo acepta.
+                      enabled: !isMutating && widget.editing == null,
+                    ),
+                  ],
                   const SizedBox(height: AppTokens.sp4),
                   AppTextField(
                     key: const Key('step_edit.content'),
-                    label: 'Mensaje',
-                    hint: 'Lo que el bot enviará al usuario',
+                    label: _isMultimedia ? 'Caption (opcional)' : 'Mensaje',
+                    hint: _isMultimedia
+                        ? 'Texto que acompaña al recurso (opcional)'
+                        : 'Lo que el bot enviará al usuario',
                     controller: _contentCtrl,
                     enabled: !isMutating,
-                    autofocus: true,
+                    autofocus: !_isMultimedia,
                     maxLines: 4,
                   ),
                   const SizedBox(height: AppTokens.sp4),
@@ -263,7 +331,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
                   AppButton.filled(
                     key: const Key('step_edit.submit'),
                     label: 'Guardar',
-                    onPressed: content.isEmpty ? null : _submit,
+                    onPressed: canSubmit ? _submit : null,
                     loading: isMutating,
                     fullWidth: true,
                   ),
@@ -375,6 +443,46 @@ class _FailureCopy extends StatelessWidget {
       'No pudimos guardar el paso. Inténtalo de nuevo.',
     ),
   };
+}
+
+class _TypePicker extends StatelessWidget {
+  const _TypePicker({
+    required this.selected,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  final fdom.StepType selected;
+  final bool enabled;
+  final ValueChanged<fdom.StepType> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Tipo',
+          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+        ),
+        const SizedBox(height: AppTokens.sp2),
+        Wrap(
+          spacing: AppTokens.sp2,
+          runSpacing: AppTokens.sp2,
+          children: <Widget>[
+            for (final t in _pickableTypes)
+              ChoiceChip(
+                key: Key('step_edit.type.${t.name}'),
+                label: Text(stepTypeLabel(t)),
+                selected: selected == t,
+                onSelected: enabled ? (_) => onSelected(t) : null,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 /// Convierte ms a un label legible. <60s muestra "Xs"; 60s+ muestra

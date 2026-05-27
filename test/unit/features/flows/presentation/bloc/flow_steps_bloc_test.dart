@@ -383,6 +383,58 @@ void main() {
       ],
     );
 
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested con type=image + mediaRef → createStep recibe IMAGE',
+      build: () {
+        final imgStep = newStep.copyWith(
+          type: fdom.StepType.image,
+          mediaRef: 'http://x.png',
+          content: 'cap',
+        );
+        when(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.image,
+            order: 2,
+            content: 'cap',
+            mediaRef: 'http://x.png',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ).thenAnswer((_) async => imgStep);
+        when(
+          () => repo.listSteps('f1'),
+        ).thenAnswer((_) async => <fdom.Step>[..._steps, imgStep]);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          type: fdom.StepType.image,
+          mediaRef: 'http://x.png',
+          content: 'cap',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
+      verify: (_) {
+        verify(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.image,
+            order: 2,
+            content: 'cap',
+            mediaRef: 'http://x.png',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ).called(1);
+      },
+    );
+
     test('Mutating + MutationFailed value-equality', () {
       const a = FlowStepsMutating(_steps);
       const b = FlowStepsMutating(_steps);

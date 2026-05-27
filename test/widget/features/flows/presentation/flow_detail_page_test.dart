@@ -160,6 +160,59 @@ void main() {
   );
 
   testWidgets(
+    'cada StepCard muestra un AppPill con el label humanizado del tipo',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'Hola',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 's2',
+            flowId: 'f1',
+            type: fdom.StepType.image,
+            order: 1,
+            content: '',
+            mediaRef: 'https://x/y.png',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 's3',
+            flowId: 'f1',
+            type: fdom.StepType.ptt,
+            order: 2,
+            content: '',
+            mediaRef: 'https://x/y.ogg',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.widgetWithText(AppPill, 'Texto'), findsOneWidget);
+      expect(find.widgetWithText(AppPill, 'Imagen'), findsOneWidget);
+      expect(find.widgetWithText(AppPill, 'PTT'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'FlowStepsLoading muestra spinner inline en el tab Pasos (header sigue visible)',
     (tester) async {
       when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));

@@ -17,6 +17,7 @@ import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
 import '../bloc/flow_steps_bloc.dart';
 import '../widgets/step_edit_sheet.dart';
+import '../widgets/step_type_label.dart';
 
 /// Detalle de un Flow (S11). Stateful para sostener el TabController de
 /// las 3 secciones del editor: Pasos / Disparadores / Configuración. El
@@ -467,7 +468,7 @@ class _StepCard extends StatelessWidget {
               style: textTheme.titleMedium?.copyWith(color: AppTokens.text2),
             ),
             const SizedBox(width: AppTokens.sp2),
-            Text(_humanLabelFor(step.type), style: textTheme.titleMedium),
+            AppPill.outline(label: stepTypeLabel(step.type)),
           ],
         ),
         const SizedBox(height: AppTokens.sp2),
@@ -632,17 +633,6 @@ class _FailedView extends StatelessWidget {
     );
   }
 }
-
-String _humanLabelFor(sdom.StepType t) => switch (t) {
-  sdom.StepType.text => 'Texto',
-  sdom.StepType.image => 'Imagen',
-  sdom.StepType.video => 'Video',
-  sdom.StepType.document => 'Documento',
-  sdom.StepType.audio => 'Audio',
-  sdom.StepType.ptt => 'Nota de voz',
-  sdom.StepType.sticker => 'Sticker',
-  sdom.StepType.conditionalTime => 'Condicional',
-};
 
 /// Etiqueta legible del delay. Convierte ms a segundos con un decimal y
 /// agrega el jitter si > 0. Ejemplos: "0s" / "1.5s" / "2s ± 10%".
