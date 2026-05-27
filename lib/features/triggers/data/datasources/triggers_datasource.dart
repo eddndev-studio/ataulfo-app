@@ -18,6 +18,32 @@ abstract interface class TriggersDatasource {
   /// padre no existe en la org del operador (o fue borrada). Lista
   /// vacía es válida (template sin disparadores configurados todavía).
   Future<List<Trigger>> listTriggers(String templateId);
+
+  /// `POST /templates/:templateId/triggers` body completo del trigger.
+  /// Devuelve 201 con el trigger creado (incluye id asignado por el
+  /// backend, timestamps).
+  ///
+  /// Discriminación TEXT vs LABEL: en modo TEXT el cliente NO manda
+  /// `labelId`/`labelAction`; en modo LABEL no manda `keyword`/
+  /// `matchType`. El backend (`triggerOptionsFrom`) selecciona la
+  /// `TriggerOption` por `triggerType`; lo del modo contrario se ignoraría
+  /// igual, pero ser explícito acota el contrato del cliente.
+  ///
+  /// 422 → [TriggersInvalidFailure] (campo inválido o regex que no
+  /// compila / dispara el guard anti-ReDoS). 403 → [TriggersForbiddenFailure]
+  /// (rol no alcanza, CRUD = ADMIN+). 404 → [TriggersNotFoundFailure]
+  /// (la Template padre no existe).
+  Future<Trigger> createTrigger({
+    required String templateId,
+    required String flowId,
+    required TriggerType triggerType,
+    required MatchType? matchType,
+    required String keyword,
+    required String labelId,
+    required LabelAction? labelAction,
+    required TriggerScope scope,
+    required bool isActive,
+  });
 }
 
 class DioTriggersDatasource implements TriggersDatasource {
@@ -49,9 +75,69 @@ class DioTriggersDatasource implements TriggersDatasource {
     }
   }
 
+  @override
+  Future<Trigger> createTrigger({
+    required String templateId,
+    required String flowId,
+    required TriggerType triggerType,
+    required MatchType? matchType,
+    required String keyword,
+    required String labelId,
+    required LabelAction? labelAction,
+    required TriggerScope scope,
+    required bool isActive,
+  }) async {
+    final body = <String, dynamic>{
+      'flowId': flowId,
+      'type': triggerType.toWire(),
+      'scope': scope.toWire(),
+      'isActive': isActive,
+    };
+    if (triggerType == TriggerType.text) {
+      body['matchType'] = matchType!.toWire();
+      body['keyword'] = keyword;
+    } else {
+      body['labelId'] = labelId;
+      body['labelAction'] = labelAction!.toWire();
+    }
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/templates/$templateId/triggers',
+        data: body,
+      );
+      final respBody = res.data;
+      if (respBody == null) {
+        throw const UnknownTriggersFailure();
+      }
+      return TriggersMapper.triggerRespToEntity(
+        TriggerResp.fromJson(respBody),
+      );
+    } on TriggersFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapMutationDioException(e);
+    } on FormatException {
+      throw const UnknownTriggersFailure();
+    } on TypeError {
+      throw const UnknownTriggersFailure();
+    }
+  }
+
+  /// Traduce DioException de mutaciones de trigger. 422 ⇒ Invalid;
+  /// el resto delega en `_mapDioException`. 404 sigue mapeando a
+  /// [TriggersNotFoundFailure] (sin discriminar template-vs-trigger;
+  /// el contexto del call site permite al bloc/sheet interpretar).
+  TriggersFailure _mapMutationDioException(DioException e) {
+    if (e.type == DioExceptionType.badResponse &&
+        e.response?.statusCode == 422) {
+      return const TriggersInvalidFailure();
+    }
+    return _mapDioException(e);
+  }
+
   /// Traduce DioException a la jerarquía sellada de TriggersFailure.
   /// Espejo fiel del `_mapDioException` de FlowsDatasource (sin mapeos
-  /// de 422 — no hay mutaciones en el slice read-only).
+  /// de 422 — esos viven en `_mapMutationDioException`).
   TriggersFailure _mapDioException(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
