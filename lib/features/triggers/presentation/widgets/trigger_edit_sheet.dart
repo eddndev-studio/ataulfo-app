@@ -8,6 +8,7 @@ import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../domain/entities/trigger.dart';
+import '../../domain/failures/triggers_failure.dart';
 import '../bloc/triggers_bloc.dart';
 
 /// Modal sheet de creación/edición de un Trigger.
@@ -155,6 +156,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     return BlocBuilder<TriggersBloc, TriggersState>(
       builder: (context, state) {
         final isMutating = state is TriggersMutating;
+        final failure = state is TriggersMutationFailed ? state.failure : null;
         return SingleChildScrollView(
           padding: const EdgeInsets.all(AppTokens.sp6),
           child: Column(
@@ -254,6 +256,13 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
                   ),
                 ],
               ),
+              if (failure != null) ...<Widget>[
+                const SizedBox(height: AppTokens.sp4),
+                _FailureCopy(
+                  failure: failure,
+                  isEdit: widget.editing != null,
+                ),
+              ],
               const SizedBox(height: AppTokens.sp6),
               AppButton.filled(
                 key: const Key('trigger_edit.submit'),
@@ -529,6 +538,68 @@ class _FlowSelector extends StatelessWidget {
       },
     );
   }
+}
+
+/// Copy de error contextual dentro del sheet. Discrimina por failure
+/// para que el operador pueda corregir y reintentar sin tener que
+/// adivinar qué pasó:
+/// - Invalid (422): "Revisa los datos" — caso típico (keyword vacío en
+///   TEXT, regex que el guard anti-ReDoS rechazó, labelId vacío en
+///   LABEL). El backend devuelve `ErrInvalidTrigger`/`ErrInvalidRegex`
+///   con el mismo status; el copy es genérico.
+/// - NotFound (404 en edit): "Este disparador ya no existe" — otro
+///   operador lo borró entre el listado y el PUT/DELETE. La UI debe
+///   forzar refresh; el sheet abierto está obsoleto.
+/// - Network/Timeout: copy reintentable.
+/// - El resto: copy genérico.
+class _FailureCopy extends StatelessWidget {
+  const _FailureCopy({required this.failure, required this.isEdit});
+
+  final TriggersFailure failure;
+  final bool isEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final (key, text) = _resolve();
+    return Text(
+      text,
+      key: Key('trigger_edit.error.$key'),
+      style: Theme.of(
+        context,
+      ).textTheme.bodySmall?.copyWith(color: AppTokens.danger),
+    );
+  }
+
+  (String, String) _resolve() => switch (failure) {
+    TriggersInvalidFailure() => (
+      'invalid',
+      'Revisa los datos. Si usaste regex, asegúrate de que compile y no '
+          'sea demasiado costosa.',
+    ),
+    TriggersNotFoundFailure() => (
+      'notfound',
+      isEdit
+          ? 'Este disparador ya no existe. Recarga la lista para verificar.'
+          : 'No encontramos la plantilla padre. Recarga la lista.',
+    ),
+    TriggersForbiddenFailure() => (
+      'forbidden',
+      'No tienes permiso para esta acción.',
+    ),
+    TriggersNetworkFailure() => (
+      'network',
+      'No pudimos conectarnos. Revisa tu red e intenta de nuevo.',
+    ),
+    TriggersTimeoutFailure() => (
+      'timeout',
+      'La operación tardó demasiado. Intenta de nuevo.',
+    ),
+    TriggersServerFailure() => (
+      'server',
+      'El servidor falló al procesar la petición. Intenta más tarde.',
+    ),
+    UnknownTriggersFailure() => ('unknown', 'No pudimos completar la acción.'),
+  };
 }
 
 class _PickerChip extends StatelessWidget {
