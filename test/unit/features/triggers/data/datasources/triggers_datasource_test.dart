@@ -511,4 +511,52 @@ void main() {
     test('404 → TriggersNotFoundFailure (trigger gone)', () => expectMappedTo<TriggersNotFoundFailure>(404));
     test('403 → TriggersForbiddenFailure', () => expectMappedTo<TriggersForbiddenFailure>(403));
   });
+
+  group('DioTriggersDatasource.deleteTrigger', () {
+    test('DELETE /triggers/:id 204 → completa sin error', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response<void>(
+          requestOptions: RequestOptions(path: '/triggers/t1'),
+          statusCode: 204,
+        ),
+      );
+
+      await ds.deleteTrigger('t1');
+
+      final captured = verify(
+        () => dio.delete<void>(captureAny(), options: any(named: 'options')),
+      ).captured;
+      expect(captured.single, '/triggers/t1');
+    });
+
+    test('404 → completa sin error (idempotente)', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(badResponse(404, path: '/triggers/t1'));
+
+      await ds.deleteTrigger('t1');
+    });
+
+    test('403 → TriggersForbiddenFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(badResponse(403, path: '/triggers/t1'));
+      await expectLater(
+        () => ds.deleteTrigger('t1'),
+        throwsA(isA<TriggersForbiddenFailure>()),
+      );
+    });
+
+    test('503 → TriggersServerFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(badResponse(503, path: '/triggers/t1'));
+      await expectLater(
+        () => ds.deleteTrigger('t1'),
+        throwsA(isA<TriggersServerFailure>()),
+      );
+    });
+  });
 }
