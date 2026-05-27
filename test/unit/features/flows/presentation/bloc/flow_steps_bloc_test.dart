@@ -532,4 +532,205 @@ void main() {
       },
     );
   });
+
+  group('FlowStepsBloc.ReorderRequested', () {
+    // Tres steps para que el reorder pueda generar ≥2 patches y deje
+    // visible el caso de skip cuando algún id ya está en su lugar.
+    const s1 = fdom.Step(
+      id: 's1',
+      flowId: 'f1',
+      type: fdom.StepType.text,
+      order: 0,
+      content: 'A',
+      mediaRef: '',
+      metadataJson: '{}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+    const s2 = fdom.Step(
+      id: 's2',
+      flowId: 'f1',
+      type: fdom.StepType.text,
+      order: 1,
+      content: 'B',
+      mediaRef: '',
+      metadataJson: '{}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+    const s3 = fdom.Step(
+      id: 's3',
+      flowId: 'f1',
+      type: fdom.StepType.text,
+      order: 2,
+      content: 'C',
+      mediaRef: '',
+      metadataJson: '{}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+    const seedSteps = <fdom.Step>[s1, s2, s3];
+    // Tras reorder [s3, s1, s2] el backend devolverá la lista refrescada
+    // ordenada por `order` ASC.
+    const afterReorder = <fdom.Step>[
+      fdom.Step(
+        id: 's3',
+        flowId: 'f1',
+        type: fdom.StepType.text,
+        order: 0,
+        content: 'C',
+        mediaRef: '',
+        metadataJson: '{}',
+        delayMs: 0,
+        jitterPct: 0,
+        aiOnly: false,
+      ),
+      fdom.Step(
+        id: 's1',
+        flowId: 'f1',
+        type: fdom.StepType.text,
+        order: 1,
+        content: 'A',
+        mediaRef: '',
+        metadataJson: '{}',
+        delayMs: 0,
+        jitterPct: 0,
+        aiOnly: false,
+      ),
+      fdom.Step(
+        id: 's2',
+        flowId: 'f1',
+        type: fdom.StepType.text,
+        order: 2,
+        content: 'B',
+        mediaRef: '',
+        metadataJson: '{}',
+        delayMs: 0,
+        jitterPct: 0,
+        aiOnly: false,
+      ),
+    ];
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'ReorderRequested ok → N×patchStep(order) + Loading + Loaded(refrescado)',
+      build: () {
+        // Patches para los ids que cambiaron de order. Sin UNIQUE en
+        // (flow_id, order) el orden de aplicación no importa.
+        when(
+          () => repo.patchStep(stepId: 's3', order: 0),
+        ).thenAnswer((_) async => afterReorder[0]);
+        when(
+          () => repo.patchStep(stepId: 's1', order: 1),
+        ).thenAnswer((_) async => afterReorder[1]);
+        when(
+          () => repo.patchStep(stepId: 's2', order: 2),
+        ).thenAnswer((_) async => afterReorder[2]);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => afterReorder);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(seedSteps),
+      act: (bloc) => bloc.add(
+        const FlowStepsReorderRequested(<String>['s3', 's1', 's2']),
+      ),
+      expect: () => const <FlowStepsState>[
+        FlowStepsMutating(seedSteps),
+        FlowStepsLoading(),
+        FlowStepsLoaded(afterReorder),
+      ],
+      verify: (_) {
+        verify(() => repo.patchStep(stepId: 's3', order: 0)).called(1);
+        verify(() => repo.patchStep(stepId: 's1', order: 1)).called(1);
+        // s2 conserva order=2 que es exactamente su lugar nuevo — la UX
+        // de drag-and-drop puede emitirlo igual; el bloc no asume nada y
+        // delega "evitar no-op" como decisión interna por orden eficiente,
+        // pero la spec elegida es: skip cuando el order no cambió.
+        verifyNever(() => repo.patchStep(stepId: 's2', order: 2));
+        verify(() => repo.listSteps('f1')).called(1);
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'ReorderRequested sin cambios reales → no patches, igual refetch',
+      build: () {
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => seedSteps);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(seedSteps),
+      // Mismos ids en el mismo orden que el snapshot vigente.
+      act: (bloc) => bloc.add(
+        const FlowStepsReorderRequested(<String>['s1', 's2', 's3']),
+      ),
+      expect: () => const <FlowStepsState>[
+        FlowStepsMutating(seedSteps),
+        FlowStepsLoading(),
+        FlowStepsLoaded(seedSteps),
+      ],
+      verify: (_) {
+        verifyNever(
+          () => repo.patchStep(
+            stepId: any(named: 'stepId'),
+            order: any(named: 'order'),
+          ),
+        );
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'ReorderRequested falla a mitad → MutationFailed(snapshot original)',
+      build: () {
+        // Primera patch ok, segunda revienta con StepNotFound (otro
+        // operador borró el step entre el listado y el drag).
+        when(
+          () => repo.patchStep(stepId: 's3', order: 0),
+        ).thenAnswer((_) async => afterReorder[0]);
+        when(
+          () => repo.patchStep(stepId: 's1', order: 1),
+        ).thenThrow(const FlowsStepNotFoundFailure());
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(seedSteps),
+      act: (bloc) => bloc.add(
+        const FlowStepsReorderRequested(<String>['s3', 's1', 's2']),
+      ),
+      expect: () => const <FlowStepsState>[
+        FlowStepsMutating(seedSteps),
+        FlowStepsMutationFailed(seedSteps, FlowsStepNotFoundFailure()),
+      ],
+      verify: (_) {
+        // No refetch tras el fallo — el backend quedó parcial; el bloc
+        // deja que el operador reintente o haga reload manual.
+        verifyNever(() => repo.listSteps('f1'));
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'ReorderRequested desde Loading → no-op',
+      build: () => FlowStepsBloc(repo: repo, flowId: 'f1'),
+      seed: () => const FlowStepsLoading(),
+      act: (bloc) => bloc.add(
+        const FlowStepsReorderRequested(<String>['s3', 's1', 's2']),
+      ),
+      expect: () => const <FlowStepsState>[],
+      verify: (_) {
+        verifyNever(
+          () => repo.patchStep(
+            stepId: any(named: 'stepId'),
+            order: any(named: 'order'),
+          ),
+        );
+      },
+    );
+
+    test('ReorderRequested value-equality', () {
+      const a = FlowStepsReorderRequested(<String>['a', 'b']);
+      const b = FlowStepsReorderRequested(<String>['a', 'b']);
+      const c = FlowStepsReorderRequested(<String>['b', 'a']);
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+      expect(a, isNot(equals(c)));
+    });
+  });
 }
