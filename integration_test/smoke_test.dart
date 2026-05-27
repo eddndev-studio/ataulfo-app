@@ -332,6 +332,168 @@ void main() {
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
+
+  testWidgets(
+    'flujo: tab Configuración → toggle usageLimit → save → rehidratación',
+    (tester) async {
+      app.main();
+
+      // Lead-in: login → tab Plantillas → primera tarjeta. Idéntico a los
+      // smokes previos. Aún en regla de 2 — no extraemos helper.
+      await _pumpUntil(tester, find.byKey(const Key('login.email')));
+      await tester.enterText(
+        find.byKey(const Key('login.email')),
+        'smoke@agentic.local',
+      );
+      await tester.enterText(
+        find.byKey(const Key('login.password')),
+        'smoke-agentic-2026',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.tap(find.text('Entrar'));
+      await _pumpUntil(
+        tester,
+        find.widgetWithText(AppBar, 'Bots'),
+        timeout: const Duration(seconds: 15),
+      );
+
+      await tester.tap(find.text('Plantillas').last);
+      await _pumpUntil(tester, find.widgetWithText(AppBar, 'Plantillas'));
+
+      final emptyTemplatesFinder = find.byKey(const Key('templates.empty'));
+      final tileFinder = find.byType(InkWell).hitTestable();
+      await _pumpUntilAny(tester, <Finder>[
+        emptyTemplatesFinder,
+        tileFinder,
+      ], timeout: const Duration(seconds: 15));
+
+      if (emptyTemplatesFinder.evaluate().isNotEmpty) {
+        // ignore: avoid_print
+        print(
+          'SMOKE FLOW SETTINGS: org sin templates — tramo saltado. '
+          'Crear al menos un template con un flow para cubrir la tab.',
+        );
+        return;
+      }
+
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(ListView),
+              matching: find.byType(InkWell),
+            )
+            .first,
+      );
+
+      // Esperar el detalle del template: la add_button de var_defs es señal
+      // canónica de Loaded (es siempre visible cuando el bloc resuelve).
+      await _pumpUntil(
+        tester,
+        find.byKey(const Key('var_defs.add_button')),
+        timeout: const Duration(seconds: 15),
+      );
+
+      // El listado de flows resuelve en empty state o con rows. El smoke
+      // skipea si está vacío — seed de flows no es responsabilidad de este
+      // test. Los row keys son `flows.row.<id>` SIN sufijo `.status_pill`.
+      final flowsEmptyFinder = find.byKey(const Key('flows.empty'));
+      final flowRowFinder = find.byWidgetPredicate(
+        (w) =>
+            w is InkWell &&
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('flows.row.') &&
+            !(w.key! as ValueKey<String>).value.endsWith('.status_pill'),
+      );
+      await _pumpUntilAny(tester, <Finder>[
+        flowsEmptyFinder,
+        flowRowFinder,
+      ], timeout: const Duration(seconds: 15));
+
+      if (flowsEmptyFinder.evaluate().isNotEmpty) {
+        // ignore: avoid_print
+        print(
+          'SMOKE FLOW SETTINGS: template sin flows — tramo saltado. '
+          'Crear al menos un flow en el primer template para cubrir la tab.',
+        );
+        return;
+      }
+
+      await tester.ensureVisible(flowRowFinder.first);
+      await tester.tap(flowRowFinder.first);
+
+      // El editor de flow monta el TabBar con tres tabs. El tab por defecto
+      // es "Pasos"; aquí queremos "Configuración".
+      await _pumpUntil(
+        tester,
+        find.text('Configuración'),
+        timeout: const Duration(seconds: 15),
+      );
+      await tester.tap(find.text('Configuración'));
+
+      // Loaded del FlowSettingsTab: el save_button aparece dentro del form.
+      await _pumpUntil(
+        tester,
+        find.byKey(const Key('flow_settings.save_button')),
+        timeout: const Duration(seconds: 15),
+      );
+
+      // Toggle idempotente 0↔5 contra el estado real del backend: el label
+      // "Sin límite" del header está visible sii usageLimit==0. Si está
+      // visible al cargar, escribimos "5"; si no, escribimos "0". Cualquier
+      // valor concreto que se use aquí debe estar dentro del cap del form
+      // (no hay cap superior en usageLimit, solo digitsOnly).
+      final unlimitedFinder = find.byKey(
+        const Key('flow_settings.usage_limit.unlimited_label'),
+      );
+      final wasUnlimited = unlimitedFinder.evaluate().isNotEmpty;
+      final newValue = wasUnlimited ? '5' : '0';
+
+      await tester.ensureVisible(
+        find.byKey(const Key('flow_settings.usage_limit.field')),
+      );
+      await tester.enterText(
+        find.byKey(const Key('flow_settings.usage_limit.field')),
+        newValue,
+      );
+      await tester.pump();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('flow_settings.save_button')),
+      );
+      await tester.tap(find.byKey(const Key('flow_settings.save_button')));
+
+      // El spinner inline puede ser instantáneo en LAN, así que no lo
+      // exigimos. La señal canónica de rehidratación es que el header
+      // "Sin límite" cambia al estado opuesto (el form re-keyea con la
+      // nueva version y el controller arranca con el nuevo flow.usageLimit).
+      if (wasUnlimited) {
+        // Pasamos de 0 → 5: el label debe desaparecer.
+        await _pumpUntilGone(
+          tester,
+          unlimitedFinder,
+          timeout: const Duration(seconds: 15),
+        );
+      } else {
+        // Pasamos de N → 0: el label debe aparecer.
+        await _pumpUntil(
+          tester,
+          unlimitedFinder,
+          timeout: const Duration(seconds: 15),
+        );
+      }
+
+      // Doble check explícito post-rehidratación.
+      expect(
+        unlimitedFinder.evaluate().isNotEmpty,
+        equals(!wasUnlimited),
+        reason:
+            'Tras el save, el label "Sin límite" refleja el nuevo '
+            'usageLimit del flow rehidratado.',
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }
 
 /// Espera frame a frame hasta que `finder` aparezca o se cumpla `timeout`.
