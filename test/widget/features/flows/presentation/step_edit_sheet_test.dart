@@ -198,6 +198,26 @@ void main() {
         expect(imageChip.selected, isFalse);
       },
     );
+
+    testWidgets(
+      'media_url aparece al elegir tipo multimedia y desaparece en TEXT',
+      (tester) async {
+        await pumpHost(tester);
+
+        // TEXT por default → sin media_url
+        expect(find.byKey(const Key('step_edit.media_url')), findsNothing);
+
+        // Cambio a IMAGE → media_url visible
+        await tester.tap(find.byKey(const Key('step_edit.type.image')));
+        await tester.pump();
+        expect(find.byKey(const Key('step_edit.media_url')), findsOneWidget);
+
+        // Vuelvo a TEXT → media_url se oculta
+        await tester.tap(find.byKey(const Key('step_edit.type.text')));
+        await tester.pump();
+        expect(find.byKey(const Key('step_edit.media_url')), findsNothing);
+      },
+    );
   });
 
   group('StepEditSheet (Edit mode)', () {
