@@ -126,14 +126,25 @@ class _StepEditSheetState extends State<StepEditSheet> {
     context.read<FlowStepsBloc>().add(FlowStepsDeleteRequested(ed.id));
   }
 
+  /// Submit es válido si el campo "principal" del tipo no está vacío:
+  /// para TEXT, `content`; para multimedia, `mediaRef`. El campo
+  /// secundario (caption en multimedia) puede quedar vacío.
+  bool get _isSubmittable {
+    if (_isMultimedia) return _mediaCtrl.text.trim().isNotEmpty;
+    return _contentCtrl.text.trim().isNotEmpty;
+  }
+
   void _submit() {
+    if (!_isSubmittable) return;
     final content = _contentCtrl.text.trim();
-    if (content.isEmpty) return;
+    final mediaRef = _mediaCtrl.text.trim();
     final ed = widget.editing;
     if (ed == null) {
       _didSubmit = true;
       context.read<FlowStepsBloc>().add(
         FlowStepsAddRequested(
+          type: _type,
+          mediaRef: _isMultimedia ? mediaRef : '',
           content: content,
           delayMs: _delayMs,
           jitterPct: _jitterPct,
@@ -180,7 +191,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
       child: BlocBuilder<FlowStepsBloc, FlowStepsState>(
         builder: (context, state) {
           final isMutating = state is FlowStepsMutating;
-          final content = _contentCtrl.text.trim();
+          final canSubmit = _isSubmittable;
           // viewInsets.bottom > 0 sólo con teclado abierto; viewPadding.bottom
           // > 0 siempre en gestos. max() cubre ambos sin doble contar.
           final media = MediaQuery.of(context);
@@ -304,7 +315,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
                   AppButton.filled(
                     key: const Key('step_edit.submit'),
                     label: 'Guardar',
-                    onPressed: content.isEmpty ? null : _submit,
+                    onPressed: canSubmit ? _submit : null,
                     loading: isMutating,
                     fullWidth: true,
                   ),
