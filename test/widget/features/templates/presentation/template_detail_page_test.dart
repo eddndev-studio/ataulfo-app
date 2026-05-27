@@ -215,6 +215,49 @@ void main() {
     expect(find.text('Eres un asistente de soporte amable.'), findsOneWidget);
   });
 
+  testWidgets(
+    'Loaded agrupa stats + prompt en card Configuración IA con key contractual',
+    (tester) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+
+      await tester.pumpWidget(host());
+
+      final cardFinder = find.byKey(
+        const Key('template_detail.card.ai_config'),
+      );
+      expect(cardFinder, findsOneWidget);
+
+      // La card combina el grid de stats + el system prompt: ambos deben
+      // estar dentro del mismo ancestro AppCard.
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Modelo')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Temperatura')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cardFinder, matching: find.text('Razonamiento')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.text('Mensajes de contexto'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardFinder,
+          matching: find.text('Eres un asistente de soporte amable.'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('Failed(NotFound) preserva key y usa AppButton "Reintentar"', (
     tester,
   ) async {
