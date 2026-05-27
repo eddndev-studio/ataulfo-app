@@ -9,6 +9,10 @@ import 'package:mocktail/mocktail.dart';
 class _MockDatasource extends Mock implements FlowsDatasource {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(fdom.StepType.text);
+  });
+
   late _MockDatasource ds;
   late FlowsRepositoryImpl repo;
 
@@ -138,6 +142,90 @@ void main() {
       await expectLater(
         () => repo.createFlow(templateId: 't1', name: ''),
         throwsA(isA<FlowsInvalidCreateFailure>()),
+      );
+    });
+  });
+
+  group('FlowsRepositoryImpl.createStep', () {
+    const newStep = fdom.Step(
+      id: 's-new',
+      flowId: 'f1',
+      type: fdom.StepType.text,
+      order: 2,
+      content: 'Bienvenido',
+      mediaRef: '',
+      metadataJson: '{}',
+      delayMs: 1500,
+      jitterPct: 10,
+      aiOnly: true,
+    );
+
+    test('delega 1:1 con todos los parámetros nombrados', () async {
+      when(
+        () => ds.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 2,
+          content: 'Bienvenido',
+          mediaRef: '',
+          delayMs: 1500,
+          jitterPct: 10,
+          aiOnly: true,
+        ),
+      ).thenAnswer((_) async => newStep);
+
+      final out = await repo.createStep(
+        flowId: 'f1',
+        type: fdom.StepType.text,
+        order: 2,
+        content: 'Bienvenido',
+        mediaRef: '',
+        delayMs: 1500,
+        jitterPct: 10,
+        aiOnly: true,
+      );
+
+      expect(out.id, 's-new');
+      verify(
+        () => ds.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 2,
+          content: 'Bienvenido',
+          mediaRef: '',
+          delayMs: 1500,
+          jitterPct: 10,
+          aiOnly: true,
+        ),
+      ).called(1);
+    });
+
+    test('relanza FlowsInvalidStepFailure sin envolver', () async {
+      when(
+        () => ds.createStep(
+          flowId: any(named: 'flowId'),
+          type: any(named: 'type'),
+          order: any(named: 'order'),
+          content: any(named: 'content'),
+          mediaRef: any(named: 'mediaRef'),
+          delayMs: any(named: 'delayMs'),
+          jitterPct: any(named: 'jitterPct'),
+          aiOnly: any(named: 'aiOnly'),
+        ),
+      ).thenThrow(const FlowsInvalidStepFailure());
+
+      await expectLater(
+        () => repo.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: '',
+          mediaRef: '',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+        throwsA(isA<FlowsInvalidStepFailure>()),
       );
     });
   });

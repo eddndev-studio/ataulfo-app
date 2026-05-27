@@ -22,4 +22,19 @@ abstract interface class FlowsRepository {
   /// defaults silenciosos y se ajustan después en el Settings tab del
   /// editor. 422 si el nombre rompe la validación → `FlowsInvalidCreateFailure`.
   Future<Flow> createFlow({required String templateId, required String name});
+
+  /// Crea un Step en el flow. El bloc resuelve `order` (último + 1 al
+  /// agregar al final) antes de invocar. El backend rechaza con 422 si
+  /// el body rompe la validación del dominio del step
+  /// → `FlowsInvalidStepFailure`; 404 si el flow padre no existe.
+  Future<fdom.Step> createStep({
+    required String flowId,
+    required fdom.StepType type,
+    required int order,
+    required String content,
+    required String mediaRef,
+    required int delayMs,
+    required int jitterPct,
+    required bool aiOnly,
+  });
 }

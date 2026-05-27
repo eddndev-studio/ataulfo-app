@@ -57,3 +57,13 @@ final class UnknownFlowsFailure extends FlowsFailure {
 final class FlowsInvalidCreateFailure extends FlowsFailure {
   const FlowsInvalidCreateFailure();
 }
+
+/// 422 contra mutaciones de step (`POST /flows/:id/steps`, `PATCH
+/// /steps/:id`): el body rompió la validación del dominio del step
+/// (content vacío en TEXT, delayMs fuera de rango, mediaRef ausente en
+/// multimedia, metadata inválida en CONDITIONAL_TIME, etc.). Reintentable
+/// tras corregir; copy del cliente debe orientar a "revisa los campos
+/// del paso" sin sacar el código del wire.
+final class FlowsInvalidStepFailure extends FlowsFailure {
+  const FlowsInvalidStepFailure();
+}

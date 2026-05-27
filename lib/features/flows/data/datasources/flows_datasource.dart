@@ -40,6 +40,26 @@ abstract interface class FlowsDatasource {
   /// 403 si el rol no alcanza (CRUD de Flow = ADMIN+). 404 si la
   /// Template padre no existe en la org del operador.
   Future<Flow> createFlow({required String templateId, required String name});
+
+  /// `POST /flows/:flowId/steps` body crudo del step (sin envelope). El
+  /// wire usa `type` en UPPERCASE; los campos opcionales que el dominio
+  /// no requiere para el tipo (ej. `mediaRef` en TEXT) viajan como
+  /// string vacío.
+  ///
+  /// 201 con el step creado (incluyendo su id asignado por el backend).
+  /// 422 si el body rompe la validación del step
+  /// → `FlowsInvalidStepFailure`. 404 si el flow padre no existe en la
+  /// org → `FlowsNotFoundFailure`. 403 si el rol no alcanza → `Forbidden`.
+  Future<fdom.Step> createStep({
+    required String flowId,
+    required fdom.StepType type,
+    required int order,
+    required String content,
+    required String mediaRef,
+    required int delayMs,
+    required int jitterPct,
+    required bool aiOnly,
+  });
 }
 
 class DioFlowsDatasource implements FlowsDatasource {
@@ -141,13 +161,65 @@ class DioFlowsDatasource implements FlowsDatasource {
     }
   }
 
-  /// Traduce DioException de una mutación. Diferencia respecto a
-  /// `_mapDioException`: 422 ⇒ `FlowsInvalidCreateFailure` (en lectura
-  /// sería UnknownFlowsFailure — 422 sólo aparece en mutaciones).
+  @override
+  Future<fdom.Step> createStep({
+    required String flowId,
+    required fdom.StepType type,
+    required int order,
+    required String content,
+    required String mediaRef,
+    required int delayMs,
+    required int jitterPct,
+    required bool aiOnly,
+  }) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/flows/$flowId/steps',
+        data: <String, dynamic>{
+          'type': type.toWire(),
+          'order': order,
+          'content': content,
+          'mediaRef': mediaRef,
+          'delayMs': delayMs,
+          'jitterPct': jitterPct,
+          'aiOnly': aiOnly,
+        },
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownFlowsFailure();
+      }
+      return StepsMapper.stepRespToEntity(StepResp.fromJson(body));
+    } on FlowsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapStepMutationDioException(e);
+    } on FormatException {
+      throw const UnknownFlowsFailure();
+    } on TypeError {
+      throw const UnknownFlowsFailure();
+    }
+  }
+
+  /// Traduce DioException de una mutación de flow (create/update del
+  /// flow propio). 422 ⇒ `FlowsInvalidCreateFailure`. En lectura sería
+  /// UnknownFlowsFailure — 422 sólo aparece en mutaciones.
   FlowsFailure _mapMutationDioException(DioException e) {
     if (e.type == DioExceptionType.badResponse &&
         e.response?.statusCode == 422) {
       return const FlowsInvalidCreateFailure();
+    }
+    return _mapDioException(e);
+  }
+
+  /// Traduce DioException de una mutación de step (create/update/delete
+  /// del step). 422 ⇒ `FlowsInvalidStepFailure` — distinto del cubo de
+  /// flow para que la UI elija copy específico del paso. 404 sigue
+  /// siendo NotFound del flow padre.
+  FlowsFailure _mapStepMutationDioException(DioException e) {
+    if (e.type == DioExceptionType.badResponse &&
+        e.response?.statusCode == 422) {
+      return const FlowsInvalidStepFailure();
     }
     return _mapDioException(e);
   }
