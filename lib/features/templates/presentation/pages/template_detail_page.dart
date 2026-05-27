@@ -160,9 +160,17 @@ class _LoadedView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppTokens.sp6),
-          const _SectionTitle('Variables'),
-          const SizedBox(height: AppTokens.sp3),
-          const _VarDefsSection(),
+          AppCard(
+            key: const Key('template_detail.card.variables'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const <Widget>[
+                _SectionTitle('Variables'),
+                SizedBox(height: AppTokens.sp3),
+                _VarDefsSection(),
+              ],
+            ),
+          ),
           const SizedBox(height: AppTokens.sp7),
           _EditButton(template: template),
           const SizedBox(height: AppTokens.sp3),
