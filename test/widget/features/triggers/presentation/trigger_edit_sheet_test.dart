@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:agentic/features/flows/presentation/bloc/flows_bloc.dart';
@@ -443,18 +445,16 @@ void main() {
     testWidgets(
       'tras submit exitoso → estado Loaded pop-ea el sheet',
       (tester) async {
-        // Después del submit el bloc emite Mutating → Loading → Loaded.
-        // El sheet espera Loaded post-submit para auto-cerrar.
-        whenListen(
-          triggers,
-          Stream<TriggersState>.fromIterable(<TriggersState>[
-            TriggersMutating(<Trigger>[]),
-            const TriggersLoading(),
-            const TriggersLoaded(<Trigger>[]),
-          ]),
-          initialState: const TriggersLoaded(<Trigger>[]),
-        );
-        // Pump el sheet dentro de un push para poder verificar maybePop.
+        // Controlamos el stream del bloc manualmente para emitir
+        // estados en el orden y momento que el test pida — usar
+        // Stream.fromIterable los emite todos antes de que el sheet
+        // monte y _didSubmit alcance a quedar en true.
+        final controller = StreamController<TriggersState>.broadcast();
+        addTearDown(controller.close);
+        var current = const TriggersLoaded(<Trigger>[]) as TriggersState;
+        when(() => triggers.state).thenAnswer((_) => current);
+        whenListen(triggers, controller.stream, initialState: current);
+
         tester.view.physicalSize = const Size(800, 2000);
         tester.view.devicePixelRatio = 1.0;
         addTearDown(tester.view.resetPhysicalSize);
@@ -490,7 +490,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Nuevo disparador'), findsOneWidget);
 
-        // Llena keyword + selecciona flow + submit para activar _didSubmit.
+        // Llena keyword + selecciona flow + submit (dispara _didSubmit).
         await tester.enterText(
           find.byKey(const Key('trigger_edit.keyword')),
           'hola',
@@ -501,8 +501,19 @@ void main() {
         await tester.tap(find.text('Bienvenida').last);
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('trigger_edit.submit')));
-        // El whenListen ya tiene programada la secuencia que termina en
-        // Loaded; al hacer settle se procesa.
+        await tester.pump();
+
+        // Ahora simulo la cadena Mutating → Loading → Loaded del bloc.
+        current = TriggersMutating(<Trigger>[]);
+        controller.add(current);
+        await tester.pump();
+        current = const TriggersLoading();
+        controller.add(current);
+        await tester.pump();
+        current = TriggersLoaded(<Trigger>[
+          _textTrigger(id: 'new', keyword: 'hola'),
+        ]);
+        controller.add(current);
         await tester.pumpAndSettle();
 
         expect(find.text('Nuevo disparador'), findsNothing);

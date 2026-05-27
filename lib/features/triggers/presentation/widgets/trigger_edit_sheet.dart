@@ -45,6 +45,13 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
   late bool _isActive;
   String? _flowId; // null hasta que el operador elija (modo create).
 
+  /// Flag que gate-a el auto-pop. El sheet escucha el estado del bloc
+  /// y popea cuando llega `Loaded` post-submit; sin este gate, un
+  /// `Loaded` espurio (ej. el load inicial de la sección mientras el
+  /// sheet ya está montado) cerraría el sheet sin que el operador
+  /// haya hecho submit. Espejo de `_didSubmit` en `StepEditSheet`.
+  bool _didSubmit = false;
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +122,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     );
     if (confirmed != true) return;
     if (!mounted) return;
+    _didSubmit = true;
     context.read<TriggersBloc>().add(TriggersDeleteRequested(triggerId: ed.id));
   }
 
@@ -122,6 +130,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     if (!_isSubmittable) return;
     final ed = widget.editing;
     if (ed == null) {
+      _didSubmit = true;
       context.read<TriggersBloc>().add(
         TriggersAddRequested(
           flowId: _flowId!,
@@ -136,6 +145,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
       );
       return;
     }
+    _didSubmit = true;
     context.read<TriggersBloc>().add(
       TriggersUpdateRequested(
         triggerId: ed.id,
@@ -153,10 +163,16 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return BlocBuilder<TriggersBloc, TriggersState>(
-      builder: (context, state) {
-        final isMutating = state is TriggersMutating;
-        final failure = state is TriggersMutationFailed ? state.failure : null;
+    return BlocListener<TriggersBloc, TriggersState>(
+      listener: (context, state) {
+        if (_didSubmit && state is TriggersLoaded) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: BlocBuilder<TriggersBloc, TriggersState>(
+        builder: (context, state) {
+          final isMutating = state is TriggersMutating;
+          final failure = state is TriggersMutationFailed ? state.failure : null;
         return SingleChildScrollView(
           padding: const EdgeInsets.all(AppTokens.sp6),
           child: Column(
@@ -274,7 +290,8 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
             ],
           ),
         );
-      },
+        },
+      ),
     );
   }
 }
