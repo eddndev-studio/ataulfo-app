@@ -372,6 +372,138 @@ void main() {
   });
 
   testWidgets(
+    'Loaded con N≥2 steps monta ReorderableListView con drag handle por card',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'A',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 's2',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 1,
+            content: 'B',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.byType(ReorderableListView), findsOneWidget);
+      expect(
+        find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('flow_detail.step_card.drag_handle.s2')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Drag de un step dispatcha FlowStepsReorderRequested con ids en orden nuevo',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'A',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 's2',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 1,
+            content: 'B',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      // Arrastra el handle del primer step hacia abajo lo suficiente
+      // para cruzar al segundo. ReorderableDragStartListener inicia el
+      // drag desde el primer movimiento del puntero sobre el handle.
+      await tester.drag(
+        find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
+        const Offset(0, 200),
+      );
+      await tester.pumpAndSettle();
+
+      verify(
+        () => stepsBloc.add(
+          const FlowStepsReorderRequested(<String>['s2', 's1']),
+        ),
+      ).called(1);
+    },
+  );
+
+  testWidgets(
+    'Loaded con 1 step NO monta ReorderableListView (1 item no tiene reorder)',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'Solo',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.byType(ReorderableListView), findsNothing);
+      expect(
+        find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
+        findsNothing,
+      );
+      // El card sigue visible para tap → editar.
+      expect(find.byKey(const Key('flow_detail.step_card.s1')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'Tap en StepCard abre el StepEditSheet en modo Edit (prefilled)',
     (tester) async {
       when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
