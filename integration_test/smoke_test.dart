@@ -103,6 +103,13 @@ void main() {
         timeout: const Duration(seconds: 10),
       );
 
+      // El edit button vive al final del scroll del detalle; en pantallas
+      // cortas queda fuera del viewport y `tap` derivaría un offset que no
+      // hit-testea contra el widget. `ensureVisible` lo scrollea al
+      // viewport antes del tap.
+      await tester.ensureVisible(
+        find.byKey(const Key('template_detail.edit_button')),
+      );
       await tester.tap(find.byKey(const Key('template_detail.edit_button')));
 
       // Editor: el form requiere TemplateEditing + CatalogLoaded. Esperar
