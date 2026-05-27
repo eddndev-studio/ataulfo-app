@@ -239,9 +239,12 @@ class _StepEditSheetState extends State<StepEditSheet> {
                     ],
                   ),
                   // El picker solo aparece al crear. En edit el tipo es
-                  // inmutable: el PATCH /steps/:id del backend no acepta
-                  // `type` ni `mediaRef`, así que cambiarlos requeriría
-                  // borrar y recrear. Se difiere a un slice cross-repo.
+                  // inmutable por decisión de UX: mutar el tipo de un
+                  // step ya creado cambia la semántica del paso (TEXT con
+                  // mediaRef no tiene sentido, multimedia sin mediaRef
+                  // rompe la validación del backend). Cambiar el tipo
+                  // implica borrar y recrear — flujo distinto que el
+                  // editor no expone aún.
                   if (widget.editing == null) ...<Widget>[
                     const SizedBox(height: AppTokens.sp4),
                     _TypePicker(
@@ -257,8 +260,11 @@ class _StepEditSheetState extends State<StepEditSheet> {
                       label: 'URL o id del recurso',
                       hint: 'https://… o id opaco del archivo subido',
                       controller: _mediaCtrl,
-                      // En edit el mediaRef es read-only por la misma razón
-                      // que el picker se oculta — el PATCH no lo acepta.
+                      // En edit el mediaRef es read-only por la misma
+                      // razón que el picker se oculta: cambiar el recurso
+                      // multimedia equivale a otro step. Edición de
+                      // media (replace de archivo) entra cuando S16
+                      // (media-storage) y file pickers aterricen.
                       enabled: !isMutating && widget.editing == null,
                     ),
                   ],
