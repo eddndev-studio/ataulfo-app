@@ -16,6 +16,8 @@ import 'package:agentic/features/templates/presentation/bloc/template_detail_blo
 import 'package:agentic/features/templates/presentation/bloc/var_defs_bloc.dart';
 import 'package:agentic/features/templates/presentation/pages/template_detail_page.dart';
 import 'package:agentic/features/templates/presentation/widgets/var_def_form_sheet.dart';
+import 'package:agentic/features/triggers/domain/entities/trigger.dart';
+import 'package:agentic/features/triggers/presentation/bloc/triggers_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -31,6 +33,9 @@ class _MockVarDefsBloc extends MockBloc<VarDefsEvent, VarDefsState>
 
 class _MockFlowsBloc extends MockBloc<FlowsEvent, FlowsState>
     implements FlowsBloc {}
+
+class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
+    implements TriggersBloc {}
 
 const _tpl = Template(
   id: 't1',
@@ -53,16 +58,19 @@ void main() {
     registerFallbackValue(const TemplateDetailLoadRequested());
     registerFallbackValue(const VarDefsLoadRequested());
     registerFallbackValue(const FlowsLoadRequested());
+    registerFallbackValue(const TriggersLoadRequested());
   });
 
   late _MockBloc bloc;
   late _MockVarDefsBloc varDefsBloc;
   late _MockFlowsBloc flowsBloc;
+  late _MockTriggersBloc triggersBloc;
 
   setUp(() {
     bloc = _MockBloc();
     varDefsBloc = _MockVarDefsBloc();
     flowsBloc = _MockFlowsBloc();
+    triggersBloc = _MockTriggersBloc();
     when(() => bloc.state).thenReturn(const TemplateDetailLoading());
     // Default: var-defs Loaded vacío (estado terminal sin animaciones).
     // Tests específicos de la sección Variables sobreescriben este stub.
@@ -72,6 +80,10 @@ void main() {
     // Default: flows Loaded vacío para que la sección Flujos no flashee
     // Loading en los tests que no la ejercen.
     when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+    // Default: triggers Loaded vacío. Mismo motivo que flows.
+    when(
+      () => triggersBloc.state,
+    ).thenReturn(const TriggersLoaded(<Trigger>[]));
   });
 
   Widget host() => MaterialApp(
@@ -81,6 +93,7 @@ void main() {
         BlocProvider<TemplateDetailBloc>.value(value: bloc),
         BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
         BlocProvider<FlowsBloc>.value(value: flowsBloc),
+        BlocProvider<TriggersBloc>.value(value: triggersBloc),
       ],
       // TemplateDetailPage es content-only; el host envuelve en Scaffold
       // para dar Material upstream a los widgets internos.
@@ -828,6 +841,7 @@ void main() {
                   BlocProvider<TemplateDetailBloc>.value(value: bloc),
                   BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
                   BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
                 ],
                 child: const Scaffold(body: TemplateDetailPage()),
               ),
@@ -925,6 +939,7 @@ void main() {
                   BlocProvider<TemplateDetailBloc>.value(value: bloc),
                   BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
                   BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
                 ],
                 child: const Scaffold(body: TemplateDetailPage()),
               ),
@@ -1115,6 +1130,7 @@ void main() {
                   BlocProvider<TemplateDetailBloc>.value(value: bloc),
                   BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
                   BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
                 ],
                 child: const Scaffold(body: TemplateDetailPage()),
               ),
@@ -1158,5 +1174,24 @@ void main() {
         );
       },
     );
+  });
+
+  // ── Sección Disparadores ──────────────────────────────────────────────────
+  group('sección Disparadores', () {
+    setUp(() {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+    });
+
+    testWidgets('siempre muestra el título "Disparadores"', (tester) async {
+      await tester.pumpWidget(host());
+      expect(find.text('Disparadores'), findsOneWidget);
+    });
+
+    testWidgets('monta TriggersSection en el árbol del page', (tester) async {
+      // Loaded vacío default del setUp → empty state inline.
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('triggers.empty')));
+      expect(find.byKey(const Key('triggers.empty')), findsOneWidget);
+    });
   });
 }

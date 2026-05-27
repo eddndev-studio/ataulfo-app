@@ -23,6 +23,8 @@ import 'package:agentic/features/templates/presentation/bloc/templates_bloc.dart
 import 'package:agentic/features/templates/presentation/pages/template_create_page.dart';
 import 'package:agentic/features/templates/presentation/pages/template_detail_page.dart';
 import 'package:agentic/features/templates/presentation/pages/template_edit_page.dart';
+import 'package:agentic/features/triggers/domain/entities/trigger.dart';
+import 'package:agentic/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -39,6 +41,8 @@ class _MockBotsRepo extends Mock implements BotsRepository {}
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
 class _MockFlowsRepo extends Mock implements FlowsRepository {}
+
+class _MockTriggersRepo extends Mock implements TriggersRepository {}
 
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
@@ -62,6 +66,7 @@ void main() {
   late _MockBotsRepo botsRepo;
   late _MockTemplatesRepo templatesRepo;
   late _MockFlowsRepo flowsRepo;
+  late _MockTriggersRepo triggersRepo;
   late _MockMembershipsRepo membershipsRepo;
   late _MockCatalogRepo catalogRepo;
   late AppRouter router;
@@ -71,6 +76,7 @@ void main() {
     botsRepo = _MockBotsRepo();
     templatesRepo = _MockTemplatesRepo();
     flowsRepo = _MockFlowsRepo();
+    triggersRepo = _MockTriggersRepo();
     membershipsRepo = _MockMembershipsRepo();
     catalogRepo = _MockCatalogRepo();
     // Los blocs page-scoped del shell arrancan con LoadRequested al
@@ -84,6 +90,9 @@ void main() {
     when(
       () => flowsRepo.listFlows(any()),
     ).thenAnswer((_) async => const <fdom.Flow>[]);
+    when(
+      () => triggersRepo.listTriggers(any()),
+    ).thenAnswer((_) async => const <Trigger>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
     when(
       catalogRepo.fetch,
@@ -94,6 +103,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -212,6 +222,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -289,6 +300,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -312,6 +324,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -371,6 +384,7 @@ void main() {
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
+        triggersRepository: triggersRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
       );
@@ -432,6 +446,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );
@@ -509,6 +524,7 @@ void main() {
         botsRepository: botsRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
+        triggersRepository: triggersRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
       );
@@ -533,6 +549,7 @@ void main() {
       botsRepository: botsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
     );

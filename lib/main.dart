@@ -22,6 +22,8 @@ import 'features/memberships/data/datasources/memberships_datasource.dart';
 import 'features/memberships/data/repositories/memberships_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
 import 'features/templates/data/repositories/templates_repository_impl.dart';
+import 'features/triggers/data/datasources/triggers_datasource.dart';
+import 'features/triggers/data/repositories/triggers_repository_impl.dart';
 
 /// Punto de entrada. Composición manual de dependencias — sin DI framework
 /// hasta que un slice futuro lo justifique.
@@ -91,6 +93,10 @@ void main() {
     datasource: DioFlowsDatasource(mainDio),
   );
 
+  final triggersRepository = TriggersRepositoryImpl(
+    datasource: DioTriggersDatasource(mainDio),
+  );
+
   final membershipsRepository = MembershipsRepositoryImpl(
     datasource: DioMembershipsDatasource(mainDio),
   );
@@ -105,6 +111,7 @@ void main() {
     botsRepository: botsRepository,
     templatesRepository: templatesRepository,
     flowsRepository: flowsRepository,
+    triggersRepository: triggersRepository,
     membershipsRepository: membershipsRepository,
     catalogRepository: catalogRepository,
   );
