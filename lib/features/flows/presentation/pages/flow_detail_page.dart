@@ -9,22 +9,46 @@ import '../../domain/entities/flow.dart' as fdom;
 import '../../domain/entities/step.dart' as sdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
+import '../bloc/flow_steps_bloc.dart';
+import '../widgets/step_edit_sheet.dart';
 
-/// Detalle de un Flow (S11) — read-only en F2. Render por estado del
-/// `FlowDetailBloc` del scope; el cableado del provider, el AppBar y el
-/// Scaffold los aporta la ruta `/flows/:id`.
-class FlowDetailPage extends StatelessWidget {
+/// Detalle de un Flow (S11). Stateful para sostener el TabController de
+/// las 3 secciones del editor: Pasos / Disparadores / Configuración. El
+/// cableado del Scaffold y el AppBar los aporta la ruta `/flows/:id`; el
+/// page entrega el shell del TabBar más el contenido por tab.
+///
+/// El TabBar solo aparece en Loaded — en Loading/Failed no tiene sentido
+/// porque el operador todavía no puede operar el flow. El TabController
+/// vive en _State y se reusa entre rebuilds del bloc.
+class FlowDetailPage extends StatefulWidget {
   const FlowDetailPage({super.key});
+
+  @override
+  State<FlowDetailPage> createState() => _FlowDetailPageState();
+}
+
+class _FlowDetailPageState extends State<FlowDetailPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<FlowDetailBloc, FlowDetailState>(
       builder: (context, state) => switch (state) {
         FlowDetailLoading() => const _LoadingView(),
-        FlowDetailLoaded(flow: final f, steps: final ss) => _LoadedView(
-          flow: f,
-          steps: ss,
-        ),
+        FlowDetailLoaded(flow: final f) => _LoadedShell(tab: _tab, flow: f),
         FlowDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );
@@ -42,11 +66,70 @@ class _LoadingView extends StatelessWidget {
   );
 }
 
-class _LoadedView extends StatelessWidget {
-  const _LoadedView({required this.flow, required this.steps});
+/// Shell del Loaded: TabBar fijo arriba + TabBarView con las 3 secciones
+/// del editor. El TabController lo aporta el _State del page para que
+/// sobreviva a los rebuilds del bloc; los tabs son fijos (3 secciones
+/// estables del editor).
+class _LoadedShell extends StatelessWidget {
+  const _LoadedShell({required this.tab, required this.flow});
+
+  final TabController tab;
+  final fdom.Flow flow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        Material(
+          color: AppTokens.surface1,
+          child: TabBar(
+            controller: tab,
+            tabs: const <Widget>[
+              Tab(text: 'Pasos'),
+              Tab(text: 'Disparadores'),
+              Tab(text: 'Configuración'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: tab,
+            children: <Widget>[
+              _StepsTab(flow: flow),
+              const _ComingSoonTab(
+                tabKey: Key('flow_detail.tab.triggers.coming_soon'),
+                title: 'Disparadores',
+                copy:
+                    'Los disparadores se administran desde la plantilla. '
+                    'Próximamente verás aquí los que apuntan a este flujo.',
+              ),
+              const _ComingSoonTab(
+                tabKey: Key('flow_detail.tab.settings.coming_soon'),
+                title: 'Configuración',
+                copy:
+                    'Próximamente: cooldown, límite de uso y exclusiones '
+                    'entre flujos.',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Tab de Pasos. El header del flow (nombre + pills v/status) se renderiza
+/// siempre — viene de `FlowDetailBloc.Loaded`, que ya está resuelto cuando
+/// el shell se monta. La lista de StepCards depende del `FlowStepsBloc`
+/// propio del tab, con sus tres estados (Loading/Loaded/Failed).
+///
+/// Que el header viva fuera del estado del listado permite mostrar
+/// progresivamente: el operador ve qué flujo está editando aunque la
+/// llamada a `/flows/:id/steps` aún esté en vuelo o haya fallado.
+class _StepsTab extends StatelessWidget {
+  const _StepsTab({required this.flow});
 
   final fdom.Flow flow;
-  final List<sdom.Step> steps;
 
   @override
   Widget build(BuildContext context) {
@@ -76,26 +159,206 @@ class _LoadedView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppTokens.sp6),
-          Text(
-            'Pasos',
-            style: textTheme.titleMedium?.copyWith(color: AppTokens.text2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppButton.text(
+              key: const Key('flow_detail.steps.add_button'),
+              label: 'Nuevo paso',
+              icon: Icons.add,
+              onPressed: () => _openStepSheet(context, null),
+            ),
           ),
           const SizedBox(height: AppTokens.sp3),
-          if (steps.isEmpty)
-            Text(
-              'Este flujo aún no tiene pasos.',
-              key: const Key('flow_detail.steps.empty'),
-              style: textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            )
-          else
-            for (final s in steps) ...<Widget>[
-              _StepCard(step: s),
-              const SizedBox(height: AppTokens.sp3),
-            ],
+          const _StepsList(),
         ],
+      ),
+    );
+  }
+}
+
+/// Lista de StepCards atada al `FlowStepsBloc`. Loading muestra spinner
+/// inline (no centrado en pantalla, ya que el header vive arriba).
+/// Failed muestra mensaje + retry; NotFound se trata como mensaje
+/// terminal sin botón.
+class _StepsList extends StatelessWidget {
+  const _StepsList();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return BlocBuilder<FlowStepsBloc, FlowStepsState>(
+      builder: (context, state) => switch (state) {
+        FlowStepsLoading() => const Padding(
+          padding: EdgeInsets.symmetric(vertical: AppTokens.sp4),
+          child: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+            ),
+          ),
+        ),
+        FlowStepsLoaded(steps: final ss) => _StepsListView(
+          steps: ss,
+          textTheme: textTheme,
+        ),
+        // Mutating y MutationFailed mantienen la lista visible (snapshot
+        // preservado) para que el operador no pierda contexto mientras la
+        // mutación está en curso o tras un fallo recuperable.
+        FlowStepsMutating(steps: final ss) => _StepsListView(
+          steps: ss,
+          textTheme: textTheme,
+          isMutating: true,
+        ),
+        FlowStepsMutationFailed(steps: final ss) => _StepsListView(
+          steps: ss,
+          textTheme: textTheme,
+        ),
+        FlowStepsFailed(failure: final f) => _StepsFailedView(failure: f),
+      },
+    );
+  }
+}
+
+/// Renderiza la lista de StepCards o el empty state. `isMutating` agrega
+/// un spinner inline al inicio (no overlay) para indicar que una
+/// mutación está en curso sin tapar la lista existente.
+class _StepsListView extends StatelessWidget {
+  const _StepsListView({
+    required this.steps,
+    required this.textTheme,
+    this.isMutating = false,
+  });
+
+  final List<sdom.Step> steps;
+  final TextTheme textTheme;
+  final bool isMutating;
+
+  @override
+  Widget build(BuildContext context) {
+    if (steps.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (isMutating) ...<Widget>[
+            const _MutatingInlineSpinner(),
+            const SizedBox(height: AppTokens.sp3),
+          ],
+          Text(
+            'Este flujo aún no tiene pasos.',
+            key: const Key('flow_detail.steps.empty'),
+            style: textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppTokens.text2,
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (isMutating) ...<Widget>[
+          const _MutatingInlineSpinner(),
+          const SizedBox(height: AppTokens.sp3),
+        ],
+        for (final s in steps) ...<Widget>[
+          _StepCard(step: s),
+          const SizedBox(height: AppTokens.sp3),
+        ],
+      ],
+    );
+  }
+}
+
+class _MutatingInlineSpinner extends StatelessWidget {
+  const _MutatingInlineSpinner();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+    key: Key('flow_detail.steps.mutating'),
+    height: 2,
+    child: LinearProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
+}
+
+class _StepsFailedView extends StatelessWidget {
+  const _StepsFailedView({required this.failure});
+
+  final FlowsFailure failure;
+
+  @override
+  Widget build(BuildContext context) {
+    final isNotFound = failure is FlowsNotFoundFailure;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      key: isNotFound
+          ? const Key('flow_detail.steps.error.not_found')
+          : const Key('flow_detail.steps.error.generic'),
+      padding: const EdgeInsets.symmetric(vertical: AppTokens.sp4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            isNotFound
+                ? 'No pudimos encontrar los pasos de este flujo.'
+                : 'No pudimos cargar los pasos.',
+            style: textTheme.bodyMedium,
+          ),
+          if (!isNotFound) ...<Widget>[
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
+              onPressed: () => context.read<FlowStepsBloc>().add(
+                const FlowStepsLoadRequested(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Placeholder para tabs aún no implementadas. Centra un mensaje breve
+/// para que el operador entienda que la sección existe pero no está
+/// lista todavía — evita confusión por tab "vacía".
+class _ComingSoonTab extends StatelessWidget {
+  const _ComingSoonTab({
+    required this.tabKey,
+    required this.title,
+    required this.copy,
+  });
+
+  final Key tabKey;
+  final String title;
+  final String copy;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Center(
+      key: tabKey,
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.sp6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(title, style: textTheme.titleMedium),
+            const SizedBox(height: AppTokens.sp2),
+            Text(
+              'Próximamente',
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppTokens.sp3),
+            Text(
+              copy,
+              style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -113,37 +376,60 @@ class _StepCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return AppCard(
+    return InkWell(
       key: Key('flow_detail.step_card.${step.id}'),
-      padding: AppTokens.sp4,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Text(
-                '${step.order + 1}.',
-                style: textTheme.titleMedium?.copyWith(color: AppTokens.text2),
-              ),
-              const SizedBox(width: AppTokens.sp2),
-              Text(_humanLabelFor(step.type), style: textTheme.titleMedium),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp2),
-          _StepBody(step: step, textTheme: textTheme),
-          const SizedBox(height: AppTokens.sp3),
-          Wrap(
-            spacing: AppTokens.sp2,
-            runSpacing: AppTokens.sp2,
-            children: <Widget>[
-              AppPill.neutral(label: _delayLabel(step)),
-              if (step.aiOnly) const AppPill.primary(label: 'Solo IA'),
-            ],
-          ),
-        ],
+      borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+      // Tap abre el sheet en modo edit pre-fillado con este step.
+      onTap: () => _openStepSheet(context, step),
+      child: AppCard(
+        padding: AppTokens.sp4,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Text(
+                  '${step.order + 1}.',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: AppTokens.text2,
+                  ),
+                ),
+                const SizedBox(width: AppTokens.sp2),
+                Text(_humanLabelFor(step.type), style: textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: AppTokens.sp2),
+            _StepBody(step: step, textTheme: textTheme),
+            const SizedBox(height: AppTokens.sp3),
+            Wrap(
+              spacing: AppTokens.sp2,
+              runSpacing: AppTokens.sp2,
+              children: <Widget>[
+                AppPill.neutral(label: _delayLabel(step)),
+                if (step.aiOnly) const AppPill.primary(label: 'Solo IA'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Abre el sheet de edición pasando el FlowStepsBloc del scope y, si
+/// `step` viene, el step a editar. La función vive a nivel de archivo
+/// porque la usan tanto _StepsTab (botón "Nuevo paso") como _StepCard
+/// (tap del card).
+void _openStepSheet(BuildContext context, sdom.Step? step) {
+  final bloc = context.read<FlowStepsBloc>();
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetCtx) => BlocProvider<FlowStepsBloc>.value(
+      value: bloc,
+      child: StepEditSheet(editing: step),
+    ),
+  );
 }
 
 /// Cuerpo del step según tipo. TEXT muestra content; multimedia muestra

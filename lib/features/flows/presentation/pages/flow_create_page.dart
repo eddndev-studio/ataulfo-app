@@ -127,7 +127,11 @@ class _FailedView extends StatelessWidget {
       'flow_create.error.network',
       'Sin conexión con el servidor. Revisa tu red y reintenta.',
     ),
-    FlowsNotFoundFailure() || FlowsServerFailure() || UnknownFlowsFailure() => (
+    FlowsNotFoundFailure() ||
+    FlowsServerFailure() ||
+    FlowsInvalidStepFailure() ||
+    FlowsStepNotFoundFailure() ||
+    UnknownFlowsFailure() => (
       'flow_create.error.generic',
       'No pudimos crear el flujo. Inténtalo de nuevo.',
     ),

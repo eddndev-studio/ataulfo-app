@@ -22,4 +22,36 @@ abstract interface class FlowsRepository {
   /// defaults silenciosos y se ajustan después en el Settings tab del
   /// editor. 422 si el nombre rompe la validación → `FlowsInvalidCreateFailure`.
   Future<Flow> createFlow({required String templateId, required String name});
+
+  /// Crea un Step en el flow. El bloc resuelve `order` (último + 1 al
+  /// agregar al final) antes de invocar. El backend rechaza con 422 si
+  /// el body rompe la validación del dominio del step
+  /// → `FlowsInvalidStepFailure`; 404 si el flow padre no existe.
+  Future<fdom.Step> createStep({
+    required String flowId,
+    required fdom.StepType type,
+    required int order,
+    required String content,
+    required String mediaRef,
+    required int delayMs,
+    required int jitterPct,
+    required bool aiOnly,
+  });
+
+  /// Edita un Step (partial update). Campos `null` se omiten — el
+  /// backend preserva su valor actual. 422 → `FlowsInvalidStepFailure`;
+  /// 404 → `FlowsStepNotFoundFailure` (el step ya no existe — el
+  /// listado en pantalla está obsoleto).
+  Future<fdom.Step> patchStep({
+    required String stepId,
+    String? content,
+    int? delayMs,
+    int? jitterPct,
+    bool? aiOnly,
+  });
+
+  /// Elimina un Step. Operación idempotente: si el step no existe, no
+  /// falla — el bloc puede asumir que tras éxito el step ya no está en
+  /// el servidor.
+  Future<void> deleteStep(String stepId);
 }

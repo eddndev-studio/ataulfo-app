@@ -57,3 +57,22 @@ final class UnknownFlowsFailure extends FlowsFailure {
 final class FlowsInvalidCreateFailure extends FlowsFailure {
   const FlowsInvalidCreateFailure();
 }
+
+/// 422 contra mutaciones de step (`POST /flows/:id/steps`, `PATCH
+/// /steps/:id`): el body rompió la validación del dominio del step
+/// (content vacío en TEXT, delayMs fuera de rango, mediaRef ausente en
+/// multimedia, metadata inválida en CONDITIONAL_TIME, etc.). Reintentable
+/// tras corregir; copy del cliente debe orientar a "revisa los campos
+/// del paso" sin sacar el código del wire.
+final class FlowsInvalidStepFailure extends FlowsFailure {
+  const FlowsInvalidStepFailure();
+}
+
+/// 404 contra mutaciones de step (`PATCH /steps/:id`). Distinto de
+/// `FlowsNotFoundFailure` (que es del flow padre) — aquí el flow puede
+/// existir pero el step en particular no, típicamente porque otro
+/// operador lo borró entre el listado y el patch. Reintentar el mismo
+/// id falla idéntico; la UI debe forzar refresh del listado.
+final class FlowsStepNotFoundFailure extends FlowsFailure {
+  const FlowsStepNotFoundFailure();
+}

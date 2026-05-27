@@ -6,6 +6,7 @@ import 'package:agentic/features/flows/domain/entities/flow.dart' as flows;
 import 'package:agentic/features/flows/domain/entities/step.dart' as fdom;
 import 'package:agentic/features/flows/domain/failures/flows_failure.dart';
 import 'package:agentic/features/flows/presentation/bloc/flow_detail_bloc.dart';
+import 'package:agentic/features/flows/presentation/bloc/flow_steps_bloc.dart';
 import 'package:agentic/features/flows/presentation/pages/flow_detail_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -13,8 +14,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockBloc extends MockBloc<FlowDetailEvent, FlowDetailState>
+class _MockDetailBloc extends MockBloc<FlowDetailEvent, FlowDetailState>
     implements FlowDetailBloc {}
+
+class _MockStepsBloc extends MockBloc<FlowStepsEvent, FlowStepsState>
+    implements FlowStepsBloc {}
 
 const _flow = flows.Flow(
   id: 'f1',
@@ -27,25 +31,32 @@ const _flow = flows.Flow(
 void main() {
   setUpAll(() {
     registerFallbackValue(const FlowDetailLoadRequested());
+    registerFallbackValue(const FlowStepsLoadRequested());
   });
 
-  late _MockBloc bloc;
+  late _MockDetailBloc detailBloc;
+  late _MockStepsBloc stepsBloc;
 
   setUp(() {
-    bloc = _MockBloc();
-    when(() => bloc.state).thenReturn(const FlowDetailLoading());
+    detailBloc = _MockDetailBloc();
+    stepsBloc = _MockStepsBloc();
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
+    when(() => stepsBloc.state).thenReturn(const FlowStepsLoading());
   });
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: BlocProvider<FlowDetailBloc>.value(
-      value: bloc,
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<FlowDetailBloc>.value(value: detailBloc),
+        BlocProvider<FlowStepsBloc>.value(value: stepsBloc),
+      ],
       child: const Scaffold(body: FlowDetailPage()),
     ),
   );
 
   testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
-    when(() => bloc.state).thenReturn(const FlowDetailLoading());
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
 
     await tester.pumpWidget(host());
 
@@ -58,9 +69,10 @@ void main() {
   testWidgets('Loaded muestra header con nombre + pill version + pill status', (
     tester,
   ) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
     when(
-      () => bloc.state,
-    ).thenReturn(const FlowDetailLoaded(_flow, <fdom.Step>[]));
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
     await tester.pumpWidget(host());
 
@@ -79,9 +91,10 @@ void main() {
         isActive: false,
         version: 1,
       );
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(paused));
       when(
-        () => bloc.state,
-      ).thenReturn(const FlowDetailLoaded(paused, <fdom.Step>[]));
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
       await tester.pumpWidget(host());
 
@@ -90,10 +103,11 @@ void main() {
     },
   );
 
-  testWidgets('Loaded con steps vacíos muestra empty state', (tester) async {
+  testWidgets('FlowStepsLoaded vacío muestra empty state', (tester) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
     when(
-      () => bloc.state,
-    ).thenReturn(const FlowDetailLoaded(_flow, <fdom.Step>[]));
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
     await tester.pumpWidget(host());
 
@@ -101,10 +115,11 @@ void main() {
   });
 
   testWidgets(
-    'Loaded con steps muestra una card por step con humanización del type',
+    'FlowStepsLoaded con items muestra una card por step con humanización del type',
     (tester) async {
-      when(() => bloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <fdom.Step>[
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
             id: 's1',
             flowId: 'f1',
@@ -136,39 +151,89 @@ void main() {
 
       expect(find.byKey(const Key('flow_detail.step_card.s1')), findsOneWidget);
       expect(find.byKey(const Key('flow_detail.step_card.s2')), findsOneWidget);
-      // Humanización del type (Texto / Imagen).
       expect(find.text('Texto'), findsOneWidget);
       expect(find.text('Imagen'), findsOneWidget);
-      // Content del TEXT step.
       expect(find.text('Hola {{name}}'), findsOneWidget);
-      // mediaRef del IMAGE step (truncado o completo según logic).
       expect(find.textContaining('example.com/x.png'), findsWidgets);
-      // Pill aiOnly visible sólo para s2.
       expect(find.widgetWithText(AppPill, 'Solo IA'), findsOneWidget);
     },
   );
 
-  testWidgets('Failed(NotFound) muestra mensaje terminal sin Reintentar', (
-    tester,
-  ) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const FlowDetailFailed(FlowsNotFoundFailure()));
+  testWidgets(
+    'FlowStepsLoading muestra spinner inline en el tab Pasos (header sigue visible)',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(const FlowStepsLoading());
 
-    await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
 
-    expect(
-      find.byKey(const Key('flow_detail.error.not_found')),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(AppButton, 'Reintentar'), findsNothing);
-  });
+      // Header sigue visible.
+      expect(find.text('Bienvenida'), findsOneWidget);
+      // Y aparece un spinner en el tab Pasos.
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    },
+  );
 
   testWidgets(
-    'Failed(no NotFound) muestra mensaje genérico + tap Reintentar dispatcha LoadRequested',
+    'FlowStepsFailed(no NotFound) muestra mensaje genérico + tap Reintentar dispatcha LoadRequested',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsFailed(FlowsServerFailure()));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('flow_detail.steps.error.generic')),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
+      await tester.pump();
+      verify(() => stepsBloc.add(const FlowStepsLoadRequested())).called(1);
+    },
+  );
+
+  testWidgets(
+    'FlowStepsFailed(NotFound) muestra mensaje terminal sin Reintentar',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsFailed(FlowsNotFoundFailure()));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('flow_detail.steps.error.not_found')),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(AppButton, 'Reintentar'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'FlowDetailFailed(NotFound) muestra mensaje terminal sin Reintentar',
     (tester) async {
       when(
-        () => bloc.state,
+        () => detailBloc.state,
+      ).thenReturn(const FlowDetailFailed(FlowsNotFoundFailure()));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('flow_detail.error.not_found')),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(AppButton, 'Reintentar'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'FlowDetailFailed(no NotFound) muestra mensaje genérico + Reintentar dispatcha LoadRequested al FlowDetailBloc',
+    (tester) async {
+      when(
+        () => detailBloc.state,
       ).thenReturn(const FlowDetailFailed(FlowsServerFailure()));
 
       await tester.pumpWidget(host());
@@ -179,7 +244,167 @@ void main() {
       );
       await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
       await tester.pump();
-      verify(() => bloc.add(const FlowDetailLoadRequested())).called(1);
+      verify(() => detailBloc.add(const FlowDetailLoadRequested())).called(1);
+    },
+  );
+
+  testWidgets(
+    'Loaded monta TabBar con 3 tabs: Pasos / Disparadores / Configuración',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+
+      await tester.pumpWidget(host());
+
+      expect(find.byType(TabBar), findsOneWidget);
+      final tabBar = find.byType(TabBar);
+      expect(
+        find.descendant(of: tabBar, matching: find.text('Pasos')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tabBar, matching: find.text('Disparadores')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tabBar, matching: find.text('Configuración')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('Tap en tab Disparadores muestra placeholder "Próximamente"', (
+    tester,
+  ) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text('Disparadores'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('flow_detail.tab.triggers.coming_soon')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Tap en tab Configuración muestra placeholder "Próximamente"', (
+    tester,
+  ) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text('Configuración'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('flow_detail.tab.settings.coming_soon')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Loading no monta TabBar', (tester) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(TabBar), findsNothing);
+  });
+
+  testWidgets('Failed no monta TabBar', (tester) async {
+    when(
+      () => detailBloc.state,
+    ).thenReturn(const FlowDetailFailed(FlowsServerFailure()));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(TabBar), findsNothing);
+  });
+
+  testWidgets('Tab Pasos muestra botón "Nuevo paso"', (tester) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+
+    expect(
+      find.byKey(const Key('flow_detail.steps.add_button')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Tap del botón "Nuevo paso" abre el StepEditSheet (modal)', (
+    tester,
+  ) async {
+    when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+    when(
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
+    await tester.pumpAndSettle();
+
+    // El sheet del paso aparece (campo content confirma su presencia;
+    // el título "Nuevo paso" choca con el label del botón).
+    expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
+    expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
+  });
+
+  testWidgets(
+    'Tap en StepCard abre el StepEditSheet en modo Edit (prefilled)',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoaded(_flow));
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'Hola original',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('flow_detail.step_card.s1')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Editar paso'), findsOneWidget);
+      // Prefilling: el TextField del content tiene el valor del step.
+      final tf = tester.widget<TextField>(
+        find.descendant(
+          of: find.byKey(const Key('step_edit.content')),
+          matching: find.byType(TextField),
+        ),
+      );
+      expect(tf.controller?.text, 'Hola original');
     },
   );
 }

@@ -472,4 +472,532 @@ void main() {
       );
     });
   });
+
+  Map<String, dynamic> stepJson({
+    String id = 's-new',
+    String flowId = 'f1',
+    String type = 'TEXT',
+    int order = 0,
+    String content = 'Hola',
+    String mediaRef = '',
+    int delayMs = 0,
+    int jitterPct = 0,
+    bool aiOnly = false,
+  }) => <String, dynamic>{
+    'id': id,
+    'flowId': flowId,
+    'type': type,
+    'order': order,
+    'content': content,
+    'mediaRef': mediaRef,
+    'metadata': <String, dynamic>{},
+    'delayMs': delayMs,
+    'jitterPct': jitterPct,
+    'aiOnly': aiOnly,
+    'createdAt': '2026-05-27T10:00:00Z',
+    'updatedAt': '2026-05-27T10:00:00Z',
+  };
+
+  group('DioFlowsDatasource.createStep happy path', () {
+    test(
+      '201 con body devuelve Step mapeado y POST al path correcto',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/flows/f1/steps'),
+            statusCode: 201,
+            data: stepJson(
+              id: 's-new',
+              order: 2,
+              content: 'Bienvenido',
+              delayMs: 1500,
+              jitterPct: 10,
+              aiOnly: true,
+            ),
+          ),
+        );
+
+        final out = await ds.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 2,
+          content: 'Bienvenido',
+          mediaRef: '',
+          delayMs: 1500,
+          jitterPct: 10,
+          aiOnly: true,
+        );
+
+        expect(out.id, 's-new');
+        expect(out.flowId, 'f1');
+        expect(out.type, fdom.StepType.text);
+        expect(out.order, 2);
+        expect(out.content, 'Bienvenido');
+        expect(out.delayMs, 1500);
+        expect(out.jitterPct, 10);
+        expect(out.aiOnly, true);
+
+        final captured = verify(
+          () => dio.post<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured[0], '/flows/f1/steps');
+        expect(captured[1], <String, dynamic>{
+          'type': 'TEXT',
+          'order': 2,
+          'content': 'Bienvenido',
+          'mediaRef': '',
+          'delayMs': 1500,
+          'jitterPct': 10,
+          'aiOnly': true,
+        });
+      },
+    );
+  });
+
+  group('DioFlowsDatasource.createStep failure mapping', () {
+    test(
+      '422 → FlowsInvalidStepFailure (content vacío en TEXT, etc.)',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenThrow(badResponse(422, path: '/flows/f1/steps'));
+
+        await expectLater(
+          () => ds.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: '',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          throwsA(isA<FlowsInvalidStepFailure>()),
+        );
+      },
+    );
+
+    test('404 → FlowsNotFoundFailure (flow padre no existe)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(404, path: '/flows/f1/steps'));
+
+      await expectLater(
+        () => ds.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: 'X',
+          mediaRef: '',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+        throwsA(isA<FlowsNotFoundFailure>()),
+      );
+    });
+
+    test('403 → FlowsForbiddenFailure (rol no alcanza)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(badResponse(403, path: '/flows/f1/steps'));
+
+      await expectLater(
+        () => ds.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: 'X',
+          mediaRef: '',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+        throwsA(isA<FlowsForbiddenFailure>()),
+      );
+    });
+
+    test('connectionError → FlowsNetworkFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1/steps'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: 'X',
+          mediaRef: '',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+        throwsA(isA<FlowsNetworkFailure>()),
+      );
+    });
+
+    test('body null en 201 → UnknownFlowsFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/flows/f1/steps'),
+          statusCode: 201,
+          data: null,
+        ),
+      );
+
+      await expectLater(
+        () => ds.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: 'X',
+          mediaRef: '',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+        throwsA(isA<UnknownFlowsFailure>()),
+      );
+    });
+
+    test('timeout → FlowsTimeoutFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1/steps'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+
+      await expectLater(
+        () => ds.createStep(
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: 'X',
+          mediaRef: '',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+        throwsA(isA<FlowsTimeoutFailure>()),
+      );
+    });
+  });
+
+  group('DioFlowsDatasource.patchStep happy path', () {
+    test(
+      '200 con body devuelve Step mapeado; body only-changed sin campos null',
+      () async {
+        when(
+          () => dio.patch<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            statusCode: 200,
+            data: stepJson(id: 's1', content: 'Nuevo'),
+          ),
+        );
+
+        final out = await ds.patchStep(stepId: 's1', content: 'Nuevo');
+
+        expect(out.id, 's1');
+        expect(out.content, 'Nuevo');
+
+        final captured = verify(
+          () => dio.patch<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured[0], '/steps/s1');
+        // El body sólo trae los campos suministrados; el resto NO va con
+        // valor null (omitir es preservar para el backend).
+        expect(captured[1], <String, dynamic>{'content': 'Nuevo'});
+      },
+    );
+
+    test('body con todos los campos opcionales viaja completo', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          statusCode: 200,
+          data: stepJson(id: 's1'),
+        ),
+      );
+
+      await ds.patchStep(
+        stepId: 's1',
+        content: 'X',
+        delayMs: 2000,
+        jitterPct: 20,
+        aiOnly: true,
+      );
+
+      final captured = verify(
+        () => dio.patch<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      expect(captured[1], <String, dynamic>{
+        'content': 'X',
+        'delayMs': 2000,
+        'jitterPct': 20,
+        'aiOnly': true,
+      });
+    });
+  });
+
+  group('DioFlowsDatasource.patchStep failure mapping', () {
+    DioException patchBadResponse(int status) => DioException(
+      requestOptions: RequestOptions(path: '/steps/s1'),
+      response: Response<dynamic>(
+        requestOptions: RequestOptions(path: '/steps/s1'),
+        statusCode: status,
+      ),
+      type: DioExceptionType.badResponse,
+    );
+
+    test('422 → FlowsInvalidStepFailure', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(patchBadResponse(422));
+
+      await expectLater(
+        () => ds.patchStep(stepId: 's1', content: ''),
+        throwsA(isA<FlowsInvalidStepFailure>()),
+      );
+    });
+
+    test('404 → FlowsStepNotFoundFailure (step inexistente)', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(patchBadResponse(404));
+
+      await expectLater(
+        () => ds.patchStep(stepId: 's1', content: 'X'),
+        throwsA(isA<FlowsStepNotFoundFailure>()),
+      );
+    });
+
+    test('403 → FlowsForbiddenFailure', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(patchBadResponse(403));
+
+      await expectLater(
+        () => ds.patchStep(stepId: 's1', content: 'X'),
+        throwsA(isA<FlowsForbiddenFailure>()),
+      );
+    });
+
+    test('connectionError → FlowsNetworkFailure', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.patchStep(stepId: 's1', content: 'X'),
+        throwsA(isA<FlowsNetworkFailure>()),
+      );
+    });
+
+    test('body null en 200 → UnknownFlowsFailure', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          statusCode: 200,
+          data: null,
+        ),
+      );
+
+      await expectLater(
+        () => ds.patchStep(stepId: 's1', content: 'X'),
+        throwsA(isA<UnknownFlowsFailure>()),
+      );
+    });
+  });
+
+  group('DioFlowsDatasource.deleteStep', () {
+    test('204 OK — request path correcto', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response<void>(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          statusCode: 204,
+        ),
+      );
+
+      await ds.deleteStep('s1');
+
+      final captured = verify(
+        () => dio.delete<void>(captureAny(), options: any(named: 'options')),
+      ).captured;
+      expect(captured[0], '/steps/s1');
+    });
+
+    test(
+      '404 NO se mapea a failure — idempotente (servidor responde 204 igual)',
+      () async {
+        // El backend siempre devuelve 204 según handler — el 404 no llega.
+        // Pero defensivamente: si llega 404, lo tratamos como éxido idempotente.
+        when(
+          () => dio.delete<void>(any(), options: any(named: 'options')),
+        ).thenThrow(
+          DioException(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            response: Response<dynamic>(
+              requestOptions: RequestOptions(path: '/steps/s1'),
+              statusCode: 404,
+            ),
+            type: DioExceptionType.badResponse,
+          ),
+        );
+
+        // No debe lanzar — el DELETE es idempotente HTTP.
+        await ds.deleteStep('s1');
+      },
+    );
+
+    test('403 → FlowsForbiddenFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            statusCode: 403,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteStep('s1'),
+        throwsA(isA<FlowsForbiddenFailure>()),
+      );
+    });
+
+    test('connectionError → FlowsNetworkFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteStep('s1'),
+        throwsA(isA<FlowsNetworkFailure>()),
+      );
+    });
+
+    test('5xx → FlowsServerFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            statusCode: 500,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteStep('s1'),
+        throwsA(isA<FlowsServerFailure>()),
+      );
+    });
+  });
 }
