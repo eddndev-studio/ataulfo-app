@@ -453,12 +453,10 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      // Arrastra el handle del primer step hacia abajo lo suficiente
-      // para cruzar al segundo. ReorderableDragStartListener inicia el
-      // drag desde el primer movimiento del puntero sobre el handle.
-      await tester.drag(
+      await tester.timedDrag(
         find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
         const Offset(0, 200),
+        const Duration(milliseconds: 500),
       );
       await tester.pumpAndSettle();
 

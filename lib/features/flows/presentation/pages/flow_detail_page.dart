@@ -123,9 +123,11 @@ class _LoadedShell extends StatelessWidget {
 /// el shell se monta. La lista de StepCards depende del `FlowStepsBloc`
 /// propio del tab, con sus tres estados (Loading/Loaded/Failed).
 ///
-/// Que el header viva fuera del estado del listado permite mostrar
-/// progresivamente: el operador ve qué flujo está editando aunque la
-/// llamada a `/flows/:id/steps` aún esté en vuelo o haya fallado.
+/// Header fijo en la parte superior + lista expandible abajo: para que
+/// el `ReorderableListView` (cuando hay ≥2 steps) tenga el viewport
+/// bounded que necesita para el drag&drop. Que el header viva fuera
+/// del listado permite render progresivo: el operador ve qué flujo
+/// está editando aunque `/flows/:id/steps` siga en vuelo o falle.
 class _StepsTab extends StatelessWidget {
   const _StepsTab({required this.flow});
 
@@ -134,44 +136,54 @@ class _StepsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final viewPaddingBottom = MediaQuery.viewPaddingOf(context).bottom;
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6 + viewPaddingBottom,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(flow.name, style: textTheme.titleLarge),
-          const SizedBox(height: AppTokens.sp3),
-          Wrap(
-            spacing: AppTokens.sp2,
-            runSpacing: AppTokens.sp2,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppTokens.sp6,
+            AppTokens.sp6,
+            AppTokens.sp6,
+            0,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              AppPill.outline(label: 'v${flow.version}'),
-              if (flow.isActive)
-                const AppPill.primary(label: 'Activo', dot: AppPillDot.active)
-              else
-                const AppPill.neutral(label: 'Pausado', dot: AppPillDot.paused),
+              Text(flow.name, style: textTheme.titleLarge),
+              const SizedBox(height: AppTokens.sp3),
+              Wrap(
+                spacing: AppTokens.sp2,
+                runSpacing: AppTokens.sp2,
+                children: <Widget>[
+                  AppPill.outline(label: 'v${flow.version}'),
+                  if (flow.isActive)
+                    const AppPill.primary(
+                      label: 'Activo',
+                      dot: AppPillDot.active,
+                    )
+                  else
+                    const AppPill.neutral(
+                      label: 'Pausado',
+                      dot: AppPillDot.paused,
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppTokens.sp6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: AppButton.text(
+                  key: const Key('flow_detail.steps.add_button'),
+                  label: 'Nuevo paso',
+                  icon: Icons.add,
+                  onPressed: () => _openStepSheet(context, null),
+                ),
+              ),
+              const SizedBox(height: AppTokens.sp3),
             ],
           ),
-          const SizedBox(height: AppTokens.sp6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: AppButton.text(
-              key: const Key('flow_detail.steps.add_button'),
-              label: 'Nuevo paso',
-              icon: Icons.add,
-              onPressed: () => _openStepSheet(context, null),
-            ),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          const _StepsList(),
-        ],
-      ),
+        ),
+        const Expanded(child: _StepsList()),
+      ],
     );
   }
 }
@@ -221,6 +233,10 @@ class _StepsList extends StatelessWidget {
 /// Renderiza la lista de StepCards o el empty state. `isMutating` agrega
 /// un spinner inline al inicio (no overlay) para indicar que una
 /// mutación está en curso sin tapar la lista existente.
+///
+/// Con ≥2 steps usa `ReorderableListView.builder` para soportar drag&drop.
+/// Con 0 o 1 step usa un layout simple — no tiene sentido pagar el costo
+/// del scroll de reorder cuando no hay nada que reordenar.
 class _StepsListView extends StatelessWidget {
   const _StepsListView({
     required this.steps,
@@ -234,36 +250,89 @@ class _StepsListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final viewPaddingBottom = MediaQuery.viewPaddingOf(context).bottom;
+    final listPadding = EdgeInsets.fromLTRB(
+      AppTokens.sp6,
+      0,
+      AppTokens.sp6,
+      AppTokens.sp6 + viewPaddingBottom,
+    );
+    final bloc = context.read<FlowStepsBloc>();
+
     if (steps.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          if (isMutating) ...<Widget>[
-            const _MutatingInlineSpinner(),
-            const SizedBox(height: AppTokens.sp3),
-          ],
-          Text(
-            'Este flujo aún no tiene pasos.',
-            key: const Key('flow_detail.steps.empty'),
-            style: textTheme.bodyMedium?.copyWith(
-              fontStyle: FontStyle.italic,
-              color: AppTokens.text2,
+      return SingleChildScrollView(
+        padding: listPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            if (isMutating) ...<Widget>[
+              const _MutatingInlineSpinner(),
+              const SizedBox(height: AppTokens.sp3),
+            ],
+            Text(
+              'Este flujo aún no tiene pasos.',
+              key: const Key('flow_detail.steps.empty'),
+              style: textTheme.bodyMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: AppTokens.text2,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
+
+    if (steps.length == 1) {
+      return SingleChildScrollView(
+        padding: listPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            if (isMutating) ...<Widget>[
+              const _MutatingInlineSpinner(),
+              const SizedBox(height: AppTokens.sp3),
+            ],
+            _StepCard(step: steps.first),
+          ],
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         if (isMutating) ...<Widget>[
-          const _MutatingInlineSpinner(),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppTokens.sp6),
+            child: _MutatingInlineSpinner(),
+          ),
           const SizedBox(height: AppTokens.sp3),
         ],
-        for (final s in steps) ...<Widget>[
-          _StepCard(step: s),
-          const SizedBox(height: AppTokens.sp3),
-        ],
+        Expanded(
+          child: ReorderableListView.builder(
+            padding: listPadding,
+            itemCount: steps.length,
+            buildDefaultDragHandles: false,
+            itemBuilder: (_, i) {
+              final s = steps[i];
+              return Padding(
+                key: ValueKey<String>('flow_detail.step_card.row.${s.id}'),
+                padding: const EdgeInsets.only(bottom: AppTokens.sp3),
+                child: _StepCard(step: s, dragIndex: i),
+              );
+            },
+            onReorder: (oldIdx, newIdx) {
+              // ReorderableListView semántica: al mover hacia abajo, el
+              // newIdx que entrega ya cuenta el slot que el item dejó
+              // libre, así que conviene normalizarlo restando 1.
+              final adjusted = newIdx > oldIdx ? newIdx - 1 : newIdx;
+              final ids = <String>[for (final s in steps) s.id];
+              final moved = ids.removeAt(oldIdx);
+              ids.insert(adjusted, moved);
+              bloc.add(FlowStepsReorderRequested(ids));
+            },
+          ),
+        ),
       ],
     );
   }
@@ -368,49 +437,73 @@ class _ComingSoonTab extends StatelessWidget {
 /// type, contenido (`content` para TEXT, `mediaRef` para multimedia,
 /// resumen de metadata para CONDITIONAL_TIME), y pills laterales (delay,
 /// aiOnly si aplica).
+///
+/// `dragIndex != null` ⇒ se renderiza con drag handle a la derecha,
+/// listo para reordenar dentro del `ReorderableListView` padre. El handle
+/// captura el gesto antes del InkWell (se monta como sibling del área
+/// tappable), así que long-press/drag sobre el handle no abre el sheet.
 class _StepCard extends StatelessWidget {
-  const _StepCard({required this.step});
+  const _StepCard({required this.step, this.dragIndex});
 
   final sdom.Step step;
+  final int? dragIndex;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return InkWell(
-      key: Key('flow_detail.step_card.${step.id}'),
-      borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-      // Tap abre el sheet en modo edit pre-fillado con este step.
-      onTap: () => _openStepSheet(context, step),
-      child: AppCard(
-        padding: AppTokens.sp4,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                Text(
-                  '${step.order + 1}.',
-                  style: textTheme.titleMedium?.copyWith(
-                    color: AppTokens.text2,
-                  ),
-                ),
-                const SizedBox(width: AppTokens.sp2),
-                Text(_humanLabelFor(step.type), style: textTheme.titleMedium),
-              ],
+            Text(
+              '${step.order + 1}.',
+              style: textTheme.titleMedium?.copyWith(color: AppTokens.text2),
             ),
-            const SizedBox(height: AppTokens.sp2),
-            _StepBody(step: step, textTheme: textTheme),
-            const SizedBox(height: AppTokens.sp3),
-            Wrap(
-              spacing: AppTokens.sp2,
-              runSpacing: AppTokens.sp2,
-              children: <Widget>[
-                AppPill.neutral(label: _delayLabel(step)),
-                if (step.aiOnly) const AppPill.primary(label: 'Solo IA'),
-              ],
-            ),
+            const SizedBox(width: AppTokens.sp2),
+            Text(_humanLabelFor(step.type), style: textTheme.titleMedium),
           ],
         ),
+        const SizedBox(height: AppTokens.sp2),
+        _StepBody(step: step, textTheme: textTheme),
+        const SizedBox(height: AppTokens.sp3),
+        Wrap(
+          spacing: AppTokens.sp2,
+          runSpacing: AppTokens.sp2,
+          children: <Widget>[
+            AppPill.neutral(label: _delayLabel(step)),
+            if (step.aiOnly) const AppPill.primary(label: 'Solo IA'),
+          ],
+        ),
+      ],
+    );
+    final dragIdx = dragIndex;
+    return AppCard(
+      padding: AppTokens.sp4,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(
+            child: InkWell(
+              key: Key('flow_detail.step_card.${step.id}'),
+              borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+              onTap: () => _openStepSheet(context, step),
+              child: content,
+            ),
+          ),
+          if (dragIdx != null)
+            ReorderableDragStartListener(
+              index: dragIdx,
+              child: Padding(
+                padding: const EdgeInsets.only(left: AppTokens.sp2),
+                child: Icon(
+                  Icons.drag_handle,
+                  key: Key('flow_detail.step_card.drag_handle.${step.id}'),
+                  color: AppTokens.text2,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
