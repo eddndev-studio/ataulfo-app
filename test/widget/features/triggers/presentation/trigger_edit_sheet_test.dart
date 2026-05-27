@@ -191,4 +191,80 @@ void main() {
       },
     );
   });
+
+  group('TriggerEditSheet (Add mode · LABEL)', () {
+    testWidgets(
+      'cambiar a LABEL oculta keyword/match/scope y muestra labelId + labelAction',
+      (tester) async {
+        await pumpHost(tester);
+
+        // TEXT por default — keyword visible.
+        expect(find.byKey(const Key('trigger_edit.keyword')), findsOneWidget);
+
+        await tester.tap(find.text('Etiqueta'));
+        await tester.pump();
+
+        expect(find.byKey(const Key('trigger_edit.keyword')), findsNothing);
+        expect(find.byKey(const Key('trigger_edit.match_picker')), findsNothing);
+        expect(find.byKey(const Key('trigger_edit.scope_picker')), findsNothing);
+        expect(find.byKey(const Key('trigger_edit.label_id')), findsOneWidget);
+        expect(
+          find.byKey(const Key('trigger_edit.label_action_picker')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'submit LABEL dispatcha AddRequested con shape LABEL (sin keyword/match)',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.tap(find.text('Etiqueta'));
+        await tester.pump();
+        await tester.enterText(
+          find.byKey(const Key('trigger_edit.label_id')),
+          'vip',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Bienvenida').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
+        await tester.pump();
+
+        verify(
+          () => triggers.add(
+            const TriggersAddRequested(
+              flowId: 'f1',
+              triggerType: TriggerType.label,
+              matchType: null,
+              keyword: '',
+              labelId: 'vip',
+              labelAction: LabelAction.add,
+              scope: TriggerScope.both,
+              isActive: true,
+            ),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets('submit LABEL con labelId vacío es no-op', (tester) async {
+      await pumpHost(tester);
+
+      await tester.tap(find.text('Etiqueta'));
+      await tester.pump();
+      // Sin enterText en labelId.
+      await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bienvenida').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('trigger_edit.submit')));
+      await tester.pump();
+
+      verifyNever(() => triggers.add(any()));
+    });
+  });
 }
