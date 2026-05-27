@@ -438,4 +438,85 @@ void main() {
       },
     );
   });
+
+  group('TriggerEditSheet · auto-pop on success', () {
+    testWidgets(
+      'tras submit exitoso → estado Loaded pop-ea el sheet',
+      (tester) async {
+        // Después del submit el bloc emite Mutating → Loading → Loaded.
+        // El sheet espera Loaded post-submit para auto-cerrar.
+        whenListen(
+          triggers,
+          Stream<TriggersState>.fromIterable(<TriggersState>[
+            TriggersMutating(<Trigger>[]),
+            const TriggersLoading(),
+            const TriggersLoaded(<Trigger>[]),
+          ]),
+          initialState: const TriggersLoaded(<Trigger>[]),
+        );
+        // Pump el sheet dentro de un push para poder verificar maybePop.
+        tester.view.physicalSize = const Size(800, 2000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            home: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<TriggersBloc>.value(value: triggers),
+                BlocProvider<FlowsBloc>.value(value: flows),
+              ],
+              child: Navigator(
+                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                  builder: (rootCtx) => Scaffold(
+                    body: Builder(
+                      builder: (innerCtx) => ElevatedButton(
+                        child: const Text('open'),
+                        onPressed: () => showModalBottomSheet<void>(
+                          context: innerCtx,
+                          builder: (_) => const TriggerEditSheet(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+        expect(find.text('Nuevo disparador'), findsOneWidget);
+
+        // Llena keyword + selecciona flow + submit para activar _didSubmit.
+        await tester.enterText(
+          find.byKey(const Key('trigger_edit.keyword')),
+          'hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Bienvenida').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
+        // El whenListen ya tiene programada la secuencia que termina en
+        // Loaded; al hacer settle se procesa.
+        await tester.pumpAndSettle();
+
+        expect(find.text('Nuevo disparador'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Loaded ANTES del submit NO cierra el sheet (sin _didSubmit)',
+      (tester) async {
+        // El sheet arranca con estado Loaded vigente; si popeara siempre
+        // con Loaded, no podría ni montarse. _didSubmit gate-a el pop.
+        await pumpHost(tester);
+        expect(find.text('Nuevo disparador'), findsOneWidget);
+      },
+    );
+  });
 }
