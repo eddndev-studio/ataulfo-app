@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -77,7 +78,12 @@ class _LoadedView extends StatelessWidget {
     final ai = template.ai;
     final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppTokens.sp6),
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp6,
+        AppTokens.sp6,
+        AppTokens.sp6,
+        AppTokens.sp6 + context.safeBottomInset,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

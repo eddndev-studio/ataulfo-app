@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_pill.dart';
@@ -70,9 +71,7 @@ void _openTriggerSheet(BuildContext context, {Trigger? editing}) {
         BlocProvider<FlowsBloc>.value(value: flowsBloc),
       ],
       child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
+        padding: EdgeInsets.only(bottom: context.sheetBottomInset),
         child: TriggerEditSheet(editing: editing),
       ),
     ),

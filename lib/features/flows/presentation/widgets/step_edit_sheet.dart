@@ -7,11 +7,10 @@
 // (_TypePicker, _SliderField, _FailureCopy) están acoplados al estado
 // de _StepEditSheetState — extraerlos a archivos sueltos movería ruido
 // sin mejorar cohesión.
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
@@ -261,18 +260,11 @@ class _StepEditSheetState extends State<StepEditSheet> {
         builder: (context, state) {
           final isMutating = state is FlowStepsMutating;
           final canSubmit = _isSubmittable;
-          // viewInsets.bottom > 0 sólo con teclado abierto; viewPadding.bottom
-          // > 0 siempre en gestos. max() cubre ambos sin doble contar.
-          final media = MediaQuery.of(context);
-          final bottomInset = math.max(
-            media.viewInsets.bottom,
-            media.viewPadding.bottom,
-          );
           final failure = state is FlowStepsMutationFailed
               ? state.failure
               : null;
           return Padding(
-            padding: EdgeInsets.only(bottom: bottomInset),
+            padding: EdgeInsets.only(bottom: context.sheetBottomInset),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppTokens.sp6),
               child: Column(

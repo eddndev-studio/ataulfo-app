@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -55,9 +56,11 @@ class _LoadedView extends StatelessWidget {
     if (items.isEmpty) return const _EmptyView();
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.sp4,
-        vertical: AppTokens.sp4,
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp4,
+        AppTokens.sp4,
+        AppTokens.sp4,
+        AppTokens.sp4 + context.safeBottomInset,
       ),
       itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),

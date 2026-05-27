@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
@@ -331,18 +332,12 @@ class _EditFormState extends State<_EditForm> {
   @override
   Widget build(BuildContext context) {
     final disabled = widget.submitting;
-    // Android 15 con gesture-nav reporta viewPadding.bottom > 0 incluso
-    // sin teclado; el Scaffold no lo absorbe automáticamente para body
-    // scrollable. Sumar el inset al padding inferior mantiene sp6 de
-    // espacio visual entre el último campo y la barra del sistema, sin
-    // que el botón Guardar quede oculto detrás de los gestos.
-    final viewPaddingBottom = MediaQuery.viewPaddingOf(context).bottom;
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         AppTokens.sp6,
         AppTokens.sp6,
         AppTokens.sp6,
-        AppTokens.sp6 + viewPaddingBottom,
+        AppTokens.sp6 + context.safeBottomInset,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
