@@ -12,6 +12,7 @@ import 'package:agentic/features/flows/presentation/bloc/flow_steps_bloc.dart';
 import 'package:agentic/features/flows/presentation/pages/flow_detail_page.dart';
 import 'package:agentic/features/triggers/domain/entities/trigger.dart';
 import 'package:agentic/features/triggers/domain/repositories/triggers_repository.dart';
+import 'package:agentic/features/triggers/presentation/widgets/flow_triggers_tab.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -460,17 +461,27 @@ void main() {
     ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
     await tester.pumpWidget(host());
+    // Sanity: el shell Loaded rendea el header del flow.
+    expect(find.text('Bienvenida'), findsOneWidget);
+
     await tester.tap(
       find.descendant(
         of: find.byType(TabBar),
         matching: find.text('Disparadores'),
       ),
     );
-    await tester.pump();
+    // Avanza la animación del TabController por frames cortos sin
+    // entrar al loop infinito de pumpAndSettle (el spinner del body
+    // nunca se detiene). 100ms × 5 = 500ms cubre la transición
+    // estándar de TabBarView (~300ms).
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
-    // El tab está montado: el TriggersBloc nuevo arrancó en Loading
-    // (la repo mock no completa) y el body renderiza su spinner con
-    // la key flow_triggers.loading.
+    // El tab está montado: el FlowTriggersTab es child del TabBarView
+    // y el body construye su TriggersBloc; la mock-repo nunca completa
+    // ⇒ estado Loading + spinner con key flow_triggers.loading.
+    expect(find.byType(FlowTriggersTab), findsOneWidget);
     expect(find.byKey(const Key('flow_triggers.loading')), findsOneWidget);
     expect(
       find.byKey(const Key('flow_detail.tab.triggers.coming_soon')),

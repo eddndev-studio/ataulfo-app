@@ -12,6 +12,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../triggers/presentation/widgets/flow_triggers_tab.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import '../../domain/entities/flow.dart' as fdom;
 import '../../domain/entities/step.dart' as sdom;
@@ -119,12 +120,9 @@ class _LoadedShell extends StatelessWidget {
             controller: tab,
             children: <Widget>[
               _StepsTab(flow: flow),
-              const _ComingSoonTab(
-                tabKey: Key('flow_detail.tab.triggers.coming_soon'),
-                title: 'Disparadores',
-                copy:
-                    'Los disparadores se administran desde la plantilla. '
-                    'Próximamente verás aquí los que apuntan a este flujo.',
+              FlowTriggersTab(
+                key: const Key('flow_detail.tab.triggers'),
+                flow: flow,
               ),
               const FlowSettingsTab(key: Key('flow_detail.tab.settings')),
             ],
@@ -400,50 +398,6 @@ class _StepsFailedView extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// Placeholder para tabs aún no implementadas. Centra un mensaje breve
-/// para que el operador entienda que la sección existe pero no está
-/// lista todavía — evita confusión por tab "vacía".
-class _ComingSoonTab extends StatelessWidget {
-  const _ComingSoonTab({
-    required this.tabKey,
-    required this.title,
-    required this.copy,
-  });
-
-  final Key tabKey;
-  final String title;
-  final String copy;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      key: tabKey,
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(title, style: textTheme.titleMedium),
-            const SizedBox(height: AppTokens.sp2),
-            Text(
-              'Próximamente',
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppTokens.sp3),
-            Text(
-              copy,
-              style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
       ),
     );
   }

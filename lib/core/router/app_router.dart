@@ -283,22 +283,25 @@ class AppRouter {
         path: '/flows/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<FlowDetailBloc>(
-                create: (_) =>
-                    FlowDetailBloc(repo: _flowsRepo, id: id)
-                      ..add(const FlowDetailLoadRequested()),
+          return RepositoryProvider<TriggersRepository>.value(
+            value: _triggersRepo,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<FlowDetailBloc>(
+                  create: (_) =>
+                      FlowDetailBloc(repo: _flowsRepo, id: id)
+                        ..add(const FlowDetailLoadRequested()),
+                ),
+                BlocProvider<FlowStepsBloc>(
+                  create: (_) =>
+                      FlowStepsBloc(repo: _flowsRepo, flowId: id)
+                        ..add(const FlowStepsLoadRequested()),
+                ),
+              ],
+              child: Scaffold(
+                appBar: AppBar(title: const Text('Detalle de flujo')),
+                body: const FlowDetailPage(),
               ),
-              BlocProvider<FlowStepsBloc>(
-                create: (_) =>
-                    FlowStepsBloc(repo: _flowsRepo, flowId: id)
-                      ..add(const FlowStepsLoadRequested()),
-              ),
-            ],
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Detalle de flujo')),
-              body: const FlowDetailPage(),
             ),
           );
         },
