@@ -1393,39 +1393,36 @@ void main() {
     );
   });
 
-  group('sección Disparadores', () {
+  // Los disparadores no son sección del TemplateDetailPage — viven en
+  // el editor del flujo (`FlowDetailPage`, tab Disparadores). El
+  // ownership real es `Trigger ∈ Flow ∈ Template`; el listado por
+  // template del wire es atajo de query, no afirmación de pertenencia.
+  group('sección Disparadores quitada (vive en el editor del flujo)', () {
     setUp(() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
-    testWidgets('vive dentro de AppCard con key contractual', (tester) async {
+    testWidgets('NO renderiza la card template_detail.card.triggers', (
+      tester,
+    ) async {
       await tester.pumpWidget(host());
-
-      final cardFinder = find.byKey(const Key('template_detail.card.triggers'));
-      expect(cardFinder, findsOneWidget);
       expect(
-        find.descendant(of: cardFinder, matching: find.text('Disparadores')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: cardFinder,
-          matching: find.byKey(const Key('triggers.empty')),
-        ),
-        findsOneWidget,
+        find.byKey(const Key('template_detail.card.triggers')),
+        findsNothing,
       );
     });
 
-    testWidgets('siempre muestra el título "Disparadores"', (tester) async {
+    testWidgets('NO renderiza el título "Disparadores"', (tester) async {
       await tester.pumpWidget(host());
-      expect(find.text('Disparadores'), findsOneWidget);
+      expect(find.text('Disparadores'), findsNothing);
     });
 
-    testWidgets('monta TriggersSection en el árbol del page', (tester) async {
-      // Loaded vacío default del setUp → empty state inline.
+    testWidgets('NO monta nada con keys del namespace triggers.*', (
+      tester,
+    ) async {
       await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('triggers.empty')));
-      expect(find.byKey(const Key('triggers.empty')), findsOneWidget);
+      expect(find.byKey(const Key('triggers.empty')), findsNothing);
+      expect(find.byKey(const Key('triggers.add_button')), findsNothing);
     });
   });
 }
