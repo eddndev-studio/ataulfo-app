@@ -6,42 +6,38 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
-import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../domain/entities/trigger.dart';
 import '../../domain/failures/triggers_failure.dart';
 import '../bloc/triggers_bloc.dart';
 
-/// Modal sheet de creación/edición de un Trigger.
+/// Modal sheet de creación/edición de un Trigger. El sheet vive siempre
+/// dentro del editor de un flujo concreto: `scopedFlow` es el Flow del
+/// scope y fija el destino — el operador no puede mover triggers entre
+/// flujos (decisión de producto + decisión del backend que preserva
+/// `flowId` en PUT).
 ///
-/// `editing == null` ⇒ modo creación (POST /triggers); el operador
-/// elige flow destino en el dropdown. `editing != null` ⇒ modo edición
-/// (PUT /triggers/:id replace-completo); el flow destino es read-only
-/// — el backend preserva `flowId` del trigger existente, mover un
-/// trigger entre flows no está habilitado.
-///
-/// `scopedFlow != null` ⇒ el sheet vive dentro del editor de un flujo
-/// concreto: el dropdown desaparece, el id se toma de `scopedFlow.id`
-/// al crear, y la línea informativa muestra `scopedFlow.name` sin
-/// consultar al `FlowsBloc` (que en ese scope no existe). Caller
-/// responsable de pasar el Flow del contexto vigente.
+/// `editing == null` ⇒ modo creación (POST /triggers/:tplId/triggers)
+/// con `flowId = scopedFlow.id`. `editing != null` ⇒ modo edición
+/// (PUT /triggers/:id replace-completo) preservando el flowId del
+/// trigger (verificado: el listado del scope solo expone triggers del
+/// flow).
 ///
 /// Discriminación por modo:
 /// - TEXT: keyword + matchType + scope.
 /// - LABEL: labelId + labelAction (scope no aplica en LABEL; el
 ///   trigger se evalúa al cambiar la SessionLabel internamente).
 class TriggerEditSheet extends StatefulWidget {
-  const TriggerEditSheet({super.key, this.editing, this.scopedFlow});
+  const TriggerEditSheet({super.key, required this.scopedFlow, this.editing});
 
   /// `null` ⇒ modo creación. No-null ⇒ modo edición; el sheet se
   /// pre-llena con los valores del trigger y el submit hace PUT
   /// replace-completo (no diff: ver `TriggersUpdateRequested`).
   final Trigger? editing;
 
-  /// Cuando se monta dentro del editor de un flujo concreto, el flow
-  /// destino es fijo: el sheet salta el lookup de `FlowsBloc` y toma
-  /// id/nombre directo del entity pasado. `null` ⇒ scope template
-  /// (dropdown en create, lookup en edit).
-  final fdom.Flow? scopedFlow;
+  /// Flow del scope: fija el destino del trigger (en create) o
+  /// confirma el destino (en edit). El sheet muestra su nombre en una
+  /// línea informativa read-only; no consulta a `FlowsBloc`.
+  final fdom.Flow scopedFlow;
 
   @override
   State<TriggerEditSheet> createState() => _TriggerEditSheetState();
@@ -55,7 +51,6 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
   late LabelAction _labelAction;
   late TriggerScope _scope;
   late bool _isActive;
-  String? _flowId; // null hasta que el operador elija (modo create).
 
   /// Flag que gate-a el auto-pop. El sheet escucha el estado del bloc
   /// y popea cuando llega `Loaded` post-submit; sin este gate, un
@@ -75,10 +70,6 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     _labelAction = ed?.labelAction ?? LabelAction.add;
     _scope = ed?.scope ?? TriggerScope.both;
     _isActive = ed?.isActive ?? true;
-    // Cuando hay scopedFlow, el id viene del scope (no del editing ni
-    // del dropdown del operador). En create scope-libre lo elige el
-    // dropdown; en edit scope-libre lo trae el trigger existente.
-    _flowId = widget.scopedFlow?.id ?? ed?.flowId;
     _keywordCtrl.addListener(_onTextChanged);
     _labelIdCtrl.addListener(_onTextChanged);
   }
@@ -102,10 +93,6 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
       if (_keywordCtrl.text.trim().isEmpty) return false;
     } else {
       if (_labelIdCtrl.text.trim().isEmpty) return false;
-    }
-    // En create necesitamos un flow destino elegido.
-    if (widget.editing == null && (_flowId == null || _flowId!.isEmpty)) {
-      return false;
     }
     return true;
   }
@@ -148,7 +135,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
       _didSubmit = true;
       context.read<TriggersBloc>().add(
         TriggersAddRequested(
-          flowId: _flowId!,
+          flowId: widget.scopedFlow.id,
           triggerType: _triggerType,
           matchType: _isText ? _matchType : null,
           keyword: _isText ? _keywordCtrl.text.trim() : '',
@@ -262,15 +249,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
                   ),
                 ],
                 const SizedBox(height: AppTokens.sp4),
-                if (widget.scopedFlow != null)
-                  _FixedFlowLine(flow: widget.scopedFlow!)
-                else
-                  _FlowSelector(
-                    editing: widget.editing,
-                    selectedFlowId: _flowId,
-                    enabled: !isMutating,
-                    onSelected: (id) => setState(() => _flowId = id),
-                  ),
+                _FixedFlowLine(flow: widget.scopedFlow),
                 const SizedBox(height: AppTokens.sp4),
                 Row(
                   key: const Key('trigger_edit.active_switch'),
@@ -487,103 +466,9 @@ class _LabelActionPicker extends StatelessWidget {
   };
 }
 
-/// Selector de flow destino. En modo create es un dropdown con la
-/// lista del FlowsBloc del scope. En modo edit es una línea read-only
-/// con el nombre del flow ("→ Flujo: ...") — el backend no acepta
-/// cambio de flowId en PUT (decisión nombrada), así que ni siquiera
-/// pintamos un widget interactivo.
-class _FlowSelector extends StatelessWidget {
-  const _FlowSelector({
-    required this.editing,
-    required this.selectedFlowId,
-    required this.enabled,
-    required this.onSelected,
-  });
-
-  final Trigger? editing;
-  final String? selectedFlowId;
-  final bool enabled;
-  final ValueChanged<String?> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final ed = editing;
-    if (ed != null) {
-      return BlocBuilder<FlowsBloc, FlowsState>(
-        builder: (context, state) {
-          final name = state is FlowsLoaded
-              ? state.flows
-                    .firstWhere(
-                      (f) => f.id == ed.flowId,
-                      orElse: () => fdom.Flow(
-                        id: ed.flowId,
-                        templateId: ed.templateId,
-                        name: ed.flowId,
-                        isActive: true,
-                        version: 1,
-                        cooldownMs: 0,
-                        usageLimit: 0,
-                        excludesFlows: const <String>[],
-                      ),
-                    )
-                    .name
-              : ed.flowId;
-          return Text(
-            '→ Flujo: $name',
-            key: const Key('trigger_edit.flow_readonly'),
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-          );
-        },
-      );
-    }
-    return BlocBuilder<FlowsBloc, FlowsState>(
-      builder: (context, state) {
-        final textTheme = Theme.of(context).textTheme;
-        final flows = state is FlowsLoaded ? state.flows : const <fdom.Flow>[];
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'Flujo destino',
-              style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
-            ),
-            const SizedBox(height: AppTokens.sp1),
-            DropdownButtonFormField<String>(
-              key: const Key('trigger_edit.flow_dropdown'),
-              initialValue: selectedFlowId,
-              isExpanded: true,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: AppTokens.surface3,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppTokens.sp4,
-                  vertical: AppTokens.sp2,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppTokens.radiusField),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              hint: const Text('Elige el flujo destino'),
-              items: <DropdownMenuItem<String>>[
-                for (final f in flows)
-                  DropdownMenuItem<String>(value: f.id, child: Text(f.name)),
-              ],
-              onChanged: enabled && flows.isNotEmpty ? onSelected : null,
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Línea informativa del flow del scope cuando el sheet vive dentro
-/// del editor de un flujo concreto. Reemplaza al `_FlowSelector` —
-/// no consulta `FlowsBloc` (no está en el scope) y no expone control
-/// interactivo: el destino es el editor mismo.
+/// Línea informativa read-only con el nombre del flow del scope. No
+/// expone control interactivo: el destino es el flow del editor, no
+/// se elige ni se cambia.
 class _FixedFlowLine extends StatelessWidget {
   const _FixedFlowLine({required this.flow});
 

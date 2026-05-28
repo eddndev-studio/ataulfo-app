@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/features/flows/domain/entities/flow.dart' as fdom;
-import 'package:agentic/features/flows/presentation/bloc/flows_bloc.dart';
 import 'package:agentic/features/triggers/domain/entities/trigger.dart';
 import 'package:agentic/features/triggers/domain/failures/triggers_failure.dart';
 import 'package:agentic/features/triggers/presentation/bloc/triggers_bloc.dart';
@@ -15,9 +14,6 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
     implements TriggersBloc {}
-
-class _MockFlowsBloc extends MockBloc<FlowsEvent, FlowsState>
-    implements FlowsBloc {}
 
 fdom.Flow _flow({
   String id = 'f1',
@@ -86,20 +82,19 @@ void main() {
   });
 
   late _MockTriggersBloc triggers;
-  late _MockFlowsBloc flows;
 
   setUp(() {
     triggers = _MockTriggersBloc();
-    flows = _MockFlowsBloc();
     when(() => triggers.state).thenReturn(const TriggersLoaded(<Trigger>[]));
-    when(() => flows.state).thenReturn(
-      FlowsLoaded(<fdom.Flow>[_flow(), _flow(id: 'f2', name: 'Pagos')]),
-    );
   });
 
   // El sheet completo con todos los controles supera el viewport
   // default de flutter_test (800x600). pumpHost agranda y restaura.
-  Future<void> pumpHost(WidgetTester tester, {Trigger? editing}) async {
+  Future<void> pumpHost(
+    WidgetTester tester, {
+    Trigger? editing,
+    fdom.Flow? scopedFlow,
+  }) async {
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -107,13 +102,15 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppDesignTheme.dark(),
-        home: MultiBlocProvider(
-          providers: <BlocProvider<dynamic>>[
-            BlocProvider<TriggersBloc>.value(value: triggers),
-            BlocProvider<FlowsBloc>.value(value: flows),
-          ],
+        home: BlocProvider<TriggersBloc>.value(
+          value: triggers,
           child: Scaffold(
-            body: SafeArea(child: TriggerEditSheet(editing: editing)),
+            body: SafeArea(
+              child: TriggerEditSheet(
+                editing: editing,
+                scopedFlow: scopedFlow ?? _flow(),
+              ),
+            ),
           ),
         ),
       ),
@@ -137,10 +134,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('trigger_edit.keyword')), findsOneWidget);
-      expect(
-        find.byKey(const Key('trigger_edit.flow_dropdown')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('trigger_edit.flow_fixed')), findsOneWidget);
+      expect(find.byKey(const Key('trigger_edit.flow_dropdown')), findsNothing);
       expect(
         find.byKey(const Key('trigger_edit.active_switch')),
         findsOneWidget,
@@ -158,7 +153,7 @@ void main() {
     });
 
     testWidgets(
-      'submit TEXT con keyword + flow → AddRequested con shape TEXT',
+      'submit TEXT con keyword → AddRequested con flowId del scopedFlow',
       (tester) async {
         await pumpHost(tester);
 
@@ -167,10 +162,6 @@ void main() {
           'hola',
         );
         await tester.pump();
-        await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Bienvenida').last);
-        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('trigger_edit.submit')));
         await tester.pump();
 
@@ -188,23 +179,6 @@ void main() {
             ),
           ),
         ).called(1);
-      },
-    );
-
-    testWidgets(
-      'submit con flow no elegido es no-op aunque keyword esté lleno',
-      (tester) async {
-        await pumpHost(tester);
-
-        await tester.enterText(
-          find.byKey(const Key('trigger_edit.keyword')),
-          'hola',
-        );
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
-        await tester.pump();
-
-        verifyNever(() => triggers.add(any()));
       },
     );
   });
@@ -250,10 +224,6 @@ void main() {
           'vip',
         );
         await tester.pump();
-        await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Bienvenida').last);
-        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('trigger_edit.submit')));
         await tester.pump();
 
@@ -280,10 +250,6 @@ void main() {
       await tester.tap(find.text('Etiqueta'));
       await tester.pump();
       // Sin enterText en labelId.
-      await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Bienvenida').last);
-      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('trigger_edit.submit')));
       await tester.pump();
 
@@ -303,17 +269,17 @@ void main() {
           findsOneWidget,
           reason: 'keyword hidratado',
         );
-        // Picker de type NO se cambia en edit: deshabilitado.
-        // El flow dropdown NO debe aparecer; en su lugar va el read-only.
+        // El flow es el del scope: línea fija con el nombre del flow
+        // del editor, sin dropdown.
         expect(
           find.byKey(const Key('trigger_edit.flow_dropdown')),
           findsNothing,
         );
         expect(
-          find.byKey(const Key('trigger_edit.flow_readonly')),
+          find.byKey(const Key('trigger_edit.flow_fixed')),
           findsOneWidget,
         );
-        expect(find.text('→ Flujo: Bienvenida'), findsOneWidget);
+        expect(find.textContaining('Bienvenida'), findsOneWidget);
       },
     );
 
@@ -489,14 +455,12 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      final scoped = _flow();
       await tester.pumpWidget(
         MaterialApp(
           theme: AppDesignTheme.dark(),
-          home: MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<TriggersBloc>.value(value: triggers),
-              BlocProvider<FlowsBloc>.value(value: flows),
-            ],
+          home: BlocProvider<TriggersBloc>.value(
+            value: triggers,
             child: Navigator(
               onGenerateRoute: (_) => MaterialPageRoute<void>(
                 builder: (rootCtx) => Scaffold(
@@ -505,7 +469,7 @@ void main() {
                       child: const Text('open'),
                       onPressed: () => showModalBottomSheet<void>(
                         context: innerCtx,
-                        builder: (_) => const TriggerEditSheet(),
+                        builder: (_) => TriggerEditSheet(scopedFlow: scoped),
                       ),
                     ),
                   ),
@@ -520,16 +484,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Nuevo disparador'), findsOneWidget);
 
-      // Llena keyword + selecciona flow + submit (dispara _didSubmit).
+      // Llena keyword + submit (dispara _didSubmit; flowId viene del
+      // scopedFlow, sin dropdown).
       await tester.enterText(
         find.byKey(const Key('trigger_edit.keyword')),
         'hola',
       );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('trigger_edit.flow_dropdown')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Bienvenida').last);
-      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('trigger_edit.submit')));
       await tester.pump();
 
@@ -557,107 +518,5 @@ void main() {
       await pumpHost(tester);
       expect(find.text('Nuevo disparador'), findsOneWidget);
     });
-  });
-
-  // El sheet usado desde el editor de flujo no tiene FlowsBloc en scope
-  // y el flow destino es el del editor — fijo, no elegible. `scopedFlow`
-  // cambia el contrato del sheet: oculta el dropdown, salta el lookup
-  // de FlowsBloc, y muestra una línea informativa con el nombre del
-  // flow del scope.
-  group('TriggerEditSheet (scopedFlow)', () {
-    Future<void> pumpHostScoped(
-      WidgetTester tester, {
-      Trigger? editing,
-      fdom.Flow? scopedFlow,
-    }) async {
-      tester.view.physicalSize = const Size(800, 2000);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppDesignTheme.dark(),
-          home: BlocProvider<TriggersBloc>.value(
-            value: triggers,
-            child: Scaffold(
-              body: SafeArea(
-                child: TriggerEditSheet(
-                  editing: editing,
-                  scopedFlow: scopedFlow,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    testWidgets(
-      'create + scopedFlow: oculta el dropdown y renderiza sin FlowsBloc',
-      (tester) async {
-        final scoped = _flow(id: 'flow-x', name: 'Pagos');
-        await pumpHostScoped(tester, scopedFlow: scoped);
-
-        expect(
-          find.byKey(const Key('trigger_edit.flow_dropdown')),
-          findsNothing,
-        );
-        expect(
-          find.byKey(const Key('trigger_edit.flow_fixed')),
-          findsOneWidget,
-        );
-        expect(find.textContaining('Pagos'), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      'create + scopedFlow: submit dispatcha AddRequested con scopedFlow.id',
-      (tester) async {
-        final scoped = _flow(id: 'flow-x', name: 'Pagos');
-        await pumpHostScoped(tester, scopedFlow: scoped);
-
-        await tester.enterText(
-          find.byKey(const Key('trigger_edit.keyword')),
-          'menu',
-        );
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
-        await tester.pump();
-
-        verify(
-          () => triggers.add(
-            any(
-              that: isA<TriggersAddRequested>().having(
-                (e) => e.flowId,
-                'flowId',
-                'flow-x',
-              ),
-            ),
-          ),
-        ).called(1);
-      },
-    );
-
-    testWidgets(
-      'edit + scopedFlow: muestra nombre del scope sin consultar FlowsBloc',
-      (tester) async {
-        final scoped = _flow(id: 'flow-x', name: 'Bienvenida');
-        await pumpHostScoped(
-          tester,
-          editing: _textTrigger(flowId: 'flow-x'),
-          scopedFlow: scoped,
-        );
-
-        expect(
-          find.byKey(const Key('trigger_edit.flow_readonly')),
-          findsNothing,
-        );
-        expect(
-          find.byKey(const Key('trigger_edit.flow_fixed')),
-          findsOneWidget,
-        );
-        expect(find.textContaining('Bienvenida'), findsOneWidget);
-      },
-    );
   });
 }
