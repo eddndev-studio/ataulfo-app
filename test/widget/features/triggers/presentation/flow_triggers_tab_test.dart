@@ -106,7 +106,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        _harness(triggers: triggers, flow: _flow(id: 'f1')),
+        _harness(
+          triggers: triggers,
+          flow: _flow(id: 'f1'),
+        ),
       );
 
       expect(find.byKey(const Key('flow_triggers.row.mine-a')), findsOneWidget);
@@ -143,12 +146,15 @@ void main() {
   );
 
   testWidgets('Mutating preserva la lista visible (snapshot)', (tester) async {
-    when(() => triggers.state).thenReturn(
-      TriggersMutating(<Trigger>[_text(id: 'a', flowId: 'f1')]),
-    );
+    when(
+      () => triggers.state,
+    ).thenReturn(TriggersMutating(<Trigger>[_text(id: 'a', flowId: 'f1')]));
 
     await tester.pumpWidget(
-      _harness(triggers: triggers, flow: _flow(id: 'f1')),
+      _harness(
+        triggers: triggers,
+        flow: _flow(id: 'f1'),
+      ),
     );
 
     expect(find.byKey(const Key('flow_triggers.row.a')), findsOneWidget);
@@ -160,7 +166,10 @@ void main() {
     when(() => triggers.state).thenReturn(const TriggersLoaded(<Trigger>[]));
 
     await tester.pumpWidget(
-      _harness(triggers: triggers, flow: _flow(id: 'f1', name: 'Bienvenida')),
+      _harness(
+        triggers: triggers,
+        flow: _flow(id: 'f1', name: 'Bienvenida'),
+      ),
     );
     await tester.tap(find.byKey(const Key('flow_triggers.add_button')));
     await tester.pumpAndSettle();
@@ -182,7 +191,10 @@ void main() {
     );
 
     await tester.pumpWidget(
-      _harness(triggers: triggers, flow: _flow(id: 'f1', name: 'Bienvenida')),
+      _harness(
+        triggers: triggers,
+        flow: _flow(id: 'f1', name: 'Bienvenida'),
+      ),
     );
     await tester.tap(find.byKey(const Key('flow_triggers.row.mine.tap')));
     await tester.pumpAndSettle();

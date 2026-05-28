@@ -602,7 +602,10 @@ void main() {
           find.byKey(const Key('trigger_edit.flow_dropdown')),
           findsNothing,
         );
-        expect(find.byKey(const Key('trigger_edit.flow_fixed')), findsOneWidget);
+        expect(
+          find.byKey(const Key('trigger_edit.flow_fixed')),
+          findsOneWidget,
+        );
         expect(find.textContaining('Pagos'), findsOneWidget);
       },
     );
@@ -649,7 +652,10 @@ void main() {
           find.byKey(const Key('trigger_edit.flow_readonly')),
           findsNothing,
         );
-        expect(find.byKey(const Key('trigger_edit.flow_fixed')), findsOneWidget);
+        expect(
+          find.byKey(const Key('trigger_edit.flow_fixed')),
+          findsOneWidget,
+        );
         expect(find.textContaining('Bienvenida'), findsOneWidget);
       },
     );

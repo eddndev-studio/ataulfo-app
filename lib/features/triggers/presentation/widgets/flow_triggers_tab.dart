@@ -12,10 +12,9 @@ import '../../domain/repositories/triggers_repository.dart';
 import '../bloc/triggers_bloc.dart';
 import 'trigger_edit_sheet.dart';
 
-/// Tab "Disparadores" del editor de flujo (S11). A diferencia de la
-/// vista template-scope (TriggersSection), aquí el flow destino es el
+/// Tab "Disparadores" del editor de flujo (S11). El flow destino es el
 /// flow del editor — fijo, no elegible — y las rows ocultan la pill
-/// "→ flow" porque es redundante.
+/// "→ flow" porque es redundante en este scope.
 ///
 /// Construye su propio `TriggersBloc` (lee la repo del scope) usando
 /// el `templateId` del flow del editor. El endpoint sigue siendo
@@ -31,12 +30,10 @@ class FlowTriggersTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider<TriggersBloc>(
-      create: (innerCtx) =>
-          TriggersBloc(
-              repo: innerCtx.read<TriggersRepository>(),
-              templateId: flow.templateId,
-            )
-            ..add(const TriggersLoadRequested()),
+      create: (innerCtx) => TriggersBloc(
+        repo: innerCtx.read<TriggersRepository>(),
+        templateId: flow.templateId,
+      )..add(const TriggersLoadRequested()),
       child: FlowTriggersBody(flow: flow),
     );
   }
@@ -107,7 +104,9 @@ class _List extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mine = items.where((t) => t.flowId == flow.id).toList(growable: false);
+    final mine = items
+        .where((t) => t.flowId == flow.id)
+        .toList(growable: false);
     final addButton = Align(
       alignment: Alignment.centerLeft,
       child: AppButton.text(
@@ -267,9 +266,8 @@ class _FailedView extends StatelessWidget {
           ),
           AppButton.text(
             label: 'Reintentar',
-            onPressed: () => context.read<TriggersBloc>().add(
-              const TriggersLoadRequested(),
-            ),
+            onPressed: () =>
+                context.read<TriggersBloc>().add(const TriggersLoadRequested()),
           ),
         ],
       ),
