@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/design/app_design_theme.dart';
+import 'core/design/widgets/app_background.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 
@@ -30,6 +31,11 @@ class AgenticApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppDesignTheme.dark(),
         routerConfig: router.router,
+        // El glow radial es el fondo absoluto de la app: se pinta una sola
+        // vez detrás del navigator y queda fijo mientras las rutas (con
+        // scaffolds transparentes) transicionan encima.
+        builder: (context, child) =>
+            AppBackground(child: child ?? const SizedBox.shrink()),
       ),
     );
   }

@@ -16,12 +16,66 @@ void main() {
       expect(theme.brightness, Brightness.dark);
     });
 
-    test('scaffoldBackgroundColor = AppTokens.bgBase', () {
-      expect(theme.scaffoldBackgroundColor, AppTokens.bgBase);
+    test('scaffoldBackgroundColor = transparent (deja ver el glow de fondo)', () {
+      // El fondo absoluto de la app es el glow radial pintado por
+      // AppBackground; el scaffold debe ser transparente para no taparlo.
+      expect(theme.scaffoldBackgroundColor, Colors.transparent);
     });
 
-    test('canvasColor = AppTokens.bgBase', () {
+    test('canvasColor = AppTokens.bgBase (menús/popovers opacos)', () {
+      // canvasColor sí permanece sólido: lo consumen menús, dropdowns y
+      // drawers, que NO deben transparentarse sobre el glow.
       expect(theme.canvasColor, AppTokens.bgBase);
+    });
+  });
+
+  group('AppDesignTheme.dark — chrome transparente sobre el glow', () {
+    final theme = AppDesignTheme.dark();
+
+    test('appBarTheme transparente y sin elevación', () {
+      final appBar = theme.appBarTheme;
+      expect(appBar.backgroundColor, Colors.transparent);
+      expect(appBar.elevation, 0);
+      expect(appBar.scrolledUnderElevation, 0);
+      // Sin tinte de superficie M3 al hacer scroll bajo la barra.
+      expect(appBar.surfaceTintColor, Colors.transparent);
+      // El primer plano (título, íconos) en text1 sobre el glow.
+      expect(appBar.foregroundColor, AppTokens.text1);
+    });
+
+    test('bottomNavigationBarTheme transparente, seleccionado en primary', () {
+      final nav = theme.bottomNavigationBarTheme;
+      expect(nav.backgroundColor, Colors.transparent);
+      expect(nav.elevation, 0);
+      expect(nav.selectedItemColor, AppTokens.primary);
+      expect(nav.unselectedItemColor, AppTokens.text2);
+    });
+
+    test('navigationRailTheme transparente, seleccionado en primary', () {
+      final rail = theme.navigationRailTheme;
+      expect(rail.backgroundColor, Colors.transparent);
+      expect(rail.selectedIconTheme?.color, AppTokens.primary);
+      expect(rail.unselectedIconTheme?.color, AppTokens.text2);
+    });
+
+    test('floatingActionButtonTheme en colores de marca', () {
+      final fab = theme.floatingActionButtonTheme;
+      // El FAB es la acción cálida: fill primary con primer plano oscuro.
+      expect(fab.backgroundColor, AppTokens.primary);
+      expect(fab.foregroundColor, AppTokens.onPrimary);
+    });
+
+    test('pageTransitionsTheme: Android sin scrim opaco (glow visible en '
+        'la transición de ruta)', () {
+      // El builder por defecto pinta colorScheme.surface como fondo del
+      // tránsito, lo que tapaba el glow con un gris durante la animación. Con
+      // scrim transparente, el glow fijo de fondo se ve durante la transición.
+      final builder = theme.pageTransitionsTheme.builders[TargetPlatform.android];
+      expect(builder, isA<FadeForwardsPageTransitionsBuilder>());
+      expect(
+        (builder! as FadeForwardsPageTransitionsBuilder).backgroundColor,
+        Colors.transparent,
+      );
     });
   });
 

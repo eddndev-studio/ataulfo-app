@@ -1,6 +1,7 @@
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/core/design/tokens.dart';
 import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_text_field.dart';
 import 'package:agentic/features/auth/domain/entities/auth_tokens.dart';
 import 'package:agentic/features/auth/presentation/bloc/login_bloc.dart';
 import 'package:agentic/features/auth/presentation/pages/login_page.dart';
@@ -41,6 +42,8 @@ void main() {
     expect(find.byKey(const Key('login.email')), findsOneWidget);
     expect(find.byKey(const Key('login.password')), findsOneWidget);
     expect(find.widgetWithText(AppButton, 'Entrar'), findsOneWidget);
+    // Los dos campos pasan al primitivo del DS.
+    expect(find.byType(AppTextField), findsNWidgets(2));
     // El botón del login pasa al primitivo del DS — el FilledButton M3
     // legado no debe quedar en el árbol.
     expect(find.byType(FilledButton), findsNothing);

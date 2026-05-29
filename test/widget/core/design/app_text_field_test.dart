@@ -217,6 +217,66 @@ void main() {
     );
   });
 
+  group('AppTextField — obscureText / autocorrect', () {
+    testWidgets('default: obscureText es false (texto visible)', (tester) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'X',
+          hint: 'h',
+          controller: TextEditingController(),
+        ),
+      );
+      final inner = tester.widget<TextField>(find.byType(TextField));
+      expect(inner.obscureText, false);
+    });
+
+    testWidgets('obscureText: true enmascara el TextField interno', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Contraseña',
+          hint: 'h',
+          controller: TextEditingController(),
+          obscureText: true,
+        ),
+      );
+      final inner = tester.widget<TextField>(find.byType(TextField));
+      expect(inner.obscureText, true);
+    });
+
+    testWidgets('default: autocorrect es true (default de Material)', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'X',
+          hint: 'h',
+          controller: TextEditingController(),
+        ),
+      );
+      final inner = tester.widget<TextField>(find.byType(TextField));
+      expect(inner.autocorrect, true);
+    });
+
+    testWidgets('autocorrect se propaga al TextField interno', (tester) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Email',
+          hint: 'h',
+          controller: TextEditingController(),
+          autocorrect: false,
+        ),
+      );
+      final inner = tester.widget<TextField>(find.byType(TextField));
+      expect(inner.autocorrect, false);
+    });
+  });
+
   group('AppTextField — forma y fondo (default)', () {
     testWidgets('píldora: borderRadius == radiusField sobre el shell', (
       tester,

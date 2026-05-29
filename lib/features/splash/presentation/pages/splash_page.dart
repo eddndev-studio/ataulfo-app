@@ -11,7 +11,9 @@ class SplashPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: AppTokens.bgBase,
+      // Transparente: el glow de fondo (AppBackground) se ve detrás mientras
+      // el AuthBloc resuelve la primera transición.
+      backgroundColor: Colors.transparent,
       body: Center(
         child: CircularProgressIndicator(
           valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),

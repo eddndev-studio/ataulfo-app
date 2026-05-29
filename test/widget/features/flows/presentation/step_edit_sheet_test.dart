@@ -1,4 +1,5 @@
 import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/widgets/app_choice_chip.dart';
 import 'package:agentic/features/flows/domain/entities/step.dart' as fdom;
 import 'package:agentic/features/flows/domain/failures/flows_failure.dart';
 import 'package:agentic/features/flows/presentation/bloc/flow_steps_bloc.dart';
@@ -190,15 +191,15 @@ void main() {
           );
         }
 
-        final textChip = tester.widget<ChoiceChip>(
+        final textChip = tester.widget<AppChoiceChip>(
           find.byKey(const Key('step_edit.type.text')),
         );
         expect(textChip.selected, isTrue);
-        final imageChip = tester.widget<ChoiceChip>(
+        final imageChip = tester.widget<AppChoiceChip>(
           find.byKey(const Key('step_edit.type.image')),
         );
         expect(imageChip.selected, isFalse);
-        final ctChip = tester.widget<ChoiceChip>(
+        final ctChip = tester.widget<AppChoiceChip>(
           find.byKey(const Key('step_edit.type.conditionalTime')),
         );
         expect(ctChip.selected, isFalse);

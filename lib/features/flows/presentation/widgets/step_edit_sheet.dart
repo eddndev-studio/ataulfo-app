@@ -13,6 +13,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import '../../domain/entities/step.dart' as fdom;
@@ -146,15 +148,15 @@ class _StepEditSheetState extends State<StepEditSheet> {
           '¿Eliminar este paso? La acción no se puede deshacer.',
         ),
         actions: <Widget>[
-          TextButton(
+          AppButton.text(
             key: const Key('step_edit.delete_confirm.cancel'),
+            label: 'Cancelar',
             onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
+          AppButton.danger(
             key: const Key('step_edit.delete_confirm.ok'),
+            label: 'Eliminar',
             onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text('Eliminar'),
           ),
         ],
       ),
@@ -377,7 +379,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
                   Row(
                     key: const Key('step_edit.ai_only_switch'),
                     children: <Widget>[
-                      Switch(
+                      AppSwitch(
                         value: _aiOnly,
                         onChanged: isMutating
                             ? null
@@ -558,9 +560,9 @@ class _TypePicker extends StatelessWidget {
           runSpacing: AppTokens.sp2,
           children: <Widget>[
             for (final t in _pickableTypes)
-              ChoiceChip(
+              AppChoiceChip(
                 key: Key('step_edit.type.${t.name}'),
-                label: Text(stepTypeLabel(t)),
+                label: stepTypeLabel(t),
                 selected: selected == t,
                 onSelected: enabled ? (_) => onSelected(t) : null,
               ),

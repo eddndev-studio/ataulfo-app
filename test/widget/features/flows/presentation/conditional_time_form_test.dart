@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_choice_chip.dart';
 import 'package:agentic/features/flows/domain/entities/conditional_time_metadata.dart';
 import 'package:agentic/features/flows/presentation/widgets/conditional_time_form.dart';
 import 'package:flutter/material.dart';
@@ -61,6 +63,34 @@ void main() {
         expect(md.windows.first.to, '18:00');
         expect(md.onMatchOrder, 0);
         expect(md.onElseOrder, 1);
+      },
+    );
+
+    testWidgets(
+      'usa componentes del design system (AppChoiceChip días, AppButton '
+      'horas y agregar ventana)',
+      (tester) async {
+        await pumpForm(tester);
+
+        // Los chips de día son AppChoiceChip controlados.
+        expect(
+          tester.widget(find.byKey(const Key('ct_form.window.0.day.0'))),
+          isA<AppChoiceChip>(),
+        );
+        // Los botones de hora desde/hasta son AppButton tonales.
+        expect(
+          tester.widget(find.byKey(const Key('ct_form.window.0.from'))),
+          isA<AppButton>(),
+        );
+        expect(
+          tester.widget(find.byKey(const Key('ct_form.window.0.to'))),
+          isA<AppButton>(),
+        );
+        // Agregar ventana es un AppButton de texto.
+        expect(
+          tester.widget(find.byKey(const Key('ct_form.add_window'))),
+          isA<AppButton>(),
+        );
       },
     );
 

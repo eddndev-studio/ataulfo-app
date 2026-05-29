@@ -16,16 +16,18 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  testWidgets('SplashPage usa AppTokens.bgBase como fondo del Scaffold', (
+  testWidgets('SplashPage es transparente para dejar ver el glow de fondo', (
     tester,
   ) async {
     await pump(tester);
 
+    // El fondo absoluto lo pinta AppBackground (glow) detrás del navigator;
+    // el splash solo debe ser transparente para no taparlo.
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
     final effective =
         scaffold.backgroundColor ??
         Theme.of(tester.element(find.byType(Scaffold))).scaffoldBackgroundColor;
-    expect(effective, AppTokens.bgBase);
+    expect(effective, Colors.transparent);
   });
 
   testWidgets('spinner pintado con AppTokens.primary', (tester) async {

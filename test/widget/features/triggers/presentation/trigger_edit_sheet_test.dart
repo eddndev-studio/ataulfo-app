@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:agentic/core/design/app_design_theme.dart';
+import 'package:agentic/core/design/widgets/app_switch.dart';
 import 'package:agentic/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:agentic/features/triggers/domain/entities/trigger.dart';
 import 'package:agentic/features/triggers/domain/failures/triggers_failure.dart';
@@ -140,6 +141,7 @@ void main() {
         find.byKey(const Key('trigger_edit.active_switch')),
         findsOneWidget,
       );
+      expect(find.byType(AppSwitch), findsOneWidget);
       expect(find.byKey(const Key('trigger_edit.submit')), findsOneWidget);
     });
 
