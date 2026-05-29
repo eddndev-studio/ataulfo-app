@@ -25,43 +25,24 @@ void main() {
   });
 
   blocTest<BotConnectBloc, BotConnectState>(
-    'Started ok → [Ready(link)] (no re-emite Loading desde el inicial)',
+    'Started SOLO emite el enlace; NO arranca la sesión (link async)',
     build: () {
-      when(() => repo.startSession('b1')).thenAnswer((_) async {});
       when(() => repo.issueConnectLink('b1')).thenAnswer((_) async => _link);
       return BotConnectBloc(repo: repo, botId: 'b1');
     },
     act: (bloc) => bloc.add(const BotConnectStarted()),
     expect: () => <BotConnectState>[BotConnectReady(_link)],
     verify: (_) {
-      verifyInOrder(<void Function()>[
-        () => repo.startSession('b1'),
-        () => repo.issueConnectLink('b1'),
-      ]);
+      verify(() => repo.issueConnectLink('b1')).called(1);
+      // Clave del fix: arrancar la sesión al emitir el enlace cerraría el QR
+      // (~2 min) antes de que el tercero abra el enlace. Start es aparte.
+      verifyNever(() => repo.startSession(any()));
     },
   );
 
   blocTest<BotConnectBloc, BotConnectState>(
-    'startSession falla → [Failed]; no emite el token',
+    'mint falla → [Failed]',
     build: () {
-      when(
-        () => repo.startSession('b1'),
-      ).thenThrow(const BotsForbiddenFailure());
-      return BotConnectBloc(repo: repo, botId: 'b1');
-    },
-    act: (bloc) => bloc.add(const BotConnectStarted()),
-    expect: () => const <BotConnectState>[
-      BotConnectFailed(BotsForbiddenFailure()),
-    ],
-    verify: (_) {
-      verifyNever(() => repo.issueConnectLink(any()));
-    },
-  );
-
-  blocTest<BotConnectBloc, BotConnectState>(
-    'issueConnectLink falla → [Failed]',
-    build: () {
-      when(() => repo.startSession('b1')).thenAnswer((_) async {});
       when(
         () => repo.issueConnectLink('b1'),
       ).thenThrow(const BotsServerFailure());
@@ -74,9 +55,37 @@ void main() {
   );
 
   blocTest<BotConnectBloc, BotConnectState>(
-    'retry desde Failed → [Loading, Ready]',
+    'PairingRequested arranca la sesión → [starting, active]',
     build: () {
       when(() => repo.startSession('b1')).thenAnswer((_) async {});
+      return BotConnectBloc(repo: repo, botId: 'b1');
+    },
+    seed: () => BotConnectReady(_link),
+    act: (bloc) => bloc.add(const BotConnectPairingRequested()),
+    expect: () => <BotConnectState>[
+      BotConnectReady(_link, phase: PairingPhase.starting),
+      BotConnectReady(_link, phase: PairingPhase.active),
+    ],
+    verify: (_) => verify(() => repo.startSession('b1')).called(1),
+  );
+
+  blocTest<BotConnectBloc, BotConnectState>(
+    'PairingRequested con fallo de start → [starting, failed] conservando el enlace',
+    build: () {
+      when(() => repo.startSession('b1')).thenThrow(const BotsServerFailure());
+      return BotConnectBloc(repo: repo, botId: 'b1');
+    },
+    seed: () => BotConnectReady(_link),
+    act: (bloc) => bloc.add(const BotConnectPairingRequested()),
+    expect: () => <BotConnectState>[
+      BotConnectReady(_link, phase: PairingPhase.starting),
+      BotConnectReady(_link, phase: PairingPhase.failed),
+    ],
+  );
+
+  blocTest<BotConnectBloc, BotConnectState>(
+    'retry del mint desde Failed → [Loading, Ready]',
+    build: () {
       when(() => repo.issueConnectLink('b1')).thenAnswer((_) async => _link);
       return BotConnectBloc(repo: repo, botId: 'b1');
     },
