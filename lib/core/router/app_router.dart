@@ -10,10 +10,13 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/bots/domain/repositories/bot_session_repository.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
+import '../../features/bots/presentation/bloc/bot_connect_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_create_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
+import '../../features/bots/presentation/pages/bot_connect_page.dart';
 import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
@@ -56,6 +59,7 @@ class AppRouter {
     required AuthBloc authBloc,
     required AuthRepository authRepository,
     required BotsRepository botsRepository,
+    required BotSessionRepository botSessionRepository,
     required TemplatesRepository templatesRepository,
     required FlowsRepository flowsRepository,
     required TriggersRepository triggersRepository,
@@ -64,6 +68,7 @@ class AppRouter {
   }) : _authBloc = authBloc,
        _authRepo = authRepository,
        _botsRepo = botsRepository,
+       _botSessionRepo = botSessionRepository,
        _templatesRepo = templatesRepository,
        _flowsRepo = flowsRepository,
        _triggersRepo = triggersRepository,
@@ -73,6 +78,7 @@ class AppRouter {
   final AuthBloc _authBloc;
   final AuthRepository _authRepo;
   final BotsRepository _botsRepo;
+  final BotSessionRepository _botSessionRepo;
   final TemplatesRepository _templatesRepo;
   final FlowsRepository _flowsRepo;
   final TriggersRepository _triggersRepo;
@@ -169,6 +175,26 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Detalle del bot')),
               body: const BotDetailPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Compartir enlace de conexión (S04 RF#7): arranca la sesión del bot
+        // y emite el ConnectLink a compartir. Sub-ruta de `/bots/:id` con un
+        // segmento más, así no compite con el detalle por orden de match.
+        // Page-scoped: el `BotConnectBloc` se construye con el ID y dispara
+        // Started al montarse.
+        path: '/bots/:id/connect',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<BotConnectBloc>(
+            create: (_) =>
+                BotConnectBloc(repo: _botSessionRepo, botId: id)
+                  ..add(const BotConnectStarted()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Conectar WhatsApp')),
+              body: const BotConnectPage(),
             ),
           );
         },

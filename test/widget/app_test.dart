@@ -6,6 +6,7 @@ import 'package:agentic/features/ai_catalog/domain/repositories/catalog_reposito
 import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
 import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:agentic/features/bots/domain/entities/bot.dart';
+import 'package:agentic/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
 import 'package:agentic/features/flows/domain/repositories/flows_repository.dart';
 import 'package:agentic/features/triggers/domain/repositories/triggers_repository.dart';
@@ -24,6 +25,8 @@ class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
 class _MockBotsRepo extends Mock implements BotsRepository {}
+
+class _MockBotSessionRepo extends Mock implements BotSessionRepository {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
@@ -56,6 +59,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      botSessionRepository: _MockBotSessionRepo(),
       templatesRepository: templatesRepo,
       flowsRepository: _MockFlowsRepo(),
       triggersRepository: _MockTriggersRepo(),
