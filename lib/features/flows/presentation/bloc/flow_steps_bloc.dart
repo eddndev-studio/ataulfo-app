@@ -1,5 +1,10 @@
+// Supera 400 LOC porque coloca el bloc con sus eventos y estados sellados
+// (patrón estándar de flutter_bloc): separarlos en archivos hermanos
+// fragmentaría una unidad cohesiva sin reuso real. Si crece más, el primer
+// corte es extraer eventos/estados a `flow_steps_event.dart`/`_state.dart`.
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/conditional_time_reorder.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../../domain/repositories/flows_repository.dart';
@@ -95,9 +100,16 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
   /// Reorder = N×PATCH /steps/:id cambiando `order`. Sin UNIQUE en
   /// `(flow_id, order)` no se requiere two-pass: cada patch viaja
   /// independiente. Se hace skip cuando el step ya estaba en su
-  /// posición destino, para no gastar requests en no-ops (ej. cuando
-  /// la UX dispara reorder con el array entero aunque el operador
-  /// haya soltado el item en su lugar original).
+  /// posición destino y no necesita remap, para no gastar requests en
+  /// no-ops (ej. cuando la UX dispara reorder con el array entero aunque
+  /// el operador haya soltado el item en su lugar original).
+  ///
+  /// Los pasos CONDITIONAL_TIME guardan sus destinos (`onMatchOrder`/
+  /// `onElseOrder`) por posición; al reordenar hay que recomponerlos para
+  /// que sigan apuntando al paso lógico (su id), o las flechas quedarían
+  /// apuntando al paso equivocado en silencio. El remap puede tocar un CT
+  /// que ni siquiera se movió (si sus destinos sí lo hicieron) y viaja en
+  /// el mismo PATCH que el cambio de `order` cuando ambos aplican.
   ///
   /// Si una patch a mitad falla, el bloc deja el backend en estado
   /// parcial y emite MutationFailed(snapshot original, failure) — la
@@ -110,12 +122,19 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
   ) async {
     await _runMutation(emit, (snapshot) async {
       final byId = <String, fdom.Step>{for (final s in snapshot) s.id: s};
+      final ctRemap = remapConditionalTargetsOnReorder(snapshot, event.ids);
       for (var i = 0; i < event.ids.length; i++) {
         final id = event.ids[i];
         final original = byId[id];
         if (original == null) continue;
-        if (original.order == i) continue;
-        await _repo.patchStep(stepId: id, order: i);
+        final orderChanged = original.order != i;
+        final newMetadataJson = ctRemap[id];
+        if (!orderChanged && newMetadataJson == null) continue;
+        await _repo.patchStep(
+          stepId: id,
+          order: orderChanged ? i : null,
+          metadataJson: newMetadataJson,
+        );
       }
     });
   }
