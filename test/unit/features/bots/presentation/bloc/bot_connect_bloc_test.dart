@@ -9,7 +9,7 @@ import 'package:mocktail/mocktail.dart';
 class _MockRepo extends Mock implements BotSessionRepository {}
 
 final _link = ConnectLink(
-  url: 'https://api.w-gateway.cc/connect?token=tok',
+  url: 'https://api.ataulfo.app/connect?token=tok',
   expiresAt: DateTime.utc(2026, 5, 29, 12, 30, 0),
 );
 

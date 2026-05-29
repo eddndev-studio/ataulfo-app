@@ -14,7 +14,7 @@ class _MockBloc extends MockBloc<BotConnectEvent, BotConnectState>
     implements BotConnectBloc {}
 
 final _link = ConnectLink(
-  url: 'https://api.w-gateway.cc/connect?token=tok123',
+  url: 'https://api.ataulfo.app/connect?token=tok123',
   expiresAt: DateTime.utc(2026, 5, 29, 12, 30, 0),
 );
 

@@ -112,7 +112,7 @@ void main() {
     test('baseUrl con barra final no duplica la barra', () async {
       when(
         () => dio.options,
-      ).thenReturn(BaseOptions(baseUrl: 'https://api.w-gateway.cc/'));
+      ).thenReturn(BaseOptions(baseUrl: 'https://api.ataulfo.app/'));
       when(
         () => dio.post<Map<String, dynamic>>('/bots/b1/connect-token'),
       ).thenAnswer(
@@ -128,7 +128,7 @@ void main() {
 
       final link = await ds.issueConnectLink('b1');
 
-      expect(link.url, 'https://api.w-gateway.cc/connect?token=tok');
+      expect(link.url, 'https://api.ataulfo.app/connect?token=tok');
     });
 
     test('body null → UnknownBotsFailure', () async {
