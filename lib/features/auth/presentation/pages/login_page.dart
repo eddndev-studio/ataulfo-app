@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/auth_tokens.dart';
 import '../bloc/login_bloc.dart';
 
@@ -62,27 +63,23 @@ class _LoginPageState extends State<LoginPage> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
-                  TextField(
+                  AppTextField(
                     key: const Key('login.email'),
+                    label: 'Email',
+                    hint: 'tucorreo@dominio.com',
                     controller: _email,
                     enabled: !submitting,
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                    ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  AppTextField(
                     key: const Key('login.password'),
+                    label: 'Contraseña',
+                    hint: 'Tu contraseña',
                     controller: _password,
                     enabled: !submitting,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Contraseña',
-                      border: OutlineInputBorder(),
-                    ),
                   ),
                   const SizedBox(height: 24),
                   AppButton.filled(

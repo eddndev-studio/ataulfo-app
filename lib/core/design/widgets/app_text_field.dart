@@ -32,6 +32,8 @@ class AppTextField extends StatefulWidget {
     this.inputFormatters,
     this.errorText,
     this.helperText,
+    this.obscureText = false,
+    this.autocorrect = true,
   });
 
   final String label;
@@ -71,6 +73,15 @@ class AppTextField extends StatefulWidget {
   /// Texto de ayuda bajo el field, en `text2`. Lo sustituye [errorText]
   /// cuando el campo está en error — no se muestran ambos a la vez.
   final String? helperText;
+
+  /// Enmascara el contenido (puntos en vez de glifos) para campos de
+  /// contraseña. Material exige `maxLines == 1` cuando es `true`; el default
+  /// de `maxLines` ya lo cumple.
+  final bool obscureText;
+
+  /// Autocorrección del teclado. Se desactiva en campos donde el corrector
+  /// estorba (email, identificadores) para que no altere lo tecleado.
+  final bool autocorrect;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -190,6 +201,8 @@ class _AppTextFieldState extends State<AppTextField> {
               maxLines: widget.maxLines,
               keyboardType: widget.keyboardType,
               inputFormatters: widget.inputFormatters,
+              obscureText: widget.obscureText,
+              autocorrect: widget.autocorrect,
               style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
               // Borderless y sin relleno/padding propios: la píldora la pinta
               // el Container, y el padding lo gobierna SIEMPRE el shell. Un

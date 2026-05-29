@@ -503,16 +503,13 @@ class _VarDefRow extends StatelessWidget {
           'Los bots que ya tengan un valor asignado bloquearán esta acción.',
         ),
         actions: <Widget>[
-          TextButton(
+          AppButton.text(
+            label: 'Cancelar',
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
+          AppButton.danger(
+            label: 'Eliminar',
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: AppTokens.danger),
-            ),
           ),
         ],
       ),

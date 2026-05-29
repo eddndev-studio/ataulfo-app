@@ -10,6 +10,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import 'conditional_time_day_mapping.dart';
 
@@ -244,11 +246,11 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
           ),
           const SizedBox(height: AppTokens.sp3),
         ],
-        TextButton.icon(
+        AppButton.text(
           key: const Key('ct_form.add_window'),
+          label: 'Agregar ventana',
+          icon: Icons.add,
           onPressed: widget.enabled ? _addWindow : null,
-          icon: const Icon(Icons.add),
-          label: const Text('Agregar ventana'),
         ),
         const SizedBox(height: AppTokens.sp5),
         Text(
@@ -343,9 +345,9 @@ class _WindowBlock extends StatelessWidget {
             spacing: AppTokens.sp1,
             children: <Widget>[
               for (var uiDay = 0; uiDay <= 6; uiDay++)
-                FilterChip(
+                AppChoiceChip(
                   key: Key('ct_form.window.$index.day.$uiDay'),
-                  label: Text(uiDayLabel(uiDay)),
+                  label: uiDayLabel(uiDay),
                   selected: window.daysUi.contains(uiDay),
                   onSelected: enabled ? (_) => onDayToggled(uiDay) : null,
                 ),
@@ -398,10 +400,11 @@ class _TimeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
+    return AppButton.tonal(
       key: buttonKey,
+      label: '$label  ${_formatTimeOfDay(value)}',
       onPressed: enabled ? onPressed : null,
-      child: Text('$label  ${_formatTimeOfDay(value)}'),
+      fullWidth: true,
     );
   }
 }

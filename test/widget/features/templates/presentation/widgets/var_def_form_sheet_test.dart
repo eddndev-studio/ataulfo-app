@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_choice_chip.dart';
 import 'package:agentic/core/design/widgets/app_text_field.dart';
 import 'package:agentic/features/templates/domain/entities/variable_def.dart';
 import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
@@ -357,12 +358,12 @@ void main() {
     ) async {
       await tester.pumpWidget(host(existingNames: <String>{}));
 
-      final chip = tester.widget<ChoiceChip>(
+      final chip = tester.widget<AppChoiceChip>(
         find.byKey(const Key('var_def_form.type.text')),
       );
       expect(chip.selected, isTrue);
 
-      final notSel = tester.widget<ChoiceChip>(
+      final notSel = tester.widget<AppChoiceChip>(
         find.byKey(const Key('var_def_form.type.audio')),
       );
       expect(notSel.selected, isFalse);
@@ -420,11 +421,11 @@ void main() {
         ),
       );
 
-      final audioChip = tester.widget<ChoiceChip>(
+      final audioChip = tester.widget<AppChoiceChip>(
         find.byKey(const Key('var_def_form.type.audio')),
       );
       expect(audioChip.selected, isTrue);
-      final textChip = tester.widget<ChoiceChip>(
+      final textChip = tester.widget<AppChoiceChip>(
         find.byKey(const Key('var_def_form.type.text')),
       );
       expect(textChip.selected, isFalse);

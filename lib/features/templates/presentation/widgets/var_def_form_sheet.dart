@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/variable_def.dart';
 import '../bloc/var_defs_bloc.dart';
@@ -190,9 +191,9 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
                   const SizedBox(height: AppTokens.sp4),
                   // Picker del tipo. Wrap soporta layouts angostos
                   // sin overflow (los 6 chips se acomodan en 2-3 filas).
-                  // ChoiceChip por chip permite reuso del componente Material
-                  // sin forzar un selector custom — el contrato hacia el test
-                  // es la key + el flag .selected, no la apariencia.
+                  // AppChoiceChip por chip da el toggle controlado del design
+                  // system sin estado interno — el contrato hacia el consumer
+                  // es la key + el flag selected, no la apariencia.
                   Text(
                     'Tipo',
                     style: textTheme.labelSmall?.copyWith(
@@ -205,9 +206,9 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
                     runSpacing: AppTokens.sp2,
                     children: <Widget>[
                       for (final t in VarType.values)
-                        ChoiceChip(
+                        AppChoiceChip(
                           key: Key('var_def_form.type.${t.toWire()}'),
-                          label: Text(_humanLabelFor(t)),
+                          label: _humanLabelFor(t),
                           selected: _type == t,
                           onSelected: isMutating
                               ? null

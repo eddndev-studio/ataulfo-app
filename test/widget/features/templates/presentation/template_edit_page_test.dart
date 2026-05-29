@@ -1,5 +1,6 @@
 import 'package:agentic/core/design/app_design_theme.dart';
 import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:agentic/core/design/widgets/app_switch.dart';
 import 'package:agentic/core/design/widgets/app_text_field.dart';
 import 'package:agentic/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:agentic/features/ai_catalog/domain/failures/catalog_failure.dart';
@@ -197,6 +198,8 @@ void main() {
           find.byKey(const Key('template_edit.field.enabled')),
           findsOneWidget,
         );
+        // El toggle de "Activar IA" es el AppSwitch del design system.
+        expect(find.byType(AppSwitch), findsOneWidget);
         expect(
           find.byKey(const Key('template_edit.field.provider')),
           findsOneWidget,

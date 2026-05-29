@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../domain/entities/trigger.dart';
@@ -109,15 +110,15 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
           '¿Eliminar este disparador? La acción no se puede deshacer.',
         ),
         actions: <Widget>[
-          TextButton(
+          AppButton.text(
             key: const Key('trigger_edit.delete_confirm.cancel'),
+            label: 'Cancelar',
             onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
+          AppButton.danger(
             key: const Key('trigger_edit.delete_confirm.ok'),
+            label: 'Eliminar',
             onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text('Eliminar'),
           ),
         ],
       ),
@@ -254,7 +255,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
                 Row(
                   key: const Key('trigger_edit.active_switch'),
                   children: <Widget>[
-                    Switch(
+                    AppSwitch(
                       value: _isActive,
                       onChanged: isMutating
                           ? null

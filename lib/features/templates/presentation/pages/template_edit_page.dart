@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../ai_catalog/domain/catalog_drift.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
@@ -509,7 +510,7 @@ class _EnabledField extends StatelessWidget {
             ],
           ),
         ),
-        Switch(
+        AppSwitch(
           key: const Key('template_edit.field.enabled'),
           value: value,
           onChanged: enabled ? onChanged : null,

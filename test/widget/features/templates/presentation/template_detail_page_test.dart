@@ -805,6 +805,10 @@ void main() {
       // Confirm dialog visible — operador debe confirmar la acción
       // destructiva. Key contractual del dialog.
       expect(find.byKey(const Key('var_defs.delete_confirm')), findsOneWidget);
+      // Las acciones del dialog son AppButton: Cancelar (text) y Eliminar
+      // (danger) — no TextButton de Material.
+      expect(find.widgetWithText(AppButton, 'Cancelar'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Eliminar'), findsOneWidget);
       // No se dispatchó nada todavía.
       verifyNever(() => varDefsBloc.add(any()));
     });
