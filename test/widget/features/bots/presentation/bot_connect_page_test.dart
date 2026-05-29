@@ -19,7 +19,10 @@ final _link = ConnectLink(
 );
 
 void main() {
-  setUpAll(() => registerFallbackValue(const BotConnectStarted()));
+  setUpAll(() {
+    registerFallbackValue(const BotConnectStarted());
+    registerFallbackValue(const BotConnectPairingRequested());
+  });
 
   late _MockBloc bloc;
 
@@ -44,13 +47,16 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  testWidgets('Ready muestra la url y un botón de copiar', (tester) async {
+  testWidgets('Ready(idle): url + copiar + Iniciar emparejamiento', (
+    tester,
+  ) async {
     when(() => bloc.state).thenReturn(BotConnectReady(_link));
 
     await tester.pumpWidget(host());
 
     expect(find.text(_link.url), findsOneWidget);
     expect(find.text('Copiar enlace'), findsOneWidget);
+    expect(find.text('Iniciar emparejamiento'), findsOneWidget);
   });
 
   testWidgets('Copiar enlace muestra confirmación', (tester) async {
@@ -65,6 +71,29 @@ void main() {
     await tester.pump();
 
     expect(find.text('Enlace copiado'), findsOneWidget);
+  });
+
+  testWidgets('tap Iniciar emparejamiento → BotConnectPairingRequested', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(BotConnectReady(_link));
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.text('Iniciar emparejamiento'));
+
+    verify(() => bloc.add(const BotConnectPairingRequested())).called(1);
+  });
+
+  testWidgets('Ready(active): muestra el aviso de escaneo en vivo', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(BotConnectReady(_link, phase: PairingPhase.active));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('bot_connect.active')), findsOneWidget);
   });
 
   testWidgets('Failed muestra error y Reintentar dispara BotConnectStarted', (
