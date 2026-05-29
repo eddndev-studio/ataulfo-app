@@ -16,8 +16,8 @@ import 'features/auth/presentation/bloc/auth_bloc.dart';
 /// Tema dark-only: el producto no expone modo claro. `theme` actúa como
 /// el ThemeData universal porque `darkTheme` queda en null y MaterialApp
 /// usa `theme` como fallback cuando no hay variante dark separada.
-class AgenticApp extends StatelessWidget {
-  const AgenticApp({super.key, required this.router, required this.authBloc});
+class AtaulfoApp extends StatelessWidget {
+  const AtaulfoApp({super.key, required this.router, required this.authBloc});
 
   final AppRouter router;
   final AuthBloc authBloc;
@@ -27,7 +27,7 @@ class AgenticApp extends StatelessWidget {
     return BlocProvider<AuthBloc>.value(
       value: authBloc,
       child: MaterialApp.router(
-        title: 'Agentic',
+        title: 'Ataúlfo',
         debugShowCheckedModeBanner: false,
         theme: AppDesignTheme.dark(),
         routerConfig: router.router,

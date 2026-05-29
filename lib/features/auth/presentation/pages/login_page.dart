@@ -58,7 +58,7 @@ class _LoginPageState extends State<LoginPage> {
                 children: <Widget>[
                   const SizedBox(height: 32),
                   Text(
-                    'Agentic',
+                    'Ataúlfo',
                     style: textTheme.displayLarge,
                     textAlign: TextAlign.center,
                   ),

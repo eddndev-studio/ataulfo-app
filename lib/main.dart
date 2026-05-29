@@ -39,15 +39,16 @@ import 'features/triggers/data/repositories/triggers_repository_impl.dart';
 ///   aquí; Bearer + retry transparente del 401 son responsabilidad del
 ///   interceptor, no de los datasources.
 ///
-/// `baseUrl` debe apuntar al `agentic-go` real. En desarrollo se usa el
-/// localhost del emulador Android (`10.0.2.2`). Para producción se configura
-/// en su slice (env por flavor, build-time arg, o pantalla de settings).
+/// `baseUrl` debe apuntar al `ataulfo-go` real. El default es producción
+/// (`https://api.ataulfo.app`); en desarrollo se sobreescribe con
+/// `--dart-define=AGENTIC_BASE_URL=http://10.0.2.2:8080` (localhost del
+/// emulador Android) o con la IP LAN del backend.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   const baseUrl = String.fromEnvironment(
     'AGENTIC_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8080',
+    defaultValue: 'https://api.ataulfo.app',
   );
 
   final kv = FlutterSecureKvStore();
@@ -135,5 +136,5 @@ void main() {
   // aterrice el slice de push.
   unawaited(DeviceIdProvider(kv).getOrCreate());
 
-  runApp(AgenticApp(router: router, authBloc: authBloc));
+  runApp(AtaulfoApp(router: router, authBloc: authBloc));
 }

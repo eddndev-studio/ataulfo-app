@@ -68,10 +68,10 @@ void main() {
     );
   });
 
-  testWidgets('AgenticApp cabla AppDesignTheme.dark() al MaterialApp', (
+  testWidgets('AtaulfoApp cabla AppDesignTheme.dark() al MaterialApp', (
     tester,
   ) async {
-    await tester.pumpWidget(AgenticApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     // El scaffold es transparente: el fondo absoluto lo pinta AppBackground
@@ -81,9 +81,9 @@ void main() {
     expect(app.theme?.brightness, Brightness.dark);
   });
 
-  testWidgets('AgenticApp pinta el glow de fondo (AppBackground) detrás de '
+  testWidgets('AtaulfoApp pinta el glow de fondo (AppBackground) detrás de '
       'todas las rutas vía el builder del MaterialApp', (tester) async {
-    await tester.pumpWidget(AgenticApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(
@@ -95,10 +95,10 @@ void main() {
     expect(find.byType(AppBackground), findsOneWidget);
   });
 
-  testWidgets('AgenticApp no expone darkTheme separado (producto dark-only)', (
+  testWidgets('AtaulfoApp no expone darkTheme separado (producto dark-only)', (
     tester,
   ) async {
-    await tester.pumpWidget(AgenticApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.darkTheme, isNull);

@@ -49,12 +49,12 @@ void main() {
     expect(find.byType(FilledButton), findsNothing);
   });
 
-  testWidgets('wordmark "Agentic" usa displayLarge del textTheme', (
+  testWidgets('wordmark "Ataúlfo" usa displayLarge del textTheme', (
     tester,
   ) async {
     await tester.pumpWidget(host());
 
-    final word = tester.widget<Text>(find.text('Agentic'));
+    final word = tester.widget<Text>(find.text('Ataúlfo'));
     expect(word.style?.fontSize, AppTokens.displaySize);
     expect(word.style?.fontWeight, AppTokens.displayWeight);
   });
