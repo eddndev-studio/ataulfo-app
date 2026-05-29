@@ -1,6 +1,6 @@
-import 'package:agentic/features/templates/data/dto/var_def_dto.dart';
-import 'package:agentic/features/templates/data/mappers/var_defs_mapper.dart';
-import 'package:agentic/features/templates/domain/entities/variable_def.dart';
+import 'package:ataulfo/features/templates/data/dto/var_def_dto.dart';
+import 'package:ataulfo/features/templates/data/mappers/var_defs_mapper.dart';
+import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

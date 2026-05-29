@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:agentic/core/storage/secure_kv_store.dart';
-import 'package:agentic/features/auth/data/datasources/auth_datasource.dart';
-import 'package:agentic/features/auth/data/interceptors/auth_interceptor.dart';
-import 'package:agentic/features/auth/data/repositories/token_storage.dart';
-import 'package:agentic/features/auth/domain/entities/auth_tokens.dart';
-import 'package:agentic/features/auth/domain/failures/auth_failure.dart';
+import 'package:ataulfo/core/storage/secure_kv_store.dart';
+import 'package:ataulfo/features/auth/data/datasources/auth_datasource.dart';
+import 'package:ataulfo/features/auth/data/interceptors/auth_interceptor.dart';
+import 'package:ataulfo/features/auth/data/repositories/token_storage.dart';
+import 'package:ataulfo/features/auth/domain/entities/auth_tokens.dart';
+import 'package:ataulfo/features/auth/domain/failures/auth_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

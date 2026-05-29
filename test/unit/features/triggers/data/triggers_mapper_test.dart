@@ -1,6 +1,6 @@
-import 'package:agentic/features/triggers/data/dto/trigger_dto.dart';
-import 'package:agentic/features/triggers/data/mappers/triggers_mapper.dart';
-import 'package:agentic/features/triggers/domain/entities/trigger.dart';
+import 'package:ataulfo/features/triggers/data/dto/trigger_dto.dart';
+import 'package:ataulfo/features/triggers/data/mappers/triggers_mapper.dart';
+import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 TriggerResp _textResp() =>

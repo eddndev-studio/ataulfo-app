@@ -1,6 +1,6 @@
-import 'package:agentic/features/bots/data/datasources/bot_session_datasource.dart';
-import 'package:agentic/features/bots/data/repositories/bot_session_repository_impl.dart';
-import 'package:agentic/features/bots/domain/entities/connect_link.dart';
+import 'package:ataulfo/features/bots/data/datasources/bot_session_datasource.dart';
+import 'package:ataulfo/features/bots/data/repositories/bot_session_repository_impl.dart';
+import 'package:ataulfo/features/bots/domain/entities/connect_link.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 

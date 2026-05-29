@@ -32,7 +32,7 @@ abstract interface class AuthDatasource {
 }
 
 /// Implementación contra dio. Se inyecta una instancia ya configurada con
-/// `baseUrl` apuntando al API de agentic-go; este datasource no toca
+/// `baseUrl` apuntando al API de ataulfo-go; este datasource no toca
 /// configuración global.
 class DioAuthDatasource implements AuthDatasource {
   DioAuthDatasource(this._dio);

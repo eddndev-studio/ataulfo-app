@@ -34,7 +34,7 @@ import 'step_type_label.dart';
 ///
 /// Rangos espejan al validador del backend: `delayMs` 0..5 min,
 /// `jitterPct` 0..100%. Cualquier ajuste de límite debe hacerse primero
-/// en `agentic-go/internal/domain/flow/step.go` (StepMaxDelayMs /
+/// en `ataulfo-go/internal/domain/flow/step.go` (StepMaxDelayMs /
 /// StepMaxJitterPct).
 ///
 /// El sheet escucha el `FlowStepsBloc`:

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'tokens.dart';
 
-/// Theme dark canónico del design system de Agentic.
+/// Theme dark canónico del design system de Ataúlfo.
 ///
 /// Solo dark — el producto no tiene tema claro hoy. Construido sobre
 /// [AppTokens]; cualquier color/tipografía aquí debe derivar de un token,

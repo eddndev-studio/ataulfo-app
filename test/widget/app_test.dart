@@ -1,19 +1,19 @@
-import 'package:agentic/app.dart';
-import 'package:agentic/core/design/widgets/app_background.dart';
-import 'package:agentic/core/router/app_router.dart';
-import 'package:agentic/features/ai_catalog/domain/entities/catalog.dart';
-import 'package:agentic/features/ai_catalog/domain/repositories/catalog_repository.dart';
-import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
-import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:agentic/features/bots/domain/entities/bot.dart';
-import 'package:agentic/features/bots/domain/repositories/bot_session_repository.dart';
-import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
-import 'package:agentic/features/flows/domain/repositories/flows_repository.dart';
-import 'package:agentic/features/triggers/domain/repositories/triggers_repository.dart';
-import 'package:agentic/features/memberships/domain/entities/membership.dart';
-import 'package:agentic/features/memberships/domain/repositories/memberships_repository.dart';
-import 'package:agentic/features/templates/domain/entities/template.dart';
-import 'package:agentic/features/templates/domain/repositories/templates_repository.dart';
+import 'package:ataulfo/app.dart';
+import 'package:ataulfo/core/design/widgets/app_background.dart';
+import 'package:ataulfo/core/router/app_router.dart';
+import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
+import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
+import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
+import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
+import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
+import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
+import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
+import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
+import 'package:ataulfo/features/templates/domain/entities/template.dart';
+import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -68,10 +68,10 @@ void main() {
     );
   });
 
-  testWidgets('AgenticApp cabla AppDesignTheme.dark() al MaterialApp', (
+  testWidgets('AtaulfoApp cabla AppDesignTheme.dark() al MaterialApp', (
     tester,
   ) async {
-    await tester.pumpWidget(AgenticApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     // El scaffold es transparente: el fondo absoluto lo pinta AppBackground
@@ -81,9 +81,9 @@ void main() {
     expect(app.theme?.brightness, Brightness.dark);
   });
 
-  testWidgets('AgenticApp pinta el glow de fondo (AppBackground) detrás de '
+  testWidgets('AtaulfoApp pinta el glow de fondo (AppBackground) detrás de '
       'todas las rutas vía el builder del MaterialApp', (tester) async {
-    await tester.pumpWidget(AgenticApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(
@@ -95,10 +95,10 @@ void main() {
     expect(find.byType(AppBackground), findsOneWidget);
   });
 
-  testWidgets('AgenticApp no expone darkTheme separado (producto dark-only)', (
+  testWidgets('AtaulfoApp no expone darkTheme separado (producto dark-only)', (
     tester,
   ) async {
-    await tester.pumpWidget(AgenticApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.darkTheme, isNull);

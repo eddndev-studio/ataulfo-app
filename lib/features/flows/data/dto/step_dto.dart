@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 /// DTO de un Step del listado `GET /flows/{flowId}/steps` (ver
-/// `stepResp` en `agentic-go/internal/adapters/httpflows/step_dto.go`).
+/// `stepResp` en `ataulfo-go/internal/adapters/httpflows/step_dto.go`).
 ///
 /// `type` queda como String en este DTO (no enum) — el mapeo al enum
 /// `StepType` ocurre en el mapper, donde un drift del backend (tipo

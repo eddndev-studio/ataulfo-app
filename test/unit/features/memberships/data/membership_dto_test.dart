@@ -1,4 +1,4 @@
-import 'package:agentic/features/memberships/data/dto/membership_dto.dart';
+import 'package:ataulfo/features/memberships/data/dto/membership_dto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

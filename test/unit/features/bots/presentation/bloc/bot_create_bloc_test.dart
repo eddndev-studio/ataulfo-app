@@ -1,7 +1,7 @@
-import 'package:agentic/features/bots/domain/entities/bot.dart';
-import 'package:agentic/features/bots/domain/failures/bots_failure.dart';
-import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
-import 'package:agentic/features/bots/presentation/bloc/bot_create_bloc.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
+import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
+import 'package:ataulfo/features/bots/presentation/bloc/bot_create_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

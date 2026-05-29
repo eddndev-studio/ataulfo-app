@@ -1,5 +1,5 @@
 /// Tipo de una variable de plantilla (S03). Set v1 espejo del backend
-/// (`agentic-go/internal/domain/template/variable_def.go`): text + label
+/// (`ataulfo-go/internal/domain/template/variable_def.go`): text + label
 /// + 4 multimedia. El interpolador del engine trata el valor como string
 /// en runtime; el type es metadata semántica para el editor.
 ///
@@ -41,7 +41,7 @@ enum VarType {
 /// Definición de una variable de plantilla. Value object: dos instancias
 /// con misma data son iguales. El nombre vive en el campo `name` aquí (el
 /// backend lo guarda como llave del map y lo expone en el response — el
-/// adaptador HTTP lo añade al DTO; ver `varDefResp` en agentic-go).
+/// adaptador HTTP lo añade al DTO; ver `varDefResp` en ataulfo-go).
 class VariableDef {
   const VariableDef({
     required this.id,

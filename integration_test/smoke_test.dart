@@ -5,9 +5,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-import 'package:agentic/main.dart' as app;
+import 'package:ataulfo/main.dart' as app;
 
-/// Smoke E2E del cliente Flutter contra un backend agentic-go real.
+/// Smoke E2E del cliente Flutter contra un backend ataulfo-go real.
 ///
 /// Recorre la ruta crítica del operador: arranque en `/login` (storage
 /// limpio), login con la cuenta smoke, navegación a la pestaña Plantillas,
@@ -39,11 +39,11 @@ void main() {
 
       await tester.enterText(
         find.byKey(const Key('login.email')),
-        'smoke@agentic.local',
+        'smoke@ataulfo.local',
       );
       await tester.enterText(
         find.byKey(const Key('login.password')),
-        'smoke-agentic-2026',
+        'smoke-ataulfo-2026',
       );
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
@@ -164,11 +164,11 @@ void main() {
       await _pumpUntil(tester, find.byKey(const Key('login.email')));
       await tester.enterText(
         find.byKey(const Key('login.email')),
-        'smoke@agentic.local',
+        'smoke@ataulfo.local',
       );
       await tester.enterText(
         find.byKey(const Key('login.password')),
-        'smoke-agentic-2026',
+        'smoke-ataulfo-2026',
       );
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
@@ -343,11 +343,11 @@ void main() {
       await _pumpUntil(tester, find.byKey(const Key('login.email')));
       await tester.enterText(
         find.byKey(const Key('login.email')),
-        'smoke@agentic.local',
+        'smoke@ataulfo.local',
       );
       await tester.enterText(
         find.byKey(const Key('login.password')),
-        'smoke-agentic-2026',
+        'smoke-ataulfo-2026',
       );
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();

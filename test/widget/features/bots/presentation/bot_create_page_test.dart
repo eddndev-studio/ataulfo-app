@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:agentic/core/design/app_design_theme.dart';
-import 'package:agentic/core/design/widgets/app_button.dart';
-import 'package:agentic/core/design/widgets/app_text_field.dart';
-import 'package:agentic/features/bots/domain/entities/bot.dart';
-import 'package:agentic/features/bots/domain/failures/bots_failure.dart';
-import 'package:agentic/features/bots/presentation/bloc/bot_create_bloc.dart';
-import 'package:agentic/features/bots/presentation/pages/bot_create_page.dart';
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_text_field.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
+import 'package:ataulfo/features/bots/presentation/bloc/bot_create_bloc.dart';
+import 'package:ataulfo/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

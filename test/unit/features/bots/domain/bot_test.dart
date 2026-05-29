@@ -1,4 +1,4 @@
-import 'package:agentic/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

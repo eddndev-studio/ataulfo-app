@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:agentic/core/design/app_design_theme.dart';
-import 'package:agentic/core/design/tokens.dart';
-import 'package:agentic/core/design/widgets/provider_badge.dart';
-import 'package:agentic/features/templates/domain/entities/template.dart';
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/provider_badge.dart';
+import 'package:ataulfo/features/templates/domain/entities/template.dart';
 
 void main() {
   Future<void> pump(WidgetTester tester, AIProvider p) async {

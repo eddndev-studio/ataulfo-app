@@ -1,5 +1,5 @@
-import 'package:agentic/core/storage/device_id_provider.dart';
-import 'package:agentic/core/storage/secure_kv_store.dart';
+import 'package:ataulfo/core/storage/device_id_provider.dart';
+import 'package:ataulfo/core/storage/secure_kv_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _MemKv implements SecureKvStore {

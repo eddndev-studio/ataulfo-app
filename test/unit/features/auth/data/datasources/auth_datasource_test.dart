@@ -1,7 +1,7 @@
-import 'package:agentic/features/auth/data/datasources/auth_datasource.dart';
-import 'package:agentic/features/auth/domain/entities/auth_tokens.dart';
-import 'package:agentic/features/auth/domain/entities/identity.dart';
-import 'package:agentic/features/auth/domain/failures/auth_failure.dart';
+import 'package:ataulfo/features/auth/data/datasources/auth_datasource.dart';
+import 'package:ataulfo/features/auth/domain/entities/auth_tokens.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/domain/failures/auth_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

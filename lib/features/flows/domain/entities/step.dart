@@ -1,5 +1,5 @@
 /// Tipo de un Step dentro de un Flow (S11). 8 valores espejo del backend
-/// (`agentic-go/internal/domain/flow/step.go`):
+/// (`ataulfo-go/internal/domain/flow/step.go`):
 /// - 6 multimedia/contenido directo: TEXT, IMAGE, VIDEO, DOCUMENT, AUDIO,
 ///   PTT, STICKER.
 /// - 1 ramificación: CONDITIONAL_TIME (evalúa ventanas horarias para

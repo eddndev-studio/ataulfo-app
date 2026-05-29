@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:agentic/core/design/tokens.dart';
-import 'package:agentic/core/design/widgets/app_background.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_background.dart';
 
 void main() {
   group('AppBackground', () {

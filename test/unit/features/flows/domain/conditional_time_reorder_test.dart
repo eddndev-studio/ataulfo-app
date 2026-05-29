@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:agentic/features/flows/domain/conditional_time_reorder.dart';
-import 'package:agentic/features/flows/domain/entities/conditional_time_metadata.dart';
-import 'package:agentic/features/flows/domain/entities/step.dart';
+import 'package:ataulfo/features/flows/domain/conditional_time_reorder.dart';
+import 'package:ataulfo/features/flows/domain/entities/conditional_time_metadata.dart';
+import 'package:ataulfo/features/flows/domain/entities/step.dart';
 
 /// Metadata CONDITIONAL_TIME canónica con destinos parametrizables. Las
 /// ventanas son irrelevantes para el remap — solo importan los `order`

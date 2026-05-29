@@ -1,7 +1,7 @@
-import 'package:agentic/features/flows/domain/entities/flow.dart';
-import 'package:agentic/features/flows/domain/failures/flows_failure.dart';
-import 'package:agentic/features/flows/domain/repositories/flows_repository.dart';
-import 'package:agentic/features/flows/presentation/bloc/flow_detail_bloc.dart';
+import 'package:ataulfo/features/flows/domain/entities/flow.dart';
+import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
+import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
+import 'package:ataulfo/features/flows/presentation/bloc/flow_detail_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

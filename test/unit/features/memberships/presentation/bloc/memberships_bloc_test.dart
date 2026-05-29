@@ -1,7 +1,7 @@
-import 'package:agentic/features/memberships/domain/entities/membership.dart';
-import 'package:agentic/features/memberships/domain/failures/memberships_failure.dart';
-import 'package:agentic/features/memberships/domain/repositories/memberships_repository.dart';
-import 'package:agentic/features/memberships/presentation/bloc/memberships_bloc.dart';
+import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
+import 'package:ataulfo/features/memberships/domain/failures/memberships_failure.dart';
+import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
+import 'package:ataulfo/features/memberships/presentation/bloc/memberships_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

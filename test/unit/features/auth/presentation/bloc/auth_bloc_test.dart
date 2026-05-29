@@ -1,7 +1,7 @@
-import 'package:agentic/features/auth/domain/entities/identity.dart';
-import 'package:agentic/features/auth/domain/failures/auth_failure.dart';
-import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
-import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/domain/failures/auth_failure.dart';
+import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

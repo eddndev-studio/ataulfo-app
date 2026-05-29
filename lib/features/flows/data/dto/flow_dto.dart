@@ -1,5 +1,5 @@
 /// DTO de un Flow del wire (ver `flowResp` en
-/// `agentic-go/internal/adapters/httpflows/dto.go`).
+/// `ataulfo-go/internal/adapters/httpflows/dto.go`).
 ///
 /// Espejo 1:1 del shape canónico: identidad + nombre + gates de
 /// comportamiento (`cooldownMs`, `usageLimit`, `excludesFlows`) +

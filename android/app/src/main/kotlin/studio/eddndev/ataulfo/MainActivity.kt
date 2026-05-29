@@ -1,4 +1,4 @@
-package studio.eddndev.agentic
+package studio.eddndev.ataulfo
 
 import io.flutter.embedding.android.FlutterActivity
 

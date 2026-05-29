@@ -1,8 +1,8 @@
-import 'package:agentic/features/templates/data/datasources/templates_datasource.dart';
-import 'package:agentic/features/templates/data/repositories/templates_repository_impl.dart';
-import 'package:agentic/features/templates/domain/entities/template.dart';
-import 'package:agentic/features/templates/domain/entities/variable_def.dart';
-import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
+import 'package:ataulfo/features/templates/data/datasources/templates_datasource.dart';
+import 'package:ataulfo/features/templates/data/repositories/templates_repository_impl.dart';
+import 'package:ataulfo/features/templates/domain/entities/template.dart';
+import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
+import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 

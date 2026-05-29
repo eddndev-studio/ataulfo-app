@@ -1,9 +1,9 @@
-import 'package:agentic/core/design/app_design_theme.dart';
-import 'package:agentic/core/design/widgets/app_button.dart';
-import 'package:agentic/core/design/widgets/app_pill.dart';
-import 'package:agentic/features/auth/domain/entities/identity.dart';
-import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:agentic/features/settings/presentation/pages/settings_page.dart';
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/settings/presentation/pages/settings_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

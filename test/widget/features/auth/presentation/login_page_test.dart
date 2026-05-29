@@ -1,10 +1,10 @@
-import 'package:agentic/core/design/app_design_theme.dart';
-import 'package:agentic/core/design/tokens.dart';
-import 'package:agentic/core/design/widgets/app_button.dart';
-import 'package:agentic/core/design/widgets/app_text_field.dart';
-import 'package:agentic/features/auth/domain/entities/auth_tokens.dart';
-import 'package:agentic/features/auth/presentation/bloc/login_bloc.dart';
-import 'package:agentic/features/auth/presentation/pages/login_page.dart';
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_text_field.dart';
+import 'package:ataulfo/features/auth/domain/entities/auth_tokens.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/login_bloc.dart';
+import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -49,12 +49,12 @@ void main() {
     expect(find.byType(FilledButton), findsNothing);
   });
 
-  testWidgets('wordmark "Agentic" usa displayLarge del textTheme', (
+  testWidgets('wordmark "Ataúlfo" usa displayLarge del textTheme', (
     tester,
   ) async {
     await tester.pumpWidget(host());
 
-    final word = tester.widget<Text>(find.text('Agentic'));
+    final word = tester.widget<Text>(find.text('Ataúlfo'));
     expect(word.style?.fontSize, AppTokens.displaySize);
     expect(word.style?.fontWeight, AppTokens.displayWeight);
   });

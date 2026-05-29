@@ -1,6 +1,6 @@
 /// DTO de una variable-definition del listado
 /// `GET /templates/{id}/variable-definitions` (ver `varDefResp` en
-/// `agentic-go/internal/adapters/httptemplates/dto.go`). Nombres
+/// `ataulfo-go/internal/adapters/httptemplates/dto.go`). Nombres
 /// `snake_case` del wire viven aquí; el mapper traduce a la entidad.
 class VarDefResp {
   const VarDefResp({

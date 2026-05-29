@@ -1,4 +1,4 @@
-import 'package:agentic/features/templates/domain/entities/variable_def.dart';
+import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

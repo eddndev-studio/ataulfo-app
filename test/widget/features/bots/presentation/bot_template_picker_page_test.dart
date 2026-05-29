@@ -1,15 +1,15 @@
 import 'dart:async';
 
-import 'package:agentic/core/design/app_design_theme.dart';
-import 'package:agentic/core/design/tokens.dart';
-import 'package:agentic/core/design/widgets/app_avatar.dart';
-import 'package:agentic/core/design/widgets/app_button.dart';
-import 'package:agentic/core/design/widgets/app_card.dart';
-import 'package:agentic/core/design/widgets/provider_badge.dart';
-import 'package:agentic/features/bots/presentation/pages/bot_template_picker_page.dart';
-import 'package:agentic/features/templates/domain/entities/template.dart';
-import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
-import 'package:agentic/features/templates/presentation/bloc/templates_bloc.dart';
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_avatar.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/provider_badge.dart';
+import 'package:ataulfo/features/bots/presentation/pages/bot_template_picker_page.dart';
+import 'package:ataulfo/features/templates/domain/entities/template.dart';
+import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
+import 'package:ataulfo/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

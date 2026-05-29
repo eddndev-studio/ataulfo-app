@@ -1,4 +1,4 @@
-import 'package:agentic/features/bots/data/dto/bot_dto.dart';
+import 'package:ataulfo/features/bots/data/dto/bot_dto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,4 +1,4 @@
-import 'package:agentic/core/design/safe_bottom.dart';
+import 'package:ataulfo/core/design/safe_bottom.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 

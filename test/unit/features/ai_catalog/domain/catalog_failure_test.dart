@@ -1,4 +1,4 @@
-import 'package:agentic/features/ai_catalog/domain/failures/catalog_failure.dart';
+import 'package:ataulfo/features/ai_catalog/domain/failures/catalog_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

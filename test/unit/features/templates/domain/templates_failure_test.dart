@@ -1,4 +1,4 @@
-import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
+import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

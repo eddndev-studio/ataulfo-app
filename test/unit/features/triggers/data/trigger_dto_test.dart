@@ -1,4 +1,4 @@
-import 'package:agentic/features/triggers/data/dto/trigger_dto.dart';
+import 'package:ataulfo/features/triggers/data/dto/trigger_dto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

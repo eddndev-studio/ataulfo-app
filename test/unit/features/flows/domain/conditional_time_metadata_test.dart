@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:agentic/features/flows/domain/entities/conditional_time_metadata.dart';
+import 'package:ataulfo/features/flows/domain/entities/conditional_time_metadata.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,7 +1,7 @@
-import 'package:agentic/features/templates/domain/entities/variable_def.dart';
-import 'package:agentic/features/templates/domain/failures/templates_failure.dart';
-import 'package:agentic/features/templates/domain/repositories/templates_repository.dart';
-import 'package:agentic/features/templates/presentation/bloc/var_defs_bloc.dart';
+import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
+import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
+import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
+import 'package:ataulfo/features/templates/presentation/bloc/var_defs_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

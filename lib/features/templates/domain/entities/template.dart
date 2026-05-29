@@ -98,7 +98,7 @@ class AIConfig {
 }
 
 /// Entidad de dominio Template (S03). Espeja `templateResp` del backend
-/// (`agentic-go/internal/adapters/httptemplates/dto.go`) sin nombres del
+/// (`ataulfo-go/internal/adapters/httptemplates/dto.go`) sin nombres del
 /// wire: los mappers traducen DTO ⇄ entidad. La Template es la entidad
 /// principal: posee el comportamiento que heredan sus Bots.
 class Template {

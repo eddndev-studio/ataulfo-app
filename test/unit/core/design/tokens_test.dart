@@ -2,7 +2,7 @@ import 'package:flutter/animation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:agentic/core/design/tokens.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 
 void main() {
   group('AppTokens — surfaces', () {

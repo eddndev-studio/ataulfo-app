@@ -1,5 +1,5 @@
-import 'package:agentic/features/ai_catalog/data/datasources/catalog_datasource.dart';
-import 'package:agentic/features/ai_catalog/domain/failures/catalog_failure.dart';
+import 'package:ataulfo/features/ai_catalog/data/datasources/catalog_datasource.dart';
+import 'package:ataulfo/features/ai_catalog/domain/failures/catalog_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

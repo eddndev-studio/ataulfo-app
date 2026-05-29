@@ -1,4 +1,4 @@
-import 'package:agentic/features/templates/data/dto/template_dto.dart';
+import 'package:ataulfo/features/templates/data/dto/template_dto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

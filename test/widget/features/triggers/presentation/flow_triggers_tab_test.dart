@@ -1,9 +1,9 @@
-import 'package:agentic/core/design/app_design_theme.dart';
-import 'package:agentic/features/flows/domain/entities/flow.dart' as fdom;
-import 'package:agentic/features/triggers/domain/entities/trigger.dart';
-import 'package:agentic/features/triggers/domain/failures/triggers_failure.dart';
-import 'package:agentic/features/triggers/presentation/bloc/triggers_bloc.dart';
-import 'package:agentic/features/triggers/presentation/widgets/flow_triggers_tab.dart';
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
+import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
+import 'package:ataulfo/features/triggers/domain/failures/triggers_failure.dart';
+import 'package:ataulfo/features/triggers/presentation/bloc/triggers_bloc.dart';
+import 'package:ataulfo/features/triggers/presentation/widgets/flow_triggers_tab.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

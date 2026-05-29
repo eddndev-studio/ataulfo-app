@@ -1,5 +1,5 @@
 /// Tipo de un Trigger (S11). 2 valores espejo del backend
-/// (`agentic-go/internal/domain/flow/trigger.go`):
+/// (`ataulfo-go/internal/domain/flow/trigger.go`):
 /// - TEXT: matchea keyword (con `matchType`) sobre el body de mensajes.
 /// - LABEL: dispara sobre cambio interno de SessionLabel (I-L1, evento
 ///   interno de la plataforma — nunca eventos de WhatsApp).

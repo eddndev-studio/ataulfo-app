@@ -1,4 +1,4 @@
-/// DTO del wire S04 (`agentic-go/internal/adapters/httpbots/dto.go:52`).
+/// DTO del wire S04 (`ataulfo-go/internal/adapters/httpbots/dto.go:52`).
 ///
 /// Cualquier nombre `snake_case` vive aquí; el dominio expone `camelCase`
 /// vía mappers. `identifier` se preserva nullable porque el handler usa

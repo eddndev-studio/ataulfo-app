@@ -1,4 +1,4 @@
-import 'package:agentic/features/memberships/domain/failures/memberships_failure.dart';
+import 'package:ataulfo/features/memberships/domain/failures/memberships_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

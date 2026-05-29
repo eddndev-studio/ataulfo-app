@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:agentic/core/design/tokens.dart';
-import 'package:agentic/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
 
 void main() {
   Future<void> pumpButton(WidgetTester tester, Widget button) async {

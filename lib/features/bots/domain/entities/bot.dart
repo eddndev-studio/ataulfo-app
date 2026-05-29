@@ -25,7 +25,7 @@ enum BotChannel {
 }
 
 /// Entidad de dominio del Bot (S04). Espeja el `botResp` del backend
-/// (`agentic-go/internal/adapters/httpbots/dto.go`) sin nombres del wire:
+/// (`ataulfo-go/internal/adapters/httpbots/dto.go`) sin nombres del wire:
 /// los mappers traducen DTO ⇄ entidad.
 class Bot {
   const Bot({

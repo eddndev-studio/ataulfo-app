@@ -1,6 +1,6 @@
-import 'package:agentic/features/templates/data/dto/template_dto.dart';
-import 'package:agentic/features/templates/data/mappers/templates_mapper.dart';
-import 'package:agentic/features/templates/domain/entities/template.dart';
+import 'package:ataulfo/features/templates/data/dto/template_dto.dart';
+import 'package:ataulfo/features/templates/data/mappers/templates_mapper.dart';
+import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

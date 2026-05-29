@@ -1,6 +1,6 @@
-import 'package:agentic/features/triggers/data/datasources/triggers_datasource.dart';
-import 'package:agentic/features/triggers/domain/entities/trigger.dart';
-import 'package:agentic/features/triggers/domain/failures/triggers_failure.dart';
+import 'package:ataulfo/features/triggers/data/datasources/triggers_datasource.dart';
+import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
+import 'package:ataulfo/features/triggers/domain/failures/triggers_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

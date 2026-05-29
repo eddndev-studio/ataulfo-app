@@ -1,6 +1,6 @@
-import 'package:agentic/features/auth/data/dto/login_dto.dart';
-import 'package:agentic/features/auth/data/mappers/auth_mapper.dart';
-import 'package:agentic/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/data/dto/login_dto.dart';
+import 'package:ataulfo/features/auth/data/mappers/auth_mapper.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,5 +1,5 @@
 /// DTO del listado `GET /templates/{templateId}/triggers` (ver
-/// `triggerResp` en `agentic-go/internal/adapters/httpflows/trigger_dto.go`).
+/// `triggerResp` en `ataulfo-go/internal/adapters/httpflows/trigger_dto.go`).
 ///
 /// Campos enum del wire (`type`, `matchType`, `labelAction`, `scope`) se
 /// preservan como `String` aquí; el mapeo a los enums del dominio ocurre

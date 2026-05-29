@@ -1,5 +1,5 @@
-import 'package:agentic/features/ai_catalog/domain/catalog_drift.dart';
-import 'package:agentic/features/ai_catalog/domain/entities/catalog.dart';
+import 'package:ataulfo/features/ai_catalog/domain/catalog_drift.dart';
+import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _catalog = Catalog(

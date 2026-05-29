@@ -1,4 +1,4 @@
-import 'package:agentic/features/bots/data/dto/connect_token_dto.dart';
+import 'package:ataulfo/features/bots/data/dto/connect_token_dto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

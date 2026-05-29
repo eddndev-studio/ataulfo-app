@@ -1,5 +1,5 @@
 /// DTO del wire S03/S12
-/// (`agentic-go/internal/adapters/httptemplates/dto.go`).
+/// (`ataulfo-go/internal/adapters/httptemplates/dto.go`).
 ///
 /// Cualquier nombre `snake_case` vive aquí; el dominio expone `camelCase`
 /// vía mappers. AiConfigDto está anidado en el campo `ai` de TemplateResp;

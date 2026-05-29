@@ -1,6 +1,6 @@
-import 'package:agentic/features/bots/data/dto/bot_dto.dart';
-import 'package:agentic/features/bots/data/mappers/bots_mapper.dart';
-import 'package:agentic/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/data/dto/bot_dto.dart';
+import 'package:ataulfo/features/bots/data/mappers/bots_mapper.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

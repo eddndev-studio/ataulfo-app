@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:agentic/core/design/tokens.dart';
-import 'package:agentic/core/design/widgets/app_input_chip.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_input_chip.dart';
 
 void main() {
   Future<void> pumpChip(WidgetTester tester, Widget chip) async {

@@ -1,6 +1,6 @@
-import 'package:agentic/features/ai_catalog/data/dto/catalog_dto.dart';
-import 'package:agentic/features/ai_catalog/data/mappers/catalog_mapper.dart';
-import 'package:agentic/features/ai_catalog/domain/entities/catalog.dart';
+import 'package:ataulfo/features/ai_catalog/data/dto/catalog_dto.dart';
+import 'package:ataulfo/features/ai_catalog/data/mappers/catalog_mapper.dart';
+import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

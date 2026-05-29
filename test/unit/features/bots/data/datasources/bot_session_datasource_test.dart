@@ -1,5 +1,5 @@
-import 'package:agentic/features/bots/data/datasources/bot_session_datasource.dart';
-import 'package:agentic/features/bots/domain/failures/bots_failure.dart';
+import 'package:ataulfo/features/bots/data/datasources/bot_session_datasource.dart';
+import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

@@ -1,6 +1,6 @@
-import 'package:agentic/features/memberships/data/dto/membership_dto.dart';
-import 'package:agentic/features/memberships/data/mappers/memberships_mapper.dart';
-import 'package:agentic/features/memberships/domain/entities/membership.dart';
+import 'package:ataulfo/features/memberships/data/dto/membership_dto.dart';
+import 'package:ataulfo/features/memberships/data/mappers/memberships_mapper.dart';
+import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

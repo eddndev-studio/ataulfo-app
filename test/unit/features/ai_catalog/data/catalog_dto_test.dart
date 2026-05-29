@@ -1,4 +1,4 @@
-import 'package:agentic/features/ai_catalog/data/dto/catalog_dto.dart';
+import 'package:ataulfo/features/ai_catalog/data/dto/catalog_dto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
