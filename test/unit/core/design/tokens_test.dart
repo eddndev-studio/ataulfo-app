@@ -62,6 +62,14 @@ void main() {
       // ~35% de alpha sobre primary (#EDB900).
       expect(AppTokens.primaryGlow, const Color(0x59EDB900));
     });
+
+    test('backgroundGlow es radial primary→accent→bgBase (fondo de app)', () {
+      const g = AppTokens.backgroundGlow;
+      expect(
+        g.colors,
+        <Color>[AppTokens.primary, AppTokens.accent, AppTokens.bgBase],
+      );
+    });
   });
 
   group('AppTokens — text', () {

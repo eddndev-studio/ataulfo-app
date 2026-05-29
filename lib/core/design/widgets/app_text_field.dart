@@ -148,6 +148,9 @@ class _AppTextFieldState extends State<AppTextField> {
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
           child: Container(
+            // Centra el texto verticalmente: con el alto mínimo de 48 el
+            // contenido de una línea quedaría pegado arriba sin esta alineación.
+            alignment: Alignment.centerLeft,
             decoration: BoxDecoration(
               color: AppTokens.input,
               borderRadius: radius,

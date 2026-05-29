@@ -93,6 +93,18 @@ class AppTokens {
   /// Tinte del glow de foco (campos) y de la sombra del FAB. `primary` al ~35%.
   static const Color primaryGlow = _Yellow.s700a35;
 
+  /// Fondo absoluto de la app: glow radial cálido anclado arriba que se
+  /// disuelve en [bgBase]. Compuesto de los tokens de marca (primary→accent)
+  /// sobre el fondo base; las pantallas se montan encima con app bars
+  /// transparentes. El centro va cerca del borde superior para que el calor
+  /// quede en la cabecera y el cuerpo respire en oscuro.
+  static const RadialGradient backgroundGlow = RadialGradient(
+    center: Alignment(0.0, -0.8),
+    radius: 1.15,
+    colors: <Color>[primary, accent, bgBase],
+    stops: <double>[0.0, 0.45, 0.9],
+  );
+
   // ── Text ────────────────────────────────────────────────────────────────
   static const Color text1 = _Gray.s100;
   static const Color text2 = _Gray.s400;
