@@ -558,9 +558,10 @@ class _StepBody extends StatelessWidget {
 /// reconfigurar.
 ///
 /// Nota: `onMatchOrder`/`onElseOrder` son enteros que apuntan a la
-/// posición de otro step, no a su id. Si los steps cambian de orden
-/// después de crear el CT, las flechas pueden quedar apuntando a un
-/// paso distinto del esperado — deuda nombrada del slice F7.
+/// posición de otro step, no a su id. Al reordenar desde el cliente, el
+/// bloc recompone estos destinos para que sigan al paso lógico; pero el
+/// wire sigue siendo posicional, así que un reorder fuera de banda (otro
+/// cliente, API directa, seed) puede dejarlos apuntando a un paso distinto.
 class _ConditionalTimeSummary extends StatelessWidget {
   const _ConditionalTimeSummary({required this.step, required this.textTheme});
 
