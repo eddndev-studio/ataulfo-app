@@ -27,9 +27,12 @@ void main() {
     verify(() => ds.stopSession('b1')).called(1);
   });
 
-  test('issueConnectLink delega y devuelve el ConnectLink del datasource', () async {
-    final link = ConnectLink(url: 'u', expiresAt: DateTime.utc(2026));
-    when(() => ds.issueConnectLink('b1')).thenAnswer((_) async => link);
-    expect(await repo.issueConnectLink('b1'), link);
-  });
+  test(
+    'issueConnectLink delega y devuelve el ConnectLink del datasource',
+    () async {
+      final link = ConnectLink(url: 'u', expiresAt: DateTime.utc(2026));
+      when(() => ds.issueConnectLink('b1')).thenAnswer((_) async => link);
+      expect(await repo.issueConnectLink('b1'), link);
+    },
+  );
 }

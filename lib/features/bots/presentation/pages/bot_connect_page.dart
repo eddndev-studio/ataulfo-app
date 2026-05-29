@@ -87,9 +87,7 @@ class _ReadyView extends StatelessWidget {
   Future<void> _copy(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     await Clipboard.setData(ClipboardData(text: link.url));
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Enlace copiado')),
-    );
+    messenger.showSnackBar(const SnackBar(content: Text('Enlace copiado')));
   }
 
   /// Formato HH:mm sin depender de intl. La fecha llega del backend en UTC;

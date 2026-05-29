@@ -50,8 +50,9 @@ void main() {
       return BotConnectBloc(repo: repo, botId: 'b1');
     },
     act: (bloc) => bloc.add(const BotConnectStarted()),
-    expect: () =>
-        const <BotConnectState>[BotConnectFailed(BotsForbiddenFailure())],
+    expect: () => const <BotConnectState>[
+      BotConnectFailed(BotsForbiddenFailure()),
+    ],
     verify: (_) {
       verifyNever(() => repo.issueConnectLink(any()));
     },
@@ -67,8 +68,9 @@ void main() {
       return BotConnectBloc(repo: repo, botId: 'b1');
     },
     act: (bloc) => bloc.add(const BotConnectStarted()),
-    expect: () =>
-        const <BotConnectState>[BotConnectFailed(BotsServerFailure())],
+    expect: () => const <BotConnectState>[
+      BotConnectFailed(BotsServerFailure()),
+    ],
   );
 
   blocTest<BotConnectBloc, BotConnectState>(

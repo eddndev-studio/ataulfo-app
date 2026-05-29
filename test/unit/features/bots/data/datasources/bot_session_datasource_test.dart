@@ -90,17 +90,18 @@ void main() {
 
   group('issueConnectLink', () {
     test('201 {token,expiresAt} → ConnectLink con url desde baseUrl', () async {
-      when(() => dio.post<Map<String, dynamic>>('/bots/b1/connect-token'))
-          .thenAnswer(
-            (_) async => resp<Map<String, dynamic>>(
-              201,
-              '/bots/b1/connect-token',
-              data: <String, dynamic>{
-                'token': 'abcDEF123-_xyz',
-                'expiresAt': '2026-05-29T12:30:00Z',
-              },
-            ),
-          );
+      when(
+        () => dio.post<Map<String, dynamic>>('/bots/b1/connect-token'),
+      ).thenAnswer(
+        (_) async => resp<Map<String, dynamic>>(
+          201,
+          '/bots/b1/connect-token',
+          data: <String, dynamic>{
+            'token': 'abcDEF123-_xyz',
+            'expiresAt': '2026-05-29T12:30:00Z',
+          },
+        ),
+      );
 
       final link = await ds.issueConnectLink('b1');
 
@@ -112,17 +113,18 @@ void main() {
       when(
         () => dio.options,
       ).thenReturn(BaseOptions(baseUrl: 'https://api.w-gateway.cc/'));
-      when(() => dio.post<Map<String, dynamic>>('/bots/b1/connect-token'))
-          .thenAnswer(
-            (_) async => resp<Map<String, dynamic>>(
-              201,
-              '/bots/b1/connect-token',
-              data: <String, dynamic>{
-                'token': 'tok',
-                'expiresAt': '2026-05-29T12:30:00Z',
-              },
-            ),
-          );
+      when(
+        () => dio.post<Map<String, dynamic>>('/bots/b1/connect-token'),
+      ).thenAnswer(
+        (_) async => resp<Map<String, dynamic>>(
+          201,
+          '/bots/b1/connect-token',
+          data: <String, dynamic>{
+            'token': 'tok',
+            'expiresAt': '2026-05-29T12:30:00Z',
+          },
+        ),
+      );
 
       final link = await ds.issueConnectLink('b1');
 
