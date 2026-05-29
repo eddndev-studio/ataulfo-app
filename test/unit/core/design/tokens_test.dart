@@ -6,76 +6,100 @@ import 'package:agentic/core/design/tokens.dart';
 
 void main() {
   group('AppTokens — surfaces', () {
-    test('bgBase es #0B141A (fondo de pantalla)', () {
-      expect(AppTokens.bgBase, const Color(0xFF0B141A));
+    test('bgBase es #070C10 (gray/950, fondo de pantalla)', () {
+      expect(AppTokens.bgBase, const Color(0xFF070C10));
     });
 
-    test('surface1 es #111B21 (app bar / sheets)', () {
-      expect(AppTokens.surface1, const Color(0xFF111B21));
+    test('surface1 es #0A1014 (gray/900, app bar / sheets)', () {
+      expect(AppTokens.surface1, const Color(0xFF0A1014));
     });
 
-    test('surface2 es #1F2C33 (cards default)', () {
-      expect(AppTokens.surface2, const Color(0xFF1F2C33));
+    test('surface2 es #131A1F (gray/800, cards default)', () {
+      expect(AppTokens.surface2, const Color(0xFF131A1F));
     });
 
-    test('surface3 es #2A3942 (bloques elevados dentro de cards)', () {
-      expect(AppTokens.surface3, const Color(0xFF2A3942));
+    test('surface3 es #192228 (gray/700, bloques elevados)', () {
+      expect(AppTokens.surface3, const Color(0xFF192228));
+    });
+
+    test('divider es #141B1F (gray/750, hairline)', () {
+      expect(AppTokens.divider, const Color(0xFF141B1F));
+    });
+
+    test('input es gray/800 al 60% (#131A1F @ 0x99)', () {
+      expect(AppTokens.input, const Color(0x99131A1F));
+    });
+
+    test('glass es gray/800 al 60% — mismo valor que input', () {
+      expect(AppTokens.glass, const Color(0x99131A1F));
+      expect(AppTokens.glass, AppTokens.input);
     });
   });
 
   group('AppTokens — brand', () {
-    test('primary es #00A884 (verde WhatsApp acción)', () {
-      expect(AppTokens.primary, const Color(0xFF00A884));
+    test('primary es #EDB900 (yellow/700, acción primaria)', () {
+      expect(AppTokens.primary, const Color(0xFFEDB900));
     });
 
-    test('primaryHover es #06CF9C', () {
-      expect(AppTokens.primaryHover, const Color(0xFF06CF9C));
+    test('primaryHover es #ECE500 (yellow/500)', () {
+      expect(AppTokens.primaryHover, const Color(0xFFECE500));
     });
 
-    test('accent es #25D366 (badges y estados activos)', () {
-      expect(AppTokens.accent, const Color(0xFF25D366));
+    test('accent es #EB7500 (yellow/900, naranja de marca)', () {
+      expect(AppTokens.accent, const Color(0xFFEB7500));
+    });
+
+    test('onPrimary es #070C10 (gray/950, texto sobre fills cálidos)', () {
+      expect(AppTokens.onPrimary, const Color(0xFF070C10));
+    });
+
+    test('brandGradient va de primary a accent (surface/primary-g)', () {
+      const g = AppTokens.brandGradient;
+      expect(g.colors, <Color>[AppTokens.primary, AppTokens.accent]);
+    });
+
+    test('primaryGlow es primary tintado para el glow de foco/FAB', () {
+      // ~35% de alpha sobre primary (#EDB900).
+      expect(AppTokens.primaryGlow, const Color(0x59EDB900));
     });
   });
 
   group('AppTokens — text', () {
-    test('text1 es #E9EDEF (primario)', () {
+    test('text1 es #E9EDEF (gray/100, primario)', () {
       expect(AppTokens.text1, const Color(0xFFE9EDEF));
     });
 
-    test('text2 es #8696A0 (secundario)', () {
+    test('text2 es #8696A0 (gray/400, secundario)', () {
       expect(AppTokens.text2, const Color(0xFF8696A0));
     });
 
-    test('textDisabled es #54656F', () {
-      expect(AppTokens.textDisabled, const Color(0xFF54656F));
+    test('textDisabled es #323D43 (gray/500)', () {
+      expect(AppTokens.textDisabled, const Color(0xFF323D43));
     });
   });
 
   group('AppTokens — status', () {
-    test('danger es #F15C6D', () {
+    test('danger es #F15C6D (red/400)', () {
       expect(AppTokens.danger, const Color(0xFFF15C6D));
     });
 
-    test('warning es #FFB74D', () {
+    test('warning es #FFB74D (orange/300)', () {
       expect(AppTokens.warning, const Color(0xFFFFB74D));
     });
 
-    test('success es #00A884 (alias semántico de primary)', () {
-      expect(AppTokens.success, AppTokens.primary);
-    });
-
-    test('divider es #222D34 (hairline)', () {
-      expect(AppTokens.divider, const Color(0xFF222D34));
+    test('success es #00A884 (teal/500, ya desacoplado de primary)', () {
+      expect(AppTokens.success, const Color(0xFF00A884));
+      expect(AppTokens.success, isNot(AppTokens.primary));
     });
   });
 
   group('AppTokens — radii (en px)', () {
-    test('escala completa: pill/card/button/field/chip/sm', () {
+    test('button y field son pill (full=999); chip/sm=8; card=20', () {
       expect(AppTokens.radiusPill, 999.0);
       expect(AppTokens.radiusCard, 20.0);
-      expect(AppTokens.radiusButton, 14.0);
-      expect(AppTokens.radiusField, 14.0);
-      expect(AppTokens.radiusChip, 10.0);
+      expect(AppTokens.radiusButton, 999.0);
+      expect(AppTokens.radiusField, 999.0);
+      expect(AppTokens.radiusChip, 8.0);
       expect(AppTokens.radiusSm, 8.0);
     });
   });
