@@ -39,10 +39,7 @@ class DioMessagesDatasource implements MessagesDatasource {
       // PathValue.
       final res = await _dio.get<Map<String, dynamic>>(
         '/sessions/$botId/${Uri.encodeComponent(chatLid)}/messages',
-        queryParameters: <String, dynamic>{
-          if (cursor != null) 'cursor': cursor,
-          if (limit != null) 'limit': limit,
-        },
+        queryParameters: <String, dynamic>{'cursor': ?cursor, 'limit': ?limit},
       );
       final body = res.data;
       if (body == null) {

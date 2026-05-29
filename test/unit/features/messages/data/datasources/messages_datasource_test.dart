@@ -49,7 +49,7 @@ void main() {
     'type': 'text',
     'content': 'hola',
     'timestampMs': 1700,
-    if (status != null) 'status': status,
+    'status': ?status,
   };
 
   void stub(Response<Map<String, dynamic>> r) {

@@ -25,9 +25,9 @@ void main() {
     'type': type,
     'content': content,
     'timestampMs': timestampMs,
-    if (mediaRef != null) 'mediaRef': mediaRef,
-    if (quotedId != null) 'quotedId': quotedId,
-    if (status != null) 'status': status,
+    'mediaRef': ?mediaRef,
+    'quotedId': ?quotedId,
+    'status': ?status,
   };
 
   group('MessageResp.fromJson', () {
