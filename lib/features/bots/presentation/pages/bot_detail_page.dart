@@ -110,6 +110,12 @@ class _LoadedView extends StatelessWidget {
             SelectableText(bot.identifier!, style: textTheme.bodyMedium),
           ],
           const SizedBox(height: AppTokens.sp7),
+          AppButton.tonal(
+            label: 'Conversaciones',
+            fullWidth: true,
+            onPressed: () => context.push('/bots/${bot.id}/sessions'),
+          ),
+          const SizedBox(height: AppTokens.sp3),
           AppButton.filled(
             label: 'Conectar WhatsApp',
             fullWidth: true,

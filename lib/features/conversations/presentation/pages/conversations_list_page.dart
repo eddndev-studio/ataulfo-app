@@ -1,0 +1,215 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../../core/design/safe_bottom.dart';
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_avatar.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_pill.dart';
+import '../../domain/entities/conversation.dart';
+import '../../domain/failures/conversations_failure.dart';
+import '../bloc/conversations_bloc.dart';
+
+/// Listado de conversaciones de un bot (S07 RF#7). Consume el
+/// `ConversationsBloc` del scope (lo cabla la ruta `/bots/:id/sessions` con el
+/// botId). Es content-only: el Scaffold y el AppBar los aporta la ruta, como
+/// el detalle/conexión del bot.
+///
+/// Slice 1: filas display-only (sin tap). La vista de hilo de mensajes (S09,
+/// `GET /sessions/:botId/:chatLid/messages`) es una rebanada posterior; cuando
+/// aterrice, la fila navegará a ella.
+class ConversationsListPage extends StatelessWidget {
+  const ConversationsListPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ConversationsBloc, ConversationsState>(
+      builder: (context, state) => switch (state) {
+        ConversationsInitial() ||
+        ConversationsLoading() => const _LoadingView(),
+        ConversationsLoaded(items: final items) => _LoadedView(items: items),
+        ConversationsFailed(failure: final f) => _FailedView(failure: f),
+      },
+    );
+  }
+}
+
+class _LoadingView extends StatelessWidget {
+  const _LoadingView();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: CircularProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
+}
+
+class _LoadedView extends StatelessWidget {
+  const _LoadedView({required this.items});
+
+  final List<Conversation> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        final bloc = context.read<ConversationsBloc>();
+        bloc.add(const ConversationsRefreshRequested());
+        await bloc.stream.firstWhere(
+          (s) =>
+              (s is ConversationsLoaded && !s.isRefreshing) ||
+              s is ConversationsFailed,
+        );
+      },
+      child: items.isEmpty
+          ? const _EmptyView()
+          : ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(
+                AppTokens.sp4,
+                AppTokens.sp4,
+                AppTokens.sp4,
+                AppTokens.sp4 + context.safeBottomInset,
+              ),
+              itemCount: items.length,
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: AppTokens.cardGap),
+              itemBuilder: (_, i) => _ConversationTile(conversation: items[i]),
+            ),
+    );
+  }
+}
+
+class _EmptyView extends StatelessWidget {
+  const _EmptyView();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return LayoutBuilder(
+      builder: (context, c) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: <Widget>[
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: c.maxHeight),
+            child: Center(
+              key: const Key('conversations.empty'),
+              child: Padding(
+                padding: const EdgeInsets.all(AppTokens.sp6),
+                child: Text(
+                  'Este bot todavía no tiene conversaciones',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyLarge,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FailedView extends StatelessWidget {
+  const _FailedView({required this.failure});
+
+  final ConversationsFailure failure;
+
+  @override
+  Widget build(BuildContext context) {
+    final isNotFound = failure is ConversationsNotFoundFailure;
+    final textTheme = Theme.of(context).textTheme;
+    return Center(
+      key: isNotFound
+          ? const Key('conversations.error.not_found')
+          : const Key('conversations.error.generic'),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.sp6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              isNotFound
+                  ? 'Este bot ya no existe en tu organización'
+                  : 'No pudimos cargar las conversaciones',
+              textAlign: TextAlign.center,
+              style: textTheme.bodyLarge,
+            ),
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
+              onPressed: () => context.read<ConversationsBloc>().add(
+                const ConversationsLoadRequested(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Fila de una conversación. Sin nombre visible aún (el backend no expone
+/// columna name, S07 RF6): la DM se identifica por su `phone`, el grupo por
+/// la etiqueta "Grupo" + su chatLID. Las pills verbalizan el app-state
+/// relevante (no leído / fijado / archivado); silenciado no se muestra como
+/// pill por no saturar (vive en `mutedUntil`, lo usará una rebanada futura).
+class _ConversationTile extends StatelessWidget {
+  const _ConversationTile({required this.conversation});
+
+  final Conversation conversation;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final c = conversation;
+    final isGroup = c.kind == ConversationKind.group;
+    final title = isGroup ? 'Grupo' : (c.phone ?? c.chatLid);
+    final subtitle = isGroup ? c.chatLid : null;
+
+    final pills = <Widget>[
+      if (c.isMarkedUnread) const AppPill.primary(label: 'No leído'),
+      if (c.isPinned) const AppPill.neutral(label: 'Fijado'),
+      if (c.isArchived) const AppPill.neutral(label: 'Archivado'),
+    ];
+
+    return AppCard(
+      child: Row(
+        children: <Widget>[
+          AppAvatar(name: title),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(title, style: textTheme.titleMedium),
+                if (subtitle != null) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppTokens.text2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (pills.isNotEmpty) ...<Widget>[
+            const SizedBox(width: AppTokens.sp3),
+            Wrap(
+              spacing: AppTokens.sp2,
+              runSpacing: AppTokens.sp2,
+              children: pills,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

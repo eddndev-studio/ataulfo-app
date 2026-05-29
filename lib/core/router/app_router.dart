@@ -20,6 +20,9 @@ import '../../features/bots/presentation/pages/bot_connect_page.dart';
 import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
+import '../../features/conversations/domain/repositories/conversations_repository.dart';
+import '../../features/conversations/presentation/bloc/conversations_bloc.dart';
+import '../../features/conversations/presentation/pages/conversations_list_page.dart';
 import '../../features/flows/domain/repositories/flows_repository.dart';
 import '../../features/flows/presentation/bloc/flow_create_bloc.dart';
 import '../../features/flows/presentation/bloc/flow_detail_bloc.dart';
@@ -60,6 +63,7 @@ class AppRouter {
     required AuthRepository authRepository,
     required BotsRepository botsRepository,
     required BotSessionRepository botSessionRepository,
+    required ConversationsRepository conversationsRepository,
     required TemplatesRepository templatesRepository,
     required FlowsRepository flowsRepository,
     required TriggersRepository triggersRepository,
@@ -69,6 +73,7 @@ class AppRouter {
        _authRepo = authRepository,
        _botsRepo = botsRepository,
        _botSessionRepo = botSessionRepository,
+       _conversationsRepo = conversationsRepository,
        _templatesRepo = templatesRepository,
        _flowsRepo = flowsRepository,
        _triggersRepo = triggersRepository,
@@ -79,6 +84,7 @@ class AppRouter {
   final AuthRepository _authRepo;
   final BotsRepository _botsRepo;
   final BotSessionRepository _botSessionRepo;
+  final ConversationsRepository _conversationsRepo;
   final TemplatesRepository _templatesRepo;
   final FlowsRepository _flowsRepo;
   final TriggersRepository _triggersRepo;
@@ -195,6 +201,25 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Conectar WhatsApp')),
               body: const BotConnectPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Conversaciones (sesiones S07 RF#7) del bot: bandeja per-bot. Sub-ruta
+        // de `/bots/:id` con un segmento más, así no compite con el detalle por
+        // orden de match. Page-scoped: `ConversationsBloc` se construye con el
+        // ID y dispara el primer load al montarse.
+        path: '/bots/:id/sessions',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<ConversationsBloc>(
+            create: (_) =>
+                ConversationsBloc(repo: _conversationsRepo, botId: id)
+                  ..add(const ConversationsLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Conversaciones')),
+              body: const ConversationsListPage(),
             ),
           );
         },

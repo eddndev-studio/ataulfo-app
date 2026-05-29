@@ -12,6 +12,9 @@ import 'package:ataulfo/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_template_picker_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
+import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
+import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
+import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
@@ -41,6 +44,8 @@ class _MockBotsRepo extends Mock implements BotsRepository {}
 
 class _MockBotSessionRepo extends Mock implements BotSessionRepository {}
 
+class _MockConversationsRepo extends Mock implements ConversationsRepository {}
+
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
 class _MockFlowsRepo extends Mock implements FlowsRepository {}
@@ -68,6 +73,7 @@ void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsRepo botsRepo;
   late _MockBotSessionRepo botSessionRepo;
+  late _MockConversationsRepo conversationsRepo;
   late _MockTemplatesRepo templatesRepo;
   late _MockFlowsRepo flowsRepo;
   late _MockTriggersRepo triggersRepo;
@@ -79,6 +85,7 @@ void main() {
     authBloc = _MockAuthBloc();
     botsRepo = _MockBotsRepo();
     botSessionRepo = _MockBotSessionRepo();
+    conversationsRepo = _MockConversationsRepo();
     templatesRepo = _MockTemplatesRepo();
     flowsRepo = _MockFlowsRepo();
     triggersRepo = _MockTriggersRepo();
@@ -107,6 +114,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
+      conversationsRepository: conversationsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -215,6 +223,28 @@ void main() {
     verify(() => botsRepo.byId('b1')).called(1);
   });
 
+  testWidgets(
+    'AuthAuthenticated → /bots/:id/sessions monta ConversationsListPage con el botId',
+    (tester) async {
+      // Bloquea el seam que ningún test de widget alcanza: la ruta debe sembrar
+      // el ConversationsBloc con el botId del path Y disparar el load al montar.
+      // Un typo de path, repo equivocado o ..add(load) caído daría spinner
+      // infinito que el widget test (que inyecta un bloc mock) no detecta.
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      when(
+        () => conversationsRepo.listForBot('b1'),
+      ).thenAnswer((_) async => const <Conversation>[]);
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/bots/b1/sessions');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ConversationsListPage), findsOneWidget);
+      verify(() => conversationsRepo.listForBot('b1')).called(1);
+    },
+  );
+
   testWidgets('AuthUnauthenticated + ruta protegida cualquiera → /login', (
     tester,
   ) async {
@@ -227,6 +257,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
+      conversationsRepository: conversationsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -306,6 +337,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
+      conversationsRepository: conversationsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -331,6 +363,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
+      conversationsRepository: conversationsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -392,6 +425,7 @@ void main() {
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
         botSessionRepository: botSessionRepo,
+        conversationsRepository: conversationsRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
         triggersRepository: triggersRepo,
@@ -455,6 +489,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
+      conversationsRepository: conversationsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -534,6 +569,7 @@ void main() {
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
         botSessionRepository: botSessionRepo,
+        conversationsRepository: conversationsRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
         triggersRepository: triggersRepo,
@@ -560,6 +596,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
+      conversationsRepository: conversationsRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
