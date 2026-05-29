@@ -19,16 +19,23 @@ void main() {
   }
 
   group('AppButton — variantes', () {
-    testWidgets('filled: fondo primary, label en blanco', (tester) async {
+    testWidgets('filled: fondo gradiente de marca, label en onPrimary', (
+      tester,
+    ) async {
       await pumpButton(
         tester,
         AppButton.filled(label: 'Crear', onPressed: () {}),
       );
       final c = rootContainer(tester);
       final d = c.decoration as BoxDecoration;
-      expect(d.color, AppTokens.primary);
+      // El fill es el gradiente de marca (primary→accent): la BoxDecoration
+      // pinta con gradient, no con un color sólido. Ambas constraints son
+      // reales — gradient presente y color ausente.
+      expect(d.gradient, AppTokens.brandGradient);
+      expect(d.color, isNull);
+      // El amarillo exige primer plano oscuro para contraste: onPrimary.
       final label = tester.widget<Text>(find.text('Crear'));
-      expect(label.style?.color, Colors.white);
+      expect(label.style?.color, AppTokens.onPrimary);
     });
 
     testWidgets('tonal: fondo surface2, label en text1', (tester) async {
@@ -69,7 +76,7 @@ void main() {
   });
 
   group('AppButton — geometría', () {
-    testWidgets('altura mínima 48 + radio 14', (tester) async {
+    testWidgets('altura mínima 48 + radio pill (999)', (tester) async {
       await pumpButton(tester, AppButton.filled(label: 'X', onPressed: () {}));
       final c = rootContainer(tester);
       final d = c.decoration as BoxDecoration;
@@ -162,7 +169,8 @@ void main() {
       );
       expect(find.byIcon(Icons.add), findsOneWidget);
       final icon = tester.widget<Icon>(find.byIcon(Icons.add));
-      expect(icon.color, Colors.white);
+      // Ícono sobre el fill cálido: onPrimary (oscuro), nunca blanco.
+      expect(icon.color, AppTokens.onPrimary);
     });
   });
 
@@ -198,11 +206,11 @@ void main() {
     });
 
     testWidgets(
-      'loading: true con foreground primary (variante filled) tinte el '
-      'spinner con onPrimary (blanco)',
+      'loading: true en variante filled tinte el spinner con onPrimary',
       (tester) async {
         // El spinner toma el foreground de la variante — coherente con el
-        // color del label que reemplaza. En filled, foreground = white.
+        // color del label que reemplaza. En filled, foreground = onPrimary
+        // (oscuro), para contrastar contra el fill cálido del gradiente.
         await pumpButton(
           tester,
           AppButton.filled(label: 'X', onPressed: () {}, loading: true),
@@ -210,7 +218,7 @@ void main() {
         final spinner = tester.widget<CircularProgressIndicator>(
           find.byType(CircularProgressIndicator),
         );
-        expect(spinner.valueColor?.value, Colors.white);
+        expect(spinner.valueColor?.value, AppTokens.onPrimary);
       },
     );
 

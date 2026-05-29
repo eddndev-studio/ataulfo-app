@@ -9,6 +9,17 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: w)));
   }
 
+  // El decorado vive en el Container raíz del avatar (descendiente directo
+  // del widget). Centralizamos el lookup como en el resto de los tests del kit.
+  Container rootContainer(WidgetTester tester) {
+    return tester.widget<Container>(
+      find.descendant(
+        of: find.byType(AppAvatar),
+        matching: find.byType(Container),
+      ),
+    );
+  }
+
   group('AppAvatar — inicial', () {
     testWidgets('toma la primera letra en uppercase', (tester) async {
       await pumpAvatar(tester, const AppAvatar(name: 'soporte'));
@@ -27,18 +38,36 @@ void main() {
   });
 
   group('AppAvatar — estilo', () {
-    testWidgets('container circular con surface3', (tester) async {
+    testWidgets('container circular', (tester) async {
       await pumpAvatar(tester, const AppAvatar(name: 'a'));
 
-      final container = tester.widget<Container>(
-        find.descendant(
-          of: find.byType(AppAvatar),
-          matching: find.byType(Container),
-        ),
-      );
-      final decoration = container.decoration as BoxDecoration;
-      expect(decoration.color, AppTokens.surface3);
+      final decoration = rootContainer(tester).decoration as BoxDecoration;
       expect(decoration.shape, BoxShape.circle);
+    });
+
+    testWidgets('interior en superficie oscura del kit (surface2/surface3)', (
+      tester,
+    ) async {
+      // El anillo amarillo es el protagonista; el relleno se mantiene en una
+      // superficie oscura para que la inicial y el borde resalten. El kit
+      // admite tanto surface2 como surface3 para este relleno.
+      await pumpAvatar(tester, const AppAvatar(name: 'a'));
+
+      final decoration = rootContainer(tester).decoration as BoxDecoration;
+      expect(
+        decoration.color,
+        anyOf(AppTokens.surface2, AppTokens.surface3),
+      );
+    });
+
+    testWidgets('anillo: borde primary alrededor del avatar', (tester) async {
+      // Detalle nuevo del re-skin (UserIcon): un anillo amarillo perimetral.
+      await pumpAvatar(tester, const AppAvatar(name: 'a'));
+
+      final decoration = rootContainer(tester).decoration as BoxDecoration;
+      expect(decoration.border, isNotNull);
+      expect(decoration.border?.top.color, AppTokens.primary);
+      expect(decoration.border?.top.width, greaterThan(0));
     });
 
     testWidgets('label DMSans bodyL/w600 con text1', (tester) async {
@@ -55,24 +84,14 @@ void main() {
   group('AppAvatar — tamaño', () {
     testWidgets('default size 40x40', (tester) async {
       await pumpAvatar(tester, const AppAvatar(name: 'a'));
-      final container = tester.widget<Container>(
-        find.descendant(
-          of: find.byType(AppAvatar),
-          matching: find.byType(Container),
-        ),
-      );
+      final container = rootContainer(tester);
       expect(container.constraints?.maxWidth, 40);
       expect(container.constraints?.maxHeight, 40);
     });
 
     testWidgets('size custom respeta el parámetro', (tester) async {
       await pumpAvatar(tester, const AppAvatar(name: 'a', size: 64));
-      final container = tester.widget<Container>(
-        find.descendant(
-          of: find.byType(AppAvatar),
-          matching: find.byType(Container),
-        ),
-      );
+      final container = rootContainer(tester);
       expect(container.constraints?.maxWidth, 64);
       expect(container.constraints?.maxHeight, 64);
     });

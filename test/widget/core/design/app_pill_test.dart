@@ -23,13 +23,17 @@ void main() {
   }
 
   group('AppPill — variantes (fondo + color de label)', () {
-    testWidgets('primary: tint verde + fg primaryHover', (tester) async {
+    testWidgets('primary: fill amarillo sólido + texto onPrimary', (
+      tester,
+    ) async {
       await pumpPill(tester, const AppPill.primary(label: 'Activo'));
       final c = pillContainer(tester);
       final d = c.decoration as BoxDecoration;
-      // primary-tint-18 == primary @ 18% alpha
-      expect(d.color, AppTokens.primary.withValues(alpha: 0.18));
-      expect(labelStyle(tester, 'Activo')?.color, AppTokens.primaryHover);
+      // Pill rellena de marca: fondo primary pleno, sin gradiente ni tint.
+      expect(d.color, AppTokens.primary);
+      expect(d.gradient, isNull);
+      // Regla on-primary: texto oscuro sobre el fill cálido, nunca blanco.
+      expect(labelStyle(tester, 'Activo')?.color, AppTokens.onPrimary);
     });
 
     testWidgets('neutral: fondo surface3 + fg text2', (tester) async {
@@ -62,7 +66,7 @@ void main() {
   });
 
   group('AppPill — geometría', () {
-    testWidgets('padding 4/10 y radio 10', (tester) async {
+    testWidgets('padding 4/10 y radio pill (full)', (tester) async {
       await pumpPill(tester, const AppPill.neutral(label: 'x'));
       final c = pillContainer(tester);
       expect(
@@ -70,7 +74,15 @@ void main() {
         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       );
       final d = c.decoration as BoxDecoration;
-      expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusChip));
+      // Todas las variantes son cápsulas: radio full, no el chip de 8.
+      expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusPill));
+    });
+
+    testWidgets('outline también usa radio pill (full)', (tester) async {
+      await pumpPill(tester, const AppPill.outline(label: 'x'));
+      final c = pillContainer(tester);
+      final d = c.decoration as BoxDecoration;
+      expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusPill));
     });
 
     testWidgets('label en caption 12/16 weight 500', (tester) async {
