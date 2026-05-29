@@ -13,8 +13,10 @@ enum _AppPillVariant { primary, neutral, danger, outline }
 ///
 /// Reemplaza al `Chip` de Material: no respeta el theme legacy (tokens
 /// duros), tipografía caption 12/16/500 y padding 4/10 idénticos en todas
-/// las variantes. El dot opcional sirve como indicador de estado al lado
-/// del label sin necesidad de iconos extra.
+/// las variantes. Toda variante es una cápsula (radio full): el badge es
+/// pequeño y el pill pleno comunica estado mejor que un chip cuadrado. El
+/// dot opcional sirve como indicador de estado al lado del label sin
+/// necesidad de iconos extra.
 class AppPill extends StatelessWidget {
   const AppPill.primary({super.key, required this.label, this.dot})
     : _variant = _AppPillVariant.primary;
@@ -40,7 +42,7 @@ class AppPill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: colors.background,
-          borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+          borderRadius: BorderRadius.circular(AppTokens.radiusPill),
           border: colors.border,
         ),
         child: Row(
@@ -77,10 +79,12 @@ class AppPill extends StatelessWidget {
 
   static _AppPillColors _colorsFor(_AppPillVariant variant) {
     switch (variant) {
+      // Pill rellena de marca: fill amarillo pleno con texto oscuro
+      // (regla on-primary — el amarillo exige primer plano oscuro).
       case _AppPillVariant.primary:
-        return _AppPillColors(
-          background: AppTokens.primary.withValues(alpha: 0.18),
-          foreground: AppTokens.primaryHover,
+        return const _AppPillColors(
+          background: AppTokens.primary,
+          foreground: AppTokens.onPrimary,
         );
       case _AppPillVariant.neutral:
         return const _AppPillColors(
