@@ -401,4 +401,67 @@ void main() {
       );
     });
   });
+
+  group('AppTextField — multilínea (text area)', () {
+    testWidgets(
+      'maxLines > 1: radio = mitad del alto de una línea (24), no pill',
+      (tester) async {
+        await pump(
+          tester,
+          AppTextField(
+            label: 'Prompt',
+            hint: 'Escribe…',
+            controller: TextEditingController(),
+            maxLines: 6,
+          ),
+        );
+        // El text area NO usa el pill pleno (radiusField=999) sino el radio
+        // efectivo de la píldora de una línea (48/2 = 24): un rect redondeado.
+        expect(
+          shellDecoration(tester).borderRadius,
+          BorderRadius.circular(24),
+        );
+      },
+    );
+
+    testWidgets('una línea conserva el pill (radiusField)', (tester) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Correo',
+          hint: 'Value',
+          controller: TextEditingController(),
+        ),
+      );
+      expect(
+        shellDecoration(tester).borderRadius,
+        BorderRadius.circular(AppTokens.radiusField),
+      );
+    });
+
+    testWidgets('maxLines > 1: padding vertical más generoso (sp3)', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Prompt',
+          hint: 'Escribe…',
+          controller: TextEditingController(),
+          maxLines: 6,
+        ),
+      );
+      // Localiza el Container del shell (el que tiene la BoxDecoration) y lee
+      // su padding vertical: multilínea respira con sp3, no sp1.
+      final shell = tester.widgetList<Container>(
+        find.descendant(
+          of: find.byType(AppTextField),
+          matching: find.byType(Container),
+        ),
+      ).firstWhere((c) => c.decoration is BoxDecoration);
+      final padding = shell.padding! as EdgeInsets;
+      expect(padding.top, AppTokens.sp3);
+      expect(padding.bottom, AppTokens.sp3);
+    });
+  });
 }
