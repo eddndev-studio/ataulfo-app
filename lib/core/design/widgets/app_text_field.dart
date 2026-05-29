@@ -77,6 +77,12 @@ class AppTextField extends StatefulWidget {
 }
 
 class _AppTextFieldState extends State<AppTextField> {
+  // Objetivo táctil (alto) de un campo de una línea. El radio del text area se
+  // deriva de aquí (_touchTarget / 2) para igualar la curvatura REAL de la
+  // píldora de una línea, en vez de un pill pleno que sobre una caja alta
+  // curva las esquinas a alto/2 y se ve deforme.
+  static const double _touchTarget = 48.0;
+
   final FocusNode _focusNode = FocusNode();
 
   @override
@@ -100,7 +106,15 @@ class _AppTextFieldState extends State<AppTextField> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final radius = BorderRadius.circular(AppTokens.radiusField);
+
+    // Una línea: píldora (radiusField). Multilínea (text area): rect redondeado
+    // con el mismo radio efectivo que la píldora de una línea (_touchTarget/2).
+    final isMultiline = widget.maxLines == null ||
+        widget.maxLines! > 1 ||
+        (widget.minLines ?? 1) > 1;
+    final radius = BorderRadius.circular(
+      isMultiline ? _touchTarget / 2 : AppTokens.radiusField,
+    );
 
     final hasError = widget.errorText != null;
     final focused = _focusNode.hasFocus;
@@ -146,20 +160,24 @@ class _AppTextFieldState extends State<AppTextField> {
         // envuelve el Container por fuera para que la píldora siga siendo el
         // único contenedor con BoxDecoration.
         ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
+          constraints: const BoxConstraints(minHeight: _touchTarget),
           child: Container(
-            // Centra el texto verticalmente: con el alto mínimo de 48 el
-            // contenido de una línea quedaría pegado arriba sin esta alineación.
-            alignment: Alignment.centerLeft,
+            // Una línea: centrado vertical dentro del alto mínimo (si no, el
+            // texto quedaría pegado arriba). Multilínea: el texto arranca arriba
+            // y crece hacia abajo.
+            alignment:
+                isMultiline ? Alignment.topLeft : Alignment.centerLeft,
             decoration: BoxDecoration(
               color: AppTokens.input,
               borderRadius: radius,
               border: Border.all(color: borderColor, width: 2),
               boxShadow: boxShadow,
             ),
-            padding: const EdgeInsets.symmetric(
+            // Multilínea necesita más respiro vertical para no rozar el borde;
+            // una línea va ajustada porque el alto mínimo ya la centra.
+            padding: EdgeInsets.symmetric(
               horizontal: AppTokens.sp4,
-              vertical: AppTokens.sp1,
+              vertical: isMultiline ? AppTokens.sp3 : AppTokens.sp1,
             ),
             child: TextField(
               controller: widget.controller,
