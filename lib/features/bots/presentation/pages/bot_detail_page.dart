@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -108,6 +109,12 @@ class _LoadedView extends StatelessWidget {
             const SizedBox(height: AppTokens.sp1),
             SelectableText(bot.identifier!, style: textTheme.bodyMedium),
           ],
+          const SizedBox(height: AppTokens.sp7),
+          AppButton.filled(
+            label: 'Conectar WhatsApp',
+            fullWidth: true,
+            onPressed: () => context.push('/bots/${bot.id}/connect'),
+          ),
         ],
       ),
     );

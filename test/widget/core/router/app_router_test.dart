@@ -6,6 +6,7 @@ import 'package:agentic/features/auth/domain/repositories/auth_repository.dart';
 import 'package:agentic/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:agentic/features/auth/presentation/pages/login_page.dart';
 import 'package:agentic/features/bots/domain/entities/bot.dart';
+import 'package:agentic/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:agentic/features/bots/domain/repositories/bots_repository.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:agentic/features/bots/presentation/pages/bot_detail_page.dart';
@@ -38,6 +39,8 @@ class _MockAuthRepo extends Mock implements AuthRepository {}
 
 class _MockBotsRepo extends Mock implements BotsRepository {}
 
+class _MockBotSessionRepo extends Mock implements BotSessionRepository {}
+
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
 class _MockFlowsRepo extends Mock implements FlowsRepository {}
@@ -64,6 +67,7 @@ Widget _host(AppRouter router, AuthBloc authBloc) =>
 void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsRepo botsRepo;
+  late _MockBotSessionRepo botSessionRepo;
   late _MockTemplatesRepo templatesRepo;
   late _MockFlowsRepo flowsRepo;
   late _MockTriggersRepo triggersRepo;
@@ -74,6 +78,7 @@ void main() {
   setUp(() {
     authBloc = _MockAuthBloc();
     botsRepo = _MockBotsRepo();
+    botSessionRepo = _MockBotSessionRepo();
     templatesRepo = _MockTemplatesRepo();
     flowsRepo = _MockFlowsRepo();
     triggersRepo = _MockTriggersRepo();
@@ -101,6 +106,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      botSessionRepository: botSessionRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -220,6 +226,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      botSessionRepository: botSessionRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -298,6 +305,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      botSessionRepository: botSessionRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -322,6 +330,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      botSessionRepository: botSessionRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -382,6 +391,7 @@ void main() {
         authBloc: authBloc,
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
+        botSessionRepository: botSessionRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
         triggersRepository: triggersRepo,
@@ -444,6 +454,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      botSessionRepository: botSessionRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -522,6 +533,7 @@ void main() {
         authBloc: authBloc,
         authRepository: _MockAuthRepo(),
         botsRepository: botsRepo,
+        botSessionRepository: botSessionRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
         triggersRepository: triggersRepo,
@@ -547,6 +559,7 @@ void main() {
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
+      botSessionRepository: botSessionRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,

@@ -14,7 +14,9 @@ import 'features/auth/data/interceptors/auth_interceptor.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/data/repositories/token_storage.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/bots/data/datasources/bot_session_datasource.dart';
 import 'features/bots/data/datasources/bots_datasource.dart';
+import 'features/bots/data/repositories/bot_session_repository_impl.dart';
 import 'features/bots/data/repositories/bots_repository_impl.dart';
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
@@ -85,6 +87,10 @@ void main() {
     datasource: DioBotsDatasource(mainDio),
   );
 
+  final botSessionRepository = BotSessionRepositoryImpl(
+    datasource: DioBotSessionDatasource(mainDio),
+  );
+
   final templatesRepository = TemplatesRepositoryImpl(
     datasource: DioTemplatesDatasource(mainDio),
   );
@@ -109,6 +115,7 @@ void main() {
     authBloc: authBloc,
     authRepository: authRepository,
     botsRepository: botsRepository,
+    botSessionRepository: botSessionRepository,
     templatesRepository: templatesRepository,
     flowsRepository: flowsRepository,
     triggersRepository: triggersRepository,
