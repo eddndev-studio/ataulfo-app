@@ -64,6 +64,115 @@ void main() {
     });
   });
 
+  group('AppCard.gradient — card destacada', () {
+    testWidgets('expone brandGradient y deja color nulo', (tester) async {
+      // El fill de marca vive en el gradiente; un BoxDecoration no puede
+      // llevar gradient y color a la vez, así que color debe quedar nulo.
+      await pumpCard(
+        tester,
+        const AppCard.gradient(child: SizedBox(width: 100, height: 100)),
+      );
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Container),
+        ),
+      );
+      final decoration = container.decoration as BoxDecoration;
+      expect(decoration.gradient, AppTokens.brandGradient);
+      expect(decoration.color, isNull);
+    });
+
+    testWidgets('conserva radio card y padding default', (tester) async {
+      await pumpCard(
+        tester,
+        const AppCard.gradient(child: SizedBox.shrink()),
+      );
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Container),
+        ),
+      );
+      final decoration = container.decoration as BoxDecoration;
+      expect(
+        decoration.borderRadius,
+        BorderRadius.circular(AppTokens.radiusCard),
+      );
+      expect(container.padding, const EdgeInsets.all(AppTokens.cardPadding));
+    });
+
+    testWidgets('con onTap: tap dispara callback', (tester) async {
+      var taps = 0;
+      await pumpCard(
+        tester,
+        AppCard.gradient(
+          onTap: () => taps++,
+          child: const SizedBox(width: 100, height: 100),
+        ),
+      );
+      await tester.tap(find.byType(AppCard));
+      await tester.pumpAndSettle();
+      expect(taps, 1);
+    });
+  });
+
+  group('AppCard.glass — card translúcida', () {
+    testWidgets('expone fondo glass (surface2 @60%)', (tester) async {
+      await pumpCard(
+        tester,
+        const AppCard.glass(child: SizedBox(width: 100, height: 100)),
+      );
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Container),
+        ),
+      );
+      final decoration = container.decoration as BoxDecoration;
+      expect(decoration.color, AppTokens.glass);
+      expect(decoration.gradient, isNull);
+    });
+
+    testWidgets('conserva radio card y padding default', (tester) async {
+      await pumpCard(
+        tester,
+        const AppCard.glass(child: SizedBox.shrink()),
+      );
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Container),
+        ),
+      );
+      final decoration = container.decoration as BoxDecoration;
+      expect(
+        decoration.borderRadius,
+        BorderRadius.circular(AppTokens.radiusCard),
+      );
+      expect(container.padding, const EdgeInsets.all(AppTokens.cardPadding));
+    });
+
+    testWidgets('padding override por prop (EdgeInsets)', (tester) async {
+      // Los constructores con nombre reciben EdgeInsetsGeometry?, no un
+      // double — el override se pasa como un EdgeInsets, no como escalar.
+      await pumpCard(
+        tester,
+        const AppCard.glass(
+          padding: EdgeInsets.zero,
+          child: SizedBox.shrink(),
+        ),
+      );
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Container),
+        ),
+      );
+      expect(container.padding, EdgeInsets.zero);
+    });
+  });
+
   group('AppCard — interacción', () {
     testWidgets('sin onTap: no es tappable (no hay InkWell ancestro)', (
       tester,

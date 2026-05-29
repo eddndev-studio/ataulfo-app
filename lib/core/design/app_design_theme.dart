@@ -16,9 +16,11 @@ class AppDesignTheme {
     const colorScheme = ColorScheme.dark(
       brightness: Brightness.dark,
       primary: AppTokens.primary,
-      onPrimary: Colors.white,
+      // El amarillo de marca exige primer plano oscuro: texto/íconos sobre
+      // cualquier fill cálido (primary o accent) usan onPrimary (gray/950).
+      onPrimary: AppTokens.onPrimary,
       secondary: AppTokens.accent,
-      onSecondary: Colors.white,
+      onSecondary: AppTokens.onPrimary,
       surface: AppTokens.surface2,
       onSurface: AppTokens.text1,
       onSurfaceVariant: AppTokens.text2,

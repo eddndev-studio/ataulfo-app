@@ -5,14 +5,18 @@ import '../tokens.dart';
 
 /// Primitivo de input del design system.
 ///
-/// Sustituye al `TextField` con `OutlineInputBorder` de Material. El
-/// chrome canónico del kit es borderless con fill `surface3`: el
-/// contenedor del campo aporta la jerarquía visual sin un border
-/// explícito que compita con el contenido tipeado. La etiqueta vive
-/// arriba del field como `labelSmall/text2`, no como floating label —
-/// el operador la lee antes de tocar el campo y no necesita esperar
-/// la animación.
-class AppTextField extends StatelessWidget {
+/// La forma canónica del kit es una píldora con fill translúcido: el borde y
+/// el glow de foco no son decoración del `TextField` de Material —no caben en
+/// un `InputDecoration`, que no admite `boxShadow`— sino de un contenedor
+/// envolvente que pinta la píldora. El `TextField` interior va borderless y
+/// solo aporta el texto, el hint y el comportamiento de edición.
+///
+/// La etiqueta vive arriba del field como caption (`labelSmall/text2`), no
+/// como floating label: el operador la lee antes de tocar el campo y no
+/// espera ninguna animación. El estado de foco se resuelve con un
+/// `FocusNode` y `setState` (rebuild inmediato), no con una transición
+/// animada, para que el borde y el glow aparezcan en el mismo frame.
+class AppTextField extends StatefulWidget {
   const AppTextField({
     super.key,
     required this.label,
@@ -26,6 +30,8 @@ class AppTextField extends StatelessWidget {
     this.maxLines = 1,
     this.keyboardType,
     this.inputFormatters,
+    this.errorText,
+    this.helperText,
   });
 
   final String label;
@@ -56,55 +62,145 @@ class AppTextField extends StatelessWidget {
   /// teclado solicitado.
   final List<TextInputFormatter>? inputFormatters;
 
+  /// Mensaje de error. No nulo ⇒ el campo entra en estado de error: borde y
+  /// label en `danger`, y el mensaje se muestra bajo el field. El error
+  /// gana sobre el foco (un campo inválido se ve inválido aunque esté
+  /// enfocado).
+  final String? errorText;
+
+  /// Texto de ayuda bajo el field, en `text2`. Lo sustituye [errorText]
+  /// cuando el campo está en error — no se muestran ambos a la vez.
+  final String? helperText;
+
+  @override
+  State<AppTextField> createState() => _AppTextFieldState();
+}
+
+class _AppTextFieldState extends State<AppTextField> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  // Rebuild inmediato del shell hacia su estado enfocado/desenfocado. Un
+  // setState (no una animación) garantiza que el borde y el glow estén
+  // presentes en el primer frame tras ganar foco.
+  void _onFocusChanged() => setState(() {});
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final radius = BorderRadius.circular(AppTokens.radiusField);
-    final borderless = OutlineInputBorder(
-      borderSide: BorderSide.none,
-      borderRadius: radius,
-    );
-    final focused = OutlineInputBorder(
-      borderSide: const BorderSide(color: AppTokens.primary, width: 1.5),
-      borderRadius: radius,
-    );
 
-    return Column(
+    final hasError = widget.errorText != null;
+    final focused = _focusNode.hasFocus;
+
+    // El error gana sobre el foco; el borde reserva siempre 2px (incluso en
+    // default, con color transparente) para que enfocar no salte el layout.
+    final Color borderColor;
+    if (hasError) {
+      borderColor = AppTokens.danger;
+    } else if (focused) {
+      borderColor = AppTokens.primary;
+    } else {
+      borderColor = Colors.transparent;
+    }
+
+    // El glow solo acompaña al foco limpio (sin error): comunica «aquí está
+    // el cursor», no «hay un problema».
+    final List<BoxShadow>? boxShadow = (focused && !hasError)
+        ? const <BoxShadow>[
+            BoxShadow(
+              color: AppTokens.primaryGlow,
+              blurRadius: 16,
+              spreadRadius: 1,
+            ),
+          ]
+        : null;
+
+    final labelColor = hasError ? AppTokens.danger : AppTokens.text2;
+    final helperOrError = widget.errorText ?? widget.helperText;
+    final helperColor = hasError ? AppTokens.danger : AppTokens.text2;
+
+    final field = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Text(
-          label,
-          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+          widget.label,
+          style: textTheme.labelSmall?.copyWith(color: labelColor),
         ),
         const SizedBox(height: AppTokens.sp1),
-        TextField(
-          controller: controller,
-          enabled: enabled,
-          autofocus: autofocus,
-          textInputAction: textInputAction,
-          onSubmitted: onSubmitted,
-          minLines: minLines,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-            filled: true,
-            fillColor: AppTokens.surface3,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.sp4,
-              vertical: AppTokens.sp3,
+        // El kit fija un objetivo táctil de 48px: el shell garantiza ese alto
+        // mínimo aunque el texto de una sola línea mida menos. El ConstrainedBox
+        // envuelve el Container por fuera para que la píldora siga siendo el
+        // único contenedor con BoxDecoration.
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Container(
+            // Centra el texto verticalmente: con el alto mínimo de 48 el
+            // contenido de una línea quedaría pegado arriba sin esta alineación.
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              color: AppTokens.input,
+              borderRadius: radius,
+              border: Border.all(color: borderColor, width: 2),
+              boxShadow: boxShadow,
             ),
-            border: borderless,
-            enabledBorder: borderless,
-            disabledBorder: borderless,
-            focusedBorder: focused,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp4,
+              vertical: AppTokens.sp1,
+            ),
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              enabled: widget.enabled,
+              autofocus: widget.autofocus,
+              textInputAction: widget.textInputAction,
+              onSubmitted: widget.onSubmitted,
+              minLines: widget.minLines,
+              maxLines: widget.maxLines,
+              keyboardType: widget.keyboardType,
+              inputFormatters: widget.inputFormatters,
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+              // Borderless y sin relleno/padding propios: la píldora la pinta
+              // el Container, y el padding lo gobierna SIEMPRE el shell. Un
+              // borde o un fill aquí competiría con el del contenedor y haría
+              // al campo sensible al tema de Material por debajo.
+              decoration: InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
+                contentPadding: EdgeInsets.zero,
+                hintText: widget.hint,
+                hintStyle:
+                    textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+              ),
+            ),
           ),
         ),
+        if (helperOrError != null) ...<Widget>[
+          const SizedBox(height: AppTokens.sp1),
+          Text(
+            helperOrError,
+            style: textTheme.labelSmall?.copyWith(color: helperColor),
+          ),
+        ],
       ],
     );
+
+    // Disabled: atenuar todo el bloque con el mismo idioma que AppButton.
+    return Opacity(opacity: widget.enabled ? 1.0 : 0.4, child: field);
   }
 }

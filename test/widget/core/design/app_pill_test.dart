@@ -23,13 +23,17 @@ void main() {
   }
 
   group('AppPill — variantes (fondo + color de label)', () {
-    testWidgets('primary: tint verde + fg primaryHover', (tester) async {
+    testWidgets('primary: fill amarillo sólido + texto onPrimary', (
+      tester,
+    ) async {
       await pumpPill(tester, const AppPill.primary(label: 'Activo'));
       final c = pillContainer(tester);
       final d = c.decoration as BoxDecoration;
-      // primary-tint-18 == primary @ 18% alpha
-      expect(d.color, AppTokens.primary.withValues(alpha: 0.18));
-      expect(labelStyle(tester, 'Activo')?.color, AppTokens.primaryHover);
+      // Pill rellena de marca: fondo primary pleno, sin gradiente ni tint.
+      expect(d.color, AppTokens.primary);
+      expect(d.gradient, isNull);
+      // Regla on-primary: texto oscuro sobre el fill cálido, nunca blanco.
+      expect(labelStyle(tester, 'Activo')?.color, AppTokens.onPrimary);
     });
 
     testWidgets('neutral: fondo surface3 + fg text2', (tester) async {
@@ -62,7 +66,7 @@ void main() {
   });
 
   group('AppPill — geometría', () {
-    testWidgets('padding 4/10 y radio 10', (tester) async {
+    testWidgets('padding 4/10 y radio pill (full)', (tester) async {
       await pumpPill(tester, const AppPill.neutral(label: 'x'));
       final c = pillContainer(tester);
       expect(
@@ -70,7 +74,15 @@ void main() {
         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       );
       final d = c.decoration as BoxDecoration;
-      expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusChip));
+      // Todas las variantes son cápsulas: radio full, no el chip de 8.
+      expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusPill));
+    });
+
+    testWidgets('outline también usa radio pill (full)', (tester) async {
+      await pumpPill(tester, const AppPill.outline(label: 'x'));
+      final c = pillContainer(tester);
+      final d = c.decoration as BoxDecoration;
+      expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusPill));
     });
 
     testWidgets('label en caption 12/16 weight 500', (tester) async {
@@ -89,10 +101,24 @@ void main() {
       expect(dotFinder(), findsNothing);
     });
 
-    testWidgets('dot active: círculo color accent', (tester) async {
+    testWidgets('dot active en primary: círculo color onPrimary', (
+      tester,
+    ) async {
       await pumpPill(
         tester,
         const AppPill.primary(label: 'Activo', dot: AppPillDot.active),
+      );
+      final dot = tester.widget<Container>(dotFinder());
+      final d = dot.decoration as BoxDecoration;
+      // Sobre el fill amarillo el dot va oscuro (onPrimary) para contrastar.
+      expect(d.color, AppTokens.onPrimary);
+      expect(d.shape, BoxShape.circle);
+    });
+
+    testWidgets('dot active en neutral: círculo color accent', (tester) async {
+      await pumpPill(
+        tester,
+        const AppPill.neutral(label: 'Activo', dot: AppPillDot.active),
       );
       final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
@@ -118,6 +144,48 @@ void main() {
       final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
       expect(d.color, AppTokens.danger);
+    });
+  });
+
+  group('AppPill — a11y (estado verbalizado)', () {
+    testWidgets('con dot active anuncia el estado "Activo"', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpPill(
+        tester,
+        const AppPill.neutral(label: 'Etiqueta', dot: AppPillDot.active),
+      );
+      // El estado-por-color del dot debe ser anunciable junto al label visible.
+      expect(find.bySemanticsLabel(RegExp('Activo')), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('con dot paused anuncia el estado "Pausado"', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpPill(
+        tester,
+        const AppPill.neutral(label: 'Etiqueta', dot: AppPillDot.paused),
+      );
+      expect(find.bySemanticsLabel(RegExp('Pausado')), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('con dot danger anuncia el estado "Error"', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpPill(
+        tester,
+        const AppPill.danger(label: 'Etiqueta', dot: AppPillDot.danger),
+      );
+      expect(find.bySemanticsLabel(RegExp('Error')), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('sin dot no agrega Semantics de estado', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpPill(tester, const AppPill.neutral(label: 'Etiqueta'));
+      expect(find.bySemanticsLabel(RegExp('Activo')), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('Pausado')), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('Error')), findsNothing);
+      handle.dispose();
     });
   });
 }

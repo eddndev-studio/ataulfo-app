@@ -32,6 +32,18 @@ void main() {
       expect(scheme.primary, AppTokens.primary);
     });
 
+    test('onPrimary = AppTokens.onPrimary (texto oscuro sobre amarillo)', () {
+      expect(scheme.onPrimary, AppTokens.onPrimary);
+    });
+
+    test('secondary = AppTokens.accent', () {
+      expect(scheme.secondary, AppTokens.accent);
+    });
+
+    test('onSecondary = AppTokens.onPrimary (texto oscuro sobre naranja)', () {
+      expect(scheme.onSecondary, AppTokens.onPrimary);
+    });
+
     test('surface = AppTokens.surface2 (cards default)', () {
       expect(scheme.surface, AppTokens.surface2);
     });

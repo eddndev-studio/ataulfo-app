@@ -11,9 +11,10 @@ enum _AppButtonVariant { filled, tonal, text, danger }
 /// Primitivo Button del design system.
 ///
 /// Cuatro variantes con la misma geometría base (altura mínima 48, radio
-/// 14, label en DM Sans weight 600). `text` y `danger` reducen el padding
-/// horizontal — viven inline (header de card, footer de modal) y no como
-/// botones independientes.
+/// pill, label en DM Sans weight 600). `filled` se pinta con el gradiente de
+/// marca y lleva el primer plano oscuro (`onPrimary`) que el amarillo exige
+/// para contraste; `text` y `danger` reducen el padding horizontal — viven
+/// inline (header de card, footer de modal) y no como botones independientes.
 ///
 /// El estado `loading` reemplaza el label por un spinner inline y bloquea
 /// el tap internamente sin nullificar `onPressed` — los formularios pueden
@@ -119,7 +120,11 @@ class AppButton extends StatelessWidget {
             width: fullWidth ? double.infinity : null,
             padding: padding,
             decoration: BoxDecoration(
+              // El relleno cálido es un gradiente, no un color sólido: cuando
+              // la variante define [gradient], `color` queda en null para que
+              // la BoxDecoration pinte con la rampa de marca.
               color: colors.background,
+              gradient: colors.gradient,
               borderRadius: radius,
             ),
             child: content,
@@ -128,21 +133,34 @@ class AppButton extends StatelessWidget {
       ),
     );
 
-    // Loading conserva opacity 1.0: el spinner ya comunica el estado y
-    // bajar el tinte agregaría ruido visual sobre algo que ya se ve.
-    return Opacity(opacity: disabled ? 0.4 : 1.0, child: button);
+    // Un único nodo de botón con su etiqueta: ExcludeSemantics colapsa el nodo
+    // del InkWell y el del label (que en loading desaparece de la vista pero
+    // sigue describiendo la acción). Loading bloquea el tap igual que disabled.
+    // Loading conserva opacity 1.0: el spinner ya comunica el estado y bajar el
+    // tinte agregaría ruido visual sobre algo que ya se ve.
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: !disabled,
+      label: label,
+      onTap: (disabled || loading) ? null : onPressed,
+      child: ExcludeSemantics(
+        child: Opacity(opacity: disabled ? 0.4 : 1.0, child: button),
+      ),
+    );
   }
 
   static _AppButtonColors _colorsFor(_AppButtonVariant variant) {
     switch (variant) {
       case _AppButtonVariant.filled:
+        // El amarillo exige primer plano oscuro: onPrimary, nunca blanco.
         return const _AppButtonColors(
-          background: AppTokens.primary,
-          foreground: Colors.white,
+          gradient: AppTokens.brandGradient,
+          foreground: AppTokens.onPrimary,
         );
       case _AppButtonVariant.tonal:
         return const _AppButtonColors(
-          background: AppTokens.surface2,
+          background: AppTokens.surface3,
           foreground: AppTokens.text1,
         );
       case _AppButtonVariant.text:
@@ -170,8 +188,16 @@ class AppButton extends StatelessWidget {
   }
 }
 
+/// Resolución de color por variante. Una variante define [gradient] (relleno
+/// cálido de marca, con [background] en null) o [background] (relleno sólido o
+/// transparente, sin [gradient]); nunca ambos a la vez.
 class _AppButtonColors {
-  const _AppButtonColors({required this.background, required this.foreground});
-  final Color background;
+  const _AppButtonColors({
+    this.background,
+    this.gradient,
+    required this.foreground,
+  });
+  final Color? background;
+  final Gradient? gradient;
   final Color foreground;
 }
