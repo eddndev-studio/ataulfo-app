@@ -84,10 +84,7 @@ void main() {
     });
 
     testWidgets('conserva radio card y padding default', (tester) async {
-      await pumpCard(
-        tester,
-        const AppCard.gradient(child: SizedBox.shrink()),
-      );
+      await pumpCard(tester, const AppCard.gradient(child: SizedBox.shrink()));
       final container = tester.widget<Container>(
         find.descendant(
           of: find.byType(AppCard),
@@ -135,10 +132,7 @@ void main() {
     });
 
     testWidgets('conserva radio card y padding default', (tester) async {
-      await pumpCard(
-        tester,
-        const AppCard.glass(child: SizedBox.shrink()),
-      );
+      await pumpCard(tester, const AppCard.glass(child: SizedBox.shrink()));
       final container = tester.widget<Container>(
         find.descendant(
           of: find.byType(AppCard),
@@ -158,10 +152,7 @@ void main() {
       // double — el override se pasa como un EdgeInsets, no como escalar.
       await pumpCard(
         tester,
-        const AppCard.glass(
-          padding: EdgeInsets.zero,
-          child: SizedBox.shrink(),
-        ),
+        const AppCard.glass(padding: EdgeInsets.zero, child: SizedBox.shrink()),
       );
       final container = tester.widget<Container>(
         find.descendant(

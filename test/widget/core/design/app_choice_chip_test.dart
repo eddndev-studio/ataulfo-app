@@ -56,30 +56,24 @@ void main() {
       },
     );
 
-    testWidgets(
-      'unselected: NO muestra el check',
-      (tester) async {
-        await pumpChip(
-          tester,
-          AppChoiceChip(label: 'Diario', selected: false, onSelected: (_) {}),
-        );
-        expect(find.byIcon(Icons.check), findsNothing);
-      },
-    );
+    testWidgets('unselected: NO muestra el check', (tester) async {
+      await pumpChip(
+        tester,
+        AppChoiceChip(label: 'Diario', selected: false, onSelected: (_) {}),
+      );
+      expect(find.byIcon(Icons.check), findsNothing);
+    });
 
-    testWidgets(
-      'selected: fondo primary y label en onPrimary',
-      (tester) async {
-        await pumpChip(
-          tester,
-          AppChoiceChip(label: 'Diario', selected: true, onSelected: (_) {}),
-        );
-        final c = chipContainer(tester);
-        final d = c.decoration as BoxDecoration;
-        expect(d.color, AppTokens.primary);
-        expect(labelStyle(tester, 'Diario')?.color, AppTokens.onPrimary);
-      },
-    );
+    testWidgets('selected: fondo primary y label en onPrimary', (tester) async {
+      await pumpChip(
+        tester,
+        AppChoiceChip(label: 'Diario', selected: true, onSelected: (_) {}),
+      );
+      final c = chipContainer(tester);
+      final d = c.decoration as BoxDecoration;
+      expect(d.color, AppTokens.primary);
+      expect(labelStyle(tester, 'Diario')?.color, AppTokens.onPrimary);
+    });
 
     testWidgets(
       'selected: muestra el check (Icons.check) tintado en onPrimary',
@@ -128,43 +122,37 @@ void main() {
       expect(opacity.opacity, 0.4);
     });
 
-    testWidgets(
-      'unselected: tap emite onSelected(true)',
-      (tester) async {
-        // El chip es controlado: el tap no alterna estado, emite el valor que
-        // el consumer debería aplicar — el negado del [selected] actual.
-        bool? received;
-        await pumpChip(
-          tester,
-          AppChoiceChip(
-            label: 'x',
-            selected: false,
-            onSelected: (value) => received = value,
-          ),
-        );
-        await tester.tap(find.byType(AppChoiceChip));
-        await tester.pumpAndSettle();
-        expect(received, isTrue);
-      },
-    );
+    testWidgets('unselected: tap emite onSelected(true)', (tester) async {
+      // El chip es controlado: el tap no alterna estado, emite el valor que
+      // el consumer debería aplicar — el negado del [selected] actual.
+      bool? received;
+      await pumpChip(
+        tester,
+        AppChoiceChip(
+          label: 'x',
+          selected: false,
+          onSelected: (value) => received = value,
+        ),
+      );
+      await tester.tap(find.byType(AppChoiceChip));
+      await tester.pumpAndSettle();
+      expect(received, isTrue);
+    });
 
-    testWidgets(
-      'selected: tap emite onSelected(false)',
-      (tester) async {
-        bool? received;
-        await pumpChip(
-          tester,
-          AppChoiceChip(
-            label: 'x',
-            selected: true,
-            onSelected: (value) => received = value,
-          ),
-        );
-        await tester.tap(find.byType(AppChoiceChip));
-        await tester.pumpAndSettle();
-        expect(received, isFalse);
-      },
-    );
+    testWidgets('selected: tap emite onSelected(false)', (tester) async {
+      bool? received;
+      await pumpChip(
+        tester,
+        AppChoiceChip(
+          label: 'x',
+          selected: true,
+          onSelected: (value) => received = value,
+        ),
+      );
+      await tester.tap(find.byType(AppChoiceChip));
+      await tester.pumpAndSettle();
+      expect(received, isFalse);
+    });
   });
 
   group('AppChoiceChip — semántica', () {

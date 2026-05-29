@@ -51,10 +51,7 @@ void main() {
     testWidgets('fontSize escala con el tile: size * 0.4', (tester) async {
       // La letra crece con el tile en paridad con el ícono (size * 0.5); un
       // tamaño fijo se vería diminuto en tiles grandes.
-      await pumpEntityIcon(
-        tester,
-        const AppEntityIcon(letter: 'A', size: 80),
-      );
+      await pumpEntityIcon(tester, const AppEntityIcon(letter: 'A', size: 80));
       final style = tester.widget<Text>(find.text('A')).style;
       expect(style?.fontSize, 80 * 0.4);
     });
@@ -74,10 +71,7 @@ void main() {
     });
 
     testWidgets('lado = size: respeta el parámetro custom', (tester) async {
-      await pumpEntityIcon(
-        tester,
-        const AppEntityIcon(letter: 'A', size: 64),
-      );
+      await pumpEntityIcon(tester, const AppEntityIcon(letter: 'A', size: 64));
       final size = tester.getSize(find.byType(AppEntityIcon));
       expect(size, const Size(64, 64));
     });

@@ -140,11 +140,7 @@ void main() {
       int? recibido;
       await pumpRadio(
         tester,
-        AppRadio<int>(
-          value: 2,
-          groupValue: 1,
-          onChanged: (v) => recibido = v,
-        ),
+        AppRadio<int>(value: 2, groupValue: 1, onChanged: (v) => recibido = v),
       );
       await tester.tap(find.byType(AppRadio<int>));
       await tester.pump();

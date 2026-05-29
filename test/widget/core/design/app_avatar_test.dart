@@ -63,10 +63,7 @@ void main() {
       await pumpAvatar(tester, const AppAvatar(name: 'a'));
 
       final decoration = rootContainer(tester).decoration as BoxDecoration;
-      expect(
-        decoration.color,
-        anyOf(AppTokens.surface2, AppTokens.surface3),
-      );
+      expect(decoration.color, anyOf(AppTokens.surface2, AppTokens.surface3));
     });
 
     testWidgets('anillo: borde primary alrededor del avatar', (tester) async {
@@ -79,20 +76,21 @@ void main() {
       expect(decoration.border?.top.width, greaterThan(0));
     });
 
-    testWidgets('label DMSans/w600 con text1, fontSize escala con el diámetro', (
-      tester,
-    ) async {
-      // size 64 → 64 * 0.4 = 25.6: un valor que NO coincide con bodyLSize,
-      // de modo que la aserción fija el escalado proporcional y no un tamaño
-      // constante.
-      await pumpAvatar(tester, const AppAvatar(name: 'a', size: 64));
+    testWidgets(
+      'label DMSans/w600 con text1, fontSize escala con el diámetro',
+      (tester) async {
+        // size 64 → 64 * 0.4 = 25.6: un valor que NO coincide con bodyLSize,
+        // de modo que la aserción fija el escalado proporcional y no un tamaño
+        // constante.
+        await pumpAvatar(tester, const AppAvatar(name: 'a', size: 64));
 
-      final style = tester.widget<Text>(find.text('A')).style;
-      expect(style?.fontFamily, AppTokens.fontSans);
-      expect(style?.fontSize, 64 * 0.4);
-      expect(style?.fontWeight, FontWeight.w600);
-      expect(style?.color, AppTokens.text1);
-    });
+        final style = tester.widget<Text>(find.text('A')).style;
+        expect(style?.fontFamily, AppTokens.fontSans);
+        expect(style?.fontSize, 64 * 0.4);
+        expect(style?.fontWeight, FontWeight.w600);
+        expect(style?.color, AppTokens.text1);
+      },
+    );
   });
 
   group('AppAvatar — accesibilidad', () {

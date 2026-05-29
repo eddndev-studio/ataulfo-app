@@ -56,9 +56,7 @@ class AppChoiceChip extends StatelessWidget {
               // es transparente y el chip se delimita por el borde hairline.
               color: selected ? AppTokens.primary : Colors.transparent,
               borderRadius: radius,
-              border: selected
-                  ? null
-                  : Border.all(color: AppTokens.divider),
+              border: selected ? null : Border.all(color: AppTokens.divider),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

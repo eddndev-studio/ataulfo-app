@@ -16,11 +16,14 @@ void main() {
       expect(theme.brightness, Brightness.dark);
     });
 
-    test('scaffoldBackgroundColor = transparent (deja ver el glow de fondo)', () {
-      // El fondo absoluto de la app es el glow radial pintado por
-      // AppBackground; el scaffold debe ser transparente para no taparlo.
-      expect(theme.scaffoldBackgroundColor, Colors.transparent);
-    });
+    test(
+      'scaffoldBackgroundColor = transparent (deja ver el glow de fondo)',
+      () {
+        // El fondo absoluto de la app es el glow radial pintado por
+        // AppBackground; el scaffold debe ser transparente para no taparlo.
+        expect(theme.scaffoldBackgroundColor, Colors.transparent);
+      },
+    );
 
     test('canvasColor = AppTokens.bgBase (menús/popovers opacos)', () {
       // canvasColor sí permanece sólido: lo consumen menús, dropdowns y
@@ -70,7 +73,8 @@ void main() {
       // El builder por defecto pinta colorScheme.surface como fondo del
       // tránsito, lo que tapaba el glow con un gris durante la animación. Con
       // scrim transparente, el glow fijo de fondo se ve durante la transición.
-      final builder = theme.pageTransitionsTheme.builders[TargetPlatform.android];
+      final builder =
+          theme.pageTransitionsTheme.builders[TargetPlatform.android];
       expect(builder, isA<FadeForwardsPageTransitionsBuilder>());
       expect(
         (builder! as FadeForwardsPageTransitionsBuilder).backgroundColor,

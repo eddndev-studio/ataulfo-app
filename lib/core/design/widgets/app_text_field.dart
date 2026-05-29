@@ -120,7 +120,8 @@ class _AppTextFieldState extends State<AppTextField> {
 
     // Una línea: píldora (radiusField). Multilínea (text area): rect redondeado
     // con el mismo radio efectivo que la píldora de una línea (_touchTarget/2).
-    final isMultiline = widget.maxLines == null ||
+    final isMultiline =
+        widget.maxLines == null ||
         widget.maxLines! > 1 ||
         (widget.minLines ?? 1) > 1;
     final radius = BorderRadius.circular(
@@ -176,8 +177,7 @@ class _AppTextFieldState extends State<AppTextField> {
             // Una línea: centrado vertical dentro del alto mínimo (si no, el
             // texto quedaría pegado arriba). Multilínea: el texto arranca arriba
             // y crece hacia abajo.
-            alignment:
-                isMultiline ? Alignment.topLeft : Alignment.centerLeft,
+            alignment: isMultiline ? Alignment.topLeft : Alignment.centerLeft,
             decoration: BoxDecoration(
               color: AppTokens.input,
               borderRadius: radius,
@@ -215,8 +215,9 @@ class _AppTextFieldState extends State<AppTextField> {
                 fillColor: Colors.transparent,
                 contentPadding: EdgeInsets.zero,
                 hintText: widget.hint,
-                hintStyle:
-                    textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+                hintStyle: textTheme.bodyMedium?.copyWith(
+                  color: AppTokens.text2,
+                ),
               ),
             ),
           ),

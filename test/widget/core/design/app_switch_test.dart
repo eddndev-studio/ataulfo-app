@@ -43,10 +43,7 @@ void main() {
     testWidgets('renderiza track y knob (un AnimatedAlign en el árbol)', (
       tester,
     ) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: false, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: false, onChanged: (_) {}));
       expect(find.byType(AppSwitch), findsOneWidget);
       expect(find.byType(AnimatedAlign), findsOneWidget);
     });
@@ -54,19 +51,13 @@ void main() {
 
   group('AppSwitch — color del track', () {
     testWidgets('off: track surface3', (tester) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: false, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: false, onChanged: (_) {}));
       final d = trackContainer(tester).decoration as BoxDecoration;
       expect(d.color, AppTokens.surface3);
     });
 
     testWidgets('on: track primary (amarillo)', (tester) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: true, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: true, onChanged: (_) {}));
       final d = trackContainer(tester).decoration as BoxDecoration;
       expect(d.color, AppTokens.primary);
     });
@@ -74,19 +65,13 @@ void main() {
 
   group('AppSwitch — color del knob', () {
     testWidgets('off: knob claro (text1)', (tester) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: false, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: false, onChanged: (_) {}));
       final d = knobContainer(tester).decoration as BoxDecoration;
       expect(d.color, AppTokens.text1);
     });
 
     testWidgets('on: knob claro (text1)', (tester) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: true, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: true, onChanged: (_) {}));
       final d = knobContainer(tester).decoration as BoxDecoration;
       expect(d.color, AppTokens.text1);
     });
@@ -94,36 +79,24 @@ void main() {
 
   group('AppSwitch — posición y animación del knob', () {
     testWidgets('off: knob alineado a la izquierda', (tester) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: false, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: false, onChanged: (_) {}));
       expect(knobAlign(tester).alignment, Alignment.centerLeft);
     });
 
     testWidgets('on: knob alineado a la derecha', (tester) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: true, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: true, onChanged: (_) {}));
       expect(knobAlign(tester).alignment, Alignment.centerRight);
     });
 
     testWidgets('transición usa durationFast', (tester) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: false, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: false, onChanged: (_) {}));
       expect(knobAlign(tester).duration, AppTokens.durationFast);
     });
   });
 
   group('AppSwitch — estado disabled', () {
     testWidgets('onChanged null: opacity 0.4', (tester) async {
-      await pumpSwitch(
-        tester,
-        const AppSwitch(value: false, onChanged: null),
-      );
+      await pumpSwitch(tester, const AppSwitch(value: false, onChanged: null));
       final opacity = tester.widget<Opacity>(
         find.descendant(
           of: find.byType(AppSwitch),
@@ -136,10 +109,7 @@ void main() {
     testWidgets('onChanged null: el tap no togglea', (tester) async {
       // Sin callback no hay contador que verificar; el contrato disabled es
       // visual (opacity) y la ausencia de toggle se garantiza con onTap null.
-      await pumpSwitch(
-        tester,
-        const AppSwitch(value: false, onChanged: null),
-      );
+      await pumpSwitch(tester, const AppSwitch(value: false, onChanged: null));
       await tester.tap(find.byType(AppSwitch));
       await tester.pump();
       // Sin excepción: el tap se absorbe. El knob permanece a la izquierda.
@@ -147,10 +117,7 @@ void main() {
     });
 
     testWidgets('habilitado: opacity 1.0', (tester) async {
-      await pumpSwitch(
-        tester,
-        AppSwitch(value: false, onChanged: (_) {}),
-      );
+      await pumpSwitch(tester, AppSwitch(value: false, onChanged: (_) {}));
       final opacity = tester.widget<Opacity>(
         find.descendant(
           of: find.byType(AppSwitch),

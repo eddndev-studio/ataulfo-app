@@ -34,7 +34,8 @@ void main() {
     expect(
       shells,
       isNotEmpty,
-      reason: 'el campo debe pintar su píldora en un Container con BoxDecoration',
+      reason:
+          'el campo debe pintar su píldora en un Container con BoxDecoration',
     );
     return shells.first;
   }
@@ -59,22 +60,23 @@ void main() {
       expect(find.byType(TextField), findsOneWidget);
     });
 
-    testWidgets('label usa caption (labelSmall) del textTheme con color text2', (
-      tester,
-    ) async {
-      await pump(
-        tester,
-        AppTextField(
-          label: 'Nombre',
-          hint: 'h',
-          controller: TextEditingController(),
-        ),
-      );
-      final style = tester.widget<Text>(find.text('Nombre')).style;
-      expect(style?.fontFamily, AppTokens.fontSans);
-      expect(style?.fontSize, AppTokens.captionSize);
-      expect(style?.color, AppTokens.text2);
-    });
+    testWidgets(
+      'label usa caption (labelSmall) del textTheme con color text2',
+      (tester) async {
+        await pump(
+          tester,
+          AppTextField(
+            label: 'Nombre',
+            hint: 'h',
+            controller: TextEditingController(),
+          ),
+        );
+        final style = tester.widget<Text>(find.text('Nombre')).style;
+        expect(style?.fontFamily, AppTokens.fontSans);
+        expect(style?.fontSize, AppTokens.captionSize);
+        expect(style?.color, AppTokens.text2);
+      },
+    );
 
     testWidgets('helper se renderiza bajo el field con copy y color text2', (
       tester,
@@ -218,7 +220,9 @@ void main() {
   });
 
   group('AppTextField — obscureText / autocorrect', () {
-    testWidgets('default: obscureText es false (texto visible)', (tester) async {
+    testWidgets('default: obscureText es false (texto visible)', (
+      tester,
+    ) async {
       await pump(
         tester,
         AppTextField(
@@ -448,7 +452,8 @@ void main() {
         of: find.byType(AppTextField),
         matching: find.byType(Opacity),
       );
-      final dimmedByOpacity = opacityFinder.evaluate().isNotEmpty &&
+      final dimmedByOpacity =
+          opacityFinder.evaluate().isNotEmpty &&
           tester.widget<Opacity>(opacityFinder.first).opacity < 1.0;
 
       final labelColor = tester.widget<Text>(find.text('Correo')).style?.color;
@@ -457,7 +462,8 @@ void main() {
       expect(
         dimmedByOpacity || dimmedByColor,
         true,
-        reason: 'el campo deshabilitado debe atenuarse (opacity o textDisabled)',
+        reason:
+            'el campo deshabilitado debe atenuarse (opacity o textDisabled)',
       );
     });
   });
@@ -477,10 +483,7 @@ void main() {
         );
         // El text area NO usa el pill pleno (radiusField=999) sino el radio
         // efectivo de la píldora de una línea (48/2 = 24): un rect redondeado.
-        expect(
-          shellDecoration(tester).borderRadius,
-          BorderRadius.circular(24),
-        );
+        expect(shellDecoration(tester).borderRadius, BorderRadius.circular(24));
       },
     );
 
@@ -513,12 +516,14 @@ void main() {
       );
       // Localiza el Container del shell (el que tiene la BoxDecoration) y lee
       // su padding vertical: multilínea respira con sp3, no sp1.
-      final shell = tester.widgetList<Container>(
-        find.descendant(
-          of: find.byType(AppTextField),
-          matching: find.byType(Container),
-        ),
-      ).firstWhere((c) => c.decoration is BoxDecoration);
+      final shell = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byType(AppTextField),
+              matching: find.byType(Container),
+            ),
+          )
+          .firstWhere((c) => c.decoration is BoxDecoration);
       final padding = shell.padding! as EdgeInsets;
       expect(padding.top, AppTokens.sp3);
       expect(padding.bottom, AppTokens.sp3);
