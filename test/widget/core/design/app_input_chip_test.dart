@@ -30,7 +30,9 @@ void main() {
       expect(find.text('Diseño'), findsOneWidget);
     });
 
-    testWidgets('renderiza el icono trailing de borrar (close)', (tester) async {
+    testWidgets('renderiza el icono trailing de borrar (close)', (
+      tester,
+    ) async {
       await pumpChip(tester, const AppInputChip(label: 'Diseño'));
       expect(find.byIcon(Icons.close), findsOneWidget);
     });
@@ -49,7 +51,9 @@ void main() {
       expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusChip));
     });
 
-    testWidgets('label en onPrimary (oscuro sobre fill cálido)', (tester) async {
+    testWidgets('label en onPrimary (oscuro sobre fill cálido)', (
+      tester,
+    ) async {
       await pumpChip(tester, const AppInputChip(label: 'Diseño'));
       expect(labelStyle(tester, 'Diseño')?.color, AppTokens.onPrimary);
     });

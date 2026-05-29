@@ -63,17 +63,20 @@ void main() {
       expect(AppTokens.primaryGlow, const Color(0x59EDB900));
     });
 
-    test('backgroundGlow es radial con la marca atenuada ~35% sobre bgBase', () {
-      // El glow es sutil: cada parada cálida se mezcla solo ~35% hacia la
-      // marca desde bgBase (equivalente a pintarla a ~35% de opacidad sobre
-      // la base), y la última parada queda en bgBase puro.
-      final g = AppTokens.backgroundGlow;
-      expect(g.colors, <Color>[
-        Color.lerp(AppTokens.bgBase, AppTokens.primary, 0.35)!,
-        Color.lerp(AppTokens.bgBase, AppTokens.accent, 0.35)!,
-        AppTokens.bgBase,
-      ]);
-    });
+    test(
+      'backgroundGlow es radial con la marca atenuada ~35% sobre bgBase',
+      () {
+        // El glow es sutil: cada parada cálida se mezcla solo ~35% hacia la
+        // marca desde bgBase (equivalente a pintarla a ~35% de opacidad sobre
+        // la base), y la última parada queda en bgBase puro.
+        final g = AppTokens.backgroundGlow;
+        expect(g.colors, <Color>[
+          Color.lerp(AppTokens.bgBase, AppTokens.primary, 0.35)!,
+          Color.lerp(AppTokens.bgBase, AppTokens.accent, 0.35)!,
+          AppTokens.bgBase,
+        ]);
+      },
+    );
   });
 
   group('AppTokens — text', () {

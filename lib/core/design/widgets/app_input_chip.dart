@@ -32,10 +32,7 @@ class AppInputChip extends StatelessWidget {
     // El Container raíz porta el contrato visual (fondo + radio); el
     // Material/InkWell vive dentro para que el ripple respete ese clip.
     return Container(
-      decoration: BoxDecoration(
-        color: AppTokens.primary,
-        borderRadius: radius,
-      ),
+      decoration: BoxDecoration(color: AppTokens.primary, borderRadius: radius),
       child: Material(
         color: Colors.transparent,
         borderRadius: radius,
@@ -106,11 +103,7 @@ class _DeleteButton extends StatelessWidget {
             width: 48,
             height: 48,
             child: Center(
-              child: Icon(
-                Icons.close,
-                size: 18,
-                color: AppTokens.onPrimary,
-              ),
+              child: Icon(Icons.close, size: 18, color: AppTokens.onPrimary),
             ),
           ),
         ),

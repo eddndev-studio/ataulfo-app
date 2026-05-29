@@ -39,11 +39,7 @@ class AppCheckbox extends StatelessWidget {
         border: value ? null : Border.all(color: AppTokens.divider),
       ),
       child: value
-          ? const Icon(
-              Icons.check,
-              size: 18,
-              color: AppTokens.onPrimary,
-            )
+          ? const Icon(Icons.check, size: 18, color: AppTokens.onPrimary)
           : null,
     );
 

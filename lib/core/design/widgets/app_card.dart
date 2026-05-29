@@ -31,27 +31,27 @@ class AppCard extends StatelessWidget {
     required this.child,
     this.onTap,
     double padding = AppTokens.cardPadding,
-  })  : _paddingValue = padding,
-        _paddingGeometry = null,
-        _variant = _AppCardVariant.surface;
+  }) : _paddingValue = padding,
+       _paddingGeometry = null,
+       _variant = _AppCardVariant.surface;
 
   const AppCard.gradient({
     super.key,
     required this.child,
     this.onTap,
     EdgeInsetsGeometry? padding,
-  })  : _paddingValue = null,
-        _paddingGeometry = padding,
-        _variant = _AppCardVariant.gradient;
+  }) : _paddingValue = null,
+       _paddingGeometry = padding,
+       _variant = _AppCardVariant.gradient;
 
   const AppCard.glass({
     super.key,
     required this.child,
     this.onTap,
     EdgeInsetsGeometry? padding,
-  })  : _paddingValue = null,
-        _paddingGeometry = padding,
-        _variant = _AppCardVariant.glass;
+  }) : _paddingValue = null,
+       _paddingGeometry = padding,
+       _variant = _AppCardVariant.glass;
 
   final Widget child;
   final VoidCallback? onTap;
@@ -62,7 +62,8 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppTokens.radiusCard);
-    final padding = _paddingGeometry ??
+    final padding =
+        _paddingGeometry ??
         EdgeInsets.all(_paddingValue ?? AppTokens.cardPadding);
     return Material(
       color: Colors.transparent,
@@ -89,20 +90,14 @@ class AppCard extends StatelessWidget {
   ) {
     switch (variant) {
       case _AppCardVariant.surface:
-        return BoxDecoration(
-          color: AppTokens.surface2,
-          borderRadius: radius,
-        );
+        return BoxDecoration(color: AppTokens.surface2, borderRadius: radius);
       case _AppCardVariant.gradient:
         return BoxDecoration(
           gradient: AppTokens.brandGradient,
           borderRadius: radius,
         );
       case _AppCardVariant.glass:
-        return BoxDecoration(
-          color: AppTokens.glass,
-          borderRadius: radius,
-        );
+        return BoxDecoration(color: AppTokens.glass, borderRadius: radius);
     }
   }
 }

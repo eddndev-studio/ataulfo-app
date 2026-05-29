@@ -29,27 +29,18 @@ void main() {
 
   group('AppCheckbox — render base', () {
     testWidgets('renderiza un único control en el árbol', (tester) async {
-      await pumpCheckbox(
-        tester,
-        AppCheckbox(value: false, onChanged: (_) {}),
-      );
+      await pumpCheckbox(tester, AppCheckbox(value: false, onChanged: (_) {}));
       expect(find.byType(AppCheckbox), findsOneWidget);
     });
 
     testWidgets('caja con radio radiusSm (8)', (tester) async {
-      await pumpCheckbox(
-        tester,
-        AppCheckbox(value: false, onChanged: (_) {}),
-      );
+      await pumpCheckbox(tester, AppCheckbox(value: false, onChanged: (_) {}));
       final d = controlDecoration(tester);
       expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusSm));
     });
 
     testWidgets('hit-target de al menos 48', (tester) async {
-      await pumpCheckbox(
-        tester,
-        AppCheckbox(value: false, onChanged: (_) {}),
-      );
+      await pumpCheckbox(tester, AppCheckbox(value: false, onChanged: (_) {}));
       final size = tester.getSize(find.byType(AppCheckbox));
       expect(size.width, greaterThanOrEqualTo(48));
       expect(size.height, greaterThanOrEqualTo(48));
@@ -57,13 +48,8 @@ void main() {
   });
 
   group('AppCheckbox — color unchecked vs checked', () {
-    testWidgets('unchecked: fondo surface3 con borde divider', (
-      tester,
-    ) async {
-      await pumpCheckbox(
-        tester,
-        AppCheckbox(value: false, onChanged: (_) {}),
-      );
+    testWidgets('unchecked: fondo surface3 con borde divider', (tester) async {
+      await pumpCheckbox(tester, AppCheckbox(value: false, onChanged: (_) {}));
       final d = controlDecoration(tester);
       expect(d.color, AppTokens.surface3);
       // El borde delinea la caja llena contra la superficie.
@@ -72,10 +58,7 @@ void main() {
     });
 
     testWidgets('checked: fondo primary (amarillo)', (tester) async {
-      await pumpCheckbox(
-        tester,
-        AppCheckbox(value: true, onChanged: (_) {}),
-      );
+      await pumpCheckbox(tester, AppCheckbox(value: true, onChanged: (_) {}));
       final d = controlDecoration(tester);
       expect(d.color, AppTokens.primary);
     });
@@ -83,20 +66,14 @@ void main() {
 
   group('AppCheckbox — presencia del check', () {
     testWidgets('unchecked: no hay Icon de check', (tester) async {
-      await pumpCheckbox(
-        tester,
-        AppCheckbox(value: false, onChanged: (_) {}),
-      );
+      await pumpCheckbox(tester, AppCheckbox(value: false, onChanged: (_) {}));
       expect(find.byIcon(Icons.check), findsNothing);
     });
 
     testWidgets('checked: muestra Icon de check en onPrimary (oscuro)', (
       tester,
     ) async {
-      await pumpCheckbox(
-        tester,
-        AppCheckbox(value: true, onChanged: (_) {}),
-      );
+      await pumpCheckbox(tester, AppCheckbox(value: true, onChanged: (_) {}));
       expect(find.byIcon(Icons.check), findsOneWidget);
       final icon = tester.widget<Icon>(find.byIcon(Icons.check));
       expect(icon.color, AppTokens.onPrimary);
