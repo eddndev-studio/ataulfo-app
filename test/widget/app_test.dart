@@ -8,6 +8,7 @@ import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
+import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
@@ -27,6 +28,8 @@ class _MockAuthRepo extends Mock implements AuthRepository {}
 class _MockBotsRepo extends Mock implements BotsRepository {}
 
 class _MockBotSessionRepo extends Mock implements BotSessionRepository {}
+
+class _MockConversationsRepo extends Mock implements ConversationsRepository {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
@@ -60,6 +63,7 @@ void main() {
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
       botSessionRepository: _MockBotSessionRepo(),
+      conversationsRepository: _MockConversationsRepo(),
       templatesRepository: templatesRepo,
       flowsRepository: _MockFlowsRepo(),
       triggersRepository: _MockTriggersRepo(),
