@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -16,9 +17,8 @@ import '../bloc/conversations_bloc.dart';
 /// botId). Es content-only: el Scaffold y el AppBar los aporta la ruta, como
 /// el detalle/conexión del bot.
 ///
-/// Slice 1: filas display-only (sin tap). La vista de hilo de mensajes (S09,
-/// `GET /sessions/:botId/:chatLid/messages`) es una rebanada posterior; cuando
-/// aterrice, la fila navegará a ella.
+/// La fila navega al hilo de mensajes (S09, `/bots/:id/sessions/:chatLid`); el
+/// botId lo aporta el `ConversationsBloc` del scope.
 class ConversationsListPage extends StatelessWidget {
   const ConversationsListPage({super.key});
 
@@ -176,6 +176,10 @@ class _ConversationTile extends StatelessWidget {
     ];
 
     return AppCard(
+      onTap: () => context.push(
+        '/bots/${context.read<ConversationsBloc>().botId}'
+        '/sessions/${Uri.encodeComponent(c.chatLid)}',
+      ),
       child: Row(
         children: <Widget>[
           AppAvatar(name: title),

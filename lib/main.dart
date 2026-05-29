@@ -24,6 +24,8 @@ import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/memberships/data/datasources/memberships_datasource.dart';
 import 'features/memberships/data/repositories/memberships_repository_impl.dart';
+import 'features/messages/data/datasources/messages_datasource.dart';
+import 'features/messages/data/repositories/messages_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
 import 'features/templates/data/repositories/templates_repository_impl.dart';
 import 'features/triggers/data/datasources/triggers_datasource.dart';
@@ -98,6 +100,10 @@ void main() {
     datasource: DioConversationsDatasource(mainDio),
   );
 
+  final messagesRepository = MessagesRepositoryImpl(
+    datasource: DioMessagesDatasource(mainDio),
+  );
+
   final templatesRepository = TemplatesRepositoryImpl(
     datasource: DioTemplatesDatasource(mainDio),
   );
@@ -124,6 +130,7 @@ void main() {
     botsRepository: botsRepository,
     botSessionRepository: botSessionRepository,
     conversationsRepository: conversationsRepository,
+    messagesRepository: messagesRepository,
     templatesRepository: templatesRepository,
     flowsRepository: flowsRepository,
     triggersRepository: triggersRepository,

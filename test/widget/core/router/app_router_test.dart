@@ -20,6 +20,10 @@ import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:ataulfo/features/memberships/presentation/pages/memberships_page.dart';
+import 'package:ataulfo/features/messages/domain/entities/message.dart';
+import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
+import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
+import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
@@ -45,6 +49,8 @@ class _MockBotsRepo extends Mock implements BotsRepository {}
 class _MockBotSessionRepo extends Mock implements BotSessionRepository {}
 
 class _MockConversationsRepo extends Mock implements ConversationsRepository {}
+
+class _MockMessagesRepo extends Mock implements MessagesRepository {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
@@ -74,6 +80,7 @@ void main() {
   late _MockBotsRepo botsRepo;
   late _MockBotSessionRepo botSessionRepo;
   late _MockConversationsRepo conversationsRepo;
+  late _MockMessagesRepo messagesRepo;
   late _MockTemplatesRepo templatesRepo;
   late _MockFlowsRepo flowsRepo;
   late _MockTriggersRepo triggersRepo;
@@ -86,6 +93,7 @@ void main() {
     botsRepo = _MockBotsRepo();
     botSessionRepo = _MockBotSessionRepo();
     conversationsRepo = _MockConversationsRepo();
+    messagesRepo = _MockMessagesRepo();
     templatesRepo = _MockTemplatesRepo();
     flowsRepo = _MockFlowsRepo();
     triggersRepo = _MockTriggersRepo();
@@ -115,6 +123,7 @@ void main() {
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
       conversationsRepository: conversationsRepo,
+      messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -245,6 +254,73 @@ void main() {
     },
   );
 
+  testWidgets(
+    'AuthAuthenticated → /bots/:id/sessions/:chatLid monta MessageThreadPage '
+    'sembrando botId+chatLid',
+    (tester) async {
+      // Seam del hilo: la ruta debe sembrar el MessagesBloc con botId Y chatLid
+      // del path y disparar el load (la cola) al montar. Un typo de path, repo
+      // equivocado o ..add(load) caído daría spinner infinito que el widget
+      // test (bloc mock) no detecta.
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      when(
+        () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
+      ).thenAnswer(
+        (_) async => const MessagePage(messages: <Message>[], prevCursor: null),
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/bots/b1/sessions/lid-1');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MessageThreadPage), findsOneWidget);
+      verify(
+        () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
+      ).called(1);
+    },
+  );
+
+  testWidgets(
+    'tap en una conversación navega a su hilo (/bots/:id/sessions/:chatLid)',
+    (tester) async {
+      // El tap de la fila empuja la ruta del hilo con el chatLid de la
+      // conversación; confirma el cableado fila→navegación end-to-end.
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      when(() => conversationsRepo.listForBot('b1')).thenAnswer(
+        (_) async => const <Conversation>[
+          Conversation(
+            chatLid: 'lid-1',
+            kind: ConversationKind.dm,
+            phone: '5215550001',
+            isArchived: false,
+            isPinned: false,
+            isMarkedUnread: false,
+            mutedUntil: null,
+          ),
+        ],
+      );
+      when(
+        () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
+      ).thenAnswer(
+        (_) async => const MessagePage(messages: <Message>[], prevCursor: null),
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/bots/b1/sessions');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('5215550001'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MessageThreadPage), findsOneWidget);
+      verify(
+        () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
+      ).called(1);
+    },
+  );
+
   testWidgets('AuthUnauthenticated + ruta protegida cualquiera → /login', (
     tester,
   ) async {
@@ -258,6 +334,7 @@ void main() {
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
       conversationsRepository: conversationsRepo,
+      messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -338,6 +415,7 @@ void main() {
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
       conversationsRepository: conversationsRepo,
+      messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -364,6 +442,7 @@ void main() {
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
       conversationsRepository: conversationsRepo,
+      messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -426,6 +505,7 @@ void main() {
         botsRepository: botsRepo,
         botSessionRepository: botSessionRepo,
         conversationsRepository: conversationsRepo,
+        messagesRepository: messagesRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
         triggersRepository: triggersRepo,
@@ -490,6 +570,7 @@ void main() {
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
       conversationsRepository: conversationsRepo,
+      messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
@@ -570,6 +651,7 @@ void main() {
         botsRepository: botsRepo,
         botSessionRepository: botSessionRepo,
         conversationsRepository: conversationsRepo,
+        messagesRepository: messagesRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
         triggersRepository: triggersRepo,
@@ -597,6 +679,7 @@ void main() {
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
       conversationsRepository: conversationsRepo,
+      messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,

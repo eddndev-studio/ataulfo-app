@@ -22,6 +22,10 @@ class ConversationsBloc extends Bloc<ConversationsEvent, ConversationsState> {
   final ConversationsRepository _repo;
   final String _botId;
 
+  /// El bot al que pertenece esta bandeja. Lo usa la fila para navegar al hilo
+  /// (`/bots/:id/sessions/:chatLid`) sin tener que recibir el id por separado.
+  String get botId => _botId;
+
   Future<void> _onLoad(
     ConversationsLoadRequested event,
     Emitter<ConversationsState> emit,

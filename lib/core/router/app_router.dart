@@ -33,6 +33,9 @@ import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
+import '../../features/messages/domain/repositories/messages_repository.dart';
+import '../../features/messages/presentation/bloc/messages_bloc.dart';
+import '../../features/messages/presentation/pages/message_thread_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
@@ -64,6 +67,7 @@ class AppRouter {
     required BotsRepository botsRepository,
     required BotSessionRepository botSessionRepository,
     required ConversationsRepository conversationsRepository,
+    required MessagesRepository messagesRepository,
     required TemplatesRepository templatesRepository,
     required FlowsRepository flowsRepository,
     required TriggersRepository triggersRepository,
@@ -74,6 +78,7 @@ class AppRouter {
        _botsRepo = botsRepository,
        _botSessionRepo = botSessionRepository,
        _conversationsRepo = conversationsRepository,
+       _messagesRepo = messagesRepository,
        _templatesRepo = templatesRepository,
        _flowsRepo = flowsRepository,
        _triggersRepo = triggersRepository,
@@ -85,6 +90,7 @@ class AppRouter {
   final BotsRepository _botsRepo;
   final BotSessionRepository _botSessionRepo;
   final ConversationsRepository _conversationsRepo;
+  final MessagesRepository _messagesRepo;
   final TemplatesRepository _templatesRepo;
   final FlowsRepository _flowsRepo;
   final TriggersRepository _triggersRepo;
@@ -220,6 +226,28 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Conversaciones')),
               body: const ConversationsListPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Hilo de mensajes de una conversación (S09 RF#5). Sub-ruta de
+        // `/bots/:id/sessions` con el chatLid como segmento extra; declarada
+        // después para no competir con la bandeja por orden de match. El
+        // chatLid llega DECODIFICADO de go_router (los grupos llevan `@`); el
+        // datasource lo re-encodea para el wire. Page-scoped: `MessagesBloc`
+        // se construye con botId+chatLid y dispara el primer load (la cola).
+        path: '/bots/:id/sessions/:chatLid',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final chatLid = state.pathParameters['chatLid']!;
+          return BlocProvider<MessagesBloc>(
+            create: (_) =>
+                MessagesBloc(repo: _messagesRepo, botId: id, chatLid: chatLid)
+                  ..add(const MessagesLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Conversación')),
+              body: const MessageThreadPage(),
             ),
           );
         },
