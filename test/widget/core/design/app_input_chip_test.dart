@@ -101,5 +101,51 @@ void main() {
       await tester.pumpAndSettle();
       expect(deleted, 0);
     });
+
+    testWidgets('tap en el icono close dispara onDeleted y NO onPressed', (
+      tester,
+    ) async {
+      // Con ambos callbacks presentes, el gesto del borrar gana el arena: el
+      // icono close solo remueve, nunca activa el cuerpo.
+      var pressed = 0;
+      var deleted = 0;
+      await pumpChip(
+        tester,
+        AppInputChip(
+          label: 'Diseño',
+          onPressed: () => pressed++,
+          onDeleted: () => deleted++,
+        ),
+      );
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(deleted, 1);
+      expect(pressed, 0);
+    });
+  });
+
+  group('AppInputChip — hit-target', () {
+    testWidgets('el área del borrar mide ≥48', (tester) async {
+      // El glifo close es de 18 px, pero su zona tappable debe ser cómoda.
+      await pumpChip(tester, const AppInputChip(label: 'Diseño'));
+      final deleteArea = find.byWidgetPredicate(
+        (w) => w is SizedBox && w.width == 48 && w.height == 48,
+      );
+      expect(deleteArea, findsOneWidget);
+      final size = tester.getSize(deleteArea);
+      expect(size.width, greaterThanOrEqualTo(48));
+      expect(size.height, greaterThanOrEqualTo(48));
+    });
+  });
+
+  group('AppInputChip — semántica', () {
+    testWidgets('el botón de borrar se anuncia como "Quitar <label>"', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpChip(tester, AppInputChip(label: 'Diseño', onDeleted: () {}));
+      expect(find.bySemanticsLabel('Quitar Diseño'), findsOneWidget);
+      handle.dispose();
+    });
   });
 }

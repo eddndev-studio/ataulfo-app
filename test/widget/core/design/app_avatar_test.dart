@@ -35,6 +35,15 @@ void main() {
       await pumpAvatar(tester, const AppAvatar(name: '   '));
       expect(find.text('?'), findsOneWidget);
     });
+
+    testWidgets('toma el primer cluster de grafemas (no parte surrogates)', (
+      tester,
+    ) async {
+      // Un substring por code unit partiría el emoji a la mitad y rendería un
+      // glifo roto; el primer cluster de grafemas lo conserva entero.
+      await pumpAvatar(tester, const AppAvatar(name: '👍team'));
+      expect(find.text('👍'), findsOneWidget);
+    });
   });
 
   group('AppAvatar — estilo', () {
@@ -70,14 +79,35 @@ void main() {
       expect(decoration.border?.top.width, greaterThan(0));
     });
 
-    testWidgets('label DMSans bodyL/w600 con text1', (tester) async {
-      await pumpAvatar(tester, const AppAvatar(name: 'a'));
+    testWidgets('label DMSans/w600 con text1, fontSize escala con el diámetro', (
+      tester,
+    ) async {
+      // size 64 → 64 * 0.4 = 25.6: un valor que NO coincide con bodyLSize,
+      // de modo que la aserción fija el escalado proporcional y no un tamaño
+      // constante.
+      await pumpAvatar(tester, const AppAvatar(name: 'a', size: 64));
 
       final style = tester.widget<Text>(find.text('A')).style;
       expect(style?.fontFamily, AppTokens.fontSans);
-      expect(style?.fontSize, AppTokens.bodyLSize);
+      expect(style?.fontSize, 64 * 0.4);
       expect(style?.fontWeight, FontWeight.w600);
       expect(style?.color, AppTokens.text1);
+    });
+  });
+
+  group('AppAvatar — accesibilidad', () {
+    testWidgets('anuncia el nombre completo, no la inicial suelta', (
+      tester,
+    ) async {
+      await pumpAvatar(tester, const AppAvatar(name: 'soporte'));
+
+      final semantics = tester.widget<Semantics>(
+        find.descendant(
+          of: find.byType(AppAvatar),
+          matching: find.byType(Semantics),
+        ),
+      );
+      expect(semantics.properties.label, 'soporte');
     });
   });
 

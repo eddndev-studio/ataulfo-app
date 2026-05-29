@@ -5,8 +5,9 @@ import '../tokens.dart';
 /// Primitivo Switch del design system.
 ///
 /// Toggle pill (track ~48x28, knob circular) que sigue la hoja de
-/// componentes: `off` → track [AppTokens.surface3] con knob claro a la
-/// izquierda; `on` → track [AppTokens.primary] con knob oscuro a la derecha.
+/// componentes: el knob es claro ([AppTokens.text1]) en ambos estados y solo
+/// el track cambia — `off` → track [AppTokens.surface3] con knob a la
+/// izquierda; `on` → track [AppTokens.primary] con knob a la derecha.
 /// El knob se desliza con [AnimatedAlign] en [AppTokens.durationFast] — leer
 /// su alignment objetivo cubre a la vez posición y transición.
 ///
@@ -47,8 +48,8 @@ class AppSwitch extends StatelessWidget {
         child: Container(
           width: _knobSize,
           height: _knobSize,
-          decoration: BoxDecoration(
-            color: value ? AppTokens.onPrimary : AppTokens.text1,
+          decoration: const BoxDecoration(
+            color: AppTokens.text1,
             shape: BoxShape.circle,
           ),
         ),
@@ -72,6 +73,17 @@ class AppSwitch extends StatelessWidget {
       ),
     );
 
-    return Opacity(opacity: disabled ? 0.4 : 1.0, child: tappable);
+    // Un único nodo de switch: ExcludeSemantics colapsa el nodo de botón del
+    // InkWell; el rol/estado (toggled) y la operabilidad por accesibilidad los
+    // porta este Semantics.
+    return Semantics(
+      container: true,
+      toggled: value,
+      enabled: !disabled,
+      onTap: disabled ? null : () => onChanged!(!value),
+      child: ExcludeSemantics(
+        child: Opacity(opacity: disabled ? 0.4 : 1.0, child: tappable),
+      ),
+    );
   }
 }

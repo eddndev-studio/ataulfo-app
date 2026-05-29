@@ -57,7 +57,7 @@ void main() {
   });
 
   group('AppCheckbox — color unchecked vs checked', () {
-    testWidgets('unchecked: fondo transparent con borde divider', (
+    testWidgets('unchecked: fondo surface3 con borde divider', (
       tester,
     ) async {
       await pumpCheckbox(
@@ -65,8 +65,8 @@ void main() {
         AppCheckbox(value: false, onChanged: (_) {}),
       );
       final d = controlDecoration(tester);
-      expect(d.color, Colors.transparent);
-      // El borde delinea la caja vacía contra la superficie.
+      expect(d.color, AppTokens.surface3);
+      // El borde delinea la caja llena contra la superficie.
       expect(d.border, isNotNull);
       expect((d.border as Border).top.color, AppTokens.divider);
     });
@@ -129,7 +129,7 @@ void main() {
       await tester.pumpAndSettle();
       // El control sigue unchecked: ni fondo primary ni check presentes.
       final d = controlDecoration(tester);
-      expect(d.color, Colors.transparent);
+      expect(d.color, AppTokens.surface3);
       expect(find.byIcon(Icons.check), findsNothing);
     });
   });
@@ -155,6 +155,46 @@ void main() {
       await tester.tap(find.byType(AppCheckbox));
       await tester.pumpAndSettle();
       expect(recibido, isFalse);
+    });
+  });
+
+  group('AppCheckbox — semántica', () {
+    testWidgets('expone rol de casilla con estado y habilitación', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpCheckbox(tester, AppCheckbox(value: true, onChanged: (_) {}));
+      expect(
+        tester.getSemantics(find.byType(AppCheckbox)),
+        containsSemantics(
+          hasCheckedState: true,
+          isChecked: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('disabled (onChanged null): casilla no habilitada', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpCheckbox(
+        tester,
+        const AppCheckbox(value: false, onChanged: null),
+      );
+      expect(
+        tester.getSemantics(find.byType(AppCheckbox)),
+        containsSemantics(
+          hasCheckedState: true,
+          isChecked: false,
+          hasEnabledState: true,
+          isEnabled: false,
+        ),
+      );
+      handle.dispose();
     });
   });
 }

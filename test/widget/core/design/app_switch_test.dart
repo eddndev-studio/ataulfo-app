@@ -82,13 +82,13 @@ void main() {
       expect(d.color, AppTokens.text1);
     });
 
-    testWidgets('on: knob oscuro (onPrimary)', (tester) async {
+    testWidgets('on: knob claro (text1)', (tester) async {
       await pumpSwitch(
         tester,
         AppSwitch(value: true, onChanged: (_) {}),
       );
       final d = knobContainer(tester).decoration as BoxDecoration;
-      expect(d.color, AppTokens.onPrimary);
+      expect(d.color, AppTokens.text1);
     });
   });
 
@@ -184,6 +184,34 @@ void main() {
       await tester.tap(find.byType(AppSwitch));
       await tester.pump();
       expect(recibido, false);
+    });
+  });
+
+  group('AppSwitch — semántica', () {
+    testWidgets('expone rol de switch con estado toggled', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSwitch(tester, AppSwitch(value: true, onChanged: (_) {}));
+      expect(
+        tester.getSemantics(find.byType(AppSwitch)),
+        containsSemantics(
+          hasToggledState: true,
+          isToggled: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('off: isToggled false', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSwitch(tester, AppSwitch(value: false, onChanged: (_) {}));
+      expect(
+        tester.getSemantics(find.byType(AppSwitch)),
+        containsSemantics(hasToggledState: true, isToggled: false),
+      );
+      handle.dispose();
     });
   });
 }

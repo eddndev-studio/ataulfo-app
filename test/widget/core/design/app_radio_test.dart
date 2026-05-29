@@ -62,13 +62,11 @@ void main() {
         AppRadio<int>(value: 0, groupValue: 1, onChanged: (_) {}),
       );
       final d = ringContainer(tester).decoration as BoxDecoration;
-      // El anillo apagado usa un color neutral (divider o text2), nunca
-      // el amarillo de marca que se reserva para el estado seleccionado.
-      expect(
-        d.border?.top.color,
-        anyOf(AppTokens.divider, AppTokens.text2),
-      );
-      expect(d.color, anyOf(isNull, Colors.transparent));
+      // El anillo apagado usa un borde neutral visible (text2), nunca el
+      // amarillo de marca que se reserva para el estado seleccionado.
+      expect(d.border?.top.color, AppTokens.text2);
+      // Interior relleno con la superficie elevada, no transparente.
+      expect(d.color, AppTokens.surface3);
       expect(dotFinder(), findsNothing);
     });
 
@@ -84,23 +82,25 @@ void main() {
   });
 
   group('AppRadio — color de marca en selected', () {
-    testWidgets('borde del anillo en primary', (tester) async {
+    testWidgets('anillo relleno en primary', (tester) async {
       await pumpRadio(
         tester,
         AppRadio<int>(value: 1, groupValue: 1, onChanged: (_) {}),
       );
       final d = ringContainer(tester).decoration as BoxDecoration;
-      expect(d.border?.top.color, AppTokens.primary);
+      // La figura se invierte: el anillo se rellena de marca.
+      expect(d.color, AppTokens.primary);
     });
 
-    testWidgets('punto interior relleno en primary y circular', (tester) async {
+    testWidgets('punto interior oscuro (onPrimary) y circular', (tester) async {
       await pumpRadio(
         tester,
         AppRadio<int>(value: 1, groupValue: 1, onChanged: (_) {}),
       );
       final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
-      expect(d.color, AppTokens.primary);
+      // Punto oscuro al centro para contraste sobre el relleno amarillo.
+      expect(d.color, AppTokens.onPrimary);
       expect(d.shape, BoxShape.circle);
     });
   });
@@ -150,6 +150,43 @@ void main() {
       await tester.pump();
       // Idioma de Radio de Flutter: el callback recibe el value del control.
       expect(recibido, 2);
+    });
+  });
+
+  group('AppRadio — semántica', () {
+    testWidgets('expone rol de radio en grupo exclusivo con estado', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpRadio(
+        tester,
+        AppRadio<int>(value: 1, groupValue: 1, onChanged: (_) {}),
+      );
+      expect(
+        tester.getSemantics(find.byType(AppRadio<int>)),
+        containsSemantics(
+          isInMutuallyExclusiveGroup: true,
+          hasCheckedState: true,
+          isChecked: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('no seleccionado: isChecked false', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpRadio(
+        tester,
+        AppRadio<int>(value: 1, groupValue: 2, onChanged: (_) {}),
+      );
+      expect(
+        tester.getSemantics(find.byType(AppRadio<int>)),
+        containsSemantics(isInMutuallyExclusiveGroup: true, isChecked: false),
+      );
+      handle.dispose();
     });
   });
 }

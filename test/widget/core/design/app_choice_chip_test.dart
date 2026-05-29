@@ -26,9 +26,17 @@ void main() {
     testWidgets('renderiza el texto del label', (tester) async {
       await pumpChip(
         tester,
-        AppChoiceChip(label: 'Diario', selected: false, onPressed: () {}),
+        AppChoiceChip(label: 'Diario', selected: false, onSelected: (_) {}),
       );
       expect(find.text('Diario'), findsOneWidget);
+    });
+
+    testWidgets('label en weight w600', (tester) async {
+      await pumpChip(
+        tester,
+        AppChoiceChip(label: 'Diario', selected: false, onSelected: (_) {}),
+      );
+      expect(labelStyle(tester, 'Diario')?.fontWeight, FontWeight.w600);
     });
   });
 
@@ -38,7 +46,7 @@ void main() {
       (tester) async {
         await pumpChip(
           tester,
-          AppChoiceChip(label: 'Diario', selected: false, onPressed: () {}),
+          AppChoiceChip(label: 'Diario', selected: false, onSelected: (_) {}),
         );
         final c = chipContainer(tester);
         final d = c.decoration as BoxDecoration;
@@ -53,7 +61,7 @@ void main() {
       (tester) async {
         await pumpChip(
           tester,
-          AppChoiceChip(label: 'Diario', selected: false, onPressed: () {}),
+          AppChoiceChip(label: 'Diario', selected: false, onSelected: (_) {}),
         );
         expect(find.byIcon(Icons.check), findsNothing);
       },
@@ -64,7 +72,7 @@ void main() {
       (tester) async {
         await pumpChip(
           tester,
-          AppChoiceChip(label: 'Diario', selected: true, onPressed: () {}),
+          AppChoiceChip(label: 'Diario', selected: true, onSelected: (_) {}),
         );
         final c = chipContainer(tester);
         final d = c.decoration as BoxDecoration;
@@ -80,7 +88,7 @@ void main() {
         // nunca blanco. Va a la izquierda del label.
         await pumpChip(
           tester,
-          AppChoiceChip(label: 'Diario', selected: true, onPressed: () {}),
+          AppChoiceChip(label: 'Diario', selected: true, onSelected: (_) {}),
         );
         expect(find.byIcon(Icons.check), findsOneWidget);
         final check = tester.widget<Icon>(find.byIcon(Icons.check));
@@ -93,7 +101,7 @@ void main() {
     testWidgets('radio AppTokens.radiusChip (8)', (tester) async {
       await pumpChip(
         tester,
-        AppChoiceChip(label: 'x', selected: false, onPressed: () {}),
+        AppChoiceChip(label: 'x', selected: false, onSelected: (_) {}),
       );
       final c = chipContainer(tester);
       final d = c.decoration as BoxDecoration;
@@ -102,12 +110,12 @@ void main() {
   });
 
   group('AppChoiceChip — estados', () {
-    testWidgets('onPressed null: opacity 0.4 y no tappable', (tester) async {
-      // onPressed null bloquea el tap; la verificación visual es la opacity.
+    testWidgets('onSelected null: opacity 0.4 y no tappable', (tester) async {
+      // onSelected null bloquea el tap; la verificación visual es la opacity.
       // No hace falta contador: no hay callback que pudiera dispararse.
       await pumpChip(
         tester,
-        const AppChoiceChip(label: 'x', selected: false, onPressed: null),
+        const AppChoiceChip(label: 'x', selected: false, onSelected: null),
       );
       await tester.tap(find.byType(AppChoiceChip));
       await tester.pumpAndSettle();
@@ -120,19 +128,79 @@ void main() {
       expect(opacity.opacity, 0.4);
     });
 
-    testWidgets('onPressed asignado: tap dispara callback', (tester) async {
-      var taps = 0;
+    testWidgets(
+      'unselected: tap emite onSelected(true)',
+      (tester) async {
+        // El chip es controlado: el tap no alterna estado, emite el valor que
+        // el consumer debería aplicar — el negado del [selected] actual.
+        bool? received;
+        await pumpChip(
+          tester,
+          AppChoiceChip(
+            label: 'x',
+            selected: false,
+            onSelected: (value) => received = value,
+          ),
+        );
+        await tester.tap(find.byType(AppChoiceChip));
+        await tester.pumpAndSettle();
+        expect(received, isTrue);
+      },
+    );
+
+    testWidgets(
+      'selected: tap emite onSelected(false)',
+      (tester) async {
+        bool? received;
+        await pumpChip(
+          tester,
+          AppChoiceChip(
+            label: 'x',
+            selected: true,
+            onSelected: (value) => received = value,
+          ),
+        );
+        await tester.tap(find.byType(AppChoiceChip));
+        await tester.pumpAndSettle();
+        expect(received, isFalse);
+      },
+    );
+  });
+
+  group('AppChoiceChip — semántica', () {
+    testWidgets('expone rol de botón seleccionado con etiqueta', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
       await pumpChip(
         tester,
-        AppChoiceChip(
-          label: 'x',
-          selected: false,
-          onPressed: () => taps++,
+        AppChoiceChip(label: 'Diseño', selected: true, onSelected: (_) {}),
+      );
+      expect(
+        tester.getSemantics(find.byType(AppChoiceChip)),
+        containsSemantics(
+          isButton: true,
+          isSelected: true,
+          label: 'Diseño',
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
         ),
       );
-      await tester.tap(find.byType(AppChoiceChip));
-      await tester.pumpAndSettle();
-      expect(taps, 1);
+      handle.dispose();
+    });
+
+    testWidgets('no seleccionado: isSelected false', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpChip(
+        tester,
+        AppChoiceChip(label: 'Diseño', selected: false, onSelected: (_) {}),
+      );
+      expect(
+        tester.getSemantics(find.byType(AppChoiceChip)),
+        containsSemantics(isButton: true, isSelected: false),
+      );
+      handle.dispose();
     });
   });
 }

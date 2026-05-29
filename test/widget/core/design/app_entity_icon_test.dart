@@ -36,6 +36,28 @@ void main() {
       expect(find.byIcon(Icons.folder), findsOneWidget);
       expect(find.byType(Text), findsNothing);
     });
+
+    test('letter + icon juntos: viola el XOR y lanza en debug', () {
+      // El glifo es letra O ícono, nunca ambos: un uso ambiguo debe fallar
+      // rápido en construcción, no resolverse en silencio.
+      expect(
+        () => AppEntityIcon(letter: 'A', icon: Icons.folder),
+        throwsAssertionError,
+      );
+    });
+  });
+
+  group('AppEntityIcon — escalado de la letra', () {
+    testWidgets('fontSize escala con el tile: size * 0.4', (tester) async {
+      // La letra crece con el tile en paridad con el ícono (size * 0.5); un
+      // tamaño fijo se vería diminuto en tiles grandes.
+      await pumpEntityIcon(
+        tester,
+        const AppEntityIcon(letter: 'A', size: 80),
+      );
+      final style = tester.widget<Text>(find.text('A')).style;
+      expect(style?.fontSize, 80 * 0.4);
+    });
   });
 
   group('AppEntityIcon — geometría', () {
@@ -117,6 +139,34 @@ void main() {
       );
       final icon = tester.widget<Icon>(find.byIcon(Icons.folder));
       expect(icon.color, AppTokens.onPrimary);
+    });
+  });
+
+  group('AppEntityIcon — semántica', () {
+    testWidgets('con semanticLabel: anuncia la etiqueta', (tester) async {
+      // Con etiqueta el glifo deja de ser decorativo y el lector de pantalla
+      // lo nombra.
+      await pumpEntityIcon(
+        tester,
+        const AppEntityIcon(letter: 'A', semanticLabel: 'Carpeta de trabajo'),
+      );
+      final semantics = tester.getSemantics(find.byType(AppEntityIcon));
+      expect(semantics.label, 'Carpeta de trabajo');
+    });
+
+    testWidgets('sin semanticLabel: excluye el glifo del árbol semántico', (
+      tester,
+    ) async {
+      // El glifo decorativo no debe ensuciar el árbol: una letra suelta sería
+      // ruido para el lector de pantalla.
+      await pumpEntityIcon(tester, const AppEntityIcon(letter: 'A'));
+      expect(
+        find.descendant(
+          of: find.byType(AppEntityIcon),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

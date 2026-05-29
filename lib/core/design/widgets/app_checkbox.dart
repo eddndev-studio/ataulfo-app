@@ -6,9 +6,10 @@ import '../tokens.dart';
 ///
 /// Caja redondeada (radio [AppTokens.radiusSm]) de lado ~24 envuelta en un
 /// área tappable de 48 — el control visible es pequeño pero el blanco de
-/// toque cumple el mínimo de accesibilidad. `unchecked` se delinea con un
-/// borde [AppTokens.divider] sobre fondo transparente; `checked` se rellena
-/// con [AppTokens.primary] y muestra el check en [AppTokens.onPrimary] (el
+/// toque cumple el mínimo de accesibilidad. `unchecked` se rellena con
+/// [AppTokens.surface3] y se delinea con un borde [AppTokens.divider]: la
+/// caja se lee llena y elevada, no hueca; `checked` se rellena con
+/// [AppTokens.primary] y muestra el check en [AppTokens.onPrimary] (el
 /// amarillo exige primer plano oscuro para contraste).
 ///
 /// El componente es controlado: no guarda estado. El tap emite
@@ -32,8 +33,8 @@ class AppCheckbox extends StatelessWidget {
       width: _boxSize,
       height: _boxSize,
       decoration: BoxDecoration(
-        // Vacío: solo el borde delinea la caja contra la superficie.
-        color: value ? AppTokens.primary : Colors.transparent,
+        // Vacío: superficie elevada con borde que delinea la caja llena.
+        color: value ? AppTokens.primary : AppTokens.surface3,
         borderRadius: radius,
         border: value ? null : Border.all(color: AppTokens.divider),
       ),
@@ -61,6 +62,18 @@ class AppCheckbox extends StatelessWidget {
       ),
     );
 
-    return Opacity(opacity: disabled ? 0.4 : 1.0, child: control);
+    // Un único nodo semántico de casilla: ExcludeSemantics colapsa el nodo de
+    // botón que aporta el InkWell (evita anunciar "casilla que contiene un
+    // botón"); el rol y el estado los porta este Semantics, que además es
+    // operable por accesibilidad vía onTap.
+    return Semantics(
+      container: true,
+      checked: value,
+      enabled: !disabled,
+      onTap: disabled ? null : () => onChanged!(!value),
+      child: ExcludeSemantics(
+        child: Opacity(opacity: disabled ? 0.4 : 1.0, child: control),
+      ),
+    );
   }
 }

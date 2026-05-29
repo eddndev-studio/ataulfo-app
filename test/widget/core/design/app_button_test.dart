@@ -38,14 +38,14 @@ void main() {
       expect(label.style?.color, AppTokens.onPrimary);
     });
 
-    testWidgets('tonal: fondo surface2, label en text1', (tester) async {
+    testWidgets('tonal: fondo surface3, label en text1', (tester) async {
       await pumpButton(
         tester,
         AppButton.tonal(label: 'Pausar', onPressed: () {}),
       );
       final c = rootContainer(tester);
       final d = c.decoration as BoxDecoration;
-      expect(d.color, AppTokens.surface2);
+      expect(d.color, AppTokens.surface3);
       final label = tester.widget<Text>(find.text('Pausar'));
       expect(label.style?.color, AppTokens.text1);
     });
@@ -258,5 +258,47 @@ void main() {
         expect(opacity.opacity, 1.0);
       },
     );
+  });
+
+  group('AppButton — semántica', () {
+    testWidgets('expone rol de botón con etiqueta y habilitación', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpButton(
+        tester,
+        AppButton.filled(label: 'Crear', onPressed: () {}),
+      );
+      expect(
+        tester.getSemantics(find.byType(AppButton)),
+        containsSemantics(
+          isButton: true,
+          label: 'Crear',
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('disabled (onPressed null): botón no habilitado', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpButton(
+        tester,
+        const AppButton.filled(label: 'Crear', onPressed: null),
+      );
+      expect(
+        tester.getSemantics(find.byType(AppButton)),
+        containsSemantics(
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: false,
+        ),
+      );
+      handle.dispose();
+    });
   });
 }

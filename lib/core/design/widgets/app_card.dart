@@ -20,10 +20,11 @@ enum _AppCardVariant { surface, gradient, glass }
 ///   home; el gradiente vive en `gradient` y deja `color` nulo.
 /// - `.glass`: fondo translúcido `glass` para cards sobre fondos vivos.
 ///
-/// El constructor default recibe `padding` como `double` (la firma histórica);
-/// los nombrados lo reciben como `EdgeInsetsGeometry?` para permitir paddings
-/// asimétricos. El `EdgeInsets.all` del default se arma en `build` y no en el
-/// initializer para que el constructor siga siendo `const`.
+/// El constructor default recibe `padding` como `double` —la card de contenido
+/// usa un padding uniforme—, mientras que los nombrados lo reciben como
+/// `EdgeInsetsGeometry?` para permitir paddings asimétricos. El `EdgeInsets.all`
+/// del default se arma en `build` y no en el initializer para que el constructor
+/// siga siendo `const`.
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -68,8 +69,8 @@ class AppCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: radius,
-        splashColor: Colors.white.withValues(alpha: 0.04),
-        highlightColor: Colors.white.withValues(alpha: 0.06),
+        splashColor: Colors.white.withValues(alpha: 0.06),
+        highlightColor: Colors.white.withValues(alpha: 0.04),
         child: Container(
           padding: padding,
           decoration: _decorationFor(_variant, radius),

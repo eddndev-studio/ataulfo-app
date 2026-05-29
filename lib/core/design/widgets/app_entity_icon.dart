@@ -13,6 +13,11 @@ import '../tokens.dart';
 /// el primer plano usa [AppTokens.onPrimary] (el amarillo exige contenido
 /// oscuro para contraste, nunca blanco). En reposo el relleno es
 /// [AppTokens.surface3] con contenido en [AppTokens.text1].
+///
+/// Accesibilidad: el glifo es decorativo por defecto. Si se pasa
+/// [semanticLabel], el contenido se anuncia con esa etiqueta; si no, se
+/// excluye del árbol semántico — una letra suelta o un ícono ornamental sin
+/// significado solo agregarían ruido al lector de pantalla.
 class AppEntityIcon extends StatelessWidget {
   const AppEntityIcon({
     super.key,
@@ -20,15 +25,17 @@ class AppEntityIcon extends StatelessWidget {
     this.icon,
     this.size = 44,
     this.highlighted = false,
+    this.semanticLabel,
   }) : assert(
-         letter != null || icon != null,
-         'AppEntityIcon requiere letter o icon',
+         (letter != null) ^ (icon != null),
+         'AppEntityIcon requiere letter o icon, no ambos',
        );
 
   final String? letter;
   final IconData? icon;
   final double size;
   final bool highlighted;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -38,16 +45,19 @@ class AppEntityIcon extends StatelessWidget {
     final Widget content = letter != null
         ? Text(
             letter!,
+            // La letra escala con el tile (size * 0.4) en paridad con el
+            // ícono (size * 0.5): un tamaño fijo se vería diminuto en tiles
+            // grandes y desbordaría en los pequeños.
             style: TextStyle(
               fontFamily: AppTokens.fontSans,
-              fontSize: AppTokens.bodyLSize,
+              fontSize: size * 0.4,
               fontWeight: FontWeight.w600,
               color: foreground,
             ),
           )
         : Icon(icon, size: size * 0.5, color: foreground);
 
-    return Container(
+    final tile = Container(
       width: size,
       height: size,
       alignment: Alignment.center,
@@ -61,5 +71,16 @@ class AppEntityIcon extends StatelessWidget {
       ),
       child: content,
     );
+
+    // Con etiqueta el glifo se anuncia; sin ella se excluye del árbol
+    // semántico por ser decorativo. En ambos casos el contenido interno
+    // (letra/ícono) se excluye: o bien la etiqueta lo reemplaza, o bien todo
+    // es decorativo — así la etiqueta queda limpia sin el nodo de la letra.
+    return semanticLabel != null
+        ? Semantics(
+            label: semanticLabel,
+            child: ExcludeSemantics(child: tile),
+          )
+        : ExcludeSemantics(child: tile);
   }
 }

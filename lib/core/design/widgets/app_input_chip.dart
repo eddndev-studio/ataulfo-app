@@ -29,8 +29,8 @@ class AppInputChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppTokens.radiusChip);
 
-    // El Container raíz porta el contrato visual (fondo + radio) y debe ser el
-    // primer Container del árbol — el test lo lee como tal.
+    // El Container raíz porta el contrato visual (fondo + radio); el
+    // Material/InkWell vive dentro para que el ripple respete ese clip.
     return Container(
       decoration: BoxDecoration(
         color: AppTokens.primary,
@@ -49,7 +49,9 @@ class AppInputChip extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(
                 left: AppTokens.sp3,
-                right: AppTokens.sp1,
+                // El borrar trae su propia caja de toque de 48 px; sin padding
+                // derecho ese hit-target no infla el ancho visual del chip.
+                right: 0,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -64,7 +66,7 @@ class AppInputChip extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: AppTokens.sp1),
-                  _DeleteButton(onDeleted: onDeleted),
+                  _DeleteButton(label: label, onDeleted: onDeleted),
                 ],
               ),
             ),
@@ -77,24 +79,40 @@ class AppInputChip extends StatelessWidget {
 
 /// Botón de borrar del chip: zona tappable propia del icono close.
 ///
-/// Separado del cuerpo para que su gesto no se solape con [onPressed]; el área
-/// de toque (≥48 vía hit-test) envuelve al icono de 18 px.
+/// Separado del cuerpo para que su gesto no se solape con [onPressed]. La caja
+/// de 48x48 centra el icono de 18 px para garantizar un objetivo de toque
+/// cómodo, mayor que el glifo visible.
 class _DeleteButton extends StatelessWidget {
-  const _DeleteButton({required this.onDeleted});
+  const _DeleteButton({required this.label, required this.onDeleted});
 
+  final String label;
   final VoidCallback? onDeleted;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    // Nodo de botón propio con etiqueta accionable ("Quitar X"): el lector lo
+    // anuncia como acción distinta del cuerpo. ExcludeSemantics descarta el
+    // icono decorativo para no duplicar el nodo.
+    return Semantics(
+      container: true,
+      button: true,
+      label: 'Quitar $label',
       onTap: onDeleted,
-      child: const Padding(
-        padding: EdgeInsets.all(AppTokens.sp2),
-        child: Icon(
-          Icons.close,
-          size: 18,
-          color: AppTokens.onPrimary,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDeleted,
+          child: const SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(
+              child: Icon(
+                Icons.close,
+                size: 18,
+                color: AppTokens.onPrimary,
+              ),
+            ),
+          ),
         ),
       ),
     );

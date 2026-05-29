@@ -11,8 +11,11 @@ import '../tokens.dart';
 ///
 /// Geometría: anillo visible de 24 centrado en un área tappable de 48 para
 /// cumplir el mínimo de hit-target sin agrandar el control a la vista. El
-/// estado apagado pinta un borde neutral ([AppTokens.divider]); el encendido
-/// pasa el borde a [AppTokens.primary] y rellena un punto interior de marca.
+/// estado apagado rellena el interior con [AppTokens.surface3] y un borde
+/// [AppTokens.text2] visible; el encendido invierte la figura — el anillo se
+/// rellena de marca ([AppTokens.primary]) y un punto oscuro
+/// ([AppTokens.onPrimary]) ancla el centro, garantizando contraste sobre el
+/// amarillo.
 ///
 /// `onChanged` nulo deshabilita: baja la opacidad y deja el control inerte
 /// (el tap no dispara nada).
@@ -37,7 +40,6 @@ class AppRadio<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final disabled = onChanged == null;
     final selected = value == groupValue;
-    final borderColor = selected ? AppTokens.primary : AppTokens.divider;
 
     final ring = Container(
       key: const ValueKey('app_radio.ring'),
@@ -45,17 +47,24 @@ class AppRadio<T> extends StatelessWidget {
       height: 24,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: 2),
+        // Seleccionado: relleno de marca. Apagado: superficie elevada con un
+        // borde neutral visible que dibuja el contorno del control.
+        color: selected ? AppTokens.primary : AppTokens.surface3,
+        border: Border.all(
+          color: selected ? AppTokens.primary : AppTokens.text2,
+          width: 2,
+        ),
       ),
-      // El punto interior solo existe en estado seleccionado.
+      // El punto interior solo existe en estado seleccionado y va oscuro
+      // ([onPrimary]) para resaltar contra el relleno amarillo.
       child: selected
           ? Center(
               child: Container(
                 key: const ValueKey('app_radio.dot'),
-                width: 12,
-                height: 12,
+                width: 8,
+                height: 8,
                 decoration: const BoxDecoration(
-                  color: AppTokens.primary,
+                  color: AppTokens.onPrimary,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -80,6 +89,18 @@ class AppRadio<T> extends StatelessWidget {
       ),
     );
 
-    return Opacity(opacity: disabled ? 0.4 : 1.0, child: control);
+    // Un único nodo de radio en grupo exclusivo: ExcludeSemantics colapsa el
+    // nodo de botón del InkWell; el rol/estado (checked = seleccionado) y la
+    // operabilidad por accesibilidad los porta este Semantics.
+    return Semantics(
+      container: true,
+      inMutuallyExclusiveGroup: true,
+      checked: selected,
+      enabled: !disabled,
+      onTap: disabled ? null : () => onChanged!(value),
+      child: ExcludeSemantics(
+        child: Opacity(opacity: disabled ? 0.4 : 1.0, child: control),
+      ),
+    );
   }
 }

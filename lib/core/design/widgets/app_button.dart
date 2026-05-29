@@ -133,9 +133,21 @@ class AppButton extends StatelessWidget {
       ),
     );
 
-    // Loading conserva opacity 1.0: el spinner ya comunica el estado y
-    // bajar el tinte agregaría ruido visual sobre algo que ya se ve.
-    return Opacity(opacity: disabled ? 0.4 : 1.0, child: button);
+    // Un único nodo de botón con su etiqueta: ExcludeSemantics colapsa el nodo
+    // del InkWell y el del label (que en loading desaparece de la vista pero
+    // sigue describiendo la acción). Loading bloquea el tap igual que disabled.
+    // Loading conserva opacity 1.0: el spinner ya comunica el estado y bajar el
+    // tinte agregaría ruido visual sobre algo que ya se ve.
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: !disabled,
+      label: label,
+      onTap: (disabled || loading) ? null : onPressed,
+      child: ExcludeSemantics(
+        child: Opacity(opacity: disabled ? 0.4 : 1.0, child: button),
+      ),
+    );
   }
 
   static _AppButtonColors _colorsFor(_AppButtonVariant variant) {
@@ -148,7 +160,7 @@ class AppButton extends StatelessWidget {
         );
       case _AppButtonVariant.tonal:
         return const _AppButtonColors(
-          background: AppTokens.surface2,
+          background: AppTokens.surface3,
           foreground: AppTokens.text1,
         );
       case _AppButtonVariant.text:

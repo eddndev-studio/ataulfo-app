@@ -12,23 +12,28 @@ import '../tokens.dart';
 ///   y el primer plano debe ser oscuro para contraste.
 ///
 /// Radio [AppTokens.radiusChip] (8) — más cuadrado que el pill de los botones,
-/// para diferenciar visualmente un filtro de una acción. `onPressed` null
+/// para diferenciar visualmente un filtro de una acción. `onSelected` null
 /// deshabilita el chip: baja el tinte a 0.4 y bloquea el tap.
+///
+/// El tap no alterna el estado por sí mismo: emite `onSelected(!selected)` y
+/// es el consumer quien decide el nuevo [selected]. Así el chip es controlado,
+/// igual que el resto de la familia de toggles, y soporta tanto selección
+/// única como múltiple sin estado interno.
 class AppChoiceChip extends StatelessWidget {
   const AppChoiceChip({
     super.key,
     required this.label,
     required this.selected,
-    required this.onPressed,
+    required this.onSelected,
   });
 
   final String label;
   final bool selected;
-  final VoidCallback? onPressed;
+  final ValueChanged<bool>? onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = onPressed == null;
+    final disabled = onSelected == null;
     final radius = BorderRadius.circular(AppTokens.radiusChip);
     final foreground = selected ? AppTokens.onPrimary : AppTokens.text1;
 
@@ -37,7 +42,7 @@ class AppChoiceChip extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: disabled ? null : onPressed,
+          onTap: disabled ? null : () => onSelected!(!selected),
           borderRadius: radius,
           splashColor: Colors.white.withValues(alpha: 0.06),
           highlightColor: Colors.white.withValues(alpha: 0.04),
@@ -67,7 +72,7 @@ class AppChoiceChip extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: AppTokens.fontSans,
                     fontSize: AppTokens.bodyMSize,
-                    fontWeight: AppTokens.captionWeight,
+                    fontWeight: FontWeight.w600,
                     color: foreground,
                   ),
                 ),
@@ -78,6 +83,19 @@ class AppChoiceChip extends StatelessWidget {
       ),
     );
 
-    return Opacity(opacity: disabled ? 0.4 : 1.0, child: chip);
+    // Un único nodo de botón seleccionable: ExcludeSemantics colapsa el nodo
+    // del InkWell y el del label; este Semantics porta rol (button), estado
+    // (selected), etiqueta y operabilidad por accesibilidad.
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      enabled: !disabled,
+      label: label,
+      onTap: disabled ? null : () => onSelected!(!selected),
+      child: ExcludeSemantics(
+        child: Opacity(opacity: disabled ? 0.4 : 1.0, child: chip),
+      ),
+    );
   }
 }

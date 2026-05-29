@@ -101,10 +101,24 @@ void main() {
       expect(dotFinder(), findsNothing);
     });
 
-    testWidgets('dot active: círculo color accent', (tester) async {
+    testWidgets('dot active en primary: círculo color onPrimary', (
+      tester,
+    ) async {
       await pumpPill(
         tester,
         const AppPill.primary(label: 'Activo', dot: AppPillDot.active),
+      );
+      final dot = tester.widget<Container>(dotFinder());
+      final d = dot.decoration as BoxDecoration;
+      // Sobre el fill amarillo el dot va oscuro (onPrimary) para contrastar.
+      expect(d.color, AppTokens.onPrimary);
+      expect(d.shape, BoxShape.circle);
+    });
+
+    testWidgets('dot active en neutral: círculo color accent', (tester) async {
+      await pumpPill(
+        tester,
+        const AppPill.neutral(label: 'Activo', dot: AppPillDot.active),
       );
       final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
@@ -130,6 +144,48 @@ void main() {
       final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
       expect(d.color, AppTokens.danger);
+    });
+  });
+
+  group('AppPill — a11y (estado verbalizado)', () {
+    testWidgets('con dot active anuncia el estado "Activo"', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpPill(
+        tester,
+        const AppPill.neutral(label: 'Etiqueta', dot: AppPillDot.active),
+      );
+      // El estado-por-color del dot debe ser anunciable junto al label visible.
+      expect(find.bySemanticsLabel(RegExp('Activo')), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('con dot paused anuncia el estado "Pausado"', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpPill(
+        tester,
+        const AppPill.neutral(label: 'Etiqueta', dot: AppPillDot.paused),
+      );
+      expect(find.bySemanticsLabel(RegExp('Pausado')), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('con dot danger anuncia el estado "Error"', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpPill(
+        tester,
+        const AppPill.danger(label: 'Etiqueta', dot: AppPillDot.danger),
+      );
+      expect(find.bySemanticsLabel(RegExp('Error')), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('sin dot no agrega Semantics de estado', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpPill(tester, const AppPill.neutral(label: 'Etiqueta'));
+      expect(find.bySemanticsLabel(RegExp('Activo')), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('Pausado')), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('Error')), findsNothing);
+      handle.dispose();
     });
   });
 }

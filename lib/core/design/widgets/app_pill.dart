@@ -37,44 +37,57 @@ class AppPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = _colorsFor(_variant);
-    return IntrinsicWidth(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: colors.background,
-          borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-          border: colors.border,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            if (dot != null) ...<Widget>[
-              Container(
-                key: const ValueKey<String>('app_pill.dot'),
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: _dotColor(dot!),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: AppTokens.fontSans,
-                fontSize: AppTokens.captionSize,
-                height: AppTokens.captionLineHeight / AppTokens.captionSize,
-                fontWeight: AppTokens.captionWeight,
-                color: colors.foreground,
-                letterSpacing: 0.1,
+    // El Row con mainAxisSize.min ya ajusta el ancho al contenido: no hace
+    // falta envolver en IntrinsicWidth.
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+        border: colors.border,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (dot != null) ...<Widget>[
+            Container(
+              key: const ValueKey<String>('app_pill.dot'),
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: _dotColor(dot!, _variant),
+                shape: BoxShape.circle,
               ),
             ),
+            const SizedBox(width: 6),
           ],
-        ),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppTokens.fontSans,
+              fontSize: AppTokens.captionSize,
+              height: AppTokens.captionLineHeight / AppTokens.captionSize,
+              fontWeight: AppTokens.captionWeight,
+              color: colors.foreground,
+              letterSpacing: 0.1,
+            ),
+          ),
+        ],
       ),
     );
+
+    // El dot comunica estado solo por color; un único nodo semántico combina
+    // el label visible con el estado verbalizado ("Etiqueta, Activo") para que
+    // el lector anuncie ambos. ExcludeSemantics descarta el nodo del Text
+    // interno para que la etiqueta del nodo sea exactamente la combinada.
+    if (dot != null) {
+      return Semantics(
+        container: true,
+        label: '$label, ${_dotSemanticLabel(dot!)}',
+        child: ExcludeSemantics(child: pill),
+      );
+    }
+    return pill;
   }
 
   static _AppPillColors _colorsFor(_AppPillVariant variant) {
@@ -105,7 +118,12 @@ class AppPill extends StatelessWidget {
     }
   }
 
-  static Color _dotColor(AppPillDot dot) {
+  static Color _dotColor(AppPillDot dot, _AppPillVariant variant) {
+    // Sobre el fill amarillo de la variante primary el dot exige primer plano
+    // oscuro (onPrimary) para ser visible; un dot cálido se perdería.
+    if (variant == _AppPillVariant.primary) {
+      return AppTokens.onPrimary;
+    }
     switch (dot) {
       case AppPillDot.active:
         return AppTokens.accent;
@@ -113,6 +131,17 @@ class AppPill extends StatelessWidget {
         return AppTokens.text2;
       case AppPillDot.danger:
         return AppTokens.danger;
+    }
+  }
+
+  static String _dotSemanticLabel(AppPillDot dot) {
+    switch (dot) {
+      case AppPillDot.active:
+        return 'Activo';
+      case AppPillDot.paused:
+        return 'Pausado';
+      case AppPillDot.danger:
+        return 'Error';
     }
   }
 }

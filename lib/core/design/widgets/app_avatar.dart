@@ -12,9 +12,9 @@ import '../tokens.dart';
 /// para que la inicial y el borde resalten contra el fondo.
 ///
 /// `size` parametriza diámetro total — los listados usan 40 (densidad
-/// alta) y los detalles 64 (header). El font-size del label sigue siendo
-/// bodyL fijo: en tamaños mayores la inicial queda relativamente más
-/// pequeña, lo cual es deliberado para no pelear con el título adyacente.
+/// alta) y los detalles 64 (header). El font-size del label escala con el
+/// diámetro (`size * 0.4`) para que la inicial guarde la misma proporción en
+/// cualquier tamaño, como muestra el kit.
 class AppAvatar extends StatelessWidget {
   const AppAvatar({super.key, required this.name, this.size = 40});
 
@@ -28,22 +28,28 @@ class AppAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: AppTokens.surface3,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppTokens.primary, width: _ringWidth),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        _initial(name),
-        style: const TextStyle(
-          fontFamily: AppTokens.fontSans,
-          fontSize: AppTokens.bodyLSize,
-          fontWeight: FontWeight.w600,
-          color: AppTokens.text1,
+    // El lector de pantalla anuncia el nombre completo, no la inicial suelta:
+    // excludeSemantics suprime el nodo de la letra para que solo se oiga `name`.
+    return Semantics(
+      label: name,
+      excludeSemantics: true,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: AppTokens.surface3,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppTokens.primary, width: _ringWidth),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          _initial(name),
+          style: TextStyle(
+            fontFamily: AppTokens.fontSans,
+            fontSize: size * 0.4,
+            fontWeight: FontWeight.w600,
+            color: AppTokens.text1,
+          ),
         ),
       ),
     );
@@ -52,6 +58,8 @@ class AppAvatar extends StatelessWidget {
   static String _initial(String s) {
     final trimmed = s.trim();
     if (trimmed.isEmpty) return '?';
-    return trimmed.substring(0, 1).toUpperCase();
+    // Primer cluster de grafemas, no `substring(0, 1)`: respeta emojis y
+    // pares surrogate que un corte por code unit partiría a la mitad.
+    return trimmed.characters.first.toUpperCase();
   }
 }

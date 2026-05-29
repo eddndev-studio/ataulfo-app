@@ -141,36 +141,49 @@ class _AppTextFieldState extends State<AppTextField> {
           style: textTheme.labelSmall?.copyWith(color: labelColor),
         ),
         const SizedBox(height: AppTokens.sp1),
-        Container(
-          decoration: BoxDecoration(
-            color: AppTokens.input,
-            borderRadius: radius,
-            border: Border.all(color: borderColor, width: 2),
-            boxShadow: boxShadow,
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.sp4,
-            vertical: AppTokens.sp1,
-          ),
-          child: TextField(
-            controller: widget.controller,
-            focusNode: _focusNode,
-            enabled: widget.enabled,
-            autofocus: widget.autofocus,
-            textInputAction: widget.textInputAction,
-            onSubmitted: widget.onSubmitted,
-            minLines: widget.minLines,
-            maxLines: widget.maxLines,
-            keyboardType: widget.keyboardType,
-            inputFormatters: widget.inputFormatters,
-            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
-            // Borderless: la píldora la pinta el Container, no el campo. Un
-            // borde aquí competiría con el del shell.
-            decoration: InputDecoration(
-              isCollapsed: true,
-              border: InputBorder.none,
-              hintText: widget.hint,
-              hintStyle: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+        // El kit fija un objetivo táctil de 48px: el shell garantiza ese alto
+        // mínimo aunque el texto de una sola línea mida menos. El ConstrainedBox
+        // envuelve el Container por fuera para que la píldora siga siendo el
+        // único contenedor con BoxDecoration.
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTokens.input,
+              borderRadius: radius,
+              border: Border.all(color: borderColor, width: 2),
+              boxShadow: boxShadow,
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp4,
+              vertical: AppTokens.sp1,
+            ),
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              enabled: widget.enabled,
+              autofocus: widget.autofocus,
+              textInputAction: widget.textInputAction,
+              onSubmitted: widget.onSubmitted,
+              minLines: widget.minLines,
+              maxLines: widget.maxLines,
+              keyboardType: widget.keyboardType,
+              inputFormatters: widget.inputFormatters,
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+              // Borderless y sin relleno/padding propios: la píldora la pinta
+              // el Container, y el padding lo gobierna SIEMPRE el shell. Un
+              // borde o un fill aquí competiría con el del contenedor y haría
+              // al campo sensible al tema de Material por debajo.
+              decoration: InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
+                contentPadding: EdgeInsets.zero,
+                hintText: widget.hint,
+                hintStyle:
+                    textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+              ),
             ),
           ),
         ),

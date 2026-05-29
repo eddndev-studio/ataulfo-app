@@ -94,6 +94,26 @@ void main() {
     });
   });
 
+  group('AppTextField — objetivo táctil', () {
+    testWidgets('el alto del campo es >= 48 (objetivo táctil del kit)', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'X',
+          hint: 'h',
+          controller: TextEditingController(),
+        ),
+      );
+      expect(
+        tester.getSize(find.byType(AppTextField)).height,
+        greaterThanOrEqualTo(48),
+        reason: 'el campo debe garantizar un alto táctil >= 48',
+      );
+    });
+  });
+
   group('AppTextField — input', () {
     testWidgets('escribir propaga al controller', (tester) async {
       final c = TextEditingController();
