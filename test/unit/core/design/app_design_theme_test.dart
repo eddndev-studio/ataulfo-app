@@ -64,6 +64,19 @@ void main() {
       expect(fab.backgroundColor, AppTokens.primary);
       expect(fab.foregroundColor, AppTokens.onPrimary);
     });
+
+    test('pageTransitionsTheme: Android sin scrim opaco (glow visible en '
+        'la transición de ruta)', () {
+      // El builder por defecto pinta colorScheme.surface como fondo del
+      // tránsito, lo que tapaba el glow con un gris durante la animación. Con
+      // scrim transparente, el glow fijo de fondo se ve durante la transición.
+      final builder = theme.pageTransitionsTheme.builders[TargetPlatform.android];
+      expect(builder, isA<FadeForwardsPageTransitionsBuilder>());
+      expect(
+        (builder! as FadeForwardsPageTransitionsBuilder).backgroundColor,
+        Colors.transparent,
+      );
+    });
   });
 
   group('AppDesignTheme.dark — ColorScheme', () {

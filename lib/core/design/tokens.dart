@@ -98,11 +98,21 @@ class AppTokens {
   /// sobre el fondo base; las pantallas se montan encima con app bars
   /// transparentes. El centro va cerca del borde superior para que el calor
   /// quede en la cabecera y el cuerpo respire en oscuro.
-  static const RadialGradient backgroundGlow = RadialGradient(
-    center: Alignment(0.0, -0.8),
+  ///
+  /// Va a intensidad baja: cada parada cálida se mezcla solo ~35% hacia la
+  /// marca desde [bgBase] (equivalente a pintar el glow a ~35% de opacidad
+  /// sobre la base), de modo que el calor sea sutil y el texto encima respire.
+  /// Sigue siendo opaco —no necesita capa de base extra—, por eso usa `lerp`
+  /// y no alpha.
+  static final RadialGradient backgroundGlow = RadialGradient(
+    center: const Alignment(0.0, -0.8),
     radius: 1.15,
-    colors: <Color>[primary, accent, bgBase],
-    stops: <double>[0.0, 0.45, 0.9],
+    colors: <Color>[
+      Color.lerp(bgBase, primary, 0.35)!,
+      Color.lerp(bgBase, accent, 0.35)!,
+      bgBase,
+    ],
+    stops: const <double>[0.0, 0.45, 0.9],
   );
 
   // ── Text ────────────────────────────────────────────────────────────────

@@ -78,6 +78,20 @@ class AppDesignTheme {
         backgroundColor: AppTokens.primary,
         foregroundColor: AppTokens.onPrimary,
       ),
+      // El glow es el fondo absoluto y fijo de la app; durante una transición
+      // de ruta debe seguir viéndose. El builder por defecto de Android pinta
+      // `colorScheme.surface` como scrim del tránsito, que tapaba el glow con
+      // un gris en los frames de la animación. Con scrim transparente el glow
+      // fijo (detrás del navigator) se ve durante toda la transición. iOS usa
+      // su transición nativa, que no pinta scrim opaco.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(
+            backgroundColor: Colors.transparent,
+          ),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
     );
   }
 

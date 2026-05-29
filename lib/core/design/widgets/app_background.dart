@@ -21,7 +21,9 @@ class AppBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(gradient: AppTokens.backgroundGlow),
+      // El gradiente del kit se compone con `Color.lerp` (no es const), por eso
+      // la decoración no puede ser const.
+      decoration: BoxDecoration(gradient: AppTokens.backgroundGlow),
       child: child,
     );
   }
