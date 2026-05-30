@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
@@ -91,22 +92,76 @@ void main() {
     expect(alignOf(tester, 'out'), Alignment.centerRight);
   });
 
-  testWidgets('OUTBOUND con status READ muestra "Leído"', (tester) async {
-    when(() => bloc.state).thenReturn(
-      MessagesLoaded(
-        items: <Message>[
-          msg(
-            externalId: 'out',
-            direction: MessageDirection.outbound,
-            status: MessageStatus.read,
-          ),
-        ],
-        prevCursor: null,
-        isLoadingOlder: false,
-      ),
-    );
-    await tester.pumpWidget(host());
-    expect(find.text('Leído'), findsOneWidget);
+  group('OUTBOUND ticks de entrega', () {
+    Future<void> pumpStatus(WidgetTester tester, MessageStatus s) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(
+              externalId: 'out',
+              direction: MessageDirection.outbound,
+              status: s,
+            ),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+    }
+
+    testWidgets('SENT → una palomita (done) gris', (tester) async {
+      await pumpStatus(tester, MessageStatus.sent);
+      expect(find.byIcon(Icons.done_all), findsNothing);
+      expect(tester.widget<Icon>(find.byIcon(Icons.done)).color, AppTokens.text2);
+    });
+
+    testWidgets('DELIVERED → doble palomita (done_all) gris', (tester) async {
+      await pumpStatus(tester, MessageStatus.delivered);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.done_all)).color,
+        AppTokens.text2,
+      );
+    });
+
+    testWidgets('READ → doble palomita (done_all) amarilla', (tester) async {
+      await pumpStatus(tester, MessageStatus.read);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.done_all)).color,
+        AppTokens.primary,
+      );
+    });
+
+    testWidgets('FAILED → ícono de error rojo', (tester) async {
+      await pumpStatus(tester, MessageStatus.failed);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.error_outline)).color,
+        AppTokens.danger,
+      );
+    });
+
+    testWidgets('el tick conserva la etiqueta de texto para a11y', (
+      tester,
+    ) async {
+      await pumpStatus(tester, MessageStatus.read);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.done_all)).semanticLabel,
+        'Leído',
+      );
+    });
+
+    testWidgets('INBOUND no muestra ningún tick', (tester) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[msg(externalId: 'in')],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byIcon(Icons.done), findsNothing);
+      expect(find.byIcon(Icons.done_all), findsNothing);
+    });
   });
 
   testWidgets('INBOUND de grupo muestra el autor (senderLid)', (tester) async {

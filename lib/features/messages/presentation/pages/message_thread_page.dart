@@ -254,7 +254,7 @@ class _MessageBubble extends StatelessWidget {
                     Text(_hhmm(m.timestampMs), style: caption),
                     if (isOutbound && m.status != null) ...<Widget>[
                       const SizedBox(width: AppTokens.sp2),
-                      Text(_statusLabel(m.status!), style: caption),
+                      _statusTick(m.status!),
                     ],
                   ],
                 ),
@@ -274,6 +274,20 @@ String _hhmm(int timestampMs) {
   final hh = dt.hour.toString().padLeft(2, '0');
   final mm = dt.minute.toString().padLeft(2, '0');
   return '$hh:$mm';
+}
+
+/// Tick de entrega estilo mensajería: ✓ enviado, ✓✓ entregado (gris), ✓✓ leído
+/// (amarillo del brand), ⚠ falló (rojo). El receipt en vivo (`message.status`)
+/// repinta este ícono solo. Conserva la etiqueta de texto como `semanticLabel`
+/// para que un lector de pantalla anuncie "Entregado/Leído", no un glifo.
+Widget _statusTick(MessageStatus s) {
+  final (IconData icon, Color color) = switch (s) {
+    MessageStatus.sent => (Icons.done, AppTokens.text2),
+    MessageStatus.delivered => (Icons.done_all, AppTokens.text2),
+    MessageStatus.read => (Icons.done_all, AppTokens.primary),
+    MessageStatus.failed => (Icons.error_outline, AppTokens.danger),
+  };
+  return Icon(icon, size: 16, color: color, semanticLabel: _statusLabel(s));
 }
 
 String _statusLabel(MessageStatus s) => switch (s) {
