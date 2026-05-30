@@ -6,6 +6,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/failures/messages_failure.dart';
+import '../../domain/reactions.dart';
 import '../bloc/messages_bloc.dart';
 
 /// Hilo de mensajes de una conversación (S09 `GET
@@ -139,13 +140,17 @@ class _ThreadView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Las reacciones (type:'reaction') se doblan sobre su target en vez de
+    // pintarse como burbuja; `renderable` son los mensajes que sí se pintan.
+    final folded = foldReactions(items);
+    final renderable = folded.renderable;
     // items viene ASC (más viejo→más nuevo); invertimos para que el índice 0
     // (más nuevo) quede al fondo con reverse:true.
-    final newestFirst = items.reversed.toList(growable: false);
+    final newestFirst = renderable.reversed.toList(growable: false);
     // Índice por externalId para resolver las citas (reply→mensaje citado)
     // contra la ventana cargada. Un citado fuera de la ventana queda sin
     // resolver (la burbuja muestra el fallback).
-    final byId = <String, Message>{for (final m in items) m.externalId: m};
+    final byId = <String, Message>{for (final m in renderable) m.externalId: m};
     return NotificationListener<ScrollNotification>(
       onNotification: (n) => _onScroll(context, n),
       child: ListView.builder(
@@ -183,6 +188,7 @@ class _ThreadView extends StatelessWidget {
           return _MessageBubble(
             message: m,
             quoted: m.quotedId == null ? null : byId[m.quotedId],
+            reactions: folded.byTarget[m.externalId],
           );
         },
       ),
@@ -195,7 +201,7 @@ class _ThreadView extends StatelessWidget {
 /// no hay nombre aún). Tipos no-texto → placeholder `[tipo]` (la media no se
 /// descarga en este slice). El OUTBOUND muestra su estado de entrega.
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, this.quoted});
+  const _MessageBubble({required this.message, this.quoted, this.reactions});
 
   final Message message;
 
@@ -203,6 +209,10 @@ class _MessageBubble extends StatelessWidget {
   /// cargada; `null` si `message` no es reply o si el citado quedó fuera de la
   /// ventana (la cita muestra entonces su fallback).
   final Message? quoted;
+
+  /// Reacciones agregadas sobre este mensaje (emoji + conteo), o `null`/vacío
+  /// si nadie reaccionó. Las pinta una fila de pills bajo la burbuja.
+  final List<ReactionTally>? reactions;
 
   @override
   Widget build(BuildContext context) {
@@ -223,63 +233,112 @@ class _MessageBubble extends StatelessWidget {
       alignment: isOutbound ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.sp4,
-              vertical: AppTokens.sp3,
-            ),
-            decoration: BoxDecoration(
-              color: isOutbound ? AppTokens.surface3 : AppTokens.surface2,
-              borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (isGroupInbound) ...<Widget>[
-                  Text(
-                    m.senderLid,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                ],
-                if (m.quotedId != null) ...<Widget>[
-                  _QuotedPreview(parentId: m.externalId, quoted: quoted),
-                  const SizedBox(height: AppTokens.sp1),
-                ],
-                Text(
-                  body,
-                  style: isText
-                      ? textTheme.bodyLarge
-                      : textTheme.bodyLarge?.copyWith(
-                          fontStyle: FontStyle.italic,
-                          color: AppTokens.text2,
-                        ),
+        child: Column(
+          crossAxisAlignment: isOutbound
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTokens.sp4,
+                  vertical: AppTokens.sp3,
                 ),
-                const SizedBox(height: AppTokens.sp1),
-                Row(
+                decoration: BoxDecoration(
+                  color: isOutbound ? AppTokens.surface3 : AppTokens.surface2,
+                  borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Text(_hhmm(m.timestampMs), style: caption),
-                    if (isOutbound && m.status != null) ...<Widget>[
-                      const SizedBox(width: AppTokens.sp2),
-                      _statusTick(m.status!),
+                    if (isGroupInbound) ...<Widget>[
+                      Text(
+                        m.senderLid,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppTokens.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
                     ],
+                    if (m.quotedId != null) ...<Widget>[
+                      _QuotedPreview(parentId: m.externalId, quoted: quoted),
+                      const SizedBox(height: AppTokens.sp1),
+                    ],
+                    Text(
+                      body,
+                      style: isText
+                          ? textTheme.bodyLarge
+                          : textTheme.bodyLarge?.copyWith(
+                              fontStyle: FontStyle.italic,
+                              color: AppTokens.text2,
+                            ),
+                    ),
+                    const SizedBox(height: AppTokens.sp1),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(_hhmm(m.timestampMs), style: caption),
+                        if (isOutbound && m.status != null) ...<Widget>[
+                          const SizedBox(width: AppTokens.sp2),
+                          _statusTick(m.status!),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
+            if (reactions != null && reactions!.isNotEmpty) ...<Widget>[
+              const SizedBox(height: AppTokens.sp1),
+              _ReactionPills(parentId: m.externalId, reactions: reactions!),
+            ],
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// Fila de pills de reacción bajo la burbuja: un chip por emoji con su conteo
+/// (el conteo sólo se muestra si más de uno reaccionó igual, como WhatsApp).
+class _ReactionPills extends StatelessWidget {
+  const _ReactionPills({required this.parentId, required this.reactions});
+
+  final String parentId;
+  final List<ReactionTally> reactions;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Wrap(
+      key: Key('message.reactions.$parentId'),
+      spacing: AppTokens.sp1,
+      runSpacing: AppTokens.sp1,
+      children: <Widget>[
+        for (final r in reactions)
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp2,
+              vertical: 1,
+            ),
+            decoration: BoxDecoration(
+              color: AppTokens.surface2,
+              borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+              border: Border.all(color: AppTokens.divider),
+            ),
+            child: Text(
+              r.count > 1 ? '${r.emoji} ${r.count}' : r.emoji,
+              style: textTheme.labelSmall?.copyWith(color: AppTokens.text1),
+            ),
+          ),
+      ],
     );
   }
 }
