@@ -57,6 +57,14 @@ void main() {
     'timestampMs': 1700,
   });
 
+  String statusJson({required String externalId, required String status}) =>
+      jsonEncode(<String, dynamic>{
+        'botId': 'b1',
+        'externalId': externalId,
+        'status': status,
+        'at': '2026-01-01T00:00:00Z',
+      });
+
   void stub(Response<ResponseBody> r) {
     when(
       () => dio.get<ResponseBody>(
@@ -68,7 +76,9 @@ void main() {
     ).thenAnswer((_) async => r);
   }
 
-  test('emite Message para message.inbound y message.outbound', () async {
+  Message asMessage(ThreadLiveEvent e) => (e as LiveMessage).message;
+
+  test('emite LiveMessage para message.inbound y message.outbound', () async {
     stub(
       sse(
         frame('message.inbound', msgJson(externalId: 'in1', direction: 'INBOUND')) +
@@ -82,17 +92,29 @@ void main() {
     final got = await ds.connectOnce('b1').toList();
 
     expect(got, hasLength(2));
-    expect(got[0].externalId, 'in1');
-    expect(got[0].direction, MessageDirection.inbound);
-    expect(got[1].externalId, 'out1');
-    expect(got[1].direction, MessageDirection.outbound);
+    expect(asMessage(got[0]).externalId, 'in1');
+    expect(asMessage(got[0]).direction, MessageDirection.inbound);
+    expect(asMessage(got[1]).externalId, 'out1');
+    expect(asMessage(got[1]).direction, MessageDirection.outbound);
   });
 
-  test('filtra topics que no son de mensaje (flow.*, bot.session, status)', () async {
+  test('message.status emite LiveStatus (externalId + status)', () async {
+    stub(sse(frame('message.status', statusJson(externalId: 'o1', status: 'READ'))));
+
+    final got = await ds.connectOnce('b1').toList();
+
+    expect(got, hasLength(1));
+    expect(got.single, isA<LiveStatus>());
+    final st = got.single as LiveStatus;
+    expect(st.externalId, 'o1');
+    expect(st.status, MessageStatus.read);
+  });
+
+  test('filtra topics sin burbuja ni receipt (bot.session, flow.*)', () async {
     stub(
       sse(
         frame('bot.session', '{"botId":"b1","state":"CONNECTED"}') +
-            frame('message.status', '{"botId":"b1","externalId":"x","status":"READ"}') +
+            frame('flow.step', '{"botId":"b1","kind":"STEP","stepIdx":0}') +
             frame('message.outbound', msgJson(externalId: 'out1', direction: 'OUTBOUND')),
       ),
     );
@@ -100,10 +122,10 @@ void main() {
     final got = await ds.connectOnce('b1').toList();
 
     expect(got, hasLength(1));
-    expect(got.single.externalId, 'out1');
+    expect(asMessage(got.single).externalId, 'out1');
   });
 
-  test('un frame malformado NO derriba el stream: se omite y siguen los demás', () async {
+  test('un frame de mensaje malformado NO derriba el stream: se omite', () async {
     stub(
       sse(
         frame('message.outbound', '{esto no es json}') +
@@ -114,7 +136,23 @@ void main() {
     final got = await ds.connectOnce('b1').toList();
 
     expect(got, hasLength(1));
-    expect(got.single.externalId, 'ok');
+    expect(asMessage(got.single).externalId, 'ok');
+  });
+
+  test('un frame message.status inválido se omite (json roto o status desconocido)', () async {
+    stub(
+      sse(
+        frame('message.status', '{roto}') +
+            frame('message.status', statusJson(externalId: 'x', status: 'PENDING')) +
+            frame('message.status', statusJson(externalId: 'o1', status: 'DELIVERED')),
+      ),
+    );
+
+    final got = await ds.connectOnce('b1').toList();
+
+    expect(got, hasLength(1));
+    expect((got.single as LiveStatus).externalId, 'o1');
+    expect((got.single as LiveStatus).status, MessageStatus.delivered);
   });
 
   test('pide /events/stream con botId en query', () async {
@@ -133,7 +171,7 @@ void main() {
     expect(captured[1], <String, dynamic>{'botId': 'b1'});
   });
 
-  test('threadEvents envuelve cada mensaje como LiveMessage', () async {
+  test('threadEvents envuelve la conexión (emite LiveMessage)', () async {
     stub(
       sse(frame('message.outbound', msgJson(externalId: 'o1', direction: 'OUTBOUND'))),
     );

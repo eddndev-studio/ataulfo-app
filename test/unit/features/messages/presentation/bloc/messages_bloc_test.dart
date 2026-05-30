@@ -362,5 +362,180 @@ void main() {
         ),
       ],
     );
+
+    // El refetch tras reconectar también recupera AVANCES de estado perdidos en
+    // el corte: READ es terminal (no llega otro receipt), así que sin esto el
+    // tick se quedaría stale hasta un pull-to-refresh manual. El conteo de items
+    // NO cambia (mismo mensaje, otro status) ⇒ exige re-emitir por cambio real,
+    // no por diferencia de longitud.
+    blocTest<MessagesBloc, MessagesState>(
+      'al reconectar, avanza el status del OUTBOUND desde la verdad HTTP',
+      build: () {
+        var call = 0;
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer((_) async {
+          call++;
+          // 1ª carga: w2 en SENT (los receipts del corte no llegaron en vivo).
+          // Refetch: w2 ya en READ (la verdad HTTP avanzó durante el corte).
+          return call == 1
+              ? MessagePage(
+                  messages: <Message>[
+                    outbound('w2', 200).withStatus(MessageStatus.sent),
+                  ],
+                  prevCursor: 'cur',
+                )
+              : MessagePage(
+                  messages: <Message>[
+                    outbound('w2', 200).withStatus(MessageStatus.read),
+                  ],
+                  prevCursor: 'cur',
+                );
+        });
+        when(() => repo.live('b1')).thenAnswer((_) => liveController.stream);
+        return build();
+      },
+      act: (b) async {
+        b.add(const MessagesLoadRequested());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        liveController.add(const LiveReconnected());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => <MessagesState>[
+        const MessagesLoading(),
+        MessagesLoaded(
+          items: <Message>[outbound('w2', 200).withStatus(MessageStatus.sent)],
+          prevCursor: 'cur',
+          isLoadingOlder: false,
+        ),
+        MessagesLoaded(
+          items: <Message>[outbound('w2', 200).withStatus(MessageStatus.read)],
+          prevCursor: 'cur',
+          isLoadingOlder: false,
+        ),
+      ],
+    );
+  });
+
+  group('Realtime status (receipts)', () {
+    blocTest<MessagesBloc, MessagesState>(
+      'un OUTBOUND sin estado recibe su primer receipt (→ DELIVERED)',
+      build: build,
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100), outbound('w2', 200)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) => b.add(
+        const MessagesStatusReceived(
+          externalId: 'w2',
+          status: MessageStatus.delivered,
+        ),
+      ),
+      expect: () => <MessagesState>[
+        MessagesLoaded(
+          items: <Message>[
+            msg('m1', 100),
+            outbound('w2', 200).withStatus(MessageStatus.delivered),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      ],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'un receipt para un externalId ausente del hilo se ignora',
+      build: build,
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) => b.add(
+        const MessagesStatusReceived(
+          externalId: 'zzz',
+          status: MessageStatus.read,
+        ),
+      ),
+      expect: () => const <MessagesState>[],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'un receipt que retrocede el estado (READ→DELIVERED) se ignora',
+      build: build,
+      seed: () => MessagesLoaded(
+        items: <Message>[outbound('w2', 200).withStatus(MessageStatus.read)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) => b.add(
+        const MessagesStatusReceived(
+          externalId: 'w2',
+          status: MessageStatus.delivered,
+        ),
+      ),
+      expect: () => const <MessagesState>[],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'sin hilo cargado (Initial) un receipt se ignora',
+      build: build,
+      act: (b) => b.add(
+        const MessagesStatusReceived(
+          externalId: 'w2',
+          status: MessageStatus.read,
+        ),
+      ),
+      expect: () => const <MessagesState>[],
+    );
+
+    // Cableado: un LiveStatus del stream `repo.live` repinta la burbuja.
+    blocTest<MessagesBloc, MessagesState>(
+      'tras cargar la cola, un LiveStatus del stream avanza el OUTBOUND',
+      build: () {
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => MessagePage(
+            messages: <Message>[outbound('w2', 200).withStatus(MessageStatus.sent)],
+            prevCursor: null,
+          ),
+        );
+        when(() => repo.live('b1')).thenAnswer((_) => liveController.stream);
+        return build();
+      },
+      act: (b) async {
+        b.add(const MessagesLoadRequested());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        liveController.add(
+          const LiveStatus(externalId: 'w2', status: MessageStatus.read),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => <MessagesState>[
+        const MessagesLoading(),
+        MessagesLoaded(
+          items: <Message>[outbound('w2', 200).withStatus(MessageStatus.sent)],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+        MessagesLoaded(
+          items: <Message>[outbound('w2', 200).withStatus(MessageStatus.read)],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      ],
+    );
   });
 }

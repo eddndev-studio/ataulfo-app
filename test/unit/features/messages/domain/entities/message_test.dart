@@ -47,6 +47,137 @@ void main() {
     });
   });
 
+  group('MessageStatus.transition (monotonía de receipts)', () {
+    test('sin estado previo (null) → cualquier estado se aplica', () {
+      expect(
+        MessageStatus.transition(null, MessageStatus.sent),
+        MessageStatus.sent,
+      );
+      expect(
+        MessageStatus.transition(null, MessageStatus.delivered),
+        MessageStatus.delivered,
+      );
+      expect(
+        MessageStatus.transition(null, MessageStatus.read),
+        MessageStatus.read,
+      );
+      expect(
+        MessageStatus.transition(null, MessageStatus.failed),
+        MessageStatus.failed,
+      );
+    });
+
+    test('cadena SENT→DELIVERED→READ sólo avanza', () {
+      expect(
+        MessageStatus.transition(MessageStatus.sent, MessageStatus.delivered),
+        MessageStatus.delivered,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.delivered, MessageStatus.read),
+        MessageStatus.read,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.sent, MessageStatus.read),
+        MessageStatus.read,
+      );
+    });
+
+    test('retroceso o igual → null (no-op)', () {
+      expect(
+        MessageStatus.transition(MessageStatus.read, MessageStatus.delivered),
+        isNull,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.delivered, MessageStatus.sent),
+        isNull,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.read, MessageStatus.read),
+        isNull,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.sent, MessageStatus.sent),
+        isNull,
+      );
+    });
+
+    test('FAILED sólo se entra desde SENT', () {
+      expect(
+        MessageStatus.transition(MessageStatus.sent, MessageStatus.failed),
+        MessageStatus.failed,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.delivered, MessageStatus.failed),
+        isNull,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.read, MessageStatus.failed),
+        isNull,
+      );
+    });
+
+    test('FAILED es terminal: desde FAILED no sale nada', () {
+      expect(
+        MessageStatus.transition(MessageStatus.failed, MessageStatus.sent),
+        isNull,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.failed, MessageStatus.delivered),
+        isNull,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.failed, MessageStatus.read),
+        isNull,
+      );
+      expect(
+        MessageStatus.transition(MessageStatus.failed, MessageStatus.failed),
+        isNull,
+      );
+    });
+  });
+
+  group('Message.withStatus', () {
+    const base = Message(
+      externalId: 'o1',
+      chatLid: 'lid-1',
+      senderLid: 'bot',
+      kind: MessageKind.dm,
+      direction: MessageDirection.outbound,
+      type: 'text',
+      content: 'hola',
+      mediaRef: null,
+      quotedId: null,
+      timestampMs: 1700,
+      status: MessageStatus.sent,
+    );
+
+    test('devuelve una copia con el nuevo status, el resto intacto', () {
+      final upd = base.withStatus(MessageStatus.read);
+      expect(upd.status, MessageStatus.read);
+      expect(
+        upd,
+        const Message(
+          externalId: 'o1',
+          chatLid: 'lid-1',
+          senderLid: 'bot',
+          kind: MessageKind.dm,
+          direction: MessageDirection.outbound,
+          type: 'text',
+          content: 'hola',
+          mediaRef: null,
+          quotedId: null,
+          timestampMs: 1700,
+          status: MessageStatus.read,
+        ),
+      );
+    });
+
+    test('no muta el original', () {
+      base.withStatus(MessageStatus.read);
+      expect(base.status, MessageStatus.sent);
+    });
+  });
+
   group('Message igualdad por valor', () {
     Message base() => const Message(
       externalId: 'e1',
