@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
@@ -23,10 +25,55 @@ Message msg(String ext, int ts) => Message(
   status: null,
 );
 
+/// Una auto-respuesta del bot (OUTBOUND) del chat abierto.
+Message outbound(String ext, int ts) => Message(
+  externalId: ext,
+  chatLid: 'lid-1',
+  senderLid: 'bot',
+  kind: MessageKind.dm,
+  direction: MessageDirection.outbound,
+  type: 'text',
+  content: 'respuesta',
+  mediaRef: null,
+  quotedId: null,
+  timestampMs: ts,
+  status: null,
+);
+
+/// Un mensaje de OTRA conversación del mismo bot (debe filtrarse del hilo).
+Message otherChat(String ext, int ts) => Message(
+  externalId: ext,
+  chatLid: 'lid-2',
+  senderLid: 'x',
+  kind: MessageKind.dm,
+  direction: MessageDirection.inbound,
+  type: 'text',
+  content: 'otro',
+  mediaRef: null,
+  quotedId: null,
+  timestampMs: ts,
+  status: null,
+);
+
 void main() {
   late _MockRepo repo;
+  late StreamController<Message> liveController;
 
-  setUp(() => repo = _MockRepo());
+  setUp(() {
+    repo = _MockRepo();
+    // Broadcast: su `close()` completa aunque nadie lo escuche (un
+    // single-subscription controller sin listener cuelga el `close`, y eso
+    // colgaría el tearDown de cada test). El test de cableado adjunta su
+    // listener (vía el bloc) antes de emitir, así que broadcast le sirve igual.
+    liveController = StreamController<Message>.broadcast();
+    // Por defecto el stream en vivo no emite: los tests de carga sólo ejercen
+    // HTTP. Los tests de realtime sobreescriben este stub.
+    when(
+      () => repo.live(any()),
+    ).thenAnswer((_) => const Stream<Message>.empty());
+  });
+
+  tearDown(() => liveController.close());
 
   MessagesBloc build() =>
       MessagesBloc(repo: repo, botId: 'b1', chatLid: 'lid-1');
@@ -166,6 +213,101 @@ void main() {
         MessagesLoaded(
           items: <Message>[msg('m4', 400)],
           prevCursor: '300:m3',
+          isLoadingOlder: false,
+        ),
+      ],
+    );
+  });
+
+  group('Realtime (live)', () {
+    // Lógica de _onLive a nivel de handler (sembrando un hilo cargado):
+    // determinista, sin depender del timing de la suscripción.
+
+    blocTest<MessagesBloc, MessagesState>(
+      'agrega una auto-respuesta nueva del chat al final (ASC)',
+      build: build,
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) => b.add(MessagesLiveReceived(outbound('w2', 200))),
+      expect: () => <MessagesState>[
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100), outbound('w2', 200)],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      ],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'dedup por externalId: un mensaje ya presente se ignora',
+      build: build,
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      // Mismo externalId que ya está en el hilo (llegó por HTTP o repetido).
+      act: (b) => b.add(MessagesLiveReceived(msg('m1', 100))),
+      expect: () => const <MessagesState>[],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'un mensaje de otra conversación del mismo bot se ignora',
+      build: build,
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) => b.add(MessagesLiveReceived(otherChat('z9', 200))),
+      expect: () => const <MessagesState>[],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'sin hilo cargado (Initial) un evento en vivo se ignora',
+      build: build,
+      act: (b) => b.add(MessagesLiveReceived(outbound('w2', 200))),
+      expect: () => const <MessagesState>[],
+    );
+
+    // Cableado extremo a extremo: tras cargar la cola, un mensaje emitido por
+    // el stream `repo.live` aparece en el hilo.
+    blocTest<MessagesBloc, MessagesState>(
+      'tras cargar la cola, un mensaje del stream aparece en el hilo',
+      build: () {
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async =>
+              MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: null),
+        );
+        when(() => repo.live('b1')).thenAnswer((_) => liveController.stream);
+        return build();
+      },
+      act: (b) async {
+        b.add(const MessagesLoadRequested());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        liveController.add(outbound('w2', 200));
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => <MessagesState>[
+        const MessagesLoading(),
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100)],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100), outbound('w2', 200)],
+          prevCursor: null,
           isLoadingOlder: false,
         ),
       ],

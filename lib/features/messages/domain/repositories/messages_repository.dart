@@ -1,8 +1,10 @@
+import '../entities/message.dart';
 import '../entities/message_page.dart';
 
-/// Puerto de dominio del hilo de mensajes (S09 RF#5). El bloc pide la cola
-/// (sin cursor) al abrir y tramos más viejos (con `cursor`) al cargar hacia
-/// arriba; la implementación vive en `data/`.
+/// Puerto de dominio del hilo de mensajes (S09 RF#5 + realtime S15). El bloc
+/// pide la cola (sin cursor) al abrir y tramos más viejos (con `cursor`) al
+/// cargar hacia arriba; y se suscribe a `live` para el flujo en vivo. La
+/// implementación vive en `data/`.
 abstract interface class MessagesRepository {
   /// Página del hilo `(botId, chatLid)`. Sin `cursor` ⇒ los mensajes más
   /// recientes; con `cursor` (un `prevCursor` previo) ⇒ el tramo
@@ -16,4 +18,10 @@ abstract interface class MessagesRepository {
     String? cursor,
     int? limit,
   });
+
+  /// Stream de mensajes en vivo del bot (SSE S15: `message.inbound` +
+  /// `message.outbound`). El filtrado por conversación lo hace el consumidor
+  /// (el bloc del hilo abierto). Best-effort: errores de transporte cierran el
+  /// stream sin derribar el hilo HTTP ya cargado.
+  Stream<Message> live(String botId);
 }
