@@ -26,6 +26,12 @@ void main() {
       bool isPinned = false,
       bool isMarkedUnread = false,
       DateTime? mutedUntil,
+      String? displayName,
+      int unreadCount = 0,
+      String? lastMessagePreview,
+      String? lastMessageType,
+      String? lastMessageDirection,
+      int? lastMessageTimestampMs,
     }) => Conversation(
       chatLid: chatLid,
       kind: kind,
@@ -34,6 +40,12 @@ void main() {
       isPinned: isPinned,
       isMarkedUnread: isMarkedUnread,
       mutedUntil: mutedUntil,
+      displayName: displayName,
+      unreadCount: unreadCount,
+      lastMessagePreview: lastMessagePreview,
+      lastMessageType: lastMessageType,
+      lastMessageDirection: lastMessageDirection,
+      lastMessageTimestampMs: lastMessageTimestampMs,
     );
 
     test('iguales con los mismos campos', () {
@@ -41,10 +53,26 @@ void main() {
       expect(make().hashCode, make().hashCode);
     });
 
+    test('iguales incluyendo actividad (preview + no-leídos)', () {
+      expect(
+        make(unreadCount: 3, lastMessagePreview: 'hola', lastMessageType: 'text'),
+        make(unreadCount: 3, lastMessagePreview: 'hola', lastMessageType: 'text'),
+      );
+    });
+
     test('difieren si cambia un campo', () {
       expect(make(), isNot(make(isPinned: true)));
       expect(make(), isNot(make(chatLid: 'lid-2')));
       expect(make(phone: '5215550001'), isNot(make(phone: null)));
+    });
+
+    test('difieren si cambia un campo de actividad', () {
+      expect(make(), isNot(make(unreadCount: 1)));
+      expect(make(), isNot(make(displayName: 'Alice')));
+      expect(make(), isNot(make(lastMessagePreview: 'hey')));
+      expect(make(), isNot(make(lastMessageType: 'image')));
+      expect(make(), isNot(make(lastMessageDirection: 'OUTBOUND')));
+      expect(make(), isNot(make(lastMessageTimestampMs: 1700)));
     });
   });
 }

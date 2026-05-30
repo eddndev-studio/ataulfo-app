@@ -22,9 +22,11 @@ enum ConversationKind {
 /// es otra cosa. Los mappers traducen el DTO del wire (`chat_lid`, etc.) a
 /// esta entidad sin nombres `snake_case`.
 ///
-/// Slice 1 = identidad + app-state. Sin último-mensaje ni no-leídos (no vienen
-/// en el contrato todavía) y sin nombre visible (el backend aún no tiene
-/// columna name; las DM se identifican por `phone`).
+/// Identidad + app-state + **actividad** de la bandeja: nombre visible
+/// (`displayName`), último-mensaje (preview/tipo/dirección/instante) y conteo
+/// de no-leídos. La actividad es opcional: una conversación sin mensajes la
+/// trae vacía (`unreadCount` 0, último-mensaje `null`); el mapper la rellena
+/// desde el wire cuando viene.
 class Conversation {
   const Conversation({
     required this.chatLid,
@@ -34,6 +36,12 @@ class Conversation {
     required this.isPinned,
     required this.isMarkedUnread,
     required this.mutedUntil,
+    this.displayName,
+    this.unreadCount = 0,
+    this.lastMessagePreview,
+    this.lastMessageType,
+    this.lastMessageDirection,
+    this.lastMessageTimestampMs,
   });
 
   final String chatLid;
@@ -51,6 +59,21 @@ class Conversation {
   /// Silenciado hasta este instante; `null` si no está silenciada.
   final DateTime? mutedUntil;
 
+  /// Nombre visible: push-name en DM, subject en grupo. `null` cuando el
+  /// backend aún no lo resolvió ⇒ la UI cae a `phone`/"Grupo".
+  final String? displayName;
+
+  /// Conteo de mensajes entrantes sin leer. Ortogonal a [isMarkedUnread] (ese
+  /// es el flag "marcar como no leído" de WhatsApp; este es el contador real).
+  final int unreadCount;
+
+  /// Último-mensaje de la conversación (proyección de la bandeja). `null`
+  /// cuando la conversación aún no tiene mensajes; los cuatro viajan juntos.
+  final String? lastMessagePreview;
+  final String? lastMessageType;
+  final String? lastMessageDirection;
+  final int? lastMessageTimestampMs;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -61,7 +84,13 @@ class Conversation {
         other.isArchived == isArchived &&
         other.isPinned == isPinned &&
         other.isMarkedUnread == isMarkedUnread &&
-        other.mutedUntil == mutedUntil;
+        other.mutedUntil == mutedUntil &&
+        other.displayName == displayName &&
+        other.unreadCount == unreadCount &&
+        other.lastMessagePreview == lastMessagePreview &&
+        other.lastMessageType == lastMessageType &&
+        other.lastMessageDirection == lastMessageDirection &&
+        other.lastMessageTimestampMs == lastMessageTimestampMs;
   }
 
   @override
@@ -73,5 +102,11 @@ class Conversation {
     isPinned,
     isMarkedUnread,
     mutedUntil,
+    displayName,
+    unreadCount,
+    lastMessagePreview,
+    lastMessageType,
+    lastMessageDirection,
+    lastMessageTimestampMs,
   );
 }

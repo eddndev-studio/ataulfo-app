@@ -36,18 +36,30 @@ void main() {
     String chatLid = 'lid-1',
     String kind = 'DM',
     String? phone = '5215550001',
+    String? displayName,
     bool isArchived = false,
     bool isPinned = false,
     bool isMarkedUnread = false,
     String? mutedUntil,
+    int unreadCount = 0,
+    String? lastMessagePreview,
+    String? lastMessageType,
+    String? lastMessageDirection,
+    int? lastMessageTimestampMs,
   }) => <String, dynamic>{
     'chat_lid': chatLid,
     'kind': kind,
     'phone': ?phone,
+    'display_name': ?displayName,
     'is_archived': isArchived,
     'is_pinned': isPinned,
     'is_marked_unread': isMarkedUnread,
     'muted_until': ?mutedUntil,
+    'unread_count': unreadCount,
+    'last_message_preview': ?lastMessagePreview,
+    'last_message_type': ?lastMessageType,
+    'last_message_direction': ?lastMessageDirection,
+    'last_message_timestamp_ms': ?lastMessageTimestampMs,
   };
 
   group('DioConversationsDatasource.listForBot', () {
@@ -58,8 +70,14 @@ void main() {
           body: <dynamic>[
             convoJson(
               chatLid: 'lid-dm',
+              displayName: 'Alice',
               isArchived: true,
               mutedUntil: '2026-06-01T12:00:00Z',
+              unreadCount: 2,
+              lastMessagePreview: 'nos vemos',
+              lastMessageType: 'text',
+              lastMessageDirection: 'INBOUND',
+              lastMessageTimestampMs: 1700000000000,
             ),
             convoJson(
               chatLid: 'lid-grp',
@@ -78,9 +96,16 @@ void main() {
       expect(convos[0].kind, ConversationKind.dm);
       expect(convos[0].isArchived, isTrue);
       expect(convos[0].mutedUntil, DateTime.utc(2026, 6, 1, 12));
+      // Actividad de bandeja end-to-end (wire → entidad).
+      expect(convos[0].displayName, 'Alice');
+      expect(convos[0].unreadCount, 2);
+      expect(convos[0].lastMessagePreview, 'nos vemos');
+      expect(convos[0].lastMessageTimestampMs, 1700000000000);
       expect(convos[1].kind, ConversationKind.group);
       expect(convos[1].phone, isNull);
       expect(convos[1].isPinned, isTrue);
+      expect(convos[1].unreadCount, 0);
+      expect(convos[1].lastMessagePreview, isNull);
       verify(() => dio.get<List<dynamic>>('/sessions/b1')).called(1);
     });
 

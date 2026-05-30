@@ -143,4 +143,132 @@ void main() {
     await tester.pump();
     verify(() => bloc.add(const ConversationsLoadRequested())).called(1);
   });
+
+  group('bandeja enriquecida (nombre + último-mensaje + no-leídos)', () {
+    Future<void> pumpOne(WidgetTester tester, Conversation c) async {
+      when(() => bloc.state).thenReturn(
+        ConversationsLoaded(items: <Conversation>[c], isRefreshing: false),
+      );
+      await tester.pumpWidget(host());
+    }
+
+    testWidgets('displayName se muestra como título (sobre phone)', (
+      tester,
+    ) async {
+      await pumpOne(
+        tester,
+        const Conversation(
+          chatLid: 'lid-dm',
+          kind: ConversationKind.dm,
+          phone: '5215550001',
+          isArchived: false,
+          isPinned: false,
+          isMarkedUnread: false,
+          mutedUntil: null,
+          displayName: 'Alice',
+        ),
+      );
+      expect(find.text('Alice'), findsOneWidget);
+      expect(find.text('5215550001'), findsNothing);
+    });
+
+    testWidgets('último-mensaje de texto: preview + hora', (tester) async {
+      // Instante fijo; la hora esperada se calcula con la misma fórmula local
+      // del widget para no depender de la zona horaria del runner.
+      const ts = 1700000000000;
+      final dt = DateTime.fromMillisecondsSinceEpoch(ts);
+      final hhmm =
+          '${dt.hour.toString().padLeft(2, '0')}:'
+          '${dt.minute.toString().padLeft(2, '0')}';
+      await pumpOne(
+        tester,
+        const Conversation(
+          chatLid: 'lid-dm',
+          kind: ConversationKind.dm,
+          phone: '5215550001',
+          isArchived: false,
+          isPinned: false,
+          isMarkedUnread: false,
+          mutedUntil: null,
+          lastMessagePreview: 'nos vemos',
+          lastMessageType: 'text',
+          lastMessageDirection: 'INBOUND',
+          lastMessageTimestampMs: ts,
+        ),
+      );
+      expect(find.text('nos vemos'), findsOneWidget);
+      expect(find.text(hhmm), findsOneWidget);
+    });
+
+    testWidgets('último-mensaje no-texto: etiqueta de tipo en vez del preview', (
+      tester,
+    ) async {
+      await pumpOne(
+        tester,
+        const Conversation(
+          chatLid: 'lid-dm',
+          kind: ConversationKind.dm,
+          phone: '5215550001',
+          isArchived: false,
+          isPinned: false,
+          isMarkedUnread: false,
+          mutedUntil: null,
+          lastMessagePreview: '',
+          lastMessageType: 'image',
+          lastMessageDirection: 'INBOUND',
+          lastMessageTimestampMs: 1700000000000,
+        ),
+      );
+      expect(find.text('Imagen'), findsOneWidget);
+    });
+
+    testWidgets('no-leídos: badge verde con el conteo', (tester) async {
+      await pumpOne(
+        tester,
+        const Conversation(
+          chatLid: 'lid-dm',
+          kind: ConversationKind.dm,
+          phone: '5215550001',
+          isArchived: false,
+          isPinned: false,
+          isMarkedUnread: false,
+          mutedUntil: null,
+          lastMessagePreview: 'hola',
+          lastMessageType: 'text',
+          lastMessageDirection: 'INBOUND',
+          lastMessageTimestampMs: 1700000000000,
+          unreadCount: 3,
+        ),
+      );
+      final badge = find.byKey(const Key('conversation.unread.lid-dm'));
+      expect(badge, findsOneWidget);
+      expect(find.descendant(of: badge, matching: find.text('3')), findsOneWidget);
+      final box = tester.widget<Container>(badge);
+      final deco = box.decoration as BoxDecoration;
+      expect(deco.color, AppTokens.chatAccent);
+    });
+
+    testWidgets('sin no-leídos (0) → sin badge', (tester) async {
+      await pumpOne(
+        tester,
+        const Conversation(
+          chatLid: 'lid-dm',
+          kind: ConversationKind.dm,
+          phone: '5215550001',
+          isArchived: false,
+          isPinned: false,
+          isMarkedUnread: false,
+          mutedUntil: null,
+          lastMessagePreview: 'hola',
+          lastMessageType: 'text',
+          lastMessageDirection: 'INBOUND',
+          lastMessageTimestampMs: 1700000000000,
+        ),
+      );
+      expect(
+        find.byKey(const Key('conversation.unread.lid-dm')),
+        findsNothing,
+      );
+    });
+  });
 }
