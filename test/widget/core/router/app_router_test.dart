@@ -23,6 +23,7 @@ import 'package:ataulfo/features/memberships/presentation/pages/memberships_page
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
+import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
@@ -117,6 +118,11 @@ void main() {
     when(
       catalogRepo.fetch,
     ).thenAnswer((_) async => const Catalog(providers: <ProviderEntry>[]));
+    // El hilo de mensajes (S15) se suscribe al stream en vivo tras cargar la
+    // cola; un stream vacío deja terminar el pumpAndSettle sin emitir nada.
+    when(
+      () => messagesRepo.live(any()),
+    ).thenAnswer((_) => const Stream<Message>.empty());
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),

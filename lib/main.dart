@@ -25,6 +25,7 @@ import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/memberships/data/datasources/memberships_datasource.dart';
 import 'features/memberships/data/repositories/memberships_repository_impl.dart';
 import 'features/messages/data/datasources/messages_datasource.dart';
+import 'features/messages/data/datasources/messages_events_datasource.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
 import 'features/templates/data/repositories/templates_repository_impl.dart';
@@ -102,6 +103,7 @@ void main() {
 
   final messagesRepository = MessagesRepositoryImpl(
     datasource: DioMessagesDatasource(mainDio),
+    events: DioMessagesEventsDatasource(mainDio),
   );
 
   final templatesRepository = TemplatesRepositoryImpl(

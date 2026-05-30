@@ -1,15 +1,22 @@
+import '../../domain/entities/message.dart';
 import '../../domain/entities/message_page.dart';
 import '../../domain/repositories/messages_repository.dart';
 import '../datasources/messages_datasource.dart';
+import '../datasources/messages_events_datasource.dart';
 
-/// Implementación trivial del puerto: cada página se trae del backend al vuelo
-/// (sin cache local en esta capa). Cuando aterrice RFC-0001 (cache + sync),
-/// esta clase orquestará verdad local vs. remota; hoy delega.
+/// Implementación trivial del puerto: la cola se trae por HTTP al vuelo y el
+/// flujo en vivo se delega al datasource de eventos (SSE). Sin cache local en
+/// esta capa; cuando aterrice RFC-0001 (cache + sync), esta clase orquestará
+/// verdad local vs. remota. Hoy delega.
 class MessagesRepositoryImpl implements MessagesRepository {
-  MessagesRepositoryImpl({required MessagesDatasource datasource})
-    : _ds = datasource;
+  MessagesRepositoryImpl({
+    required MessagesDatasource datasource,
+    required MessagesEventsDatasource events,
+  }) : _ds = datasource,
+       _events = events;
 
   final MessagesDatasource _ds;
+  final MessagesEventsDatasource _events;
 
   @override
   Future<MessagePage> thread(
@@ -18,4 +25,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
     String? cursor,
     int? limit,
   }) => _ds.thread(botId, chatLid, cursor: cursor, limit: limit);
+
+  @override
+  Stream<Message> live(String botId) => _events.threadEvents(botId);
 }
