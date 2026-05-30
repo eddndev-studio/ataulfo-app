@@ -36,6 +36,10 @@ import '../../features/memberships/presentation/pages/memberships_page.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
 import '../../features/messages/presentation/bloc/messages_bloc.dart';
 import '../../features/messages/presentation/pages/message_thread_page.dart';
+import '../../features/profile/domain/repositories/profile_repository.dart';
+import '../../features/profile/presentation/bloc/profile_bloc.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/profile/presentation/widgets/chat_thread_app_bar.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
@@ -68,6 +72,7 @@ class AppRouter {
     required BotSessionRepository botSessionRepository,
     required ConversationsRepository conversationsRepository,
     required MessagesRepository messagesRepository,
+    required ProfileRepository profileRepository,
     required TemplatesRepository templatesRepository,
     required FlowsRepository flowsRepository,
     required TriggersRepository triggersRepository,
@@ -79,6 +84,7 @@ class AppRouter {
        _botSessionRepo = botSessionRepository,
        _conversationsRepo = conversationsRepository,
        _messagesRepo = messagesRepository,
+       _profileRepo = profileRepository,
        _templatesRepo = templatesRepository,
        _flowsRepo = flowsRepository,
        _triggersRepo = triggersRepository,
@@ -91,6 +97,7 @@ class AppRouter {
   final BotSessionRepository _botSessionRepo;
   final ConversationsRepository _conversationsRepo;
   final MessagesRepository _messagesRepo;
+  final ProfileRepository _profileRepo;
   final TemplatesRepository _templatesRepo;
   final FlowsRepository _flowsRepo;
   final TriggersRepository _triggersRepo;
@@ -241,13 +248,47 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final chatLid = state.pathParameters['chatLid']!;
-          return BlocProvider<MessagesBloc>(
-            create: (_) =>
-                MessagesBloc(repo: _messagesRepo, botId: id, chatLid: chatLid)
-                  ..add(const MessagesLoadRequested()),
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<MessagesBloc>(
+                create: (_) => MessagesBloc(
+                  repo: _messagesRepo,
+                  botId: id,
+                  chatLid: chatLid,
+                )..add(const MessagesLoadRequested()),
+              ),
+              // El perfil alimenta el header (avatar + nombre real) y se
+              // re-monta en la pantalla de perfil; dos cargas hoy, la cache
+              // RFC-0001 las absorberá.
+              BlocProvider<ProfileBloc>(
+                create: (_) =>
+                    ProfileBloc(repo: _profileRepo, botId: id, chatLid: chatLid)
+                      ..add(const ProfileLoadRequested()),
+              ),
+            ],
             child: Scaffold(
-              appBar: AppBar(title: const Text('Conversación')),
+              appBar: ChatThreadAppBar(botId: id, chatLid: chatLid),
               body: const MessageThreadPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // "Revisar perfil" de una conversación. Sub-ruta del hilo con un
+        // segmento `/profile` extra (5 segmentos vs. 4 del hilo) ⇒ no compite
+        // por orden de match. Page-scoped: `ProfileBloc` se construye con
+        // botId+chatLid y dispara el load al montarse.
+        path: '/bots/:id/sessions/:chatLid/profile',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final chatLid = state.pathParameters['chatLid']!;
+          return BlocProvider<ProfileBloc>(
+            create: (_) =>
+                ProfileBloc(repo: _profileRepo, botId: id, chatLid: chatLid)
+                  ..add(const ProfileLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Perfil')),
+              body: const ProfilePage(),
             ),
           );
         },

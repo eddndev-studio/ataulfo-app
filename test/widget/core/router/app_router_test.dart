@@ -25,6 +25,10 @@ import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
 import 'package:ataulfo/features/messages/domain/entities/thread_live_event.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
+import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
+import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
+import 'package:ataulfo/features/profile/presentation/pages/profile_page.dart';
+import 'package:ataulfo/features/profile/presentation/widgets/chat_thread_app_bar.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
@@ -53,6 +57,8 @@ class _MockConversationsRepo extends Mock implements ConversationsRepository {}
 
 class _MockMessagesRepo extends Mock implements MessagesRepository {}
 
+class _MockProfileRepo extends Mock implements ProfileRepository {}
+
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
 class _MockFlowsRepo extends Mock implements FlowsRepository {}
@@ -70,6 +76,18 @@ const _identity = Identity(
   email: 'op@example.com',
 );
 
+const _profile = ChatProfile(
+  chatLid: 'lid-1',
+  isGroup: false,
+  phone: '5215550001',
+  displayName: null,
+  photoUrl: null,
+  isArchived: false,
+  isPinned: false,
+  isMarkedUnread: false,
+  mutedUntil: null,
+);
+
 Widget _host(AppRouter router, AuthBloc authBloc) =>
     BlocProvider<AuthBloc>.value(
       value: authBloc,
@@ -82,6 +100,7 @@ void main() {
   late _MockBotSessionRepo botSessionRepo;
   late _MockConversationsRepo conversationsRepo;
   late _MockMessagesRepo messagesRepo;
+  late _MockProfileRepo profileRepo;
   late _MockTemplatesRepo templatesRepo;
   late _MockFlowsRepo flowsRepo;
   late _MockTriggersRepo triggersRepo;
@@ -95,6 +114,7 @@ void main() {
     botSessionRepo = _MockBotSessionRepo();
     conversationsRepo = _MockConversationsRepo();
     messagesRepo = _MockMessagesRepo();
+    profileRepo = _MockProfileRepo();
     templatesRepo = _MockTemplatesRepo();
     flowsRepo = _MockFlowsRepo();
     triggersRepo = _MockTriggersRepo();
@@ -123,6 +143,11 @@ void main() {
     when(
       () => messagesRepo.live(any()),
     ).thenAnswer((_) => const Stream<ThreadLiveEvent>.empty());
+    // El hilo monta un ProfileBloc que dispara fetch al construirse (alimenta
+    // el header); un perfil terminal deja que pumpAndSettle termine.
+    when(
+      () => profileRepo.fetch(any(), any()),
+    ).thenAnswer((_) async => _profile);
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
@@ -135,6 +160,7 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      profileRepository: profileRepo,
     );
   });
 
@@ -327,6 +353,37 @@ void main() {
     },
   );
 
+  testWidgets('tap en el header del hilo abre la pantalla de perfil', (
+    tester,
+  ) async {
+    // Seam header→perfil: el app bar del hilo (ChatThreadAppBar) es tappable y
+    // empuja la ruta de perfil, que monta ProfilePage. Un typo de path o un
+    // header no-tappable rompería el "revisar perfil" sin que los widget tests
+    // aislados lo noten.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+    when(
+      () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
+    ).thenAnswer(
+      (_) async => const MessagePage(messages: <Message>[], prevCursor: null),
+    );
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/bots/b1/sessions/lid-1');
+    await tester.pumpAndSettle();
+    expect(find.byType(ChatThreadAppBar), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(ChatThreadAppBar),
+        matching: find.byType(InkWell),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProfilePage), findsOneWidget);
+  });
+
   testWidgets('AuthUnauthenticated + ruta protegida cualquiera → /login', (
     tester,
   ) async {
@@ -346,6 +403,7 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      profileRepository: profileRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -427,6 +485,7 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      profileRepository: profileRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -454,6 +513,7 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      profileRepository: profileRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -517,6 +577,7 @@ void main() {
         triggersRepository: triggersRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
+        profileRepository: profileRepo,
       );
 
       await tester.pumpWidget(_host(router, authBloc));
@@ -582,6 +643,7 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      profileRepository: profileRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -663,6 +725,7 @@ void main() {
         triggersRepository: triggersRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
+        profileRepository: profileRepo,
       );
 
       await tester.pumpWidget(_host(router, authBloc));
@@ -691,6 +754,7 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      profileRepository: profileRepo,
     );
 
     await tester.pumpWidget(_host(router, authBloc));
