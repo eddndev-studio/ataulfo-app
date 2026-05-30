@@ -49,6 +49,33 @@ enum MessageStatus {
       _ => throw ArgumentError.value(raw, 'MessageStatus.fromWire'),
     };
   }
+
+  /// Posición en la cadena monótona SENT < DELIVERED < READ. FAILED queda
+  /// fuera de la cadena (se trata aparte en `transition`).
+  int get _rank => switch (this) {
+    MessageStatus.sent => 1,
+    MessageStatus.delivered => 2,
+    MessageStatus.read => 3,
+    MessageStatus.failed => 0,
+  };
+
+  /// Aplica la monotonía de receipts sobre el estado actual (`current`, que
+  /// puede ser `null` si un OUTBOUND llegó en vivo aún sin estado). Devuelve el
+  /// estado resultante si la transición es real, o `null` si es no-op
+  /// (retroceso, igual o stale). Espeja la máquina del backend:
+  ///
+  ///   - sin estado previo (`null`) ⇒ cualquier estado es progreso.
+  ///   - cadena SENT→DELIVERED→READ: sólo avanza.
+  ///   - FAILED sólo se entra desde SENT; un FAILED tras DELIVERED/READ es stale.
+  ///   - FAILED es terminal: desde FAILED no sale nada.
+  static MessageStatus? transition(MessageStatus? current, MessageStatus incoming) {
+    if (current == null) return incoming;
+    if (current == MessageStatus.failed) return null;
+    if (incoming == MessageStatus.failed) {
+      return current == MessageStatus.sent ? MessageStatus.failed : null;
+    }
+    return incoming._rank > current._rank ? incoming : null;
+  }
 }
 
 /// Un mensaje del historial de una conversación (S09 `GET
@@ -96,6 +123,23 @@ class Message {
 
   /// Estado de entrega (OUTBOUND). `null` en INBOUND.
   final MessageStatus? status;
+
+  /// Copia con el estado de entrega actualizado; el resto de campos intactos.
+  /// La inmutabilidad la garantiza devolver una instancia nueva: el realtime de
+  /// receipts (`message.status`) reemplaza el mensaje en la lista, no lo muta.
+  Message withStatus(MessageStatus status) => Message(
+    externalId: externalId,
+    chatLid: chatLid,
+    senderLid: senderLid,
+    kind: kind,
+    direction: direction,
+    type: type,
+    content: content,
+    mediaRef: mediaRef,
+    quotedId: quotedId,
+    timestampMs: timestampMs,
+    status: status,
+  );
 
   @override
   bool operator ==(Object other) {
