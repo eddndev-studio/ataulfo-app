@@ -1,5 +1,5 @@
-import '../../domain/entities/message.dart';
 import '../../domain/entities/message_page.dart';
+import '../../domain/entities/thread_live_event.dart';
 import '../../domain/repositories/messages_repository.dart';
 import '../datasources/messages_datasource.dart';
 import '../datasources/messages_events_datasource.dart';
@@ -27,5 +27,5 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }) => _ds.thread(botId, chatLid, cursor: cursor, limit: limit);
 
   @override
-  Stream<Message> live(String botId) => _events.threadEvents(botId);
+  Stream<ThreadLiveEvent> live(String botId) => _events.threadEvents(botId);
 }

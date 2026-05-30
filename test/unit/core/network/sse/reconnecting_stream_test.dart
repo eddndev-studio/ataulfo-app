@@ -123,6 +123,36 @@ void main() {
     await sub.cancel();
   });
 
+  test('emite reconnectMarker en cada reconexión, nunca en el primer connect', () async {
+    final controllers = <StreamController<int>>[];
+    final bk = recordingBackoff();
+
+    final stream = reconnectingStream<int>(
+      () {
+        final c = StreamController<int>();
+        controllers.add(c);
+        return c.stream;
+      },
+      backoff: bk.fn,
+      reconnectMarker: () => -1, // valor distinguible de los mensajes
+    );
+
+    final got = <int>[];
+    final sub = stream.listen(got.add);
+    await Future<void>.delayed(Duration.zero);
+
+    controllers[0].add(1); // primer connect: SIN marcador antes
+    await Future<void>.delayed(Duration.zero);
+    await controllers[0].close(); // cae → reconecta
+    await Future<void>.delayed(Duration.zero);
+    controllers[1].add(2); // segundo connect: marcador ANTES de los eventos
+    await Future<void>.delayed(Duration.zero);
+
+    expect(got, <int>[1, -1, 2],
+        reason: 'el marcador (-1) aparece sólo al reconectar, no en el primer connect');
+    await sub.cancel();
+  });
+
   test('al cancelar mientras está conectado NO vuelve a conectar', () async {
     var calls = 0;
     final controllers = <StreamController<int>>[];

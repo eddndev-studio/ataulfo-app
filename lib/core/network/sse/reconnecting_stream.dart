@@ -26,16 +26,20 @@ Future<void> expoBackoff(int attempt) {
 /// desmonta sin quedar suspendido.
 ///
 /// HUECO CONOCIDO: la reconexión reanuda la entrega EN VIVO; no rellena los
-/// eventos emitidos durante el corte (el productor no reproduce historia). La
-/// verdad autoritativa vive en el fetch HTTP; un refresh recupera el hueco.
+/// eventos emitidos durante el corte (el productor no reproduce historia). Para
+/// cerrarlo, [reconnectMarker]: si se da, su valor se emite al stream cada vez
+/// que se REESTABLECE una conexión (no en la primera), como señal para que el
+/// consumidor reconcilie contra la verdad autoritativa (p. ej. un fetch HTTP).
 Stream<T> reconnectingStream<T>(
   Stream<T> Function() connect, {
   Future<void> Function(int attempt) backoff = expoBackoff,
+  T Function()? reconnectMarker,
 }) {
   late StreamController<T> controller;
   StreamSubscription<T>? inner;
   Completer<void>? connectionClosed;
   var cancelled = false;
+  var firstConnect = true;
   var attempt = 0;
 
   // Libera el await de la conexión en curso —al cerrarse, fallar, o al cancelar
@@ -62,6 +66,10 @@ Stream<T> reconnectingStream<T>(
         cancelOnError: true,
       );
       if (cancelled) break;
+      if (!firstConnect && reconnectMarker != null) {
+        controller.add(reconnectMarker());
+      }
+      firstConnect = false;
       await closed.future;
       await inner?.cancel();
       inner = null;

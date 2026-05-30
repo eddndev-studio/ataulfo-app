@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/message.dart';
+import '../../domain/entities/thread_live_event.dart';
 import '../../domain/failures/messages_failure.dart';
 import '../../domain/repositories/messages_repository.dart';
 
@@ -33,13 +34,19 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     on<MessagesLoadRequested>(_onLoad);
     on<MessagesOlderRequested>(_onOlder);
     on<MessagesLiveReceived>(_onLive);
+    on<MessagesReconnected>(_onReconnected);
   }
 
   final MessagesRepository _repo;
   final String _botId;
   final String _chatLid;
 
-  StreamSubscription<Message>? _liveSub;
+  StreamSubscription<ThreadLiveEvent>? _liveSub;
+
+  /// Evita refetchs solapados cuando llegan varias reconexiones seguidas
+  /// (flapping): si ya hay uno en vuelo, las demás se ignoran (el dedup las
+  /// haría inocuas, pero ahorramos las llamadas HTTP).
+  bool _refetching = false;
 
   Future<void> _onLoad(
     MessagesLoadRequested event,
@@ -72,7 +79,14 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     _liveSub = _repo
         .live(_botId)
         .listen(
-          (m) => add(MessagesLiveReceived(m)),
+          (e) {
+            switch (e) {
+              case LiveMessage(:final message):
+                add(MessagesLiveReceived(message));
+              case LiveReconnected():
+                add(const MessagesReconnected());
+            }
+          },
           // Realtime caído NO derriba el hilo: el state HTTP sigue válido.
           onError: (Object _) {},
         );
@@ -102,6 +116,54 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         isLoadingOlder: current.isLoadingOlder,
       ),
     );
+  }
+
+  /// Tras reconectar el stream en vivo, reconcilia contra la verdad HTTP: el SSE
+  /// no reproduce los mensajes emitidos durante el corte, así que refetcha la
+  /// cola y funde lo nuevo. Merge robusto: unión por `externalId` (lo ya pintado
+  /// gana) y reordenado por `(timestampMs, externalId)`, de modo que un mensaje
+  /// del hueco cae en su sitio cronológico aunque ya haya entrado algo más nuevo
+  /// en vivo. Best-effort: si el refetch falla, el hilo en vivo se conserva.
+  Future<void> _onReconnected(
+    MessagesReconnected event,
+    Emitter<MessagesState> emit,
+  ) async {
+    if (state is! MessagesLoaded || _refetching) {
+      return;
+    }
+    _refetching = true;
+    try {
+      final page = await _repo.thread(_botId, _chatLid);
+      final current = state;
+      if (current is! MessagesLoaded) {
+        return;
+      }
+      final byId = <String, Message>{
+        for (final m in current.items) m.externalId: m,
+      };
+      for (final m in page.messages) {
+        byId.putIfAbsent(m.externalId, () => m);
+      }
+      if (byId.length == current.items.length) {
+        return; // nada nuevo del hueco: evita re-emitir un estado equivalente
+      }
+      final merged = byId.values.toList()
+        ..sort((a, b) {
+          final byTime = a.timestampMs.compareTo(b.timestampMs);
+          return byTime != 0 ? byTime : a.externalId.compareTo(b.externalId);
+        });
+      emit(
+        MessagesLoaded(
+          items: merged,
+          prevCursor: current.prevCursor,
+          isLoadingOlder: current.isLoadingOlder,
+        ),
+      );
+    } on MessagesFailure {
+      // Refetch best-effort: una reconexión sin red no debe derribar el hilo.
+    } finally {
+      _refetching = false;
+    }
   }
 
   @override
@@ -195,6 +257,16 @@ class MessagesLiveReceived extends MessagesEvent {
       other is MessagesLiveReceived && other.message == message;
   @override
   int get hashCode => message.hashCode;
+}
+
+/// El stream en vivo se reconectó tras un corte (S15). Dispara una reconciliación
+/// contra la verdad HTTP para recuperar los mensajes que el SSE no reprodujo.
+class MessagesReconnected extends MessagesEvent {
+  const MessagesReconnected();
+  @override
+  bool operator ==(Object other) => other is MessagesReconnected;
+  @override
+  int get hashCode => (MessagesReconnected).hashCode;
 }
 
 // States --------------------------------------------------------------------
