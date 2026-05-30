@@ -151,11 +151,12 @@ class _FailedView extends StatelessWidget {
   }
 }
 
-/// Fila de una conversación. Sin nombre visible aún (el backend no expone
-/// columna name, S07 RF6): la DM se identifica por su `phone`, el grupo por
-/// la etiqueta "Grupo" + su chatLID. Las pills verbalizan el app-state
-/// relevante (no leído / fijado / archivado); silenciado no se muestra como
-/// pill por no saturar (vive en `mutedUntil`, lo usará una rebanada futura).
+/// Fila de una conversación, estilo bandeja de WhatsApp: nombre visible
+/// (`displayName`; cae a `phone` en DM o "Grupo"), línea de último-mensaje
+/// (preview de texto o etiqueta de tipo para media) con su hora, y un badge
+/// verde con el conteo de no-leídos. Las pills verbalizan el app-state
+/// (no leído / fijado / archivado); silenciado no se muestra (vive en
+/// `mutedUntil`, lo usará una rebanada futura).
 class _ConversationTile extends StatelessWidget {
   const _ConversationTile({required this.conversation});
 
@@ -166,8 +167,14 @@ class _ConversationTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final c = conversation;
     final isGroup = c.kind == ConversationKind.group;
-    final title = isGroup ? 'Grupo' : (c.phone ?? c.chatLid);
-    final subtitle = isGroup ? c.chatLid : null;
+    final title = c.displayName ?? (isGroup ? 'Grupo' : (c.phone ?? c.chatLid));
+    final hasLast = c.lastMessageTimestampMs != null;
+    final secondary = hasLast
+        ? _previewLabel(c.lastMessageType, c.lastMessagePreview)
+        : (isGroup ? c.chatLid : null);
+    final hasUnread = c.unreadCount > 0;
+    final showSecondaryRow =
+        (secondary != null && secondary.isNotEmpty) || hasUnread;
 
     final pills = <Widget>[
       if (c.isMarkedUnread) const AppPill.primary(label: 'No leído'),
@@ -181,6 +188,7 @@ class _ConversationTile extends StatelessWidget {
         '/sessions/${Uri.encodeComponent(c.chatLid)}',
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           AppAvatar(name: title),
           const SizedBox(width: AppTokens.sp4),
@@ -189,31 +197,122 @@ class _ConversationTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Text(title, style: textTheme.titleMedium),
-                if (subtitle != null) ...<Widget>[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.text2,
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleMedium,
+                      ),
                     ),
+                    if (hasLast) ...<Widget>[
+                      const SizedBox(width: AppTokens.sp2),
+                      Text(
+                        _hhmm(c.lastMessageTimestampMs!),
+                        style: textTheme.labelSmall?.copyWith(
+                          // La hora se tiñe del verde de sección cuando hay
+                          // no-leídos: el acento "ligero" que la bandeja comparte
+                          // con el tick de leído del hilo.
+                          color: hasUnread ? AppTokens.chatAccent : AppTokens.text2,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (showSecondaryRow) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          secondary ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: AppTokens.text2,
+                          ),
+                        ),
+                      ),
+                      if (hasUnread) ...<Widget>[
+                        const SizedBox(width: AppTokens.sp2),
+                        _UnreadBadge(count: c.unreadCount, chatLid: c.chatLid),
+                      ],
+                    ],
+                  ),
+                ],
+                if (pills.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: AppTokens.sp2),
+                  Wrap(
+                    spacing: AppTokens.sp2,
+                    runSpacing: AppTokens.sp2,
+                    children: pills,
                   ),
                 ],
               ],
             ),
           ),
-          if (pills.isNotEmpty) ...<Widget>[
-            const SizedBox(width: AppTokens.sp3),
-            Wrap(
-              spacing: AppTokens.sp2,
-              runSpacing: AppTokens.sp2,
-              children: pills,
-            ),
-          ],
         ],
       ),
     );
   }
+}
+
+/// Badge circular con el conteo de no-leídos, en el verde de sección. Texto
+/// oscuro ([AppTokens.onPrimary]) para contraste sobre el verde brillante.
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count, required this.chatLid});
+
+  final int count;
+  final String chatLid;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: Key('conversation.unread.$chatLid'),
+      constraints: const BoxConstraints(minWidth: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: const BoxDecoration(
+        color: AppTokens.chatAccent,
+        borderRadius: BorderRadius.all(Radius.circular(AppTokens.radiusPill)),
+      ),
+      child: Text(
+        '$count',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: AppTokens.onPrimary,
+          fontSize: AppTokens.captionSize,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// Texto de la línea de último-mensaje: el preview tal cual si es texto; una
+/// etiqueta legible del tipo si es media (no hay preview útil que mostrar). El
+/// backend ya excluye las reacciones de la actividad, así que `reaction` no
+/// llega aquí; un tipo no catalogado cae a `[tipo]` como en el hilo.
+String _previewLabel(String? type, String? preview) {
+  if (type == null || type == 'text') return preview ?? '';
+  return switch (type) {
+    'image' => 'Imagen',
+    'video' => 'Video',
+    'audio' || 'ptt' => 'Audio',
+    'document' => 'Documento',
+    'sticker' => 'Sticker',
+    'location' => 'Ubicación',
+    'contact' || 'vcard' => 'Contacto',
+    _ => '[$type]',
+  };
+}
+
+/// Hora local HH:mm del epoch en ms para la línea de último-mensaje. Formateo
+/// manual para no arrastrar `intl` por una hora; la bandeja no muestra fecha.
+String _hhmm(int timestampMs) {
+  final dt = DateTime.fromMillisecondsSinceEpoch(timestampMs);
+  final hh = dt.hour.toString().padLeft(2, '0');
+  final mm = dt.minute.toString().padLeft(2, '0');
+  return '$hh:$mm';
 }
