@@ -15,8 +15,9 @@ import '../bloc/messages_bloc.dart';
 /// los aporta la ruta.
 ///
 /// Abre en la cola (mensajes recientes, abajo) y carga hacia arriba al hacer
-/// scroll al tope. Slice 1: sólo lectura (enviar es rebanada posterior); los
-/// tipos no-texto se pintan como placeholder (la media no se descarga aún).
+/// scroll al tope. Sólo lectura (enviar es rebanada posterior). La media se
+/// renderiza por tipo: imagen/sticker desde la URL firmada, el resto como
+/// tarjeta de tipo.
 class MessageThreadPage extends StatelessWidget {
   const MessageThreadPage({super.key});
 
@@ -197,9 +198,9 @@ class _ThreadView extends StatelessWidget {
 }
 
 /// Burbuja de un mensaje. INBOUND a la izquierda (`surface2`), OUTBOUND a la
-/// derecha (`surface3`). En grupos, el INBOUND muestra el autor (`senderLid`,
-/// no hay nombre aún). Tipos no-texto → placeholder `[tipo]` (la media no se
-/// descarga en este slice). El OUTBOUND muestra su estado de entrega.
+/// derecha (`surface3`). En grupos, el INBOUND muestra el autor (`senderLid`).
+/// El texto se pinta directo; la media va por `_MediaContent`. El OUTBOUND
+/// muestra su estado de entrega; las reacciones cuelgan bajo la burbuja.
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message, this.quoted, this.reactions});
 
@@ -221,7 +222,6 @@ class _MessageBubble extends StatelessWidget {
     final isOutbound = m.direction == MessageDirection.outbound;
     final isGroupInbound = m.kind == MessageKind.group && !isOutbound;
     final isText = m.type == 'text';
-    final body = isText ? m.content : '[${m.type}]';
 
     final caption = textTheme.bodyMedium?.copyWith(
       color: AppTokens.text2,
@@ -271,15 +271,10 @@ class _MessageBubble extends StatelessWidget {
                       _QuotedPreview(parentId: m.externalId, quoted: quoted),
                       const SizedBox(height: AppTokens.sp1),
                     ],
-                    Text(
-                      body,
-                      style: isText
-                          ? textTheme.bodyLarge
-                          : textTheme.bodyLarge?.copyWith(
-                              fontStyle: FontStyle.italic,
-                              color: AppTokens.text2,
-                            ),
-                    ),
+                    if (isText)
+                      Text(m.content, style: textTheme.bodyLarge)
+                    else
+                      _MediaContent(message: m),
                     const SizedBox(height: AppTokens.sp1),
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -304,6 +299,125 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Contenido de un mensaje no-texto. Imagen/sticker se cargan con la URL
+/// firmada (`mediaUrl`); el resto (video/audio/documento) se muestra como una
+/// tarjeta de tipo (ícono + etiqueta). v1: no se reproduce video ni audio inline
+/// (sin dependencia de player); la tarjeta deja claro el tipo. Si la media trae
+/// caption (`content`), se pinta debajo.
+class _MediaContent extends StatelessWidget {
+  const _MediaContent({required this.message});
+
+  final Message message;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final m = message;
+    final media = switch (m.type) {
+      'image' => _mediaImage(context, m.mediaUrl, sticker: false),
+      'sticker' => _mediaImage(context, m.mediaUrl, sticker: true),
+      'video' => _mediaTypedCard(context, Icons.videocam_outlined, 'Video'),
+      'audio' ||
+      'ptt' => _mediaTypedCard(context, Icons.mic_none_outlined, 'Audio'),
+      'document' => _mediaTypedCard(
+        context,
+        Icons.description_outlined,
+        'Documento',
+      ),
+      _ => Text(
+        '[${m.type}]',
+        style: textTheme.bodyLarge?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: AppTokens.text2,
+        ),
+      ),
+    };
+    if (m.content.isEmpty) {
+      return media;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        media,
+        const SizedBox(height: AppTokens.sp1),
+        Text(m.content, style: textTheme.bodyLarge),
+      ],
+    );
+  }
+}
+
+/// Miniatura de imagen/sticker desde la URL firmada, con estados de carga y
+/// error (R2 caído ⇒ el error es lo que se ve). Sin URL ⇒ tarjeta de tipo.
+Widget _mediaImage(BuildContext context, String? url, {required bool sticker}) {
+  if (url == null) {
+    return _mediaTypedCard(
+      context,
+      sticker ? Icons.emoji_emotions_outlined : Icons.image_outlined,
+      sticker ? 'Sticker' : 'Imagen',
+    );
+  }
+  final side = sticker ? 120.0 : 220.0;
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+    child: Image.network(
+      url,
+      width: side,
+      height: side,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return SizedBox(
+          width: side,
+          height: side,
+          child: const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+              ),
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stack) => _mediaTypedCard(
+        context,
+        Icons.broken_image_outlined,
+        sticker ? 'Sticker no disponible' : 'Imagen no disponible',
+      ),
+    ),
+  );
+}
+
+/// Tarjeta de tipo para media no-imagen (o imagen sin URL/caída): ícono en el
+/// verde de sección + etiqueta legible del tipo.
+Widget _mediaTypedCard(BuildContext context, IconData icon, String label) {
+  final textTheme = Theme.of(context).textTheme;
+  return Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppTokens.sp3,
+      vertical: AppTokens.sp2,
+    ),
+    decoration: BoxDecoration(
+      color: AppTokens.bgBase.withValues(alpha: 0.25),
+      borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(icon, size: 20, color: AppTokens.chatAccent),
+        const SizedBox(width: AppTokens.sp2),
+        Text(
+          label,
+          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Fila de pills de reacción bajo la burbuja: un chip por emoji con su conteo
