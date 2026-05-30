@@ -21,6 +21,7 @@ Message msg({
   String senderLid = 'alice',
   String type = 'text',
   String content = 'hola',
+  String? quotedId,
   MessageStatus? status,
   int ts = 1700,
 }) => Message(
@@ -32,7 +33,7 @@ Message msg({
   type: type,
   content: content,
   mediaRef: null,
-  quotedId: null,
+  quotedId: quotedId,
   timestampMs: ts,
   status: status,
 );
@@ -178,6 +179,80 @@ void main() {
     );
     await tester.pumpWidget(host());
     expect(find.text('bob'), findsOneWidget);
+  });
+
+  group('respuestas citadas (quoted replies)', () {
+    testWidgets('reply resuelto muestra el bloque de cita con el preview', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(externalId: 'orig', senderLid: 'bob', content: 'el original'),
+            msg(
+              externalId: 'reply',
+              direction: MessageDirection.outbound,
+              content: 'mi respuesta',
+              quotedId: 'orig',
+              ts: 1800,
+            ),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      final quote = find.byKey(const Key('message.quoted.reply'));
+      expect(quote, findsOneWidget);
+      // El preview del citado vive DENTRO del bloque de cita de 'reply'.
+      expect(
+        find.descendant(of: quote, matching: find.text('el original')),
+        findsOneWidget,
+      );
+      // La barra de la cita usa el verde de sección.
+      final bar = tester.widget<Container>(
+        find.byKey(const Key('message.quoted.reply.bar')),
+      );
+      expect(bar.color, AppTokens.chatAccent);
+    });
+
+    testWidgets('reply con citado fuera de ventana → fallback', (tester) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(externalId: 'reply', content: 'respondo', quotedId: 'ausente'),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      final quote = find.byKey(const Key('message.quoted.reply'));
+      expect(quote, findsOneWidget);
+      expect(
+        find.descendant(
+          of: quote,
+          matching: find.text('Mensaje original no disponible'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('mensaje sin quotedId no muestra bloque de cita', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[msg(externalId: 'plain')],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('message.quoted.plain')), findsNothing);
+    });
   });
 
   testWidgets('tipo no-texto se pinta como placeholder [tipo]', (tester) async {

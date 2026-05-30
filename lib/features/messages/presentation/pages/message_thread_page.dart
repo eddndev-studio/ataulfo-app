@@ -142,6 +142,10 @@ class _ThreadView extends StatelessWidget {
     // items viene ASC (más viejo→más nuevo); invertimos para que el índice 0
     // (más nuevo) quede al fondo con reverse:true.
     final newestFirst = items.reversed.toList(growable: false);
+    // Índice por externalId para resolver las citas (reply→mensaje citado)
+    // contra la ventana cargada. Un citado fuera de la ventana queda sin
+    // resolver (la burbuja muestra el fallback).
+    final byId = <String, Message>{for (final m in items) m.externalId: m};
     return NotificationListener<ScrollNotification>(
       onNotification: (n) => _onScroll(context, n),
       child: ListView.builder(
@@ -175,7 +179,11 @@ class _ThreadView extends StatelessWidget {
               ),
             );
           }
-          return _MessageBubble(message: newestFirst[i]);
+          final m = newestFirst[i];
+          return _MessageBubble(
+            message: m,
+            quoted: m.quotedId == null ? null : byId[m.quotedId],
+          );
         },
       ),
     );
@@ -187,9 +195,14 @@ class _ThreadView extends StatelessWidget {
 /// no hay nombre aún). Tipos no-texto → placeholder `[tipo]` (la media no se
 /// descarga en este slice). El OUTBOUND muestra su estado de entrega.
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({required this.message, this.quoted});
 
   final Message message;
+
+  /// El mensaje citado por `message.quotedId`, ya resuelto contra la ventana
+  /// cargada; `null` si `message` no es reply o si el citado quedó fuera de la
+  /// ventana (la cita muestra entonces su fallback).
+  final Message? quoted;
 
   @override
   Widget build(BuildContext context) {
@@ -238,6 +251,10 @@ class _MessageBubble extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                 ],
+                if (m.quotedId != null) ...<Widget>[
+                  _QuotedPreview(parentId: m.externalId, quoted: quoted),
+                  const SizedBox(height: AppTokens.sp1),
+                ],
                 Text(
                   body,
                   style: isText
@@ -261,6 +278,83 @@ class _MessageBubble extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bloque de cita estilo WhatsApp dentro de una burbuja reply: barra izquierda
+/// en el verde de sección + autor y preview del mensaje citado. Si el citado no
+/// está en la ventana cargada (`quoted == null`) cae a un fallback neutro — la
+/// cita igual se dibuja para que el reply no quede huérfano.
+class _QuotedPreview extends StatelessWidget {
+  const _QuotedPreview({required this.parentId, required this.quoted});
+
+  /// `externalId` del mensaje que contiene esta cita (para el `Key`).
+  final String parentId;
+  final Message? quoted;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final q = quoted;
+    final author = q == null
+        ? null
+        : (q.direction == MessageDirection.outbound ? 'Tú' : q.senderLid);
+    final preview = q == null
+        ? 'Mensaje original no disponible'
+        : (q.type == 'text' ? q.content : '[${q.type}]');
+
+    return Container(
+      key: Key('message.quoted.$parentId'),
+      decoration: BoxDecoration(
+        color: AppTokens.bgBase.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Container(
+              key: Key('message.quoted.$parentId.bar'),
+              width: 3,
+              color: AppTokens.chatAccent,
+            ),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTokens.sp2,
+                  vertical: AppTokens.sp1,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    if (author != null)
+                      Text(
+                        author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: AppTokens.chatAccent,
+                        ),
+                      ),
+                    Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.text2,
+                        fontStyle: q == null ? FontStyle.italic : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
