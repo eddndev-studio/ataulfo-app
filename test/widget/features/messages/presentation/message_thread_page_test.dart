@@ -255,6 +255,50 @@ void main() {
     });
   });
 
+  group('reacciones (agregación en cliente)', () {
+    testWidgets('la reacción se dobla sobre el target y no es una burbuja', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(externalId: 'm1', content: 'qué buena foto'),
+            msg(
+              externalId: 'r1',
+              type: 'reaction',
+              content: '👍',
+              quotedId: 'm1',
+              ts: 1900,
+            ),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      // El target conserva su burbuja; la reacción NO tiene burbuja propia.
+      expect(find.byKey(const Key('message.m1')), findsOneWidget);
+      expect(find.byKey(const Key('message.r1')), findsNothing);
+      // La reacción se muestra como pill sobre el target.
+      final pills = find.byKey(const Key('message.reactions.m1'));
+      expect(pills, findsOneWidget);
+      expect(find.descendant(of: pills, matching: find.text('👍')), findsOneWidget);
+    });
+
+    testWidgets('mensaje sin reacciones no muestra pills', (tester) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[msg(externalId: 'm1')],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('message.reactions.m1')), findsNothing);
+    });
+  });
+
   testWidgets('tipo no-texto se pinta como placeholder [tipo]', (tester) async {
     when(() => bloc.state).thenReturn(
       MessagesLoaded(
