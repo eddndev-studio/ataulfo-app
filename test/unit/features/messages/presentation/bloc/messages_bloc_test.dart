@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
+import 'package:ataulfo/features/messages/domain/entities/thread_live_event.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
@@ -57,7 +58,7 @@ Message otherChat(String ext, int ts) => Message(
 
 void main() {
   late _MockRepo repo;
-  late StreamController<Message> liveController;
+  late StreamController<ThreadLiveEvent> liveController;
 
   setUp(() {
     repo = _MockRepo();
@@ -65,12 +66,12 @@ void main() {
     // single-subscription controller sin listener cuelga el `close`, y eso
     // colgaría el tearDown de cada test). El test de cableado adjunta su
     // listener (vía el bloc) antes de emitir, así que broadcast le sirve igual.
-    liveController = StreamController<Message>.broadcast();
+    liveController = StreamController<ThreadLiveEvent>.broadcast();
     // Por defecto el stream en vivo no emite: los tests de carga sólo ejercen
     // HTTP. Los tests de realtime sobreescriben este stub.
     when(
       () => repo.live(any()),
-    ).thenAnswer((_) => const Stream<Message>.empty());
+    ).thenAnswer((_) => const Stream<ThreadLiveEvent>.empty());
   });
 
   tearDown(() => liveController.close());
@@ -295,7 +296,7 @@ void main() {
       act: (b) async {
         b.add(const MessagesLoadRequested());
         await Future<void>.delayed(const Duration(milliseconds: 20));
-        liveController.add(outbound('w2', 200));
+        liveController.add(LiveMessage(outbound('w2', 200)));
         await Future<void>.delayed(const Duration(milliseconds: 20));
       },
       expect: () => <MessagesState>[
@@ -308,6 +309,55 @@ void main() {
         MessagesLoaded(
           items: <Message>[msg('m1', 100), outbound('w2', 200)],
           prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      ],
+    );
+
+    // Refetch-on-reconnect: al reconectar el stream, el bloc reconcilia contra
+    // HTTP y funde el mensaje que se perdió durante el corte —ordenado por
+    // timestamp, sin duplicar lo ya pintado.
+    blocTest<MessagesBloc, MessagesState>(
+      'al reconectar, refetcha la cola y funde el mensaje perdido en el corte',
+      build: () {
+        var call = 0;
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer((_) async {
+          call++;
+          // 1ª carga: sólo m1. Refetch tras reconectar: m1 + el m2 del hueco.
+          return call == 1
+              ? MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: 'cur')
+              : MessagePage(
+                  messages: <Message>[msg('m1', 100), msg('m2', 150)],
+                  prevCursor: 'cur',
+                );
+        });
+        when(() => repo.live('b1')).thenAnswer((_) => liveController.stream);
+        return build();
+      },
+      act: (b) async {
+        b.add(const MessagesLoadRequested());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        liveController.add(const LiveReconnected());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => <MessagesState>[
+        const MessagesLoading(),
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100)],
+          prevCursor: 'cur',
+          isLoadingOlder: false,
+        ),
+        // El refetch funde m2 (perdido en el corte) conservando prevCursor.
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100), msg('m2', 150)],
+          prevCursor: 'cur',
           isLoadingOlder: false,
         ),
       ],
