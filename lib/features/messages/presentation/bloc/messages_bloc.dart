@@ -34,6 +34,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     on<MessagesLoadRequested>(_onLoad);
     on<MessagesOlderRequested>(_onOlder);
     on<MessagesLiveReceived>(_onLive);
+    on<MessagesStatusReceived>(_onStatus);
     on<MessagesReconnected>(_onReconnected);
   }
 
@@ -83,6 +84,13 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
             switch (e) {
               case LiveMessage(:final message):
                 add(MessagesLiveReceived(message));
+              case LiveStatus(:final externalId, :final status):
+                add(
+                  MessagesStatusReceived(
+                    externalId: externalId,
+                    status: status,
+                  ),
+                );
               case LiveReconnected():
                 add(const MessagesReconnected());
             }
@@ -118,12 +126,53 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     );
   }
 
+  /// Aplica un receipt en vivo (`message.status`): localiza el OUTBOUND por
+  /// `externalId` (único global ⇒ no hace falta `chatLid`) y avanza su estado de
+  /// entrega. La monotonía la decide `MessageStatus.transition` (sólo avanza;
+  /// retroceso/igual/stale = no-op). Un receipt de un mensaje que no está en el
+  /// hilo abierto se ignora.
+  void _onStatus(MessagesStatusReceived event, Emitter<MessagesState> emit) {
+    final current = state;
+    if (current is! MessagesLoaded) {
+      return;
+    }
+    final i = current.items.indexWhere((m) => m.externalId == event.externalId);
+    if (i < 0) {
+      return;
+    }
+    final advanced = MessageStatus.transition(
+      current.items[i].status,
+      event.status,
+    );
+    if (advanced == null) {
+      return; // no-op: el estado no avanza
+    }
+    final items = List<Message>.of(current.items);
+    items[i] = items[i].withStatus(advanced);
+    emit(
+      MessagesLoaded(
+        items: items,
+        prevCursor: current.prevCursor,
+        isLoadingOlder: current.isLoadingOlder,
+      ),
+    );
+  }
+
   /// Tras reconectar el stream en vivo, reconcilia contra la verdad HTTP: el SSE
-  /// no reproduce los mensajes emitidos durante el corte, así que refetcha la
-  /// cola y funde lo nuevo. Merge robusto: unión por `externalId` (lo ya pintado
-  /// gana) y reordenado por `(timestampMs, externalId)`, de modo que un mensaje
-  /// del hueco cae en su sitio cronológico aunque ya haya entrado algo más nuevo
-  /// en vivo. Best-effort: si el refetch falla, el hilo en vivo se conserva.
+  /// no reproduce lo emitido durante el corte, así que refetcha la cola y funde
+  /// lo perdido. Dos clases de pérdida se recuperan aquí:
+  ///
+  ///   - **Mensajes del hueco:** los que no estaban se agregan; reordenados por
+  ///     `(timestampMs, externalId)` para que caigan en su sitio cronológico.
+  ///   - **Avances de estado del hueco:** un OUTBOUND ya pintado pudo avanzar
+  ///     (p. ej. SENT→READ) sin que sus `message.status` llegaran en vivo. READ
+  ///     es terminal —no llega otro receipt—, así que sin reconciliar el tick
+  ///     quedaría stale. Se avanza desde la verdad HTTP con la misma monotonía
+  ///     (`transition`), conservando el resto del mensaje ya pintado.
+  ///
+  /// Re-emite sólo si hubo un cambio real (mensaje nuevo o avance de estado): un
+  /// avance no cambia el conteo de items, de ahí el flag en vez de comparar
+  /// longitudes. Best-effort: si el refetch falla, el hilo en vivo se conserva.
   Future<void> _onReconnected(
     MessagesReconnected event,
     Emitter<MessagesState> emit,
@@ -141,11 +190,22 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
       final byId = <String, Message>{
         for (final m in current.items) m.externalId: m,
       };
+      var changed = false;
       for (final m in page.messages) {
-        byId.putIfAbsent(m.externalId, () => m);
+        final existing = byId[m.externalId];
+        if (existing == null) {
+          byId[m.externalId] = m; // mensaje del hueco
+          changed = true;
+        } else if (m.status != null) {
+          final advanced = MessageStatus.transition(existing.status, m.status!);
+          if (advanced != null) {
+            byId[m.externalId] = existing.withStatus(advanced);
+            changed = true;
+          }
+        }
       }
-      if (byId.length == current.items.length) {
-        return; // nada nuevo del hueco: evita re-emitir un estado equivalente
+      if (!changed) {
+        return; // nada nuevo ni avance de estado: no re-emitir
       }
       final merged = byId.values.toList()
         ..sort((a, b) {
@@ -257,6 +317,27 @@ class MessagesLiveReceived extends MessagesEvent {
       other is MessagesLiveReceived && other.message == message;
   @override
   int get hashCode => message.hashCode;
+}
+
+/// Llegó un receipt en vivo (`message.status`): el OUTBOUND `externalId` avanzó
+/// a `status`. Lo produce la suscripción a `repo.live`; el handler localiza el
+/// mensaje en el hilo abierto y repinta su estado de entrega (monótono).
+class MessagesStatusReceived extends MessagesEvent {
+  const MessagesStatusReceived({
+    required this.externalId,
+    required this.status,
+  });
+
+  final String externalId;
+  final MessageStatus status;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MessagesStatusReceived &&
+      other.externalId == externalId &&
+      other.status == status;
+  @override
+  int get hashCode => Object.hash(externalId, status);
 }
 
 /// El stream en vivo se reconectó tras un corte (S15). Dispara una reconciliación
