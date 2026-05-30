@@ -37,23 +37,34 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             _ => (chatLid, null),
           };
-          return InkWell(
-            onTap: () => context.push(
-              '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/profile',
-            ),
-            child: Row(
-              children: <Widget>[
-                AppAvatar(name: name, size: 36, imageUrl: photo),
-                const SizedBox(width: AppTokens.sp3),
-                Expanded(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleMedium,
-                  ),
+          // El header completo es un botón: el lector de pantalla lo anuncia
+          // como control ("Ver perfil") en vez de leer el nombre como texto
+          // inerte. ExcludeSemantics evita que el nombre se anuncie dos veces
+          // (ya está en el label del Semantics y en el de AppAvatar).
+          return Semantics(
+            button: true,
+            label: name,
+            hint: 'Ver perfil',
+            child: InkWell(
+              onTap: () => context.push(
+                '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/profile',
+              ),
+              child: ExcludeSemantics(
+                child: Row(
+                  children: <Widget>[
+                    AppAvatar(name: name, size: 36, imageUrl: photo),
+                    const SizedBox(width: AppTokens.sp3),
+                    Expanded(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           );
         },

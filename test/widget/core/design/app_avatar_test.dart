@@ -124,4 +124,47 @@ void main() {
       expect(container.constraints?.maxHeight, 64);
     });
   });
+
+  group('AppAvatar — foto (imageUrl)', () {
+    testWidgets('con imageUrl renderiza un Image.network', (tester) async {
+      await pumpAvatar(
+        tester,
+        const AppAvatar(name: 'a', imageUrl: 'https://cdn.test/p.jpg'),
+      );
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('la foto se inserta dentro del anillo (no lo tapa)', (
+      tester,
+    ) async {
+      // El Image se dimensiona al diámetro menos 2× el grosor del anillo, de
+      // modo que el borde de marca sigue visible como en la variante de
+      // iniciales (regresión: foto a tamaño completo se comía el anillo).
+      await pumpAvatar(
+        tester,
+        const AppAvatar(
+          name: 'a',
+          size: 64,
+          imageUrl: 'https://cdn.test/p.jpg',
+        ),
+      );
+      final img = tester.widget<Image>(find.byType(Image));
+      expect(img.width, lessThan(64));
+      expect(img.width, 64 - 2 * 2.0);
+    });
+
+    testWidgets('foto que no carga cae a la inicial (errorBuilder)', (
+      tester,
+    ) async {
+      // En tests Image.network falla (sin red real); el errorBuilder es el
+      // fallback que importa cuando la foto está rota o el CDN no responde:
+      // debe mostrar la inicial, no un hueco ni un glifo roto.
+      await pumpAvatar(
+        tester,
+        const AppAvatar(name: 'a', imageUrl: 'https://invalid.test/falla.jpg'),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('A'), findsOneWidget);
+    });
+  });
 }

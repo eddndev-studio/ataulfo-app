@@ -62,19 +62,27 @@ class AppAvatar extends StatelessWidget {
           border: Border.all(color: AppTokens.primary, width: _ringWidth),
         ),
         alignment: Alignment.center,
-        clipBehavior: url == null ? Clip.none : Clip.antiAlias,
+        clipBehavior: Clip.none,
         child: url == null
             ? label()
-            : Image.network(
-                url,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                // Foto rota / R2 caído / aún cargando ⇒ la inicial.
-                errorBuilder: (context, error, stackTrace) =>
-                    Center(child: label()),
-                loadingBuilder: (context, child, progress) =>
-                    progress == null ? child : Center(child: label()),
+            // La foto se inserta dentro del anillo (padding = grosor del anillo)
+            // y se recorta en círculo, para que el borde de marca siga visible
+            // igual que en la variante de iniciales (no lo tapa el BoxFit.cover).
+            : Padding(
+                padding: const EdgeInsets.all(_ringWidth),
+                child: ClipOval(
+                  child: Image.network(
+                    url,
+                    width: size - _ringWidth * 2,
+                    height: size - _ringWidth * 2,
+                    fit: BoxFit.cover,
+                    // Foto rota / R2 caído / aún cargando ⇒ la inicial.
+                    errorBuilder: (context, error, stackTrace) =>
+                        Center(child: label()),
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null ? child : Center(child: label()),
+                  ),
+                ),
               ),
       ),
     );

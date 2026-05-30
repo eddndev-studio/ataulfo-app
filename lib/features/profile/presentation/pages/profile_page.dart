@@ -50,7 +50,10 @@ class _ProfileView extends StatelessWidget {
       if (p.isMarkedUnread) const AppPill.primary(label: 'No leído'),
       if (p.isPinned) const AppPill.neutral(label: 'Fijado'),
       if (p.isArchived) const AppPill.neutral(label: 'Archivado'),
-      if (p.mutedUntil != null) const AppPill.neutral(label: 'Silenciado'),
+      // El backend serializa muted_until aunque ya haya expirado (sólo omite el
+      // cero); sólo es "silenciado" si la fecha sigue en el futuro.
+      if (p.mutedUntil != null && p.mutedUntil!.isAfter(DateTime.now()))
+        const AppPill.neutral(label: 'Silenciado'),
     ];
 
     return ListView(
