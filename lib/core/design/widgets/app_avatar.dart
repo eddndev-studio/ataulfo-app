@@ -16,10 +16,20 @@ import '../tokens.dart';
 /// diámetro (`size * 0.4`) para que la inicial guarde la misma proporción en
 /// cualquier tamaño, como muestra el kit.
 class AppAvatar extends StatelessWidget {
-  const AppAvatar({super.key, required this.name, this.size = 40});
+  const AppAvatar({
+    super.key,
+    required this.name,
+    this.size = 40,
+    this.imageUrl,
+  });
 
   final String name;
   final double size;
+
+  /// Foto opcional (URL firmada/efímera). Si viene, se carga recortada en el
+  /// círculo con el anillo de marca; al fallar o no estar (`null`) cae a la
+  /// inicial. Mantiene la misma forma y semántica que la variante de iniciales.
+  final String? imageUrl;
 
   /// Grosor del anillo de marca. Fijo en cualquier tamaño: un borde más
   /// delgado se perdería en avatares chicos y uno proporcional al diámetro
@@ -30,6 +40,16 @@ class AppAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     // El lector de pantalla anuncia el nombre completo, no la inicial suelta:
     // excludeSemantics suprime el nodo de la letra para que solo se oiga `name`.
+    Widget label() => Text(
+      _initial(name),
+      style: TextStyle(
+        fontFamily: AppTokens.fontSans,
+        fontSize: size * 0.4,
+        fontWeight: FontWeight.w600,
+        color: AppTokens.text1,
+      ),
+    );
+    final url = imageUrl;
     return Semantics(
       label: name,
       excludeSemantics: true,
@@ -42,15 +62,20 @@ class AppAvatar extends StatelessWidget {
           border: Border.all(color: AppTokens.primary, width: _ringWidth),
         ),
         alignment: Alignment.center,
-        child: Text(
-          _initial(name),
-          style: TextStyle(
-            fontFamily: AppTokens.fontSans,
-            fontSize: size * 0.4,
-            fontWeight: FontWeight.w600,
-            color: AppTokens.text1,
-          ),
-        ),
+        clipBehavior: url == null ? Clip.none : Clip.antiAlias,
+        child: url == null
+            ? label()
+            : Image.network(
+                url,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                // Foto rota / R2 caído / aún cargando ⇒ la inicial.
+                errorBuilder: (context, error, stackTrace) =>
+                    Center(child: label()),
+                loadingBuilder: (context, child, progress) =>
+                    progress == null ? child : Center(child: label()),
+              ),
       ),
     );
   }
