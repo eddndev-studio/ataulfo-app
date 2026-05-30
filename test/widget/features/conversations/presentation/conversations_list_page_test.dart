@@ -200,27 +200,28 @@ void main() {
       expect(find.text(hhmm), findsOneWidget);
     });
 
-    testWidgets('último-mensaje no-texto: etiqueta de tipo en vez del preview', (
-      tester,
-    ) async {
-      await pumpOne(
-        tester,
-        const Conversation(
-          chatLid: 'lid-dm',
-          kind: ConversationKind.dm,
-          phone: '5215550001',
-          isArchived: false,
-          isPinned: false,
-          isMarkedUnread: false,
-          mutedUntil: null,
-          lastMessagePreview: '',
-          lastMessageType: 'image',
-          lastMessageDirection: 'INBOUND',
-          lastMessageTimestampMs: 1700000000000,
-        ),
-      );
-      expect(find.text('Imagen'), findsOneWidget);
-    });
+    testWidgets(
+      'último-mensaje no-texto: etiqueta de tipo en vez del preview',
+      (tester) async {
+        await pumpOne(
+          tester,
+          const Conversation(
+            chatLid: 'lid-dm',
+            kind: ConversationKind.dm,
+            phone: '5215550001',
+            isArchived: false,
+            isPinned: false,
+            isMarkedUnread: false,
+            mutedUntil: null,
+            lastMessagePreview: '',
+            lastMessageType: 'image',
+            lastMessageDirection: 'INBOUND',
+            lastMessageTimestampMs: 1700000000000,
+          ),
+        );
+        expect(find.text('Imagen'), findsOneWidget);
+      },
+    );
 
     testWidgets('no-leídos: badge verde con el conteo', (tester) async {
       await pumpOne(
@@ -242,7 +243,10 @@ void main() {
       );
       final badge = find.byKey(const Key('conversation.unread.lid-dm'));
       expect(badge, findsOneWidget);
-      expect(find.descendant(of: badge, matching: find.text('3')), findsOneWidget);
+      expect(
+        find.descendant(of: badge, matching: find.text('3')),
+        findsOneWidget,
+      );
       final box = tester.widget<Container>(badge);
       final deco = box.decoration as BoxDecoration;
       expect(deco.color, AppTokens.chatAccent);
@@ -265,10 +269,7 @@ void main() {
           lastMessageTimestampMs: 1700000000000,
         ),
       );
-      expect(
-        find.byKey(const Key('conversation.unread.lid-dm')),
-        findsNothing,
-      );
+      expect(find.byKey(const Key('conversation.unread.lid-dm')), findsNothing);
     });
   });
 }

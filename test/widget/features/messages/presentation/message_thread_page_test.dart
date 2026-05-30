@@ -116,7 +116,10 @@ void main() {
     testWidgets('SENT → una palomita (done) gris', (tester) async {
       await pumpStatus(tester, MessageStatus.sent);
       expect(find.byIcon(Icons.done_all), findsNothing);
-      expect(tester.widget<Icon>(find.byIcon(Icons.done)).color, AppTokens.text2);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.done)).color,
+        AppTokens.text2,
+      );
     });
 
     testWidgets('DELIVERED → doble palomita (done_all) gris', (tester) async {
@@ -285,7 +288,10 @@ void main() {
       // La reacción se muestra como pill sobre el target.
       final pills = find.byKey(const Key('message.reactions.m1'));
       expect(pills, findsOneWidget);
-      expect(find.descendant(of: pills, matching: find.text('👍')), findsOneWidget);
+      expect(
+        find.descendant(of: pills, matching: find.text('👍')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('mensaje sin reacciones no muestra pills', (tester) async {
@@ -341,10 +347,7 @@ void main() {
     testWidgets('imagen sin mediaUrl → placeholder de tipo (sin Image)', (
       tester,
     ) async {
-      await pumpMsg(
-        tester,
-        msg(externalId: 'img', type: 'image', content: ''),
-      );
+      await pumpMsg(tester, msg(externalId: 'img', type: 'image', content: ''));
       expect(find.byType(Image), findsNothing);
       expect(find.text('Imagen'), findsOneWidget);
     });
@@ -379,10 +382,7 @@ void main() {
     });
 
     testWidgets('audio → tarjeta "Audio"', (tester) async {
-      await pumpMsg(
-        tester,
-        msg(externalId: 'aud', type: 'audio', content: ''),
-      );
+      await pumpMsg(tester, msg(externalId: 'aud', type: 'audio', content: ''));
       expect(find.text('Audio'), findsOneWidget);
     });
 

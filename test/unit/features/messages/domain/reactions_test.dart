@@ -48,7 +48,9 @@ void main() {
       final folded = foldReactions(all);
 
       expect(folded.renderable.map((m) => m.externalId), <String>['m1']);
-      expect(folded.byTarget['m1'], <ReactionTally>[const ReactionTally('👍', 1)]);
+      expect(folded.byTarget['m1'], <ReactionTally>[
+        const ReactionTally('👍', 1),
+      ]);
     });
 
     test('mismo emoji de dos remitentes cuenta 2', () {
@@ -58,7 +60,9 @@ void main() {
         reaction(externalId: 'r2', target: 'm1', emoji: '❤️', senderLid: 'b'),
       ];
       final folded = foldReactions(all);
-      expect(folded.byTarget['m1'], <ReactionTally>[const ReactionTally('❤️', 2)]);
+      expect(folded.byTarget['m1'], <ReactionTally>[
+        const ReactionTally('❤️', 2),
+      ]);
     });
 
     test('un remitente sólo tiene una reacción: la última gana', () {
@@ -68,7 +72,9 @@ void main() {
         reaction(externalId: 'r2', target: 'm1', emoji: '😂', ts: 1900),
       ];
       final folded = foldReactions(all);
-      expect(folded.byTarget['m1'], <ReactionTally>[const ReactionTally('😂', 1)]);
+      expect(folded.byTarget['m1'], <ReactionTally>[
+        const ReactionTally('😂', 1),
+      ]);
     });
 
     test('emoji vacío quita la reacción del remitente', () {

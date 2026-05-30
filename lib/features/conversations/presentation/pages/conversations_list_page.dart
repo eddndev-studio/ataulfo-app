@@ -215,7 +215,9 @@ class _ConversationTile extends StatelessWidget {
                           // La hora se tiñe del verde de sección cuando hay
                           // no-leídos: el acento "ligero" que la bandeja comparte
                           // con el tick de leído del hilo.
-                          color: hasUnread ? AppTokens.chatAccent : AppTokens.text2,
+                          color: hasUnread
+                              ? AppTokens.chatAccent
+                              : AppTokens.text2,
                         ),
                       ),
                     ],
