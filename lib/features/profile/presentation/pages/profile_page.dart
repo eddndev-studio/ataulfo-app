@@ -10,9 +10,9 @@ import '../../domain/failures/profile_failure.dart';
 import '../bloc/profile_bloc.dart';
 
 /// Pantalla "revisar perfil" de una conversación: foto + nombre + phone/tipo y
-/// el app-state (fijado/archivado/silenciado/no leído). Sólo lectura — las
-/// acciones de mutación (fijar/silenciar/...) y la galería de media quedan para
-/// una rebanada posterior. Content-only: el Scaffold/AppBar los aporta la ruta.
+/// el app-state (fijado/archivado/silenciado/no leído). Sólo lectura: las
+/// acciones de mutación (fijar/silenciar/...) y la galería de media no forman
+/// parte de esta pantalla. Content-only: el Scaffold/AppBar los aporta la ruta.
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 

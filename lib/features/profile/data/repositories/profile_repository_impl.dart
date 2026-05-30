@@ -3,8 +3,8 @@ import '../../domain/repositories/profile_repository.dart';
 import '../datasources/profile_datasource.dart';
 
 /// Implementación trivial: delega en el datasource (refresco contra el backend
-/// en cada open, sin cache local en esta capa). Cuando aterrice RFC-0001 esta
-/// clase orquestará verdad local vs. remota.
+/// en cada consulta, sin cache local en esta capa). La orquestación de verdad
+/// local vs. remota la cubre RFC-0001.
 class ProfileRepositoryImpl implements ProfileRepository {
   ProfileRepositoryImpl({required ProfileDatasource datasource})
     : _ds = datasource;
