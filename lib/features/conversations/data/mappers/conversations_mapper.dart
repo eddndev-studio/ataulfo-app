@@ -21,5 +21,11 @@ class ConversationsMapper {
     mutedUntil: resp.mutedUntil == null
         ? null
         : DateTime.parse(resp.mutedUntil!),
+    displayName: resp.displayName,
+    unreadCount: resp.unreadCount,
+    lastMessagePreview: resp.lastMessagePreview,
+    lastMessageType: resp.lastMessageType,
+    lastMessageDirection: resp.lastMessageDirection,
+    lastMessageTimestampMs: resp.lastMessageTimestampMs,
   );
 }
