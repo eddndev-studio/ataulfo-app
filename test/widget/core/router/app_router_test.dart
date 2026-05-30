@@ -23,7 +23,6 @@ import 'package:ataulfo/features/memberships/presentation/pages/memberships_page
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
-import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
