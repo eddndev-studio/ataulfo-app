@@ -22,6 +22,7 @@ import 'package:ataulfo/features/memberships/domain/repositories/memberships_rep
 import 'package:ataulfo/features/memberships/presentation/pages/memberships_page.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
+import 'package:ataulfo/features/messages/domain/entities/thread_live_event.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -121,7 +122,7 @@ void main() {
     // cola; un stream vacío deja terminar el pumpAndSettle sin emitir nada.
     when(
       () => messagesRepo.live(any()),
-    ).thenAnswer((_) => const Stream<Message>.empty());
+    ).thenAnswer((_) => const Stream<ThreadLiveEvent>.empty());
     router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),

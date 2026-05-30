@@ -1,5 +1,5 @@
-import '../entities/message.dart';
 import '../entities/message_page.dart';
+import '../entities/thread_live_event.dart';
 
 /// Puerto de dominio del hilo de mensajes (S09 RF#5 + realtime S15). El bloc
 /// pide la cola (sin cursor) al abrir y tramos más viejos (con `cursor`) al
@@ -19,9 +19,10 @@ abstract interface class MessagesRepository {
     int? limit,
   });
 
-  /// Stream de mensajes en vivo del bot (SSE S15: `message.inbound` +
+  /// Stream de eventos en vivo del bot (SSE S15: `message.inbound` +
   /// `message.outbound`). El filtrado por conversación lo hace el consumidor
-  /// (el bloc del hilo abierto). Best-effort: errores de transporte cierran el
-  /// stream sin derribar el hilo HTTP ya cargado.
-  Stream<Message> live(String botId);
+  /// (el bloc del hilo abierto). Perdurable: se reconecta solo ante caídas;
+  /// emite `LiveMessage` por mensaje y `LiveReconnected` al reconectar (señal
+  /// para reconciliar contra la verdad HTTP, que sí cubre el tramo del corte).
+  Stream<ThreadLiveEvent> live(String botId);
 }

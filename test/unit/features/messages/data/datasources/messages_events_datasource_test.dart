@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:ataulfo/features/messages/data/datasources/messages_events_datasource.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
+import 'package:ataulfo/features/messages/domain/entities/thread_live_event.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -130,5 +131,17 @@ void main() {
     ).captured;
     expect(captured[0], '/events/stream');
     expect(captured[1], <String, dynamic>{'botId': 'b1'});
+  });
+
+  test('threadEvents envuelve cada mensaje como LiveMessage', () async {
+    stub(
+      sse(frame('message.outbound', msgJson(externalId: 'o1', direction: 'OUTBOUND'))),
+    );
+
+    // .first cancela tras el primer evento (corta el loop de reconexión).
+    final first = await ds.threadEvents('b1').first;
+
+    expect(first, isA<LiveMessage>());
+    expect((first as LiveMessage).message.externalId, 'o1');
   });
 }
