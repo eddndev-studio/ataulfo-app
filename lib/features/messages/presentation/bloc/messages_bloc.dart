@@ -77,27 +77,20 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   /// bloc, de modo que el append vive en un solo punto (`_onLive`).
   void _startLive() {
     _liveSub?.cancel();
-    _liveSub = _repo
-        .live(_botId)
-        .listen(
-          (e) {
-            switch (e) {
-              case LiveMessage(:final message):
-                add(MessagesLiveReceived(message));
-              case LiveStatus(:final externalId, :final status):
-                add(
-                  MessagesStatusReceived(
-                    externalId: externalId,
-                    status: status,
-                  ),
-                );
-              case LiveReconnected():
-                add(const MessagesReconnected());
-            }
-          },
-          // Realtime caído NO derriba el hilo: el state HTTP sigue válido.
-          onError: (Object _) {},
-        );
+    _liveSub = _repo.live(_botId).listen(
+      (e) {
+        switch (e) {
+          case LiveMessage(:final message):
+            add(MessagesLiveReceived(message));
+          case LiveStatus(:final externalId, :final status):
+            add(MessagesStatusReceived(externalId: externalId, status: status));
+          case LiveReconnected():
+            add(const MessagesReconnected());
+        }
+      },
+      // Realtime caído NO derriba el hilo: el state HTTP sigue válido.
+      onError: (Object _) {},
+    );
   }
 
   void _onLive(MessagesLiveReceived event, Emitter<MessagesState> emit) {

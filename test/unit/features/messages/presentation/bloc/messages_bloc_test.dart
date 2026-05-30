@@ -287,8 +287,10 @@ void main() {
             limit: any(named: 'limit'),
           ),
         ).thenAnswer(
-          (_) async =>
-              MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: null),
+          (_) async => MessagePage(
+            messages: <Message>[msg('m1', 100)],
+            prevCursor: null,
+          ),
         );
         when(() => repo.live('b1')).thenAnswer((_) => liveController.stream);
         return build();
@@ -332,7 +334,10 @@ void main() {
           call++;
           // 1ª carga: sólo m1. Refetch tras reconectar: m1 + el m2 del hueco.
           return call == 1
-              ? MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: 'cur')
+              ? MessagePage(
+                  messages: <Message>[msg('m1', 100)],
+                  prevCursor: 'cur',
+                )
               : MessagePage(
                   messages: <Message>[msg('m1', 100), msg('m2', 150)],
                   prevCursor: 'cur',
@@ -508,7 +513,9 @@ void main() {
           ),
         ).thenAnswer(
           (_) async => MessagePage(
-            messages: <Message>[outbound('w2', 200).withStatus(MessageStatus.sent)],
+            messages: <Message>[
+              outbound('w2', 200).withStatus(MessageStatus.sent),
+            ],
             prevCursor: null,
           ),
         );

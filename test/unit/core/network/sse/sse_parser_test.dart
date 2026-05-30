@@ -35,16 +35,19 @@ void main() {
       expect(got.single.data, '{"x":true}');
     });
 
-    test('un frame partido a mitad de línea entre dos chunks → un frame', () async {
-      // El corte cae dentro de la línea `data:` y del JSON.
-      final got = await decodeSseEvents(
-        bytes(['event: message.outbound\ndata: {"id":', '"w1"}\n\n']),
-      ).toList();
+    test(
+      'un frame partido a mitad de línea entre dos chunks → un frame',
+      () async {
+        // El corte cae dentro de la línea `data:` y del JSON.
+        final got = await decodeSseEvents(
+          bytes(['event: message.outbound\ndata: {"id":', '"w1"}\n\n']),
+        ).toList();
 
-      expect(got, hasLength(1));
-      expect(got.single.event, 'message.outbound');
-      expect(got.single.data, '{"id":"w1"}');
-    });
+        expect(got, hasLength(1));
+        expect(got.single.event, 'message.outbound');
+        expect(got.single.data, '{"id":"w1"}');
+      },
+    );
 
     test('dos frames en un solo chunk → dos eventos en orden', () async {
       final got = await decodeSseEvents(

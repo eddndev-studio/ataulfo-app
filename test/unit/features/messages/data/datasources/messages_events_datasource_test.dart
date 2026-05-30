@@ -81,7 +81,10 @@ void main() {
   test('emite LiveMessage para message.inbound y message.outbound', () async {
     stub(
       sse(
-        frame('message.inbound', msgJson(externalId: 'in1', direction: 'INBOUND')) +
+        frame(
+              'message.inbound',
+              msgJson(externalId: 'in1', direction: 'INBOUND'),
+            ) +
             frame(
               'message.outbound',
               msgJson(externalId: 'out1', direction: 'OUTBOUND'),
@@ -99,7 +102,11 @@ void main() {
   });
 
   test('message.status emite LiveStatus (externalId + status)', () async {
-    stub(sse(frame('message.status', statusJson(externalId: 'o1', status: 'READ'))));
+    stub(
+      sse(
+        frame('message.status', statusJson(externalId: 'o1', status: 'READ')),
+      ),
+    );
 
     final got = await ds.connectOnce('b1').toList();
 
@@ -115,7 +122,10 @@ void main() {
       sse(
         frame('bot.session', '{"botId":"b1","state":"CONNECTED"}') +
             frame('flow.step', '{"botId":"b1","kind":"STEP","stepIdx":0}') +
-            frame('message.outbound', msgJson(externalId: 'out1', direction: 'OUTBOUND')),
+            frame(
+              'message.outbound',
+              msgJson(externalId: 'out1', direction: 'OUTBOUND'),
+            ),
       ),
     );
 
@@ -125,35 +135,50 @@ void main() {
     expect(asMessage(got.single).externalId, 'out1');
   });
 
-  test('un frame de mensaje malformado NO derriba el stream: se omite', () async {
-    stub(
-      sse(
-        frame('message.outbound', '{esto no es json}') +
-            frame('message.outbound', msgJson(externalId: 'ok', direction: 'OUTBOUND')),
-      ),
-    );
+  test(
+    'un frame de mensaje malformado NO derriba el stream: se omite',
+    () async {
+      stub(
+        sse(
+          frame('message.outbound', '{esto no es json}') +
+              frame(
+                'message.outbound',
+                msgJson(externalId: 'ok', direction: 'OUTBOUND'),
+              ),
+        ),
+      );
 
-    final got = await ds.connectOnce('b1').toList();
+      final got = await ds.connectOnce('b1').toList();
 
-    expect(got, hasLength(1));
-    expect(asMessage(got.single).externalId, 'ok');
-  });
+      expect(got, hasLength(1));
+      expect(asMessage(got.single).externalId, 'ok');
+    },
+  );
 
-  test('un frame message.status inválido se omite (json roto o status desconocido)', () async {
-    stub(
-      sse(
-        frame('message.status', '{roto}') +
-            frame('message.status', statusJson(externalId: 'x', status: 'PENDING')) +
-            frame('message.status', statusJson(externalId: 'o1', status: 'DELIVERED')),
-      ),
-    );
+  test(
+    'un frame message.status inválido se omite (json roto o status desconocido)',
+    () async {
+      stub(
+        sse(
+          frame('message.status', '{roto}') +
+              frame(
+                'message.status',
+                statusJson(externalId: 'x', status: 'PENDING'),
+              ) +
+              frame(
+                'message.status',
+                statusJson(externalId: 'o1', status: 'DELIVERED'),
+              ),
+        ),
+      );
 
-    final got = await ds.connectOnce('b1').toList();
+      final got = await ds.connectOnce('b1').toList();
 
-    expect(got, hasLength(1));
-    expect((got.single as LiveStatus).externalId, 'o1');
-    expect((got.single as LiveStatus).status, MessageStatus.delivered);
-  });
+      expect(got, hasLength(1));
+      expect((got.single as LiveStatus).externalId, 'o1');
+      expect((got.single as LiveStatus).status, MessageStatus.delivered);
+    },
+  );
 
   test('pide /events/stream con botId en query', () async {
     stub(sse(''));
@@ -173,7 +198,12 @@ void main() {
 
   test('threadEvents envuelve la conexión (emite LiveMessage)', () async {
     stub(
-      sse(frame('message.outbound', msgJson(externalId: 'o1', direction: 'OUTBOUND'))),
+      sse(
+        frame(
+          'message.outbound',
+          msgJson(externalId: 'o1', direction: 'OUTBOUND'),
+        ),
+      ),
     );
 
     // .first cancela tras el primer evento (corta el loop de reconexión).

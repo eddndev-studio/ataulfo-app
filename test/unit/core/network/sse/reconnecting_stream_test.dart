@@ -94,64 +94,78 @@ void main() {
     await sub.cancel();
   });
 
-  test('el backoff escala en fallos seguidos y se reinicia tras entregar', () async {
-    final controllers = <StreamController<int>>[];
-    final bk = recordingBackoff();
+  test(
+    'el backoff escala en fallos seguidos y se reinicia tras entregar',
+    () async {
+      final controllers = <StreamController<int>>[];
+      final bk = recordingBackoff();
 
-    final stream = reconnectingStream<int>(() {
-      final c = StreamController<int>();
-      controllers.add(c);
-      return c.stream;
-    }, backoff: bk.fn);
-
-    final sub = stream.listen((_) {});
-    await Future<void>.delayed(Duration.zero);
-
-    // Dos conexiones que fallan SIN entregar nada: el intento escala 1, 2.
-    await controllers[0].close();
-    await Future<void>.delayed(Duration.zero);
-    await controllers[1].close();
-    await Future<void>.delayed(Duration.zero);
-    // Tercera conexión entrega un evento y luego cae: el intento se reinicia a 1.
-    controllers[2].add(42);
-    await Future<void>.delayed(Duration.zero);
-    await controllers[2].close();
-    await Future<void>.delayed(Duration.zero);
-
-    expect(bk.attempts, <int>[1, 2, 1],
-        reason: 'escala en fallos seguidos; se reinicia tras una conexión que entregó');
-    await sub.cancel();
-  });
-
-  test('emite reconnectMarker en cada reconexión, nunca en el primer connect', () async {
-    final controllers = <StreamController<int>>[];
-    final bk = recordingBackoff();
-
-    final stream = reconnectingStream<int>(
-      () {
+      final stream = reconnectingStream<int>(() {
         final c = StreamController<int>();
         controllers.add(c);
         return c.stream;
-      },
-      backoff: bk.fn,
-      reconnectMarker: () => -1, // valor distinguible de los mensajes
-    );
+      }, backoff: bk.fn);
 
-    final got = <int>[];
-    final sub = stream.listen(got.add);
-    await Future<void>.delayed(Duration.zero);
+      final sub = stream.listen((_) {});
+      await Future<void>.delayed(Duration.zero);
 
-    controllers[0].add(1); // primer connect: SIN marcador antes
-    await Future<void>.delayed(Duration.zero);
-    await controllers[0].close(); // cae → reconecta
-    await Future<void>.delayed(Duration.zero);
-    controllers[1].add(2); // segundo connect: marcador ANTES de los eventos
-    await Future<void>.delayed(Duration.zero);
+      // Dos conexiones que fallan SIN entregar nada: el intento escala 1, 2.
+      await controllers[0].close();
+      await Future<void>.delayed(Duration.zero);
+      await controllers[1].close();
+      await Future<void>.delayed(Duration.zero);
+      // Tercera conexión entrega un evento y luego cae: el intento se reinicia a 1.
+      controllers[2].add(42);
+      await Future<void>.delayed(Duration.zero);
+      await controllers[2].close();
+      await Future<void>.delayed(Duration.zero);
 
-    expect(got, <int>[1, -1, 2],
-        reason: 'el marcador (-1) aparece sólo al reconectar, no en el primer connect');
-    await sub.cancel();
-  });
+      expect(
+        bk.attempts,
+        <int>[1, 2, 1],
+        reason:
+            'escala en fallos seguidos; se reinicia tras una conexión que entregó',
+      );
+      await sub.cancel();
+    },
+  );
+
+  test(
+    'emite reconnectMarker en cada reconexión, nunca en el primer connect',
+    () async {
+      final controllers = <StreamController<int>>[];
+      final bk = recordingBackoff();
+
+      final stream = reconnectingStream<int>(
+        () {
+          final c = StreamController<int>();
+          controllers.add(c);
+          return c.stream;
+        },
+        backoff: bk.fn,
+        reconnectMarker: () => -1, // valor distinguible de los mensajes
+      );
+
+      final got = <int>[];
+      final sub = stream.listen(got.add);
+      await Future<void>.delayed(Duration.zero);
+
+      controllers[0].add(1); // primer connect: SIN marcador antes
+      await Future<void>.delayed(Duration.zero);
+      await controllers[0].close(); // cae → reconecta
+      await Future<void>.delayed(Duration.zero);
+      controllers[1].add(2); // segundo connect: marcador ANTES de los eventos
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        got,
+        <int>[1, -1, 2],
+        reason:
+            'el marcador (-1) aparece sólo al reconectar, no en el primer connect',
+      );
+      await sub.cancel();
+    },
+  );
 
   test('al cancelar mientras está conectado NO vuelve a conectar', () async {
     var calls = 0;
@@ -175,30 +189,38 @@ void main() {
     expect(calls, 1, reason: 'cancelado estando conectado: cero reconexiones');
   });
 
-  test('al cancelar DURANTE el backoff NO vuelve a conectar (sin loop runaway)', () async {
-    var calls = 0;
-    final controllers = <StreamController<int>>[];
-    // Backoff lento: deja una ventana para cancelar mientras espera.
-    Future<void> slowBackoff(int _) => Future<void>.delayed(const Duration(milliseconds: 100));
+  test(
+    'al cancelar DURANTE el backoff NO vuelve a conectar (sin loop runaway)',
+    () async {
+      var calls = 0;
+      final controllers = <StreamController<int>>[];
+      // Backoff lento: deja una ventana para cancelar mientras espera.
+      Future<void> slowBackoff(int _) =>
+          Future<void>.delayed(const Duration(milliseconds: 100));
 
-    final stream = reconnectingStream<int>(() {
-      final c = StreamController<int>();
-      controllers.add(c);
-      calls++;
-      return c.stream;
-    }, backoff: slowBackoff);
+      final stream = reconnectingStream<int>(() {
+        final c = StreamController<int>();
+        controllers.add(c);
+        calls++;
+        return c.stream;
+      }, backoff: slowBackoff);
 
-    final sub = stream.listen((_) {});
-    await Future<void>.delayed(Duration.zero);
-    expect(calls, 1);
+      final sub = stream.listen((_) {});
+      await Future<void>.delayed(Duration.zero);
+      expect(calls, 1);
 
-    // La conexión cae: el combinador entra al backoff (100ms).
-    await controllers[0].close();
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-    // Cancelamos DURANTE el backoff.
-    await sub.cancel();
-    // Esperamos más allá de la ventana de backoff: NO debe reconectar.
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    expect(calls, 1, reason: 'cancelado durante el backoff: cero reconexiones (no runaway)');
-  });
+      // La conexión cae: el combinador entra al backoff (100ms).
+      await controllers[0].close();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      // Cancelamos DURANTE el backoff.
+      await sub.cancel();
+      // Esperamos más allá de la ventana de backoff: NO debe reconectar.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(
+        calls,
+        1,
+        reason: 'cancelado durante el backoff: cero reconexiones (no runaway)',
+      );
+    },
+  );
 }

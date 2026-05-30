@@ -51,7 +51,10 @@ FoldedThread foldReactions(List<Message> all) {
     if (target == null) {
       continue; // reacción huérfana: ni se pinta ni cuenta
     }
-    final bySender = perTargetSender.putIfAbsent(target, () => <String, String>{});
+    final bySender = perTargetSender.putIfAbsent(
+      target,
+      () => <String, String>{},
+    );
     if (m.content.isEmpty) {
       bySender.remove(m.senderLid); // quitar reacción
     } else {
@@ -67,7 +70,8 @@ FoldedThread foldReactions(List<Message> all) {
     }
     if (counts.isNotEmpty) {
       byTarget[target] = <ReactionTally>[
-        for (final entry in counts.entries) ReactionTally(entry.key, entry.value),
+        for (final entry in counts.entries)
+          ReactionTally(entry.key, entry.value),
       ];
     }
   });

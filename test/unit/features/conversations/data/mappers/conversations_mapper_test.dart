@@ -48,22 +48,25 @@ void main() {
       expect(c.lastMessageTimestampMs, 1700000000000);
     });
 
-    test('sin actividad → entidad con defaults (unread 0, último-mensaje null)', () {
-      const resp = ConversationResp(
-        chatLid: 'lid-grp',
-        kind: 'GROUP',
-        phone: null,
-        isArchived: false,
-        isPinned: false,
-        isMarkedUnread: false,
-        mutedUntil: null,
-      );
-      final c = ConversationsMapper.respToEntity(resp);
-      expect(c.displayName, isNull);
-      expect(c.unreadCount, 0);
-      expect(c.lastMessagePreview, isNull);
-      expect(c.lastMessageTimestampMs, isNull);
-    });
+    test(
+      'sin actividad → entidad con defaults (unread 0, último-mensaje null)',
+      () {
+        const resp = ConversationResp(
+          chatLid: 'lid-grp',
+          kind: 'GROUP',
+          phone: null,
+          isArchived: false,
+          isPinned: false,
+          isMarkedUnread: false,
+          mutedUntil: null,
+        );
+        final c = ConversationsMapper.respToEntity(resp);
+        expect(c.displayName, isNull);
+        expect(c.unreadCount, 0);
+        expect(c.lastMessagePreview, isNull);
+        expect(c.lastMessageTimestampMs, isNull);
+      },
+    );
 
     test('GROUP sin phone ni muted → phone/mutedUntil null', () {
       const resp = ConversationResp(

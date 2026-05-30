@@ -55,8 +55,16 @@ void main() {
 
     test('iguales incluyendo actividad (preview + no-leídos)', () {
       expect(
-        make(unreadCount: 3, lastMessagePreview: 'hola', lastMessageType: 'text'),
-        make(unreadCount: 3, lastMessagePreview: 'hola', lastMessageType: 'text'),
+        make(
+          unreadCount: 3,
+          lastMessagePreview: 'hola',
+          lastMessageType: 'text',
+        ),
+        make(
+          unreadCount: 3,
+          lastMessagePreview: 'hola',
+          lastMessageType: 'text',
+        ),
       );
     });
 

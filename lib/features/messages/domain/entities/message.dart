@@ -68,7 +68,10 @@ enum MessageStatus {
   ///   - cadena SENT→DELIVERED→READ: sólo avanza.
   ///   - FAILED sólo se entra desde SENT; un FAILED tras DELIVERED/READ es stale.
   ///   - FAILED es terminal: desde FAILED no sale nada.
-  static MessageStatus? transition(MessageStatus? current, MessageStatus incoming) {
+  static MessageStatus? transition(
+    MessageStatus? current,
+    MessageStatus incoming,
+  ) {
     if (current == null) return incoming;
     if (current == MessageStatus.failed) return null;
     if (incoming == MessageStatus.failed) {
