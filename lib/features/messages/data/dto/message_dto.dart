@@ -3,9 +3,12 @@
 /// del wire (este adaptador NO usa snake_case, a diferencia de httpsessions) y
 /// los tipos crudos; la traducción a dominio vive en `MessagesMapper`.
 ///
-/// `mediaRef`, `quotedId` y `status` son nullable porque el handler usa
-/// `omitempty`: un mensaje sin media/quote no los manda, y los INBOUND no
-/// llevan `status`. `content` NO es omitempty (siempre presente, puede ser "").
+/// `mediaRef`, `mediaUrl`, `quotedId` y `status` son nullable porque el handler
+/// usa `omitempty`: un mensaje sin media no manda `mediaRef`/`mediaUrl`, uno sin
+/// quote no manda `quotedId`, y los INBOUND no llevan `status`. `content` NO es
+/// omitempty (siempre presente, puede ser ""). `mediaUrl` es la URL firmada
+/// lista para consumir (el cliente no firma); ausente cuando no hay media o el
+/// backend no pudo firmar (p. ej. R2 sin configurar).
 class MessageResp {
   const MessageResp({
     required this.externalId,
@@ -19,6 +22,7 @@ class MessageResp {
     required this.mediaRef,
     required this.quotedId,
     required this.status,
+    this.mediaUrl,
   });
 
   factory MessageResp.fromJson(Map<String, dynamic> json) {
@@ -31,6 +35,7 @@ class MessageResp {
     final content = json['content'];
     final timestampMs = json['timestampMs'];
     final mediaRef = json['mediaRef'];
+    final mediaUrl = json['mediaUrl'];
     final quotedId = json['quotedId'];
     final status = json['status'];
     if (externalId is! String ||
@@ -48,6 +53,9 @@ class MessageResp {
     if (mediaRef != null && mediaRef is! String) {
       throw const FormatException('messageResp: mediaRef no es String ni null');
     }
+    if (mediaUrl != null && mediaUrl is! String) {
+      throw const FormatException('messageResp: mediaUrl no es String ni null');
+    }
     if (quotedId != null && quotedId is! String) {
       throw const FormatException('messageResp: quotedId no es String ni null');
     }
@@ -64,6 +72,7 @@ class MessageResp {
       content: content,
       timestampMs: timestampMs,
       mediaRef: mediaRef as String?,
+      mediaUrl: mediaUrl as String?,
       quotedId: quotedId as String?,
       status: status as String?,
     );
@@ -78,6 +87,9 @@ class MessageResp {
   final String content;
   final int timestampMs;
   final String? mediaRef;
+
+  /// URL firmada lista para consumir, o `null` (sin media / sin firmar).
+  final String? mediaUrl;
   final String? quotedId;
   final String? status;
 }

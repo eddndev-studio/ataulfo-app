@@ -22,6 +22,7 @@ Message msg({
   String type = 'text',
   String content = 'hola',
   String? quotedId,
+  String? mediaUrl,
   MessageStatus? status,
   int ts = 1700,
 }) => Message(
@@ -33,6 +34,7 @@ Message msg({
   type: type,
   content: content,
   mediaRef: null,
+  mediaUrl: mediaUrl,
   quotedId: quotedId,
   timestampMs: ts,
   status: status,
@@ -299,16 +301,98 @@ void main() {
     });
   });
 
-  testWidgets('tipo no-texto se pinta como placeholder [tipo]', (tester) async {
+  testWidgets('tipo no catalogado cae a placeholder [tipo]', (tester) async {
     when(() => bloc.state).thenReturn(
       MessagesLoaded(
-        items: <Message>[msg(externalId: 'm', type: 'image', content: '')],
+        items: <Message>[msg(externalId: 'm', type: 'location', content: '')],
         prevCursor: null,
         isLoadingOlder: false,
       ),
     );
     await tester.pumpWidget(host());
-    expect(find.text('[image]'), findsOneWidget);
+    expect(find.text('[location]'), findsOneWidget);
+  });
+
+  group('multimedia (render por tipo via mediaUrl)', () {
+    Future<void> pumpMsg(WidgetTester tester, Message m) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[m],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+    }
+
+    testWidgets('imagen con mediaUrl renderiza un Image', (tester) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'img',
+          type: 'image',
+          content: '',
+          mediaUrl: 'https://cdn/x.jpg',
+        ),
+      );
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('imagen sin mediaUrl → placeholder de tipo (sin Image)', (
+      tester,
+    ) async {
+      await pumpMsg(
+        tester,
+        msg(externalId: 'img', type: 'image', content: ''),
+      );
+      expect(find.byType(Image), findsNothing);
+      expect(find.text('Imagen'), findsOneWidget);
+    });
+
+    testWidgets('imagen con caption muestra el texto', (tester) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'img',
+          type: 'image',
+          content: 'mira esto',
+          mediaUrl: 'https://cdn/x.jpg',
+        ),
+      );
+      expect(find.text('mira esto'), findsOneWidget);
+    });
+
+    testWidgets('video → tarjeta de tipo (ícono + etiqueta)', (tester) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'vid',
+          type: 'video',
+          content: '',
+          mediaUrl: 'https://cdn/x.mp4',
+        ),
+      );
+      expect(find.text('Video'), findsOneWidget);
+      expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
+      // v1: el video no se reproduce inline (sin dep de player).
+      expect(find.byType(Image), findsNothing);
+    });
+
+    testWidgets('audio → tarjeta "Audio"', (tester) async {
+      await pumpMsg(
+        tester,
+        msg(externalId: 'aud', type: 'audio', content: ''),
+      );
+      expect(find.text('Audio'), findsOneWidget);
+    });
+
+    testWidgets('documento → tarjeta "Documento"', (tester) async {
+      await pumpMsg(
+        tester,
+        msg(externalId: 'doc', type: 'document', content: ''),
+      );
+      expect(find.text('Documento'), findsOneWidget);
+    });
   });
 
   testWidgets('Loaded vacío muestra empty state', (tester) async {
