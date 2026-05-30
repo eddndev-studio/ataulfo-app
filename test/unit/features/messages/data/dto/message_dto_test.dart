@@ -14,6 +14,7 @@ void main() {
     String content = 'hola',
     int timestampMs = 1700,
     String? mediaRef,
+    String? mediaUrl,
     String? quotedId,
     String? status,
   }) => <String, dynamic>{
@@ -26,6 +27,7 @@ void main() {
     'content': content,
     'timestampMs': timestampMs,
     'mediaRef': ?mediaRef,
+    'mediaUrl': ?mediaUrl,
     'quotedId': ?quotedId,
     'status': ?status,
   };
@@ -36,7 +38,9 @@ void main() {
         msgJson(
           direction: 'OUTBOUND',
           status: 'SENT',
+          type: 'image',
           mediaRef: 'ref-1',
+          mediaUrl: 'https://cdn.example/signed?token=abc',
           quotedId: 'e0',
         ),
       );
@@ -45,20 +49,22 @@ void main() {
       expect(r.senderLid, 'alice');
       expect(r.kind, 'DM');
       expect(r.direction, 'OUTBOUND');
-      expect(r.type, 'text');
+      expect(r.type, 'image');
       expect(r.content, 'hola');
       expect(r.timestampMs, 1700);
       expect(r.mediaRef, 'ref-1');
+      expect(r.mediaUrl, 'https://cdn.example/signed?token=abc');
       expect(r.quotedId, 'e0');
       expect(r.status, 'SENT');
     });
 
     test(
-      'INBOUND sin omitempty (status/mediaRef/quotedId ausentes) → null',
+      'INBOUND sin omitempty (status/mediaRef/mediaUrl/quotedId ausentes) → null',
       () {
         final r = MessageResp.fromJson(msgJson());
         expect(r.status, isNull);
         expect(r.mediaRef, isNull);
+        expect(r.mediaUrl, isNull);
         expect(r.quotedId, isNull);
       },
     );

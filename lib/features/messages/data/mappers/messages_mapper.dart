@@ -21,6 +21,7 @@ class MessagesMapper {
     type: r.type,
     content: r.content,
     mediaRef: r.mediaRef,
+    mediaUrl: r.mediaUrl,
     quotedId: r.quotedId,
     timestampMs: r.timestampMs,
     status: MessageStatus.fromWire(r.status),

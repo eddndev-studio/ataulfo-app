@@ -99,6 +99,7 @@ class Message {
     required this.quotedId,
     required this.timestampMs,
     required this.status,
+    this.mediaUrl,
   });
 
   final String externalId;
@@ -114,6 +115,11 @@ class Message {
 
   /// Referencia opaca a storage (media inbound/outbound). `null` si no aplica.
   final String? mediaRef;
+
+  /// URL firmada lista para cargar la media (la firma el backend; el cliente la
+  /// consume tal cual). `null` si no hay media o el backend no pudo firmar
+  /// (p. ej. R2 sin configurar) ⇒ la UI cae a un placeholder por tipo.
+  final String? mediaUrl;
 
   /// `externalId` del mensaje citado (reply), o `null`.
   final String? quotedId;
@@ -136,6 +142,7 @@ class Message {
     type: type,
     content: content,
     mediaRef: mediaRef,
+    mediaUrl: mediaUrl,
     quotedId: quotedId,
     timestampMs: timestampMs,
     status: status,
@@ -153,6 +160,7 @@ class Message {
         other.type == type &&
         other.content == content &&
         other.mediaRef == mediaRef &&
+        other.mediaUrl == mediaUrl &&
         other.quotedId == quotedId &&
         other.timestampMs == timestampMs &&
         other.status == status;
@@ -168,6 +176,7 @@ class Message {
     type,
     content,
     mediaRef,
+    mediaUrl,
     quotedId,
     timestampMs,
     status,

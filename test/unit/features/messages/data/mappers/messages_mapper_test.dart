@@ -8,16 +8,19 @@ void main() {
     String kind = 'GROUP',
     String direction = 'OUTBOUND',
     String? status = 'READ',
+    String type = 'text',
+    String? mediaUrl,
   }) => MessageResp(
     externalId: 'e1',
     chatLid: 'grupo-1',
     senderLid: 'bot',
     kind: kind,
     direction: direction,
-    type: 'text',
+    type: type,
     content: 'ey',
     timestampMs: 1800,
     mediaRef: null,
+    mediaUrl: mediaUrl,
     quotedId: null,
     status: status,
   );
@@ -36,6 +39,13 @@ void main() {
         resp(direction: 'INBOUND', status: null),
       );
       expect(m.status, isNull);
+    });
+
+    test('mediaUrl firmada pasa al dominio tal cual', () {
+      final m = MessagesMapper.respToMessage(
+        resp(type: 'image', mediaUrl: 'https://cdn/x?token=1'),
+      );
+      expect(m.mediaUrl, 'https://cdn/x?token=1');
     });
 
     test('kind desconocido → ArgumentError (propaga fail-loud)', () {
