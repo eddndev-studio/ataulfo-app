@@ -32,6 +32,7 @@ import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
 import '../../features/media/domain/repositories/media_repository.dart';
+import '../../features/media/data/cache/media_thumbnail_loader.dart';
 import '../../features/media/presentation/bloc/media_gallery_bloc.dart';
 import '../../features/media/presentation/pages/media_gallery_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
@@ -84,6 +85,7 @@ class AppRouter {
     required CatalogRepository catalogRepository,
     required MediaRepository mediaRepository,
     required MediaFilePicker mediaFilePicker,
+    required MediaThumbnailLoader mediaThumbnailLoader,
   }) : _authBloc = authBloc,
        _authRepo = authRepository,
        _botsRepo = botsRepository,
@@ -97,7 +99,8 @@ class AppRouter {
        _membershipsRepo = membershipsRepository,
        _catalogRepo = catalogRepository,
        _mediaRepo = mediaRepository,
-       _mediaFilePicker = mediaFilePicker;
+       _mediaFilePicker = mediaFilePicker,
+       _mediaThumbnailLoader = mediaThumbnailLoader;
 
   final AuthBloc _authBloc;
   final AuthRepository _authRepo;
@@ -113,6 +116,7 @@ class AppRouter {
   final CatalogRepository _catalogRepo;
   final MediaRepository _mediaRepo;
   final MediaFilePicker _mediaFilePicker;
+  final MediaThumbnailLoader _mediaThumbnailLoader;
 
   /// Observer compartido entre el Navigator del GoRouter y los list pages
   /// del shell. El GoRouter notifica push/pop sobre este observer; las
@@ -458,7 +462,7 @@ class AppRouter {
                 ..add(const MediaGalleryLoadRequested()),
           child: Scaffold(
             appBar: AppBar(title: const Text('Galería de multimedia')),
-            body: const MediaGalleryPage(),
+            body: MediaGalleryPage(loader: _mediaThumbnailLoader),
           ),
         ),
       ),
@@ -484,7 +488,10 @@ class AppRouter {
             )..add(const MediaGalleryLoadRequested()),
             child: Scaffold(
               appBar: AppBar(title: const Text('Elegir multimedia')),
-              body: MediaGalleryPage(onSelect: (asset) => context.pop(asset)),
+              body: MediaGalleryPage(
+                onSelect: (asset) => context.pop(asset),
+                loader: _mediaThumbnailLoader,
+              ),
             ),
           );
         },

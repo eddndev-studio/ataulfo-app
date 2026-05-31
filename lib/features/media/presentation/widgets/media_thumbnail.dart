@@ -1,47 +1,89 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../data/cache/media_thumbnail_loader.dart';
 import '../../domain/entities/media_asset.dart';
 
 /// Miniatura cuadrada de un asset en el grid de la galería.
 ///
-/// LINCHPIN: muestra [MediaAsset.previewUrl] (URL firmada EFÍMERA) sólo para el
-/// render; un consumidor que use [onTap] como picker recibe el asset entero y
-/// debe leer `asset.ref` (BARE), NUNCA la previewUrl. Esta clase no decide eso:
-/// sólo pinta y delega el tap.
+/// LINCHPIN: pinta los bytes que resuelve el [MediaThumbnailLoader] (cache local
+/// por `ref` o descarga de la `previewUrl` efímera); un consumidor que use
+/// [onTap] como picker recibe el asset entero y debe leer `asset.ref` (BARE),
+/// NUNCA la previewUrl. Esta clase no decide eso: sólo pinta y delega el tap.
 ///
-/// Robustez: si `previewUrl` es null (omitempty del wire) o la imagen falla al
-/// cargar (la firma pudo expirar), cae a un placeholder con un ícono según el
-/// `contentType` — nunca un crash ni un `!` sobre null.
-class MediaThumbnail extends StatelessWidget {
-  const MediaThumbnail({super.key, required this.asset, this.onTap});
+/// El loader desacopla el render del origen de los bytes: con cache, la
+/// miniatura no se re-descarga al re-entrar a la galería ni depende de que la
+/// firma siga viva. Robustez: si el loader devuelve null (sin cache y sin
+/// preview, o la descarga falló) o los bytes no decodifican, cae a un
+/// placeholder con un ícono según el `contentType` — nunca un crash.
+class MediaThumbnail extends StatefulWidget {
+  const MediaThumbnail({
+    super.key,
+    required this.asset,
+    required this.loader,
+    this.onTap,
+  });
 
   final MediaAsset asset;
+  final MediaThumbnailLoader loader;
   final VoidCallback? onTap;
+
+  @override
+  State<MediaThumbnail> createState() => _MediaThumbnailState();
+}
+
+class _MediaThumbnailState extends State<MediaThumbnail> {
+  late Future<Uint8List?> _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _bytes = widget.loader.load(widget.asset);
+  }
+
+  @override
+  void didUpdateWidget(MediaThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // El grid recicla widgets: si el ref cambia, re-resolver. (Los bytes de un
+    // mismo ref son inmutables, así que sólo el cambio de ref importa.)
+    if (oldWidget.asset.ref != widget.asset.ref ||
+        oldWidget.loader != widget.loader) {
+      _bytes = widget.loader.load(widget.asset);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppTokens.radiusChip);
-    final url = asset.previewUrl;
-    final Widget content = url == null
-        ? _placeholder()
-        : Image.network(
-            url,
-            fit: BoxFit.cover,
-            // La firma pudo expirar o la red caer: el errorBuilder cae al mismo
-            // placeholder en vez de mostrar el ícono roto de Flutter.
-            errorBuilder: (_, _, _) => _placeholder(),
-            loadingBuilder: (_, child, progress) =>
-                progress == null ? child : _loading(),
-          );
 
     return Material(
       color: AppTokens.surface2,
       borderRadius: radius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
-        child: AspectRatio(aspectRatio: 1, child: content),
+        onTap: widget.onTap,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: FutureBuilder<Uint8List?>(
+            future: _bytes,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return _loading();
+              }
+              final bytes = snapshot.data;
+              if (bytes == null) return _placeholder();
+              return Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                // Bytes corruptos (o no-imagen, p. ej. un PDF): mismo placeholder
+                // en vez del ícono roto de Flutter.
+                errorBuilder: (_, _, _) => _placeholder(),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -57,12 +99,13 @@ class MediaThumbnail extends StatelessWidget {
     ),
   );
 
-  /// Placeholder cuando no hay preview (o falló): un ícono según el tipo de
+  /// Placeholder cuando no hay bytes que pintar: un ícono según el tipo de
   /// contenido sobre la superficie de la card. Para documentos añade el filename
   /// bajo el ícono (un PDF/Office no tiene miniatura, así que el nombre es la
   /// única identidad visual útil); para imagen/video/audio el ícono basta
   /// (las miniaturas reales de video/audio quedan diferidas).
   Widget _placeholder() {
+    final asset = widget.asset;
     final name = asset.filename.trim();
     final showName = _isDocument(asset.contentType) && name.isNotEmpty;
     return Container(

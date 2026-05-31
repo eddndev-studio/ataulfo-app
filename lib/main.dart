@@ -22,6 +22,9 @@ import 'features/conversations/data/datasources/conversations_datasource.dart';
 import 'features/conversations/data/repositories/conversations_repository_impl.dart';
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
+import 'features/media/data/cache/caching_media_thumbnail_loader.dart';
+import 'features/media/data/cache/dio_thumbnail_downloader.dart';
+import 'features/media/data/cache/file_media_byte_store.dart';
 import 'features/media/data/datasources/media_datasource.dart';
 import 'features/media/data/repositories/caching_media_repository.dart';
 import 'features/media/data/repositories/file_picker_media_file_picker.dart';
@@ -144,6 +147,15 @@ void main() {
     MediaRepositoryImpl(datasource: DioMediaDatasource(mainDio)),
   );
 
+  // Cache de bytes de miniatura por `ref` (inmutable, org-safe: el ref embebe
+  // el tenant). A diferencia de la metadata, NO tiene TTL: una vez en disco,
+  // la miniatura no se re-descarga al re-entrar a la galería ni depende de que
+  // la firma de `previewUrl` siga viva. Singleton de sesión como el repo.
+  final mediaThumbnailLoader = CachingMediaThumbnailLoader(
+    store: FileMediaByteStore(),
+    download: DioThumbnailDownloader().call,
+  );
+
   // El picker es un puerto sin estado; el adaptador concreto envuelve
   // `file_picker` y lee bytes cross-platform (no toca dart:io). file_picker
   // abre CUALQUIER tipo (audio/video/PDF/Office), no sólo imágenes.
@@ -164,6 +176,7 @@ void main() {
     catalogRepository: catalogRepository,
     mediaRepository: mediaRepository,
     mediaFilePicker: mediaFilePicker,
+    mediaThumbnailLoader: mediaThumbnailLoader,
   );
 
   // Dispara el check inicial: lee storage, si hay tokens valida con

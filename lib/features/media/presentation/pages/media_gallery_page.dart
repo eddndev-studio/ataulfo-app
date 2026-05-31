@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../data/cache/media_thumbnail_loader.dart';
 import '../../domain/entities/media_asset.dart';
 import '../bloc/media_gallery_bloc.dart';
 import '../widgets/media_thumbnail.dart';
@@ -17,7 +18,11 @@ import '../widgets/media_thumbnail.dart';
 /// y el bloc decide si hay algo que cargar. El callback [onSelect] (opcional)
 /// permite reusar la pantalla como picker: recibe el [MediaAsset] completo.
 class MediaGalleryPage extends StatelessWidget {
-  const MediaGalleryPage({super.key, this.onSelect});
+  const MediaGalleryPage({super.key, required this.loader, this.onSelect});
+
+  /// Resuelve los bytes de cada miniatura (cache local por ref → red). Inyectado
+  /// desde la composición para que el cache de bytes sea un singleton de sesión.
+  final MediaThumbnailLoader loader;
 
   /// Selección de un asset (picker). Recibe el [MediaAsset] completo (ref +
   /// content_type + filename) para que el caller alinee tipo↔asset y persista
@@ -44,7 +49,11 @@ class MediaGalleryPage extends StatelessWidget {
         builder: (context, state) => switch (state) {
           MediaGalleryInitial() ||
           MediaGalleryLoading() => const _LoadingView(),
-          MediaGalleryLoaded() => _LoadedView(state: state, onSelect: onSelect),
+          MediaGalleryLoaded() => _LoadedView(
+            state: state,
+            onSelect: onSelect,
+            loader: loader,
+          ),
           MediaGalleryFailed() => const _FailedView(),
         },
       ),
@@ -99,10 +108,15 @@ class _FailedView extends StatelessWidget {
 /// FAB de subida. El grid y el FAB se montan en un Stack para que el botón
 /// flote sobre el contenido (el Scaffold de la ruta no aporta floatingActionButton).
 class _LoadedView extends StatefulWidget {
-  const _LoadedView({required this.state, required this.onSelect});
+  const _LoadedView({
+    required this.state,
+    required this.onSelect,
+    required this.loader,
+  });
 
   final MediaGalleryLoaded state;
   final ValueChanged<MediaAsset>? onSelect;
+  final MediaThumbnailLoader loader;
 
   @override
   State<_LoadedView> createState() => _LoadedViewState();
@@ -162,6 +176,7 @@ class _LoadedViewState extends State<_LoadedView> {
                   controller: _controller,
                   state: state,
                   onSelect: widget.onSelect,
+                  loader: widget.loader,
                 ),
         ),
         Positioned(
@@ -179,11 +194,13 @@ class _Grid extends StatelessWidget {
     required this.controller,
     required this.state,
     required this.onSelect,
+    required this.loader,
   });
 
   final ScrollController controller;
   final MediaGalleryLoaded state;
   final ValueChanged<MediaAsset>? onSelect;
+  final MediaThumbnailLoader loader;
 
   @override
   Widget build(BuildContext context) {
@@ -224,6 +241,7 @@ class _Grid extends StatelessWidget {
         final MediaAsset asset = items[i];
         return MediaThumbnail(
           asset: asset,
+          loader: loader,
           // El picker recibe el MediaAsset completo; el consumidor extrae el ref
           // BARE (identidad) y el filename, nunca persiste la previewUrl.
           onTap: onSelect == null ? null : () => onSelect!(asset),
