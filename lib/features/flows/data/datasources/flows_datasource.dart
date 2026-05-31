@@ -1,3 +1,9 @@
+// Archivo > 400 LOC justificado: coloca el puerto de datos de Flow
+// (`FlowsDatasource`, consumer-defined) junto a su única implementación
+// `DioFlowsDatasource` y al mapeo centralizado de DioException → FlowsFailure
+// que comparten todas las rutas. Separar la interfaz de su impl fragmentaría
+// un borde HTTP cohesivo sin reuso real; el corte futuro, si crece, es
+// extraer el armado/parseo de DTOs a un helper, no partir el puerto.
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
