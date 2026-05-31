@@ -1,0 +1,116 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+
+import '../../domain/entities/media_asset.dart';
+import '../../domain/failures/media_failure.dart';
+import '../dto/media_dto.dart';
+import '../mappers/media_mapper.dart';
+
+/// Puerto de datos del catálogo de media.
+///
+/// Las implementaciones lanzan `MediaFailure` tipadas; nunca DioException
+/// cruda. El Bearer lo inyecta el AuthInterceptor del Dio principal (y maneja
+/// el refresh en 401): este datasource recibe un Dio ya configurado y sólo
+/// llama endpoints.
+abstract interface class MediaDatasource {
+  /// `POST /upload` multipart: un único part `file`. Devuelve el resultado
+  /// mínimo `{ref, previewUrl?}` (201). El backend NO devuelve metadata; se
+  /// obtiene re-listando.
+  Future<UploadedMedia> upload({
+    required Uint8List bytes,
+    required String filename,
+  });
+
+  /// `GET /media-assets?cursor=&limit=` paginado. Devuelve una página
+  /// (assets + nextCursor opaco).
+  Future<MediaPage> listAssets({String? cursor, int? limit});
+}
+
+class DioMediaDatasource implements MediaDatasource {
+  DioMediaDatasource(this._dio);
+
+  final Dio _dio;
+
+  @override
+  Future<UploadedMedia> upload({
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    try {
+      // El part se nombra `file` (lo que el backend espera). Dio fija el
+      // Content-Type multipart con boundary al detectar el FormData, anulando
+      // el `application/json` por defecto del cliente.
+      final form = FormData.fromMap(<String, dynamic>{
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final res = await _dio.post<Map<String, dynamic>>('/upload', data: form);
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownMediaFailure();
+      }
+      return MediaMapper.uploadRespToEntity(UploadResp.fromJson(body));
+    } on MediaFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownMediaFailure();
+    } on TypeError {
+      throw const UnknownMediaFailure();
+    }
+  }
+
+  @override
+  Future<MediaPage> listAssets({String? cursor, int? limit}) async {
+    try {
+      // Omitimos cada clave cuando el valor es null (null-aware element): el
+      // backend distingue "sin cursor" (primera página) de un cursor vacío.
+      final query = <String, dynamic>{'cursor': ?cursor, 'limit': ?limit};
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/media-assets',
+        queryParameters: query,
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownMediaFailure();
+      }
+      return MediaMapper.listRespToPage(MediaListResp.fromJson(body));
+    } on MediaFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownMediaFailure();
+    } on TypeError {
+      // `cast<Map<String,dynamic>>` rompe si el wire mete un tipo inesperado.
+      throw const UnknownMediaFailure();
+    }
+  }
+
+  /// Traduce DioException a la jerarquía sellada. 413/415 son específicos de la
+  /// subida; 401 final (refresh agotado) y 400 (form/cursor inválido) colapsan
+  /// a Unknown — el AuthInterceptor ya intentó el refresh.
+  MediaFailure _mapDioException(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return const MediaTimeoutFailure();
+      case DioExceptionType.connectionError:
+        return const MediaNetworkFailure();
+      case DioExceptionType.badResponse:
+        final status = e.response?.statusCode ?? 0;
+        if (status == 403) return const MediaForbiddenFailure();
+        if (status == 404) return const MediaNotFoundFailure();
+        if (status == 413) return const MediaTooLargeFailure();
+        if (status == 415) return const MediaUnsupportedTypeFailure();
+        if (status >= 500 && status < 600) return const MediaServerFailure();
+        return const UnknownMediaFailure();
+      case DioExceptionType.cancel:
+      case DioExceptionType.badCertificate:
+      case DioExceptionType.unknown:
+        return const UnknownMediaFailure();
+    }
+  }
+}
