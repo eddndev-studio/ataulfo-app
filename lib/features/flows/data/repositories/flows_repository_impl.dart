@@ -51,6 +51,7 @@ class FlowsRepositoryImpl implements FlowsRepository {
   Future<fdom.Step> patchStep({
     required String stepId,
     String? content,
+    String? mediaRef,
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
@@ -59,6 +60,7 @@ class FlowsRepositoryImpl implements FlowsRepository {
   }) => _ds.patchStep(
     stepId: stepId,
     content: content,
+    mediaRef: mediaRef,
     delayMs: delayMs,
     jitterPct: jitterPct,
     aiOnly: aiOnly,

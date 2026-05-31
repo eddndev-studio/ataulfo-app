@@ -52,9 +52,13 @@ abstract interface class FlowsRepository {
   /// `metadataJson` viaja con el shape literal de `Step.metadata`. Hoy
   /// solo CONDITIONAL_TIME lo necesita (ventanas horarias); otros tipos
   /// no exponen edición de metadata desde la UI.
+  ///
+  /// `mediaRef` viaja cuando se reemplaza el recurso de un step
+  /// multimedia. Es el `ref` BARE canónico, nunca la URL firmada.
   Future<fdom.Step> patchStep({
     required String stepId,
     String? content,
+    String? mediaRef,
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
