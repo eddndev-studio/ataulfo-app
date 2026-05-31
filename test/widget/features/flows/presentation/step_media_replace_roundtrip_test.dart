@@ -169,6 +169,16 @@ void main() {
       await tester.tap(find.byKey(const Key('step_edit.media_change')));
       await tester.pumpAndSettle();
 
+      // El reemplazo también abre la galería FILTRADA por la familia del paso
+      // (IMAGE): el sheet pasó family='image' al picker.
+      verify(
+        () => mediaRepo.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: 'image',
+        ),
+      ).called(greaterThanOrEqualTo(1));
+
       // La galería cargó (repo fake) y la miniatura es tappable.
       expect(find.byType(MediaThumbnail), findsOneWidget);
       await tester.tap(find.byType(MediaThumbnail));
