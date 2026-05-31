@@ -25,6 +25,7 @@ import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/media/data/cache/caching_media_thumbnail_loader.dart';
 import 'features/media/data/cache/dio_thumbnail_downloader.dart';
 import 'features/media/data/cache/file_media_byte_store.dart';
+import 'features/media/data/cache/file_media_page_store.dart';
 import 'features/media/data/datasources/media_datasource.dart';
 import 'features/media/data/repositories/caching_media_repository.dart';
 import 'features/media/data/repositories/file_picker_media_file_picker.dart';
@@ -143,8 +144,17 @@ void main() {
   // a nivel de sesión (este singleton sobrevive a las entradas/salidas de la
   // galería, que es donde el bloc page-scoped re-listaba en cada visita). Se
   // purga en logout vía `onSignedOut` más abajo.
+  //
+  // Capa persistente + offline: persiste la primera página por `(orgId, type)`
+  // en disco y la sirve (stale) si la red falla. El `orgId` sale de los claims
+  // de auth y namespacea el disco — sin él (no autenticado) no se persiste.
   final mediaRepository = CachingMediaRepository(
     MediaRepositoryImpl(datasource: DioMediaDatasource(mainDio)),
+    store: FileMediaPageStore(),
+    orgId: () {
+      final state = authBloc.state;
+      return state is AuthAuthenticated ? state.identity.orgId : null;
+    },
   );
 
   // Cache de bytes de miniatura por `ref` (inmutable, org-safe: el ref embebe
