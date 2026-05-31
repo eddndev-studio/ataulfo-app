@@ -455,9 +455,10 @@ void main() {
     });
 
     testWidgets(
-      'editing multimedia muestra el chip read-only con el ref original y '
-      'sin botón "Cambiar"',
+      'editing multimedia SIN pickMediaRef muestra el chip read-only con el '
+      'ref original y sin botón "Cambiar"',
       (tester) async {
+        // Sin callback el media queda read-only (no hay vía para reemplazar).
         await pumpHost(tester, editing: imgStep);
 
         // El chip "Recurso seleccionado" está presente con una cola del ref.
@@ -468,7 +469,7 @@ void main() {
         expect(find.textContaining('orig.png'), findsOneWidget);
         // No hay selector "Seleccionar multimedia" (ya hay ref).
         expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
-        // En edición el media es read-only: no hay botón "Cambiar".
+        // Sin callback no hay botón "Cambiar".
         expect(find.byKey(const Key('step_edit.media_change')), findsNothing);
       },
     );
