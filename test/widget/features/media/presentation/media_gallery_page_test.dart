@@ -130,6 +130,64 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'LINCHPIN: onSelect recibe el ref BARE del asset, NUNCA la previewUrl',
+    (tester) async {
+      // Invariante arc-wide: la galería usada como picker devuelve la
+      // identidad estable (`ref` BARE), jamás la URL firmada efímera.
+      // Un asset con ref != previewUrl prueba que el ref gana aun cuando
+      // hay una previewUrl presente.
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[
+            _asset('media/abc', previewUrl: 'https://signed/abc'),
+          ],
+          nextCursor: '',
+        ),
+      );
+
+      String? captured;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: BlocProvider<MediaGalleryBloc>.value(
+            value: bloc,
+            child: Scaffold(
+              body: MediaGalleryPage(onSelect: (ref) => captured = ref),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(MediaThumbnail));
+      await tester.pump();
+
+      // Aserción positiva (null-failing): si el tap no llega a la closure,
+      // captured queda null y esta línea falla.
+      expect(captured, 'media/abc');
+      // Y explícitamente NO la previewUrl firmada.
+      expect(captured, isNot('https://signed/abc'));
+    },
+  );
+
+  testWidgets('sin onSelect (visor) el tap a la miniatura no lanza', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      MediaGalleryLoaded(
+        items: <MediaAsset>[
+          _asset('media/abc', previewUrl: 'https://signed/abc'),
+        ],
+        nextCursor: '',
+      ),
+    );
+    // host() construye MediaGalleryPage() con onSelect == null.
+    await tester.pumpWidget(host());
+    await tester.tap(find.byType(MediaThumbnail));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('FAB de subida dispara MediaGalleryUploadRequested', (
     tester,
   ) async {
