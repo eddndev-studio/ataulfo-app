@@ -474,6 +474,37 @@ void main() {
     );
 
     testWidgets(
+      'editing multimedia con pickMediaRef cableado SIGUE read-only — el sheet '
+      'neutraliza el callback al editar (sin "Cambiar", picker nunca invocado)',
+      (tester) async {
+        // Espeja producción: _openStepSheet cablea pickMediaRef SIEMPRE, tanto
+        // al crear como al editar. El read-only en edición no puede descansar
+        // en "el caller no pasó callback" — debe nacer del propio sheet, que
+        // anula el picker cuando editing != null. Este test le da dientes a esa
+        // neutralización: con el callback presente, si el sheet dejara de
+        // anularlo el botón "Cambiar" reaparecería y este expect fallaría.
+        var pickerCalls = 0;
+        await pumpHost(
+          tester,
+          editing: imgStep,
+          pickMediaRef: (_) async {
+            pickerCalls++;
+            return 'tenant/o/media/otro.png';
+          },
+        );
+
+        expect(
+          find.byKey(const Key('step_edit.media_selected')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('step_edit.media_change')), findsNothing);
+        expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
+        // Nada en el chip read-only dispara el picker.
+        expect(pickerCalls, 0);
+      },
+    );
+
+    testWidgets(
       'editing multimedia: cambiar caption dispatcha UpdateRequested(content) only-changed',
       (tester) async {
         await pumpHost(tester, editing: imgStep);
