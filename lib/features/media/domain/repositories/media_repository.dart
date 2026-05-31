@@ -16,7 +16,8 @@ abstract interface class MediaRepository {
   });
 
   /// Lista una página del catálogo (`GET /media-assets`). [cursor] vacío/null
-  /// pide la primera página; [limit] acota el tamaño. `MediaPage.nextCursor`
-  /// vacío ⇒ no hay más páginas.
-  Future<MediaPage> listAssets({String? cursor, int? limit});
+  /// pide la primera página; [limit] acota el tamaño; [type] filtra por familia
+  /// del content-type (image|video|audio|document), null ⇒ sin filtro.
+  /// `MediaPage.nextCursor` vacío ⇒ no hay más páginas.
+  Future<MediaPage> listAssets({String? cursor, int? limit, String? type});
 }
