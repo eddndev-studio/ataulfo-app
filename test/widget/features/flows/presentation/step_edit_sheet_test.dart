@@ -35,7 +35,16 @@ void main() {
   // El sheet con todos los controles + form CONDITIONAL_TIME (chip
   // picker + ventanas con time pickers + dropdowns) supera el viewport
   // default de flutter_test (800x600). `pumpHost` agranda y restaura.
-  Future<void> pumpHost(WidgetTester tester, {fdom.Step? editing}) async {
+  //
+  // [pickMediaRef] cablea el selector de multimedia. Cuando es null el
+  // selector es read-only (no abre nada): así el sheet sigue testeable
+  // aislado. Los tests que ejercen la selección pasan un fake que
+  // devuelve un `ref` BARE conocido.
+  Future<void> pumpHost(
+    WidgetTester tester, {
+    fdom.Step? editing,
+    MediaRefPicker? pickMediaRef,
+  }) async {
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -46,7 +55,12 @@ void main() {
         home: BlocProvider<FlowStepsBloc>.value(
           value: bloc,
           child: Scaffold(
-            body: SafeArea(child: StepEditSheet(editing: editing)),
+            body: SafeArea(
+              child: StepEditSheet(
+                editing: editing,
+                pickMediaRef: pickMediaRef,
+              ),
+            ),
           ),
         ),
       ),
@@ -206,37 +220,37 @@ void main() {
       },
     );
 
-    testWidgets(
-      'media_url aparece al elegir tipo multimedia y desaparece en TEXT',
-      (tester) async {
-        await pumpHost(tester);
+    testWidgets('el selector de multimedia aparece al elegir tipo multimedia y '
+        'desaparece en TEXT', (tester) async {
+      await pumpHost(tester);
 
-        // TEXT por default → sin media_url
-        expect(find.byKey(const Key('step_edit.media_url')), findsNothing);
+      // TEXT por default → sin selector de multimedia.
+      expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
 
-        // Cambio a IMAGE → media_url visible
-        await tester.tap(find.byKey(const Key('step_edit.type.image')));
-        await tester.pump();
-        expect(find.byKey(const Key('step_edit.media_url')), findsOneWidget);
+      // Cambio a IMAGE → el selector "Seleccionar multimedia" aparece.
+      await tester.tap(find.byKey(const Key('step_edit.type.image')));
+      await tester.pump();
+      expect(find.byKey(const Key('step_edit.media_picker')), findsOneWidget);
 
-        // Vuelvo a TEXT → media_url se oculta
-        await tester.tap(find.byKey(const Key('step_edit.type.text')));
-        await tester.pump();
-        expect(find.byKey(const Key('step_edit.media_url')), findsNothing);
-      },
-    );
+      // Vuelvo a TEXT → el selector se oculta.
+      await tester.tap(find.byKey(const Key('step_edit.type.text')));
+      await tester.pump();
+      expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
+    });
 
     testWidgets(
-      'submit multimedia con media_url y caption vacío dispatcha AddRequested',
+      'elegir un asset vía el picker y submit dispatcha AddRequested con el '
+      'ref BARE devuelto (caption vacío)',
       (tester) async {
-        await pumpHost(tester);
+        // El picker fake devuelve el `ref` BARE canónico. El evento
+        // despachado DEBE llevar exactamente ese ref — re-pinea el
+        // linchpin a nivel del sheet: lo que se persiste es el ref BARE.
+        const bareRef = 'tenant/org1/media/abc123.png';
+        await pumpHost(tester, pickMediaRef: (_) async => bareRef);
 
         await tester.tap(find.byKey(const Key('step_edit.type.image')));
         await tester.pump();
-        await tester.enterText(
-          find.byKey(const Key('step_edit.media_url')),
-          'http://x.png',
-        );
+        await tester.tap(find.byKey(const Key('step_edit.media_picker')));
         await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.submit')));
         await tester.pump();
@@ -245,7 +259,7 @@ void main() {
           () => bloc.add(
             const FlowStepsAddRequested(
               type: fdom.StepType.image,
-              mediaRef: 'http://x.png',
+              mediaRef: bareRef,
               content: '',
               delayMs: 0,
               jitterPct: 0,
@@ -256,19 +270,40 @@ void main() {
       },
     );
 
-    testWidgets('submit multimedia sin media_url es no-op (gate del trim)', (
+    testWidgets('submit multimedia sin selección es no-op (gate del trim)', (
       tester,
     ) async {
-      await pumpHost(tester);
+      await pumpHost(tester, pickMediaRef: (_) async => 'tenant/o/media/x.png');
 
       await tester.tap(find.byKey(const Key('step_edit.type.image')));
       await tester.pump();
-      // Sin enterText en media_url
+      // Sin tocar el picker → _mediaCtrl sigue vacío.
       await tester.tap(find.byKey(const Key('step_edit.submit')));
       await tester.pump();
 
       verifyNever(() => bloc.add(any()));
     });
+
+    testWidgets(
+      'cancelar el picker (devuelve null) no cambia nada; submit sigue no-op',
+      (tester) async {
+        await pumpHost(tester, pickMediaRef: (_) async => null);
+
+        await tester.tap(find.byKey(const Key('step_edit.type.image')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.media_picker')));
+        await tester.pump();
+
+        // Sin ref seleccionado: el selector sigue presente y no hay chip.
+        expect(find.byKey(const Key('step_edit.media_picker')), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.media_selected')), findsNothing);
+
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verifyNever(() => bloc.add(any()));
+      },
+    );
   });
 
   group('StepEditSheet (Edit mode)', () {
@@ -420,12 +455,52 @@ void main() {
     });
 
     testWidgets(
-      'editing multimedia muestra media_url con el valor original (read-only)',
+      'editing multimedia muestra el chip read-only con el ref original y '
+      'sin botón "Cambiar"',
       (tester) async {
         await pumpHost(tester, editing: imgStep);
 
-        expect(find.byKey(const Key('step_edit.media_url')), findsOneWidget);
-        expect(find.text('https://x/orig.png'), findsOneWidget);
+        // El chip "Recurso seleccionado" está presente con una cola del ref.
+        expect(
+          find.byKey(const Key('step_edit.media_selected')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('orig.png'), findsOneWidget);
+        // No hay selector "Seleccionar multimedia" (ya hay ref).
+        expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
+        // En edición el media es read-only: no hay botón "Cambiar".
+        expect(find.byKey(const Key('step_edit.media_change')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'editing multimedia con pickMediaRef cableado SIGUE read-only — el sheet '
+      'neutraliza el callback al editar (sin "Cambiar", picker nunca invocado)',
+      (tester) async {
+        // Espeja producción: _openStepSheet cablea pickMediaRef SIEMPRE, tanto
+        // al crear como al editar. El read-only en edición no puede descansar
+        // en "el caller no pasó callback" — debe nacer del propio sheet, que
+        // anula el picker cuando editing != null. Este test le da dientes a esa
+        // neutralización: con el callback presente, si el sheet dejara de
+        // anularlo el botón "Cambiar" reaparecería y este expect fallaría.
+        var pickerCalls = 0;
+        await pumpHost(
+          tester,
+          editing: imgStep,
+          pickMediaRef: (_) async {
+            pickerCalls++;
+            return 'tenant/o/media/otro.png';
+          },
+        );
+
+        expect(
+          find.byKey(const Key('step_edit.media_selected')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('step_edit.media_change')), findsNothing);
+        expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
+        // Nada en el chip read-only dispara el picker.
+        expect(pickerCalls, 0);
       },
     );
 
@@ -456,7 +531,7 @@ void main() {
 
   group('StepEditSheet (Add mode · conditionalTime)', () {
     testWidgets(
-      'pick chip Condicional muestra el form CT y oculta content/media_url',
+      'pick chip Condicional muestra el form CT y oculta content/selector',
       (tester) async {
         await pumpHost(tester);
 
@@ -467,9 +542,9 @@ void main() {
 
         // El form CT está presente.
         expect(find.byKey(const Key('ct_form.tz_dropdown')), findsOneWidget);
-        // content y media_url están ocultos.
+        // content y el selector de multimedia están ocultos.
         expect(find.byKey(const Key('step_edit.content')), findsNothing);
-        expect(find.byKey(const Key('step_edit.media_url')), findsNothing);
+        expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
       },
     );
 

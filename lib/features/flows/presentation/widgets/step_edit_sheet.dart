@@ -23,6 +23,13 @@ import '../bloc/flow_steps_bloc.dart';
 import 'conditional_time_form.dart';
 import 'step_type_label.dart';
 
+/// Abre un selector de multimedia y devuelve el `ref` BARE elegido, o `null`
+/// si el usuario cancela. La identidad que viaja es siempre el ref BARE
+/// canónico (`tenant/<org>/media/<id>[.<ext>]`) — JAMÁS la `previewUrl`
+/// firmada efímera. El `BuildContext` se pasa para que el selector pueda
+/// navegar (p. ej. `context.push('/media/pick')`).
+typedef MediaRefPicker = Future<String?> Function(BuildContext context);
+
 /// Modal sheet de creación/edición de un step TEXT (S11 F5a). Cuenta
 /// con tres controles: `content` (TextField multiline), `delayMs` y
 /// `jitterPct` (sliders), y `aiOnly` (switch).
@@ -44,12 +51,18 @@ import 'step_type_label.dart';
 /// - MutationFailed ⇒ sigue montado; copy específico por cubo permite
 ///   al operador corregir y reintentar.
 class StepEditSheet extends StatefulWidget {
-  const StepEditSheet({super.key, this.editing});
+  const StepEditSheet({super.key, this.editing, this.pickMediaRef});
 
   /// `null` ⇒ modo creación. No-null ⇒ modo edición; el sheet se
   /// pre-llena con los valores actuales del step y el submit hace
   /// only-changed contra el original.
   final fdom.Step? editing;
+
+  /// Abre el selector de multimedia (galería en modo picker) y resuelve al
+  /// `ref` BARE elegido. `null` ⇒ el selector queda read-only: no abre nada,
+  /// lo que mantiene el sheet testeable aislado y deja el modo edición de
+  /// multimedia read-only.
+  final MediaRefPicker? pickMediaRef;
 
   @override
   State<StepEditSheet> createState() => _StepEditSheetState();
@@ -321,17 +334,18 @@ class _StepEditSheetState extends State<StepEditSheet> {
                   ] else ...<Widget>[
                     if (_isMultimedia) ...<Widget>[
                       const SizedBox(height: AppTokens.sp4),
-                      AppTextField(
-                        key: const Key('step_edit.media_url'),
-                        label: 'URL o id del recurso',
-                        hint: 'https://… o id opaco del archivo subido',
+                      _MediaField(
                         controller: _mediaCtrl,
-                        // En edit el mediaRef es read-only por la misma
-                        // razón que el picker se oculta: cambiar el recurso
-                        // multimedia equivale a otro step. Edición de
-                        // media (replace de archivo) entra cuando S16
-                        // (media-storage) y file pickers aterricen.
-                        enabled: !isMutating && widget.editing == null,
+                        // Interactivo sólo al crear: en edición el media es
+                        // read-only porque cambiar el recurso equivale a otro
+                        // step (el tipo es inmutable y el backend valida que
+                        // multimedia lleve mediaRef). Sin `pickMediaRef` el
+                        // selector tampoco abre nada — el sheet sigue usable
+                        // aislado.
+                        pickMediaRef: widget.editing == null
+                            ? widget.pickMediaRef
+                            : null,
+                        enabled: !isMutating,
                       ),
                     ],
                     const SizedBox(height: AppTokens.sp4),
@@ -571,6 +585,133 @@ class _TypePicker extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Selector del recurso multimedia del step. El [controller] es la fuente de
+/// verdad del `ref` BARE: el gate de submit y el evento de creación leen
+/// `controller.text`, no este widget.
+///
+/// Sin ref: muestra un control tappable (`step_edit.media_picker`) que abre
+/// la galería en modo picker vía [pickMediaRef] y guarda el ref devuelto. Con
+/// ref: muestra un chip (`step_edit.media_selected`) con una cola corta del
+/// ref más un botón "Cambiar" (`step_edit.media_change`) que reabre el picker.
+///
+/// El widget es read-only cuando [pickMediaRef] es `null` o cuando [enabled]
+/// es false (mutación en vuelo): el control no abre nada y el chip no expone
+/// "Cambiar". NUNCA renderiza la `previewUrl` ni una miniatura — sólo el ref
+/// BARE en texto —, así no arrastra la URL firmada efímera a la UI.
+class _MediaField extends StatelessWidget {
+  const _MediaField({
+    required this.controller,
+    required this.pickMediaRef,
+    required this.enabled,
+  });
+
+  final TextEditingController controller;
+  final MediaRefPicker? pickMediaRef;
+  final bool enabled;
+
+  bool get _interactive => enabled && pickMediaRef != null;
+
+  Future<void> _pick(BuildContext context) async {
+    final picker = pickMediaRef;
+    if (picker == null) return;
+    final ref = await picker(context);
+    if (ref == null || ref.trim().isEmpty) return;
+    // Setear el texto dispara el listener del controller (en el padre), que
+    // hace setState y re-renderiza con el chip seleccionado.
+    controller.text = ref.trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final ref = controller.text.trim();
+    if (ref.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Recurso',
+            style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+          ),
+          const SizedBox(height: AppTokens.sp2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppButton.tonal(
+              key: const Key('step_edit.media_picker'),
+              label: 'Seleccionar multimedia',
+              icon: Icons.perm_media_outlined,
+              onPressed: _interactive ? () => _pick(context) : null,
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Recurso',
+          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+        ),
+        const SizedBox(height: AppTokens.sp2),
+        Container(
+          key: const Key('step_edit.media_selected'),
+          padding: const EdgeInsets.all(AppTokens.sp3),
+          decoration: BoxDecoration(
+            color: AppTokens.surface2,
+            borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+          ),
+          child: Row(
+            children: <Widget>[
+              const Icon(
+                Icons.check_circle_outline,
+                size: 18,
+                color: AppTokens.primary,
+              ),
+              const SizedBox(width: AppTokens.sp2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Recurso seleccionado', style: textTheme.bodyMedium),
+                    const SizedBox(height: AppTokens.sp1),
+                    Text(
+                      // Cola corta del ref (display-only). La fuente de verdad
+                      // sigue siendo el ref BARE completo en el controller.
+                      _shortRef(ref),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        color: AppTokens.text2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_interactive)
+                AppButton.text(
+                  key: const Key('step_edit.media_change'),
+                  label: 'Cambiar',
+                  onPressed: () => _pick(context),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Cola corta del ref BARE para mostrar en el chip (display-only): el último
+/// segmento del path (el nombre/id del archivo). Si el ref no tiene `/`, se
+/// muestra completo. NUNCA se persiste esta forma corta — sólo se pinta.
+String _shortRef(String ref) {
+  final slash = ref.lastIndexOf('/');
+  if (slash < 0 || slash == ref.length - 1) return ref;
+  return ref.substring(slash + 1);
 }
 
 /// Extrae los `order` de los steps vigentes del bloc state para los

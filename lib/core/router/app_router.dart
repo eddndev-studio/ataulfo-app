@@ -463,6 +463,24 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        // La misma galería en modo selección: un `push` a esta ruta abre el
+        // grid como picker; tocar un asset hace pop devolviendo su `ref` BARE
+        // al caller que espera el resultado. La `previewUrl` firmada NUNCA
+        // sale por aquí — sólo el ref canónico que se persiste en el step.
+        // Segmento extra bajo `/media` (no compite por orden de match al no
+        // existir un `/media/:id`).
+        path: '/media/pick',
+        builder: (context, _) => BlocProvider<MediaGalleryBloc>(
+          create: (_) =>
+              MediaGalleryBloc(repo: _mediaRepo, picker: _mediaFilePicker)
+                ..add(const MediaGalleryLoadRequested()),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Elegir multimedia')),
+            body: MediaGalleryPage(onSelect: (ref) => context.pop(ref)),
+          ),
+        ),
+      ),
+      GoRoute(
         // Crear bot dentro del namespace de su Template padre. Forzar el
         // templateId como path param es la garantía estructural de que el
         // formulario (`BotCreatePage`) siempre nace ligado a una plantilla

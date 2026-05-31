@@ -6,6 +6,7 @@
 // _StepCard + _StepBody a `widgets/step_card.dart` será el primer corte.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -490,7 +491,12 @@ void _openStepSheet(BuildContext context, sdom.Step? step) {
     isScrollControlled: true,
     builder: (sheetCtx) => BlocProvider<FlowStepsBloc>.value(
       value: bloc,
-      child: StepEditSheet(editing: step),
+      // Al crear un step multimedia, el selector abre la galería en modo
+      // picker (`/media/pick`) que devuelve el `ref` BARE vía pop.
+      child: StepEditSheet(
+        editing: step,
+        pickMediaRef: (ctx) => ctx.push<String>('/media/pick'),
+      ),
     ),
   );
 }
