@@ -50,4 +50,9 @@ void main() {
     expect(result, page);
     verify(() => ds.listAssets(cursor: 'c', limit: 10)).called(1);
   });
+
+  test('invalidate es no-op: no toca el datasource ni lanza', () {
+    expect(repo.invalidate, returnsNormally);
+    verifyZeroInteractions(ds);
+  });
 }
