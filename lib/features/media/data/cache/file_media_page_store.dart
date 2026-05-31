@@ -69,8 +69,15 @@ class FileMediaPageStore implements MediaPageStore {
 
   @override
   Future<void> clear() async {
-    final base = await _directoryProvider();
-    final dir = Directory('${base.path}/$_subdir');
-    if (dir.existsSync()) await dir.delete(recursive: true);
+    // Best-effort, igual que read/write: un clear concurrente puede haber
+    // borrado ya el dir entre el existsSync y el delete (TOCTOU), o una
+    // escritura puede estar recreándolo. Tragamos el error — si el dir ya no
+    // está, el objetivo (que no quede nada) ya se cumplió. Sin esto, al ir
+    // `unawaited` sería un error de zona no capturado (no hay guard global).
+    try {
+      final base = await _directoryProvider();
+      final dir = Directory('${base.path}/$_subdir');
+      if (dir.existsSync()) await dir.delete(recursive: true);
+    } catch (_) {}
   }
 }

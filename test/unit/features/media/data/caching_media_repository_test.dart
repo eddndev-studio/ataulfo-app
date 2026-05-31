@@ -15,6 +15,7 @@ class _FakeStore implements MediaPageStore {
   final Map<String, MediaPage> _data = <String, MediaPage>{};
   final List<List<Object?>> writes = <List<Object?>>[];
   int clears = 0;
+  bool throwOnWrite = false;
 
   String _k(String org, String? type) => '$org|${type ?? '_all'}';
 
@@ -26,6 +27,7 @@ class _FakeStore implements MediaPageStore {
 
   @override
   Future<void> write(String org, String? type, MediaPage p) async {
+    if (throwOnWrite) throw Exception('disk full');
     writes.add(<Object?>[org, type, p]);
     _data[_k(org, type)] = p;
   }
@@ -319,8 +321,8 @@ void main() {
         ),
       ).thenThrow(const MediaNetworkFailure());
 
-      expect(
-        () => withDisk(store).listAssets(type: 'image'),
+      await expectLater(
+        withDisk(store).listAssets(type: 'image'),
         throwsA(isA<MediaNetworkFailure>()),
       );
     });
@@ -355,11 +357,71 @@ void main() {
           type: any(named: 'type'),
         ),
       ).thenThrow(const MediaNetworkFailure());
-      expect(
-        () => repo.listAssets(type: 'video'),
+      await expectLater(
+        repo.listAssets(type: 'video'),
         throwsA(isA<MediaNetworkFailure>()),
       );
     });
+
+    test(
+      'un error que NO es MediaFailure se propaga (no sirve stale)',
+      () async {
+        // Un bug del datasource (TypeError, StateError…) NO debe enmascararse
+        // sirviendo una página vieja: sólo un fallo de red cae al disco.
+        final store = _FakeStore()
+          ..seed('org-1', 'image', _page(<String>['media/old']));
+        when(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: any(named: 'type'),
+          ),
+        ).thenThrow(StateError('bug del mapper'));
+
+        await expectLater(
+          withDisk(store).listAssets(type: 'image'),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+
+    test('la lista online se devuelve aunque el write a disco falle', () async {
+      final store = _FakeStore()..throwOnWrite = true;
+      stubList(_page(<String>['media/a']));
+      final page = await withDisk(store).listAssets(type: 'image');
+      expect(page, _page(<String>['media/a']));
+    });
+
+    test(
+      'la página stale servida offline NO se memoiza: la siguiente reintenta la red',
+      () async {
+        final store = _FakeStore()
+          ..seed('org-1', 'image', _page(<String>['media/old']));
+        var calls = 0;
+        when(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: any(named: 'type'),
+          ),
+        ).thenAnswer((_) async {
+          calls++;
+          if (calls == 1) throw const MediaNetworkFailure();
+          return _page(<String>['media/fresh']);
+        });
+        final repo = withDisk(store);
+
+        expect(
+          await repo.listAssets(type: 'image'),
+          _page(<String>['media/old']),
+        );
+        // La segunda entrada reintenta la red (no quedó memoizada la stale).
+        expect(
+          await repo.listAssets(type: 'image'),
+          _page(<String>['media/fresh']),
+        );
+      },
+    );
   });
 }
 

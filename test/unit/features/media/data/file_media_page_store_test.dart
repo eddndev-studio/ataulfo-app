@@ -76,4 +76,24 @@ void main() {
     await f.writeAsString('}{ no es json valido');
     expect(await s.read('org-1', 'image'), isNull);
   });
+
+  test('JSON válido pero de otro esquema se trata como miss', () async {
+    final s = store();
+    await s.write('org-1', 'image', page('a'));
+    final dir = Directory('${tmp.path}/media_pages');
+    final f = dir.listSync().whereType<File>().first;
+    // Parsea como JSON pero le faltan `nextCursor`/`assets`: el cast falla y se
+    // trata como miss (compat hacia adelante si el esquema en disco cambiara).
+    await f.writeAsString('{"unexpected": true}');
+    expect(await s.read('org-1', 'image'), isNull);
+  });
+
+  test('clear concurrente / repetido no lanza (best-effort)', () async {
+    final s = store();
+    await s.write('org-1', 'image', page('a')); // crea el dir
+    // Varios clear en vuelo a la vez: el segundo no debe explotar al encontrar
+    // el directorio ya borrado por el primero (TOCTOU del delete recursivo).
+    await Future.wait(<Future<void>>[s.clear(), s.clear(), s.clear()]);
+    expect(await s.read('org-1', 'image'), isNull);
+  });
 }

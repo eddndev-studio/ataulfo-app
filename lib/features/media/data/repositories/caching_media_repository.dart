@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import '../../domain/entities/media_asset.dart';
+import '../../domain/failures/media_failure.dart';
 import '../../domain/repositories/media_page_store.dart';
 import '../../domain/repositories/media_repository.dart';
 
@@ -115,7 +116,10 @@ class CachingMediaRepository implements MediaRepository {
         } catch (_) {}
       }
       return page;
-    } catch (_) {
+    } on MediaFailure {
+      // Sólo un fallo del catálogo (red/server tipado) cae al disco. Un error
+      // no-MediaFailure (bug del datasource: TypeError, StateError…) se propaga:
+      // enmascararlo sirviendo stale escondería el bug.
       if (_store != null && org != null) {
         final persisted = await _store.read(org, type);
         // Stale a propósito: no se memoiza en L1 para que cada entrada reintente
