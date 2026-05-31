@@ -75,14 +75,12 @@ void main() {
 
   // El host monta un GoRouter con dos rutas: la host abre el StepEditSheet
   // (vía showModalBottomSheet, igual que la app real) con el callback REAL
-  // `ctx.push('/media/pick')`, y `/media/pick` monta la galería-picker que
-  // devuelve el ref con `context.pop(ref)`. La galería-picker usa el
-  // `onSelect` que `context.pop(refDevuelto)` para que el test pueda mutar
-  // qué se devuelve (ref vs previewUrl) y verificar los dientes.
-  Future<void> pumpHost(
-    WidgetTester tester, {
-    required String Function(MediaAsset) onSelectValue,
-  }) async {
+  // `ctx.push('/media/pick')`, y `/media/pick` monta la galería-picker con
+  // EXACTAMENTE el mismo `onSelect: (ref) => context.pop(ref)` que la ruta
+  // real. Así el valor que vuelve al sheet es el que la galería emite por
+  // `onSelect`, no un valor calculado por una vía lateral: el test captura
+  // tanto una regresión de cableado como una de "la galería emite previewUrl".
+  Future<void> pumpHost(WidgetTester tester) async {
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -130,9 +128,7 @@ void main() {
                   ..add(const MediaGalleryLoadRequested()),
             child: Scaffold(
               appBar: AppBar(title: const Text('Elegir multimedia')),
-              body: MediaGalleryPage(
-                onSelect: (ref) => context.pop(onSelectValue(asset)),
-              ),
+              body: MediaGalleryPage(onSelect: (ref) => context.pop(ref)),
             ),
           ),
         ),
@@ -148,8 +144,7 @@ void main() {
     'push(/media/pick) → tap miniatura → pop(ref BARE) → submit despacha '
     'AddRequested con el ref BARE (NO la previewUrl)',
     (tester) async {
-      // onSelect devuelve el ref BARE — el comportamiento de producción.
-      await pumpHost(tester, onSelectValue: (a) => a.ref);
+      await pumpHost(tester);
 
       // Abrir el sheet, elegir IMAGE, abrir el picker.
       await tester.tap(find.byKey(const Key('host.open_sheet')));
