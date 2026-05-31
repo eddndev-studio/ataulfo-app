@@ -52,24 +52,26 @@ void main() {
   }
 
   group('CachingMediaRepository — primera página', () {
-    test('memoiza por type: dos llamadas ⇒ el inner se pega una sola vez',
-        () async {
-      stubList(_page(<String>['media/a']));
-      final repo = build();
+    test(
+      'memoiza por type: dos llamadas ⇒ el inner se pega una sola vez',
+      () async {
+        stubList(_page(<String>['media/a']));
+        final repo = build();
 
-      final p1 = await repo.listAssets(type: 'image');
-      final p2 = await repo.listAssets(type: 'image');
+        final p1 = await repo.listAssets(type: 'image');
+        final p2 = await repo.listAssets(type: 'image');
 
-      expect(p1, _page(<String>['media/a']));
-      expect(p2, p1);
-      verify(
-        () => inner.listAssets(
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-          type: 'image',
-        ),
-      ).called(1);
-    });
+        expect(p1, _page(<String>['media/a']));
+        expect(p2, p1);
+        verify(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'image',
+          ),
+        ).called(1);
+      },
+    );
 
     test('cursor != null NUNCA se cachea: siempre delega al inner', () async {
       stubList(_page(<String>['media/b'], nextCursor: 'c2'));
@@ -87,119 +89,132 @@ void main() {
       ).called(2);
     });
 
-    test('aislamiento por familia: image y video se cachean por separado',
-        () async {
-      when(
-        () => inner.listAssets(
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-          type: 'image',
-        ),
-      ).thenAnswer((_) async => _page(<String>['media/img']));
-      when(
-        () => inner.listAssets(
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-          type: 'video',
-        ),
-      ).thenAnswer((_) async => _page(<String>['media/vid']));
-      final repo = build();
+    test(
+      'aislamiento por familia: image y video se cachean por separado',
+      () async {
+        when(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'image',
+          ),
+        ).thenAnswer((_) async => _page(<String>['media/img']));
+        when(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'video',
+          ),
+        ).thenAnswer((_) async => _page(<String>['media/vid']));
+        final repo = build();
 
-      final img = await repo.listAssets(type: 'image');
-      final vid = await repo.listAssets(type: 'video');
-      final img2 = await repo.listAssets(type: 'image');
+        final img = await repo.listAssets(type: 'image');
+        final vid = await repo.listAssets(type: 'video');
+        final img2 = await repo.listAssets(type: 'image');
 
-      expect(img.assets.single.ref, 'media/img');
-      expect(vid.assets.single.ref, 'media/vid');
-      expect(img2, img);
-      verify(
-        () => inner.listAssets(
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-          type: 'image',
-        ),
-      ).called(1);
-      verify(
-        () => inner.listAssets(
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-          type: 'video',
-        ),
-      ).called(1);
-    });
+        expect(img.assets.single.ref, 'media/img');
+        expect(vid.assets.single.ref, 'media/vid');
+        expect(img2, img);
+        verify(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'image',
+          ),
+        ).called(1);
+        verify(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'video',
+          ),
+        ).called(1);
+      },
+    );
   });
 
   group('CachingMediaRepository — frescura', () {
-    test('invalidate() limpia: la siguiente primera página vuelve al inner',
-        () async {
-      stubList(_page(<String>['media/a']));
-      final repo = build();
+    test(
+      'invalidate() limpia: la siguiente primera página vuelve al inner',
+      () async {
+        stubList(_page(<String>['media/a']));
+        final repo = build();
 
-      await repo.listAssets(type: 'image'); // miss → inner (1)
-      await repo.listAssets(type: 'image'); // hit
-      repo.invalidate();
-      await repo.listAssets(type: 'image'); // miss → inner (2)
+        await repo.listAssets(type: 'image'); // miss → inner (1)
+        await repo.listAssets(type: 'image'); // hit
+        repo.invalidate();
+        await repo.listAssets(type: 'image'); // miss → inner (2)
 
-      verify(
-        () => inner.listAssets(
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-          type: 'image',
-        ),
-      ).called(2);
-    });
+        verify(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'image',
+          ),
+        ).called(2);
+      },
+    );
 
-    test('TTL: sirve cache dentro de la ventana, vuelve al inner al expirar',
-        () async {
-      stubList(_page(<String>['media/a']));
-      final repo = build(ttl: const Duration(minutes: 3));
+    test(
+      'TTL: sirve cache dentro de la ventana, vuelve al inner al expirar',
+      () async {
+        stubList(_page(<String>['media/a']));
+        final repo = build(ttl: const Duration(minutes: 3));
 
-      await repo.listAssets(type: 'image'); // inner (1) @ 12:00
-      fakeNow = fakeNow.add(const Duration(minutes: 2));
-      await repo.listAssets(type: 'image'); // hit (2 min < 3)
-      fakeNow = fakeNow.add(const Duration(minutes: 2)); // +4 min del fetch
-      await repo.listAssets(type: 'image'); // miss → inner (2)
+        await repo.listAssets(type: 'image'); // inner (1) @ 12:00
+        fakeNow = fakeNow.add(const Duration(minutes: 2));
+        await repo.listAssets(type: 'image'); // hit (2 min < 3)
+        fakeNow = fakeNow.add(const Duration(minutes: 2)); // +4 min del fetch
+        await repo.listAssets(type: 'image'); // miss → inner (2)
 
-      verify(
-        () => inner.listAssets(
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-          type: 'image',
-        ),
-      ).called(2);
-    });
+        verify(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'image',
+          ),
+        ).called(2);
+      },
+    );
   });
 
   group('CachingMediaRepository — mutaciones auto-invalidan', () {
-    test('upload delega al inner y limpia la primera página cacheada',
-        () async {
-      stubList(_page(<String>['media/a']));
-      when(
-        () => inner.upload(
-          bytes: any(named: 'bytes'),
-          filename: any(named: 'filename'),
-        ),
-      ).thenAnswer((_) async => const UploadedMedia(ref: 'media/c', previewUrl: null));
-      final repo = build();
+    test(
+      'upload delega al inner y limpia la primera página cacheada',
+      () async {
+        stubList(_page(<String>['media/a']));
+        when(
+          () => inner.upload(
+            bytes: any(named: 'bytes'),
+            filename: any(named: 'filename'),
+          ),
+        ).thenAnswer(
+          (_) async => const UploadedMedia(ref: 'media/c', previewUrl: null),
+        );
+        final repo = build();
 
-      await repo.listAssets(type: 'image'); // inner list (1)
-      await repo.upload(bytes: Uint8List.fromList(<int>[1]), filename: 'f.png');
-      await repo.listAssets(type: 'image'); // miss → inner list (2)
+        await repo.listAssets(type: 'image'); // inner list (1)
+        await repo.upload(
+          bytes: Uint8List.fromList(<int>[1]),
+          filename: 'f.png',
+        );
+        await repo.listAssets(type: 'image'); // miss → inner list (2)
 
-      verify(
-        () => inner.upload(
-          bytes: any(named: 'bytes'),
-          filename: any(named: 'filename'),
-        ),
-      ).called(1);
-      verify(
-        () => inner.listAssets(
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-          type: 'image',
-        ),
-      ).called(2);
-    });
+        verify(
+          () => inner.upload(
+            bytes: any(named: 'bytes'),
+            filename: any(named: 'filename'),
+          ),
+        ).called(1);
+        verify(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'image',
+          ),
+        ).called(2);
+      },
+    );
 
     test('subida fallida NO invalida (el catálogo no cambió)', () async {
       stubList(_page(<String>['media/a']));
