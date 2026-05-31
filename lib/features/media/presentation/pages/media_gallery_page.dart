@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../data/cache/media_thumbnail_loader.dart';
+import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../../domain/entities/media_asset.dart';
 import '../bloc/media_gallery_bloc.dart';
 import '../widgets/media_thumbnail.dart';

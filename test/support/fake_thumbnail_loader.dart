@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:ataulfo/features/media/data/cache/media_thumbnail_loader.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_thumbnail_loader.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 
 /// Loader fake para tests de wiring/navegación: devuelve null (⇒ placeholder),

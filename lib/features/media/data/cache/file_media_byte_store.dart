@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 
-import 'media_byte_store.dart';
+import '../../domain/repositories/media_byte_store.dart';
 
 /// [MediaByteStore] respaldado por el sistema de archivos (un archivo por ref
 /// bajo el cache dir de la app). Cross-platform: usa `path_provider` para el
@@ -24,6 +24,10 @@ class FileMediaByteStore implements MediaByteStore {
   final Future<Directory> Function() _directoryProvider;
 
   static const _subdir = 'media_bytes';
+
+  // Sufijo único por escritura (proceso-local): dos writes concurrentes del
+  // mismo ref no comparten el temporal y por tanto no chocan en el rename.
+  static int _writeSeq = 0;
 
   Future<Directory> _dir() async {
     final base = await _directoryProvider();
@@ -47,6 +51,18 @@ class FileMediaByteStore implements MediaByteStore {
   @override
   Future<void> write(String ref, Uint8List bytes) async {
     final file = _fileFor(await _dir(), ref);
-    await file.writeAsBytes(bytes, flush: true);
+    // Escritura atómica: escribir a un temporal y renombrar sobre el destino.
+    // `rename` reemplaza atómicamente en el mismo filesystem (POSIX), así que un
+    // read concurrente o un crash a media escritura nunca observa un archivo
+    // truncado — servir basura por un ref inmutable lo dejaría roto para
+    // siempre, ya que el cache no tiene TTL ni revalidación.
+    final tmp = File('${file.path}.${_writeSeq++}.tmp');
+    try {
+      await tmp.writeAsBytes(bytes, flush: true);
+      await tmp.rename(file.path);
+    } catch (_) {
+      if (tmp.existsSync()) await tmp.delete();
+      rethrow;
+    }
   }
 }

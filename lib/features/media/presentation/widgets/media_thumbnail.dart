@@ -3,15 +3,16 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
-import '../../data/cache/media_thumbnail_loader.dart';
 import '../../domain/entities/media_asset.dart';
+import '../../domain/repositories/media_thumbnail_loader.dart';
 
 /// Miniatura cuadrada de un asset en el grid de la galería.
 ///
 /// LINCHPIN: pinta los bytes que resuelve el [MediaThumbnailLoader] (cache local
-/// por `ref` o descarga de la `previewUrl` efímera); un consumidor que use
-/// [onTap] como picker recibe el asset entero y debe leer `asset.ref` (BARE),
-/// NUNCA la previewUrl. Esta clase no decide eso: sólo pinta y delega el tap.
+/// por `ref` o descarga de la `previewUrl` efímera). Como picker, el call-site
+/// envuelve [onTap] en una closure que captura el asset y debe leer `asset.ref`
+/// (BARE), NUNCA la previewUrl. Esta clase no decide eso: sólo pinta y delega el
+/// tap ([onTap] es un `VoidCallback`; no transporta el asset por sí mismo).
 ///
 /// El loader desacopla el render del origen de los bytes: con cache, la
 /// miniatura no se re-descarga al re-entrar a la galería ni depende de que la

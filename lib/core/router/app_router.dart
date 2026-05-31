@@ -32,7 +32,7 @@ import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
 import '../../features/media/domain/repositories/media_repository.dart';
-import '../../features/media/data/cache/media_thumbnail_loader.dart';
+import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
 import '../../features/media/presentation/bloc/media_gallery_bloc.dart';
 import '../../features/media/presentation/pages/media_gallery_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';

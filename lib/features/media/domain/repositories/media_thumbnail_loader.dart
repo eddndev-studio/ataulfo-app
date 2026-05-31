@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import '../../domain/entities/media_asset.dart';
+import '../entities/media_asset.dart';
 
 /// Resuelve los bytes de la miniatura de un asset para pintarla. Abstrae al
 /// widget de DÓNDE salen los bytes (cache en disco vs. red): el widget sólo

@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
-import 'package:ataulfo/features/media/data/cache/media_thumbnail_loader.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_thumbnail_loader.dart';
 import 'package:ataulfo/features/media/presentation/widgets/media_thumbnail.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +15,29 @@ class _FakeLoader implements MediaThumbnailLoader {
   @override
   Future<Uint8List?> load(MediaAsset asset) => _result;
 }
+
+/// Loader que responde según el `ref` y registra qué se le pidió — para
+/// verificar que el widget re-resuelve cuando el grid recicla la celda a otro
+/// asset (didUpdateWidget).
+class _RefLoader implements MediaThumbnailLoader {
+  _RefLoader(this._byRef);
+  final Map<String, Uint8List?> _byRef;
+  final List<String> requested = <String>[];
+  @override
+  Future<Uint8List?> load(MediaAsset asset) async {
+    requested.add(asset.ref);
+    return _byRef[asset.ref];
+  }
+}
+
+MediaAsset _assetRef(String ref) => MediaAsset(
+  ref: ref,
+  previewUrl: 'https://x/sig',
+  filename: 'f.png',
+  contentType: 'image/png',
+  size: 1,
+  createdAt: DateTime.utc(2026, 1, 1),
+);
 
 // PNG 1x1 transparente válido — bytes reales para que el camino de imagen no
 // caiga al errorBuilder por datos corruptos.
@@ -100,5 +123,42 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     expect(find.byType(Image), findsNothing);
     pending.complete(null); // limpia el futuro pendiente al cerrar el test
+  });
+
+  testWidgets('cambia el ref ⇒ re-resuelve vía el loader (didUpdateWidget)', (
+    tester,
+  ) async {
+    final loader = _RefLoader(<String, Uint8List?>{
+      'tenant/o/media/x': null, // ⇒ placeholder
+      'tenant/o/media/y': _png1x1, // ⇒ Image
+    });
+    Widget at(String ref) => MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: 120,
+            height: 120,
+            // Misma Key ⇒ el segundo pump entra por didUpdateWidget, no initState.
+            child: MediaThumbnail(
+              key: const Key('t'),
+              asset: _assetRef(ref),
+              loader: loader,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(at('tenant/o/media/x'));
+    await tester.pump();
+    expect(find.byType(Image), findsNothing);
+
+    await tester.pumpWidget(at('tenant/o/media/y'));
+    await tester.pump();
+    expect(find.byType(Image), findsOneWidget);
+
+    // Re-resolvió al cambiar el ref (no sirvió la resolución vieja).
+    expect(loader.requested, <String>['tenant/o/media/x', 'tenant/o/media/y']);
   });
 }

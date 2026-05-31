@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
 import '../../domain/entities/media_asset.dart';
-import 'media_byte_store.dart';
-import 'media_thumbnail_loader.dart';
+import '../../domain/repositories/media_byte_store.dart';
+import '../../domain/repositories/media_thumbnail_loader.dart';
 
 /// [MediaThumbnailLoader] con disciplina "descargar una vez": consulta el
 /// [MediaByteStore] por `ref` y sólo va a la red en un miss.
@@ -36,7 +36,14 @@ class CachingMediaThumbnailLoader implements MediaThumbnailLoader {
     final bytes = await _download(url);
     if (bytes == null) return null;
 
-    await _store.write(asset.ref, bytes);
+    // La persistencia es best-effort: una descarga exitosa se sirve aunque el
+    // disco falle (la próxima vez será otro miss → otra descarga, nunca un
+    // placeholder por no haber podido cachear).
+    try {
+      await _store.write(asset.ref, bytes);
+    } catch (_) {
+      // Ignorado a propósito: no romper el render por un fallo de cache.
+    }
     return bytes;
   }
 }

@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:ataulfo/features/media/data/cache/caching_media_thumbnail_loader.dart';
-import 'package:ataulfo/features/media/data/cache/media_byte_store.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_byte_store.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,6 +10,9 @@ class _FakeStore implements MediaByteStore {
   final Map<String, Uint8List> _data = <String, Uint8List>{};
   final List<String> writes = <String>[];
 
+  /// Simula un disco lleno / IO error en la persistencia.
+  bool throwOnWrite = false;
+
   void seed(String ref, Uint8List bytes) => _data[ref] = bytes;
 
   @override
@@ -17,6 +20,7 @@ class _FakeStore implements MediaByteStore {
 
   @override
   Future<void> write(String ref, Uint8List bytes) async {
+    if (throwOnWrite) throw Exception('disk full');
     writes.add(ref);
     _data[ref] = bytes;
   }
@@ -104,6 +108,21 @@ void main() {
 
       expect(await loader.load(_asset(previewUrl: 'https://x/sig')), isNull);
       expect(store.writes, isEmpty);
+    },
+  );
+
+  test(
+    'descarga OK pero el write falla: sirve los bytes igual (no propaga)',
+    () async {
+      final store = _FakeStore()..throwOnWrite = true;
+      final loader = CachingMediaThumbnailLoader(
+        store: store,
+        download: (url) async => fetched,
+      );
+
+      // La persistencia es best-effort: si el disco falla, la miniatura se
+      // pinta con los bytes recién descargados en vez de caer a placeholder.
+      expect(await loader.load(_asset(previewUrl: 'https://x/sig')), fetched);
     },
   );
 }
