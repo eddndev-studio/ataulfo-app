@@ -23,6 +23,7 @@ import 'features/conversations/data/repositories/conversations_repository_impl.d
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/media/data/datasources/media_datasource.dart';
+import 'features/media/data/repositories/caching_media_repository.dart';
 import 'features/media/data/repositories/file_picker_media_file_picker.dart';
 import 'features/media/data/repositories/media_repository_impl.dart';
 import 'features/memberships/data/datasources/memberships_datasource.dart';
@@ -135,8 +136,12 @@ void main() {
     datasource: DioCatalogDatasource(mainDio),
   );
 
-  final mediaRepository = MediaRepositoryImpl(
-    datasource: DioMediaDatasource(mainDio),
+  // Decoramos el repo con el cache de la primera página por familia type, vivo
+  // a nivel de sesión (este singleton sobrevive a las entradas/salidas de la
+  // galería, que es donde el bloc page-scoped re-listaba en cada visita). Se
+  // purga en logout vía `onSignedOut` más abajo.
+  final mediaRepository = CachingMediaRepository(
+    MediaRepositoryImpl(datasource: DioMediaDatasource(mainDio)),
   );
 
   // El picker es un puerto sin estado; el adaptador concreto envuelve
@@ -173,5 +178,13 @@ void main() {
   // aterrice el slice de push.
   unawaited(DeviceIdProvider(kv).getOrCreate());
 
-  runApp(AtaulfoApp(router: router, authBloc: authBloc));
+  runApp(
+    AtaulfoApp(
+      router: router,
+      authBloc: authBloc,
+      // Al cerrar sesión, purga el cache de media para no servir el catálogo de
+      // una cuenta a la siguiente sin reiniciar la app.
+      onSignedOut: mediaRepository.invalidate,
+    ),
+  );
 }

@@ -3,6 +3,7 @@ import 'package:ataulfo/core/design/widgets/app_background.dart';
 import 'package:ataulfo/core/router/app_router.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
@@ -94,7 +95,9 @@ void main() {
   testWidgets('AtaulfoApp cabla AppDesignTheme.dark() al MaterialApp', (
     tester,
   ) async {
-    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(
+      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
+    );
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     // El scaffold es transparente: el fondo absoluto lo pinta AppBackground
@@ -106,7 +109,9 @@ void main() {
 
   testWidgets('AtaulfoApp pinta el glow de fondo (AppBackground) detrás de '
       'todas las rutas vía el builder del MaterialApp', (tester) async {
-    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(
+      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
+    );
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(
@@ -121,9 +126,48 @@ void main() {
   testWidgets('AtaulfoApp no expone darkTheme separado (producto dark-only)', (
     tester,
   ) async {
-    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(
+      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
+    );
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.darkTheme, isNull);
   });
+
+  // Higiene de sesión: el cache de media es un singleton de sesión; al cerrar
+  // sesión hay que purgarlo o la próxima cuenta vería el catálogo de la
+  // anterior sin reiniciar la app. AtaulfoApp dispara onSignedOut al caer a
+  // Unauthenticated; la composición lo enchufa a MediaRepository.invalidate.
+  testWidgets(
+    'AtaulfoApp dispara onSignedOut al caer la sesión a Unauthenticated',
+    (tester) async {
+      var signedOut = 0;
+      // Authenticated ANTES de Unauthenticated: el listener (listenWhen) debe
+      // filtrar el primero y disparar SÓLO en el segundo. Si filtrara mal y
+      // disparara en cada transición, signedOut sería 2 — por eso afirmamos
+      // == 1 (no >= 1): cierra la mutación de un listenWhen permisivo.
+      whenListen(
+        authBloc,
+        Stream<AuthState>.fromIterable(const <AuthState>[
+          AuthAuthenticated(
+            Identity(userId: 'u', orgId: 'o', role: 'OWNER', email: 'u@x'),
+          ),
+          AuthUnauthenticated(),
+        ]),
+        initialState: const AuthInitial(),
+      );
+
+      await tester.pumpWidget(
+        AtaulfoApp(
+          router: router,
+          authBloc: authBloc,
+          onSignedOut: () => signedOut++,
+        ),
+      );
+      await tester.pump(); // procesa Authenticated
+      await tester.pump(); // procesa Unauthenticated
+
+      expect(signedOut, 1);
+    },
+  );
 }

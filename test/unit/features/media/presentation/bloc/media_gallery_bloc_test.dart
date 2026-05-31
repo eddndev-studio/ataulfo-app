@@ -341,6 +341,38 @@ void main() {
         ],
       );
 
+      // El pull-to-refresh DEBE forzar red: si sirviera el cache, el spinner
+      // resolvería con datos rancios. Por eso invalida ANTES de recargar (el
+      // decorador no puede distinguir "entrada" de "refresh": misma firma).
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'invalida el cache ANTES de recargar (orden: invalidate → listAssets)',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
+          );
+          return build(_lastRepo, _MockPicker());
+        },
+        seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: ''),
+        act: (b) => b.add(const MediaGalleryRefreshRequested()),
+        verify: (_) {
+          verifyInOrder(<void Function()>[
+            () => _lastRepo.invalidate(),
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+            ),
+          ]);
+        },
+      );
+
       blocTest<MediaGalleryBloc, MediaGalleryState>(
         'desde Initial cae a primera carga (Loading + Loaded)',
         build: () {

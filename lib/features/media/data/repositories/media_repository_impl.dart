@@ -5,8 +5,9 @@ import '../../domain/repositories/media_repository.dart';
 import '../datasources/media_datasource.dart';
 
 /// Implementación fina del puerto: delega en el datasource. Sin cache local en
-/// esta capa (cuando aterrice RFC-0001 esta clase orquestará verdad local vs.
-/// remota; hoy delega).
+/// esta capa: el memoizado de la primera página vive en
+/// [CachingMediaRepository], que decora a ésta. Por eso aquí [invalidate] es un
+/// no-op honesto (no hay nada local que descartar).
 class MediaRepositoryImpl implements MediaRepository {
   MediaRepositoryImpl({required MediaDatasource datasource}) : _ds = datasource;
 
@@ -21,4 +22,9 @@ class MediaRepositoryImpl implements MediaRepository {
   @override
   Future<MediaPage> listAssets({String? cursor, int? limit, String? type}) =>
       _ds.listAssets(cursor: cursor, limit: limit, type: type);
+
+  @override
+  void invalidate() {
+    // Sin estado local: nada que descartar.
+  }
 }

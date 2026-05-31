@@ -20,4 +20,11 @@ abstract interface class MediaRepository {
   /// del content-type (image|video|audio|document), null ⇒ sin filtro.
   /// `MediaPage.nextCursor` vacío ⇒ no hay más páginas.
   Future<MediaPage> listAssets({String? cursor, int? limit, String? type});
+
+  /// Descarta cualquier verdad local cacheada: la próxima lectura va a la
+  /// fuente. Verbo del puerto (no detalle de implementación): una implementación
+  /// sin cache lo cumple como no-op. Lo invoca quien necesita forzar frescura
+  /// (pull-to-refresh) o purgar al cerrar sesión, sin conocer si hay cache
+  /// debajo.
+  void invalidate();
 }

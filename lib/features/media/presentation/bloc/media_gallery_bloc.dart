@@ -94,6 +94,10 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     } else {
       emit(const MediaGalleryLoading());
     }
+    // Forzar red: descartamos cualquier verdad cacheada antes de recargar. El
+    // repo no puede inferir que esta lectura es un refresh (misma firma que la
+    // carga de entrada que SÍ debe servir cache), así que el bloc lo señala.
+    _repo.invalidate();
     await _fetchFirstPage(emit);
   }
 
