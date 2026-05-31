@@ -71,10 +71,15 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     MediaGalleryRefreshRequested event,
     Emitter<MediaGalleryState> emit,
   ) async {
+    final current = state;
     // Desde Loaded recargamos la primera página SIN pasar por Loading: la lista
-    // visible se mantiene mientras el RefreshIndicator gira. Desde otro estado,
-    // es una primera carga normal.
-    if (state is! MediaGalleryLoaded) {
+    // visible se mantiene mientras el RefreshIndicator gira. La señal transitoria
+    // `isRefreshing:true` garantiza una emisión distinguible aunque la página
+    // nueva iguale a la actual, para que el `firstWhere` del pull-to-refresh no
+    // quede colgado. Desde otro estado, es una primera carga normal (Loading).
+    if (current is MediaGalleryLoaded) {
+      emit(current.copyWith(isRefreshing: true));
+    } else {
       emit(const MediaGalleryLoading());
     }
     await _fetchFirstPage(emit);
@@ -189,14 +194,18 @@ class MediaGalleryLoading extends MediaGalleryState {
 
 /// Catálogo cargado. [nextCursor] vacío ⇒ no hay más páginas ([hasMore] lo
 /// deriva). [isLoadingMore] marca una página en vuelo; [isUploading] una
-/// subida en curso. [uploadError] es un error TRANSITORIO de la última subida:
-/// se muestra sin tumbar la lista y no es un estado terminal.
+/// subida en curso. [isRefreshing] marca un pull-to-refresh en vuelo: existe
+/// para garantizar una emisión distinguible aun cuando los datos no cambien
+/// (sin ella, refrescar a los mismos datos no emitiría y el spinner del
+/// RefreshIndicator quedaría colgado). [uploadError] es un error TRANSITORIO de
+/// la última subida: se muestra sin tumbar la lista y no es un estado terminal.
 class MediaGalleryLoaded extends MediaGalleryState {
   const MediaGalleryLoaded({
     required this.items,
     required this.nextCursor,
     this.isLoadingMore = false,
     this.isUploading = false,
+    this.isRefreshing = false,
     this.uploadError,
   });
 
@@ -204,6 +213,7 @@ class MediaGalleryLoaded extends MediaGalleryState {
   final String nextCursor;
   final bool isLoadingMore;
   final bool isUploading;
+  final bool isRefreshing;
   final MediaFailure? uploadError;
 
   /// Hay más páginas sii el cursor no está vacío. Derivado, nunca un flag.
@@ -214,6 +224,7 @@ class MediaGalleryLoaded extends MediaGalleryState {
     String? nextCursor,
     bool? isLoadingMore,
     bool? isUploading,
+    bool? isRefreshing,
     MediaFailure? uploadError,
     bool clearUploadError = false,
   }) => MediaGalleryLoaded(
@@ -221,6 +232,7 @@ class MediaGalleryLoaded extends MediaGalleryState {
     nextCursor: nextCursor ?? this.nextCursor,
     isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     isUploading: isUploading ?? this.isUploading,
+    isRefreshing: isRefreshing ?? this.isRefreshing,
     uploadError: clearUploadError ? null : (uploadError ?? this.uploadError),
   );
 
@@ -231,6 +243,7 @@ class MediaGalleryLoaded extends MediaGalleryState {
     if (other.nextCursor != nextCursor ||
         other.isLoadingMore != isLoadingMore ||
         other.isUploading != isUploading ||
+        other.isRefreshing != isRefreshing ||
         other.uploadError != uploadError) {
       return false;
     }
@@ -247,6 +260,7 @@ class MediaGalleryLoaded extends MediaGalleryState {
     nextCursor,
     isLoadingMore,
     isUploading,
+    isRefreshing,
     uploadError,
   );
 }

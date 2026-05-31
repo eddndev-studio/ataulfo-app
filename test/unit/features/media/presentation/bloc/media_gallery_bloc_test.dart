@@ -266,12 +266,46 @@ void main() {
           nextCursor: 'cur-1',
         ),
         act: (b) => b.add(const MediaGalleryRefreshRequested()),
-        verify: (b) {
-          expect(
-            b.state,
-            MediaGalleryLoaded(items: <MediaAsset>[_c], nextCursor: ''),
+        expect: () => <MediaGalleryState>[
+          // Señal transitoria: la lista visible se mantiene mientras refresca
+          // (NO pasa por Loading, que la vaciaría).
+          MediaGalleryLoaded(
+            items: <MediaAsset>[_a, _b],
+            nextCursor: 'cur-1',
+            isRefreshing: true,
+          ),
+          MediaGalleryLoaded(items: <MediaAsset>[_c], nextCursor: ''),
+        ],
+      );
+
+      // Caso común: refrescar sin que cambien los datos. El resultado iguala al
+      // estado actual; sin la señal transitoria `isRefreshing`, el `emit` final
+      // se descartaría por igualdad y un `firstWhere` esperando un cambio
+      // quedaría colgado (RefreshIndicator girando para siempre).
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'datos sin cambios ⇒ igual emite (isRefreshing true→false), no se cuelga',
+        build: () {
+          final repo = _MockRepo();
+          when(
+            () => repo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
           );
+          return build(repo, _MockPicker());
         },
+        seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: ''),
+        act: (b) => b.add(const MediaGalleryRefreshRequested()),
+        expect: () => <MediaGalleryState>[
+          MediaGalleryLoaded(
+            items: <MediaAsset>[_a],
+            nextCursor: '',
+            isRefreshing: true,
+          ),
+          MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: ''),
+        ],
       );
 
       blocTest<MediaGalleryBloc, MediaGalleryState>(

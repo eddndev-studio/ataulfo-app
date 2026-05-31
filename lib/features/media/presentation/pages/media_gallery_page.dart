@@ -144,7 +144,14 @@ class _LoadedViewState extends State<_LoadedView> {
           onRefresh: () async {
             final bloc = context.read<MediaGalleryBloc>();
             bloc.add(const MediaGalleryRefreshRequested());
-            await bloc.stream.firstWhere((s) => s is! MediaGalleryLoading);
+            // Espera el fin del refresh: un Loaded ya no-refrescando (siempre
+            // se emite gracias a la señal transitoria, aun si los datos no
+            // cambian) o un Failed terminal.
+            await bloc.stream.firstWhere(
+              (s) =>
+                  (s is MediaGalleryLoaded && !s.isRefreshing) ||
+                  s is MediaGalleryFailed,
+            );
           },
           child: state.items.isEmpty
               ? const _EmptyView()
