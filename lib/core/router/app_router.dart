@@ -447,10 +447,10 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        // Galería de media de la org. Entry point hoy: tile en SettingsPage.
-        // La Fase 3 la reusará como picker (abriéndola con un `onSelect` que
-        // devuelve el `ref` BARE). Page-scoped: el bloc se construye con repo
-        // + picker y dispara el primer load al montarse.
+        // Galería de media de la org. Entry point: tile en SettingsPage.
+        // Reusable como picker abriéndola con un `onSelect` que devuelve el
+        // `ref` BARE. Page-scoped: el bloc se construye con repo + picker y
+        // dispara el primer load al montarse.
         path: '/media',
         builder: (context, _) => BlocProvider<MediaGalleryBloc>(
           create: (_) =>

@@ -14,8 +14,9 @@ import '../widgets/media_thumbnail.dart';
 ///
 /// La paginación vive en el [MediaGalleryBloc]; esta página es un disparador
 /// delgado: un scroll cerca del fondo despacha [MediaGalleryLoadMoreRequested]
-/// y el bloc decide si hay algo que cargar. El callback [onSelect] (para que la
-/// Fase 3 la reúse como picker) recibe el `ref` BARE, nunca la previewUrl.
+/// y el bloc decide si hay algo que cargar. El callback [onSelect] (opcional)
+/// permite reusar la pantalla como picker: recibe el `ref` BARE, nunca la
+/// previewUrl.
 class MediaGalleryPage extends StatelessWidget {
   const MediaGalleryPage({super.key, this.onSelect});
 
