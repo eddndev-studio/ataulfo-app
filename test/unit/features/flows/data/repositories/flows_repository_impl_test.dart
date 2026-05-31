@@ -362,6 +362,17 @@ void main() {
       ).called(1);
     });
 
+    test('enhebra mediaRef al datasource', () async {
+      const bareRef = 'tenant/org1/media/nuevo999.png';
+      when(
+        () => ds.patchStep(stepId: 's1', mediaRef: bareRef),
+      ).thenAnswer((_) async => patched);
+
+      await repo.patchStep(stepId: 's1', mediaRef: bareRef);
+
+      verify(() => ds.patchStep(stepId: 's1', mediaRef: bareRef)).called(1);
+    });
+
     test('omite parámetros null al delegar', () async {
       when(
         () => ds.patchStep(stepId: 's1', content: 'Solo content'),
