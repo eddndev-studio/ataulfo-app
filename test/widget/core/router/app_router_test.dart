@@ -46,6 +46,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../../support/fake_thumbnail_loader.dart';
+
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
 
@@ -171,6 +173,7 @@ void main() {
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
+      mediaThumbnailLoader: const FakeThumbnailLoader(),
       profileRepository: profileRepo,
     );
   });
@@ -416,6 +419,7 @@ void main() {
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
+      mediaThumbnailLoader: const FakeThumbnailLoader(),
       profileRepository: profileRepo,
     );
 
@@ -500,6 +504,7 @@ void main() {
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
+      mediaThumbnailLoader: const FakeThumbnailLoader(),
       profileRepository: profileRepo,
     );
 
@@ -530,6 +535,7 @@ void main() {
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
+      mediaThumbnailLoader: const FakeThumbnailLoader(),
       profileRepository: profileRepo,
     );
 
@@ -596,6 +602,7 @@ void main() {
         catalogRepository: catalogRepo,
         mediaRepository: _MockMediaRepo(),
         mediaFilePicker: _FakeMediaFilePicker(),
+        mediaThumbnailLoader: const FakeThumbnailLoader(),
         profileRepository: profileRepo,
       );
 
@@ -664,6 +671,7 @@ void main() {
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
+      mediaThumbnailLoader: const FakeThumbnailLoader(),
       profileRepository: profileRepo,
     );
 
@@ -748,6 +756,7 @@ void main() {
         catalogRepository: catalogRepo,
         mediaRepository: _MockMediaRepo(),
         mediaFilePicker: _FakeMediaFilePicker(),
+        mediaThumbnailLoader: const FakeThumbnailLoader(),
         profileRepository: profileRepo,
       );
 
@@ -779,6 +788,7 @@ void main() {
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
+      mediaThumbnailLoader: const FakeThumbnailLoader(),
       profileRepository: profileRepo,
     );
 
