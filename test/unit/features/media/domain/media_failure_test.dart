@@ -33,8 +33,11 @@ void main() {
       expect(describe(const UnknownMediaFailure()), 'unknown');
     });
 
-    test('const sin campos: dos instancias son idénticas (igualdad de estado)', () {
-      expect(const MediaTooLargeFailure(), const MediaTooLargeFailure());
-    });
+    test(
+      'const sin campos: dos instancias son idénticas (igualdad de estado)',
+      () {
+        expect(const MediaTooLargeFailure(), const MediaTooLargeFailure());
+      },
+    );
   });
 }

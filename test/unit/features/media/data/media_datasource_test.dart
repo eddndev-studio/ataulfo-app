@@ -46,10 +46,8 @@ void main() {
 
     test('201 {ref, url} => UploadedMedia(ref bare, previewUrl)', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenAnswer(
         (_) async => mapResp(
           '/upload',
@@ -70,36 +68,38 @@ void main() {
       );
     });
 
-    test('manda un FormData con el part "file" y el filename correcto', () async {
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
-      ).thenAnswer(
-        (_) async => mapResp('/upload', 201, body: <String, dynamic>{'ref': 'r'}),
-      );
+    test(
+      'manda un FormData con el part "file" y el filename correcto',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            '/upload',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async =>
+              mapResp('/upload', 201, body: <String, dynamic>{'ref': 'r'}),
+        );
 
-      await ds.upload(bytes: bytes, filename: 'photo.png');
+        await ds.upload(bytes: bytes, filename: 'photo.png');
 
-      final captured = verify(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: captureAny(named: 'data'),
-        ),
-      ).captured;
-      final fd = captured.single as FormData;
-      expect(fd.files, hasLength(1));
-      expect(fd.files.first.key, 'file');
-      expect(fd.files.first.value.filename, 'photo.png');
-    });
+        final captured = verify(
+          () => dio.post<Map<String, dynamic>>(
+            '/upload',
+            data: captureAny(named: 'data'),
+          ),
+        ).captured;
+        final fd = captured.single as FormData;
+        expect(fd.files, hasLength(1));
+        expect(fd.files.first.key, 'file');
+        expect(fd.files.first.value.filename, 'photo.png');
+      },
+    );
 
     test('201 con url ausente (omitempty) => previewUrl null', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenAnswer(
         (_) async =>
             mapResp('/upload', 201, body: <String, dynamic>{'ref': 'bare/ref'}),
@@ -113,10 +113,8 @@ void main() {
 
     test('413 => MediaTooLargeFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenThrow(badResponse('/upload', 413));
 
       await expectLater(
@@ -127,10 +125,8 @@ void main() {
 
     test('415 => MediaUnsupportedTypeFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenThrow(badResponse('/upload', 415));
 
       await expectLater(
@@ -141,10 +137,8 @@ void main() {
 
     test('400 (form inválido) => UnknownMediaFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenThrow(badResponse('/upload', 400));
 
       await expectLater(
@@ -153,26 +147,27 @@ void main() {
       );
     });
 
-    test('401 final (interceptor agotó refresh) => UnknownMediaFailure', () async {
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
-      ).thenThrow(badResponse('/upload', 401));
+    test(
+      '401 final (interceptor agotó refresh) => UnknownMediaFailure',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            '/upload',
+            data: any(named: 'data'),
+          ),
+        ).thenThrow(badResponse('/upload', 401));
 
-      await expectLater(
-        ds.upload(bytes: bytes, filename: 'f'),
-        throwsA(isA<UnknownMediaFailure>()),
-      );
-    });
+        await expectLater(
+          ds.upload(bytes: bytes, filename: 'f'),
+          throwsA(isA<UnknownMediaFailure>()),
+        );
+      },
+    );
 
     test('500 => MediaServerFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenThrow(badResponse('/upload', 500));
 
       await expectLater(
@@ -183,10 +178,8 @@ void main() {
 
     test('timeout => MediaTimeoutFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/upload'),
@@ -202,10 +195,8 @@ void main() {
 
     test('sin conexión => MediaNetworkFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/upload'),
@@ -221,10 +212,8 @@ void main() {
 
     test('body nulo => UnknownMediaFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenAnswer((_) async => mapResp('/upload', 201, body: null));
 
       await expectLater(
@@ -235,16 +224,11 @@ void main() {
 
     test('body malformado (ref ausente) => UnknownMediaFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(
-          '/upload',
-          data: any(named: 'data'),
-        ),
+        () =>
+            dio.post<Map<String, dynamic>>('/upload', data: any(named: 'data')),
       ).thenAnswer(
-        (_) async => mapResp(
-          '/upload',
-          201,
-          body: <String, dynamic>{'url': 'sin-ref'},
-        ),
+        (_) async =>
+            mapResp('/upload', 201, body: <String, dynamic>{'url': 'sin-ref'}),
       );
 
       await expectLater(
@@ -289,28 +273,28 @@ void main() {
       expect(page.nextCursor, 'next-opaque');
     });
 
-    test('next_cursor vacío => MediaPage.nextCursor vacío (sin más páginas)', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>(
-          '/media-assets',
-          queryParameters: any(named: 'queryParameters'),
-        ),
-      ).thenAnswer(
-        (_) async => mapResp(
-          '/media-assets',
-          200,
-          body: <String, dynamic>{
-            'assets': <dynamic>[],
-            'next_cursor': '',
-          },
-        ),
-      );
+    test(
+      'next_cursor vacío => MediaPage.nextCursor vacío (sin más páginas)',
+      () async {
+        when(
+          () => dio.get<Map<String, dynamic>>(
+            '/media-assets',
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async => mapResp(
+            '/media-assets',
+            200,
+            body: <String, dynamic>{'assets': <dynamic>[], 'next_cursor': ''},
+          ),
+        );
 
-      final page = await ds.listAssets();
+        final page = await ds.listAssets();
 
-      expect(page.assets, isEmpty);
-      expect(page.nextCursor, '');
-    });
+        expect(page.assets, isEmpty);
+        expect(page.nextCursor, '');
+      },
+    );
 
     test('cursor + limit provistos => query params correctos', () async {
       when(
@@ -337,30 +321,33 @@ void main() {
       expect(captured.single, <String, dynamic>{'cursor': 'abc', 'limit': 20});
     });
 
-    test('cursor/limit omitidos => query params vacíos (sin claves null)', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>(
-          '/media-assets',
-          queryParameters: any(named: 'queryParameters'),
-        ),
-      ).thenAnswer(
-        (_) async => mapResp(
-          '/media-assets',
-          200,
-          body: <String, dynamic>{'assets': <dynamic>[], 'next_cursor': ''},
-        ),
-      );
+    test(
+      'cursor/limit omitidos => query params vacíos (sin claves null)',
+      () async {
+        when(
+          () => dio.get<Map<String, dynamic>>(
+            '/media-assets',
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async => mapResp(
+            '/media-assets',
+            200,
+            body: <String, dynamic>{'assets': <dynamic>[], 'next_cursor': ''},
+          ),
+        );
 
-      await ds.listAssets();
+        await ds.listAssets();
 
-      final captured = verify(
-        () => dio.get<Map<String, dynamic>>(
-          '/media-assets',
-          queryParameters: captureAny(named: 'queryParameters'),
-        ),
-      ).captured;
-      expect(captured.single, <String, dynamic>{});
-    });
+        final captured = verify(
+          () => dio.get<Map<String, dynamic>>(
+            '/media-assets',
+            queryParameters: captureAny(named: 'queryParameters'),
+          ),
+        ).captured;
+        expect(captured.single, <String, dynamic>{});
+      },
+    );
 
     test('400 (cursor corrupto) => UnknownMediaFailure', () async {
       when(
@@ -384,10 +371,7 @@ void main() {
         ),
       ).thenThrow(badResponse('/media-assets', 403));
 
-      await expectLater(
-        ds.listAssets(),
-        throwsA(isA<MediaForbiddenFailure>()),
-      );
+      await expectLater(ds.listAssets(), throwsA(isA<MediaForbiddenFailure>()));
     });
 
     test('404 => MediaNotFoundFailure', () async {
@@ -398,10 +382,7 @@ void main() {
         ),
       ).thenThrow(badResponse('/media-assets', 404));
 
-      await expectLater(
-        ds.listAssets(),
-        throwsA(isA<MediaNotFoundFailure>()),
-      );
+      await expectLater(ds.listAssets(), throwsA(isA<MediaNotFoundFailure>()));
     });
 
     test('500 => MediaServerFailure', () async {
@@ -412,10 +393,7 @@ void main() {
         ),
       ).thenThrow(badResponse('/media-assets', 500));
 
-      await expectLater(
-        ds.listAssets(),
-        throwsA(isA<MediaServerFailure>()),
-      );
+      await expectLater(ds.listAssets(), throwsA(isA<MediaServerFailure>()));
     });
 
     test('timeout => MediaTimeoutFailure', () async {
@@ -431,31 +409,28 @@ void main() {
         ),
       );
 
-      await expectLater(
-        ds.listAssets(),
-        throwsA(isA<MediaTimeoutFailure>()),
-      );
+      await expectLater(ds.listAssets(), throwsA(isA<MediaTimeoutFailure>()));
     });
 
-    test('body malformado (next_cursor ausente) => UnknownMediaFailure', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>(
-          '/media-assets',
-          queryParameters: any(named: 'queryParameters'),
-        ),
-      ).thenAnswer(
-        (_) async => mapResp(
-          '/media-assets',
-          200,
-          body: <String, dynamic>{'assets': <dynamic>[]},
-        ),
-      );
+    test(
+      'body malformado (next_cursor ausente) => UnknownMediaFailure',
+      () async {
+        when(
+          () => dio.get<Map<String, dynamic>>(
+            '/media-assets',
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async => mapResp(
+            '/media-assets',
+            200,
+            body: <String, dynamic>{'assets': <dynamic>[]},
+          ),
+        );
 
-      await expectLater(
-        ds.listAssets(),
-        throwsA(isA<UnknownMediaFailure>()),
-      );
-    });
+        await expectLater(ds.listAssets(), throwsA(isA<UnknownMediaFailure>()));
+      },
+    );
 
     test('body nulo => UnknownMediaFailure', () async {
       when(
@@ -465,10 +440,7 @@ void main() {
         ),
       ).thenAnswer((_) async => mapResp('/media-assets', 200, body: null));
 
-      await expectLater(
-        ds.listAssets(),
-        throwsA(isA<UnknownMediaFailure>()),
-      );
+      await expectLater(ds.listAssets(), throwsA(isA<UnknownMediaFailure>()));
     });
   });
 }

@@ -24,7 +24,10 @@ void main() {
   test('upload delega al datasource con bytes + filename', () async {
     final bytes = Uint8List.fromList(<int>[1, 2]);
     when(
-      () => ds.upload(bytes: any(named: 'bytes'), filename: any(named: 'filename')),
+      () => ds.upload(
+        bytes: any(named: 'bytes'),
+        filename: any(named: 'filename'),
+      ),
     ).thenAnswer((_) async => const UploadedMedia(ref: 'r', previewUrl: 'u'));
 
     final result = await repo.upload(bytes: bytes, filename: 'f.png');

@@ -15,7 +15,10 @@ void main() {
     );
 
     test('igualdad de valor: mismos campos => instancias iguales', () {
-      expect(build(previewUrl: 'https://x/p'), build(previewUrl: 'https://x/p'));
+      expect(
+        build(previewUrl: 'https://x/p'),
+        build(previewUrl: 'https://x/p'),
+      );
       expect(
         build(previewUrl: 'https://x/p').hashCode,
         build(previewUrl: 'https://x/p').hashCode,

@@ -47,26 +47,17 @@ void main() {
 
     test('filename ausente => FormatException', () {
       final j = valid()..remove('filename');
-      expect(
-        () => MediaAssetResp.fromJson(j),
-        throwsA(isA<FormatException>()),
-      );
+      expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));
     });
 
     test('size de tipo equivocado => FormatException', () {
       final j = valid()..['size'] = 'big';
-      expect(
-        () => MediaAssetResp.fromJson(j),
-        throwsA(isA<FormatException>()),
-      );
+      expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));
     });
 
     test('created_at ausente => FormatException', () {
       final j = valid()..remove('created_at');
-      expect(
-        () => MediaAssetResp.fromJson(j),
-        throwsA(isA<FormatException>()),
-      );
+      expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));
     });
   });
 
