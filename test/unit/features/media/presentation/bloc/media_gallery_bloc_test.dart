@@ -49,6 +49,39 @@ void main() {
       );
     });
 
+    group('filtro por type (galería como picker)', () {
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'construido con type ⇒ propaga ?type= en la primera página',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
+          );
+          return MediaGalleryBloc(
+            repo: _lastRepo,
+            picker: _MockPicker(),
+            type: 'video',
+          );
+        },
+        act: (b) => b.add(const MediaGalleryLoadRequested()),
+        verify: (b) {
+          verify(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: 'video',
+            ),
+          ).called(1);
+        },
+      );
+    });
+
     group('MediaGalleryLoadRequested (primera página)', () {
       blocTest<MediaGalleryBloc, MediaGalleryState>(
         'ok → [Loading, Loaded(items, nextCursor)]',
