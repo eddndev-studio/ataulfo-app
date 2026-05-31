@@ -13,6 +13,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../media/domain/entities/media_asset.dart';
 import '../../../triggers/presentation/widgets/flow_triggers_tab.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import '../../domain/entities/flow.dart' as fdom;
@@ -492,12 +493,15 @@ void _openStepSheet(BuildContext context, sdom.Step? step) {
     builder: (sheetCtx) => BlocProvider<FlowStepsBloc>.value(
       value: bloc,
       // Al crear o reemplazar el recurso de un step multimedia, el selector
-      // abre la galería en modo picker (`/media/pick`) que devuelve el `ref`
-      // BARE vía pop. Se cablea igual al crear y al editar; el sheet decide
-      // la interactividad según el tipo de step.
+      // abre la galería en modo picker (`/media/pick?type=<familia>`, filtrada
+      // por el tipo del paso) que devuelve el MediaAsset completo vía pop. Se
+      // cablea igual al crear y al editar; el sheet decide la interactividad
+      // según el tipo de step y aporta la familia.
       child: StepEditSheet(
         editing: step,
-        pickMediaRef: (ctx) => ctx.push<String>('/media/pick'),
+        pickMediaRef: (ctx, family) => ctx.push<MediaAsset>(
+          family == null ? '/media/pick' : '/media/pick?type=$family',
+        ),
       ),
     ),
   );

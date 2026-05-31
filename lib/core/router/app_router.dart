@@ -470,15 +470,24 @@ class AppRouter {
         // Segmento extra bajo `/media` (no compite por orden de match al no
         // existir un `/media/:id`).
         path: '/media/pick',
-        builder: (context, _) => BlocProvider<MediaGalleryBloc>(
-          create: (_) =>
-              MediaGalleryBloc(repo: _mediaRepo, picker: _mediaFilePicker)
-                ..add(const MediaGalleryLoadRequested()),
-          child: Scaffold(
-            appBar: AppBar(title: const Text('Elegir multimedia')),
-            body: MediaGalleryPage(onSelect: (ref) => context.pop(ref)),
-          ),
-        ),
+        builder: (context, state) {
+          // `?type=` filtra la galería-picker por familia (image|video|audio|
+          // document) según el tipo del paso de flujo que la abrió; ausente ⇒
+          // galería completa. El asset elegido vuelve por `pop` ENTERO (ref +
+          // content_type + filename); el caller persiste sólo el ref BARE.
+          final type = state.uri.queryParameters['type'];
+          return BlocProvider<MediaGalleryBloc>(
+            create: (_) => MediaGalleryBloc(
+              repo: _mediaRepo,
+              picker: _mediaFilePicker,
+              type: type,
+            )..add(const MediaGalleryLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Elegir multimedia')),
+              body: MediaGalleryPage(onSelect: (asset) => context.pop(asset)),
+            ),
+          );
+        },
       ),
       GoRoute(
         // Crear bot dentro del namespace de su Template padre. Forzar el

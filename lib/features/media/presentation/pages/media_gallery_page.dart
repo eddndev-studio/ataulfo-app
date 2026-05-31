@@ -15,14 +15,16 @@ import '../widgets/media_thumbnail.dart';
 /// La paginación vive en el [MediaGalleryBloc]; esta página es un disparador
 /// delgado: un scroll cerca del fondo despacha [MediaGalleryLoadMoreRequested]
 /// y el bloc decide si hay algo que cargar. El callback [onSelect] (opcional)
-/// permite reusar la pantalla como picker: recibe el `ref` BARE, nunca la
-/// previewUrl.
+/// permite reusar la pantalla como picker: recibe el [MediaAsset] completo.
 class MediaGalleryPage extends StatelessWidget {
   const MediaGalleryPage({super.key, this.onSelect});
 
-  /// Selección de un asset (picker). Recibe el `ref` BARE — la identidad
-  /// estable —, JAMÁS la `previewUrl` efímera. Null ⇒ la galería es sólo visor.
-  final ValueChanged<String>? onSelect;
+  /// Selección de un asset (picker). Recibe el [MediaAsset] completo (ref +
+  /// content_type + filename) para que el caller alinee tipo↔asset y persista
+  /// el filename del documento. El CONSUMIDOR debe usar `asset.ref` (BARE) como
+  /// identidad y NUNCA persistir `asset.previewUrl` (firmada efímera). Null ⇒ la
+  /// galería es sólo visor.
+  final ValueChanged<MediaAsset>? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +102,7 @@ class _LoadedView extends StatefulWidget {
   const _LoadedView({required this.state, required this.onSelect});
 
   final MediaGalleryLoaded state;
-  final ValueChanged<String>? onSelect;
+  final ValueChanged<MediaAsset>? onSelect;
 
   @override
   State<_LoadedView> createState() => _LoadedViewState();
@@ -181,7 +183,7 @@ class _Grid extends StatelessWidget {
 
   final ScrollController controller;
   final MediaGalleryLoaded state;
-  final ValueChanged<String>? onSelect;
+  final ValueChanged<MediaAsset>? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -222,8 +224,9 @@ class _Grid extends StatelessWidget {
         final MediaAsset asset = items[i];
         return MediaThumbnail(
           asset: asset,
-          // LINCHPIN: el picker recibe el ref BARE, nunca la previewUrl.
-          onTap: onSelect == null ? null : () => onSelect!(asset.ref),
+          // El picker recibe el MediaAsset completo; el consumidor extrae el ref
+          // BARE (identidad) y el filename, nunca persiste la previewUrl.
+          onTap: onSelect == null ? null : () => onSelect!(asset),
         );
       },
     );
