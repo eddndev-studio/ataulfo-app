@@ -24,6 +24,12 @@ import '../../domain/repositories/media_repository.dart';
 /// por debajo de esa ventana. Al expirar, [listAssets] vuelve a la red (y trae
 /// URLs frescas).
 ///
+/// El default (3 min) está por debajo de la firma del backend (5 min). Es un
+/// límite duro, no una preferencia: cualquier `ttl` que se pase DEBE quedar bajo
+/// la vida de la firma del servidor, o el cache servirá miniaturas ya expiradas.
+/// El cliente no puede observar ese valor del servidor, así que el invariante se
+/// sostiene por convención aquí.
+///
 /// Invalidación:
 /// - Las mutaciones que pasan por el repo se auto-invalidan: tras un [upload]
 ///   con éxito se limpian TODOS los buckets (el archivo subido cae en ALGUNA

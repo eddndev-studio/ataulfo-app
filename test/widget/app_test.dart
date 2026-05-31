@@ -3,6 +3,7 @@ import 'package:ataulfo/core/design/widgets/app_background.dart';
 import 'package:ataulfo/core/router/app_router.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
@@ -141,9 +142,16 @@ void main() {
     'AtaulfoApp dispara onSignedOut al caer la sesión a Unauthenticated',
     (tester) async {
       var signedOut = 0;
+      // Authenticated ANTES de Unauthenticated: el listener (listenWhen) debe
+      // filtrar el primero y disparar SÓLO en el segundo. Si filtrara mal y
+      // disparara en cada transición, signedOut sería 2 — por eso afirmamos
+      // == 1 (no >= 1): cierra la mutación de un listenWhen permisivo.
       whenListen(
         authBloc,
         Stream<AuthState>.fromIterable(const <AuthState>[
+          AuthAuthenticated(
+            Identity(userId: 'u', orgId: 'o', role: 'OWNER', email: 'u@x'),
+          ),
           AuthUnauthenticated(),
         ]),
         initialState: const AuthInitial(),
@@ -156,7 +164,8 @@ void main() {
           onSignedOut: () => signedOut++,
         ),
       );
-      await tester.pump(); // procesa la emisión Unauthenticated
+      await tester.pump(); // procesa Authenticated
+      await tester.pump(); // procesa Unauthenticated
 
       expect(signedOut, 1);
     },
