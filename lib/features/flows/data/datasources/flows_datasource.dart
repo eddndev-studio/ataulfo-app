@@ -1,3 +1,9 @@
+// Archivo > 400 LOC justificado: coloca el puerto de datos de Flow
+// (`FlowsDatasource`, consumer-defined) junto a su única implementación
+// `DioFlowsDatasource` y al mapeo centralizado de DioException → FlowsFailure
+// que comparten todas las rutas. Separar la interfaz de su impl fragmentaría
+// un borde HTTP cohesivo sin reuso real; el corte futuro, si crece, es
+// extraer el armado/parseo de DTOs a un helper, no partir el puerto.
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -75,6 +81,10 @@ abstract interface class FlowsDatasource {
   /// UNIQUE en `(flow_id, order)` no requiere two-pass — cada patch
   /// va independiente y el listado posterior se ordena por `order` ASC.
   ///
+  /// `mediaRef` viaja cuando se reemplaza el recurso de un step
+  /// multimedia. Es el `ref` BARE canónico (`tenant/<org>/media/<id>`),
+  /// nunca la URL firmada efímera.
+  ///
   /// 200 con el step resultante completo. 422
   /// → `FlowsInvalidStepFailure`. 404 → `FlowsStepNotFoundFailure`
   /// (distinto del NotFound del flow padre: aquí el step en sí no
@@ -82,6 +92,7 @@ abstract interface class FlowsDatasource {
   Future<fdom.Step> patchStep({
     required String stepId,
     String? content,
+    String? mediaRef,
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
@@ -371,6 +382,7 @@ class DioFlowsDatasource implements FlowsDatasource {
   Future<fdom.Step> patchStep({
     required String stepId,
     String? content,
+    String? mediaRef,
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
@@ -379,6 +391,7 @@ class DioFlowsDatasource implements FlowsDatasource {
   }) async {
     final body = <String, dynamic>{};
     if (content != null) body['content'] = content;
+    if (mediaRef != null) body['mediaRef'] = mediaRef;
     if (delayMs != null) body['delayMs'] = delayMs;
     if (jitterPct != null) body['jitterPct'] = jitterPct;
     if (aiOnly != null) body['aiOnly'] = aiOnly;

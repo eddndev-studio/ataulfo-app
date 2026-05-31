@@ -80,6 +80,7 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
       await _repo.patchStep(
         stepId: event.stepId,
         content: event.content,
+        mediaRef: event.mediaRef,
         delayMs: event.delayMs,
         jitterPct: event.jitterPct,
         aiOnly: event.aiOnly,
@@ -255,6 +256,7 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
   const FlowStepsUpdateRequested({
     required this.stepId,
     this.content,
+    this.mediaRef,
     this.delayMs,
     this.jitterPct,
     this.aiOnly,
@@ -263,6 +265,11 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
 
   final String stepId;
   final String? content;
+
+  /// Nuevo `ref` BARE del recurso multimedia cuando el operador lo
+  /// reemplaza. Null = preservar el recurso actual (omitido del PATCH).
+  /// Siempre el ref BARE canónico — jamás la URL firmada efímera.
+  final String? mediaRef;
   final int? delayMs;
   final int? jitterPct;
   final bool? aiOnly;
@@ -276,14 +283,22 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
       other is FlowStepsUpdateRequested &&
       other.stepId == stepId &&
       other.content == content &&
+      other.mediaRef == mediaRef &&
       other.delayMs == delayMs &&
       other.jitterPct == jitterPct &&
       other.aiOnly == aiOnly &&
       other.metadataJson == metadataJson;
 
   @override
-  int get hashCode =>
-      Object.hash(stepId, content, delayMs, jitterPct, aiOnly, metadataJson);
+  int get hashCode => Object.hash(
+    stepId,
+    content,
+    mediaRef,
+    delayMs,
+    jitterPct,
+    aiOnly,
+    metadataJson,
+  );
 }
 
 /// Pide eliminar un step. La operación es idempotente en el backend,

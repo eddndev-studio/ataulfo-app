@@ -491,8 +491,10 @@ void _openStepSheet(BuildContext context, sdom.Step? step) {
     isScrollControlled: true,
     builder: (sheetCtx) => BlocProvider<FlowStepsBloc>.value(
       value: bloc,
-      // Al crear un step multimedia, el selector abre la galería en modo
-      // picker (`/media/pick`) que devuelve el `ref` BARE vía pop.
+      // Al crear o reemplazar el recurso de un step multimedia, el selector
+      // abre la galería en modo picker (`/media/pick`) que devuelve el `ref`
+      // BARE vía pop. Se cablea igual al crear y al editar; el sheet decide
+      // la interactividad según el tipo de step.
       child: StepEditSheet(
         editing: step,
         pickMediaRef: (ctx) => ctx.push<String>('/media/pick'),

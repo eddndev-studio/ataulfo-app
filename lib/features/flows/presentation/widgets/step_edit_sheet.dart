@@ -59,9 +59,9 @@ class StepEditSheet extends StatefulWidget {
   final fdom.Step? editing;
 
   /// Abre el selector de multimedia (galería en modo picker) y resuelve al
-  /// `ref` BARE elegido. `null` ⇒ el selector queda read-only: no abre nada,
-  /// lo que mantiene el sheet testeable aislado y deja el modo edición de
-  /// multimedia read-only.
+  /// `ref` BARE elegido. Aplica tanto al crear como al reemplazar el recurso
+  /// de un step en edición. `null` ⇒ el selector queda read-only: no abre
+  /// nada, lo que mantiene el sheet testeable aislado.
   final MediaRefPicker? pickMediaRef;
 
   @override
@@ -219,6 +219,12 @@ class _StepEditSheetState extends State<StepEditSheet> {
         : content != ed.content
         ? content
         : null;
+    // Solo multimedia reemplaza recurso: el nuevo ref viaja si cambió y no
+    // quedó vacío. TEXT/CONDITIONAL_TIME nunca mandan mediaRef.
+    final newMediaRef =
+        _isMultimedia && mediaRef.isNotEmpty && mediaRef != ed.mediaRef
+        ? mediaRef
+        : null;
     final newDelay = _delayMs != ed.delayMs ? _delayMs : null;
     final newJitter = _jitterPct != ed.jitterPct ? _jitterPct : null;
     final newAiOnly = _aiOnly != ed.aiOnly ? _aiOnly : null;
@@ -243,6 +249,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
 
     final isNoOp =
         newContent == null &&
+        newMediaRef == null &&
         newDelay == null &&
         newJitter == null &&
         newAiOnly == null &&
@@ -254,6 +261,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
       FlowStepsUpdateRequested(
         stepId: ed.id,
         content: newContent,
+        mediaRef: newMediaRef,
         delayMs: newDelay,
         jitterPct: newJitter,
         aiOnly: newAiOnly,
@@ -336,15 +344,12 @@ class _StepEditSheetState extends State<StepEditSheet> {
                       const SizedBox(height: AppTokens.sp4),
                       _MediaField(
                         controller: _mediaCtrl,
-                        // Interactivo sólo al crear: en edición el media es
-                        // read-only porque cambiar el recurso equivale a otro
-                        // step (el tipo es inmutable y el backend valida que
-                        // multimedia lleve mediaRef). Sin `pickMediaRef` el
-                        // selector tampoco abre nada — el sheet sigue usable
-                        // aislado.
-                        pickMediaRef: widget.editing == null
-                            ? widget.pickMediaRef
-                            : null,
+                        // Tanto al crear como al editar el selector es
+                        // interactivo: en edición el operador puede reemplazar
+                        // el recurso (el ref BARE resultante viaja en el PATCH).
+                        // Sin `pickMediaRef` el selector no abre nada — el
+                        // sheet sigue usable aislado.
+                        pickMediaRef: widget.pickMediaRef,
                         enabled: !isMutating,
                       ),
                     ],

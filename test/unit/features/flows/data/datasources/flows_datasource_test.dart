@@ -885,6 +885,67 @@ void main() {
     });
 
     test(
+      'mediaRef no-null viaja en el body bajo `mediaRef` (camelCase)',
+      () async {
+        when(
+          () => dio.patch<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/steps/s1'),
+            statusCode: 200,
+            data: stepJson(id: 's1'),
+          ),
+        );
+
+        // El ref BARE canónico, lo único que se persiste — nunca una URL firmada.
+        const bareRef = 'tenant/org1/media/nuevo999.png';
+        await ds.patchStep(stepId: 's1', mediaRef: bareRef);
+
+        final captured = verify(
+          () => dio.patch<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        final body = captured[1] as Map<String, dynamic>;
+        expect(body['mediaRef'], bareRef);
+      },
+    );
+
+    test('mediaRef null se omite del body (preservar = omitir)', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/steps/s1'),
+          statusCode: 200,
+          data: stepJson(id: 's1'),
+        ),
+      );
+
+      await ds.patchStep(stepId: 's1', content: 'X');
+
+      final captured = verify(
+        () => dio.patch<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      final body = captured[1] as Map<String, dynamic>;
+      expect(body.containsKey('mediaRef'), isFalse);
+    });
+
+    test(
       'metadataJson no-null viaja como objeto JSON bajo `metadata`',
       () async {
         when(

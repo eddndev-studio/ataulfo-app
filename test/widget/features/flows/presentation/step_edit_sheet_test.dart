@@ -455,9 +455,10 @@ void main() {
     });
 
     testWidgets(
-      'editing multimedia muestra el chip read-only con el ref original y '
-      'sin botón "Cambiar"',
+      'editing multimedia SIN pickMediaRef muestra el chip read-only con el '
+      'ref original y sin botón "Cambiar"',
       (tester) async {
+        // Sin callback el media queda read-only (no hay vía para reemplazar).
         await pumpHost(tester, editing: imgStep);
 
         // El chip "Recurso seleccionado" está presente con una cola del ref.
@@ -468,39 +469,114 @@ void main() {
         expect(find.textContaining('orig.png'), findsOneWidget);
         // No hay selector "Seleccionar multimedia" (ya hay ref).
         expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
-        // En edición el media es read-only: no hay botón "Cambiar".
+        // Sin callback no hay botón "Cambiar".
         expect(find.byKey(const Key('step_edit.media_change')), findsNothing);
       },
     );
 
     testWidgets(
-      'editing multimedia con pickMediaRef cableado SIGUE read-only — el sheet '
-      'neutraliza el callback al editar (sin "Cambiar", picker nunca invocado)',
+      'editing multimedia con pickMediaRef cableado expone "Cambiar" — la '
+      'edición de multimedia es interactiva',
       (tester) async {
         // Espeja producción: _openStepSheet cablea pickMediaRef SIEMPRE, tanto
-        // al crear como al editar. El read-only en edición no puede descansar
-        // en "el caller no pasó callback" — debe nacer del propio sheet, que
-        // anula el picker cuando editing != null. Este test le da dientes a esa
-        // neutralización: con el callback presente, si el sheet dejara de
-        // anularlo el botón "Cambiar" reaparecería y este expect fallaría.
-        var pickerCalls = 0;
+        // al crear como al editar. Con el callback presente, el chip de recurso
+        // expone "Cambiar" para reabrir el picker y reemplazar el media. Sin
+        // callback el chip queda read-only (test aparte). Este test le da
+        // dientes al cableado interactivo de edición.
         await pumpHost(
           tester,
           editing: imgStep,
-          pickMediaRef: (_) async {
-            pickerCalls++;
-            return 'tenant/o/media/otro.png';
-          },
+          pickMediaRef: (_) async => 'tenant/o/media/otro.png',
         );
 
         expect(
           find.byKey(const Key('step_edit.media_selected')),
           findsOneWidget,
         );
-        expect(find.byKey(const Key('step_edit.media_change')), findsNothing);
+        // El media ya está prefilled → el control es el chip con "Cambiar",
+        // no el selector inicial.
+        expect(find.byKey(const Key('step_edit.media_change')), findsOneWidget);
         expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
-        // Nada en el chip read-only dispara el picker.
-        expect(pickerCalls, 0);
+      },
+    );
+
+    testWidgets(
+      'editing multimedia: "Cambiar" devuelve un nuevo ref BARE → submit '
+      'dispatcha UpdateRequested(mediaRef) only-changed con ese ref exacto',
+      (tester) async {
+        // Re-pinea el linchpin a nivel de edición: lo que viaja como mediaRef
+        // es exactamente el ref BARE que el picker devolvió (distinto del
+        // original), y los demás campos quedan null (no cambiaron).
+        const nuevoRef = 'tenant/org1/media/nuevo999.png';
+        await pumpHost(
+          tester,
+          editing: imgStep,
+          pickMediaRef: (_) async => nuevoRef,
+        );
+
+        await tester.tap(find.byKey(const Key('step_edit.media_change')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const FlowStepsUpdateRequested(stepId: 's-img', mediaRef: nuevoRef),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'editing multimedia: "Cambiar" devuelve el MISMO ref que el original → '
+      'submit es no-op (mediaRef no cambió)',
+      (tester) async {
+        await pumpHost(
+          tester,
+          editing: imgStep,
+          // Devuelve el ref idéntico al del step en edición.
+          pickMediaRef: (_) async => imgStep.mediaRef,
+        );
+
+        await tester.tap(find.byKey(const Key('step_edit.media_change')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verifyNever(() => bloc.add(any()));
+      },
+    );
+
+    testWidgets(
+      'editing multimedia: cambiar media Y caption → UpdateRequested con '
+      'mediaRef y content ambos set',
+      (tester) async {
+        const nuevoRef = 'tenant/org1/media/nuevo999.png';
+        await pumpHost(
+          tester,
+          editing: imgStep,
+          pickMediaRef: (_) async => nuevoRef,
+        );
+
+        await tester.tap(find.byKey(const Key('step_edit.media_change')));
+        await tester.pump();
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'caption nuevo',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const FlowStepsUpdateRequested(
+              stepId: 's-img',
+              mediaRef: nuevoRef,
+              content: 'caption nuevo',
+            ),
+          ),
+        ).called(1);
       },
     );
 

@@ -742,4 +742,43 @@ void main() {
       expect(tf.controller?.text, 'Hola original');
     },
   );
+
+  testWidgets(
+    'Tap en StepCard multimedia abre el sheet con "Cambiar" interactivo '
+    '(el host de producción cablea el picker también al editar)',
+    (tester) async {
+      // Pinea el callsite real: _openStepSheet pasa pickMediaRef sin gatear
+      // por modo. Los tests del sheet inyectan el callback a mano, así que
+      // sólo aquí se verifica que la edición de multimedia nace interactiva
+      // en producción. Si alguien volviera a anular el picker al editar, el
+      // botón "Cambiar" desaparecería y este expect caería.
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.image,
+            order: 0,
+            content: 'caption',
+            mediaRef: 'tenant/org1/media/orig.png',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('flow_detail.step_card.s1')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Editar paso'), findsOneWidget);
+      expect(find.byKey(const Key('step_edit.media_selected')), findsOneWidget);
+      expect(find.byKey(const Key('step_edit.media_change')), findsOneWidget);
+    },
+  );
 }

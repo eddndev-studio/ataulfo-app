@@ -639,6 +639,33 @@ void main() {
     );
 
     blocTest<FlowStepsBloc, FlowStepsState>(
+      'UpdateRequested con mediaRef propaga al repo (replace de multimedia)',
+      build: () {
+        const bareRef = 'tenant/org1/media/nuevo999.png';
+        when(
+          () => repo.patchStep(stepId: 's1', mediaRef: bareRef),
+        ).thenAnswer((_) async => patched);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => afterPatch);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsUpdateRequested(
+          stepId: 's1',
+          mediaRef: 'tenant/org1/media/nuevo999.png',
+        ),
+      ),
+      verify: (_) {
+        verify(
+          () => repo.patchStep(
+            stepId: 's1',
+            mediaRef: 'tenant/org1/media/nuevo999.png',
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
       'UpdateRequested falla → MutationFailed(steps intactos)',
       build: () {
         when(
