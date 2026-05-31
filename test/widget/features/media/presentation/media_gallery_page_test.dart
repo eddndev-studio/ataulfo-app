@@ -153,7 +153,11 @@ void main() {
           home: BlocProvider<MediaGalleryBloc>.value(
             value: bloc,
             child: Scaffold(
-              body: MediaGalleryPage(onSelect: (ref) => captured = ref),
+              body: MediaGalleryPage(
+                // onSelect recibe el MediaAsset completo; el consumidor extrae
+                // el ref BARE (identidad), nunca la previewUrl efímera.
+                onSelect: (asset) => captured = asset.ref,
+              ),
             ),
           ),
         ),

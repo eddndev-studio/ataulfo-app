@@ -58,13 +58,43 @@ class MediaThumbnail extends StatelessWidget {
   );
 
   /// Placeholder cuando no hay preview (o falló): un ícono según el tipo de
-  /// contenido sobre la superficie de la card.
-  Widget _placeholder() => Container(
-    key: Key('media_thumbnail.placeholder.${asset.ref}'),
-    color: AppTokens.surface2,
-    alignment: Alignment.center,
-    child: Icon(_iconFor(asset.contentType), color: AppTokens.text2, size: 28),
-  );
+  /// contenido sobre la superficie de la card. Para documentos añade el filename
+  /// bajo el ícono (un PDF/Office no tiene miniatura, así que el nombre es la
+  /// única identidad visual útil); para imagen/video/audio el ícono basta
+  /// (las miniaturas reales de video/audio quedan diferidas).
+  Widget _placeholder() {
+    final name = asset.filename.trim();
+    final showName = _isDocument(asset.contentType) && name.isNotEmpty;
+    return Container(
+      key: Key('media_thumbnail.placeholder.${asset.ref}'),
+      color: AppTokens.surface2,
+      padding: const EdgeInsets.all(AppTokens.sp2),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(_iconFor(asset.contentType), color: AppTokens.text2, size: 28),
+          if (showName) ...<Widget>[
+            const SizedBox(height: AppTokens.sp1),
+            Text(
+              name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppTokens.text2, fontSize: 10),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Familia "documento": application/* y text/* (PDF, Office, texto/CSV). Es la
+  /// única familia cuya miniatura no es renderizable, así que se etiqueta con el
+  /// nombre del archivo.
+  static bool _isDocument(String contentType) =>
+      contentType.startsWith('application/') || contentType.startsWith('text/');
 
   /// Ícono representativo por familia de `contentType`. Un tipo no catalogado
   /// cae al genérico de archivo.

@@ -77,7 +77,11 @@ void main() {
     ).thenReturn(const FlowStepsLoaded(<fdom.Step>[imgStep]));
     mediaRepo = _MockMediaRepo();
     when(
-      () => mediaRepo.listAssets(cursor: any(named: 'cursor'), limit: null),
+      () => mediaRepo.listAssets(
+        cursor: any(named: 'cursor'),
+        limit: null,
+        type: any(named: 'type'),
+      ),
     ).thenAnswer(
       (_) async => MediaPage(assets: <MediaAsset>[asset], nextCursor: ''),
     );
@@ -112,8 +116,11 @@ void main() {
                               value: bloc,
                               child: StepEditSheet(
                                 editing: imgStep,
-                                pickMediaRef: (c) =>
-                                    c.push<String>('/media/pick'),
+                                pickMediaRef: (c, family) => c.push<MediaAsset>(
+                                  family == null
+                                      ? '/media/pick'
+                                      : '/media/pick?type=$family',
+                                ),
                               ),
                             ),
                       );
@@ -127,15 +134,20 @@ void main() {
         ),
         GoRoute(
           path: '/media/pick',
-          builder: (context, _) => BlocProvider<MediaGalleryBloc>(
-            create: (_) =>
-                MediaGalleryBloc(repo: mediaRepo, picker: filePicker)
-                  ..add(const MediaGalleryLoadRequested()),
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Elegir multimedia')),
-              body: MediaGalleryPage(onSelect: (ref) => context.pop(ref)),
-            ),
-          ),
+          builder: (context, state) {
+            final type = state.uri.queryParameters['type'];
+            return BlocProvider<MediaGalleryBloc>(
+              create: (_) => MediaGalleryBloc(
+                repo: mediaRepo,
+                picker: filePicker,
+                type: type,
+              )..add(const MediaGalleryLoadRequested()),
+              child: Scaffold(
+                appBar: AppBar(title: const Text('Elegir multimedia')),
+                body: MediaGalleryPage(onSelect: (asset) => context.pop(asset)),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -156,6 +168,16 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('step_edit.media_change')));
       await tester.pumpAndSettle();
+
+      // El reemplazo también abre la galería FILTRADA por la familia del paso
+      // (IMAGE): el sheet pasó family='image' al picker.
+      verify(
+        () => mediaRepo.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: 'image',
+        ),
+      ).called(greaterThanOrEqualTo(1));
 
       // La galería cargó (repo fake) y la miniatura es tappable.
       expect(find.byType(MediaThumbnail), findsOneWidget);

@@ -7,6 +7,8 @@
 // (_TypePicker, _SliderField, _FailureCopy) están acoplados al estado
 // de _StepEditSheetState — extraerlos a archivos sueltos movería ruido
 // sin mejorar cohesión.
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -16,6 +18,7 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../media/domain/entities/media_asset.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
@@ -23,12 +26,14 @@ import '../bloc/flow_steps_bloc.dart';
 import 'conditional_time_form.dart';
 import 'step_type_label.dart';
 
-/// Abre un selector de multimedia y devuelve el `ref` BARE elegido, o `null`
-/// si el usuario cancela. La identidad que viaja es siempre el ref BARE
-/// canónico (`tenant/<org>/media/<id>[.<ext>]`) — JAMÁS la `previewUrl`
-/// firmada efímera. El `BuildContext` se pasa para que el selector pueda
-/// navegar (p. ej. `context.push('/media/pick')`).
-typedef MediaRefPicker = Future<String?> Function(BuildContext context);
+/// Abre un selector de multimedia filtrado por [family] (image|video|audio|
+/// document, o null = sin filtro) y devuelve el [MediaAsset] elegido, o `null`
+/// si el usuario cancela. El caller persiste el ref BARE canónico
+/// (`tenant/<org>/media/<id>[.<ext>]`) — JAMÁS la `previewUrl` firmada efímera —
+/// y el filename del asset (para documentos). El `BuildContext` se pasa para que
+/// el selector pueda navegar (p. ej. `context.push('/media/pick?type=<family>')`).
+typedef MediaRefPicker =
+    Future<MediaAsset?> Function(BuildContext context, String? family);
 
 /// Modal sheet de creación/edición de un step TEXT (S11 F5a). Cuenta
 /// con tres controles: `content` (TextField multiline), `delayMs` y
@@ -106,6 +111,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
   /// implícito al notar que el form no refleja la config guardada.
   ConditionalTimeMetadata? _ctInitial;
 
+  /// Nombre real del documento elegido (clave `media_filename` del metadata).
+  /// Sólo aplica a DOCUMENT: el backend lo usa para `DocumentMessage.FileName`.
+  /// Se actualiza al elegir un asset; al editar se hidrata del metadata
+  /// existente. [_docFilenameInitial] guarda el valor original para el diff
+  /// only-changed del PATCH.
+  String? _pickedFilename;
+  String? _docFilenameInitial;
+
   @override
   void initState() {
     super.initState();
@@ -128,6 +141,47 @@ class _StepEditSheetState extends State<StepEditSheet> {
         _ctInitial = null;
       }
     }
+    if (ed != null && ed.type == fdom.StepType.document) {
+      _docFilenameInitial = _filenameFromMetadata(ed.metadataJson);
+      _pickedFilename = _docFilenameInitial;
+    }
+  }
+
+  /// Familia de content-type por la que filtrar el picker, derivada del tipo del
+  /// paso. STICKER usa el contenedor de imagen; AUDIO/PTT comparten audio.
+  /// TEXT/CONDITIONAL_TIME no llevan media ⇒ null.
+  static String? _mediaFamilyFor(fdom.StepType type) => switch (type) {
+    fdom.StepType.image || fdom.StepType.sticker => 'image',
+    fdom.StepType.video => 'video',
+    fdom.StepType.audio || fdom.StepType.ptt => 'audio',
+    fdom.StepType.document => 'document',
+    fdom.StepType.text || fdom.StepType.conditionalTime => null,
+  };
+
+  /// Extrae `media_filename` de un metadata JSON (objeto). Ausente/corrupto ⇒
+  /// null (el sheet sigue usable; el backend cae al nombre por defecto).
+  static String? _filenameFromMetadata(String metadataJson) {
+    if (metadataJson.trim().isEmpty) return null;
+    try {
+      final decoded = jsonDecode(metadataJson);
+      if (decoded is Map<String, dynamic>) {
+        final name = decoded['media_filename'];
+        if (name is String && name.trim().isNotEmpty) return name;
+      }
+    } on FormatException {
+      return null;
+    }
+    return null;
+  }
+
+  /// Metadata JSON a persistir para un DOCUMENT con filename conocido:
+  /// `{"media_filename": "..."}`. Sin filename ⇒ null (no se escribe metadata).
+  String? _documentMetadataJson() {
+    final name = _pickedFilename?.trim();
+    if (_type != fdom.StepType.document || name == null || name.isEmpty) {
+      return null;
+    }
+    return jsonEncode(<String, dynamic>{'media_filename': name});
   }
 
   void _onContentChanged() => setState(() {});
@@ -206,7 +260,9 @@ class _StepEditSheetState extends State<StepEditSheet> {
           delayMs: _delayMs,
           jitterPct: _jitterPct,
           aiOnly: _aiOnly,
-          metadataJson: _isConditionalTime ? _ctMetadataJson : null,
+          metadataJson: _isConditionalTime
+              ? _ctMetadataJson
+              : _documentMetadataJson(),
         ),
       );
       return;
@@ -244,6 +300,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
         // El form gates submit con metadataJson != null, así que un
         // parse fail aquí sería bug. Lo dejamos pasar como cambio.
         newMetadata = _ctMetadataJson;
+      }
+    } else if (_type == fdom.StepType.document) {
+      // DOCUMENT: el media_filename viaja sólo si cambió respecto al original
+      // (re-pick de otro asset). Sin cambio ⇒ no se manda metadata (el backend
+      // conserva el existente). Comparación por valor del filename.
+      if ((_pickedFilename ?? '') != (_docFilenameInitial ?? '')) {
+        newMetadata = _documentMetadataJson();
       }
     }
 
@@ -350,6 +413,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
                         // Sin `pickMediaRef` el selector no abre nada — el
                         // sheet sigue usable aislado.
                         pickMediaRef: widget.pickMediaRef,
+                        // La galería-picker se abre filtrada por la familia del
+                        // tipo del paso (alineación tipo↔asset).
+                        family: _mediaFamilyFor(_type),
+                        // Al elegir, capturamos el filename real del asset para
+                        // persistirlo en el metadata del documento.
+                        onPicked: (asset) =>
+                            setState(() => _pickedFilename = asset.filename),
                         enabled: !isMutating,
                       ),
                     ],
@@ -609,11 +679,22 @@ class _MediaField extends StatelessWidget {
   const _MediaField({
     required this.controller,
     required this.pickMediaRef,
+    required this.family,
+    required this.onPicked,
     required this.enabled,
   });
 
   final TextEditingController controller;
   final MediaRefPicker? pickMediaRef;
+
+  /// Familia de content-type para filtrar la galería-picker (image|video|
+  /// audio|document) según el tipo del paso; null ⇒ sin filtro.
+  final String? family;
+
+  /// Notifica al padre el asset elegido (para capturar su filename). El ref
+  /// BARE va por el [controller]; este callback lleva el resto del asset.
+  final ValueChanged<MediaAsset> onPicked;
+
   final bool enabled;
 
   bool get _interactive => enabled && pickMediaRef != null;
@@ -621,11 +702,15 @@ class _MediaField extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     final picker = pickMediaRef;
     if (picker == null) return;
-    final ref = await picker(context);
-    if (ref == null || ref.trim().isEmpty) return;
+    final asset = await picker(context, family);
+    if (asset == null) return;
+    final ref = asset.ref.trim();
+    if (ref.isEmpty) return;
     // Setear el texto dispara el listener del controller (en el padre), que
-    // hace setState y re-renderiza con el chip seleccionado.
-    controller.text = ref.trim();
+    // hace setState y re-renderiza con el chip seleccionado. El filename viaja
+    // por onPicked. NUNCA se persiste asset.previewUrl (firmada efímera).
+    controller.text = ref;
+    onPicked(asset);
   }
 
   @override

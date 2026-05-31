@@ -15,8 +15,10 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
   MediaGalleryBloc({
     required MediaRepository repo,
     required MediaFilePicker picker,
+    String? type,
   }) : _repo = repo,
        _picker = picker,
+       _type = type,
        super(const MediaGalleryInitial()) {
     on<MediaGalleryLoadRequested>(_onLoad);
     on<MediaGalleryLoadMoreRequested>(_onLoadMore);
@@ -26,6 +28,13 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
 
   final MediaRepository _repo;
   final MediaFilePicker _picker;
+
+  /// Familia de content-type por la que se filtra el catálogo (image|video|
+  /// audio|document). null ⇒ galería completa (modo browse); no-null ⇒ la
+  /// galería se usa como picker filtrado por el tipo del paso de flujo. Se fija
+  /// al construir y se aplica a TODAS las páginas (primera, load-more, refresh,
+  /// re-list tras subir) para que la paginación no mezcle familias.
+  final String? _type;
 
   Future<void> _onLoad(
     MediaGalleryLoadRequested event,
@@ -51,7 +60,10 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     }
     emit(current.copyWith(isLoadingMore: true));
     try {
-      final page = await _repo.listAssets(cursor: current.nextCursor);
+      final page = await _repo.listAssets(
+        cursor: current.nextCursor,
+        type: _type,
+      );
       // Append sin duplicar: la página nueva se concatena al final.
       emit(
         current.copyWith(
@@ -102,8 +114,8 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
       await _repo.upload(bytes: picked.bytes, filename: picked.filename);
       // No fabricamos un MediaAsset desde el UploadedMedia (sólo trae ref+url,
       // sin metadata): re-listamos para mostrar el asset con la verdad del
-      // servidor.
-      final page = await _repo.listAssets();
+      // servidor. Respetamos el filtro de familia para no traer ajenos al picker.
+      final page = await _repo.listAssets(type: _type);
       emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
     } on MediaFailure catch (f) {
       // El fallo de subida NO colapsa a Failed (eso vaciaría la galería):
@@ -117,7 +129,7 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
   /// (terminal: no hay lista previa que preservar en la carga inicial).
   Future<void> _fetchFirstPage(Emitter<MediaGalleryState> emit) async {
     try {
-      final page = await _repo.listAssets();
+      final page = await _repo.listAssets(type: _type);
       emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
     } on MediaFailure catch (f) {
       emit(MediaGalleryFailed(f));

@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/widgets/step_edit_sheet.dart';
+import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,6 +15,21 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockBloc extends MockBloc<FlowStepsEvent, FlowStepsState>
     implements FlowStepsBloc {}
+
+/// Asset de prueba con un content-type/filename dado; la previewUrl difiere del
+/// ref para verificar que sólo el ref BARE (y el filename) se persisten.
+MediaAsset _asset(
+  String ref, {
+  String ct = 'image/png',
+  String filename = 'file.png',
+}) => MediaAsset(
+  ref: ref,
+  previewUrl: 'https://signed/$ref?sig=ephemeral',
+  filename: filename,
+  contentType: ct,
+  size: 1,
+  createdAt: DateTime.utc(2026, 1, 1),
+);
 
 void main() {
   setUpAll(() {
@@ -246,7 +264,7 @@ void main() {
         // despachado DEBE llevar exactamente ese ref — re-pinea el
         // linchpin a nivel del sheet: lo que se persiste es el ref BARE.
         const bareRef = 'tenant/org1/media/abc123.png';
-        await pumpHost(tester, pickMediaRef: (_) async => bareRef);
+        await pumpHost(tester, pickMediaRef: (_, _) async => _asset(bareRef));
 
         await tester.tap(find.byKey(const Key('step_edit.type.image')));
         await tester.pump();
@@ -270,10 +288,74 @@ void main() {
       },
     );
 
+    testWidgets(
+      'DOCUMENT: el picker se abre con family="document" y el filename del '
+      'asset viaja como media_filename en el metadata (cliente de B4)',
+      (tester) async {
+        String? gotFamily;
+        await pumpHost(
+          tester,
+          pickMediaRef: (_, family) async {
+            gotFamily = family;
+            return _asset(
+              'tenant/org1/media/doc777.pdf',
+              ct: 'application/pdf',
+              filename: 'informe-q3.pdf',
+            );
+          },
+        );
+
+        await tester.tap(find.byKey(const Key('step_edit.type.document')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.media_picker')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        // El sheet derivó la familia del tipo del paso y la pasó al picker.
+        expect(gotFamily, 'document');
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        expect(captured, hasLength(1));
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.type, fdom.StepType.document);
+        expect(ev.mediaRef, 'tenant/org1/media/doc777.pdf');
+        // El nombre real del documento viaja en media_filename.
+        expect(ev.metadataJson, isNotNull);
+        final meta = jsonDecode(ev.metadataJson!) as Map<String, dynamic>;
+        expect(meta['media_filename'], 'informe-q3.pdf');
+      },
+    );
+
+    testWidgets(
+      'IMAGE: no escribe media_filename en el metadata (sólo DOCUMENT lo usa)',
+      (tester) async {
+        await pumpHost(
+          tester,
+          pickMediaRef: (_, _) async =>
+              _asset('tenant/org1/media/foto.png', filename: 'foto.png'),
+        );
+
+        await tester.tap(find.byKey(const Key('step_edit.type.image')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.media_picker')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.metadataJson, isNull);
+      },
+    );
+
     testWidgets('submit multimedia sin selección es no-op (gate del trim)', (
       tester,
     ) async {
-      await pumpHost(tester, pickMediaRef: (_) async => 'tenant/o/media/x.png');
+      await pumpHost(
+        tester,
+        pickMediaRef: (_, _) async => _asset('tenant/o/media/x.png'),
+      );
 
       await tester.tap(find.byKey(const Key('step_edit.type.image')));
       await tester.pump();
@@ -287,7 +369,7 @@ void main() {
     testWidgets(
       'cancelar el picker (devuelve null) no cambia nada; submit sigue no-op',
       (tester) async {
-        await pumpHost(tester, pickMediaRef: (_) async => null);
+        await pumpHost(tester, pickMediaRef: (_, _) async => null);
 
         await tester.tap(find.byKey(const Key('step_edit.type.image')));
         await tester.pump();
@@ -486,7 +568,7 @@ void main() {
         await pumpHost(
           tester,
           editing: imgStep,
-          pickMediaRef: (_) async => 'tenant/o/media/otro.png',
+          pickMediaRef: (_, _) async => _asset('tenant/o/media/otro.png'),
         );
 
         expect(
@@ -511,7 +593,7 @@ void main() {
         await pumpHost(
           tester,
           editing: imgStep,
-          pickMediaRef: (_) async => nuevoRef,
+          pickMediaRef: (_, _) async => _asset(nuevoRef),
         );
 
         await tester.tap(find.byKey(const Key('step_edit.media_change')));
@@ -535,7 +617,7 @@ void main() {
           tester,
           editing: imgStep,
           // Devuelve el ref idéntico al del step en edición.
-          pickMediaRef: (_) async => imgStep.mediaRef,
+          pickMediaRef: (_, _) async => _asset(imgStep.mediaRef),
         );
 
         await tester.tap(find.byKey(const Key('step_edit.media_change')));
@@ -555,7 +637,7 @@ void main() {
         await pumpHost(
           tester,
           editing: imgStep,
-          pickMediaRef: (_) async => nuevoRef,
+          pickMediaRef: (_, _) async => _asset(nuevoRef),
         );
 
         await tester.tap(find.byKey(const Key('step_edit.media_change')));

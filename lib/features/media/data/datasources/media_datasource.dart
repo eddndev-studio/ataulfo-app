@@ -22,9 +22,10 @@ abstract interface class MediaDatasource {
     required String filename,
   });
 
-  /// `GET /media-assets?cursor=&limit=` paginado. Devuelve una página
-  /// (assets + nextCursor opaco).
-  Future<MediaPage> listAssets({String? cursor, int? limit});
+  /// `GET /media-assets?cursor=&limit=&type=` paginado. Devuelve una página
+  /// (assets + nextCursor opaco). [type] filtra por familia del content-type
+  /// (image|video|audio|document); null ⇒ sin filtro (todo el catálogo).
+  Future<MediaPage> listAssets({String? cursor, int? limit, String? type});
 }
 
 class DioMediaDatasource implements MediaDatasource {
@@ -62,11 +63,20 @@ class DioMediaDatasource implements MediaDatasource {
   }
 
   @override
-  Future<MediaPage> listAssets({String? cursor, int? limit}) async {
+  Future<MediaPage> listAssets({
+    String? cursor,
+    int? limit,
+    String? type,
+  }) async {
     try {
       // Omitimos cada clave cuando el valor es null (null-aware element): el
-      // backend distingue "sin cursor" (primera página) de un cursor vacío.
-      final query = <String, dynamic>{'cursor': ?cursor, 'limit': ?limit};
+      // backend distingue "sin cursor" (primera página) de un cursor vacío, y
+      // "sin type" (todo el catálogo) de una familia concreta.
+      final query = <String, dynamic>{
+        'cursor': ?cursor,
+        'limit': ?limit,
+        'type': ?type,
+      };
       final res = await _dio.get<Map<String, dynamic>>(
         '/media-assets',
         queryParameters: query,
