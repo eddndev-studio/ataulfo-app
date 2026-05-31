@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/features/media/data/cache/media_thumbnail_loader.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/failures/media_failure.dart';
 import 'package:ataulfo/features/media/presentation/bloc/media_gallery_bloc.dart';
@@ -12,8 +15,30 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../../../support/fake_thumbnail_loader.dart';
+
 class _MockBloc extends MockBloc<MediaGalleryEvent, MediaGalleryState>
     implements MediaGalleryBloc {}
+
+/// Loader que siempre resuelve los mismos bytes — para verificar que la página
+/// threadea SU loader hasta las miniaturas (no para testear la lógica de cache,
+/// que vive en caching_media_thumbnail_loader_test).
+class _BytesLoader implements MediaThumbnailLoader {
+  const _BytesLoader(this._bytes);
+  final Uint8List _bytes;
+  @override
+  Future<Uint8List?> load(MediaAsset asset) async => _bytes;
+}
+
+// PNG 1x1 transparente válido.
+final _png1x1 = Uint8List.fromList(<int>[
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, //
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, //
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, //
+  0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0x00, 0x01, 0x00, 0x00, //
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, //
+  0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+]);
 
 MediaAsset _asset(
   String ref, {
@@ -40,13 +65,14 @@ void main() {
     when(() => bloc.state).thenReturn(const MediaGalleryInitial());
   });
 
-  Widget host() => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: BlocProvider<MediaGalleryBloc>.value(
-      value: bloc,
-      child: const Scaffold(body: MediaGalleryPage()),
-    ),
-  );
+  Widget host({MediaThumbnailLoader loader = const FakeThumbnailLoader()}) =>
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: BlocProvider<MediaGalleryBloc>.value(
+          value: bloc,
+          child: Scaffold(body: MediaGalleryPage(loader: loader)),
+        ),
+      );
 
   testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
     when(() => bloc.state).thenReturn(const MediaGalleryLoading());
@@ -95,7 +121,10 @@ void main() {
     verify(() => bloc.add(const MediaGalleryLoadRequested())).called(1);
   });
 
-  testWidgets('asset con previewUrl null renderiza placeholder, no excepción', (
+  // Wiring página↔miniatura: la página debe pasar SU loader a cada miniatura.
+  // El comportamiento fino del loader (hit/miss/descarga) vive en
+  // caching_media_thumbnail_loader_test; aquí sólo se verifica el cableado.
+  testWidgets('loader que resuelve null ⇒ la miniatura cae a placeholder', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(
@@ -104,8 +133,9 @@ void main() {
         nextCursor: '',
       ),
     );
-    await tester.pumpWidget(host());
-    // No Image.network cuando no hay URL; sí un placeholder con ícono.
+    await tester.pumpWidget(host()); // loader por defecto: null
+    await tester.pump(); // asienta el FutureBuilder de la miniatura
+
     expect(find.byType(Image), findsNothing);
     expect(
       find.byKey(const Key('media_thumbnail.placeholder.media/a')),
@@ -114,21 +144,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('asset con previewUrl renderiza Image (no placeholder)', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(
-      MediaGalleryLoaded(
-        items: <MediaAsset>[_asset('media/a', previewUrl: 'https://signed/a')],
-        nextCursor: '',
-      ),
-    );
-    await tester.pumpWidget(host());
-    // Image.network falla por defecto en widget tests; basta con que el nodo
-    // Image exista (su errorBuilder cae al mismo placeholder, sin crash).
-    expect(find.byType(Image), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'la página threadea su loader: bytes ⇒ la miniatura pinta Image',
+    (tester) async {
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[
+            _asset('media/a', previewUrl: 'https://signed/a'),
+          ],
+          nextCursor: '',
+        ),
+      );
+      await tester.pumpWidget(host(loader: _BytesLoader(_png1x1)));
+      await tester.pump();
+
+      expect(find.byType(Image), findsOneWidget);
+      expect(
+        find.byKey(const Key('media_thumbnail.placeholder.media/a')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'LINCHPIN: onSelect recibe el ref BARE del asset, NUNCA la previewUrl',
@@ -154,6 +191,7 @@ void main() {
             value: bloc,
             child: Scaffold(
               body: MediaGalleryPage(
+                loader: const FakeThumbnailLoader(),
                 // onSelect recibe el MediaAsset completo; el consumidor extrae
                 // el ref BARE (identidad), nunca la previewUrl efímera.
                 onSelect: (asset) => captured = asset.ref,

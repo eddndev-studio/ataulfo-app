@@ -15,6 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../../../support/fake_thumbnail_loader.dart';
+
 class _MockStepsBloc extends MockBloc<FlowStepsEvent, FlowStepsState>
     implements FlowStepsBloc {}
 
@@ -139,7 +141,10 @@ void main() {
               )..add(const MediaGalleryLoadRequested()),
               child: Scaffold(
                 appBar: AppBar(title: const Text('Elegir multimedia')),
-                body: MediaGalleryPage(onSelect: (asset) => context.pop(asset)),
+                body: MediaGalleryPage(
+                  loader: const FakeThumbnailLoader(),
+                  onSelect: (asset) => context.pop(asset),
+                ),
               ),
             );
           },
