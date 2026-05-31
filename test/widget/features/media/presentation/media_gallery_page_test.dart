@@ -15,15 +15,18 @@ import 'package:mocktail/mocktail.dart';
 class _MockBloc extends MockBloc<MediaGalleryEvent, MediaGalleryState>
     implements MediaGalleryBloc {}
 
-MediaAsset _asset(String ref, {String? previewUrl, String contentType = 'image/png'}) =>
-    MediaAsset(
-      ref: ref,
-      previewUrl: previewUrl,
-      filename: '$ref.png',
-      contentType: contentType,
-      size: 10,
-      createdAt: DateTime.utc(2026, 1, 1),
-    );
+MediaAsset _asset(
+  String ref, {
+  String? previewUrl,
+  String contentType = 'image/png',
+}) => MediaAsset(
+  ref: ref,
+  previewUrl: previewUrl,
+  filename: '$ref.png',
+  contentType: contentType,
+  size: 10,
+  createdAt: DateTime.utc(2026, 1, 1),
+);
 
 void main() {
   setUpAll(() {
@@ -68,7 +71,9 @@ void main() {
     expect(find.byType(MediaThumbnail), findsNWidgets(2));
   });
 
-  testWidgets('Loaded vacío muestra empty state (sin miniaturas)', (tester) async {
+  testWidgets('Loaded vacío muestra empty state (sin miniaturas)', (
+    tester,
+  ) async {
     when(() => bloc.state).thenReturn(
       const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
     );
@@ -77,7 +82,9 @@ void main() {
     expect(find.byKey(const Key('media_gallery.empty')), findsOneWidget);
   });
 
-  testWidgets('Failed → mensaje + Reintentar dispara LoadRequested', (tester) async {
+  testWidgets('Failed → mensaje + Reintentar dispara LoadRequested', (
+    tester,
+  ) async {
     when(
       () => bloc.state,
     ).thenReturn(const MediaGalleryFailed(MediaNetworkFailure()));
@@ -88,25 +95,24 @@ void main() {
     verify(() => bloc.add(const MediaGalleryLoadRequested())).called(1);
   });
 
-  testWidgets(
-    'asset con previewUrl null renderiza placeholder, no excepción',
-    (tester) async {
-      when(() => bloc.state).thenReturn(
-        MediaGalleryLoaded(
-          items: <MediaAsset>[_asset('media/a', previewUrl: null)],
-          nextCursor: '',
-        ),
-      );
-      await tester.pumpWidget(host());
-      // No Image.network cuando no hay URL; sí un placeholder con ícono.
-      expect(find.byType(Image), findsNothing);
-      expect(
-        find.byKey(const Key('media_thumbnail.placeholder.media/a')),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('asset con previewUrl null renderiza placeholder, no excepción', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      MediaGalleryLoaded(
+        items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+        nextCursor: '',
+      ),
+    );
+    await tester.pumpWidget(host());
+    // No Image.network cuando no hay URL; sí un placeholder con ícono.
+    expect(find.byType(Image), findsNothing);
+    expect(
+      find.byKey(const Key('media_thumbnail.placeholder.media/a')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('asset con previewUrl renderiza Image (no placeholder)', (
     tester,
@@ -124,7 +130,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('FAB de subida dispara MediaGalleryUploadRequested', (tester) async {
+  testWidgets('FAB de subida dispara MediaGalleryUploadRequested', (
+    tester,
+  ) async {
     when(() => bloc.state).thenReturn(
       const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
     );
@@ -134,21 +142,22 @@ void main() {
     verify(() => bloc.add(const MediaGalleryUploadRequested())).called(1);
   });
 
-  testWidgets('hasMore + scroll al fondo dispara MediaGalleryLoadMoreRequested', (
-    tester,
-  ) async {
-    final items = List<MediaAsset>.generate(
-      20,
-      (i) => _asset('media/$i', previewUrl: null),
-    );
-    when(() => bloc.state).thenReturn(
-      MediaGalleryLoaded(items: items, nextCursor: 'cur-1'),
-    );
-    await tester.pumpWidget(host());
-    await tester.drag(find.byType(GridView), const Offset(0, -2000));
-    await tester.pump();
-    verify(() => bloc.add(const MediaGalleryLoadMoreRequested())).called(1);
-  });
+  testWidgets(
+    'hasMore + scroll al fondo dispara MediaGalleryLoadMoreRequested',
+    (tester) async {
+      final items = List<MediaAsset>.generate(
+        20,
+        (i) => _asset('media/$i', previewUrl: null),
+      );
+      when(
+        () => bloc.state,
+      ).thenReturn(MediaGalleryLoaded(items: items, nextCursor: 'cur-1'));
+      await tester.pumpWidget(host());
+      await tester.drag(find.byType(GridView), const Offset(0, -2000));
+      await tester.pump();
+      verify(() => bloc.add(const MediaGalleryLoadMoreRequested())).called(1);
+    },
+  );
 
   testWidgets('isLoadingMore muestra indicador de paginación', (tester) async {
     when(() => bloc.state).thenReturn(

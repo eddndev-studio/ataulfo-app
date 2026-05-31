@@ -30,22 +30,94 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
   Future<void> _onLoad(
     MediaGalleryLoadRequested event,
     Emitter<MediaGalleryState> emit,
-  ) async {}
+  ) async {
+    emit(const MediaGalleryLoading());
+    await _fetchFirstPage(emit);
+  }
 
   Future<void> _onLoadMore(
     MediaGalleryLoadMoreRequested event,
     Emitter<MediaGalleryState> emit,
-  ) async {}
+  ) async {
+    final current = state;
+    // Guardas: sólo paginamos desde Loaded, sólo si hay más páginas y no hay
+    // ya una en vuelo. La de concurrencia depende de emitir `isLoadingMore`
+    // ANTES del primer await (abajo): así un segundo LoadMore encolado lee el
+    // estado ya actualizado y cae en este `return` sin disparar otro fetch.
+    if (current is! MediaGalleryLoaded ||
+        !current.hasMore ||
+        current.isLoadingMore) {
+      return;
+    }
+    emit(current.copyWith(isLoadingMore: true));
+    try {
+      final page = await _repo.listAssets(cursor: current.nextCursor);
+      // Append sin duplicar: la página nueva se concatena al final.
+      emit(
+        current.copyWith(
+          items: <MediaAsset>[...current.items, ...page.assets],
+          nextCursor: page.nextCursor,
+          isLoadingMore: false,
+        ),
+      );
+    } on MediaFailure {
+      // Un fallo de paginación no tumba la lista visible: revertimos el flag y
+      // dejamos items/cursor intactos para que el usuario pueda reintentar.
+      emit(current.copyWith(isLoadingMore: false));
+    }
+  }
 
   Future<void> _onRefresh(
     MediaGalleryRefreshRequested event,
     Emitter<MediaGalleryState> emit,
-  ) async {}
+  ) async {
+    // Desde Loaded recargamos la primera página SIN pasar por Loading: la lista
+    // visible se mantiene mientras el RefreshIndicator gira. Desde otro estado,
+    // es una primera carga normal.
+    if (state is! MediaGalleryLoaded) {
+      emit(const MediaGalleryLoading());
+    }
+    await _fetchFirstPage(emit);
+  }
 
   Future<void> _onUpload(
     MediaGalleryUploadRequested event,
     Emitter<MediaGalleryState> emit,
-  ) async {}
+  ) async {
+    final picked = await _picker.pick();
+    // Cancelación: no-op. No subimos ni tocamos el estado.
+    if (picked == null) return;
+
+    final current = state;
+    final base = current is MediaGalleryLoaded
+        ? current
+        : const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: '');
+    emit(base.copyWith(isUploading: true, clearUploadError: true));
+    try {
+      await _repo.upload(bytes: picked.bytes, filename: picked.filename);
+      // No fabricamos un MediaAsset desde el UploadedMedia (sólo trae ref+url,
+      // sin metadata): re-listamos para mostrar el asset con la verdad del
+      // servidor.
+      final page = await _repo.listAssets();
+      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+    } on MediaFailure catch (f) {
+      // El fallo de subida NO colapsa a Failed (eso vaciaría la galería):
+      // viaja como error transitorio sobre el Loaded actual; la UI lo muestra
+      // (snackbar) y la lista sigue intacta.
+      emit(base.copyWith(isUploading: false, uploadError: f));
+    }
+  }
+
+  /// Carga la primera página y emite Loaded; un `MediaFailure` colapsa a Failed
+  /// (terminal: no hay lista previa que preservar en la carga inicial).
+  Future<void> _fetchFirstPage(Emitter<MediaGalleryState> emit) async {
+    try {
+      final page = await _repo.listAssets();
+      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+    } on MediaFailure catch (f) {
+      emit(MediaGalleryFailed(f));
+    }
+  }
 }
 
 // Events --------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
@@ -124,15 +125,20 @@ void main() {
         build: () {
           final repo = _MockRepo();
           when(
-            () => repo.listAssets(cursor: 'cur-1', limit: any(named: 'limit')),
+            () => repo.listAssets(
+              cursor: 'cur-1',
+              limit: any(named: 'limit'),
+            ),
           ).thenAnswer(
             (_) async =>
                 MediaPage(assets: <MediaAsset>[_c, _d], nextCursor: 'cur-2'),
           );
           return build(repo, _MockPicker());
         },
-        seed: () =>
-            MediaGalleryLoaded(items: <MediaAsset>[_a, _b], nextCursor: 'cur-1'),
+        seed: () => MediaGalleryLoaded(
+          items: <MediaAsset>[_a, _b],
+          nextCursor: 'cur-1',
+        ),
         act: (b) => b.add(const MediaGalleryLoadMoreRequested()),
         expect: () => <MediaGalleryState>[
           MediaGalleryLoaded(
@@ -174,26 +180,37 @@ void main() {
       );
 
       // GUARDA (c): load-more concurrente guardado — si ya hay una en vuelo,
-      // un segundo LoadMore (sin await entre ambos) NO dispara un 2º fetch.
+      // un segundo LoadMore NO dispara un 2º fetch. La primera petición se
+      // retiene viva con un Completer para que el segundo evento llegue a su
+      // guarda con `isLoadingMore == true` todavía (un mock que resuelve al
+      // instante terminaría la 1ª antes de que el 2º evento atraviese el
+      // pipeline, y no habría solape que guardar).
       blocTest<MediaGalleryBloc, MediaGalleryState>(
-        'dos LoadMore seguidos ⇒ una sola llamada al repo (guarda de concurrencia)',
+        'dos LoadMore concurrentes ⇒ una sola llamada al repo (guarda de concurrencia)',
         build: () {
           _lastRepo = _MockRepo();
+          _gate = Completer<MediaPage>();
           when(
             () => _lastRepo.listAssets(
               cursor: 'cur-1',
               limit: any(named: 'limit'),
             ),
-          ).thenAnswer(
-            (_) async =>
-                MediaPage(assets: <MediaAsset>[_c], nextCursor: 'cur-2'),
-          );
+          ).thenAnswer((_) => _gate.future);
           return build(_lastRepo, _MockPicker());
         },
-        seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: 'cur-1'),
-        act: (b) => b
-          ..add(const MediaGalleryLoadMoreRequested())
-          ..add(const MediaGalleryLoadMoreRequested()),
+        seed: () =>
+            MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: 'cur-1'),
+        act: (b) async {
+          b
+            ..add(const MediaGalleryLoadMoreRequested())
+            ..add(const MediaGalleryLoadMoreRequested());
+          // Drena la cola de microtasks: ambos eventos alcanzan su guarda con
+          // la 1ª petición aún colgada del Completer.
+          await Future<void>.delayed(Duration.zero);
+          _gate.complete(
+            MediaPage(assets: <MediaAsset>[_c], nextCursor: 'cur-2'),
+          );
+        },
         verify: (_) {
           verify(
             () => _lastRepo.listAssets(
@@ -209,11 +226,15 @@ void main() {
         build: () {
           final repo = _MockRepo();
           when(
-            () => repo.listAssets(cursor: 'cur-1', limit: any(named: 'limit')),
+            () => repo.listAssets(
+              cursor: 'cur-1',
+              limit: any(named: 'limit'),
+            ),
           ).thenThrow(const MediaNetworkFailure());
           return build(repo, _MockPicker());
         },
-        seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: 'cur-1'),
+        seed: () =>
+            MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: 'cur-1'),
         act: (b) => b.add(const MediaGalleryLoadMoreRequested()),
         verify: (b) {
           expect(b.state, isA<MediaGalleryLoaded>());
@@ -240,8 +261,10 @@ void main() {
           );
           return build(repo, _MockPicker());
         },
-        seed: () =>
-            MediaGalleryLoaded(items: <MediaAsset>[_a, _b], nextCursor: 'cur-1'),
+        seed: () => MediaGalleryLoaded(
+          items: <MediaAsset>[_a, _b],
+          nextCursor: 'cur-1',
+        ),
         act: (b) => b.add(const MediaGalleryRefreshRequested()),
         verify: (b) {
           expect(
@@ -315,7 +338,8 @@ void main() {
               limit: any(named: 'limit'),
             ),
           ).thenAnswer(
-            (_) async => MediaPage(assets: <MediaAsset>[_c, _a], nextCursor: ''),
+            (_) async =>
+                MediaPage(assets: <MediaAsset>[_c, _a], nextCursor: ''),
           );
           return build(repo, picker);
         },
@@ -351,11 +375,13 @@ void main() {
               limit: any(named: 'limit'),
             ),
           ).thenAnswer(
-            (_) async => const MediaPage(assets: <MediaAsset>[], nextCursor: ''),
+            (_) async =>
+                const MediaPage(assets: <MediaAsset>[], nextCursor: ''),
           );
           return build(_lastRepo, picker);
         },
-        seed: () => const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
+        seed: () =>
+            const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
         act: (b) => b.add(const MediaGalleryUploadRequested()),
         verify: (_) {
           verify(
@@ -410,3 +436,7 @@ void main() {
 /// Repo capturado por la closure de `build` para aserciones `verify` en tests
 /// que no pueden alcanzar el mock desde el bloc (el bloc no lo expone).
 late _MockRepo _lastRepo;
+
+/// Compuerta para retener una petición de listado en vuelo (guarda de
+/// concurrencia de load-more).
+late Completer<MediaPage> _gate;
