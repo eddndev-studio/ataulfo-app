@@ -56,7 +56,10 @@ void main() {
           value: bloc,
           child: Scaffold(
             body: SafeArea(
-              child: StepEditSheet(editing: editing, pickMediaRef: pickMediaRef),
+              child: StepEditSheet(
+                editing: editing,
+                pickMediaRef: pickMediaRef,
+              ),
             ),
           ),
         ),
@@ -217,26 +220,23 @@ void main() {
       },
     );
 
-    testWidgets(
-      'el selector de multimedia aparece al elegir tipo multimedia y '
-      'desaparece en TEXT',
-      (tester) async {
-        await pumpHost(tester);
+    testWidgets('el selector de multimedia aparece al elegir tipo multimedia y '
+        'desaparece en TEXT', (tester) async {
+      await pumpHost(tester);
 
-        // TEXT por default → sin selector de multimedia.
-        expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
+      // TEXT por default → sin selector de multimedia.
+      expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
 
-        // Cambio a IMAGE → el selector "Seleccionar multimedia" aparece.
-        await tester.tap(find.byKey(const Key('step_edit.type.image')));
-        await tester.pump();
-        expect(find.byKey(const Key('step_edit.media_picker')), findsOneWidget);
+      // Cambio a IMAGE → el selector "Seleccionar multimedia" aparece.
+      await tester.tap(find.byKey(const Key('step_edit.type.image')));
+      await tester.pump();
+      expect(find.byKey(const Key('step_edit.media_picker')), findsOneWidget);
 
-        // Vuelvo a TEXT → el selector se oculta.
-        await tester.tap(find.byKey(const Key('step_edit.type.text')));
-        await tester.pump();
-        expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
-      },
-    );
+      // Vuelvo a TEXT → el selector se oculta.
+      await tester.tap(find.byKey(const Key('step_edit.type.text')));
+      await tester.pump();
+      expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
+    });
 
     testWidgets(
       'elegir un asset vía el picker y submit dispatcha AddRequested con el '
@@ -246,10 +246,7 @@ void main() {
         // despachado DEBE llevar exactamente ese ref — re-pinea el
         // linchpin a nivel del sheet: lo que se persiste es el ref BARE.
         const bareRef = 'tenant/org1/media/abc123.png';
-        await pumpHost(
-          tester,
-          pickMediaRef: (_) async => bareRef,
-        );
+        await pumpHost(tester, pickMediaRef: (_) async => bareRef);
 
         await tester.tap(find.byKey(const Key('step_edit.type.image')));
         await tester.pump();

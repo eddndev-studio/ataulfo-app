@@ -61,11 +61,15 @@ void main() {
 
   setUp(() {
     stepsBloc = _MockStepsBloc();
-    when(() => stepsBloc.state).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+    when(
+      () => stepsBloc.state,
+    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
     mediaRepo = _MockMediaRepo();
     when(
       () => mediaRepo.listAssets(cursor: any(named: 'cursor'), limit: null),
-    ).thenAnswer((_) async => MediaPage(assets: <MediaAsset>[asset], nextCursor: ''));
+    ).thenAnswer(
+      (_) async => MediaPage(assets: <MediaAsset>[asset], nextCursor: ''),
+    );
     filePicker = _MockFilePicker();
   });
 
@@ -101,12 +105,14 @@ void main() {
                       showModalBottomSheet<void>(
                         context: ctx,
                         isScrollControlled: true,
-                        builder: (sheetCtx) => BlocProvider<FlowStepsBloc>.value(
-                          value: bloc,
-                          child: StepEditSheet(
-                            pickMediaRef: (c) => c.push<String>('/media/pick'),
-                          ),
-                        ),
+                        builder: (sheetCtx) =>
+                            BlocProvider<FlowStepsBloc>.value(
+                              value: bloc,
+                              child: StepEditSheet(
+                                pickMediaRef: (c) =>
+                                    c.push<String>('/media/pick'),
+                              ),
+                            ),
                       );
                     },
                     child: const Text('open'),
@@ -134,10 +140,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp.router(
-        theme: AppDesignTheme.dark(),
-        routerConfig: router,
-      ),
+      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
     );
   }
 
@@ -167,8 +170,7 @@ void main() {
       await tester.tap(find.byKey(const Key('step_edit.submit')));
       await tester.pump();
 
-      final captured =
-          verify(() => stepsBloc.add(captureAny())).captured;
+      final captured = verify(() => stepsBloc.add(captureAny())).captured;
       expect(captured, hasLength(1));
       final ev = captured.single as FlowStepsAddRequested;
       expect(ev.type, fdom.StepType.image);
