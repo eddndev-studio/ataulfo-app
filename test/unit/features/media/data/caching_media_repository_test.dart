@@ -3,11 +3,39 @@ import 'dart:typed_data';
 import 'package:ataulfo/features/media/data/repositories/caching_media_repository.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/failures/media_failure.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_page_store.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockInner extends Mock implements MediaRepository {}
+
+/// Store en memoria que registra qué se persistió/leyó/limpió.
+class _FakeStore implements MediaPageStore {
+  final Map<String, MediaPage> _data = <String, MediaPage>{};
+  final List<List<Object?>> writes = <List<Object?>>[];
+  int clears = 0;
+
+  String _k(String org, String? type) => '$org|${type ?? '_all'}';
+
+  void seed(String org, String? type, MediaPage p) => _data[_k(org, type)] = p;
+
+  @override
+  Future<MediaPage?> read(String org, String? type) async =>
+      _data[_k(org, type)];
+
+  @override
+  Future<void> write(String org, String? type, MediaPage p) async {
+    writes.add(<Object?>[org, type, p]);
+    _data[_k(org, type)] = p;
+  }
+
+  @override
+  Future<void> clear() async {
+    clears++;
+    _data.clear();
+  }
+}
 
 MediaAsset _asset(String ref) => MediaAsset(
   ref: ref,
@@ -242,4 +270,98 @@ void main() {
       ).called(1);
     });
   });
+
+  group('CachingMediaRepository — persistencia + offline (disco)', () {
+    CachingMediaRepository withDisk(
+      MediaPageStore store, {
+      String? Function() orgId = _org1,
+    }) => CachingMediaRepository(inner, now: now, store: store, orgId: orgId);
+
+    test(
+      'una lista online exitosa persiste la primera página por (org,type)',
+      () async {
+        final store = _FakeStore();
+        stubList(_page(<String>['media/a']));
+        await withDisk(store).listAssets(type: 'image');
+
+        expect(store.writes, hasLength(1));
+        expect(store.writes.first[0], 'org-1');
+        expect(store.writes.first[1], 'image');
+        expect(store.writes.first[2], _page(<String>['media/a']));
+      },
+    );
+
+    test(
+      'offline (el inner lanza) sirve la página persistida (stale)',
+      () async {
+        final store = _FakeStore()
+          ..seed('org-1', 'image', _page(<String>['media/old']));
+        when(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: any(named: 'type'),
+          ),
+        ).thenThrow(const MediaNetworkFailure());
+
+        final page = await withDisk(store).listAssets(type: 'image');
+        expect(page, _page(<String>['media/old']));
+      },
+    );
+
+    test('offline + disco vacío ⇒ relanza el fallo', () async {
+      final store = _FakeStore();
+      when(
+        () => inner.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: any(named: 'type'),
+        ),
+      ).thenThrow(const MediaNetworkFailure());
+
+      expect(
+        () => withDisk(store).listAssets(type: 'image'),
+        throwsA(isA<MediaNetworkFailure>()),
+      );
+    });
+
+    test(
+      'la paginación profunda (cursor != null) jamás toca el disco',
+      () async {
+        final store = _FakeStore();
+        stubList(_page(<String>['media/b']));
+        await withDisk(store).listAssets(cursor: 'c1', type: 'image');
+        expect(store.writes, isEmpty);
+      },
+    );
+
+    test('invalidate purga también el disco', () async {
+      final store = _FakeStore();
+      withDisk(store).invalidate();
+      expect(store.clears, 1);
+    });
+
+    test('sin orgId (no autenticado) no toca el disco', () async {
+      final store = _FakeStore();
+      stubList(_page(<String>['media/a']));
+      final repo = withDisk(store, orgId: _noOrg);
+      await repo.listAssets(type: 'image');
+      expect(store.writes, isEmpty);
+
+      when(
+        () => inner.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: any(named: 'type'),
+        ),
+      ).thenThrow(const MediaNetworkFailure());
+      expect(
+        () => repo.listAssets(type: 'video'),
+        throwsA(isA<MediaNetworkFailure>()),
+      );
+    });
+  });
 }
+
+String? _org1() => 'org-1';
+String? _noOrg() => null;
