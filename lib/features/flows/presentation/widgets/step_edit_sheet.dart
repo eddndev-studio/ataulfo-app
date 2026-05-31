@@ -221,7 +221,8 @@ class _StepEditSheetState extends State<StepEditSheet> {
         : null;
     // Solo multimedia reemplaza recurso: el nuevo ref viaja si cambió y no
     // quedó vacío. TEXT/CONDITIONAL_TIME nunca mandan mediaRef.
-    final newMediaRef = _isMultimedia && mediaRef.isNotEmpty && mediaRef != ed.mediaRef
+    final newMediaRef =
+        _isMultimedia && mediaRef.isNotEmpty && mediaRef != ed.mediaRef
         ? mediaRef
         : null;
     final newDelay = _delayMs != ed.delayMs ? _delayMs : null;

@@ -520,10 +520,7 @@ void main() {
 
         verify(
           () => bloc.add(
-            const FlowStepsUpdateRequested(
-              stepId: 's-img',
-              mediaRef: nuevoRef,
-            ),
+            const FlowStepsUpdateRequested(stepId: 's-img', mediaRef: nuevoRef),
           ),
         ).called(1);
       },
