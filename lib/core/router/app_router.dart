@@ -30,6 +30,10 @@ import '../../features/flows/presentation/bloc/flow_steps_bloc.dart';
 import '../../features/flows/presentation/bloc/flows_bloc.dart';
 import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
+import '../../features/media/domain/repositories/media_file_picker.dart';
+import '../../features/media/domain/repositories/media_repository.dart';
+import '../../features/media/presentation/bloc/media_gallery_bloc.dart';
+import '../../features/media/presentation/pages/media_gallery_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
@@ -78,6 +82,8 @@ class AppRouter {
     required TriggersRepository triggersRepository,
     required MembershipsRepository membershipsRepository,
     required CatalogRepository catalogRepository,
+    required MediaRepository mediaRepository,
+    required MediaFilePicker mediaFilePicker,
   }) : _authBloc = authBloc,
        _authRepo = authRepository,
        _botsRepo = botsRepository,
@@ -89,7 +95,9 @@ class AppRouter {
        _flowsRepo = flowsRepository,
        _triggersRepo = triggersRepository,
        _membershipsRepo = membershipsRepository,
-       _catalogRepo = catalogRepository;
+       _catalogRepo = catalogRepository,
+       _mediaRepo = mediaRepository,
+       _mediaFilePicker = mediaFilePicker;
 
   final AuthBloc _authBloc;
   final AuthRepository _authRepo;
@@ -103,6 +111,8 @@ class AppRouter {
   final TriggersRepository _triggersRepo;
   final MembershipsRepository _membershipsRepo;
   final CatalogRepository _catalogRepo;
+  final MediaRepository _mediaRepo;
+  final MediaFilePicker _mediaFilePicker;
 
   /// Observer compartido entre el Navigator del GoRouter y los list pages
   /// del shell. El GoRouter notifica push/pop sobre este observer; las
@@ -433,6 +443,22 @@ class AppRouter {
           child: Scaffold(
             appBar: AppBar(title: const Text('Tus organizaciones')),
             body: const MembershipsPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Galería de media de la org. Entry point: tile en SettingsPage.
+        // Reusable como picker abriéndola con un `onSelect` que devuelve el
+        // `ref` BARE. Page-scoped: el bloc se construye con repo + picker y
+        // dispara el primer load al montarse.
+        path: '/media',
+        builder: (context, _) => BlocProvider<MediaGalleryBloc>(
+          create: (_) =>
+              MediaGalleryBloc(repo: _mediaRepo, picker: _mediaFilePicker)
+                ..add(const MediaGalleryLoadRequested()),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Galería de multimedia')),
+            body: const MediaGalleryPage(),
           ),
         ),
       ),

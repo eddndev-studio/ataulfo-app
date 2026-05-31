@@ -60,6 +60,21 @@ class SettingsPage extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: AppTokens.cardGap),
+              AppCard(
+                key: const Key('settings.media_tile'),
+                // push (no go): apila /media sobre Settings para que el back
+                // físico vuelva al shell, igual que el tile de organizaciones.
+                onTap: () => context.push('/media'),
+                child: const Row(
+                  children: <Widget>[
+                    Icon(Icons.perm_media_outlined, color: AppTokens.text2),
+                    SizedBox(width: AppTokens.sp4),
+                    Expanded(child: Text('Galería de multimedia')),
+                    Icon(Icons.chevron_right, color: AppTokens.text2),
+                  ],
+                ),
+              ),
               const SizedBox(height: AppTokens.sp7),
               AppButton.danger(
                 label: 'Cerrar sesión',

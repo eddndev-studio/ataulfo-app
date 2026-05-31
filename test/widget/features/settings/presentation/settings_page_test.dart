@@ -129,6 +129,65 @@ void main() {
     );
   });
 
+  testWidgets('Authenticated expone tile "Galería de multimedia"', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('settings.media_tile')), findsOneWidget);
+    expect(find.text('Galería de multimedia'), findsOneWidget);
+  });
+
+  testWidgets('tap "Galería de multimedia" apila /media (push, no go)', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    final navigated = <String>[];
+    final canPopAtDestination = <bool>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<AuthBloc>.value(
+            value: authBloc,
+            child: const Scaffold(body: SettingsPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/media',
+          builder: (_, _) {
+            navigated.add('/media');
+            return Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  canPopAtDestination.add(Navigator.of(ctx).canPop());
+                  return const SizedBox.shrink();
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.byKey(const Key('settings.media_tile')));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/media']);
+    expect(
+      canPopAtDestination,
+      <bool>[true],
+      reason:
+          'la galería debe quedar apilada sobre Settings para que el back '
+          'físico vuelva al shell',
+    );
+  });
+
   testWidgets('tap Cerrar sesión dispara AuthLoggedOut en el bloc', (
     tester,
   ) async {

@@ -17,6 +17,8 @@ import 'package:ataulfo/features/conversations/domain/repositories/conversations
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:ataulfo/features/memberships/presentation/pages/memberships_page.dart';
@@ -68,6 +70,13 @@ class _MockTriggersRepo extends Mock implements TriggersRepository {}
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
+
+class _MockMediaRepo extends Mock implements MediaRepository {}
+
+class _FakeMediaFilePicker implements MediaFilePicker {
+  @override
+  Future<PickedMedia?> pick() async => null;
+}
 
 const _identity = Identity(
   userId: 'u1',
@@ -160,6 +169,8 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
       profileRepository: profileRepo,
     );
   });
@@ -403,6 +414,8 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
       profileRepository: profileRepo,
     );
 
@@ -485,6 +498,8 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
       profileRepository: profileRepo,
     );
 
@@ -513,6 +528,8 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
       profileRepository: profileRepo,
     );
 
@@ -577,6 +594,8 @@ void main() {
         triggersRepository: triggersRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
+        mediaRepository: _MockMediaRepo(),
+        mediaFilePicker: _FakeMediaFilePicker(),
         profileRepository: profileRepo,
       );
 
@@ -643,6 +662,8 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
       profileRepository: profileRepo,
     );
 
@@ -725,6 +746,8 @@ void main() {
         triggersRepository: triggersRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
+        mediaRepository: _MockMediaRepo(),
+        mediaFilePicker: _FakeMediaFilePicker(),
         profileRepository: profileRepo,
       );
 
@@ -754,6 +777,8 @@ void main() {
       triggersRepository: triggersRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
       profileRepository: profileRepo,
     );
 

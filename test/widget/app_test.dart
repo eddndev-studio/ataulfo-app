@@ -13,6 +13,8 @@ import 'package:ataulfo/features/messages/domain/repositories/messages_repositor
 import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -47,6 +49,13 @@ class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
 
+class _MockMediaRepo extends Mock implements MediaRepository {}
+
+class _FakeMediaFilePicker implements MediaFilePicker {
+  @override
+  Future<PickedMedia?> pick() async => null;
+}
+
 void main() {
   late _MockAuthBloc authBloc;
   late AppRouter router;
@@ -77,6 +86,8 @@ void main() {
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       profileRepository: _MockProfileRepo(),
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
     );
   });
 

@@ -22,6 +22,9 @@ import 'features/conversations/data/datasources/conversations_datasource.dart';
 import 'features/conversations/data/repositories/conversations_repository_impl.dart';
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
+import 'features/media/data/datasources/media_datasource.dart';
+import 'features/media/data/repositories/image_picker_media_file_picker.dart';
+import 'features/media/data/repositories/media_repository_impl.dart';
 import 'features/memberships/data/datasources/memberships_datasource.dart';
 import 'features/memberships/data/repositories/memberships_repository_impl.dart';
 import 'features/messages/data/datasources/messages_datasource.dart';
@@ -132,6 +135,14 @@ void main() {
     datasource: DioCatalogDatasource(mainDio),
   );
 
+  final mediaRepository = MediaRepositoryImpl(
+    datasource: DioMediaDatasource(mainDio),
+  );
+
+  // El picker es un puerto sin estado; el adaptador concreto envuelve
+  // `image_picker` y lee bytes cross-platform (no toca dart:io).
+  final mediaFilePicker = ImagePickerMediaFilePicker();
+
   final router = AppRouter(
     authBloc: authBloc,
     authRepository: authRepository,
@@ -145,6 +156,8 @@ void main() {
     triggersRepository: triggersRepository,
     membershipsRepository: membershipsRepository,
     catalogRepository: catalogRepository,
+    mediaRepository: mediaRepository,
+    mediaFilePicker: mediaFilePicker,
   );
 
   // Dispara el check inicial: lee storage, si hay tokens valida con
