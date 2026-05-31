@@ -94,7 +94,7 @@ void main() {
   testWidgets('AtaulfoApp cabla AppDesignTheme.dark() al MaterialApp', (
     tester,
   ) async {
-    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     // El scaffold es transparente: el fondo absoluto lo pinta AppBackground
@@ -106,7 +106,7 @@ void main() {
 
   testWidgets('AtaulfoApp pinta el glow de fondo (AppBackground) detrás de '
       'todas las rutas vía el builder del MaterialApp', (tester) async {
-    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(
@@ -121,9 +121,35 @@ void main() {
   testWidgets('AtaulfoApp no expone darkTheme separado (producto dark-only)', (
     tester,
   ) async {
-    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc));
+    await tester.pumpWidget(AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.darkTheme, isNull);
+  });
+
+  // Higiene de sesión: el cache de media es un singleton de sesión; al cerrar
+  // sesión hay que purgarlo o la próxima cuenta vería el catálogo de la
+  // anterior sin reiniciar la app. AtaulfoApp dispara onSignedOut al caer a
+  // Unauthenticated; la composición lo enchufa a MediaRepository.invalidate.
+  testWidgets('AtaulfoApp dispara onSignedOut al caer la sesión a Unauthenticated', (
+    tester,
+  ) async {
+    var signedOut = 0;
+    whenListen(
+      authBloc,
+      Stream<AuthState>.fromIterable(const <AuthState>[AuthUnauthenticated()]),
+      initialState: const AuthInitial(),
+    );
+
+    await tester.pumpWidget(
+      AtaulfoApp(
+        router: router,
+        authBloc: authBloc,
+        onSignedOut: () => signedOut++,
+      ),
+    );
+    await tester.pump(); // procesa la emisión Unauthenticated
+
+    expect(signedOut, 1);
   });
 }
