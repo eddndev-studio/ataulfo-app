@@ -206,4 +206,42 @@ void main() {
     expect(captured[0], '/events/stream');
     expect((captured[1] as Map<String, dynamic>)['botId'], 'b1');
   });
+
+  test(
+    'liveEvents emite WaLabelReconnected entre conexiones tras un corte',
+    () async {
+      // Cablea liveEvents (no connectOnce): verifica que este datasource pasa
+      // WaLabelReconnected.new como reconnectMarker. La primera conexión entrega
+      // un evento y termina; reconnectingStream reconecta y, al reestablecerse,
+      // emite el marker ANTES de los eventos del segundo tramo.
+      var calls = 0;
+      when(
+        () => dio.get<ResponseBody>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async {
+        calls++;
+        return calls == 1
+            ? sse(
+                waFrame('label.wa.edited', 'EDITED', <String, dynamic>{
+                  'name': 'A',
+                }),
+              )
+            : sse(
+                waFrame('label.wa.edited', 'EDITED', <String, dynamic>{
+                  'name': 'B',
+                }),
+              );
+      });
+
+      final events = await ds.liveEvents('b1').take(3).toList();
+      expect(events, hasLength(3));
+      expect((events[0] as WaLabelCatalogChanged).name, 'A');
+      expect(events[1], isA<WaLabelReconnected>());
+      expect((events[2] as WaLabelCatalogChanged).name, 'B');
+    },
+  );
 }

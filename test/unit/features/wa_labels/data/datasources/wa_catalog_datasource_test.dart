@@ -375,5 +375,17 @@ void main() {
         throwsA(isA<WaLabelsUpstreamFailure>()),
       );
     });
+
+    test('409→NotConnected (delete empuja el tombstone a WA)', () async {
+      // deleteLabel tiene su PROPIO catch push(e); el 409 (bot no conectado)
+      // no queda cubierto transitivamente por create/update.
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(bad(409, path: '/bots/b1/wa-labels/1000'));
+      await expectLater(
+        () => ds.deleteLabel(botId: 'b1', waLabelId: '1000'),
+        throwsA(isA<WaLabelsNotConnectedFailure>()),
+      );
+    });
   });
 }

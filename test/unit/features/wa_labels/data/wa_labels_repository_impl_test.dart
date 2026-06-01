@@ -4,9 +4,11 @@ import 'package:ataulfo/features/wa_labels/data/datasources/wa_catalog_datasourc
 import 'package:ataulfo/features/wa_labels/data/datasources/wa_label_events_datasource.dart';
 import 'package:ataulfo/features/wa_labels/data/datasources/wa_mapping_datasource.dart';
 import 'package:ataulfo/features/wa_labels/data/repositories/wa_labels_repository_impl.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_live_event.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_mapping.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_msg_assoc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -143,5 +145,93 @@ void main() {
     ).thenAnswer((_) async => const <WaLabelMapping>[]);
     expect(await repo.listMappings('b1'), isEmpty);
     verify(() => mapping.listMappings('b1')).called(1);
+  });
+
+  test('updateLabel pasa waLabelId/name/color', () async {
+    const label = WaLabel(
+      waLabelId: '1000',
+      name: 'Oro',
+      color: 5,
+      deleted: false,
+    );
+    when(
+      () => catalog.updateLabel(
+        botId: 'b1',
+        waLabelId: '1000',
+        name: 'Oro',
+        color: 5,
+      ),
+    ).thenAnswer((_) async => label);
+    expect(
+      await repo.updateLabel(
+        botId: 'b1',
+        waLabelId: '1000',
+        name: 'Oro',
+        color: 5,
+      ),
+      label,
+    );
+    verify(
+      () => catalog.updateLabel(
+        botId: 'b1',
+        waLabelId: '1000',
+        name: 'Oro',
+        color: 5,
+      ),
+    ).called(1);
+  });
+
+  test('labelMessage pasa los 6 argumentos sin perder ninguno', () async {
+    when(
+      () => assoc.labelMessage(
+        botId: 'b1',
+        waLabelId: '1000',
+        chatLid: 'c1',
+        kind: ConversationKind.dm,
+        messageId: 'wamid.1',
+        labeled: false,
+      ),
+    ).thenAnswer((_) async {});
+    await repo.labelMessage(
+      botId: 'b1',
+      waLabelId: '1000',
+      chatLid: 'c1',
+      kind: ConversationKind.dm,
+      messageId: 'wamid.1',
+      labeled: false,
+    );
+    verify(
+      () => assoc.labelMessage(
+        botId: 'b1',
+        waLabelId: '1000',
+        chatLid: 'c1',
+        kind: ConversationKind.dm,
+        messageId: 'wamid.1',
+        labeled: false,
+      ),
+    ).called(1);
+  });
+
+  test('listChatAssocs / listMsgAssocs delegan', () async {
+    when(
+      () => assoc.listChatAssocs('b1'),
+    ).thenAnswer((_) async => const <WaChatAssoc>[]);
+    when(
+      () => assoc.listMsgAssocs('b1'),
+    ).thenAnswer((_) async => const <WaMsgAssoc>[]);
+    expect(await repo.listChatAssocs('b1'), isEmpty);
+    expect(await repo.listMsgAssocs('b1'), isEmpty);
+    verify(() => assoc.listChatAssocs('b1')).called(1);
+    verify(() => assoc.listMsgAssocs('b1')).called(1);
+  });
+
+  test('deleteMapping delega', () async {
+    when(
+      () => mapping.deleteMapping(botId: 'b1', waLabelId: '1000'),
+    ).thenAnswer((_) async {});
+    await repo.deleteMapping(botId: 'b1', waLabelId: '1000');
+    verify(
+      () => mapping.deleteMapping(botId: 'b1', waLabelId: '1000'),
+    ).called(1);
   });
 }

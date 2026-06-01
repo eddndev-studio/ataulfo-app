@@ -235,5 +235,34 @@ void main() {
         expect(body['labeled'], isTrue);
       },
     );
+
+    test('409→NotConnected, 502→Upstream, 422→Invalid', () async {
+      // labelMessage tiene su propio catch push(e); este loop evita que un
+      // slip a read(e) mis-mapee silenciosamente (409/502→Unknown/Server).
+      for (final pair in <List<Object>>[
+        <Object>[409, WaLabelsNotConnectedFailure],
+        <Object>[502, WaLabelsUpstreamFailure],
+        <Object>[422, WaLabelsInvalidFailure],
+      ]) {
+        when(
+          () => dio.put<void>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenThrow(bad(pair[0] as int));
+        await expectLater(
+          () => ds.labelMessage(
+            botId: 'b1',
+            waLabelId: '1000',
+            chatLid: 'c1',
+            kind: ConversationKind.dm,
+            messageId: 'wamid.1',
+            labeled: true,
+          ),
+          throwsA(predicate((e) => e.runtimeType == pair[1])),
+        );
+      }
+    });
   });
 }
