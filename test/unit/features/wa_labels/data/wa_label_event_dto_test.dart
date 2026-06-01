@@ -80,16 +80,19 @@ void main() {
       );
     });
 
-    test('color ausente → FormatException (siempre presente en el contrato)', () {
-      expect(
-        () => WaLabelEventResp.fromJson(<String, dynamic>{
-          'botId': 'bot-1',
-          'kind': 'EDITED',
-          'waLabelId': '1000',
-          'labeled': false,
-        }),
-        throwsA(isA<FormatException>()),
-      );
-    });
+    test(
+      'color ausente → FormatException (siempre presente en el contrato)',
+      () {
+        expect(
+          () => WaLabelEventResp.fromJson(<String, dynamic>{
+            'botId': 'bot-1',
+            'kind': 'EDITED',
+            'waLabelId': '1000',
+            'labeled': false,
+          }),
+          throwsA(isA<FormatException>()),
+        );
+      },
+    );
   });
 }

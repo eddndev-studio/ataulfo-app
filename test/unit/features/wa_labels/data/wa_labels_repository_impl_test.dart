@@ -39,19 +39,33 @@ void main() {
   });
 
   test('listCatalog delega en el datasource de catálogo', () async {
-    const label = WaLabel(waLabelId: '1000', name: 'VIP', color: 3, deleted: false);
-    when(() => catalog.listCatalog('b1')).thenAnswer((_) async => <WaLabel>[label]);
+    const label = WaLabel(
+      waLabelId: '1000',
+      name: 'VIP',
+      color: 3,
+      deleted: false,
+    );
+    when(
+      () => catalog.listCatalog('b1'),
+    ).thenAnswer((_) async => <WaLabel>[label]);
     expect(await repo.listCatalog('b1'), <WaLabel>[label]);
     verify(() => catalog.listCatalog('b1')).called(1);
   });
 
   test('createLabel pasa name/color al datasource', () async {
-    const label = WaLabel(waLabelId: '1000', name: 'VIP', color: 3, deleted: false);
+    const label = WaLabel(
+      waLabelId: '1000',
+      name: 'VIP',
+      color: 3,
+      deleted: false,
+    );
     when(
       () => catalog.createLabel(botId: 'b1', name: 'VIP', color: 3),
     ).thenAnswer((_) async => label);
     expect(await repo.createLabel(botId: 'b1', name: 'VIP', color: 3), label);
-    verify(() => catalog.createLabel(botId: 'b1', name: 'VIP', color: 3)).called(1);
+    verify(
+      () => catalog.createLabel(botId: 'b1', name: 'VIP', color: 3),
+    ).called(1);
   });
 
   test('deleteLabel delega', () async {
@@ -100,19 +114,33 @@ void main() {
   test('setMapping delega y devuelve el mapeo', () async {
     const m = WaLabelMapping(waLabelId: '1000', labelId: 'uuid-vip');
     when(
-      () => mapping.setMapping(botId: 'b1', waLabelId: '1000', labelId: 'uuid-vip'),
+      () => mapping.setMapping(
+        botId: 'b1',
+        waLabelId: '1000',
+        labelId: 'uuid-vip',
+      ),
     ).thenAnswer((_) async => m);
     expect(
-      await repo.setMapping(botId: 'b1', waLabelId: '1000', labelId: 'uuid-vip'),
+      await repo.setMapping(
+        botId: 'b1',
+        waLabelId: '1000',
+        labelId: 'uuid-vip',
+      ),
       m,
     );
     verify(
-      () => mapping.setMapping(botId: 'b1', waLabelId: '1000', labelId: 'uuid-vip'),
+      () => mapping.setMapping(
+        botId: 'b1',
+        waLabelId: '1000',
+        labelId: 'uuid-vip',
+      ),
     ).called(1);
   });
 
   test('listMappings delega', () async {
-    when(() => mapping.listMappings('b1')).thenAnswer((_) async => const <WaLabelMapping>[]);
+    when(
+      () => mapping.listMappings('b1'),
+    ).thenAnswer((_) async => const <WaLabelMapping>[]);
     expect(await repo.listMappings('b1'), isEmpty);
     verify(() => mapping.listMappings('b1')).called(1);
   });

@@ -77,5 +77,8 @@ abstract interface class WaLabelsRepository {
   });
 
   /// Quita el vínculo (idempotente; NO empuja a WhatsApp).
-  Future<void> deleteMapping({required String botId, required String waLabelId});
+  Future<void> deleteMapping({
+    required String botId,
+    required String waLabelId,
+  });
 }

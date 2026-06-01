@@ -39,19 +39,22 @@ void main() {
 
   /// Frame `label.wa.*` con el `kind` del data fundido. El topic (`event:`) y el
   /// `kind` del payload van 1:1 en el contrato (httpevents); ambos viajan.
-  String waFrame(String topic, String kind, [Map<String, dynamic> over = const <String, dynamic>{}]) =>
-      frame(
-        topic,
-        jsonEncode(<String, dynamic>{
-          'botId': 'b1',
-          'kind': kind,
-          'waLabelId': '1000',
-          'color': 3,
-          'labeled': false,
-          'at': '2026-05-31T12:00:00Z',
-          ...over,
-        }),
-      );
+  String waFrame(
+    String topic,
+    String kind, [
+    Map<String, dynamic> over = const <String, dynamic>{},
+  ]) => frame(
+    topic,
+    jsonEncode(<String, dynamic>{
+      'botId': 'b1',
+      'kind': kind,
+      'waLabelId': '1000',
+      'color': 3,
+      'labeled': false,
+      'at': '2026-05-31T12:00:00Z',
+      ...over,
+    }),
+  );
 
   void stub(Response<ResponseBody> r) {
     when(
@@ -65,7 +68,11 @@ void main() {
   }
 
   test('label.wa.edited → WaLabelCatalogChanged(removed:false)', () async {
-    stub(sse(waFrame('label.wa.edited', 'EDITED', <String, dynamic>{'name': 'VIP'})));
+    stub(
+      sse(
+        waFrame('label.wa.edited', 'EDITED', <String, dynamic>{'name': 'VIP'}),
+      ),
+    );
     final events = await ds.connectOnce('b1').toList();
     expect(events, hasLength(1));
     expect(
@@ -141,7 +148,9 @@ void main() {
       sse(
         frame('message.inbound', '{"botId":"b1"}') +
             frame('label.assigned', '{"botId":"b1"}') +
-            waFrame('label.wa.edited', 'EDITED', <String, dynamic>{'name': 'VIP'}),
+            waFrame('label.wa.edited', 'EDITED', <String, dynamic>{
+              'name': 'VIP',
+            }),
       ),
     );
     final events = await ds.connectOnce('b1').toList();
@@ -149,23 +158,31 @@ void main() {
     expect(events.single, isA<WaLabelCatalogChanged>());
   });
 
-  test('frame label.wa con JSON roto se omite sin derribar el stream', () async {
-    stub(
-      sse(
-        frame('label.wa.edited', '{roto') +
-            waFrame('label.wa.edited', 'EDITED', <String, dynamic>{'name': 'OK'}),
-      ),
-    );
-    final events = await ds.connectOnce('b1').toList();
-    expect(events, hasLength(1));
-    expect((events.single as WaLabelCatalogChanged).name, 'OK');
-  });
+  test(
+    'frame label.wa con JSON roto se omite sin derribar el stream',
+    () async {
+      stub(
+        sse(
+          frame('label.wa.edited', '{roto') +
+              waFrame('label.wa.edited', 'EDITED', <String, dynamic>{
+                'name': 'OK',
+              }),
+        ),
+      );
+      final events = await ds.connectOnce('b1').toList();
+      expect(events, hasLength(1));
+      expect((events.single as WaLabelCatalogChanged).name, 'OK');
+    },
+  );
 
-  test('kind desconocido en data se omite (mapper fail-loud, datasource soft)', () async {
-    stub(sse(waFrame('label.wa.edited', 'ARCHIVED')));
-    final events = await ds.connectOnce('b1').toList();
-    expect(events, isEmpty);
-  });
+  test(
+    'kind desconocido en data se omite (mapper fail-loud, datasource soft)',
+    () async {
+      stub(sse(waFrame('label.wa.edited', 'ARCHIVED')));
+      final events = await ds.connectOnce('b1').toList();
+      expect(events, isEmpty);
+    },
+  );
 
   test('CHAT sin chatLid se omite (campos faltantes)', () async {
     stub(sse(waFrame('label.wa.chat', 'CHAT')));
@@ -174,7 +191,9 @@ void main() {
   });
 
   test('pasa botId como query param y pide stream', () async {
-    stub(sse(waFrame('label.wa.edited', 'EDITED', <String, dynamic>{'name': 'x'})));
+    stub(
+      sse(waFrame('label.wa.edited', 'EDITED', <String, dynamic>{'name': 'x'})),
+    );
     await ds.connectOnce('b1').toList();
     final captured = verify(
       () => dio.get<ResponseBody>(

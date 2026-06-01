@@ -40,12 +40,15 @@ void main() {
         color: 3,
         labeled: false,
       );
-      expect(a, const WaChatLabelChanged(
-        waLabelId: '1000',
-        chatLid: 'c1',
-        color: 3,
-        labeled: true,
-      ));
+      expect(
+        a,
+        const WaChatLabelChanged(
+          waLabelId: '1000',
+          chatLid: 'c1',
+          color: 3,
+          labeled: true,
+        ),
+      );
       expect(a, isNot(off));
     });
 

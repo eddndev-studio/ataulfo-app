@@ -46,7 +46,9 @@ class DioWaMappingDatasource implements WaMappingDatasource {
       if (body == null) {
         throw const WaLabelsUnknownFailure();
       }
-      return WaLabelsMapper.mappingsToEntities(WaMappingListResp.fromJson(body));
+      return WaLabelsMapper.mappingsToEntities(
+        WaMappingListResp.fromJson(body),
+      );
     } on WaLabelsFailure {
       rethrow;
     } on DioException catch (e) {

@@ -31,7 +31,10 @@ void main() {
   group('listLabels', () {
     test('GET /labels → List<Label>', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(path: '/labels'),
@@ -61,7 +64,10 @@ void main() {
 
     test('lista vacía es válida', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(path: '/labels'),
@@ -74,7 +80,10 @@ void main() {
 
     test('403→Forbidden, 503→Server, body roto→Unknown', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(bad(403));
       await expectLater(
         () => ds.listLabels(),
@@ -82,7 +91,10 @@ void main() {
       );
 
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(bad(503));
       await expectLater(
         () => ds.listLabels(),
@@ -90,7 +102,10 @@ void main() {
       );
 
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(path: '/labels'),
@@ -106,7 +121,10 @@ void main() {
 
     test('connectionError→Network, timeout→Timeout', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/labels'),
@@ -119,7 +137,10 @@ void main() {
       );
 
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/labels'),

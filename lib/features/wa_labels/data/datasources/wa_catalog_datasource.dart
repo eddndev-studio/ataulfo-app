@@ -50,7 +50,9 @@ class DioWaCatalogDatasource implements WaCatalogDatasource {
   @override
   Future<List<WaLabel>> listCatalog(String botId) async {
     try {
-      final res = await _dio.get<Map<String, dynamic>>('/bots/$botId/wa-labels');
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/bots/$botId/wa-labels',
+      );
       final body = res.data;
       if (body == null) {
         throw const WaLabelsUnknownFailure();

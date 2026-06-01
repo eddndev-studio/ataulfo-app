@@ -32,7 +32,10 @@ void main() {
   group('listChatAssocs / listMsgAssocs', () {
     test('GET chats → List<WaChatAssoc>', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(path: '/bots/b1/wa-labels/chats'),
@@ -61,7 +64,10 @@ void main() {
 
     test('GET messages → List<WaMsgAssoc>; 403→Forbidden', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(path: '/bots/b1/wa-labels/messages'),
@@ -81,7 +87,10 @@ void main() {
       expect((await ds.listMsgAssocs('b1')).single.messageId, 'wamid.1');
 
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(bad(403));
       await expectLater(
         () => ds.listMsgAssocs('b1'),
@@ -186,42 +195,45 @@ void main() {
   });
 
   group('labelMessage', () {
-    test('PUT .../messages con body {chatLid, kind, messageId, labeled}', () async {
-      when(
-        () => dio.put<void>(
-          any(),
-          data: any(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer(
-        (_) async => Response<void>(
-          requestOptions: RequestOptions(path: '/x'),
-          statusCode: 200,
-        ),
-      );
+    test(
+      'PUT .../messages con body {chatLid, kind, messageId, labeled}',
+      () async {
+        when(
+          () => dio.put<void>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<void>(
+            requestOptions: RequestOptions(path: '/x'),
+            statusCode: 200,
+          ),
+        );
 
-      await ds.labelMessage(
-        botId: 'b1',
-        waLabelId: '1000',
-        chatLid: 'c1',
-        kind: ConversationKind.dm,
-        messageId: 'wamid.1',
-        labeled: true,
-      );
+        await ds.labelMessage(
+          botId: 'b1',
+          waLabelId: '1000',
+          chatLid: 'c1',
+          kind: ConversationKind.dm,
+          messageId: 'wamid.1',
+          labeled: true,
+        );
 
-      final captured = verify(
-        () => dio.put<void>(
-          captureAny(),
-          data: captureAny(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).captured;
-      expect(captured[0], '/bots/b1/wa-labels/1000/messages');
-      final body = captured[1] as Map<String, dynamic>;
-      expect(body['chatLid'], 'c1');
-      expect(body['kind'], 'DM');
-      expect(body['messageId'], 'wamid.1');
-      expect(body['labeled'], isTrue);
-    });
+        final captured = verify(
+          () => dio.put<void>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured[0], '/bots/b1/wa-labels/1000/messages');
+        final body = captured[1] as Map<String, dynamic>;
+        expect(body['chatLid'], 'c1');
+        expect(body['kind'], 'DM');
+        expect(body['messageId'], 'wamid.1');
+        expect(body['labeled'], isTrue);
+      },
+    );
   });
 }

@@ -28,8 +28,11 @@ class WaLabelsMapper {
   static List<WaLabel> catalogToLabels(WaCatalogResp resp) =>
       resp.items.map(labelToEntity).toList(growable: false);
 
-  static WaChatAssoc chatAssocToEntity(WaChatAssocResp r) =>
-      WaChatAssoc(chatLid: r.chatLid, waLabelId: r.waLabelId, labeled: r.labeled);
+  static WaChatAssoc chatAssocToEntity(WaChatAssocResp r) => WaChatAssoc(
+    chatLid: r.chatLid,
+    waLabelId: r.waLabelId,
+    labeled: r.labeled,
+  );
 
   static List<WaChatAssoc> chatAssocToEntities(WaChatAssocListResp resp) =>
       resp.items.map(chatAssocToEntity).toList(growable: false);

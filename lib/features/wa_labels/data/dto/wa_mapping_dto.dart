@@ -1,6 +1,6 @@
-/// DTOs del mapeo explícito etiqueta-WhatsApp ↔ Label interno
-/// (`mappingResp` en httpwalabel/dto.go). El `labelId` es el uuid de un Label
-/// interno (S10); el `waLabelId` es el id de la etiqueta WhatsApp.
+// DTOs del mapeo explícito etiqueta-WhatsApp ↔ Label interno
+// (`mappingResp` en httpwalabel/dto.go). El `labelId` es el uuid de un Label
+// interno (S10); el `waLabelId` es el id de la etiqueta WhatsApp.
 
 class WaMappingResp {
   const WaMappingResp({required this.waLabelId, required this.labelId});

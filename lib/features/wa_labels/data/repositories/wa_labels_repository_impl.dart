@@ -32,7 +32,8 @@ class WaLabelsRepositoryImpl implements WaLabelsRepository {
   final WaLabelEventsDatasource _events;
 
   @override
-  Future<List<WaLabel>> listCatalog(String botId) => _catalog.listCatalog(botId);
+  Future<List<WaLabel>> listCatalog(String botId) =>
+      _catalog.listCatalog(botId);
 
   @override
   Future<WaLabel> createLabel({
@@ -61,7 +62,8 @@ class WaLabelsRepositoryImpl implements WaLabelsRepository {
   }) => _catalog.deleteLabel(botId: botId, waLabelId: waLabelId);
 
   @override
-  Stream<WaLabelLiveEvent> liveEvents(String botId) => _events.liveEvents(botId);
+  Stream<WaLabelLiveEvent> liveEvents(String botId) =>
+      _events.liveEvents(botId);
 
   @override
   Future<List<WaChatAssoc>> listChatAssocs(String botId) =>
@@ -112,11 +114,8 @@ class WaLabelsRepositoryImpl implements WaLabelsRepository {
     required String botId,
     required String waLabelId,
     required String labelId,
-  }) => _mapping.setMapping(
-    botId: botId,
-    waLabelId: waLabelId,
-    labelId: labelId,
-  );
+  }) =>
+      _mapping.setMapping(botId: botId, waLabelId: waLabelId, labelId: labelId);
 
   @override
   Future<void> deleteMapping({

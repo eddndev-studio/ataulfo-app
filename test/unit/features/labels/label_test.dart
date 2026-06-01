@@ -20,7 +20,17 @@ void main() {
       );
       expect(a, b);
       expect(a.hashCode, b.hashCode);
-      expect(a, isNot(const Label(id: 'u2', name: 'VIP', color: '#34B7F1', description: 'clientes top')));
+      expect(
+        a,
+        isNot(
+          const Label(
+            id: 'u2',
+            name: 'VIP',
+            color: '#34B7F1',
+            description: 'clientes top',
+          ),
+        ),
+      );
     });
   });
 
@@ -83,7 +93,10 @@ void main() {
         }),
       );
       expect(ls, hasLength(2));
-      expect(ls[0], const Label(id: 'u1', name: 'VIP', color: '#34B7F1', description: ''));
+      expect(
+        ls[0],
+        const Label(id: 'u1', name: 'VIP', color: '#34B7F1', description: ''),
+      );
       expect(ls[1].name, 'Spam');
     });
 

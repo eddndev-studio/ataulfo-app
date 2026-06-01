@@ -31,7 +31,10 @@ void main() {
   group('listMappings', () {
     test('GET /bots/b1/wa-label-mappings → List<WaLabelMapping>', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(path: '/bots/b1/wa-label-mappings'),
@@ -65,7 +68,9 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
-          requestOptions: RequestOptions(path: '/bots/b1/wa-labels/1000/mapping'),
+          requestOptions: RequestOptions(
+            path: '/bots/b1/wa-labels/1000/mapping',
+          ),
           statusCode: 200,
           data: <String, dynamic>{'waLabelId': '1000', 'labelId': 'uuid-vip'},
         ),
@@ -126,7 +131,9 @@ void main() {
         () => dio.delete<void>(any(), options: any(named: 'options')),
       ).thenAnswer(
         (_) async => Response<void>(
-          requestOptions: RequestOptions(path: '/bots/b1/wa-labels/1000/mapping'),
+          requestOptions: RequestOptions(
+            path: '/bots/b1/wa-labels/1000/mapping',
+          ),
           statusCode: 200,
         ),
       );

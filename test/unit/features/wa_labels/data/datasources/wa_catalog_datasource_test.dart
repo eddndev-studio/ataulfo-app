@@ -54,7 +54,10 @@ void main() {
   group('listCatalog', () {
     test('200 con items → List<WaLabel> con orden y tombstones', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => resp(
           200,
@@ -84,7 +87,10 @@ void main() {
 
     test('200 items vacío → lista vacía', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => resp(200, body: <String, dynamic>{'items': <dynamic>[]}),
       );
@@ -98,8 +104,10 @@ void main() {
         <Object>[503, WaLabelsServerFailure],
       ]) {
         when(
-          () =>
-              dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+          () => dio.get<Map<String, dynamic>>(
+            any(),
+            options: any(named: 'options'),
+          ),
         ).thenThrow(bad(pair[0] as int));
         await expectLater(
           () => ds.listCatalog('b1'),
@@ -110,7 +118,10 @@ void main() {
 
     test('connectionError→Network, timeout→Timeout', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/bots/b1/wa-labels'),
@@ -123,7 +134,10 @@ void main() {
       );
 
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/bots/b1/wa-labels'),
@@ -138,7 +152,10 @@ void main() {
 
     test('body null → Unknown; body malformado → Unknown', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer((_) async => resp(200));
       await expectLater(
         () => ds.listCatalog('b1'),
@@ -146,7 +163,10 @@ void main() {
       );
 
       when(
-        () => dio.get<Map<String, dynamic>>(any(), options: any(named: 'options')),
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => resp(200, body: <String, dynamic>{'foo': 'bar'}),
       );
@@ -262,41 +282,44 @@ void main() {
   });
 
   group('updateLabel', () {
-    test('PUT /bots/b1/wa-labels/1000 con body completo → 200 WaLabel', () async {
-      when(
-        () => dio.put<Map<String, dynamic>>(
-          any(),
-          data: any(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer(
-        (_) async => Response<Map<String, dynamic>>(
-          requestOptions: RequestOptions(path: '/bots/b1/wa-labels/1000'),
-          statusCode: 200,
-          data: labelJson(name: 'Oro', color: 5),
-        ),
-      );
+    test(
+      'PUT /bots/b1/wa-labels/1000 con body completo → 200 WaLabel',
+      () async {
+        when(
+          () => dio.put<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/bots/b1/wa-labels/1000'),
+            statusCode: 200,
+            data: labelJson(name: 'Oro', color: 5),
+          ),
+        );
 
-      final l = await ds.updateLabel(
-        botId: 'b1',
-        waLabelId: '1000',
-        name: 'Oro',
-        color: 5,
-      );
-      expect(l.name, 'Oro');
+        final l = await ds.updateLabel(
+          botId: 'b1',
+          waLabelId: '1000',
+          name: 'Oro',
+          color: 5,
+        );
+        expect(l.name, 'Oro');
 
-      final captured = verify(
-        () => dio.put<Map<String, dynamic>>(
-          captureAny(),
-          data: captureAny(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).captured;
-      expect(captured[0], '/bots/b1/wa-labels/1000');
-      final body = captured[1] as Map<String, dynamic>;
-      expect(body['name'], 'Oro');
-      expect(body['color'], 5);
-    });
+        final captured = verify(
+          () => dio.put<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured[0], '/bots/b1/wa-labels/1000');
+        final body = captured[1] as Map<String, dynamic>;
+        expect(body['name'], 'Oro');
+        expect(body['color'], 5);
+      },
+    );
 
     test('409→NotConnected', () async {
       when(
@@ -307,7 +330,8 @@ void main() {
         ),
       ).thenThrow(bad(409, path: '/bots/b1/wa-labels/1000'));
       await expectLater(
-        () => ds.updateLabel(botId: 'b1', waLabelId: '1000', name: 'x', color: 1),
+        () =>
+            ds.updateLabel(botId: 'b1', waLabelId: '1000', name: 'x', color: 1),
         throwsA(isA<WaLabelsNotConnectedFailure>()),
       );
     });

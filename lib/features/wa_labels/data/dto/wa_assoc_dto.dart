@@ -1,6 +1,6 @@
-/// DTOs de las asociaciones espejadas: etiqueta↔chat y etiqueta↔mensaje
-/// (`chatAssocResp`/`msgAssocResp` en httpwalabel/dto.go). `labeled` viaja
-/// siempre (false = desasociación conservada en el espejo).
+// DTOs de las asociaciones espejadas: etiqueta↔chat y etiqueta↔mensaje
+// (`chatAssocResp`/`msgAssocResp` en httpwalabel/dto.go). `labeled` viaja
+// siempre (false = desasociación conservada en el espejo).
 
 class WaChatAssocResp {
   const WaChatAssocResp({

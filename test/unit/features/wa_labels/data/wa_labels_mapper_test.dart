@@ -84,16 +84,15 @@ void main() {
   });
 
   group('eventToLive (frame SSE → evento de dominio)', () {
-    WaLabelEventResp resp(Map<String, dynamic> over) => WaLabelEventResp.fromJson(
-      <String, dynamic>{
-        'botId': 'bot-1',
-        'waLabelId': '1000',
-        'color': 3,
-        'labeled': false,
-        'at': '2026-05-31T12:00:00Z',
-        ...over,
-      },
-    );
+    WaLabelEventResp resp(Map<String, dynamic> over) =>
+        WaLabelEventResp.fromJson(<String, dynamic>{
+          'botId': 'bot-1',
+          'waLabelId': '1000',
+          'color': 3,
+          'labeled': false,
+          'at': '2026-05-31T12:00:00Z',
+          ...over,
+        });
 
     test('EDITED → WaLabelCatalogChanged(removed:false)', () {
       final ev = WaLabelsMapper.eventToLive(
@@ -111,7 +110,9 @@ void main() {
     });
 
     test('REMOVED → WaLabelCatalogChanged(removed:true), name vacío', () {
-      final ev = WaLabelsMapper.eventToLive(resp(<String, dynamic>{'kind': 'REMOVED'}));
+      final ev = WaLabelsMapper.eventToLive(
+        resp(<String, dynamic>{'kind': 'REMOVED'}),
+      );
       expect(
         ev,
         const WaLabelCatalogChanged(
@@ -125,7 +126,11 @@ void main() {
 
     test('CHAT → WaChatLabelChanged', () {
       final ev = WaLabelsMapper.eventToLive(
-        resp(<String, dynamic>{'kind': 'CHAT', 'chatLid': 'c1', 'labeled': true}),
+        resp(<String, dynamic>{
+          'kind': 'CHAT',
+          'chatLid': 'c1',
+          'labeled': true,
+        }),
       );
       expect(
         ev,
@@ -158,16 +163,22 @@ void main() {
       );
     });
 
-    test('kind desconocido → ArgumentError (fail-loud; el datasource lo omite)', () {
-      expect(
-        () => WaLabelsMapper.eventToLive(resp(<String, dynamic>{'kind': 'ARCHIVED'})),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
+    test(
+      'kind desconocido → ArgumentError (fail-loud; el datasource lo omite)',
+      () {
+        expect(
+          () => WaLabelsMapper.eventToLive(
+            resp(<String, dynamic>{'kind': 'ARCHIVED'}),
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
 
     test('CHAT sin chatLid → FormatException', () {
       expect(
-        () => WaLabelsMapper.eventToLive(resp(<String, dynamic>{'kind': 'CHAT'})),
+        () =>
+            WaLabelsMapper.eventToLive(resp(<String, dynamic>{'kind': 'CHAT'})),
         throwsA(isA<FormatException>()),
       );
     });
