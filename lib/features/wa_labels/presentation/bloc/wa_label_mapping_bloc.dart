@@ -4,6 +4,7 @@ import '../../../labels/domain/entities/label.dart';
 import '../../../labels/domain/failures/labels_failure.dart';
 import '../../../labels/domain/repositories/labels_repository.dart';
 import '../../domain/entities/wa_label.dart';
+import '../../domain/entities/wa_label_mapping.dart';
 import '../../domain/failures/wa_labels_failure.dart';
 import '../../domain/repositories/wa_labels_repository.dart';
 
@@ -44,13 +45,17 @@ class WaLabelMappingBloc extends Bloc<WaMappingEvent, WaMappingState> {
       emit(const WaMappingLoading());
     }
     try {
-      // Concurrente: dispara las tres lecturas y luego las espera.
-      final catalogF = _wa.listCatalog(_botId);
-      final mappingsF = _wa.listMappings(_botId);
-      final labelsF = _labels.listLabels();
-      final catalog = await catalogF;
-      final mappings = await mappingsF;
-      final internal = await labelsF;
+      // Concurrente con Future.wait: escucha las tres a la vez, así un fallo de
+      // una NO deja las otras como errores async sin capturar (lo que pasaría
+      // con awaits secuenciales si la primera lanza antes de awaitar el resto).
+      final results = await Future.wait<Object>(<Future<Object>>[
+        _wa.listCatalog(_botId),
+        _wa.listMappings(_botId),
+        _labels.listLabels(),
+      ]);
+      final catalog = results[0] as List<WaLabel>;
+      final mappings = results[1] as List<WaLabelMapping>;
+      final internal = results[2] as List<Label>;
       emit(
         WaMappingLoaded(
           WaMappingData(
