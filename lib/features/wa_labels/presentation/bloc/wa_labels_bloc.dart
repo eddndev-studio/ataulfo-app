@@ -29,6 +29,9 @@ class WaLabelsBloc extends Bloc<WaLabelsEvent, WaLabelsState> {
     on<WaLabelsRefreshRequested>(_onRefresh);
     on<WaLabelsCatalogChanged>(_onCatalogChanged);
     on<WaLabelsReconnected>(_onReconnected);
+    on<WaLabelsAddRequested>(_onAdd);
+    on<WaLabelsUpdateRequested>(_onUpdate);
+    on<WaLabelsDeleteRequested>(_onDelete);
   }
 
   final WaLabelsRepository _repo;
@@ -88,11 +91,13 @@ class WaLabelsBloc extends Bloc<WaLabelsEvent, WaLabelsState> {
     Emitter<WaLabelsState> emit,
   ) {
     final current = state;
-    if (current is! WaLabelsLoaded) {
+    final base = _snapshotOf(current);
+    if (base == null) {
+      // Loading/Mutating/Failed: sin lista sobre la que parchear.
       return;
     }
     final c = event.change;
-    final labels = List<WaLabel>.of(current.labels);
+    final labels = List<WaLabel>.of(base);
     final i = labels.indexWhere((l) => l.waLabelId == c.waLabelId);
     if (i >= 0) {
       // REMOVED conserva la identidad del espejo (el evento puede traer name
@@ -119,32 +124,63 @@ class WaLabelsBloc extends Bloc<WaLabelsEvent, WaLabelsState> {
     } else {
       return; // REMOVED de una etiqueta que no teníamos: nada que reflejar
     }
-    emit(WaLabelsLoaded(labels: labels, isRefreshing: current.isRefreshing));
+    emit(_reemitWithLabels(current, labels));
   }
 
   /// Tras reconectar, reconcilia contra la verdad HTTP (el SSE no reproduce el
   /// hueco). Best-effort: si el refetch falla, el catálogo en vivo se conserva.
+  ///
+  /// Aplica también desde `MutationFailed`: si una mutación falló y el sheet se
+  /// descartó sin reintentar, el bloc quedaría clavado ahí; sin esto el realtime
+  /// quedaría congelado hasta un refresh manual. Conserva la variante (no vuelve
+  /// a `Loaded`) para no cerrar el sheet si sigue abierto mostrando el error.
   Future<void> _onReconnected(
     WaLabelsReconnected event,
     Emitter<WaLabelsState> emit,
   ) async {
-    if (state is! WaLabelsLoaded || _refetching) {
+    if (_snapshotOf(state) == null || _refetching) {
       return;
     }
     _refetching = true;
     try {
       final labels = await _repo.listCatalog(_botId);
       final current = state;
-      if (current is! WaLabelsLoaded) {
-        return;
+      if (_snapshotOf(current) == null) {
+        return; // una mutación arrancó durante el refetch: no la pisamos
       }
-      emit(WaLabelsLoaded(labels: labels, isRefreshing: current.isRefreshing));
+      emit(_reemitWithLabels(current, labels));
     } on WaLabelsFailure {
       // Refetch best-effort: una reconexión sin red no debe derribar la lista.
     } finally {
       _refetching = false;
     }
   }
+
+  /// La lista vigente de un estado que la lleva (`Loaded`/`MutationFailed`), o
+  /// `null` si el estado no tiene un espejo sobre el que parchear realtime.
+  static List<WaLabel>? _snapshotOf(WaLabelsState state) => switch (state) {
+    WaLabelsLoaded(labels: final l) => l,
+    WaLabelsMutationFailed(labels: final l) => l,
+    _ => null,
+  };
+
+  /// Re-emite el MISMO tipo de estado con una lista nueva. Preserva
+  /// `isRefreshing` de `Loaded` y el `failure` de `MutationFailed`, para que un
+  /// parche de realtime no cierre el sheet ni borre el error en vuelo.
+  static WaLabelsState _reemitWithLabels(
+    WaLabelsState current,
+    List<WaLabel> labels,
+  ) => switch (current) {
+    WaLabelsMutationFailed(failure: final f) => WaLabelsMutationFailed(
+      labels,
+      f,
+    ),
+    WaLabelsLoaded(isRefreshing: final r) => WaLabelsLoaded(
+      labels: labels,
+      isRefreshing: r,
+    ),
+    _ => WaLabelsLoaded(labels: labels, isRefreshing: false),
+  };
 
   Future<void> _onRefresh(
     WaLabelsRefreshRequested event,
@@ -162,6 +198,90 @@ class WaLabelsBloc extends Bloc<WaLabelsEvent, WaLabelsState> {
     } on WaLabelsFailure catch (f) {
       emit(WaLabelsFailed(f));
     }
+  }
+
+  Future<void> _onAdd(
+    WaLabelsAddRequested event,
+    Emitter<WaLabelsState> emit,
+  ) async {
+    await _runMutation(emit, (snapshot) async {
+      final created = await _repo.createLabel(
+        botId: _botId,
+        name: event.name,
+        color: event.color,
+      );
+      return _upsert(snapshot, created);
+    });
+  }
+
+  Future<void> _onUpdate(
+    WaLabelsUpdateRequested event,
+    Emitter<WaLabelsState> emit,
+  ) async {
+    await _runMutation(emit, (snapshot) async {
+      final updated = await _repo.updateLabel(
+        botId: _botId,
+        waLabelId: event.waLabelId,
+        name: event.name,
+        color: event.color,
+      );
+      return _upsert(snapshot, updated);
+    });
+  }
+
+  Future<void> _onDelete(
+    WaLabelsDeleteRequested event,
+    Emitter<WaLabelsState> emit,
+  ) async {
+    await _runMutation(emit, (snapshot) async {
+      await _repo.deleteLabel(botId: _botId, waLabelId: event.waLabelId);
+      return snapshot
+          .map(
+            (l) =>
+                l.waLabelId == event.waLabelId ? l.copyWith(deleted: true) : l,
+          )
+          .toList(growable: false);
+    });
+  }
+
+  /// Orquesta una mutación del catálogo. Reusa el snapshot del último estado
+  /// válido (`Loaded` o `MutationFailed`); desde `Loading`/`Mutating`/`Failed`
+  /// ignora — no hay snapshot fiable. El espejo se aplica OPTIMISTA con el
+  /// resultado de la mutación: el catálogo del backend se reconcilia por el eco
+  /// SSE entrante (no por la respuesta HTTP), así que un refetch inmediato no lo
+  /// vería; el upsert idempotente hace que el eco posterior sea inocuo.
+  Future<void> _runMutation(
+    Emitter<WaLabelsState> emit,
+    Future<List<WaLabel>> Function(List<WaLabel> snapshot) mutate,
+  ) async {
+    final current = state;
+    final List<WaLabel> snapshot;
+    if (current is WaLabelsLoaded) {
+      snapshot = current.labels;
+    } else if (current is WaLabelsMutationFailed) {
+      snapshot = current.labels;
+    } else {
+      return;
+    }
+
+    emit(WaLabelsMutating(snapshot));
+    try {
+      final next = await mutate(snapshot);
+      emit(WaLabelsLoaded(labels: next, isRefreshing: false));
+    } on WaLabelsFailure catch (f) {
+      emit(WaLabelsMutationFailed(snapshot, f));
+    }
+  }
+
+  static List<WaLabel> _upsert(List<WaLabel> list, WaLabel label) {
+    final out = List<WaLabel>.of(list);
+    final i = out.indexWhere((l) => l.waLabelId == label.waLabelId);
+    if (i >= 0) {
+      out[i] = label;
+    } else {
+      out.add(label);
+    }
+    return out;
   }
 
   @override
@@ -217,6 +337,57 @@ class WaLabelsReconnected extends WaLabelsEvent {
   int get hashCode => (WaLabelsReconnected).hashCode;
 }
 
+/// Pide crear una etiqueta (el servidor asigna el id y empuja a WhatsApp).
+class WaLabelsAddRequested extends WaLabelsEvent {
+  const WaLabelsAddRequested({required this.name, required this.color});
+
+  final String name;
+  final int color;
+
+  @override
+  bool operator ==(Object other) =>
+      other is WaLabelsAddRequested &&
+      other.name == name &&
+      other.color == color;
+  @override
+  int get hashCode => Object.hash(name, color);
+}
+
+/// Pide editar una etiqueta por id (empuja a WhatsApp).
+class WaLabelsUpdateRequested extends WaLabelsEvent {
+  const WaLabelsUpdateRequested({
+    required this.waLabelId,
+    required this.name,
+    required this.color,
+  });
+
+  final String waLabelId;
+  final String name;
+  final int color;
+
+  @override
+  bool operator ==(Object other) =>
+      other is WaLabelsUpdateRequested &&
+      other.waLabelId == waLabelId &&
+      other.name == name &&
+      other.color == color;
+  @override
+  int get hashCode => Object.hash(waLabelId, name, color);
+}
+
+/// Pide borrar una etiqueta por id (tombstone; empuja a WhatsApp).
+class WaLabelsDeleteRequested extends WaLabelsEvent {
+  const WaLabelsDeleteRequested({required this.waLabelId});
+
+  final String waLabelId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is WaLabelsDeleteRequested && other.waLabelId == waLabelId;
+  @override
+  int get hashCode => waLabelId.hashCode;
+}
+
 // States --------------------------------------------------------------------
 
 sealed class WaLabelsState {
@@ -267,4 +438,53 @@ class WaLabelsFailed extends WaLabelsState {
       other is WaLabelsFailed && other.failure == failure;
   @override
   int get hashCode => failure.hashCode;
+}
+
+/// Una mutación del catálogo está en vuelo. Lleva el snapshot vigente para que
+/// la UI siga mostrando la lista mientras el sheet dibuja su spinner; al
+/// terminar pasa a `Loaded` (éxito, espejo optimista) o a `MutationFailed`.
+class WaLabelsMutating extends WaLabelsState {
+  const WaLabelsMutating(this.labels);
+
+  final List<WaLabel> labels;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! WaLabelsMutating) return false;
+    if (other.labels.length != labels.length) return false;
+    for (var i = 0; i < labels.length; i++) {
+      if (other.labels[i] != labels[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll(labels);
+}
+
+/// Mutación fallida que preserva el snapshot pre-mutación. El sheet abierto
+/// interpreta el failure (Invalid / NotConnected / Upstream / …) y lo muestra;
+/// el resto de la página sigue viendo la lista. Una nueva mutación desde aquí
+/// reusa el snapshot como base.
+class WaLabelsMutationFailed extends WaLabelsState {
+  const WaLabelsMutationFailed(this.labels, this.failure);
+
+  final List<WaLabel> labels;
+  final WaLabelsFailure failure;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! WaLabelsMutationFailed) return false;
+    if (other.failure != failure) return false;
+    if (other.labels.length != labels.length) return false;
+    for (var i = 0; i < labels.length; i++) {
+      if (other.labels[i] != labels[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(failure, Object.hashAll(labels));
 }

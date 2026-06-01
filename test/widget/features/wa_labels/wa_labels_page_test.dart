@@ -33,11 +33,12 @@ void main() {
     theme: AppDesignTheme.dark(),
     home: BlocProvider<WaLabelsBloc>.value(
       value: bloc,
-      child: const Scaffold(body: WaLabelsPage()),
+      child: const WaLabelsPage(),
     ),
   );
 
   void stub(WaLabelsState state) {
+    when(() => bloc.state).thenReturn(state);
     whenListen(bloc, Stream<WaLabelsState>.value(state), initialState: state);
   }
 
@@ -94,5 +95,45 @@ void main() {
     expect(find.byKey(const Key('wa_labels.error')), findsOneWidget);
     await tester.tap(find.text('Reintentar'));
     verify(() => bloc.add(const WaLabelsLoadRequested())).called(1);
+  });
+
+  testWidgets('FAB de crear ausente en Loading', (tester) async {
+    stub(const WaLabelsLoading());
+    await tester.pumpWidget(host());
+    expect(find.byKey(const Key('wa_labels.create')), findsNothing);
+  });
+
+  testWidgets('FAB de crear presente en Loaded', (tester) async {
+    stub(WaLabelsLoaded(labels: <WaLabel>[_label()], isRefreshing: false));
+    await tester.pumpWidget(host());
+    await tester.pump();
+    expect(find.byKey(const Key('wa_labels.create')), findsOneWidget);
+  });
+
+  testWidgets('FAB abre el sheet de creación', (tester) async {
+    stub(WaLabelsLoaded(labels: <WaLabel>[_label()], isRefreshing: false));
+    await tester.pumpWidget(host());
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('wa_labels.create')));
+    await tester.pumpAndSettle();
+    expect(find.text('Nueva etiqueta'), findsOneWidget);
+  });
+
+  testWidgets('tap en una etiqueta abre el sheet de edición de esa etiqueta', (
+    tester,
+  ) async {
+    stub(
+      WaLabelsLoaded(
+        labels: <WaLabel>[_label(name: 'Soporte', color: 3)],
+        isRefreshing: false,
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+    await tester.tap(find.text('Soporte'));
+    await tester.pumpAndSettle();
+    expect(find.text('Editar etiqueta'), findsOneWidget);
+    // El nombre llega precargado al sheet (distinto del hint 'Cliente VIP').
+    expect(find.widgetWithText(TextField, 'Soporte'), findsOneWidget);
   });
 }
