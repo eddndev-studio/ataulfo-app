@@ -173,6 +173,24 @@ class WaMappingData {
     return null;
   }
 
+  /// Labels internos que el selector puede ofrecer al editar el vínculo de
+  /// [waLabelId]: todos los de la org MENOS los ya vinculados a OTRA etiqueta
+  /// WhatsApp del bot. El Label que esta misma etiqueta ya tiene vinculado SÍ se
+  /// incluye, para mostrarlo marcado y permitir quitarlo. Refleja en la UI la
+  /// exclusividad 1:1 que el backend enforza (un Label interno lo otorga a lo
+  /// sumo una etiqueta WhatsApp por bot): oculta lo que un set chocaría con 409,
+  /// sin esperar al rechazo del servidor.
+  List<Label> selectableLabelsFor(String waLabelId) {
+    final takenByOthers = <String>{
+      for (final e in mappings.entries)
+        if (e.key != waLabelId) e.value,
+    };
+    return <Label>[
+      for (final l in internalLabels)
+        if (!takenByOthers.contains(l.id)) l,
+    ];
+  }
+
   WaMappingData copyWith({Map<String, String>? mappings}) => WaMappingData(
     waLabels: waLabels,
     mappings: mappings ?? this.mappings,
