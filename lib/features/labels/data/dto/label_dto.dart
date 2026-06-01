@@ -52,3 +52,25 @@ class LabelListResp {
 
   final List<LabelResp> items;
 }
+
+/// Body de `POST /labels` y `PUT /labels/{id}` (mismo shape: el catálogo es
+/// plano, PUT reemplaza el documento). `color` es hex `#RRGGBB`. La validación
+/// fina (longitudes, formato del color) la hace el backend; aquí solo se
+/// serializa lo que el operador introdujo.
+class LabelUpsertReq {
+  const LabelUpsertReq({
+    required this.name,
+    required this.color,
+    required this.description,
+  });
+
+  final String name;
+  final String color;
+  final String description;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'name': name,
+    'color': color,
+    'description': description,
+  };
+}

@@ -3,6 +3,9 @@ import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
+import 'package:ataulfo/features/labels/presentation/pages/labels_admin_page.dart';
 import 'package:ataulfo/features/settings/presentation/pages/settings_page.dart';
 import 'package:ataulfo/features/shell/presentation/pages/shell_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -24,6 +27,9 @@ class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
 class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
     implements TemplatesBloc {}
 
+class _MockLabelsAdminBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
+    implements LabelsAdminBloc {}
+
 const _identity = Identity(
   userId: 'u1',
   orgId: 'o1',
@@ -35,11 +41,16 @@ void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsBloc botsBloc;
   late _MockTemplatesBloc templatesBloc;
+  late _MockLabelsAdminBloc labelsBloc;
 
   setUp(() {
     authBloc = _MockAuthBloc();
     botsBloc = _MockBotsBloc();
     templatesBloc = _MockTemplatesBloc();
+    labelsBloc = _MockLabelsAdminBloc();
+    when(() => labelsBloc.state).thenReturn(
+      const LabelsAdminLoaded(labels: <Label>[], isRefreshing: false),
+    );
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
     // Loaded([]) en vez de Loading: el spinner del CircularProgressIndicator
     // tiene animación infinita y pumpAndSettle nunca termina. Loaded es
@@ -58,6 +69,7 @@ void main() {
       BlocProvider<AuthBloc>.value(value: authBloc),
       BlocProvider<BotsBloc>.value(value: botsBloc),
       BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+      BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
     ],
     child: const MaterialApp(home: ShellPage()),
   );
@@ -271,6 +283,74 @@ void main() {
       );
     });
 
+    testWidgets('tab Etiquetas presente en BottomNavigationBar (phone)', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Etiquetas'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('tap Etiquetas (phone) muestra LabelsAdminPage', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Etiquetas'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LabelsAdminPage), findsOneWidget);
+      expect(find.byKey(const Key('labels_admin.empty')), findsOneWidget);
+    });
+
+    testWidgets('tab Etiquetas (phone) expone FAB de crear etiqueta', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Etiquetas'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('shell.fab.label_create')), findsOneWidget);
+    });
+
+    testWidgets('FAB de Etiquetas abre la hoja de creación', (tester) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Etiquetas'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('shell.fab.label_create')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nueva etiqueta'), findsOneWidget);
+    });
+
     testWidgets('tab Ajustes no expone FAB', (tester) async {
       useViewport(tester, widthDp: 420);
 
@@ -307,6 +387,7 @@ void main() {
                 BlocProvider<AuthBloc>.value(value: authBloc),
                 BlocProvider<BotsBloc>.value(value: botsBloc),
                 BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+                BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
               ],
               child: const ShellPage(),
             ),
@@ -361,6 +442,7 @@ void main() {
                 BlocProvider<AuthBloc>.value(value: authBloc),
                 BlocProvider<BotsBloc>.value(value: botsBloc),
                 BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+                BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
               ],
               child: const ShellPage(),
             ),
@@ -439,6 +521,7 @@ void main() {
             BlocProvider<AuthBloc>.value(value: authBloc),
             BlocProvider<BotsBloc>.value(value: botsBloc),
             BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+            BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
           ],
           child: MaterialApp(home: ShellPage(routeObserver: observer)),
         ),
