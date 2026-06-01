@@ -1,5 +1,4 @@
 import 'package:ataulfo/features/wa_labels/presentation/widgets/wa_label_palette.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

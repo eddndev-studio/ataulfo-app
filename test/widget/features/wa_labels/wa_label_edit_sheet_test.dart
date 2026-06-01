@@ -23,9 +23,9 @@ void main() {
 
   setUp(() => bloc = _MockBloc());
 
-  final loaded = WaLabelsLoaded(
+  const loaded = WaLabelsLoaded(
     labels: <WaLabel>[
-      const WaLabel(waLabelId: '1000', name: 'VIP', color: 3, deleted: false),
+      WaLabel(waLabelId: '1000', name: 'VIP', color: 3, deleted: false),
     ],
     isRefreshing: false,
   );
