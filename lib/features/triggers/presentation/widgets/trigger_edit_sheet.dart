@@ -1,3 +1,11 @@
+// Pesa >400 LOC porque agrupa el modal del editor + sus pickers
+// cohesivos de modo (tipo, coincidencia, ámbito, acción de etiqueta), la
+// línea fija del flow, el copy de error por failure y el chip de
+// selección. Son helpers privados de este sheet y solo se usan aquí:
+// repartirlos en archivos hermanos obligaría a compartir estructuras
+// privadas sin ganancia de reutilización. El selector de etiqueta, en
+// cambio, sí salió a `label_picker.dart` por ser una unidad autónoma con
+// estado propio (consume el `LabelsBloc`).
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -10,6 +18,7 @@ import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../domain/entities/trigger.dart';
 import '../../domain/failures/triggers_failure.dart';
 import '../bloc/triggers_bloc.dart';
+import 'label_picker.dart';
 
 /// Modal sheet de creación/edición de un Trigger. El sheet vive siempre
 /// dentro del editor de un flujo concreto: `scopedFlow` es el Flow del
@@ -46,7 +55,13 @@ class TriggerEditSheet extends StatefulWidget {
 
 class _TriggerEditSheetState extends State<TriggerEditSheet> {
   late final TextEditingController _keywordCtrl;
-  late final TextEditingController _labelIdCtrl;
+
+  /// Id de la `SessionLabel` elegida en el selector (modo LABEL). `null`
+  /// ⇒ sin selección (en creación el submit queda bloqueado). En edición
+  /// se hidrata con el `labelId` del trigger; si ese id ya no está en el
+  /// catálogo, el selector lo muestra como "etiqueta desconocida" pero
+  /// el valor se preserva para no perder lo que el operador tenía.
+  String? _selectedLabelId;
   late TriggerType _triggerType;
   late MatchType _matchType;
   late LabelAction _labelAction;
@@ -65,14 +80,15 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     super.initState();
     final ed = widget.editing;
     _keywordCtrl = TextEditingController(text: ed?.keyword ?? '');
-    _labelIdCtrl = TextEditingController(text: ed?.labelId ?? '');
+    _selectedLabelId = (ed != null && ed.labelId.trim().isNotEmpty)
+        ? ed.labelId
+        : null;
     _triggerType = ed?.triggerType ?? TriggerType.text;
     _matchType = ed?.matchType ?? MatchType.exact;
     _labelAction = ed?.labelAction ?? LabelAction.add;
     _scope = ed?.scope ?? TriggerScope.both;
     _isActive = ed?.isActive ?? true;
     _keywordCtrl.addListener(_onTextChanged);
-    _labelIdCtrl.addListener(_onTextChanged);
   }
 
   void _onTextChanged() => setState(() {});
@@ -80,9 +96,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
   @override
   void dispose() {
     _keywordCtrl.removeListener(_onTextChanged);
-    _labelIdCtrl.removeListener(_onTextChanged);
     _keywordCtrl.dispose();
-    _labelIdCtrl.dispose();
     super.dispose();
   }
 
@@ -93,7 +107,11 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     if (_isText) {
       if (_keywordCtrl.text.trim().isEmpty) return false;
     } else {
-      if (_labelIdCtrl.text.trim().isEmpty) return false;
+      // LABEL exige una etiqueta elegida — no se crea un trigger LABEL
+      // sin label. En edición el valor viene hidratado; en creación el
+      // operador debe elegir uno del selector.
+      final id = _selectedLabelId;
+      if (id == null || id.trim().isEmpty) return false;
     }
     return true;
   }
@@ -140,7 +158,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
           triggerType: _triggerType,
           matchType: _isText ? _matchType : null,
           keyword: _isText ? _keywordCtrl.text.trim() : '',
-          labelId: _isLabel ? _labelIdCtrl.text.trim() : '',
+          labelId: _isLabel ? (_selectedLabelId?.trim() ?? '') : '',
           labelAction: _isLabel ? _labelAction : null,
           scope: _scope,
           isActive: _isActive,
@@ -155,7 +173,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
         triggerType: _triggerType,
         matchType: _isText ? _matchType : null,
         keyword: _isText ? _keywordCtrl.text.trim() : '',
-        labelId: _isLabel ? _labelIdCtrl.text.trim() : '',
+        labelId: _isLabel ? (_selectedLabelId?.trim() ?? '') : '',
         labelAction: _isLabel ? _labelAction : null,
         scope: _scope,
         isActive: _isActive,
@@ -235,12 +253,10 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
                     onSelected: (s) => setState(() => _scope = s),
                   ),
                 ] else ...<Widget>[
-                  AppTextField(
-                    key: const Key('trigger_edit.label_id'),
-                    label: 'Etiqueta (id)',
-                    hint: 'id de la SessionLabel',
-                    controller: _labelIdCtrl,
+                  LabelPicker(
+                    selectedLabelId: _selectedLabelId,
                     enabled: !isMutating,
+                    onSelected: (id) => setState(() => _selectedLabelId = id),
                   ),
                   const SizedBox(height: AppTokens.sp4),
                   _LabelActionPicker(

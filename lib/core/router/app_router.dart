@@ -467,8 +467,18 @@ class AppRouter {
         path: '/flows/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return RepositoryProvider<TriggersRepository>.value(
-            value: _triggersRepo,
+          // El tab de Disparadores consume `TriggersRepository` (CRUD de
+          // triggers) y `LabelsRepository` (catálogo que alimenta el
+          // selector de etiqueta del trigger LABEL). Ambos cuelgan del
+          // scope de la página para que el `_openSheet` los lleve al
+          // subtree del sheet.
+          return MultiRepositoryProvider(
+            providers: <RepositoryProvider<dynamic>>[
+              RepositoryProvider<TriggersRepository>.value(
+                value: _triggersRepo,
+              ),
+              RepositoryProvider<LabelsRepository>.value(value: _labelsRepo),
+            ],
             child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<FlowDetailBloc>(
