@@ -123,10 +123,13 @@ void main() {
       await bloc.close();
     });
 
-    test('REMOVED → marca la etiqueta como deleted (tombstone)', () async {
+    test('REMOVED → marca deleted y PRESERVA name/color del espejo', () async {
+      // El espejo del backend conserva la identidad (name/color) en el
+      // tombstone; el evento REMOVED puede traer name vacío. El cliente no debe
+      // blanquear el name al marcar el tombstone.
       when(
         () => repo.listCatalog('b1'),
-      ).thenAnswer((_) async => <WaLabel>[_label()]);
+      ).thenAnswer((_) async => <WaLabel>[_label(name: 'VIP', color: 7)]);
       when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
       final bloc = build()..add(const WaLabelsLoadRequested());
       await bloc.stream.firstWhere((s) => s is WaLabelsLoaded);
@@ -135,7 +138,7 @@ void main() {
         const WaLabelCatalogChanged(
           waLabelId: '1000',
           name: '',
-          color: 3,
+          color: 7,
           removed: true,
         ),
       );
@@ -146,6 +149,8 @@ void main() {
               )
               as WaLabelsLoaded;
       expect(next.labels.first.deleted, isTrue);
+      expect(next.labels.first.name, 'VIP'); // no se blanquea
+      expect(next.labels.first.color, 7);
       await bloc.close();
     });
 

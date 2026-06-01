@@ -92,18 +92,30 @@ class WaLabelsBloc extends Bloc<WaLabelsEvent, WaLabelsState> {
       return;
     }
     final c = event.change;
-    final updated = WaLabel(
-      waLabelId: c.waLabelId,
-      name: c.name,
-      color: c.color,
-      deleted: c.removed,
-    );
     final labels = List<WaLabel>.of(current.labels);
     final i = labels.indexWhere((l) => l.waLabelId == c.waLabelId);
     if (i >= 0) {
-      labels[i] = updated; // edición, re-creación o tombstone de una existente
+      // REMOVED conserva la identidad del espejo (el evento puede traer name
+      // vacío; el espejo del backend mantiene name/color en el tombstone).
+      // EDITED reescribe name/color con el estado fundido del evento.
+      labels[i] = c.removed
+          ? labels[i].copyWith(deleted: true)
+          : WaLabel(
+              waLabelId: c.waLabelId,
+              name: c.name,
+              color: c.color,
+              deleted: false,
+            );
     } else if (!c.removed) {
-      labels.add(updated); // alta llegada de otro dispositivo
+      // Alta llegada de otro dispositivo.
+      labels.add(
+        WaLabel(
+          waLabelId: c.waLabelId,
+          name: c.name,
+          color: c.color,
+          deleted: false,
+        ),
+      );
     } else {
       return; // REMOVED de una etiqueta que no teníamos: nada que reflejar
     }

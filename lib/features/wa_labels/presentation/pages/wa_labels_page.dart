@@ -58,9 +58,13 @@ class _LoadedView extends StatelessWidget {
       onRefresh: () async {
         final bloc = context.read<WaLabelsBloc>();
         bloc.add(const WaLabelsRefreshRequested());
+        // `orElse` evita un StateError async si el bloc se cierra (el operador
+        // navega fuera) mientras el refresh sigue en vuelo: el stream completa
+        // sin emitir el estado esperado y `firstWhere` lanzaría sin él.
         await bloc.stream.firstWhere(
           (s) =>
               (s is WaLabelsLoaded && !s.isRefreshing) || s is WaLabelsFailed,
+          orElse: () => bloc.state,
         );
       },
       child: active.isEmpty
