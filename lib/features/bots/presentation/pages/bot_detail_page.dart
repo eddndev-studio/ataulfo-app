@@ -116,6 +116,12 @@ class _LoadedView extends StatelessWidget {
             onPressed: () => context.push('/bots/${bot.id}/sessions'),
           ),
           const SizedBox(height: AppTokens.sp3),
+          AppButton.tonal(
+            label: 'Etiquetas de WhatsApp',
+            fullWidth: true,
+            onPressed: () => context.push('/bots/${bot.id}/wa-labels'),
+          ),
+          const SizedBox(height: AppTokens.sp3),
           AppButton.filled(
             label: 'Conectar WhatsApp',
             fullWidth: true,

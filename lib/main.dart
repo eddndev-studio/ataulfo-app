@@ -41,6 +41,11 @@ import 'features/templates/data/datasources/templates_datasource.dart';
 import 'features/templates/data/repositories/templates_repository_impl.dart';
 import 'features/triggers/data/datasources/triggers_datasource.dart';
 import 'features/triggers/data/repositories/triggers_repository_impl.dart';
+import 'features/wa_labels/data/datasources/wa_assoc_datasource.dart';
+import 'features/wa_labels/data/datasources/wa_catalog_datasource.dart';
+import 'features/wa_labels/data/datasources/wa_label_events_datasource.dart';
+import 'features/wa_labels/data/datasources/wa_mapping_datasource.dart';
+import 'features/wa_labels/data/repositories/wa_labels_repository_impl.dart';
 
 /// Punto de entrada. Composición manual de dependencias — sin DI framework
 /// hasta que un slice futuro lo justifique.
@@ -132,6 +137,16 @@ void main() {
     datasource: DioTriggersDatasource(mainDio),
   );
 
+  // Etiquetas WhatsApp (S21): el repo agrega los cuatro datasources por
+  // sub-recurso (catálogo/asociaciones/mapeo) más el realtime SSE, todos sobre
+  // el mismo `mainDio` (Bearer + refresh transparente del interceptor).
+  final waLabelsRepository = WaLabelsRepositoryImpl(
+    catalog: DioWaCatalogDatasource(mainDio),
+    assoc: DioWaAssocDatasource(mainDio),
+    mapping: DioWaMappingDatasource(mainDio),
+    events: DioWaLabelEventsDatasource(mainDio),
+  );
+
   final membershipsRepository = MembershipsRepositoryImpl(
     datasource: DioMembershipsDatasource(mainDio),
   );
@@ -182,6 +197,7 @@ void main() {
     templatesRepository: templatesRepository,
     flowsRepository: flowsRepository,
     triggersRepository: triggersRepository,
+    waLabelsRepository: waLabelsRepository,
     membershipsRepository: membershipsRepository,
     catalogRepository: catalogRepository,
     mediaRepository: mediaRepository,
