@@ -181,10 +181,11 @@ class WaMappingData {
   /// sumo una etiqueta WhatsApp por bot): oculta lo que un set chocaría con 409,
   /// sin esperar al rechazo del servidor.
   List<Label> selectableLabelsFor(String waLabelId) {
+    final own = mappings[waLabelId];
     final takenByOthers = <String>{
       for (final e in mappings.entries)
         if (e.key != waLabelId) e.value,
-    };
+    }..remove(own);
     return <Label>[
       for (final l in internalLabels)
         if (!takenByOthers.contains(l.id)) l,
