@@ -254,5 +254,18 @@ void main() {
         isEmpty,
       );
     });
+
+    test('conserva el propio label aunque otra etiqueta apunte al mismo', () {
+      // Estado que el backend hace imposible (UNIQUE bot_id,label_id), pero la
+      // función nunca debe esconder el vínculo de la fila que se edita: si lo
+      // hiciera, el operador perdería de vista su propia asignación.
+      expect(
+        data(const <String, String>{
+          '1000': 'uuid-vip',
+          '1001': 'uuid-vip',
+        }).selectableLabelsFor('1000').map((l) => l.id),
+        contains('uuid-vip'),
+      );
+    });
   });
 }

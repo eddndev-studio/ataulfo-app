@@ -200,12 +200,32 @@ void main() {
       await tester.pump();
       expect(find.text('Clientes top'), findsOneWidget);
       expect(find.text('Spam'), findsNothing);
+      // El propio vínculo se muestra marcado (checkmark) además de removible.
+      expect(find.byIcon(Icons.check), findsOneWidget);
       expect(
         find.byKey(const Key('wa_mapping_selector.remove')),
         findsOneWidget,
       );
     },
   );
+
+  testWidgets('vínculo a un label que ya no existe en la org → "Quitar" sigue', (
+    tester,
+  ) async {
+    // currentId apunta a un label ausente de internalLabels (borrado en la org):
+    // ninguna opción se marca, pero el operador debe poder romper el vínculo.
+    await tester.pumpWidget(
+      host(
+        _wa(),
+        state: WaMappingLoaded(
+          dataWith(const <String, String>{'1000': 'uuid-ghost'}),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byIcon(Icons.check), findsNothing);
+    expect(find.byKey(const Key('wa_mapping_selector.remove')), findsOneWidget);
+  });
 
   testWidgets(
     'todas las internas tomadas por otras → copy distinto al de crear',
