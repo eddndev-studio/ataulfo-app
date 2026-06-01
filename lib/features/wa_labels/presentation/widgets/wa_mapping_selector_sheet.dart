@@ -85,7 +85,13 @@ class _WaMappingSelectorSheetState extends State<WaMappingSelectorSheet> {
               ? state.failure
               : null;
           final currentId = data?.mappings[widget.waLabel.waLabelId];
-          final internal = data?.internalLabels ?? const <Label>[];
+          // Oculta los labels ya vinculados a otra etiqueta WhatsApp del bot
+          // (exclusividad 1:1): solo ofrece lo que el server aceptaría, así el
+          // operador no choca el 409. El vínculo de ESTA etiqueta se conserva.
+          final selectable =
+              data?.selectableLabelsFor(widget.waLabel.waLabelId) ??
+              const <Label>[];
+          final hasAnyInternal = data != null && data.internalLabels.isNotEmpty;
           return SingleChildScrollView(
             key: const Key('wa_mapping_selector'),
             padding: EdgeInsets.fromLTRB(
@@ -119,21 +125,24 @@ class _WaMappingSelectorSheetState extends State<WaMappingSelectorSheet> {
                   style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
                 ),
                 const SizedBox(height: AppTokens.sp4),
-                if (internal.isEmpty)
+                if (selectable.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       vertical: AppTokens.sp4,
                     ),
                     child: Text(
-                      'No tienes etiquetas internas todavía. Créalas en la '
-                      'sección Etiquetas para poder vincularlas.',
+                      hasAnyInternal
+                          ? 'Todas tus etiquetas internas ya están vinculadas '
+                                'a otras etiquetas de WhatsApp.'
+                          : 'No tienes etiquetas internas todavía. Créalas en '
+                                'la sección Etiquetas para poder vincularlas.',
                       style: textTheme.bodyMedium?.copyWith(
                         color: AppTokens.text2,
                       ),
                     ),
                   )
                 else
-                  ...internal.map(
+                  ...selectable.map(
                     (l) => _LabelOption(
                       label: l,
                       selected: l.id == currentId,

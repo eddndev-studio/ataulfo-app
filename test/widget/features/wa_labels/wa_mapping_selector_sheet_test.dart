@@ -163,6 +163,90 @@ void main() {
     },
   );
 
+  testWidgets('oculta un label ya vinculado a OTRA etiqueta WhatsApp', (
+    tester,
+  ) async {
+    // "Spam" (uuid-spam) está vinculado a la WA 1001; al editar el vínculo de
+    // la WA 1000 no debe ofrecerse (lo rechazaría el 409 de exclusividad 1:1).
+    await tester.pumpWidget(
+      host(
+        _wa(),
+        state: WaMappingLoaded(
+          dataWith(const <String, String>{'1001': 'uuid-spam'}),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Clientes top'), findsOneWidget);
+    expect(find.text('Spam'), findsNothing);
+  });
+
+  testWidgets(
+    'conserva el label vinculado a ESTA etiqueta (marcado + Quitar)',
+    (tester) async {
+      // uuid-vip está en la propia 1000 (se conserva y se marca); uuid-spam en
+      // otra (1001) ⇒ oculto.
+      await tester.pumpWidget(
+        host(
+          _wa(),
+          state: WaMappingLoaded(
+            dataWith(const <String, String>{
+              '1000': 'uuid-vip',
+              '1001': 'uuid-spam',
+            }),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Clientes top'), findsOneWidget);
+      expect(find.text('Spam'), findsNothing);
+      // El propio vínculo se muestra marcado (checkmark) además de removible.
+      expect(find.byIcon(Icons.check), findsOneWidget);
+      expect(
+        find.byKey(const Key('wa_mapping_selector.remove')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('vínculo a un label que ya no existe en la org → "Quitar" sigue', (
+    tester,
+  ) async {
+    // currentId apunta a un label ausente de internalLabels (borrado en la org):
+    // ninguna opción se marca, pero el operador debe poder romper el vínculo.
+    await tester.pumpWidget(
+      host(
+        _wa(),
+        state: WaMappingLoaded(
+          dataWith(const <String, String>{'1000': 'uuid-ghost'}),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byIcon(Icons.check), findsNothing);
+    expect(find.byKey(const Key('wa_mapping_selector.remove')), findsOneWidget);
+  });
+
+  testWidgets(
+    'todas las internas tomadas por otras → copy distinto al de crear',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          _wa(),
+          state: WaMappingLoaded(
+            dataWith(const <String, String>{
+              '1001': 'uuid-vip',
+              '1002': 'uuid-spam',
+            }),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('ya están vinculadas'), findsOneWidget);
+      expect(find.textContaining('No tienes etiquetas internas'), findsNothing);
+    },
+  );
+
   testWidgets('sheet nuevo sobre un MutationFailed previo NO arrastra el error', (
     tester,
   ) async {

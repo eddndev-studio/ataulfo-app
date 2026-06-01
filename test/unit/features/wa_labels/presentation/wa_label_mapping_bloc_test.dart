@@ -198,4 +198,74 @@ void main() {
       ],
     );
   });
+
+  group('selectableLabelsFor (exclusividad 1:1 reflejada en UI)', () {
+    WaMappingData data(Map<String, String> mappings) => WaMappingData(
+      waLabels: <WaLabel>[
+        _wa(),
+        _wa(id: '1001'),
+      ],
+      mappings: mappings,
+      internalLabels: <Label>[
+        _il(id: 'uuid-vip', name: 'VIP'),
+        _il(id: 'uuid-spam', name: 'Spam'),
+        _il(id: 'uuid-urgent', name: 'Urgente'),
+      ],
+    );
+
+    test('sin mapeos devuelve todos los labels internos', () {
+      expect(
+        data(
+          const <String, String>{},
+        ).selectableLabelsFor('1000').map((l) => l.id).toList(),
+        <String>['uuid-vip', 'uuid-spam', 'uuid-urgent'],
+      );
+    });
+
+    test('oculta el label ya mapeado a OTRA etiqueta WhatsApp', () {
+      // uuid-spam vive en 1001 ⇒ no seleccionable al editar 1000.
+      expect(
+        data(const <String, String>{
+          '1001': 'uuid-spam',
+        }).selectableLabelsFor('1000').map((l) => l.id).toList(),
+        <String>['uuid-vip', 'uuid-urgent'],
+      );
+    });
+
+    test('conserva el label vinculado a ESTA etiqueta (la que se edita)', () {
+      // uuid-vip mapeado a la propia 1000 ⇒ sigue seleccionable (marcado +
+      // removible); uuid-spam mapeado a 1001 ⇒ oculto.
+      expect(
+        data(const <String, String>{
+          '1000': 'uuid-vip',
+          '1001': 'uuid-spam',
+        }).selectableLabelsFor('1000').map((l) => l.id).toList(),
+        <String>['uuid-vip', 'uuid-urgent'],
+      );
+    });
+
+    test('todos tomados por otras etiquetas ⇒ lista vacía', () {
+      expect(
+        data(const <String, String>{
+          '1001': 'uuid-vip',
+          '1002': 'uuid-spam',
+          '1003': 'uuid-urgent',
+        }).selectableLabelsFor('1000'),
+        isEmpty,
+      );
+    });
+
+    test('conserva el propio label aunque otra etiqueta apunte al mismo', () {
+      // Estado que el backend hace imposible (UNIQUE bot_id,label_id), pero la
+      // función nunca debe esconder el vínculo de la fila que se edita: si lo
+      // hiciera, el operador perdería de vista su propia asignación.
+      expect(
+        data(const <String, String>{
+          '1000': 'uuid-vip',
+          '1001': 'uuid-vip',
+        }).selectableLabelsFor('1000').map((l) => l.id),
+        contains('uuid-vip'),
+      );
+    });
+  });
 }
