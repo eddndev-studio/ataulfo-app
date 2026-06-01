@@ -22,6 +22,8 @@ import 'features/conversations/data/datasources/conversations_datasource.dart';
 import 'features/conversations/data/repositories/conversations_repository_impl.dart';
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
+import 'features/labels/data/datasources/labels_datasource.dart';
+import 'features/labels/data/repositories/labels_repository_impl.dart';
 import 'features/media/data/cache/caching_media_thumbnail_loader.dart';
 import 'features/media/data/cache/dio_thumbnail_downloader.dart';
 import 'features/media/data/cache/file_media_byte_store.dart';
@@ -147,6 +149,11 @@ void main() {
     events: DioWaLabelEventsDatasource(mainDio),
   );
 
+  // Labels internos (S10): el selector del mapeo WA↔interno los lista.
+  final labelsRepository = LabelsRepositoryImpl(
+    datasource: DioLabelsDatasource(mainDio),
+  );
+
   final membershipsRepository = MembershipsRepositoryImpl(
     datasource: DioMembershipsDatasource(mainDio),
   );
@@ -198,6 +205,7 @@ void main() {
     flowsRepository: flowsRepository,
     triggersRepository: triggersRepository,
     waLabelsRepository: waLabelsRepository,
+    labelsRepository: labelsRepository,
     membershipsRepository: membershipsRepository,
     catalogRepository: catalogRepository,
     mediaRepository: mediaRepository,

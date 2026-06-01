@@ -13,6 +13,7 @@ import 'package:ataulfo/features/conversations/domain/repositories/conversations
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
+import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
@@ -48,6 +49,8 @@ class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 class _MockFlowsRepo extends Mock implements FlowsRepository {}
 
 class _MockTriggersRepo extends Mock implements TriggersRepository {}
+
+class _MockLabelsRepo extends Mock implements LabelsRepository {}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
@@ -90,6 +93,7 @@ void main() {
       flowsRepository: _MockFlowsRepo(),
       triggersRepository: _MockTriggersRepo(),
       waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: _MockLabelsRepo(),
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       profileRepository: _MockProfileRepo(),

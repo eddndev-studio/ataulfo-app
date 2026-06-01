@@ -97,6 +97,15 @@ void main() {
     verify(() => bloc.add(const WaLabelsLoadRequested())).called(1);
   });
 
+  testWidgets('AppBar expone la acción de Vínculos con etiquetas internas', (
+    tester,
+  ) async {
+    stub(WaLabelsLoaded(labels: <WaLabel>[_label()], isRefreshing: false));
+    await tester.pumpWidget(host());
+    await tester.pump();
+    expect(find.byKey(const Key('wa_labels.mappings')), findsOneWidget);
+  });
+
   testWidgets('FAB de crear ausente en Loading', (tester) async {
     stub(const WaLabelsLoading());
     await tester.pumpWidget(host());
