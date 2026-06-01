@@ -183,6 +183,65 @@ void main() {
       await bloc.close();
     });
 
+    test(
+      'un evento CHAT de una etiqueta fuera del catálogo se ignora (sin fantasma)',
+      () async {
+        stubLoad();
+        when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
+        final bloc = build()..add(const WaChatLabelsLoadRequested());
+        final loaded =
+            await bloc.stream.firstWhere((s) => s is WaChatLabelsLoaded)
+                as WaChatLabelsLoaded;
+
+        final states = <WaChatLabelsState>[];
+        final sub = bloc.stream.listen(states.add);
+        // '9999' no está en el catálogo [1000,1001]: añadirlo sería invisible.
+        live.add(
+          const WaChatLabelChanged(
+            waLabelId: '9999',
+            chatLid: 'c1',
+            color: 3,
+            labeled: true,
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(states, isEmpty);
+        expect(loaded.associated, <String>{'1000'});
+        await sub.cancel();
+        await bloc.close();
+      },
+    );
+
+    test('reconexión refetcha catálogo Y asociaciones', () async {
+      var catalogCalls = 0;
+      when(() => repo.listCatalog('b1')).thenAnswer((_) async {
+        catalogCalls++;
+        return catalogCalls == 1
+            ? <WaLabel>[_wa(), _wa(id: '1001')]
+            : <WaLabel>[_wa(), _wa(id: '1001'), _wa(id: '1002')];
+      });
+      when(() => repo.listChatAssocs('b1')).thenAnswer(
+        (_) async => <WaChatAssoc>[
+          const WaChatAssoc(chatLid: 'c1', waLabelId: '1002', labeled: true),
+        ],
+      );
+      when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
+      final bloc = build()..add(const WaChatLabelsLoadRequested());
+      await bloc.stream.firstWhere((s) => s is WaChatLabelsLoaded);
+
+      live.add(const WaLabelReconnected());
+
+      final next =
+          await bloc.stream.firstWhere(
+                (s) => s is WaChatLabelsLoaded && s.catalog.length == 3,
+              )
+              as WaChatLabelsLoaded;
+      expect(next.catalog.map((l) => l.waLabelId), contains('1002'));
+      expect(next.associated, <String>{'1002'});
+      expect(catalogCalls, 2); // refetcha el catálogo, no solo las asociaciones
+      await bloc.close();
+    });
+
     test('un evento CHAT de OTRO chat se ignora', () async {
       stubLoad();
       when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);

@@ -130,6 +130,12 @@ class WaChatLabelsBloc extends Bloc<WaChatLabelsEvent, WaChatLabelsState> {
       return;
     }
     final ev = event.change;
+    // El catálogo no se reconcilia en vivo (solo en reconexión/reapertura): un
+    // evento CHAT de una etiqueta que aún no está en el catálogo se ignora para
+    // no dejar una asociación "fantasma" que el sheet no puede pintar ni togglear.
+    if (!snap.$1.any((l) => l.waLabelId == ev.waLabelId)) {
+      return;
+    }
     final next = Set<String>.of(snap.$2);
     if (ev.labeled) {
       next.add(ev.waLabelId);
@@ -149,17 +155,26 @@ class WaChatLabelsBloc extends Bloc<WaChatLabelsEvent, WaChatLabelsState> {
     }
     _refetching = true;
     try {
+      // Reconcilia AMBOS contra la verdad HTTP: el catálogo (otra etiqueta pudo
+      // crearse/editarse/borrarse durante el corte) y las asociaciones.
+      final catalog = await _repo.listCatalog(_botId);
       final assocs = await _repo.listChatAssocs(_botId);
       final current = state;
-      final cur = _snapshotOf(current);
-      if (cur == null) {
+      if (_snapshotOf(current) == null) {
         return;
       }
       emit(
-        _reemit(current, cur.$1, <String>{
-          for (final a in assocs)
-            if (a.chatLid == _chatLid && a.labeled) a.waLabelId,
-        }),
+        _reemit(
+          current,
+          <WaLabel>[
+            for (final l in catalog)
+              if (!l.deleted) l,
+          ],
+          <String>{
+            for (final a in assocs)
+              if (a.chatLid == _chatLid && a.labeled) a.waLabelId,
+          },
+        ),
       );
     } on WaLabelsFailure {
       // best-effort

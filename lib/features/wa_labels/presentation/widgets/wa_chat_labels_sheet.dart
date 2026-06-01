@@ -119,7 +119,29 @@ class _Body extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('Etiquetas en este chat', style: textTheme.titleLarge),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  'Etiquetas en este chat',
+                  style: textTheme.titleLarge,
+                ),
+              ),
+              // Mientras el toggle empuja a WhatsApp (puede tardar por la red),
+              // un spinner sutil da feedback; los checkboxes quedan deshabilitados.
+              if (isMutating)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppTokens.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: AppTokens.sp4),
           if (catalog.isEmpty)
             Padding(
