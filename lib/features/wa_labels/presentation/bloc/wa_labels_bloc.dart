@@ -91,11 +91,13 @@ class WaLabelsBloc extends Bloc<WaLabelsEvent, WaLabelsState> {
     Emitter<WaLabelsState> emit,
   ) {
     final current = state;
-    if (current is! WaLabelsLoaded) {
+    final base = _snapshotOf(current);
+    if (base == null) {
+      // Loading/Mutating/Failed: sin lista sobre la que parchear.
       return;
     }
     final c = event.change;
-    final labels = List<WaLabel>.of(current.labels);
+    final labels = List<WaLabel>.of(base);
     final i = labels.indexWhere((l) => l.waLabelId == c.waLabelId);
     if (i >= 0) {
       // REMOVED conserva la identidad del espejo (el evento puede traer name
@@ -122,32 +124,63 @@ class WaLabelsBloc extends Bloc<WaLabelsEvent, WaLabelsState> {
     } else {
       return; // REMOVED de una etiqueta que no teníamos: nada que reflejar
     }
-    emit(WaLabelsLoaded(labels: labels, isRefreshing: current.isRefreshing));
+    emit(_reemitWithLabels(current, labels));
   }
 
   /// Tras reconectar, reconcilia contra la verdad HTTP (el SSE no reproduce el
   /// hueco). Best-effort: si el refetch falla, el catálogo en vivo se conserva.
+  ///
+  /// Aplica también desde `MutationFailed`: si una mutación falló y el sheet se
+  /// descartó sin reintentar, el bloc quedaría clavado ahí; sin esto el realtime
+  /// quedaría congelado hasta un refresh manual. Conserva la variante (no vuelve
+  /// a `Loaded`) para no cerrar el sheet si sigue abierto mostrando el error.
   Future<void> _onReconnected(
     WaLabelsReconnected event,
     Emitter<WaLabelsState> emit,
   ) async {
-    if (state is! WaLabelsLoaded || _refetching) {
+    if (_snapshotOf(state) == null || _refetching) {
       return;
     }
     _refetching = true;
     try {
       final labels = await _repo.listCatalog(_botId);
       final current = state;
-      if (current is! WaLabelsLoaded) {
-        return;
+      if (_snapshotOf(current) == null) {
+        return; // una mutación arrancó durante el refetch: no la pisamos
       }
-      emit(WaLabelsLoaded(labels: labels, isRefreshing: current.isRefreshing));
+      emit(_reemitWithLabels(current, labels));
     } on WaLabelsFailure {
       // Refetch best-effort: una reconexión sin red no debe derribar la lista.
     } finally {
       _refetching = false;
     }
   }
+
+  /// La lista vigente de un estado que la lleva (`Loaded`/`MutationFailed`), o
+  /// `null` si el estado no tiene un espejo sobre el que parchear realtime.
+  static List<WaLabel>? _snapshotOf(WaLabelsState state) => switch (state) {
+    WaLabelsLoaded(labels: final l) => l,
+    WaLabelsMutationFailed(labels: final l) => l,
+    _ => null,
+  };
+
+  /// Re-emite el MISMO tipo de estado con una lista nueva. Preserva
+  /// `isRefreshing` de `Loaded` y el `failure` de `MutationFailed`, para que un
+  /// parche de realtime no cierre el sheet ni borre el error en vuelo.
+  static WaLabelsState _reemitWithLabels(
+    WaLabelsState current,
+    List<WaLabel> labels,
+  ) => switch (current) {
+    WaLabelsMutationFailed(failure: final f) => WaLabelsMutationFailed(
+      labels,
+      f,
+    ),
+    WaLabelsLoaded(isRefreshing: final r) => WaLabelsLoaded(
+      labels: labels,
+      isRefreshing: r,
+    ),
+    _ => WaLabelsLoaded(labels: labels, isRefreshing: false),
+  };
 
   Future<void> _onRefresh(
     WaLabelsRefreshRequested event,

@@ -150,6 +150,52 @@ void main() {
     );
   });
 
+  group('realtime sigue vivo desde MutationFailed (no se congela)', () {
+    blocTest<WaLabelsBloc, WaLabelsState>(
+      'un cambio live parchea el snapshot pero conserva la variante/failure',
+      build: build,
+      seed: () => WaLabelsMutationFailed(<WaLabel>[
+        _l(),
+      ], const WaLabelsUpstreamFailure()),
+      act: (b) => b.add(
+        const WaLabelsCatalogChanged(
+          WaLabelCatalogChanged(
+            waLabelId: '1002',
+            name: 'Live',
+            color: 9,
+            removed: false,
+          ),
+        ),
+      ),
+      expect: () => <WaLabelsState>[
+        WaLabelsMutationFailed(<WaLabel>[
+          _l(),
+          _l(id: '1002', name: 'Live', color: 9),
+        ], const WaLabelsUpstreamFailure()),
+      ],
+    );
+
+    blocTest<WaLabelsBloc, WaLabelsState>(
+      'reconexión refetcha incluso desde MutationFailed (conserva failure)',
+      build: () {
+        when(() => repo.listCatalog('b1')).thenAnswer(
+          (_) async => <WaLabel>[_l(), _l(id: '1003', name: 'Refetch')],
+        );
+        return build();
+      },
+      seed: () => WaLabelsMutationFailed(<WaLabel>[
+        _l(),
+      ], const WaLabelsNotConnectedFailure()),
+      act: (b) => b.add(const WaLabelsReconnected()),
+      expect: () => <WaLabelsState>[
+        WaLabelsMutationFailed(<WaLabel>[
+          _l(),
+          _l(id: '1003', name: 'Refetch'),
+        ], const WaLabelsNotConnectedFailure()),
+      ],
+    );
+  });
+
   group('reusar snapshot / ignorar', () {
     blocTest<WaLabelsBloc, WaLabelsState>(
       'mutación desde Loading se ignora (sin snapshot fiable)',
