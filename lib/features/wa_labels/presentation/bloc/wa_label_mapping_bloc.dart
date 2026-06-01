@@ -14,8 +14,9 @@ import '../../domain/repositories/wa_labels_repository.dart';
 /// del label mapeado). El set/clear NO empuja a WhatsApp: es metadata interna
 /// que decide qué automatización dispara la etiqueta.
 ///
-/// Las mutaciones son optimistas con el resultado HTTP (los mapeos no tienen
-/// realtime); ante fallo, `MutationFailed` preserva el snapshot para que el
+/// El set/clear aplica el cambio al estado TRAS confirmar el HTTP (no antes:
+/// no es optimista, así que no necesita rollback); los mapeos no tienen
+/// realtime. Ante fallo, `MutationFailed` preserva el snapshot para que el
 /// selector muestre el error (p. ej. 422: el Label ya no existe en la org).
 class WaLabelMappingBloc extends Bloc<WaMappingEvent, WaMappingState> {
   WaLabelMappingBloc({

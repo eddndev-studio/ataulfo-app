@@ -78,7 +78,10 @@ class _WaMappingSelectorSheetState extends State<WaMappingSelectorSheet> {
         builder: (context, state) {
           final data = _dataOf(state);
           final isMutating = state is WaMappingMutating;
-          final failure = state is WaMappingMutationFailed
+          // Solo muestra el error si ESTE sheet disparó la mutación: al reabrir
+          // sobre un bloc que quedó en MutationFailed (page-scoped), un sheet
+          // nuevo no debe arrastrar el error de una acción anterior.
+          final failure = _didSubmit && state is WaMappingMutationFailed
               ? state.failure
               : null;
           final currentId = data?.mappings[widget.waLabel.waLabelId];

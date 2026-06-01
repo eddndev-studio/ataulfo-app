@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
@@ -129,7 +131,43 @@ void main() {
     expect(find.textContaining('No tienes etiquetas internas'), findsOneWidget);
   });
 
-  testWidgets('MutationFailed 422 → copy de label inexistente', (tester) async {
+  testWidgets(
+    'tras un set propio que falla con 422 → copy de label inexistente',
+    (tester) async {
+      final ctrl = StreamController<WaMappingState>.broadcast();
+      addTearDown(ctrl.close);
+      final loaded = WaMappingLoaded(dataWith(const <String, String>{}));
+      when(() => bloc.state).thenReturn(loaded);
+      whenListen(bloc, ctrl.stream, initialState: loaded);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: BlocProvider<WaLabelMappingBloc>.value(
+            value: bloc,
+            child: Scaffold(body: WaMappingSelectorSheet(waLabel: _wa())),
+          ),
+        ),
+      );
+      await tester.pump();
+      // El sheet dispara su propia acción y luego el bloc emite MutationFailed.
+      await tester.tap(find.text('Spam'));
+      ctrl.add(
+        WaMappingMutationFailed(
+          dataWith(const <String, String>{}),
+          const WaLabelsInvalidFailure(),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('ya no existe'), findsOneWidget);
+    },
+  );
+
+  testWidgets('sheet nuevo sobre un MutationFailed previo NO arrastra el error', (
+    tester,
+  ) async {
+    // El bloc page-scoped quedó en MutationFailed por una acción anterior; un
+    // sheet recién abierto (sin submit propio) no debe mostrar ese error viejo.
     await tester.pumpWidget(
       host(
         _wa(),
@@ -140,6 +178,6 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.textContaining('ya no existe'), findsOneWidget);
+    expect(find.textContaining('ya no existe'), findsNothing);
   });
 }

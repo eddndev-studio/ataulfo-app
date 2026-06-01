@@ -91,7 +91,11 @@ class _LoadedView extends StatelessWidget {
           )
         else
           for (final wa in waLabels) ...<Widget>[
-            _MappingRow(waLabel: wa, mapped: data.mappedLabel(wa.waLabelId)),
+            _MappingRow(
+              waLabel: wa,
+              hasMapping: data.mappings.containsKey(wa.waLabelId),
+              mapped: data.mappedLabel(wa.waLabelId),
+            ),
             const SizedBox(height: AppTokens.cardGap),
           ],
       ],
@@ -101,11 +105,19 @@ class _LoadedView extends StatelessWidget {
 
 /// Una fila: etiqueta WhatsApp (swatch + nombre) y su vínculo interno actual.
 class _MappingRow extends StatelessWidget {
-  const _MappingRow({required this.waLabel, required this.mapped});
+  const _MappingRow({
+    required this.waLabel,
+    required this.hasMapping,
+    required this.mapped,
+  });
 
   final WaLabel waLabel;
 
-  /// El Label interno vinculado, o `null` si no hay vínculo.
+  /// Hay una fila de mapeo para esta etiqueta (aunque apunte a un Label borrado).
+  final bool hasMapping;
+
+  /// El Label interno vinculado RESUELTO, o `null` si no hay vínculo o si el
+  /// vínculo está roto (apunta a un Label que ya no existe en la org).
   final Label? mapped;
 
   @override
@@ -139,10 +151,17 @@ class _MappingRow extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppTokens.sp2),
-            if (m == null)
+            if (m == null && !hasMapping)
               Text(
                 'Sin vincular',
                 style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+              )
+            else if (m == null)
+              // Hay un mapeo pero el Label interno fue borrado de la org: roto.
+              // El operador puede tocar la fila y "Quitar vínculo" para limpiarlo.
+              Text(
+                'Vínculo roto',
+                style: textTheme.bodyMedium?.copyWith(color: AppTokens.warning),
               )
             else
               Row(

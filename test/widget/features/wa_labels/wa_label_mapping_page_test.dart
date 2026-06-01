@@ -70,6 +70,26 @@ void main() {
     },
   );
 
+  testWidgets(
+    'mapeo colgante (label borrado) → "Vínculo roto", no "Sin vincular"',
+    (tester) async {
+      stub(
+        WaMappingLoaded(
+          WaMappingData(
+            waLabels: <WaLabel>[_wa(name: 'Soporte')],
+            // Mapea a un label que ya no existe en internalLabels.
+            mappings: const <String, String>{'1000': 'ghost'},
+            internalLabels: <Label>[_il()],
+          ),
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.pump();
+      expect(find.text('Vínculo roto'), findsOneWidget);
+      expect(find.text('Sin vincular'), findsNothing);
+    },
+  );
+
   testWidgets('Failed → error + Reintentar despacha load', (tester) async {
     stub(const WaMappingFailed(WaMappingError.forbidden));
     await tester.pumpWidget(host());
