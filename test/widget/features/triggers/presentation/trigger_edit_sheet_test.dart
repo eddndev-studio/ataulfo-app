@@ -330,6 +330,48 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets(
+      'tras elegir etiqueta y volver a TEXT, el submit TEXT no arrastra labelId',
+      (tester) async {
+        await pumpHost(tester);
+
+        // LABEL: elige una etiqueta.
+        await tester.tap(find.text('Etiqueta'));
+        await tester.pump();
+        await tester.tap(
+          find.byKey(const Key('trigger_edit.label_picker.option.vip')),
+        );
+        await tester.pump();
+
+        // Vuelve a TEXT y crea un trigger de texto.
+        await tester.tap(find.text('Texto'));
+        await tester.pump();
+        await tester.enterText(
+          find.byKey(const Key('trigger_edit.keyword')),
+          'hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
+        await tester.pump();
+
+        // El labelId elegido no debe filtrarse al payload TEXT.
+        verify(
+          () => triggers.add(
+            const TriggersAddRequested(
+              flowId: 'f1',
+              triggerType: TriggerType.text,
+              matchType: MatchType.exact,
+              keyword: 'hola',
+              labelId: '',
+              labelAction: null,
+              scope: TriggerScope.both,
+              isActive: true,
+            ),
+          ),
+        ).called(1);
+      },
+    );
   });
 
   group('TriggerEditSheet (LABEL · estados del catálogo)', () {

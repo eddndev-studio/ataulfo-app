@@ -30,6 +30,13 @@ import 'trigger_edit_sheet.dart';
 /// LABEL. Vive a nivel del tab para reusar la carga entre aperturas del
 /// sheet; el `_openSheet` lo re-provee al subtree del modal (el sheet
 /// monta en una ruta nueva del Navigator y no hereda los providers).
+///
+/// Limitación aceptada de la carga única: si el operador crea o renombra
+/// una etiqueta en otra sección y vuelve a este tab sin remontarlo, el
+/// selector muestra el catálogo previo hasta que se recargue (reabrir el
+/// detalle del flujo, o el botón de reintento del propio selector). Un id
+/// borrado no se pierde: el selector lo muestra como "etiqueta
+/// desconocida" con su id crudo.
 class FlowTriggersTab extends StatelessWidget {
   const FlowTriggersTab({super.key, required this.flow});
 
@@ -60,6 +67,10 @@ class FlowTriggersTab extends StatelessWidget {
 /// `flow.id`. Vive público en el archivo para que los widget tests
 /// puedan inyectar un bloc mockeado vía `BlocProvider.value` sin
 /// pasar por el wrapper que construye la repo real.
+///
+/// Requiere además un `LabelsBloc` en el scope: `_openSheet` lo lee para
+/// re-proveerlo al sheet (el selector de etiqueta del trigger LABEL). Un
+/// test que monte este body directo debe proveer ambos blocs.
 class FlowTriggersBody extends StatelessWidget {
   const FlowTriggersBody({super.key, required this.flow});
 
