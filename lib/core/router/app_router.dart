@@ -250,10 +250,8 @@ class AppRouter {
             create: (_) =>
                 WaLabelsBloc(repo: _waLabelsRepo, botId: id)
                   ..add(const WaLabelsLoadRequested()),
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Etiquetas de WhatsApp')),
-              body: const WaLabelsPage(),
-            ),
+            // La página posee su Scaffold (AppBar + FAB de crear + sheets).
+            child: const WaLabelsPage(),
           );
         },
       ),

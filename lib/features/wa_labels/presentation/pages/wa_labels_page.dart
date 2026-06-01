@@ -8,27 +8,52 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../domain/entities/wa_label.dart';
 import '../../domain/failures/wa_labels_failure.dart';
 import '../bloc/wa_labels_bloc.dart';
+import '../widgets/wa_label_edit_sheet.dart';
 import '../widgets/wa_label_swatch.dart';
 
 /// Catálogo de etiquetas WhatsApp del bot (S21). Consume el `WaLabelsBloc` del
-/// scope (la ruta `/bots/:id/wa-labels` lo cabla con el botId). Content-only: el
-/// Scaffold y el AppBar los aporta la ruta, como el resto de las sub-secciones
-/// del bot.
+/// scope (la ruta `/bots/:id/wa-labels` lo cabla con el botId). Posee su propio
+/// Scaffold porque la sección tiene un FAB ligado al bloc (crear) y sheets
+/// modales (crear/editar) — a diferencia de las sub-secciones de solo lectura.
 ///
 /// Lee el espejo y pinta solo las etiquetas activas (filtra tombstones); el
 /// swatch resuelve el índice de paleta de WhatsApp. Se actualiza en vivo por SSE
-/// `label.wa.*` sin recargar.
+/// `label.wa.*` sin recargar. Tocar una etiqueta abre el sheet de edición; el
+/// FAB abre el de creación.
 class WaLabelsPage extends StatelessWidget {
   const WaLabelsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<WaLabelsBloc, WaLabelsState>(
-      builder: (context, state) => switch (state) {
-        WaLabelsLoading() => const _LoadingView(),
-        WaLabelsLoaded(labels: final labels) => _LoadedView(labels: labels),
-        WaLabelsFailed(failure: final f) => _FailedView(failure: f),
-      },
+    return Scaffold(
+      appBar: AppBar(title: const Text('Etiquetas de WhatsApp')),
+      body: BlocBuilder<WaLabelsBloc, WaLabelsState>(
+        builder: (context, state) => switch (state) {
+          WaLabelsLoading() => const _LoadingView(),
+          WaLabelsLoaded(labels: final labels) ||
+          WaLabelsMutating(labels: final labels) ||
+          WaLabelsMutationFailed(
+            labels: final labels,
+          ) => _LoadedView(labels: labels),
+          WaLabelsFailed(failure: final f) => _FailedView(failure: f),
+        },
+      ),
+      floatingActionButton: BlocBuilder<WaLabelsBloc, WaLabelsState>(
+        builder: (context, state) {
+          // El FAB solo aparece cuando hay un catálogo cargado (crear necesita
+          // un snapshot sobre el que aplicar el alta optimista).
+          final canCreate =
+              state is WaLabelsLoaded ||
+              state is WaLabelsMutating ||
+              state is WaLabelsMutationFailed;
+          if (!canCreate) return const SizedBox.shrink();
+          return FloatingActionButton(
+            key: const Key('wa_labels.create'),
+            onPressed: () => WaLabelEditSheet.openCreate(context),
+            child: const Icon(Icons.add),
+          );
+        },
+      ),
     );
   }
 }
@@ -94,20 +119,25 @@ class _WaLabelTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return AppCard(
-      child: Row(
-        children: <Widget>[
-          WaLabelSwatch(colorIndex: label.color),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Text(
-              label.name,
-              style: textTheme.titleMedium,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => WaLabelEditSheet.openEdit(context, label),
+      child: AppCard(
+        child: Row(
+          children: <Widget>[
+            WaLabelSwatch(colorIndex: label.color),
+            const SizedBox(width: AppTokens.sp4),
+            Expanded(
+              child: Text(
+                label.name,
+                style: textTheme.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
-        ],
+            const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
+          ],
+        ),
       ),
     );
   }
