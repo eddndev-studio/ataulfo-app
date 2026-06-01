@@ -1,0 +1,110 @@
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
+import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
+import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_live_event.dart';
+import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
+import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockConvBloc extends MockBloc<ConversationsEvent, ConversationsState>
+    implements ConversationsBloc {}
+
+class _MockWaRepo extends Mock implements WaLabelsRepository {}
+
+const _dm = Conversation(
+  chatLid: 'lid-dm',
+  kind: ConversationKind.dm,
+  phone: '5215550001',
+  isArchived: false,
+  isPinned: false,
+  isMarkedUnread: false,
+  mutedUntil: null,
+  displayName: 'Alice',
+  unreadCount: 0,
+  lastMessagePreview: null,
+  lastMessageType: null,
+  lastMessageDirection: null,
+  lastMessageTimestampMs: null,
+);
+
+void main() {
+  late _MockConvBloc conv;
+  late _MockWaRepo repo;
+
+  setUp(() {
+    conv = _MockConvBloc();
+    repo = _MockWaRepo();
+    when(() => conv.botId).thenReturn('b1');
+    when(() => conv.state).thenReturn(
+      const ConversationsLoaded(
+        items: <Conversation>[_dm],
+        isRefreshing: false,
+      ),
+    );
+    when(() => repo.listCatalog(any())).thenAnswer((_) async => <WaLabel>[]);
+    when(
+      () => repo.listChatAssocs(any()),
+    ).thenAnswer((_) async => <WaChatAssoc>[]);
+    when(
+      () => repo.liveEvents(any()),
+    ).thenAnswer((_) => const Stream<WaLabelLiveEvent>.empty());
+  });
+
+  Widget app() {
+    final router = GoRouter(
+      initialLocation: '/conv',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/conv',
+          builder: (_, _) => RepositoryProvider<WaLabelsRepository>.value(
+            value: repo,
+            child: BlocProvider<ConversationsBloc>.value(
+              value: conv,
+              child: const Scaffold(body: ConversationsListPage()),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/bots/:id/sessions/:chatLid',
+          builder: (_, _) => const Scaffold(body: Text('HILO_SENTINEL')),
+        ),
+      ],
+    );
+    return MaterialApp.router(
+      theme: AppDesignTheme.dark(),
+      routerConfig: router,
+    );
+  }
+
+  testWidgets('tocar el icono de etiquetas abre el sheet y NO navega al hilo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('conversation.labels.lid-dm')));
+    await tester.pumpAndSettle();
+
+    // El sheet se abrió...
+    expect(find.text('Etiquetas en este chat'), findsOneWidget);
+    // ...y NO se navegó al hilo (el tap lo absorbió el IconButton).
+    expect(find.text('HILO_SENTINEL'), findsNothing);
+  });
+
+  testWidgets('tocar el cuerpo de la fila SÍ navega al hilo', (tester) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('HILO_SENTINEL'), findsOneWidget);
+  });
+}

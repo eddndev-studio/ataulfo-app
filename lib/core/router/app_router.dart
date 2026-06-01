@@ -291,13 +291,18 @@ class AppRouter {
         path: '/bots/:id/sessions',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return BlocProvider<ConversationsBloc>(
-            create: (_) =>
-                ConversationsBloc(repo: _conversationsRepo, botId: id)
-                  ..add(const ConversationsLoadRequested()),
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Conversaciones')),
-              body: const ConversationsListPage(),
+          // El repo de etiquetas WA cuelga del scope para el sheet de etiquetas
+          // por chat (la fila de la bandeja lo abre con su chatLid + kind).
+          return RepositoryProvider<WaLabelsRepository>.value(
+            value: _waLabelsRepo,
+            child: BlocProvider<ConversationsBloc>(
+              create: (_) =>
+                  ConversationsBloc(repo: _conversationsRepo, botId: id)
+                    ..add(const ConversationsLoadRequested()),
+              child: Scaffold(
+                appBar: AppBar(title: const Text('Conversaciones')),
+                body: const ConversationsListPage(),
+              ),
             ),
           );
         },

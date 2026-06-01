@@ -8,6 +8,7 @@ import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import '../../domain/entities/conversation.dart';
 import '../../domain/failures/conversations_failure.dart';
 import '../bloc/conversations_bloc.dart';
@@ -253,6 +254,19 @@ class _ConversationTile extends StatelessWidget {
                   ),
                 ],
               ],
+            ),
+          ),
+          // Acción secundaria: etiquetar este chat con etiquetas de WhatsApp.
+          // El tap del icono no dispara el onTap del card (lo absorbe el botón).
+          IconButton(
+            key: Key('conversation.labels.${c.chatLid}'),
+            tooltip: 'Etiquetas de WhatsApp',
+            icon: const Icon(Icons.label_outline, color: AppTokens.text2),
+            onPressed: () => WaChatLabelsSheet.open(
+              context,
+              botId: context.read<ConversationsBloc>().botId,
+              chatLid: c.chatLid,
+              kind: c.kind,
             ),
           ),
         ],

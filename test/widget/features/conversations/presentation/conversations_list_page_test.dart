@@ -85,6 +85,23 @@ void main() {
     },
   );
 
+  testWidgets('cada conversación expone la acción de etiquetas de WhatsApp', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const ConversationsLoaded(
+        items: <Conversation>[_dm, _group],
+        isRefreshing: false,
+      ),
+    );
+    await tester.pumpWidget(host());
+    expect(find.byKey(const Key('conversation.labels.lid-dm')), findsOneWidget);
+    expect(
+      find.byKey(const Key('conversation.labels.lid-grp')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('conversación fijada muestra AppPill "Fijado"', (tester) async {
     when(() => bloc.state).thenReturn(
       const ConversationsLoaded(
