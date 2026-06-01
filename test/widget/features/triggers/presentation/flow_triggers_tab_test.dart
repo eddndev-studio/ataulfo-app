@@ -1,7 +1,11 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
+import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/triggers/domain/failures/triggers_failure.dart';
+import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/triggers/presentation/bloc/triggers_bloc.dart';
 import 'package:ataulfo/features/triggers/presentation/widgets/flow_triggers_tab.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -12,6 +16,16 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
     implements TriggersBloc {}
+
+class _MockLabelsBloc extends MockBloc<LabelsEvent, LabelsState>
+    implements LabelsBloc {}
+
+class _MockTriggersRepo extends Mock implements TriggersRepository {}
+
+class _MockLabelsRepo extends Mock implements LabelsRepository {}
+
+Label _lbl({String id = 'vip', String name = 'VIP'}) =>
+    Label(id: id, name: name, color: '#FF8800', description: '');
 
 fdom.Flow _flow({String id = 'f1', String name = 'Bienvenida'}) => fdom.Flow(
   id: id,
@@ -47,16 +61,29 @@ Trigger _text({
 /// el `TriggersBloc` en el árbol. El wrapper `FlowTriggersTab` que
 /// construye el bloc se cubre por separado en el cycle de cableado del
 /// FlowDetailPage.
+/// El `FlowTriggersBody` consume `TriggersBloc`; el `_openSheet` que abre
+/// desde el body también lee el `LabelsBloc` del scope para re-proveerlo
+/// al sheet — por eso el harness inyecta ambos. Un `LabelsBloc` mockeado
+/// con catálogo poblado por default basta para estos tests (el selector
+/// se ejercita a fondo en `trigger_edit_sheet_test.dart`).
 Widget _harness({
   required _MockTriggersBloc triggers,
   required fdom.Flow flow,
-}) => MaterialApp(
-  theme: AppDesignTheme.dark(),
-  home: BlocProvider<TriggersBloc>.value(
-    value: triggers,
-    child: Scaffold(body: FlowTriggersBody(flow: flow)),
-  ),
-);
+  _MockLabelsBloc? labels,
+}) {
+  final lbls = labels ?? _MockLabelsBloc();
+  when(() => lbls.state).thenReturn(LabelsLoaded(<Label>[_lbl()]));
+  return MaterialApp(
+    theme: AppDesignTheme.dark(),
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<TriggersBloc>.value(value: triggers),
+        BlocProvider<LabelsBloc>.value(value: lbls),
+      ],
+      child: Scaffold(body: FlowTriggersBody(flow: flow)),
+    ),
+  );
+}
 
 void main() {
   late _MockTriggersBloc triggers;
@@ -201,5 +228,57 @@ void main() {
 
     expect(find.text('Editar disparador'), findsOneWidget);
     expect(find.byKey(const Key('trigger_edit.flow_fixed')), findsOneWidget);
+  });
+
+  group('FlowTriggersTab · cableado del catálogo al sheet', () {
+    testWidgets(
+      'el selector del sheet ve los labels del LabelsRepository del scope',
+      (tester) async {
+        // Pump del wrapper REAL (construye TriggersBloc + LabelsBloc desde
+        // los repos del scope) para cubrir la gotcha: el sheet monta en una
+        // ruta nueva del Navigator y solo ve los labels si `_openSheet`
+        // re-proveyó el LabelsBloc al subtree del modal.
+        final triggersRepo = _MockTriggersRepo();
+        final labelsRepo = _MockLabelsRepo();
+        when(
+          () => triggersRepo.listTriggers(any()),
+        ).thenAnswer((_) async => <Trigger>[]);
+        when(
+          () => labelsRepo.listLabels(),
+        ).thenAnswer((_) async => <Label>[_lbl(id: 'vip', name: 'VIP')]);
+
+        tester.view.physicalSize = const Size(800, 2000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            home: MultiRepositoryProvider(
+              providers: <RepositoryProvider<dynamic>>[
+                RepositoryProvider<TriggersRepository>.value(
+                  value: triggersRepo,
+                ),
+                RepositoryProvider<LabelsRepository>.value(value: labelsRepo),
+              ],
+              child: Scaffold(body: FlowTriggersTab(flow: _flow())),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('flow_triggers.add_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Etiqueta'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('trigger_edit.label_picker.option.vip')),
+          findsOneWidget,
+        );
+        expect(find.text('VIP'), findsOneWidget);
+      },
+    );
   });
 }

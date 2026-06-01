@@ -6,6 +6,8 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
+import '../../../labels/domain/repositories/labels_repository.dart';
+import '../../../labels/presentation/bloc/labels_bloc.dart';
 import '../../domain/entities/trigger.dart';
 import '../../domain/failures/triggers_failure.dart';
 import '../../domain/repositories/triggers_repository.dart';
@@ -22,6 +24,12 @@ import 'trigger_edit_sheet.dart';
 /// por `flowId` lo aplica el body al renderizar. Ownership real:
 /// `Trigger ∈ Flow ∈ Template`; el endpoint template-scoped es un
 /// atajo de query, no una afirmación de pertenencia.
+///
+/// También construye un `LabelsBloc` (carga única del catálogo
+/// org-scoped) que alimenta el selector de etiqueta del sheet en modo
+/// LABEL. Vive a nivel del tab para reusar la carga entre aperturas del
+/// sheet; el `_openSheet` lo re-provee al subtree del modal (el sheet
+/// monta en una ruta nueva del Navigator y no hereda los providers).
 class FlowTriggersTab extends StatelessWidget {
   const FlowTriggersTab({super.key, required this.flow});
 
@@ -29,11 +37,20 @@ class FlowTriggersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<TriggersBloc>(
-      create: (innerCtx) => TriggersBloc(
-        repo: innerCtx.read<TriggersRepository>(),
-        templateId: flow.templateId,
-      )..add(const TriggersLoadRequested()),
+    return MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<TriggersBloc>(
+          create: (innerCtx) => TriggersBloc(
+            repo: innerCtx.read<TriggersRepository>(),
+            templateId: flow.templateId,
+          )..add(const TriggersLoadRequested()),
+        ),
+        BlocProvider<LabelsBloc>(
+          create: (innerCtx) =>
+              LabelsBloc(repo: innerCtx.read<LabelsRepository>())
+                ..add(const LabelsLoadRequested()),
+        ),
+      ],
       child: FlowTriggersBody(flow: flow),
     );
   }
@@ -78,16 +95,26 @@ class FlowTriggersBody extends StatelessWidget {
   }
 }
 
-/// Abre el sheet de creación/edición pasando el bloc del scope y el
+/// Abre el sheet de creación/edición pasando los blocs del scope y el
 /// flow del editor como `scopedFlow`. El sheet ya sabe que no hay
 /// `FlowsBloc` y oculta el dropdown.
+///
+/// `showModalBottomSheet` monta el sheet en una ruta nueva del
+/// `Navigator` que NO hereda los providers de esta página: leemos los
+/// blocs aquí (en el context de la página) y los re-proveemos `.value`
+/// al subtree del modal. Sin esto, el selector de etiqueta del sheet no
+/// vería el `LabelsBloc`.
 void _openSheet(BuildContext context, fdom.Flow flow, {Trigger? editing}) {
-  final bloc = context.read<TriggersBloc>();
+  final triggersBloc = context.read<TriggersBloc>();
+  final labelsBloc = context.read<LabelsBloc>();
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (_) => BlocProvider<TriggersBloc>.value(
-      value: bloc,
+    builder: (_) => MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<TriggersBloc>.value(value: triggersBloc),
+        BlocProvider<LabelsBloc>.value(value: labelsBloc),
+      ],
       child: Padding(
         padding: EdgeInsets.only(bottom: context.sheetBottomInset),
         child: TriggerEditSheet(editing: editing, scopedFlow: flow),
