@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -26,7 +27,20 @@ class WaLabelsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Etiquetas de WhatsApp')),
+      appBar: AppBar(
+        title: const Text('Etiquetas de WhatsApp'),
+        actions: <Widget>[
+          IconButton(
+            key: const Key('wa_labels.mappings'),
+            tooltip: 'Vínculos con etiquetas internas',
+            icon: const Icon(Icons.link),
+            onPressed: () {
+              final botId = context.read<WaLabelsBloc>().botId;
+              context.push('/bots/$botId/wa-label-mappings');
+            },
+          ),
+        ],
+      ),
       body: BlocBuilder<WaLabelsBloc, WaLabelsState>(
         builder: (context, state) => switch (state) {
           WaLabelsLoading() => const _LoadingView(),

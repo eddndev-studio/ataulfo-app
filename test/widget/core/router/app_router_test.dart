@@ -39,6 +39,7 @@ import 'package:ataulfo/features/templates/presentation/pages/template_create_pa
 import 'package:ataulfo/features/templates/presentation/pages/template_detail_page.dart';
 import 'package:ataulfo/features/templates/presentation/pages/template_edit_page.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
+import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -69,6 +70,8 @@ class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 class _MockFlowsRepo extends Mock implements FlowsRepository {}
 
 class _MockTriggersRepo extends Mock implements TriggersRepository {}
+
+class _MockLabelsRepo extends Mock implements LabelsRepository {}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
@@ -173,6 +176,7 @@ void main() {
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: _MockLabelsRepo(),
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
@@ -420,6 +424,7 @@ void main() {
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: _MockLabelsRepo(),
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
@@ -506,6 +511,7 @@ void main() {
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: _MockLabelsRepo(),
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
@@ -538,6 +544,7 @@ void main() {
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: _MockLabelsRepo(),
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
@@ -606,6 +613,7 @@ void main() {
         flowsRepository: flowsRepo,
         triggersRepository: triggersRepo,
         waLabelsRepository: _MockWaLabelsRepo(),
+        labelsRepository: _MockLabelsRepo(),
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
         mediaRepository: _MockMediaRepo(),
@@ -676,6 +684,7 @@ void main() {
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: _MockLabelsRepo(),
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),
@@ -762,6 +771,7 @@ void main() {
         flowsRepository: flowsRepo,
         triggersRepository: triggersRepo,
         waLabelsRepository: _MockWaLabelsRepo(),
+        labelsRepository: _MockLabelsRepo(),
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
         mediaRepository: _MockMediaRepo(),
@@ -795,6 +805,7 @@ void main() {
       flowsRepository: flowsRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: _MockLabelsRepo(),
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       mediaRepository: _MockMediaRepo(),

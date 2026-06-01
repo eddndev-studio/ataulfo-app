@@ -30,6 +30,7 @@ import '../../features/flows/presentation/bloc/flow_steps_bloc.dart';
 import '../../features/flows/presentation/bloc/flows_bloc.dart';
 import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
+import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
 import '../../features/media/domain/repositories/media_repository.dart';
 import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
@@ -58,7 +59,9 @@ import '../../features/templates/presentation/pages/template_detail_page.dart';
 import '../../features/templates/presentation/pages/template_edit_page.dart';
 import '../../features/triggers/domain/repositories/triggers_repository.dart';
 import '../../features/wa_labels/domain/repositories/wa_labels_repository.dart';
+import '../../features/wa_labels/presentation/bloc/wa_label_mapping_bloc.dart';
 import '../../features/wa_labels/presentation/bloc/wa_labels_bloc.dart';
+import '../../features/wa_labels/presentation/pages/wa_label_mapping_page.dart';
 import '../../features/wa_labels/presentation/pages/wa_labels_page.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
@@ -85,6 +88,7 @@ class AppRouter {
     required FlowsRepository flowsRepository,
     required TriggersRepository triggersRepository,
     required WaLabelsRepository waLabelsRepository,
+    required LabelsRepository labelsRepository,
     required MembershipsRepository membershipsRepository,
     required CatalogRepository catalogRepository,
     required MediaRepository mediaRepository,
@@ -101,6 +105,7 @@ class AppRouter {
        _flowsRepo = flowsRepository,
        _triggersRepo = triggersRepository,
        _waLabelsRepo = waLabelsRepository,
+       _labelsRepo = labelsRepository,
        _membershipsRepo = membershipsRepository,
        _catalogRepo = catalogRepository,
        _mediaRepo = mediaRepository,
@@ -118,6 +123,7 @@ class AppRouter {
   final FlowsRepository _flowsRepo;
   final TriggersRepository _triggersRepo;
   final WaLabelsRepository _waLabelsRepo;
+  final LabelsRepository _labelsRepo;
   final MembershipsRepository _membershipsRepo;
   final CatalogRepository _catalogRepo;
   final MediaRepository _mediaRepo;
@@ -252,6 +258,28 @@ class AppRouter {
                   ..add(const WaLabelsLoadRequested()),
             // La página posee su Scaffold (AppBar + FAB de crear + sheets).
             child: const WaLabelsPage(),
+          );
+        },
+      ),
+      GoRoute(
+        // Mapeo etiqueta-WhatsApp ↔ Label interno (S21 Dirección 2). Segmento
+        // distinto de `wa-labels` ⇒ no compite por orden de match. Page-scoped:
+        // `WaLabelMappingBloc` une catálogo + mapeos + labels internos al montar.
+        path: '/bots/:id/wa-label-mappings',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<WaLabelMappingBloc>(
+            create: (_) => WaLabelMappingBloc(
+              waRepo: _waLabelsRepo,
+              labelsRepo: _labelsRepo,
+              botId: id,
+            )..add(const WaMappingLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(
+                title: const Text('Vínculos con etiquetas internas'),
+              ),
+              body: const WaLabelMappingPage(),
+            ),
           );
         },
       ),
