@@ -46,7 +46,10 @@ void main() {
       act: (b) => b.add(const WaLabelsLoadRequested()),
       expect: () => <WaLabelsState>[
         WaLabelsLoaded(
-          labels: <WaLabel>[_label(), _label(id: '1001', deleted: true)],
+          labels: <WaLabel>[
+            _label(),
+            _label(id: '1001', deleted: true),
+          ],
           isRefreshing: false,
         ),
       ],
@@ -227,7 +230,10 @@ void main() {
         WaLabelsLoaded(labels: <WaLabel>[_label()], isRefreshing: false),
         WaLabelsLoaded(labels: <WaLabel>[_label()], isRefreshing: true),
         WaLabelsLoaded(
-          labels: <WaLabel>[_label(), _label(id: '1004', name: 'Extra')],
+          labels: <WaLabel>[
+            _label(),
+            _label(id: '1004', name: 'Extra'),
+          ],
           isRefreshing: false,
         ),
       ],

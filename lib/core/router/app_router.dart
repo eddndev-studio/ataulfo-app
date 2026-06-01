@@ -57,6 +57,9 @@ import '../../features/templates/presentation/pages/template_create_page.dart';
 import '../../features/templates/presentation/pages/template_detail_page.dart';
 import '../../features/templates/presentation/pages/template_edit_page.dart';
 import '../../features/triggers/domain/repositories/triggers_repository.dart';
+import '../../features/wa_labels/domain/repositories/wa_labels_repository.dart';
+import '../../features/wa_labels/presentation/bloc/wa_labels_bloc.dart';
+import '../../features/wa_labels/presentation/pages/wa_labels_page.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -81,6 +84,7 @@ class AppRouter {
     required TemplatesRepository templatesRepository,
     required FlowsRepository flowsRepository,
     required TriggersRepository triggersRepository,
+    required WaLabelsRepository waLabelsRepository,
     required MembershipsRepository membershipsRepository,
     required CatalogRepository catalogRepository,
     required MediaRepository mediaRepository,
@@ -96,6 +100,7 @@ class AppRouter {
        _templatesRepo = templatesRepository,
        _flowsRepo = flowsRepository,
        _triggersRepo = triggersRepository,
+       _waLabelsRepo = waLabelsRepository,
        _membershipsRepo = membershipsRepository,
        _catalogRepo = catalogRepository,
        _mediaRepo = mediaRepository,
@@ -112,6 +117,7 @@ class AppRouter {
   final TemplatesRepository _templatesRepo;
   final FlowsRepository _flowsRepo;
   final TriggersRepository _triggersRepo;
+  final WaLabelsRepository _waLabelsRepo;
   final MembershipsRepository _membershipsRepo;
   final CatalogRepository _catalogRepo;
   final MediaRepository _mediaRepo;
@@ -228,6 +234,25 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Conectar WhatsApp')),
               body: const BotConnectPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Catálogo de etiquetas WhatsApp del bot (S21). Sub-ruta de `/bots/:id`
+        // con un segmento más, así no compite con el detalle por orden de match.
+        // Page-scoped: `WaLabelsBloc` se construye con el botId, dispara el
+        // primer load y se suscribe al realtime `label.wa.*` al montarse.
+        path: '/bots/:id/wa-labels',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<WaLabelsBloc>(
+            create: (_) =>
+                WaLabelsBloc(repo: _waLabelsRepo, botId: id)
+                  ..add(const WaLabelsLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Etiquetas de WhatsApp')),
+              body: const WaLabelsPage(),
             ),
           );
         },

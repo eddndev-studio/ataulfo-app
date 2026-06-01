@@ -168,8 +168,9 @@ class _FailedView extends StatelessWidget {
             const SizedBox(height: AppTokens.sp3),
             AppButton.tonal(
               label: 'Reintentar',
-              onPressed: () =>
-                  context.read<WaLabelsBloc>().add(const WaLabelsLoadRequested()),
+              onPressed: () => context.read<WaLabelsBloc>().add(
+                const WaLabelsLoadRequested(),
+              ),
             ),
           ],
         ),
@@ -178,12 +179,13 @@ class _FailedView extends StatelessWidget {
   }
 
   static String _message(WaLabelsFailure f) => switch (f) {
-    WaLabelsForbiddenFailure() => 'No tienes permiso para ver las etiquetas '
-        'de este bot.',
+    WaLabelsForbiddenFailure() =>
+      'No tienes permiso para ver las etiquetas '
+          'de este bot.',
     WaLabelsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
-    WaLabelsNetworkFailure() ||
-    WaLabelsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de '
-        'nuevo.',
+    WaLabelsNetworkFailure() || WaLabelsTimeoutFailure() =>
+      'Sin conexión. Revisa tu red e inténtalo de '
+          'nuevo.',
     WaLabelsServerFailure() ||
     WaLabelsUnknownFailure() ||
     WaLabelsInvalidFailure() ||
