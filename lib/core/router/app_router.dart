@@ -31,6 +31,7 @@ import '../../features/flows/presentation/bloc/flows_bloc.dart';
 import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
+import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
 import '../../features/media/domain/repositories/media_repository.dart';
 import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
@@ -172,6 +173,11 @@ class AppRouter {
               create: (_) =>
                   TemplatesBloc(_templatesRepo)
                     ..add(const TemplatesLoadRequested()),
+            ),
+            BlocProvider<LabelsAdminBloc>(
+              create: (_) =>
+                  LabelsAdminBloc(repo: _labelsRepo)
+                    ..add(const LabelsAdminLoadRequested()),
             ),
           ],
           // Blocs page-scoped a nivel del shell: cambiar de tab no
