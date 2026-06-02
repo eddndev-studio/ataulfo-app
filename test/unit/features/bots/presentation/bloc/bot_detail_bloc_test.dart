@@ -295,4 +295,77 @@ void main() {
       ),
     );
   });
+
+  group('BotDetailBloc — clonar (éxito = navegación)', () {
+    const _clone = Bot(
+      id: 'b2',
+      orgId: 'o1',
+      templateId: 't1',
+      name: 'Soporte (copia)',
+      channel: BotChannel.waUnofficial,
+      identifier: null,
+      version: 0,
+      paused: false,
+      aiDisabled: false,
+    );
+
+    blocTest<BotDetailBloc, BotDetailState>(
+      'CloneRequested OK → Mutating → CloneSucceeded(newId) → Loaded(snapshot)',
+      build: () {
+        when(
+          () => repo.clone(id: 'b1', name: 'Soporte (copia)'),
+        ).thenAnswer((_) async => _clone);
+        return BotDetailBloc(repo: repo, id: 'b1');
+      },
+      seed: () => const BotDetailLoaded(_b1),
+      act: (b) =>
+          b.add(const BotDetailCloneRequested('Soporte (copia)')),
+      expect: () => const <BotDetailState>[
+        BotDetailMutating(_b1),
+        BotDetailCloneSucceeded('b2'),
+        BotDetailLoaded(_b1), // snapshot intacto: el clon es OTRO bot
+      ],
+      verify: (_) =>
+          verify(() => repo.clone(id: 'b1', name: 'Soporte (copia)')).called(1),
+    );
+
+    blocTest<BotDetailBloc, BotDetailState>(
+      'CloneRequested 422 → Mutating → MutationFailed(snapshot, invalid)',
+      build: () {
+        when(
+          () => repo.clone(id: any(named: 'id'), name: any(named: 'name')),
+        ).thenAnswer(
+          (_) => Future<Bot>.error(const BotsInvalidCreateFailure()),
+        );
+        return BotDetailBloc(repo: repo, id: 'b1');
+      },
+      seed: () => const BotDetailLoaded(_b1),
+      act: (b) => b.add(const BotDetailCloneRequested('')),
+      expect: () => const <BotDetailState>[
+        BotDetailMutating(_b1),
+        BotDetailMutationFailed(_b1, BotsInvalidCreateFailure()),
+      ],
+    );
+
+    test('value-equality del evento y el estado de clone', () {
+      expect(
+        const BotDetailCloneRequested('x'),
+        const BotDetailCloneRequested('x'),
+      );
+      expect(
+        const BotDetailCloneRequested('x') ==
+            const BotDetailCloneRequested('y'),
+        isFalse,
+      );
+      expect(
+        const BotDetailCloneSucceeded('b2'),
+        const BotDetailCloneSucceeded('b2'),
+      );
+      expect(
+        const BotDetailCloneSucceeded('b2') ==
+            const BotDetailCloneSucceeded('b3'),
+        isFalse,
+      );
+    });
+  });
 }
