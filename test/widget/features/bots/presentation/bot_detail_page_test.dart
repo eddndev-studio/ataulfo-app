@@ -452,6 +452,31 @@ void main() {
       expect(find.byKey(const Key('bot_detail.variables')), findsNothing);
     });
   });
+
+  group('clonar (S7, ADMIN+)', () {
+    testWidgets('ADMIN ve Clonar bot; tap abre BotCloneSheet', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      final clone = find.byKey(const Key('bot_detail.clone'));
+      expect(clone, findsOneWidget);
+
+      await tester.ensureVisible(clone);
+      await tester.tap(clone);
+      await tester.pumpAndSettle();
+      expect(find.text('Clonar bot'), findsWidgets);
+      expect(find.byKey(const Key('bot_clone.name')), findsOneWidget);
+    });
+
+    testWidgets('WORKER no ve Clonar bot', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host(role: 'WORKER'));
+
+      expect(find.byKey(const Key('bot_detail.clone')), findsNothing);
+    });
+  });
 }
 
 class _Boom implements Exception {

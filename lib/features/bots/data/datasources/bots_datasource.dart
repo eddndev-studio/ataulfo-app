@@ -46,6 +46,11 @@ abstract interface class BotsDatasource {
     bool? aiDisabled,
     Map<String, String>? variableValues,
   });
+
+  /// `POST /bots/:id/clone` body `{name}` ⇒ 201. Devuelve el Bot clonado con
+  /// un id NUEVO (canal y plantilla heredados, version reiniciada). 422 si el
+  /// nombre es inválido; 404 si el bot origen no existe. No usa CAS de versión.
+  Future<Bot> clone({required String id, required String name});
 }
 
 class DioBotsDatasource implements BotsDatasource {
@@ -159,6 +164,29 @@ class DioBotsDatasource implements BotsDatasource {
       rethrow;
     } on DioException catch (e) {
       throw _mapDioException(e, versionConflict: true);
+    } on FormatException {
+      throw const UnknownBotsFailure();
+    } on TypeError {
+      throw const UnknownBotsFailure();
+    }
+  }
+
+  @override
+  Future<Bot> clone({required String id, required String name}) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/bots/$id/clone',
+        data: BotCloneReq(name: name).toJson(),
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownBotsFailure();
+      }
+      return BotsMapper.botRespToEntity(BotResp.fromJson(body));
+    } on BotsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
     } on FormatException {
       throw const UnknownBotsFailure();
     } on TypeError {

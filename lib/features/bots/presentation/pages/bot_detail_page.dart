@@ -13,6 +13,7 @@ import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_detail_bloc.dart';
 import '../widgets/bot_ai_toggle.dart';
+import '../widgets/bot_clone_sheet.dart';
 import '../widgets/bot_edit_sheet.dart';
 import '../widgets/bot_toggle_row.dart';
 
@@ -50,6 +51,9 @@ class BotDetailPage extends StatelessWidget {
         ),
         BotDetailMutationFailed(bot: final bot, failure: final f) =>
           _LoadedView(bot: bot, isAdmin: isAdmin, failure: f),
+        // Transitorio: el listener ya navegó al clon; el bloc vuelve a Loaded
+        // enseguida. Un frame de spinner evita parpadeo.
+        BotDetailCloneSucceeded() => const _LoadingView(),
         BotDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );
@@ -210,6 +214,18 @@ class _LoadedView extends StatelessWidget {
               label: 'Variables',
               fullWidth: true,
               onPressed: () => context.push('/bots/${bot.id}/variables'),
+            ),
+            const SizedBox(height: AppTokens.sp7),
+            AppButton.tonal(
+              key: const Key('bot_detail.clone'),
+              label: 'Clonar bot',
+              fullWidth: true,
+              onPressed: isMutating
+                  ? null
+                  : () => BotCloneSheet.open(
+                      context,
+                      onCloned: (newId) => context.push('/bots/$newId'),
+                    ),
             ),
           ],
         ],

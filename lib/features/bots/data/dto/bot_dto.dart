@@ -97,3 +97,14 @@ class BotUpdateReq {
     'version': version,
   };
 }
+
+/// Body de `POST /bots/:id/clone` (`cloneReq`). El cliente provee el `name`
+/// del clon; el dominio no inventa sufijos. El clon nace con id, canal y
+/// plantilla heredados pero `version` reiniciada y sin identifier.
+class BotCloneReq {
+  const BotCloneReq({required this.name});
+
+  final String name;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{'name': name};
+}
