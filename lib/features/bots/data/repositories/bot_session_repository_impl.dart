@@ -27,4 +27,7 @@ class BotSessionRepositoryImpl implements BotSessionRepository {
 
   @override
   Future<void> resetSessions(String botId) => _ds.resetSessions(botId);
+
+  @override
+  Future<void> wipeCredentials(String botId) => _ds.wipeCredentials(botId);
 }
