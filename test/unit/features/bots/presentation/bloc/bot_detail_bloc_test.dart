@@ -370,4 +370,50 @@ void main() {
       );
     });
   });
+
+  group('BotDetailBloc — borrar (éxito = pop)', () {
+    blocTest<BotDetailBloc, BotDetailState>(
+      'DeleteRequested OK → Mutating → DeleteSucceeded',
+      build: () {
+        when(() => repo.delete('b1')).thenAnswer((_) async {});
+        return BotDetailBloc(repo: repo, id: 'b1');
+      },
+      seed: () => const BotDetailLoaded(_b1),
+      act: (b) => b.add(const BotDetailDeleteRequested()),
+      expect: () => const <BotDetailState>[
+        BotDetailMutating(_b1),
+        BotDetailDeleteSucceeded(),
+      ],
+      verify: (_) => verify(() => repo.delete('b1')).called(1),
+    );
+
+    blocTest<BotDetailBloc, BotDetailState>(
+      'DeleteRequested fallo → Mutating → MutationFailed(snapshot, failure)',
+      build: () {
+        when(
+          () => repo.delete('b1'),
+        ).thenAnswer((_) => Future<void>.error(const BotsServerFailure()));
+        return BotDetailBloc(repo: repo, id: 'b1');
+      },
+      seed: () => const BotDetailLoaded(_b1),
+      act: (b) => b.add(const BotDetailDeleteRequested()),
+      expect: () => const <BotDetailState>[
+        BotDetailMutating(_b1),
+        BotDetailMutationFailed(_b1, BotsServerFailure()),
+      ],
+    );
+
+    blocTest<BotDetailBloc, BotDetailState>(
+      'DeleteRequested sin snapshot (Loading) se ignora',
+      build: () => BotDetailBloc(repo: repo, id: 'b1'),
+      act: (b) => b.add(const BotDetailDeleteRequested()),
+      expect: () => const <BotDetailState>[],
+      verify: (_) => verifyNever(() => repo.delete(any())),
+    );
+
+    test('value-equality del evento y estado de delete', () {
+      expect(const BotDetailDeleteRequested(), const BotDetailDeleteRequested());
+      expect(const BotDetailDeleteSucceeded(), const BotDetailDeleteSucceeded());
+    });
+  });
 }
