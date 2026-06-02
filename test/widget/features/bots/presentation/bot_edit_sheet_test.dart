@@ -71,7 +71,9 @@ void main() {
     verifyNever(() => bloc.add(any()));
   });
 
-  testWidgets('submit con nombre nuevo → UpdateRequested(name)', (tester) async {
+  testWidgets('submit con nombre nuevo → UpdateRequested(name)', (
+    tester,
+  ) async {
     await tester.pumpWidget(host());
     await tester.enterText(
       find.byKey(const Key('bot_edit.name')),
