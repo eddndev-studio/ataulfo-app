@@ -35,4 +35,16 @@ void main() {
       expect(await repo.issueConnectLink('b1'), link);
     },
   );
+
+  test('clearConversations delega en el datasource', () async {
+    when(() => ds.clearConversations('b1')).thenAnswer((_) async {});
+    await repo.clearConversations('b1');
+    verify(() => ds.clearConversations('b1')).called(1);
+  });
+
+  test('resetSessions delega en el datasource', () async {
+    when(() => ds.resetSessions('b1')).thenAnswer((_) async {});
+    await repo.resetSessions('b1');
+    verify(() => ds.resetSessions('b1')).called(1);
+  });
 }

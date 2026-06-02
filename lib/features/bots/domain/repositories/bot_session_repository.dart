@@ -16,4 +16,12 @@ abstract interface class BotSessionRepository {
   /// Emite un ConnectToken y devuelve el enlace público a compartir con
   /// quien escaneará el QR desde la página `/connect`.
   Future<ConnectLink> issueConnectLink(String botId);
+
+  /// Purga conversaciones del bot (`clear-conversations`). EXIGE `paused`:
+  /// `BotsNotPausedFailure` (409) si no lo está.
+  Future<void> clearConversations(String botId);
+
+  /// Reinicia las sesiones de cifrado (`reset-sessions`). EXIGE `paused`:
+  /// `BotsNotPausedFailure` (409) si no lo está.
+  Future<void> resetSessions(String botId);
 }

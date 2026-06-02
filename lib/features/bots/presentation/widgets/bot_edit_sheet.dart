@@ -178,6 +178,7 @@ class _BotEditSheetState extends State<BotEditSheet> {
     BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
+    BotsNotPausedFailure() ||
     BotsServerFailure() ||
     UnknownBotsFailure() => 'No pudimos guardar el cambio. Inténtalo de nuevo.',
   };

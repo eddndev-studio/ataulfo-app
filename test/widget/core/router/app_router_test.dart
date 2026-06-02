@@ -10,6 +10,7 @@ import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
+import 'package:ataulfo/features/bots/presentation/pages/bot_maintenance_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_template_picker_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_variables_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
@@ -390,6 +391,61 @@ void main() {
     // Y NUNCA fetchea las var-defs (la ruta ni se montó).
     verifyNever(() => templatesRepo.listVarDefs(any()));
   });
+
+  testWidgets(
+    'AuthAuthenticated(OWNER) → /bots/:id/maintenance monta BotMaintenancePage',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      when(() => botsRepo.byId('b1')).thenAnswer(
+        (_) async => const Bot(
+          id: 'b1',
+          orgId: 'o1',
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+          identifier: null,
+          version: 3,
+          paused: true,
+          aiDisabled: false,
+        ),
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/bots/b1/maintenance');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BotMaintenancePage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'WORKER deep-link a /bots/:id/maintenance → redirige al detalle',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_worker));
+      when(() => botsRepo.byId('b1')).thenAnswer(
+        (_) async => const Bot(
+          id: 'b1',
+          orgId: 'o1',
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+          identifier: null,
+          version: 3,
+          paused: true,
+          aiDisabled: false,
+        ),
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/bots/b1/maintenance');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BotMaintenancePage), findsNothing);
+      expect(find.byType(BotDetailPage), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'AuthAuthenticated → /bots/:id/sessions monta ConversationsListPage con el botId',

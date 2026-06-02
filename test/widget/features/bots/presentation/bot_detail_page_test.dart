@@ -453,6 +453,22 @@ void main() {
 
       expect(find.byKey(const Key('bot_detail.variables')), findsNothing);
     });
+
+    testWidgets('ADMIN ve el botón Mantenimiento', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bot_detail.maintenance')), findsOneWidget);
+    });
+
+    testWidgets('WORKER no ve el botón Mantenimiento', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host(role: 'WORKER'));
+
+      expect(find.byKey(const Key('bot_detail.maintenance')), findsNothing);
+    });
   });
 
   group('clonar (S7, ADMIN+)', () {

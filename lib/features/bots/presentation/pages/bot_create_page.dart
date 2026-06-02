@@ -200,6 +200,7 @@ class _FailedView extends StatelessWidget {
     BotsNotFoundFailure() ||
     BotsServerFailure() ||
     BotsConflictFailure() ||
+    BotsNotPausedFailure() ||
     UnknownBotsFailure() => (
       'bot_create.error.generic',
       'No pudimos crear el bot. Inténtalo de nuevo.',
