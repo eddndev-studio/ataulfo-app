@@ -368,18 +368,19 @@ void main() {
       expect(sw.onChanged, isNotNull);
     });
 
-    testWidgets('WORKER NO ve el switch IA y NO fetchea la Template (MAJOR 1)', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+    testWidgets(
+      'WORKER NO ve el switch IA y NO fetchea la Template (MAJOR 1)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
-      await tester.pumpWidget(host(role: 'WORKER'));
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(host(role: 'WORKER'));
+        await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('bot_detail.ai')), findsNothing);
-      // La carga compartida NUNCA toca el endpoint ADMIN+ de Template.
-      verifyNever(() => templatesRepo.byId(any()));
-    });
+        expect(find.byKey(const Key('bot_detail.ai')), findsNothing);
+        // La carga compartida NUNCA toca el endpoint ADMIN+ de Template.
+        verifyNever(() => templatesRepo.byId(any()));
+      },
+    );
 
     testWidgets('tap en el switch IA despacha UpdateRequested(aiDisabled)', (
       tester,
