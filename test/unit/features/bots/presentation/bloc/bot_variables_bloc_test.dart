@@ -72,9 +72,9 @@ void main() {
       setUp: () {
         when(() => botsRepo.byId('b1')).thenAnswer((_) async => _bot);
         // El template está en version 9 — NO debe filtrarse al PUT.
-        when(() => templatesRepo.listVarDefs('t1')).thenAnswer(
-          (_) async => (version: 9, defs: _defs),
-        );
+        when(
+          () => templatesRepo.listVarDefs('t1'),
+        ).thenAnswer((_) async => (version: 9, defs: _defs));
       },
       build: build,
       act: (b) => b.add(const BotVariablesLoadRequested()),
@@ -91,9 +91,9 @@ void main() {
       'template sin defs → Empty',
       setUp: () {
         when(() => botsRepo.byId('b1')).thenAnswer((_) async => _bot);
-        when(() => templatesRepo.listVarDefs('t1')).thenAnswer(
-          (_) async => (version: 9, defs: const <VariableDef>[]),
-        );
+        when(
+          () => templatesRepo.listVarDefs('t1'),
+        ).thenAnswer((_) async => (version: 9, defs: const <VariableDef>[]));
       },
       build: build,
       act: (b) => b.add(const BotVariablesLoadRequested()),
@@ -168,8 +168,7 @@ void main() {
       ).thenAnswer((_) async => _bot),
       build: build,
       seed: () => const BotVariablesLoaded(defs: _defs, botVersion: 5),
-      act: (b) =>
-          b.add(const BotVariablesSaveRequested(<String, String>{})),
+      act: (b) => b.add(const BotVariablesSaveRequested(<String, String>{})),
       expect: () => const <BotVariablesState>[
         BotVariablesSaving(defs: _defs, botVersion: 5),
         BotVariablesSaved(),
@@ -194,9 +193,8 @@ void main() {
       ).thenThrow(const BotsConflictFailure()),
       build: build,
       seed: () => const BotVariablesLoaded(defs: _defs, botVersion: 5),
-      act: (b) => b.add(
-        const BotVariablesSaveRequested(<String, String>{'tono': 'x'}),
-      ),
+      act: (b) =>
+          b.add(const BotVariablesSaveRequested(<String, String>{'tono': 'x'})),
       expect: () => const <BotVariablesState>[
         BotVariablesSaving(defs: _defs, botVersion: 5),
         BotVariablesSaveFailed(

@@ -11,6 +11,7 @@ import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_template_picker_page.dart';
+import 'package:ataulfo/features/bots/presentation/pages/bot_variables_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
@@ -92,6 +93,13 @@ const _identity = Identity(
   orgId: 'o1',
   role: 'OWNER',
   email: 'op@example.com',
+);
+
+const _worker = Identity(
+  userId: 'u2',
+  orgId: 'o1',
+  role: 'WORKER',
+  email: 'worker@example.com',
 );
 
 const _profile = ChatProfile(
@@ -310,6 +318,77 @@ void main() {
 
     expect(find.byType(BotDetailPage), findsOneWidget);
     verify(() => botsRepo.byId('b1')).called(1);
+  });
+
+  testWidgets(
+    'AuthAuthenticated(OWNER) → /bots/:id/variables monta BotVariablesPage',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      when(() => botsRepo.byId('b1')).thenAnswer(
+        (_) async => const Bot(
+          id: 'b1',
+          orgId: 'o1',
+          templateId: 't1',
+          name: 'Soporte',
+          channel: BotChannel.waUnofficial,
+          identifier: null,
+          version: 3,
+          paused: false,
+          aiDisabled: false,
+        ),
+      );
+      when(() => templatesRepo.listVarDefs('t1')).thenAnswer(
+        (_) async => (
+          version: 9,
+          defs: const <VariableDef>[
+            VariableDef(
+              id: 'v1',
+              name: 'tono',
+              type: VarType.text,
+              defaultValue: 'neutral',
+              description: 'Tono',
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/bots/b1/variables');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BotVariablesPage), findsOneWidget);
+    },
+  );
+
+  testWidgets('WORKER deep-link a /bots/:id/variables → redirige al detalle', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_worker));
+    when(() => botsRepo.byId('b1')).thenAnswer(
+      (_) async => const Bot(
+        id: 'b1',
+        orgId: 'o1',
+        templateId: 't1',
+        name: 'Soporte',
+        channel: BotChannel.waUnofficial,
+        identifier: null,
+        version: 3,
+        paused: false,
+        aiDisabled: false,
+      ),
+    );
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/bots/b1/variables');
+    await tester.pumpAndSettle();
+
+    // El gateo ADMIN+ del redirect lo desvía al detalle; el editor no monta.
+    expect(find.byType(BotVariablesPage), findsNothing);
+    expect(find.byType(BotDetailPage), findsOneWidget);
+    // Y NUNCA fetchea las var-defs (la ruta ni se montó).
+    verifyNever(() => templatesRepo.listVarDefs(any()));
   });
 
   testWidgets(

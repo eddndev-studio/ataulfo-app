@@ -433,6 +433,25 @@ void main() {
       expect(sw.onChanged, isNotNull);
     });
   });
+
+  group('navegación a sub-páginas ADMIN+ (S6)', () {
+    testWidgets('ADMIN ve el botón Variables', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bot_detail.variables')), findsOneWidget);
+    });
+
+    testWidgets('WORKER no ve el botón Variables', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host(role: 'WORKER'));
+
+      expect(find.byKey(const Key('bot_detail.variables')), findsNothing);
+    });
+  });
 }
 
 class _Boom implements Exception {

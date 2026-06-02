@@ -15,11 +15,13 @@ import '../../features/bots/domain/repositories/bots_repository.dart';
 import '../../features/bots/presentation/bloc/bot_connect_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_create_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
+import '../../features/bots/presentation/bloc/bot_variables_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/pages/bot_connect_page.dart';
 import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
+import '../../features/bots/presentation/pages/bot_variables_page.dart';
 import '../../features/conversations/domain/repositories/conversations_repository.dart';
 import '../../features/conversations/presentation/bloc/conversations_bloc.dart';
 import '../../features/conversations/presentation/pages/conversations_list_page.dart';
@@ -64,6 +66,7 @@ import '../../features/wa_labels/presentation/bloc/wa_label_mapping_bloc.dart';
 import '../../features/wa_labels/presentation/bloc/wa_labels_bloc.dart';
 import '../../features/wa_labels/presentation/pages/wa_label_mapping_page.dart';
 import '../../features/wa_labels/presentation/pages/wa_labels_page.dart';
+import '../auth/role_privilege.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -138,6 +141,13 @@ class AppRouter {
   /// el operador tiene que pull-to-refresh tras crear/editar.
   final RouteObserver<PageRoute<dynamic>> _routeObserver =
       RouteObserver<PageRoute<dynamic>>();
+
+  /// Sub-rutas de configuración bot-level que el backend gatea ADMIN+
+  /// (`/bots/:id/{variables,maintenance}`). El `_redirect` las desvía al
+  /// detalle si el rol no alcanza.
+  static final RegExp _adminOnlyBotRoute = RegExp(
+    r'^/bots/[^/]+/(variables|maintenance)$',
+  );
 
   late final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -253,6 +263,28 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Conectar WhatsApp')),
               body: const BotConnectPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Editor de variable_values del bot (S04). Sub-ruta de `/bots/:id`.
+        // Page-scoped y cross-feature: `BotVariablesBloc` obtiene el bot él
+        // mismo (byId → version+templateId) y las defs del template para sembrar
+        // el form; el PUT envía la versión del BOT (MAJOR 2). El gateo ADMIN+ de
+        // esta ruta vive en `_redirect` (un WORKER deep-link cae al detalle).
+        path: '/bots/:id/variables',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<BotVariablesBloc>(
+            create: (_) => BotVariablesBloc(
+              botsRepo: _botsRepo,
+              templatesRepo: _templatesRepo,
+              botId: id,
+            )..add(const BotVariablesLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Variables del bot')),
+              body: const BotVariablesPage(),
             ),
           );
         },
@@ -614,6 +646,14 @@ class AppRouter {
       return location == '/' ? null : '/';
     }
     if (auth is AuthAuthenticated) {
+      // Gateo ADMIN+ de las sub-rutas de configuración bot-level (el backend
+      // las cabla adminOnly y 403ea a WORKER). Un deep-link de WORKER cae al
+      // detalle del bot en vez de pintar una pantalla que fallaría. Es gateo
+      // cosmético: la autoridad real sigue siendo el 403/404 del backend.
+      if (_adminOnlyBotRoute.hasMatch(location) &&
+          !isAdminOrAbove(auth.identity.role)) {
+        return location.substring(0, location.lastIndexOf('/'));
+      }
       // Sesión válida: las rutas públicas redirigen a /home.
       return (location == '/' || location == '/login') ? '/home' : null;
     }

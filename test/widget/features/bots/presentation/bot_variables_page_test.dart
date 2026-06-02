@@ -74,26 +74,27 @@ void main() {
     expect(find.byKey(const Key('bot_variables.submit')), findsOneWidget);
   });
 
-  testWidgets('submit con un override → SaveRequested({tono}) omitiendo vacíos', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      host(state: const BotVariablesLoaded(defs: _defs, botVersion: 5)),
-    );
+  testWidgets(
+    'submit con un override → SaveRequested({tono}) omitiendo vacíos',
+    (tester) async {
+      await tester.pumpWidget(
+        host(state: const BotVariablesLoaded(defs: _defs, botVersion: 5)),
+      );
 
-    await tester.enterText(
-      find.byKey(const Key('bot_variables.field.tono')),
-      'formal',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('bot_variables.submit')));
+      await tester.enterText(
+        find.byKey(const Key('bot_variables.field.tono')),
+        'formal',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('bot_variables.submit')));
 
-    verify(
-      () => bloc.add(
-        const BotVariablesSaveRequested(<String, String>{'tono': 'formal'}),
-      ),
-    ).called(1);
-  });
+      verify(
+        () => bloc.add(
+          const BotVariablesSaveRequested(<String, String>{'tono': 'formal'}),
+        ),
+      ).called(1);
+    },
+  );
 
   testWidgets('submit sin tocar nada → SaveRequested({}) (vaciar = {})', (
     tester,
