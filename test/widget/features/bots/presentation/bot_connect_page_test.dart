@@ -22,6 +22,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(const BotConnectStarted());
     registerFallbackValue(const BotConnectPairingRequested());
+    registerFallbackValue(const BotConnectStopRequested());
   });
 
   late _MockBloc bloc;
@@ -109,4 +110,23 @@ void main() {
     await tester.tap(find.text('Reintentar'));
     verify(() => bloc.add(const BotConnectStarted())).called(1);
   });
+
+  testWidgets(
+    'Ready(active): botón Desconectar dispara BotConnectStopRequested',
+    (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(BotConnectReady(_link, phase: PairingPhase.active));
+
+      await tester.pumpWidget(host());
+
+      final stop = find.byKey(const Key('bot_connect.stop'));
+      expect(stop, findsOneWidget);
+      await tester.ensureVisible(stop);
+      await tester.tap(stop);
+      await tester.pump();
+
+      verify(() => bloc.add(const BotConnectStopRequested())).called(1);
+    },
+  );
 }

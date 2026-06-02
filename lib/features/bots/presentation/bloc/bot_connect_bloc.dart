@@ -27,6 +27,7 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
       super(const BotConnectLoading()) {
     on<BotConnectStarted>(_onStarted);
     on<BotConnectPairingRequested>(_onPairingRequested);
+    on<BotConnectStopRequested>(_onStopRequested);
   }
 
   final BotSessionRepository _repo;
@@ -65,6 +66,27 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
       emit(BotConnectReady(current.link, phase: PairingPhase.failed));
     }
   }
+
+  Future<void> _onStopRequested(
+    BotConnectStopRequested event,
+    Emitter<BotConnectState> emit,
+  ) async {
+    final current = state;
+    if (current is! BotConnectReady) {
+      return; // sin enlace todavía no hay sesión que detener
+    }
+    // `DELETE /bots/:id/session` es idempotente (204 aun si no corría). Desde
+    // la perspectiva del operador el emparejamiento queda cancelado pase lo
+    // que pase, así que volvemos a `idle` (re-ofrecer Iniciar) incluso si la
+    // llamada falla. La máquina de estados real (poll + estado del backend)
+    // aterriza después; aquí el botón es un disparo simple.
+    try {
+      await _repo.stopSession(_botId);
+    } on BotsFailure {
+      // Idempotente: tratar el fallo como ya-detenido.
+    }
+    emit(BotConnectReady(current.link));
+  }
 }
 
 // Events --------------------------------------------------------------------
@@ -90,6 +112,16 @@ class BotConnectPairingRequested extends BotConnectEvent {
   bool operator ==(Object other) => other is BotConnectPairingRequested;
   @override
   int get hashCode => (BotConnectPairingRequested).hashCode;
+}
+
+/// Detiene la sesión / cancela el emparejamiento (`DELETE /bots/:id/session`,
+/// idempotente). Vuelve la fase a `idle` para re-ofrecer Iniciar.
+class BotConnectStopRequested extends BotConnectEvent {
+  const BotConnectStopRequested();
+  @override
+  bool operator ==(Object other) => other is BotConnectStopRequested;
+  @override
+  int get hashCode => (BotConnectStopRequested).hashCode;
 }
 
 // States --------------------------------------------------------------------
