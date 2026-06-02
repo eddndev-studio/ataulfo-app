@@ -49,15 +49,15 @@ void main() {
     bloc = _MockBotDetailBloc();
     when(() => bloc.state).thenReturn(const BotDetailLoading());
     authBloc = _MockAuthBloc();
-    when(() => authBloc.state).thenReturn(AuthAuthenticated(_identity('ADMIN')));
+    when(
+      () => authBloc.state,
+    ).thenReturn(AuthAuthenticated(_identity('ADMIN')));
   });
 
   // El gateo ADMIN+ lee el rol del AuthBloc del scope; por defecto ADMIN
   // (ve los controles). `role` lo baja a WORKER para los casos de gateo.
   Widget host({String role = 'ADMIN'}) {
-    when(
-      () => authBloc.state,
-    ).thenReturn(AuthAuthenticated(_identity(role)));
+    when(() => authBloc.state).thenReturn(AuthAuthenticated(_identity(role)));
     return MaterialApp(
       theme: AppDesignTheme.dark(),
       home: MultiBlocProvider(
@@ -286,9 +286,9 @@ void main() {
     testWidgets('MutationFailed(conflict) muestra copy de desactualizado', (
       tester,
     ) async {
-      when(() => bloc.state).thenReturn(
-        const BotDetailMutationFailed(_bot, BotsConflictFailure()),
-      );
+      when(
+        () => bloc.state,
+      ).thenReturn(const BotDetailMutationFailed(_bot, BotsConflictFailure()));
 
       await tester.pumpWidget(host());
 

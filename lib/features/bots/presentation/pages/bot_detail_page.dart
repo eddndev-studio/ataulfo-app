@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_switch.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_detail_bloc.dart';
@@ -15,20 +18,36 @@ import '../bloc/bot_detail_bloc.dart';
 /// cableado del provider y del ID lo hace el router en `/bots/:id`. Es
 /// content-only: el Scaffold y el AppBar los aporta la ruta, igual que
 /// en el listado para mantener consistencia con el shell.
+///
+/// Centro de mando: WORKER ve el detalle (la ruta es WORKER+), pero todos
+/// los controles de mutación están gateados ADMIN+ leyendo `Identity.role`
+/// del `AuthBloc` global. El gateo es cosmético; la autoridad real es el
+/// 403 del backend.
 class BotDetailPage extends StatelessWidget {
   const BotDetailPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthBloc>().state;
+    final isAdmin =
+        authState is AuthAuthenticated &&
+        isAdminOrAbove(authState.identity.role);
     return BlocBuilder<BotDetailBloc, BotDetailState>(
       builder: (context, state) => switch (state) {
         BotDetailLoading() => const _LoadingView(),
-        BotDetailLoaded(bot: final bot) => _LoadedView(bot: bot),
-        // Durante una mutación y tras un fallo de mutación el bot sigue
-        // visible. Los controles inline (pausar / IA / renombrar) y el copy
-        // de error se cablean en slices posteriores; aquí el snapshot basta.
-        BotDetailMutating(bot: final bot) => _LoadedView(bot: bot),
-        BotDetailMutationFailed(bot: final bot) => _LoadedView(bot: bot),
+        BotDetailLoaded(bot: final bot) => _LoadedView(
+          bot: bot,
+          isAdmin: isAdmin,
+        ),
+        // Durante una mutación el bot sigue visible con los controles
+        // inhabilitados; tras un fallo, visible con el copy de error.
+        BotDetailMutating(bot: final bot) => _LoadedView(
+          bot: bot,
+          isAdmin: isAdmin,
+          isMutating: true,
+        ),
+        BotDetailMutationFailed(bot: final bot, failure: final f) =>
+          _LoadedView(bot: bot, isAdmin: isAdmin, failure: f),
         BotDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );
@@ -47,13 +66,28 @@ class _LoadingView extends StatelessWidget {
 }
 
 class _LoadedView extends StatelessWidget {
-  const _LoadedView({required this.bot});
+  const _LoadedView({
+    required this.bot,
+    required this.isAdmin,
+    this.isMutating = false,
+    this.failure,
+  });
 
   final Bot bot;
+
+  /// El operador alcanza ADMIN+ → ve y opera los controles de mutación.
+  final bool isAdmin;
+
+  /// Hay un PUT en vuelo → los controles quedan inhabilitados.
+  final bool isMutating;
+
+  /// Última mutación fallida (copy inline en danger). Null = sin error.
+  final BotsFailure? failure;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final f = failure;
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         AppTokens.sp6,
@@ -105,6 +139,30 @@ class _LoadedView extends StatelessWidget {
                 ),
             ],
           ),
+          if (isAdmin) ...<Widget>[
+            const SizedBox(height: AppTokens.sp6),
+            _ToggleRow(
+              switchKey: const Key('bot_detail.paused'),
+              label: 'Pausar bot',
+              caption:
+                  'Pausado, el bot deja de procesar mensajes hasta que lo '
+                  'reanudes; no se reanuda solo.',
+              value: bot.paused,
+              onChanged: isMutating
+                  ? null
+                  : (v) => context.read<BotDetailBloc>().add(
+                      BotDetailUpdateRequested(paused: v),
+                    ),
+            ),
+          ],
+          if (f != null) ...<Widget>[
+            const SizedBox(height: AppTokens.sp4),
+            Text(
+              _failureMessage(f),
+              key: const Key('bot_detail.mutation_error'),
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
+            ),
+          ],
           if (bot.identifier != null) ...<Widget>[
             const SizedBox(height: AppTokens.sp6),
             Text(
@@ -144,6 +202,66 @@ class _LoadedView extends StatelessWidget {
     BotChannel.waUnofficial => 'WhatsApp',
     BotChannel.waba => 'WhatsApp Business',
   };
+
+  // Copy inline de un fallo de mutación. El 409 (conflicto de versión) ya
+  // disparó un re-GET en el bloc: el snapshot está fresco, sólo falta avisar
+  // y que el operador reintente.
+  static String _failureMessage(BotsFailure f) => switch (f) {
+    BotsConflictFailure() =>
+      'Tu edición estaba desactualizada; la refrescamos. Revisa y reintenta.',
+    BotsInvalidCreateFailure() =>
+      'Revisa los datos del bot: el cambio no es válido.',
+    BotsForbiddenFailure() => 'Tu rol no permite editar este bot.',
+    BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+    BotsNetworkFailure() ||
+    BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
+    BotsServerFailure() ||
+    UnknownBotsFailure() => 'No pudimos guardar el cambio. Inténtalo de nuevo.',
+  };
+}
+
+/// Fila de un toggle de configuración: etiqueta + descripción a la izquierda,
+/// [AppSwitch] a la derecha. Comparten esta forma el toggle de pausa y el de
+/// IA; `onChanged` nulo lo deja inhabilitado (mutación en vuelo).
+class _ToggleRow extends StatelessWidget {
+  const _ToggleRow({
+    required this.switchKey,
+    required this.label,
+    required this.caption,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final Key switchKey;
+  final String label;
+  final String caption;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(label, style: textTheme.titleMedium),
+              const SizedBox(height: 2),
+              Text(
+                caption,
+                style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppTokens.sp4),
+        AppSwitch(key: switchKey, value: value, onChanged: onChanged),
+      ],
+    );
+  }
 }
 
 class _FailedView extends StatelessWidget {
