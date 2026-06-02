@@ -71,9 +71,13 @@ void main() {
       // El icono description_outlined del chip sobrevive a la migración:
       // sigue siendo el indicador visual de "plantilla seleccionada".
       expect(find.byIcon(Icons.description_outlined), findsOneWidget);
-      // El form usa AppTextField (no TextField raw) y la key se conserva.
-      expect(find.byType(AppTextField), findsOneWidget);
+      // El form usa AppTextField (no TextField raw): nombre + identifier.
+      expect(find.byType(AppTextField), findsNWidgets(2));
       expect(find.byKey(const Key('bot_create.field.name')), findsOneWidget);
+      expect(
+        find.byKey(const Key('bot_create.field.identifier')),
+        findsOneWidget,
+      );
       final btn = submitButton(tester);
       expect(btn.onPressed, isNull, reason: 'name vacío deshabilita el submit');
       expect(btn.loading, false);
@@ -129,6 +133,59 @@ void main() {
       ).called(1);
     },
   );
+
+  testWidgets('identifier opcional: si se escribe, viaja en el evento', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    await tester.enterText(
+      find.byKey(const Key('bot_create.field.name')),
+      'Bot soporte',
+    );
+    await tester.enterText(
+      find.byKey(const Key('bot_create.field.identifier')),
+      '5215512345678',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('bot_create.submit')));
+    await tester.pump();
+
+    verify(
+      () => bloc.add(
+        const BotCreateSubmitted(
+          templateId: 't1',
+          name: 'Bot soporte',
+          channel: BotChannel.waUnofficial,
+          identifier: '5215512345678',
+        ),
+      ),
+    ).called(1);
+  });
+
+  testWidgets('identifier vacío no exige nada y viaja como null', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    await tester.enterText(
+      find.byKey(const Key('bot_create.field.name')),
+      'Bot soporte',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('bot_create.submit')));
+    await tester.pump();
+
+    verify(
+      () => bloc.add(
+        const BotCreateSubmitted(
+          templateId: 't1',
+          name: 'Bot soporte',
+          channel: BotChannel.waUnofficial,
+        ),
+      ),
+    ).called(1);
+  });
 
   testWidgets(
     'Submitting pone el AppButton en loading=true (spinner + tap bloqueado)',

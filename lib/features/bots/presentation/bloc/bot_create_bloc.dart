@@ -29,6 +29,7 @@ class BotCreateBloc extends Bloc<BotCreateEvent, BotCreateState> {
         templateId: event.templateId,
         name: event.name,
         channel: event.channel,
+        identifier: event.identifier,
       );
       emit(BotCreateSucceeded(bot));
     } on BotsFailure catch (e) {
@@ -48,21 +49,27 @@ class BotCreateSubmitted extends BotCreateEvent {
     required this.templateId,
     required this.name,
     required this.channel,
+    this.identifier,
   });
 
   final String templateId;
   final String name;
   final BotChannel channel;
 
+  /// Label libre opcional v1 (en WABA aterrizará como número verificado). Null
+  /// o vacío ⇒ no viaja.
+  final String? identifier;
+
   @override
   bool operator ==(Object other) =>
       other is BotCreateSubmitted &&
       other.templateId == templateId &&
       other.name == name &&
-      other.channel == channel;
+      other.channel == channel &&
+      other.identifier == identifier;
 
   @override
-  int get hashCode => Object.hash(templateId, name, channel);
+  int get hashCode => Object.hash(templateId, name, channel, identifier);
 }
 
 // States --------------------------------------------------------------------

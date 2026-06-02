@@ -29,6 +29,7 @@ class BotCreatePage extends StatefulWidget {
 
 class _BotCreatePageState extends State<BotCreatePage> {
   final TextEditingController _ctrl = TextEditingController();
+  final TextEditingController _idCtrl = TextEditingController();
   bool _canSubmit = false;
 
   @override
@@ -48,20 +49,24 @@ class _BotCreatePageState extends State<BotCreatePage> {
   void dispose() {
     _ctrl.removeListener(_recomputeCanSubmit);
     _ctrl.dispose();
+    _idCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
     final name = _ctrl.text.trim();
     if (name.isEmpty) return;
+    final identifier = _idCtrl.text.trim();
     // WA_UNOFFICIAL es el único canal del cliente v1: WABA aterrizará con
     // el flujo de verificación que pide producto. El bloc recibe el
-    // channel explícito para no asumir defaults dentro del dominio.
+    // channel explícito para no asumir defaults dentro del dominio. El
+    // `identifier` es opcional (label libre); vacío ⇒ no viaja.
     context.read<BotCreateBloc>().add(
       BotCreateSubmitted(
         templateId: widget.templateId,
         name: name,
         channel: BotChannel.waUnofficial,
+        identifier: identifier.isEmpty ? null : identifier,
       ),
     );
   }
@@ -95,6 +100,18 @@ class _BotCreatePageState extends State<BotCreatePage> {
                 controller: _ctrl,
                 enabled: !submitting,
                 autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) {
+                  if (_canSubmit) _submit();
+                },
+              ),
+              const SizedBox(height: AppTokens.sp4),
+              AppTextField(
+                key: const Key('bot_create.field.identifier'),
+                label: 'Identificador (opcional)',
+                hint: 'Ej. número o etiqueta de referencia',
+                controller: _idCtrl,
+                enabled: !submitting,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) {
                   if (_canSubmit) _submit();

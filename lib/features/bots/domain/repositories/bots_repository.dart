@@ -20,6 +20,7 @@ abstract interface class BotsRepository {
     required String templateId,
     required String name,
     required BotChannel channel,
+    String? identifier,
   });
 
   /// Edita un Bot existente (`PUT /bots/:id` con CAS optimista por `version`).

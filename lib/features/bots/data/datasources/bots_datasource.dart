@@ -19,17 +19,16 @@ abstract interface class BotsDatasource {
   /// 403 si el rol no alcanza (típicamente WORKER sin asignación al bot).
   Future<Bot> byId(String id);
 
-  /// `POST /bots` body `{template_id, name, channel}`. 422 colapsa las
-  /// cuatro variantes del dominio del backend (`ErrInvalidBot`,
+  /// `POST /bots` body `{template_id, name, channel, identifier?}`. 422
+  /// colapsa las cuatro variantes del dominio del backend (`ErrInvalidBot`,
   /// `ErrInvalidChannel`, `ErrTemplateNotFound`, `ErrVariableNotInDefs`)
-  /// en un único `BotsInvalidCreateFailure`: el operador no puede
-  /// accionar distinto entre ellas sin instrumentación adicional. El
-  /// `identifier` (label libre opcional v1) no viaja — aterrizará con
-  /// el flujo de pareado.
+  /// en un único `BotsInvalidCreateFailure`. El `identifier` (label libre
+  /// opcional v1) viaja sólo si no está vacío (omitempty, espejo de createReq).
   Future<Bot> create({
     required String templateId,
     required String name,
     required BotChannel channel,
+    String? identifier,
   });
 
   /// `PUT /bots/:id` con CAS optimista. Cuerpo tristate: los campos null se
@@ -113,14 +112,18 @@ class DioBotsDatasource implements BotsDatasource {
     required String templateId,
     required String name,
     required BotChannel channel,
+    String? identifier,
   }) async {
     try {
+      final trimmedId = identifier?.trim() ?? '';
       final res = await _dio.post<Map<String, dynamic>>(
         '/bots',
         data: <String, dynamic>{
           'template_id': templateId,
           'name': name,
           'channel': channel.toWire(),
+          // omitempty: el identifier sólo viaja si el operador lo escribió.
+          if (trimmedId.isNotEmpty) 'identifier': trimmedId,
         },
       );
       final body = res.data;
