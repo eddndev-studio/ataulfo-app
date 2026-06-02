@@ -1,4 +1,5 @@
 import '../../domain/entities/connect_link.dart';
+import '../../domain/entities/session_status.dart';
 import '../../domain/repositories/bot_session_repository.dart';
 import '../datasources/bot_session_datasource.dart';
 
@@ -30,4 +31,8 @@ class BotSessionRepositoryImpl implements BotSessionRepository {
 
   @override
   Future<void> wipeCredentials(String botId) => _ds.wipeCredentials(botId);
+
+  @override
+  Future<SessionStatus> getSessionState(String botId) =>
+      _ds.getSessionState(botId);
 }

@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/bots/domain/entities/connect_link.dart';
+import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_connect_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -162,4 +166,235 @@ void main() {
     expect: () => const <BotConnectState>[],
     verify: (_) => verifyNever(() => repo.wipeCredentials(any())),
   );
+
+  group('poll de estado (S11)', () {
+    blocTest<BotConnectBloc, BotConnectState>(
+      'StatusPolled PAIRING → Ready con status PAIRING + qr',
+      build: () {
+        when(() => repo.getSessionState('b1')).thenAnswer(
+          (_) async =>
+              const SessionStatus(state: SessionState.pairing, qrCode: 'QR1'),
+        );
+        return BotConnectBloc(repo: repo, botId: 'b1');
+      },
+      seed: () => BotConnectReady(_link, phase: PairingPhase.active),
+      act: (bloc) => bloc.add(const BotConnectStatusPolled()),
+      expect: () => <BotConnectState>[
+        BotConnectReady(
+          _link,
+          phase: PairingPhase.active,
+          status: const SessionStatus(
+            state: SessionState.pairing,
+            qrCode: 'QR1',
+          ),
+        ),
+      ],
+      verify: (_) => verify(() => repo.getSessionState('b1')).called(1),
+    );
+
+    blocTest<BotConnectBloc, BotConnectState>(
+      'StatusPolled PAIRING→DISCONNECTED → qrExpired',
+      build: () {
+        when(() => repo.getSessionState('b1')).thenAnswer(
+          (_) async => const SessionStatus(state: SessionState.disconnected),
+        );
+        return BotConnectBloc(repo: repo, botId: 'b1');
+      },
+      seed: () => BotConnectReady(
+        _link,
+        phase: PairingPhase.active,
+        status: const SessionStatus(state: SessionState.pairing, qrCode: 'QR1'),
+      ),
+      act: (bloc) => bloc.add(const BotConnectStatusPolled()),
+      expect: () => <BotConnectState>[
+        BotConnectReady(
+          _link,
+          phase: PairingPhase.active,
+          status: const SessionStatus(state: SessionState.disconnected),
+          qrExpired: true,
+        ),
+      ],
+    );
+
+    blocTest<BotConnectBloc, BotConnectState>(
+      'StatusPolled CONNECTED → Ready status CONNECTED, sin expiración',
+      build: () {
+        when(() => repo.getSessionState('b1')).thenAnswer(
+          (_) async => const SessionStatus(state: SessionState.connected),
+        );
+        return BotConnectBloc(repo: repo, botId: 'b1');
+      },
+      seed: () => BotConnectReady(_link, phase: PairingPhase.active),
+      act: (bloc) => bloc.add(const BotConnectStatusPolled()),
+      expect: () => <BotConnectState>[
+        BotConnectReady(
+          _link,
+          phase: PairingPhase.active,
+          status: const SessionStatus(state: SessionState.connected),
+        ),
+      ],
+    );
+
+    blocTest<BotConnectBloc, BotConnectState>(
+      'StatusPolled fuera de Ready se ignora',
+      build: () => BotConnectBloc(repo: repo, botId: 'b1'),
+      act: (bloc) => bloc.add(const BotConnectStatusPolled()),
+      expect: () => const <BotConnectState>[],
+      verify: (_) => verifyNever(() => repo.getSessionState(any())),
+    );
+
+    test('el poll arranca tras Pairing y se DETIENE al llegar a CONNECTED', () {
+      fakeAsync((async) {
+        when(() => repo.issueConnectLink('b1')).thenAnswer((_) async => _link);
+        when(() => repo.startSession('b1')).thenAnswer((_) async {});
+        var calls = 0;
+        when(() => repo.getSessionState('b1')).thenAnswer((_) async {
+          calls++;
+          // PAIRING en el primer tick, CONNECTED en el segundo → debe parar.
+          return SessionStatus(
+            state: calls >= 2 ? SessionState.connected : SessionState.pairing,
+          );
+        });
+
+        final bloc = BotConnectBloc(repo: repo, botId: 'b1');
+        bloc.add(const BotConnectStarted());
+        async.flushMicrotasks();
+        bloc.add(const BotConnectPairingRequested());
+        async.flushMicrotasks();
+
+        // Antes de cualquier tick no se ha sondeado.
+        expect(calls, 0);
+
+        async.elapse(const Duration(seconds: 2)); // tick 1 → PAIRING
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 2)); // tick 2 → CONNECTED → para
+        async.flushMicrotasks();
+        expect(calls, 2);
+
+        // Tras CONNECTED el timer está cancelado: no hay más polls.
+        async.elapse(const Duration(seconds: 10));
+        async.flushMicrotasks();
+        expect(calls, 2);
+
+        bloc.close();
+        async.flushMicrotasks();
+      });
+    });
+
+    test(
+      'el poll SIGUE activo en RECONNECTING (transitorio, no se estanca)',
+      () {
+        fakeAsync((async) {
+          when(
+            () => repo.issueConnectLink('b1'),
+          ).thenAnswer((_) async => _link);
+          when(() => repo.startSession('b1')).thenAnswer((_) async {});
+          var calls = 0;
+          when(() => repo.getSessionState('b1')).thenAnswer((_) async {
+            calls++;
+            return SessionStatus(
+              state: switch (calls) {
+                1 => SessionState.pairing,
+                2 => SessionState.reconnecting,
+                _ => SessionState.connected,
+              },
+            );
+          });
+
+          final bloc = BotConnectBloc(repo: repo, botId: 'b1');
+          bloc.add(const BotConnectStarted());
+          async.flushMicrotasks();
+          bloc.add(const BotConnectPairingRequested());
+          async.flushMicrotasks();
+          async.elapse(const Duration(seconds: 2)); // PAIRING
+          async.flushMicrotasks();
+          async.elapse(
+            const Duration(seconds: 2),
+          ); // RECONNECTING → debe seguir
+          async.flushMicrotasks();
+          async.elapse(const Duration(seconds: 2)); // CONNECTED → para
+          async.flushMicrotasks();
+          expect(calls, 3);
+          bloc.close();
+          async.flushMicrotasks();
+        });
+      },
+    );
+
+    test('stop durante un poll en vuelo NO produce un falso qrExpired', () {
+      fakeAsync((async) {
+        when(() => repo.issueConnectLink('b1')).thenAnswer((_) async => _link);
+        when(() => repo.startSession('b1')).thenAnswer((_) async {});
+        when(() => repo.stopSession('b1')).thenAnswer((_) async {});
+        final inFlight = Completer<SessionStatus>();
+        var calls = 0;
+        when(() => repo.getSessionState('b1')).thenAnswer((_) {
+          calls++;
+          if (calls == 1) {
+            return Future<SessionStatus>.value(
+              const SessionStatus(state: SessionState.pairing, qrCode: 'Q'),
+            );
+          }
+          return inFlight.future; // 2.º poll: queda en vuelo
+        });
+
+        final bloc = BotConnectBloc(repo: repo, botId: 'b1');
+        final seen = <BotConnectState>[];
+        final sub = bloc.stream.listen(seen.add);
+        bloc.add(const BotConnectStarted());
+        async.flushMicrotasks();
+        bloc.add(const BotConnectPairingRequested());
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 2)); // poll 1 → PAIRING + qr
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 2)); // poll 2 → en vuelo
+        async.flushMicrotasks();
+
+        // El operador cancela mientras el poll 2 sigue en vuelo.
+        bloc.add(const BotConnectStopRequested());
+        async.flushMicrotasks();
+        // Ahora el poll 2 resuelve con DISCONNECTED — NO debe pintar "expiró".
+        inFlight.complete(
+          const SessionStatus(state: SessionState.disconnected),
+        );
+        async.flushMicrotasks();
+
+        expect(bloc.state, BotConnectReady(_link)); // idle, sin qrExpired
+        expect(
+          seen.whereType<BotConnectReady>().any((s) => s.qrExpired),
+          isFalse,
+        );
+        sub.cancel();
+        bloc.close();
+        async.flushMicrotasks();
+      });
+    });
+
+    test('close cancela el poll (no hay más polls tras cerrar)', () {
+      fakeAsync((async) {
+        when(() => repo.issueConnectLink('b1')).thenAnswer((_) async => _link);
+        when(() => repo.startSession('b1')).thenAnswer((_) async {});
+        var calls = 0;
+        when(() => repo.getSessionState('b1')).thenAnswer((_) async {
+          calls++;
+          return const SessionStatus(state: SessionState.pairing);
+        });
+
+        final bloc = BotConnectBloc(repo: repo, botId: 'b1');
+        bloc.add(const BotConnectStarted());
+        async.flushMicrotasks();
+        bloc.add(const BotConnectPairingRequested());
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 2)); // 1 poll (sigue PAIRING)
+        async.flushMicrotasks();
+        expect(calls, 1);
+
+        bloc.close();
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 10));
+        async.flushMicrotasks();
+        expect(calls, 1); // ningún poll tras close
+      });
+    });
+  });
 }

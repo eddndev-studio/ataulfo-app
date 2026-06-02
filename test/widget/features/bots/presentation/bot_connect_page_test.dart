@@ -1,6 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/connect_link.dart';
+import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_connect_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_connect_page.dart';
@@ -163,6 +164,60 @@ void main() {
       await tester.pumpWidget(host(channel: BotChannel.waba));
 
       expect(find.byKey(const Key('bot_connect.wipe')), findsNothing);
+    });
+  });
+
+  group('estado real + QR (S11)', () {
+    testWidgets('PAIRING con código muestra el QR escaneable', (tester) async {
+      when(() => bloc.state).thenReturn(
+        BotConnectReady(
+          _link,
+          phase: PairingPhase.active,
+          status: const SessionStatus(
+            state: SessionState.pairing,
+            qrCode: 'QR-DATA',
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('bot_connect.qr')), findsOneWidget);
+    });
+
+    testWidgets('CONNECTED muestra "Bot en línea" y no QR', (tester) async {
+      when(() => bloc.state).thenReturn(
+        BotConnectReady(
+          _link,
+          phase: PairingPhase.active,
+          status: const SessionStatus(state: SessionState.connected),
+        ),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('bot_connect.connected')), findsOneWidget);
+      expect(find.text('Bot en línea'), findsOneWidget);
+      expect(find.byKey(const Key('bot_connect.qr')), findsNothing);
+    });
+
+    testWidgets('qrExpired muestra aviso de expiración y re-ofrece Iniciar', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        BotConnectReady(
+          _link,
+          phase: PairingPhase.active,
+          status: const SessionStatus(state: SessionState.disconnected),
+          qrExpired: true,
+        ),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('bot_connect.qr_expired')), findsOneWidget);
+      expect(find.textContaining('expiró'), findsOneWidget);
+      expect(find.text('Iniciar emparejamiento'), findsOneWidget);
     });
   });
 }

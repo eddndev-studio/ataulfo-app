@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/connect_link.dart';
+import '../../domain/entities/session_status.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../../domain/repositories/bot_session_repository.dart';
 
@@ -29,10 +32,46 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
     on<BotConnectPairingRequested>(_onPairingRequested);
     on<BotConnectStopRequested>(_onStopRequested);
     on<BotConnectWipeRequested>(_onWipeRequested);
+    on<BotConnectStatusPolled>(_onStatusPolled);
   }
 
   final BotSessionRepository _repo;
   final String _botId;
+
+  /// Cadencia del poll del estado de sesión mientras el QR está vivo.
+  static const Duration _pollInterval = Duration(seconds: 2);
+
+  /// Timer del poll, activo sólo mientras la sesión está transitoria
+  /// (PAIRING/CONNECTING/RECONNECTING). Cancelado al alcanzar un estado
+  /// terminal, al detener/borrar, y en `close`.
+  Timer? _poll;
+
+  /// Generación del poll: la bumpean start/stop. Un `_onStatusPolled` en vuelo
+  /// captura la generación al entrar; si cambió tras el `await` (un stop/wipe o
+  /// un nuevo arranque ocurrió mientras la red respondía), descarta su
+  /// resultado en vez de pisar el estado (evita falsos qrExpired / QR zombi).
+  int _pollGen = 0;
+
+  @override
+  Future<void> close() {
+    _poll?.cancel();
+    return super.close();
+  }
+
+  void _stopPolling() {
+    _poll?.cancel();
+    _poll = null;
+    _pollGen++;
+  }
+
+  void _startPolling() {
+    _poll?.cancel();
+    _pollGen++;
+    _poll = Timer.periodic(
+      _pollInterval,
+      (_) => add(const BotConnectStatusPolled()),
+    );
+  }
 
   Future<void> _onStarted(
     BotConnectStarted event,
@@ -63,8 +102,52 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
     try {
       await _repo.startSession(_botId);
       emit(BotConnectReady(current.link, phase: PairingPhase.active));
+      // La sesión entra en PAIRING: empezamos a sondear el estado real para
+      // traer el QR y detectar conexión / expiración.
+      _startPolling();
     } on BotsFailure {
       emit(BotConnectReady(current.link, phase: PairingPhase.failed));
+    }
+  }
+
+  Future<void> _onStatusPolled(
+    BotConnectStatusPolled event,
+    Emitter<BotConnectState> emit,
+  ) async {
+    final current = state;
+    if (current is! BotConnectReady) {
+      _stopPolling();
+      return;
+    }
+    final gen = _pollGen;
+    try {
+      final status = await _repo.getSessionState(_botId);
+      // Si un stop/wipe o un nuevo arranque ocurrió mientras la red respondía,
+      // este resultado quedó obsoleto: descartarlo en vez de pisar el estado
+      // (evita un falso qrExpired tras cancelar, o resucitar un QR zombi).
+      if (gen != _pollGen) return;
+      // El QR de whatsmeow vive ~2 min: si veníamos en PAIRING y el backend
+      // reporta DISCONNECTED, el código expiró (no es un fallo).
+      final wasPairing = current.status?.state == SessionState.pairing;
+      final qrExpired = wasPairing && status.state == SessionState.disconnected;
+      // PAIRING/CONNECTING/RECONNECTING son transitorios que justifican seguir
+      // sondeando; en cualquier otro estado (CONNECTED/DISCONNECTED) paramos.
+      final keepPolling =
+          status.state == SessionState.pairing ||
+          status.state == SessionState.connecting ||
+          status.state == SessionState.reconnecting;
+      if (!keepPolling) _stopPolling();
+      emit(
+        BotConnectReady(
+          current.link,
+          phase: current.phase,
+          status: status,
+          qrExpired: qrExpired,
+        ),
+      );
+    } on BotsFailure {
+      // Poll transitorio fallido: el siguiente tick reintenta. No degradamos
+      // el estado visible (no falseamos una desconexión por un fallo de red).
     }
   }
 
@@ -81,6 +164,7 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
     // que pase, así que volvemos a `idle` (re-ofrecer Iniciar) incluso si la
     // llamada falla. La máquina de estados real (poll + estado del backend)
     // aterriza después; aquí el botón es un disparo simple.
+    _stopPolling();
     try {
       await _repo.stopSession(_botId);
     } on BotsFailure {
@@ -100,6 +184,7 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
     // `wipe-credentials` destruye el pareado: el bot re-parea desde cero. Es
     // idempotente (204), así que volvemos a `idle` (re-ofrecer Iniciar) pase lo
     // que pase. NO gateado por `paused` — es Tier B.
+    _stopPolling();
     try {
       await _repo.wipeCredentials(_botId);
     } on BotsFailure {
@@ -154,6 +239,16 @@ class BotConnectWipeRequested extends BotConnectEvent {
   int get hashCode => (BotConnectWipeRequested).hashCode;
 }
 
+/// Tick del poll: consulta `GET /bots/:id/session` y actualiza el estado real.
+/// Lo dispara el Timer interno mientras la sesión está PAIRING/CONNECTING.
+class BotConnectStatusPolled extends BotConnectEvent {
+  const BotConnectStatusPolled();
+  @override
+  bool operator ==(Object other) => other is BotConnectStatusPolled;
+  @override
+  int get hashCode => (BotConnectStatusPolled).hashCode;
+}
+
 // States --------------------------------------------------------------------
 
 sealed class BotConnectState {
@@ -168,19 +263,33 @@ class BotConnectLoading extends BotConnectState {
   int get hashCode => (BotConnectLoading).hashCode;
 }
 
-/// El enlace está listo para compartir. [phase] refleja el estado de la
-/// sesión que el operador arranca aparte.
+/// El enlace está listo para compartir. [phase] refleja la acción optimista que
+/// el operador arranca aparte; [status] es el estado REAL de la sesión que el
+/// poll trae del backend (null hasta el primer poll). El QR escaneable
+/// (`status.qrCode`) sólo viene en `SessionState.pairing`. [qrExpired] marca la
+/// transición PAIRING→DISCONNECTED (el código de ~2 min caducó).
 class BotConnectReady extends BotConnectState {
-  const BotConnectReady(this.link, {this.phase = PairingPhase.idle});
+  const BotConnectReady(
+    this.link, {
+    this.phase = PairingPhase.idle,
+    this.status,
+    this.qrExpired = false,
+  });
 
   final ConnectLink link;
   final PairingPhase phase;
+  final SessionStatus? status;
+  final bool qrExpired;
 
   @override
   bool operator ==(Object other) =>
-      other is BotConnectReady && other.link == link && other.phase == phase;
+      other is BotConnectReady &&
+      other.link == link &&
+      other.phase == phase &&
+      other.status == status &&
+      other.qrExpired == qrExpired;
   @override
-  int get hashCode => Object.hash(link, phase);
+  int get hashCode => Object.hash(link, phase, status, qrExpired);
 }
 
 /// La emisión del enlace falló (no hay enlace). El retry re-emite el enlace.

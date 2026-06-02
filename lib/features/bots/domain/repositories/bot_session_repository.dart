@@ -1,4 +1,5 @@
 import '../entities/connect_link.dart';
+import '../entities/session_status.dart';
 
 /// Puerto de dominio para el emparejamiento de un Bot (S04): control de la
 /// sesión de canal y emisión del enlace público a compartir. Define los
@@ -28,4 +29,8 @@ abstract interface class BotSessionRepository {
   /// Destruye las credenciales del dispositivo (`wipe-credentials`, 204
   /// idempotente). El bot re-parea desde cero. NO gateado por `paused`.
   Future<void> wipeCredentials(String botId);
+
+  /// Estado vivo de la sesión (`GET /bots/:id/session`). El QR sólo viene en
+  /// PAIRING; "no corre" = `DISCONNECTED`.
+  Future<SessionStatus> getSessionState(String botId);
 }

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/entities/connect_link.dart';
+import '../../domain/entities/session_status.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_connect_bloc.dart';
 
@@ -30,11 +32,19 @@ class BotConnectPage extends StatelessWidget {
     return BlocBuilder<BotConnectBloc, BotConnectState>(
       builder: (context, state) => switch (state) {
         BotConnectLoading() => const _LoadingView(),
-        BotConnectReady(link: final link, phase: final phase) => _ReadyView(
-          link: link,
-          phase: phase,
-          channel: channel,
-        ),
+        BotConnectReady(
+          link: final link,
+          phase: final phase,
+          status: final status,
+          qrExpired: final qrExpired,
+        ) =>
+          _ReadyView(
+            link: link,
+            phase: phase,
+            channel: channel,
+            status: status,
+            qrExpired: qrExpired,
+          ),
         BotConnectFailed(failure: final f) => _FailedView(failure: f),
       },
     );
@@ -57,11 +67,15 @@ class _ReadyView extends StatelessWidget {
     required this.link,
     required this.phase,
     required this.channel,
+    required this.status,
+    required this.qrExpired,
   });
 
   final ConnectLink link;
   final PairingPhase phase;
   final BotChannel channel;
+  final SessionStatus? status;
+  final bool qrExpired;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +114,7 @@ class _ReadyView extends StatelessWidget {
           const SizedBox(height: AppTokens.sp7),
           const Divider(color: AppTokens.divider, height: 1),
           const SizedBox(height: AppTokens.sp6),
-          _PairingSection(phase: phase),
+          _PairingSection(phase: phase, status: status, qrExpired: qrExpired),
           // Wipe (Tier B): SÓLO WA no oficial; oculto en WABA. No gateado por
           // paused; siempre disponible tras confirmación fuerte.
           if (channel == BotChannel.waUnofficial) ...<Widget>[
@@ -174,10 +188,20 @@ class _ReadyView extends StatelessWidget {
 
 /// Bloque de "encender el QR". Separado del enlace porque el código vive sólo
 /// ~2 min: se inicia cuando la otra persona ya tiene el enlace abierto.
+///
+/// Cuando el poll trae el estado REAL ([status]) toma precedencia sobre la
+/// [phase] optimista: CONNECTED → "En línea"; PAIRING con código → QR
+/// escaneable; expiración del QR → aviso + re-ofrecer Iniciar.
 class _PairingSection extends StatelessWidget {
-  const _PairingSection({required this.phase});
+  const _PairingSection({
+    required this.phase,
+    required this.status,
+    required this.qrExpired,
+  });
 
   final PairingPhase phase;
+  final SessionStatus? status;
+  final bool qrExpired;
 
   void _start(BuildContext context) =>
       context.read<BotConnectBloc>().add(const BotConnectPairingRequested());
@@ -185,6 +209,82 @@ class _PairingSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+
+    // 1) Estado real del backend (poll) — toma precedencia sobre la fase.
+    final st = status?.state;
+    if (st == SessionState.connected) {
+      return AppCard(
+        key: const Key('bot_connect.connected'),
+        child: Row(
+          children: <Widget>[
+            const Icon(Icons.check_circle, color: AppTokens.success, size: 20),
+            const SizedBox(width: AppTokens.sp2),
+            Expanded(child: Text('Bot en línea', style: textTheme.titleMedium)),
+          ],
+        ),
+      );
+    }
+    final qr = status?.qrCode;
+    if (st == SessionState.pairing && qr != null && qr.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('Escanea este código', style: textTheme.titleMedium),
+          const SizedBox(height: AppTokens.sp2),
+          Text(
+            'Desde WhatsApp › Dispositivos vinculados › Vincular dispositivo. '
+            'Válido ~2 minutos.',
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(AppTokens.sp3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+              ),
+              child: QrImageView(
+                key: const Key('bot_connect.qr'),
+                data: qr,
+                version: QrVersions.auto,
+                size: 220,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          AppButton.danger(
+            key: const Key('bot_connect.stop'),
+            label: 'Cancelar emparejamiento',
+            fullWidth: true,
+            onPressed: () => context.read<BotConnectBloc>().add(
+              const BotConnectStopRequested(),
+            ),
+          ),
+        ],
+      );
+    }
+    if (qrExpired) {
+      return Column(
+        key: const Key('bot_connect.qr_expired'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'El código QR expiró (~2 min). Pulsa Iniciar para generar uno '
+            'nuevo cuando la otra persona esté lista para escanear.',
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          AppButton.filled(
+            label: 'Iniciar emparejamiento',
+            fullWidth: true,
+            onPressed: () => _start(context),
+          ),
+        ],
+      );
+    }
+
+    // 2) Sin estado real aún: la fase optimista de arranque.
     switch (phase) {
       case PairingPhase.idle:
       case PairingPhase.starting:
