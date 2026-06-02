@@ -128,4 +128,38 @@ void main() {
     expect: () => const <BotConnectState>[],
     verify: (_) => verifyNever(() => repo.stopSession(any())),
   );
+
+  blocTest<BotConnectBloc, BotConnectState>(
+    'WipeRequested desde Ready → wipeCredentials invocado → Ready(idle)',
+    build: () {
+      when(() => repo.wipeCredentials('b1')).thenAnswer((_) async {});
+      return BotConnectBloc(repo: repo, botId: 'b1');
+    },
+    seed: () => BotConnectReady(_link, phase: PairingPhase.active),
+    act: (bloc) => bloc.add(const BotConnectWipeRequested()),
+    expect: () => <BotConnectState>[BotConnectReady(_link)],
+    verify: (_) => verify(() => repo.wipeCredentials('b1')).called(1),
+  );
+
+  blocTest<BotConnectBloc, BotConnectState>(
+    'WipeRequested idempotente: aun si falla, vuelve a idle',
+    build: () {
+      when(
+        () => repo.wipeCredentials('b1'),
+      ).thenThrow(const BotsServerFailure());
+      return BotConnectBloc(repo: repo, botId: 'b1');
+    },
+    seed: () => BotConnectReady(_link, phase: PairingPhase.active),
+    act: (bloc) => bloc.add(const BotConnectWipeRequested()),
+    expect: () => <BotConnectState>[BotConnectReady(_link)],
+    verify: (_) => verify(() => repo.wipeCredentials('b1')).called(1),
+  );
+
+  blocTest<BotConnectBloc, BotConnectState>(
+    'WipeRequested fuera de Ready se ignora',
+    build: () => BotConnectBloc(repo: repo, botId: 'b1'),
+    act: (bloc) => bloc.add(const BotConnectWipeRequested()),
+    expect: () => const <BotConnectState>[],
+    verify: (_) => verifyNever(() => repo.wipeCredentials(any())),
+  );
 }
