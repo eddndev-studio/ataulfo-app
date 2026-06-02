@@ -25,6 +25,7 @@ class BotDetailBloc extends Bloc<BotDetailEvent, BotDetailState> {
       super(const BotDetailLoading()) {
     on<BotDetailLoadRequested>(_onLoad);
     on<BotDetailUpdateRequested>(_onUpdate);
+    on<BotDetailCloneRequested>(_onClone);
   }
 
   final BotsRepository _repo;
@@ -63,6 +64,37 @@ class BotDetailBloc extends Bloc<BotDetailEvent, BotDetailState> {
         aiDisabled: event.aiDisabled,
       ),
     );
+  }
+
+  /// Clona el Bot. A diferencia de `update`, el éxito NO muta el snapshot (el
+  /// clon es OTRO bot con id nuevo): emite el estado transitorio
+  /// `CloneSucceeded(newId)` que el listener consume para navegar, y vuelve al
+  /// snapshot intacto. El fallo reusa `MutationFailed(snapshot, failure)` para
+  /// que la hoja muestre el error sin perder el bot de fondo.
+  Future<void> _onClone(
+    BotDetailCloneRequested event,
+    Emitter<BotDetailState> emit,
+  ) async {
+    final current = state;
+    final Bot snapshot;
+    if (current is BotDetailLoaded) {
+      snapshot = current.bot;
+    } else if (current is BotDetailMutationFailed) {
+      snapshot = current.bot;
+    } else {
+      return;
+    }
+
+    emit(BotDetailMutating(snapshot));
+    try {
+      final clone = await _repo.clone(id: _id, name: event.name);
+      emit(BotDetailCloneSucceeded(clone.id));
+      // Vuelve al snapshot intacto: si el operador regresa a este detalle (el
+      // listener empujó el del clon encima), ve el bot original estable.
+      emit(BotDetailLoaded(snapshot));
+    } on BotsFailure catch (f) {
+      emit(BotDetailMutationFailed(snapshot, f));
+    }
   }
 
   /// Orquesta una mutación reusando el último snapshot válido (`Loaded` o
@@ -139,6 +171,20 @@ class BotDetailUpdateRequested extends BotDetailEvent {
   int get hashCode => Object.hash(name, paused, aiDisabled);
 }
 
+/// Clona el Bot con el `name` dado (`POST /bots/:id/clone`). El éxito navega al
+/// clon; no muta el bot actual.
+class BotDetailCloneRequested extends BotDetailEvent {
+  const BotDetailCloneRequested(this.name);
+
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BotDetailCloneRequested && other.name == name;
+  @override
+  int get hashCode => name.hashCode;
+}
+
 // States --------------------------------------------------------------------
 
 sealed class BotDetailState {
@@ -190,6 +236,20 @@ class BotDetailMutating extends BotDetailState {
       other is BotDetailMutating && other.bot == bot;
   @override
   int get hashCode => bot.hashCode;
+}
+
+/// Clone exitoso (transitorio): lleva el id del clon para que el listener
+/// navegue a su detalle. El bloc vuelve enseguida a `Loaded` (snapshot intacto).
+class BotDetailCloneSucceeded extends BotDetailState {
+  const BotDetailCloneSucceeded(this.newBotId);
+
+  final String newBotId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BotDetailCloneSucceeded && other.newBotId == newBotId;
+  @override
+  int get hashCode => newBotId.hashCode;
 }
 
 /// Mutación fallida que preserva un snapshot del bot. La página sigue

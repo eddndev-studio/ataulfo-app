@@ -50,6 +50,9 @@ class BotDetailPage extends StatelessWidget {
         ),
         BotDetailMutationFailed(bot: final bot, failure: final f) =>
           _LoadedView(bot: bot, isAdmin: isAdmin, failure: f),
+        // Transitorio: el listener ya navegó al clon; el bloc vuelve a Loaded
+        // enseguida. Un frame de spinner evita parpadeo.
+        BotDetailCloneSucceeded() => const _LoadingView(),
         BotDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );
