@@ -246,7 +246,9 @@ void main() {
     });
 
     test('propaga BotsNotFoundFailure', () async {
-      when(() => ds.delete(any())).thenThrow(const BotsNotFoundFailure());
+      when(
+        () => ds.delete(any()),
+      ).thenAnswer((_) => Future<void>.error(const BotsNotFoundFailure()));
 
       await expectLater(
         repo.delete('b1'),
