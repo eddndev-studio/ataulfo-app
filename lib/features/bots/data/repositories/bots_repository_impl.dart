@@ -22,7 +22,13 @@ class BotsRepositoryImpl implements BotsRepository {
     required String templateId,
     required String name,
     required BotChannel channel,
-  }) => _ds.create(templateId: templateId, name: name, channel: channel);
+    String? identifier,
+  }) => _ds.create(
+    templateId: templateId,
+    name: name,
+    channel: channel,
+    identifier: identifier,
+  );
 
   @override
   Future<Bot> update({
