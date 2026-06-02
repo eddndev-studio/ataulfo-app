@@ -40,4 +40,8 @@ class BotsRepositoryImpl implements BotsRepository {
     aiDisabled: aiDisabled,
     variableValues: variableValues,
   );
+
+  @override
+  Future<Bot> clone({required String id, required String name}) =>
+      _ds.clone(id: id, name: name);
 }

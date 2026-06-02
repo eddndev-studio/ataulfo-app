@@ -36,4 +36,9 @@ abstract interface class BotsRepository {
     bool? aiDisabled,
     Map<String, String>? variableValues,
   });
+
+  /// Clona un Bot (`POST /bots/:id/clone`). Devuelve el clon con id NUEVO.
+  /// `BotsInvalidCreateFailure` (422) si el nombre es inválido;
+  /// `BotsNotFoundFailure` (404) si el bot origen no existe.
+  Future<Bot> clone({required String id, required String name});
 }

@@ -196,4 +196,40 @@ void main() {
       );
     });
   });
+
+  group('BotsRepositoryImpl.clone', () {
+    const clone = Bot(
+      id: 'b2',
+      orgId: 'o1',
+      templateId: 't1',
+      name: 'Soporte (copia)',
+      channel: BotChannel.waUnofficial,
+      identifier: null,
+      version: 0,
+      paused: false,
+      aiDisabled: false,
+    );
+
+    test('delega al datasource y devuelve el clon (id nuevo)', () async {
+      when(
+        () => ds.clone(id: 'b1', name: 'Soporte (copia)'),
+      ).thenAnswer((_) async => clone);
+
+      final result = await repo.clone(id: 'b1', name: 'Soporte (copia)');
+
+      expect(result, clone);
+      verify(() => ds.clone(id: 'b1', name: 'Soporte (copia)')).called(1);
+    });
+
+    test('propaga BotsInvalidCreateFailure', () async {
+      when(
+        () => ds.clone(id: any(named: 'id'), name: any(named: 'name')),
+      ).thenAnswer((_) => Future<Bot>.error(const BotsInvalidCreateFailure()));
+
+      await expectLater(
+        repo.clone(id: 'b1', name: ''),
+        throwsA(isA<BotsInvalidCreateFailure>()),
+      );
+    });
+  });
 }
