@@ -43,6 +43,20 @@ final class BotsInvalidCreateFailure extends BotsFailure {
   const BotsInvalidCreateFailure();
 }
 
+/// 409 contra `PUT /bots/:id`: conflicto de versión (CAS). La `version`
+/// enviada quedó atrás respecto a la del servidor — otra edición ganó la
+/// carrera. La UI refresca el snapshot y ofrece reintentar.
+///
+/// NOTA sobre el 409 sobrecargado: el mismo status lo emite `RequireActiveOrg`
+/// cuando el Bearer no trae org activa, ANTES de llegar al handler. Como este
+/// cliente no modela switch-org (el org activo viaja baqueado en el token),
+/// ese caso es inalcanzable post-login y el cliente interpreta el 409 del PUT
+/// como conflicto de versión. El mapeo es POR-ENDPOINT: sólo el PUT lo traduce
+/// a este failure; en otros verbos (create) un 409 colapsa a `UnknownBotsFailure`.
+final class BotsConflictFailure extends BotsFailure {
+  const BotsConflictFailure();
+}
+
 /// 5xx del backend. Distinto de red: el servidor respondió, pero rompió.
 final class BotsServerFailure extends BotsFailure {
   const BotsServerFailure();

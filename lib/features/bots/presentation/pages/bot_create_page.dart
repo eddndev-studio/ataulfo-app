@@ -195,7 +195,12 @@ class _FailedView extends StatelessWidget {
       'bot_create.error.network',
       'Sin conexión con el servidor. Revisa tu red y reintenta.',
     ),
-    BotsNotFoundFailure() || BotsServerFailure() || UnknownBotsFailure() => (
+    // BotsConflictFailure no es alcanzable por el create (su 409 = org no
+    // activa → Unknown), pero el sealed exige cubrirlo: cae al genérico.
+    BotsNotFoundFailure() ||
+    BotsServerFailure() ||
+    BotsConflictFailure() ||
+    UnknownBotsFailure() => (
       'bot_create.error.generic',
       'No pudimos crear el bot. Inténtalo de nuevo.',
     ),

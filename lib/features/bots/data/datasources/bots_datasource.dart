@@ -31,6 +31,21 @@ abstract interface class BotsDatasource {
     required String name,
     required BotChannel channel,
   });
+
+  /// `PUT /bots/:id` con CAS optimista. Cuerpo tristate: los campos null se
+  /// omiten ("no tocar"); `version` siempre viaja. Devuelve el Bot ya
+  /// actualizado (con `version+1`). Mapeo de errores POR-ENDPOINT: un 409 es
+  /// `BotsConflictFailure` (conflicto de versión); 422 →
+  /// `BotsInvalidCreateFailure`; 404 → `BotsNotFoundFailure`. `channel` e
+  /// `identifier` NO viajan (inmutables / create-only).
+  Future<Bot> update({
+    required String id,
+    required int version,
+    String? name,
+    bool? paused,
+    bool? aiDisabled,
+    Map<String, String>? variableValues,
+  });
 }
 
 class DioBotsDatasource implements BotsDatasource {
@@ -115,11 +130,51 @@ class DioBotsDatasource implements BotsDatasource {
     }
   }
 
+  @override
+  Future<Bot> update({
+    required String id,
+    required int version,
+    String? name,
+    bool? paused,
+    bool? aiDisabled,
+    Map<String, String>? variableValues,
+  }) async {
+    try {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/bots/$id',
+        data: BotUpdateReq(
+          version: version,
+          name: name,
+          paused: paused,
+          aiDisabled: aiDisabled,
+          variableValues: variableValues,
+        ).toJson(),
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownBotsFailure();
+      }
+      return BotsMapper.botRespToEntity(BotResp.fromJson(body));
+    } on BotsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e, versionConflict: true);
+    } on FormatException {
+      throw const UnknownBotsFailure();
+    } on TypeError {
+      throw const UnknownBotsFailure();
+    }
+  }
+
   /// Traduce DioException a la jerarquía sellada de BotsFailure. Duplica el
   /// patrón de AuthFailure._mapDioException con los códigos de S04 (403 vs
   /// 401-de-login). Regla de tres: refactor a un helper compartido en el
   /// próximo feature que lo necesite.
-  BotsFailure _mapDioException(DioException e) {
+  ///
+  /// `versionConflict` rige el 409 POR-ENDPOINT: en el PUT (CAS) un 409 es
+  /// conflicto de versión (`BotsConflictFailure`); en list/byId/create el 409
+  /// (org no activa) no es accionable como conflicto y colapsa a genérico.
+  BotsFailure _mapDioException(DioException e, {bool versionConflict = false}) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
@@ -131,6 +186,9 @@ class DioBotsDatasource implements BotsDatasource {
         final status = e.response?.statusCode ?? 0;
         if (status == 403) return const BotsForbiddenFailure();
         if (status == 404) return const BotsNotFoundFailure();
+        if (status == 409 && versionConflict) {
+          return const BotsConflictFailure();
+        }
         if (status == 422) return const BotsInvalidCreateFailure();
         if (status >= 500 && status < 600) return const BotsServerFailure();
         return const UnknownBotsFailure();

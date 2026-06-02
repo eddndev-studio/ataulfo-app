@@ -62,3 +62,38 @@ class BotResp {
   final bool paused;
   final bool aiDisabled;
 }
+
+/// Body de `PUT /bots/:id` (`ataulfo-go/internal/adapters/httpbots/dto.go`
+/// `putReq`). Tristate POR OMISIÓN: un campo null se OMITE del JSON ("no
+/// tocar"); presente se aplica. `version` SIEMPRE viaja (CAS optimista).
+///
+/// `channel` NUNCA viaja (I-B3: el canal es inmutable tras crear; el backend
+/// lo enforca por ausencia del campo, no por guard). `identifier` tampoco:
+/// es create-only.
+///
+/// `variableValues` se serializa como objeto JSON: `{}` (vaciar overrides) o
+/// `{...}`; **jamás `null`** — el backend rechaza `variable_values:null` con
+/// 422. Por eso un null aquí se OMITE (no se serializa la clave).
+class BotUpdateReq {
+  const BotUpdateReq({
+    required this.version,
+    this.name,
+    this.paused,
+    this.aiDisabled,
+    this.variableValues,
+  });
+
+  final int version;
+  final String? name;
+  final bool? paused;
+  final bool? aiDisabled;
+  final Map<String, String>? variableValues;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    if (name != null) 'name': name,
+    if (paused != null) 'paused': paused,
+    if (aiDisabled != null) 'ai_disabled': aiDisabled,
+    if (variableValues != null) 'variable_values': variableValues,
+    'version': version,
+  };
+}
