@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/connect_link.dart';
+import '../../domain/entities/session_status.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../dto/connect_token_dto.dart';
+import '../dto/session_state_dto.dart';
 
 /// Puerto de datos para el ciclo de vida de la sesión de canal de un Bot y
 /// la emisión de enlaces públicos de emparejamiento (S04 RF#7).
@@ -35,6 +37,11 @@ abstract interface class BotSessionDatasource {
   /// credenciales persistidas del dispositivo: el bot re-parea desde cero
   /// (nuevo QR). NO gateado por `paused`; su 409 (org ausente) NO es NotPaused.
   Future<void> wipeCredentials(String botId);
+
+  /// `GET /bots/:id/session` ⇒ 200 `{state, qr?{code}}`. Estado vivo de la
+  /// sesión; el `qr` SÓLO viene en PAIRING. "No corre" = `200 + DISCONNECTED`
+  /// (NO es error). Estado desconocido en el wire → `UnknownBotsFailure`.
+  Future<SessionStatus> getSessionState(String botId);
 }
 
 class DioBotSessionDatasource implements BotSessionDatasource {
@@ -118,6 +125,29 @@ class DioBotSessionDatasource implements BotSessionDatasource {
     } on DioException catch (e) {
       // Sin flag: el wipe no gatea paused, así que su 409 colapsa a genérico.
       throw _mapDioException(e);
+    }
+  }
+
+  @override
+  Future<SessionStatus> getSessionState(String botId) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/bots/$botId/session');
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownBotsFailure();
+      }
+      return SessionStateResp.fromJson(body).toDomain();
+    } on BotsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownBotsFailure();
+    } on ArgumentError {
+      // SessionState.fromWire fail-loud ante un estado desconocido.
+      throw const UnknownBotsFailure();
+    } on TypeError {
+      throw const UnknownBotsFailure();
     }
   }
 
