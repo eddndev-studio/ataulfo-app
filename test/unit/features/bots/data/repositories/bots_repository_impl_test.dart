@@ -223,7 +223,10 @@ void main() {
 
     test('propaga BotsInvalidCreateFailure', () async {
       when(
-        () => ds.clone(id: any(named: 'id'), name: any(named: 'name')),
+        () => ds.clone(
+          id: any(named: 'id'),
+          name: any(named: 'name'),
+        ),
       ).thenAnswer((_) => Future<Bot>.error(const BotsInvalidCreateFailure()));
 
       await expectLater(

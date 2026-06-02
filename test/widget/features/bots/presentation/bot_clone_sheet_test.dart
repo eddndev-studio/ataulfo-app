@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_detail_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/widgets/bot_clone_sheet.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -40,9 +42,7 @@ void main() {
       theme: AppDesignTheme.dark(),
       home: BlocProvider<BotDetailBloc>.value(
         value: bloc,
-        child: Scaffold(
-          body: BotCloneSheet(onCloned: (_) {}),
-        ),
+        child: Scaffold(body: BotCloneSheet(onCloned: (_) {})),
       ),
     );
   }
@@ -113,6 +113,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('bot_clone.submit')), findsOneWidget);
 
+    // El operador clona; sólo entonces el sheet reacciona a CloneSucceeded.
+    await tester.enterText(find.byKey(const Key('bot_clone.name')), 'Copia');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('bot_clone.submit')));
     ctrl.add(const BotDetailCloneSucceeded('b2'));
     await tester.pumpAndSettle();
 

@@ -297,7 +297,7 @@ void main() {
   });
 
   group('BotDetailBloc — clonar (éxito = navegación)', () {
-    const _clone = Bot(
+    const clone = Bot(
       id: 'b2',
       orgId: 'o1',
       templateId: 't1',
@@ -314,12 +314,11 @@ void main() {
       build: () {
         when(
           () => repo.clone(id: 'b1', name: 'Soporte (copia)'),
-        ).thenAnswer((_) async => _clone);
+        ).thenAnswer((_) async => clone);
         return BotDetailBloc(repo: repo, id: 'b1');
       },
       seed: () => const BotDetailLoaded(_b1),
-      act: (b) =>
-          b.add(const BotDetailCloneRequested('Soporte (copia)')),
+      act: (b) => b.add(const BotDetailCloneRequested('Soporte (copia)')),
       expect: () => const <BotDetailState>[
         BotDetailMutating(_b1),
         BotDetailCloneSucceeded('b2'),
@@ -333,7 +332,10 @@ void main() {
       'CloneRequested 422 → Mutating → MutationFailed(snapshot, invalid)',
       build: () {
         when(
-          () => repo.clone(id: any(named: 'id'), name: any(named: 'name')),
+          () => repo.clone(
+            id: any(named: 'id'),
+            name: any(named: 'name'),
+          ),
         ).thenAnswer(
           (_) => Future<Bot>.error(const BotsInvalidCreateFailure()),
         );
