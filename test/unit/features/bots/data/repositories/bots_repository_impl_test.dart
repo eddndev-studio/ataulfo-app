@@ -137,4 +137,63 @@ void main() {
       );
     });
   });
+
+  group('BotsRepositoryImpl.update', () {
+    const updated = Bot(
+      id: 'b1',
+      orgId: 'o1',
+      templateId: 't1',
+      name: 'Soporte+',
+      channel: BotChannel.waUnofficial,
+      identifier: '52155...',
+      version: 4,
+      paused: true,
+      aiDisabled: false,
+    );
+
+    test('delega al datasource con los mismos argumentos', () async {
+      when(
+        () => ds.update(
+          id: 'b1',
+          version: 3,
+          name: null,
+          paused: true,
+          aiDisabled: null,
+          variableValues: null,
+        ),
+      ).thenAnswer((_) async => updated);
+
+      final result = await repo.update(id: 'b1', version: 3, paused: true);
+
+      expect(result, updated);
+      verify(
+        () => ds.update(
+          id: 'b1',
+          version: 3,
+          name: null,
+          paused: true,
+          aiDisabled: null,
+          variableValues: null,
+        ),
+      ).called(1);
+    });
+
+    test('propaga BotsConflictFailure sin atraparla', () async {
+      when(
+        () => ds.update(
+          id: any(named: 'id'),
+          version: any(named: 'version'),
+          name: any(named: 'name'),
+          paused: any(named: 'paused'),
+          aiDisabled: any(named: 'aiDisabled'),
+          variableValues: any(named: 'variableValues'),
+        ),
+      ).thenAnswer((_) => Future<Bot>.error(const BotsConflictFailure()));
+
+      await expectLater(
+        repo.update(id: 'b1', version: 1, name: 'x'),
+        throwsA(isA<BotsConflictFailure>()),
+      );
+    });
+  });
 }

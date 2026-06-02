@@ -21,4 +21,19 @@ abstract interface class BotsRepository {
     required String name,
     required BotChannel channel,
   });
+
+  /// Edita un Bot existente (`PUT /bots/:id` con CAS optimista por `version`).
+  /// Cuerpo tristate: los campos null se omiten ("no tocar"). Devuelve el Bot
+  /// actualizado (con `version+1`). `BotsConflictFailure` (409) cuando la
+  /// `version` quedó atrás; `BotsInvalidCreateFailure` (422) si el dominio
+  /// rechaza el cambio; `BotsNotFoundFailure` (404) si el bot no existe. El
+  /// canal e `identifier` NO se editan (inmutables / create-only).
+  Future<Bot> update({
+    required String id,
+    required int version,
+    String? name,
+    bool? paused,
+    bool? aiDisabled,
+    Map<String, String>? variableValues,
+  });
 }

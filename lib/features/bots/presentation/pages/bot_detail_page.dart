@@ -24,6 +24,11 @@ class BotDetailPage extends StatelessWidget {
       builder: (context, state) => switch (state) {
         BotDetailLoading() => const _LoadingView(),
         BotDetailLoaded(bot: final bot) => _LoadedView(bot: bot),
+        // Durante una mutación y tras un fallo de mutación el bot sigue
+        // visible. Los controles inline (pausar / IA / renombrar) y el copy
+        // de error se cablean en slices posteriores; aquí el snapshot basta.
+        BotDetailMutating(bot: final bot) => _LoadedView(bot: bot),
+        BotDetailMutationFailed(bot: final bot) => _LoadedView(bot: bot),
         BotDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );
