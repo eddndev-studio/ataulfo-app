@@ -24,4 +24,8 @@ abstract interface class BotSessionRepository {
   /// Reinicia las sesiones de cifrado (`reset-sessions`). EXIGE `paused`:
   /// `BotsNotPausedFailure` (409) si no lo está.
   Future<void> resetSessions(String botId);
+
+  /// Destruye las credenciales del dispositivo (`wipe-credentials`, 204
+  /// idempotente). El bot re-parea desde cero. NO gateado por `paused`.
+  Future<void> wipeCredentials(String botId);
 }

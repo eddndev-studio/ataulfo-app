@@ -28,6 +28,7 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
     on<BotConnectStarted>(_onStarted);
     on<BotConnectPairingRequested>(_onPairingRequested);
     on<BotConnectStopRequested>(_onStopRequested);
+    on<BotConnectWipeRequested>(_onWipeRequested);
   }
 
   final BotSessionRepository _repo;
@@ -87,6 +88,25 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
     }
     emit(BotConnectReady(current.link));
   }
+
+  Future<void> _onWipeRequested(
+    BotConnectWipeRequested event,
+    Emitter<BotConnectState> emit,
+  ) async {
+    final current = state;
+    if (current is! BotConnectReady) {
+      return;
+    }
+    // `wipe-credentials` destruye el pareado: el bot re-parea desde cero. Es
+    // idempotente (204), así que volvemos a `idle` (re-ofrecer Iniciar) pase lo
+    // que pase. NO gateado por `paused` — es Tier B.
+    try {
+      await _repo.wipeCredentials(_botId);
+    } on BotsFailure {
+      // Idempotente: tratar el fallo como ya-borrado.
+    }
+    emit(BotConnectReady(current.link));
+  }
 }
 
 // Events --------------------------------------------------------------------
@@ -122,6 +142,16 @@ class BotConnectStopRequested extends BotConnectEvent {
   bool operator ==(Object other) => other is BotConnectStopRequested;
   @override
   int get hashCode => (BotConnectStopRequested).hashCode;
+}
+
+/// Borra las credenciales del dispositivo (`wipe-credentials`, idempotente). El
+/// bot re-parea desde cero. NO gateado por `paused` (Tier B).
+class BotConnectWipeRequested extends BotConnectEvent {
+  const BotConnectWipeRequested();
+  @override
+  bool operator ==(Object other) => other is BotConnectWipeRequested;
+  @override
+  int get hashCode => (BotConnectWipeRequested).hashCode;
 }
 
 // States --------------------------------------------------------------------

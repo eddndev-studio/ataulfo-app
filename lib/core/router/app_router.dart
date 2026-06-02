@@ -10,6 +10,7 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/bots/domain/entities/bot.dart';
 import '../../features/bots/domain/repositories/bot_session_repository.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
 import '../../features/bots/presentation/bloc/bot_connect_bloc.dart';
@@ -258,13 +259,18 @@ class AppRouter {
         path: '/bots/:id/connect',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
+          // El `?channel=` (lo pasa el detalle) gatea la sección de wipe; ausente
+          // o desconocido ⇒ WA_UNOFFICIAL (el único canal hoy; deep-link safe).
+          final channel = state.uri.queryParameters['channel'] == 'WABA'
+              ? BotChannel.waba
+              : BotChannel.waUnofficial;
           return BlocProvider<BotConnectBloc>(
             create: (_) =>
                 BotConnectBloc(repo: _botSessionRepo, botId: id)
                   ..add(const BotConnectStarted()),
             child: Scaffold(
               appBar: AppBar(title: const Text('Conectar WhatsApp')),
-              body: const BotConnectPage(),
+              body: BotConnectPage(channel: channel),
             ),
           );
         },

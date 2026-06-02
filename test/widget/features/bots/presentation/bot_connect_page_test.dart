@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/connect_link.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_connect_bloc.dart';
@@ -23,6 +24,7 @@ void main() {
     registerFallbackValue(const BotConnectStarted());
     registerFallbackValue(const BotConnectPairingRequested());
     registerFallbackValue(const BotConnectStopRequested());
+    registerFallbackValue(const BotConnectWipeRequested());
   });
 
   late _MockBloc bloc;
@@ -32,11 +34,11 @@ void main() {
     when(() => bloc.state).thenReturn(const BotConnectLoading());
   });
 
-  Widget host() => MaterialApp(
+  Widget host({BotChannel channel = BotChannel.waUnofficial}) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: BlocProvider<BotConnectBloc>.value(
       value: bloc,
-      child: const Scaffold(body: BotConnectPage()),
+      child: Scaffold(body: BotConnectPage(channel: channel)),
     ),
   );
 
@@ -129,4 +131,38 @@ void main() {
       verify(() => bloc.add(const BotConnectStopRequested())).called(1);
     },
   );
+
+  group('wipe-credentials (S10, Tier B)', () {
+    testWidgets(
+      'WA_UNOFFICIAL: tap wipe → confirma → BotConnectWipeRequested',
+      (tester) async {
+        when(() => bloc.state).thenReturn(BotConnectReady(_link));
+
+        await tester.pumpWidget(host());
+        final wipe = find.byKey(const Key('bot_connect.wipe'));
+        expect(wipe, findsOneWidget);
+        await tester.ensureVisible(wipe);
+        await tester.tap(wipe);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('bot_connect.wipe_confirm')),
+          findsOneWidget,
+        );
+        verifyNever(() => bloc.add(const BotConnectWipeRequested()));
+
+        await tester.tap(find.byKey(const Key('bot_connect.wipe_confirm')));
+        await tester.pump();
+        verify(() => bloc.add(const BotConnectWipeRequested())).called(1);
+      },
+    );
+
+    testWidgets('WABA: la sección wipe está oculta', (tester) async {
+      when(() => bloc.state).thenReturn(BotConnectReady(_link));
+
+      await tester.pumpWidget(host(channel: BotChannel.waba));
+
+      expect(find.byKey(const Key('bot_connect.wipe')), findsNothing);
+    });
+  });
 }

@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../domain/entities/bot.dart';
 import '../../domain/entities/connect_link.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_connect_bloc.dart';
@@ -16,8 +17,13 @@ import '../bloc/bot_connect_bloc.dart';
 /// (vive 15 min); luego, cuando la otra persona está por escanear, el operador
 /// inicia el emparejamiento (el QR vive ~2 min). Por eso "Iniciar
 /// emparejamiento" es una acción aparte y no ocurre al abrir la pantalla.
+///
+/// El `channel` (default `WA_UNOFFICIAL`, el único hoy) gatea la sección de
+/// borrar credenciales: el wipe sólo aplica a WA no oficial; en WABA se oculta.
 class BotConnectPage extends StatelessWidget {
-  const BotConnectPage({super.key});
+  const BotConnectPage({super.key, this.channel = BotChannel.waUnofficial});
+
+  final BotChannel channel;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +33,7 @@ class BotConnectPage extends StatelessWidget {
         BotConnectReady(link: final link, phase: final phase) => _ReadyView(
           link: link,
           phase: phase,
+          channel: channel,
         ),
         BotConnectFailed(failure: final f) => _FailedView(failure: f),
       },
@@ -46,10 +53,15 @@ class _LoadingView extends StatelessWidget {
 }
 
 class _ReadyView extends StatelessWidget {
-  const _ReadyView({required this.link, required this.phase});
+  const _ReadyView({
+    required this.link,
+    required this.phase,
+    required this.channel,
+  });
 
   final ConnectLink link;
   final PairingPhase phase;
+  final BotChannel channel;
 
   @override
   Widget build(BuildContext context) {
@@ -89,9 +101,60 @@ class _ReadyView extends StatelessWidget {
           const Divider(color: AppTokens.divider, height: 1),
           const SizedBox(height: AppTokens.sp6),
           _PairingSection(phase: phase),
+          // Wipe (Tier B): SÓLO WA no oficial; oculto en WABA. No gateado por
+          // paused; siempre disponible tras confirmación fuerte.
+          if (channel == BotChannel.waUnofficial) ...<Widget>[
+            const SizedBox(height: AppTokens.sp7),
+            const Divider(color: AppTokens.divider, height: 1),
+            const SizedBox(height: AppTokens.sp6),
+            Text('Zona peligrosa', style: textTheme.titleMedium),
+            const SizedBox(height: AppTokens.sp2),
+            Text(
+              'Borrar las credenciales del dispositivo desvincula el bot: '
+              're-parea desde cero (nuevo QR). Úsalo si la sesión quedó '
+              'corrupta o quieres mover el bot a otro número.',
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            ),
+            const SizedBox(height: AppTokens.sp4),
+            AppButton.danger(
+              key: const Key('bot_connect.wipe'),
+              label: 'Borrar credenciales del dispositivo',
+              fullWidth: true,
+              onPressed: () => _confirmWipe(context),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _confirmWipe(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Borrar credenciales del dispositivo?'),
+        content: const Text(
+          'El bot perderá su vínculo con WhatsApp y deberá re-parearse desde '
+          'cero (nuevo QR). Esta acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('bot_connect.wipe_confirm'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Borrar',
+              style: TextStyle(color: AppTokens.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    context.read<BotConnectBloc>().add(const BotConnectWipeRequested());
   }
 
   Future<void> _copy(BuildContext context) async {

@@ -215,7 +215,9 @@ class _LoadedView extends StatelessWidget {
           AppButton.filled(
             label: 'Conectar WhatsApp',
             fullWidth: true,
-            onPressed: () => context.push('/bots/${bot.id}/connect'),
+            onPressed: () => context.push(
+              '/bots/${bot.id}/connect?channel=${bot.channel.toWire()}',
+            ),
           ),
           if (isAdmin) ...<Widget>[
             const SizedBox(height: AppTokens.sp3),

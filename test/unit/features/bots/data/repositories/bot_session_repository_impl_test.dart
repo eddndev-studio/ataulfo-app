@@ -47,4 +47,10 @@ void main() {
     await repo.resetSessions('b1');
     verify(() => ds.resetSessions('b1')).called(1);
   });
+
+  test('wipeCredentials delega en el datasource', () async {
+    when(() => ds.wipeCredentials('b1')).thenAnswer((_) async {});
+    await repo.wipeCredentials('b1');
+    verify(() => ds.wipeCredentials('b1')).called(1);
+  });
 }

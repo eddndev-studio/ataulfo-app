@@ -30,6 +30,11 @@ abstract interface class BotSessionDatasource {
   /// perder el pareado (útil tras `Bad MAC`). EXIGE `paused=true`: 409
   /// `ErrBotNotPaused` → `BotsNotPausedFailure`.
   Future<void> resetSessions(String botId);
+
+  /// `POST /bots/:id/wipe-credentials` ⇒ 204 (idempotente). Destruye las
+  /// credenciales persistidas del dispositivo: el bot re-parea desde cero
+  /// (nuevo QR). NO gateado por `paused`; su 409 (org ausente) NO es NotPaused.
+  Future<void> wipeCredentials(String botId);
 }
 
 class DioBotSessionDatasource implements BotSessionDatasource {
@@ -103,6 +108,16 @@ class DioBotSessionDatasource implements BotSessionDatasource {
       await _dio.post<void>('/bots/$botId/reset-sessions');
     } on DioException catch (e) {
       throw _mapDioException(e, notPausedConflict: true);
+    }
+  }
+
+  @override
+  Future<void> wipeCredentials(String botId) async {
+    try {
+      await _dio.post<void>('/bots/$botId/wipe-credentials');
+    } on DioException catch (e) {
+      // Sin flag: el wipe no gatea paused, así que su 409 colapsa a genérico.
+      throw _mapDioException(e);
     }
   }
 
