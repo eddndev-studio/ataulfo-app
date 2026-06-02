@@ -203,6 +203,15 @@ class _LoadedView extends StatelessWidget {
             fullWidth: true,
             onPressed: () => context.push('/bots/${bot.id}/connect'),
           ),
+          if (isAdmin) ...<Widget>[
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              key: const Key('bot_detail.variables'),
+              label: 'Variables',
+              fullWidth: true,
+              onPressed: () => context.push('/bots/${bot.id}/variables'),
+            ),
+          ],
         ],
       ),
     );
