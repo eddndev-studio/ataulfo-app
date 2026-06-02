@@ -41,9 +41,16 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
   /// Cadencia del poll del estado de sesión mientras el QR está vivo.
   static const Duration _pollInterval = Duration(seconds: 2);
 
-  /// Timer del poll, activo sólo mientras la sesión está PAIRING/CONNECTING.
-  /// Cancelado al alcanzar un estado terminal, al detener/borrar, y en `close`.
+  /// Timer del poll, activo sólo mientras la sesión está transitoria
+  /// (PAIRING/CONNECTING/RECONNECTING). Cancelado al alcanzar un estado
+  /// terminal, al detener/borrar, y en `close`.
   Timer? _poll;
+
+  /// Generación del poll: la bumpean start/stop. Un `_onStatusPolled` en vuelo
+  /// captura la generación al entrar; si cambió tras el `await` (un stop/wipe o
+  /// un nuevo arranque ocurrió mientras la red respondía), descarta su
+  /// resultado en vez de pisar el estado (evita falsos qrExpired / QR zombi).
+  int _pollGen = 0;
 
   @override
   Future<void> close() {
@@ -54,10 +61,12 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
   void _stopPolling() {
     _poll?.cancel();
     _poll = null;
+    _pollGen++;
   }
 
   void _startPolling() {
     _poll?.cancel();
+    _pollGen++;
     _poll = Timer.periodic(
       _pollInterval,
       (_) => add(const BotConnectStatusPolled()),
@@ -110,17 +119,23 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
       _stopPolling();
       return;
     }
+    final gen = _pollGen;
     try {
       final status = await _repo.getSessionState(_botId);
+      // Si un stop/wipe o un nuevo arranque ocurrió mientras la red respondía,
+      // este resultado quedó obsoleto: descartarlo en vez de pisar el estado
+      // (evita un falso qrExpired tras cancelar, o resucitar un QR zombi).
+      if (gen != _pollGen) return;
       // El QR de whatsmeow vive ~2 min: si veníamos en PAIRING y el backend
       // reporta DISCONNECTED, el código expiró (no es un fallo).
       final wasPairing = current.status?.state == SessionState.pairing;
       final qrExpired = wasPairing && status.state == SessionState.disconnected;
-      // Sólo PAIRING/CONNECTING son transitorios que justifican seguir
-      // sondeando; en cualquier otro estado paramos.
+      // PAIRING/CONNECTING/RECONNECTING son transitorios que justifican seguir
+      // sondeando; en cualquier otro estado (CONNECTED/DISCONNECTED) paramos.
       final keepPolling =
           status.state == SessionState.pairing ||
-          status.state == SessionState.connecting;
+          status.state == SessionState.connecting ||
+          status.state == SessionState.reconnecting;
       if (!keepPolling) _stopPolling();
       emit(
         BotConnectReady(
