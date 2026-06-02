@@ -297,4 +297,26 @@ void main() {
       expect(find.textContaining('desactualizada'), findsOneWidget);
     });
   });
+
+  group('editar nombre (S3, ADMIN+)', () {
+    testWidgets('ADMIN ve el lápiz; tap abre BotEditSheet', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('bot_detail.edit')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('bot_detail.edit')));
+      await tester.pumpAndSettle();
+      expect(find.text('Editar bot'), findsOneWidget);
+      expect(find.byKey(const Key('bot_edit.name')), findsOneWidget);
+    });
+
+    testWidgets('WORKER no ve el lápiz', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host(role: 'WORKER'));
+
+      expect(find.byKey(const Key('bot_detail.edit')), findsNothing);
+    });
+  });
 }

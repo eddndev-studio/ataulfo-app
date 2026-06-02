@@ -13,6 +13,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_detail_bloc.dart';
+import '../widgets/bot_edit_sheet.dart';
 
 /// Detalle de un Bot (S04). Consume el `BotDetailBloc` del scope; el
 /// cableado del provider y del ID lo hace el router en `/bots/:id`. Es
@@ -117,6 +118,15 @@ class _LoadedView extends StatelessWidget {
                   ],
                 ),
               ),
+              if (isAdmin)
+                IconButton(
+                  key: const Key('bot_detail.edit'),
+                  tooltip: 'Editar bot',
+                  icon: const Icon(Icons.edit_outlined, color: AppTokens.text2),
+                  onPressed: isMutating
+                      ? null
+                      : () => BotEditSheet.openEdit(context, bot),
+                ),
             ],
           ),
           const SizedBox(height: AppTokens.sp6),
