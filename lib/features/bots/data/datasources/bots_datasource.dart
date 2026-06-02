@@ -51,6 +51,10 @@ abstract interface class BotsDatasource {
   /// un id NUEVO (canal y plantilla heredados, version reiniciada). 422 si el
   /// nombre es inválido; 404 si el bot origen no existe. No usa CAS de versión.
   Future<Bot> clone({required String id, required String name});
+
+  /// `DELETE /bots/:id` ⇒ 204. Borra el bot (deja huérfanas sessions/messages/
+  /// executions sin FK). 404 si ya no existe. No usa CAS de versión.
+  Future<void> delete(String id);
 }
 
 class DioBotsDatasource implements BotsDatasource {
@@ -191,6 +195,15 @@ class DioBotsDatasource implements BotsDatasource {
       throw const UnknownBotsFailure();
     } on TypeError {
       throw const UnknownBotsFailure();
+    }
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete<void>('/bots/$id');
+    } on DioException catch (e) {
+      throw _mapDioException(e);
     }
   }
 

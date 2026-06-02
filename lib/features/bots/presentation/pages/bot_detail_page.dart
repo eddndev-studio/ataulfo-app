@@ -35,27 +35,37 @@ class BotDetailPage extends StatelessWidget {
     final isAdmin =
         authState is AuthAuthenticated &&
         isAdminOrAbove(authState.identity.role);
-    return BlocBuilder<BotDetailBloc, BotDetailState>(
-      builder: (context, state) => switch (state) {
-        BotDetailLoading() => const _LoadingView(),
-        BotDetailLoaded(bot: final bot) => _LoadedView(
-          bot: bot,
-          isAdmin: isAdmin,
-        ),
-        // Durante una mutación el bot sigue visible con los controles
-        // inhabilitados; tras un fallo, visible con el copy de error.
-        BotDetailMutating(bot: final bot) => _LoadedView(
-          bot: bot,
-          isAdmin: isAdmin,
-          isMutating: true,
-        ),
-        BotDetailMutationFailed(bot: final bot, failure: final f) =>
-          _LoadedView(bot: bot, isAdmin: isAdmin, failure: f),
-        // Transitorio: el listener ya navegó al clon; el bloc vuelve a Loaded
-        // enseguida. Un frame de spinner evita parpadeo.
-        BotDetailCloneSucceeded() => const _LoadingView(),
-        BotDetailFailed(failure: final f) => _FailedView(failure: f),
+    return BlocListener<BotDetailBloc, BotDetailState>(
+      listenWhen: (_, current) => current is BotDetailDeleteSucceeded,
+      listener: (context, state) {
+        // Borrado: vuelve a la lista (que se refresca vía el RouteObserver).
+        // `maybePop` sobre el Navigator raíz (el mismo que usa go_router) hace
+        // pop sólo si hay algo debajo — robusto en pruebas y en la app real.
+        Navigator.of(context).maybePop();
       },
+      child: BlocBuilder<BotDetailBloc, BotDetailState>(
+        builder: (context, state) => switch (state) {
+          BotDetailLoading() => const _LoadingView(),
+          BotDetailLoaded(bot: final bot) => _LoadedView(
+            bot: bot,
+            isAdmin: isAdmin,
+          ),
+          // Durante una mutación el bot sigue visible con los controles
+          // inhabilitados; tras un fallo, visible con el copy de error.
+          BotDetailMutating(bot: final bot) => _LoadedView(
+            bot: bot,
+            isAdmin: isAdmin,
+            isMutating: true,
+          ),
+          BotDetailMutationFailed(bot: final bot, failure: final f) =>
+            _LoadedView(bot: bot, isAdmin: isAdmin, failure: f),
+          // Transitorios: el listener ya navegó (clon) o hizo pop (borrado);
+          // un frame de spinner evita parpadeo mientras se desmonta.
+          BotDetailCloneSucceeded() => const _LoadingView(),
+          BotDetailDeleteSucceeded() => const _LoadingView(),
+          BotDetailFailed(failure: final f) => _FailedView(failure: f),
+        },
+      ),
     );
   }
 }
@@ -227,10 +237,51 @@ class _LoadedView extends StatelessWidget {
                       onCloned: (newId) => context.push('/bots/$newId'),
                     ),
             ),
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.danger(
+              key: const Key('bot_detail.delete'),
+              label: 'Eliminar bot',
+              fullWidth: true,
+              onPressed: isMutating ? null : () => _confirmDelete(context, bot),
+            ),
           ],
         ],
       ),
     );
+  }
+
+  /// Confirmación fuerte (Tier B) antes de borrar. Avisa de los huérfanos
+  /// (sessions/messages/executions sin FK) y sugiere limpiar conversaciones
+  /// antes. Sólo tras confirmar despacha el borrado.
+  Future<void> _confirmDelete(BuildContext context, Bot bot) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar este bot?'),
+        content: Text(
+          'Se borrará "${bot.name}" de forma permanente. Sus conversaciones, '
+          'mensajes y ejecuciones quedarán huérfanos; si quieres limpiarlos, '
+          'usa "Borrar conversaciones" en Mantenimiento antes de eliminar. '
+          'Esta acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('bot_detail.delete_confirm'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppTokens.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    context.read<BotDetailBloc>().add(const BotDetailDeleteRequested());
   }
 
   // Duplicado intencional con BotsListPage._BotTile._channelLabel: regla

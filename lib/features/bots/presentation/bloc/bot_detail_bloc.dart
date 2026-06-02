@@ -26,6 +26,7 @@ class BotDetailBloc extends Bloc<BotDetailEvent, BotDetailState> {
     on<BotDetailLoadRequested>(_onLoad);
     on<BotDetailUpdateRequested>(_onUpdate);
     on<BotDetailCloneRequested>(_onClone);
+    on<BotDetailDeleteRequested>(_onDelete);
   }
 
   final BotsRepository _repo;
@@ -92,6 +93,32 @@ class BotDetailBloc extends Bloc<BotDetailEvent, BotDetailState> {
       // Vuelve al snapshot intacto: si el operador regresa a este detalle (el
       // listener empujó el del clon encima), ve el bot original estable.
       emit(BotDetailLoaded(snapshot));
+    } on BotsFailure catch (f) {
+      emit(BotDetailMutationFailed(snapshot, f));
+    }
+  }
+
+  /// Borra el Bot. El éxito deja sin entidad: emite `DeleteSucceeded`
+  /// (transitorio) que el listener consume para hacer pop a la lista. El fallo
+  /// reusa `MutationFailed(snapshot, failure)`.
+  Future<void> _onDelete(
+    BotDetailDeleteRequested event,
+    Emitter<BotDetailState> emit,
+  ) async {
+    final current = state;
+    final Bot snapshot;
+    if (current is BotDetailLoaded) {
+      snapshot = current.bot;
+    } else if (current is BotDetailMutationFailed) {
+      snapshot = current.bot;
+    } else {
+      return;
+    }
+
+    emit(BotDetailMutating(snapshot));
+    try {
+      await _repo.delete(_id);
+      emit(const BotDetailDeleteSucceeded());
     } on BotsFailure catch (f) {
       emit(BotDetailMutationFailed(snapshot, f));
     }
@@ -185,6 +212,15 @@ class BotDetailCloneRequested extends BotDetailEvent {
   int get hashCode => name.hashCode;
 }
 
+/// Borra el Bot (`DELETE /bots/:id`). El éxito hace pop a la lista.
+class BotDetailDeleteRequested extends BotDetailEvent {
+  const BotDetailDeleteRequested();
+  @override
+  bool operator ==(Object other) => other is BotDetailDeleteRequested;
+  @override
+  int get hashCode => (BotDetailDeleteRequested).hashCode;
+}
+
 // States --------------------------------------------------------------------
 
 sealed class BotDetailState {
@@ -236,6 +272,16 @@ class BotDetailMutating extends BotDetailState {
       other is BotDetailMutating && other.bot == bot;
   @override
   int get hashCode => bot.hashCode;
+}
+
+/// Delete exitoso (transitorio): el listener hace pop a la lista (que se
+/// refresca vía el RouteObserver). El bot ya no existe; no hay snapshot.
+class BotDetailDeleteSucceeded extends BotDetailState {
+  const BotDetailDeleteSucceeded();
+  @override
+  bool operator ==(Object other) => other is BotDetailDeleteSucceeded;
+  @override
+  int get hashCode => (BotDetailDeleteSucceeded).hashCode;
 }
 
 /// Clone exitoso (transitorio): lleva el id del clon para que el listener

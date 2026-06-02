@@ -44,4 +44,7 @@ class BotsRepositoryImpl implements BotsRepository {
   @override
   Future<Bot> clone({required String id, required String name}) =>
       _ds.clone(id: id, name: name);
+
+  @override
+  Future<void> delete(String id) => _ds.delete(id);
 }
