@@ -20,4 +20,11 @@ class BotSessionRepositoryImpl implements BotSessionRepository {
   @override
   Future<ConnectLink> issueConnectLink(String botId) =>
       _ds.issueConnectLink(botId);
+
+  @override
+  Future<void> clearConversations(String botId) =>
+      _ds.clearConversations(botId);
+
+  @override
+  Future<void> resetSessions(String botId) => _ds.resetSessions(botId);
 }

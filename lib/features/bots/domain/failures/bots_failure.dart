@@ -57,6 +57,15 @@ final class BotsConflictFailure extends BotsFailure {
   const BotsConflictFailure();
 }
 
+/// 409 contra `clear-conversations` / `reset-sessions`: el bot no está pausado
+/// (`ErrBotNotPaused`). Estas ops de runtime exigen `paused=true`. La UI las
+/// deshabilita cuando `!paused`; este failure es la red de seguridad si el
+/// estado quedó stale. Mapeo POR-ENDPOINT: sólo clear/reset traducen 409 a
+/// este failure (otros verbos de sesión colapsan su 409 a genérico).
+final class BotsNotPausedFailure extends BotsFailure {
+  const BotsNotPausedFailure();
+}
+
 /// 5xx del backend. Distinto de red: el servidor respondió, pero rompió.
 final class BotsServerFailure extends BotsFailure {
   const BotsServerFailure();

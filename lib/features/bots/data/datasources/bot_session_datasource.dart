@@ -20,6 +20,16 @@ abstract interface class BotSessionDatasource {
   /// `POST /bots/:id/connect-token` ⇒ 201 `{token, expiresAt}`. Emite un
   /// ConnectToken y construye el enlace público a compartir.
   Future<ConnectLink> issueConnectLink(String botId);
+
+  /// `POST /bots/:id/clear-conversations` ⇒ 204. Purga messages/sessions/
+  /// executions/labels/dedupe del bot. EXIGE `paused=true`: 409 `ErrBotNotPaused`
+  /// → `BotsNotPausedFailure`. Idempotente sobre cero filas.
+  Future<void> clearConversations(String botId);
+
+  /// `POST /bots/:id/reset-sessions` ⇒ 204. Invalida el handshake Signal sin
+  /// perder el pareado (útil tras `Bad MAC`). EXIGE `paused=true`: 409
+  /// `ErrBotNotPaused` → `BotsNotPausedFailure`.
+  Future<void> resetSessions(String botId);
 }
 
 class DioBotSessionDatasource implements BotSessionDatasource {
@@ -78,11 +88,36 @@ class DioBotSessionDatasource implements BotSessionDatasource {
     return '$base/connect?token=${Uri.encodeComponent(token)}';
   }
 
+  @override
+  Future<void> clearConversations(String botId) async {
+    try {
+      await _dio.post<void>('/bots/$botId/clear-conversations');
+    } on DioException catch (e) {
+      throw _mapDioException(e, notPausedConflict: true);
+    }
+  }
+
+  @override
+  Future<void> resetSessions(String botId) async {
+    try {
+      await _dio.post<void>('/bots/$botId/reset-sessions');
+    } on DioException catch (e) {
+      throw _mapDioException(e, notPausedConflict: true);
+    }
+  }
+
   /// Traduce DioException a la jerarquía sellada de BotsFailure. Mismo patrón
   /// que `DioBotsDatasource._mapDioException`; sin caso 422 (los endpoints de
-  /// sesión no validan body) y el 409 de connect-token —org activa ausente—
-  /// colapsa a genérico (el operador no acciona distinto sin más contexto).
-  BotsFailure _mapDioException(DioException e) {
+  /// sesión no validan body).
+  ///
+  /// `notPausedConflict` rige el 409 POR-ENDPOINT: en clear/reset un 409 es
+  /// `ErrBotNotPaused` (`BotsNotPausedFailure`); en los demás verbos de sesión
+  /// el 409 (org activa ausente) colapsa a genérico — el operador no acciona
+  /// distinto sin más contexto.
+  BotsFailure _mapDioException(
+    DioException e, {
+    bool notPausedConflict = false,
+  }) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
@@ -94,6 +129,9 @@ class DioBotSessionDatasource implements BotSessionDatasource {
         final status = e.response?.statusCode ?? 0;
         if (status == 403) return const BotsForbiddenFailure();
         if (status == 404) return const BotsNotFoundFailure();
+        if (status == 409 && notPausedConflict) {
+          return const BotsNotPausedFailure();
+        }
         if (status >= 500 && status < 600) return const BotsServerFailure();
         return const UnknownBotsFailure();
       case DioExceptionType.cancel:
