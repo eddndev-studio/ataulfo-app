@@ -5,13 +5,11 @@ void main() {
   Map<String, dynamic> defJson({
     String id = 'v1',
     String name = 'nombre',
-    String type = 'text',
     String def = '',
     String description = '',
   }) => <String, dynamic>{
     'id': id,
     'name': name,
-    'type': type,
     'default': def,
     'description': description,
   };
@@ -22,7 +20,6 @@ void main() {
         defJson(
           id: 'v1',
           name: 'nombre',
-          type: 'text',
           def: 'cliente',
           description: 'Saludo personalizado',
         ),
@@ -30,7 +27,6 @@ void main() {
 
       expect(r.id, 'v1');
       expect(r.name, 'nombre');
-      expect(r.type, 'text');
       expect(r.defaultValue, 'cliente');
       expect(r.description, 'Saludo personalizado');
     });
@@ -43,6 +39,40 @@ void main() {
     });
 
     test(
+      'respuesta CON la clave legacy `type` decodifica bien (se ignora)',
+      () {
+        // El backend sigue emitiendo `type: "text"` por compat de wire; el
+        // cliente lo tolera sin leerlo — las variables son solo-texto.
+        final r = VarDefResp.fromJson(<String, dynamic>{
+          'id': 'v1',
+          'name': 'nombre',
+          'type': 'text',
+          'default': 'cliente',
+          'description': '',
+        });
+
+        expect(r.id, 'v1');
+        expect(r.name, 'nombre');
+        expect(r.defaultValue, 'cliente');
+      },
+    );
+
+    test('respuesta SIN la clave `type` decodifica igual de bien', () {
+      // Cuando el backend deje de emitir `type`, la respuesta sigue
+      // siendo válida — la clave nunca fue obligatoria para el cliente.
+      final r = VarDefResp.fromJson(<String, dynamic>{
+        'id': 'v1',
+        'name': 'nombre',
+        'default': 'cliente',
+        'description': '',
+      });
+
+      expect(r.id, 'v1');
+      expect(r.name, 'nombre');
+      expect(r.defaultValue, 'cliente');
+    });
+
+    test(
       'default/description faltantes son interpretados como string vacío',
       () {
         // El backend serializa con omitempty: defaults vacíos no aparecen
@@ -50,7 +80,6 @@ void main() {
         final r = VarDefResp.fromJson(<String, dynamic>{
           'id': 'v1',
           'name': 'nombre',
-          'type': 'text',
         });
 
         expect(r.defaultValue, '');

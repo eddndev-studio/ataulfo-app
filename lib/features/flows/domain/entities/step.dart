@@ -5,9 +5,8 @@
 /// - 1 ramificación: CONDITIONAL_TIME (evalúa ventanas horarias para
 ///   bifurcar el flow).
 ///
-/// Política de wire: tokens **UPPERCASE** canonical (intencionalmente
-/// distinto de `VarType` que usa lowercase; refleja la inconsistencia
-/// interna del backend, no se silencia). Cualquier token con casing
+/// Política de wire: tokens **UPPERCASE** canonical (refleja el wire
+/// actual del backend, no se silencia). Cualquier token con casing
 /// distinto o fuera del set es drift de contrato y rompe fail-loud.
 enum StepType {
   text,

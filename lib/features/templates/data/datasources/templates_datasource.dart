@@ -39,26 +39,21 @@ abstract interface class TemplatesDatasource {
   Future<({int version, List<VariableDef> defs})> listVarDefs(String id);
 
   /// `POST /templates/:id/variable-definitions` body
-  /// `{name, type, default, description, version}` con CAS optimista
-  /// sobre el Template padre. Devuelve la VariableDef recién creada
-  /// (con id opaco del servidor). El backend NO devuelve la nueva
-  /// version del Template — el llamador debe refetchar el listado para
-  /// el siguiente CAS.
+  /// `{name, default, description, version}` con CAS optimista sobre el
+  /// Template padre. Devuelve la VariableDef recién creada (con id opaco
+  /// del servidor). El backend NO devuelve la nueva version del Template
+  /// — el llamador debe refetchar el listado para el siguiente CAS.
   ///
   /// 409 (`ErrTemplateConflict`/`ErrVariableNameDuplicated`/`ErrVariableInUse`)
   /// ⇒ `TemplatesConflictFailure`. El backend no discrimina entre
   /// version stale y duplicate name; el cliente trata todos como
   /// "recarga y vuelve a intentar".
   ///
-  /// 422 (`ErrInvalidVariableName`/`ErrInvalidVariableType`) ⇒
-  /// `TemplatesInvalidUpdateFailure`. Aterriza cuando un nombre rompe
-  /// la regex del backend o cuando el tipo no es válido (v1 sólo `text`,
-  /// pero si el cliente avanza con un tipo nuevo antes que el backend
-  /// el 422 lo atrapa).
+  /// 422 (`ErrInvalidVariableName`) ⇒ `TemplatesInvalidUpdateFailure`.
+  /// Aterriza cuando un nombre rompe la regex del backend.
   Future<VariableDef> addVarDef({
     required String templateId,
     required String name,
-    required VarType type,
     required String defaultValue,
     required String description,
     required int version,
@@ -80,7 +75,6 @@ abstract interface class TemplatesDatasource {
     required String varDefId,
     required int version,
     String? name,
-    VarType? type,
     String? defaultValue,
     String? description,
   });
@@ -249,7 +243,6 @@ class DioTemplatesDatasource implements TemplatesDatasource {
   Future<VariableDef> addVarDef({
     required String templateId,
     required String name,
-    required VarType type,
     required String defaultValue,
     required String description,
     required int version,
@@ -259,7 +252,6 @@ class DioTemplatesDatasource implements TemplatesDatasource {
         '/templates/$templateId/variable-definitions',
         data: <String, dynamic>{
           'name': name,
-          'type': type.toWire(),
           'default': defaultValue,
           'description': description,
           'version': version,
@@ -286,7 +278,6 @@ class DioTemplatesDatasource implements TemplatesDatasource {
     required String varDefId,
     required int version,
     String? name,
-    VarType? type,
     String? defaultValue,
     String? description,
   }) async {
@@ -296,7 +287,6 @@ class DioTemplatesDatasource implements TemplatesDatasource {
       // nil del backend). Cadena vacía es set explícito.
       final body = <String, dynamic>{'version': version};
       if (name != null) body['name'] = name;
-      if (type != null) body['type'] = type.toWire();
       if (defaultValue != null) body['default'] = defaultValue;
       if (description != null) body['description'] = description;
 

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
-import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
@@ -21,7 +20,6 @@ const _defs = <VariableDef>[
   VariableDef(
     id: 'v1',
     name: 'nombre',
-    type: VarType.text,
     defaultValue: 'cliente',
     description: '',
   ),
@@ -108,7 +106,6 @@ void main() {
           () => bloc.add(
             const VarDefsAddRequested(
               name: 'saldo',
-              type: VarType.text,
               defaultValue: 'x',
               description: 'saldo del cliente',
             ),
@@ -134,7 +131,6 @@ void main() {
         () => bloc.add(
           const VarDefsAddRequested(
             name: 'saldo',
-            type: VarType.text,
             defaultValue: '',
             description: '',
           ),
@@ -326,195 +322,6 @@ void main() {
     });
   });
 
-  group('VarDefFormSheet — picker de tipo (set v1)', () {
-    // Set v1 acordado con el usuario: text + label + 4 multimedia. El sheet
-    // muestra un picker de chips humanizados; el chip seleccionado pinta
-    // el tipo de la variable. Default para nuevas variables: text.
-    testWidgets('crear: renderiza 6 chips humanizados con keys contractuales', (
-      tester,
-    ) async {
-      await tester.pumpWidget(host(existingNames: <String>{}));
-
-      expect(find.byKey(const Key('var_def_form.type.text')), findsOneWidget);
-      expect(find.byKey(const Key('var_def_form.type.label')), findsOneWidget);
-      expect(find.byKey(const Key('var_def_form.type.image')), findsOneWidget);
-      expect(find.byKey(const Key('var_def_form.type.video')), findsOneWidget);
-      expect(find.byKey(const Key('var_def_form.type.audio')), findsOneWidget);
-      expect(
-        find.byKey(const Key('var_def_form.type.document')),
-        findsOneWidget,
-      );
-      // Labels humanizados (visibles al operador):
-      expect(find.text('Texto'), findsOneWidget);
-      expect(find.text('Etiqueta'), findsOneWidget);
-      expect(find.text('Imagen'), findsOneWidget);
-      expect(find.text('Video'), findsOneWidget);
-      expect(find.text('Audio'), findsOneWidget);
-      expect(find.text('Documento'), findsOneWidget);
-    });
-
-    testWidgets('crear: default es text — el chip text arranca seleccionado', (
-      tester,
-    ) async {
-      await tester.pumpWidget(host(existingNames: <String>{}));
-
-      final chip = tester.widget<AppChoiceChip>(
-        find.byKey(const Key('var_def_form.type.text')),
-      );
-      expect(chip.selected, isTrue);
-
-      final notSel = tester.widget<AppChoiceChip>(
-        find.byKey(const Key('var_def_form.type.audio')),
-      );
-      expect(notSel.selected, isFalse);
-    });
-
-    testWidgets(
-      'crear: tap chip cambia la selección y el submit usa el tipo elegido',
-      (tester) async {
-        await tester.pumpWidget(host(existingNames: <String>{}));
-
-        await tester.enterText(
-          find.byKey(const Key('var_def_form.name')),
-          'foto_perfil',
-        );
-        await tester.tap(find.byKey(const Key('var_def_form.type.image')));
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('var_def_form.submit')));
-        await tester.pump();
-
-        verify(
-          () => bloc.add(
-            const VarDefsAddRequested(
-              name: 'foto_perfil',
-              type: VarType.image,
-              defaultValue: '',
-              description: '',
-            ),
-          ),
-        ).called(1);
-      },
-    );
-
-    testWidgets('edit: chip pre-seleccionado refleja el editing.type', (
-      tester,
-    ) async {
-      const editing = VariableDef(
-        id: 'v9',
-        name: 'cancion',
-        type: VarType.audio,
-        defaultValue: '',
-        description: '',
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppDesignTheme.dark(),
-          home: Scaffold(
-            body: BlocProvider<VarDefsBloc>.value(
-              value: bloc,
-              child: const VarDefFormSheet(
-                existingNames: <String>{'cancion'},
-                editing: editing,
-              ),
-            ),
-          ),
-        ),
-      );
-
-      final audioChip = tester.widget<AppChoiceChip>(
-        find.byKey(const Key('var_def_form.type.audio')),
-      );
-      expect(audioChip.selected, isTrue);
-      final textChip = tester.widget<AppChoiceChip>(
-        find.byKey(const Key('var_def_form.type.text')),
-      );
-      expect(textChip.selected, isFalse);
-    });
-
-    testWidgets(
-      'edit: cambiar el chip dispatcha UpdateRequested only-changed con el nuevo type',
-      (tester) async {
-        const editing = VariableDef(
-          id: 'v9',
-          name: 'cancion',
-          type: VarType.text,
-          defaultValue: '',
-          description: '',
-        );
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppDesignTheme.dark(),
-            home: Scaffold(
-              body: BlocProvider<VarDefsBloc>.value(
-                value: bloc,
-                child: const VarDefFormSheet(
-                  existingNames: <String>{'cancion'},
-                  editing: editing,
-                ),
-              ),
-            ),
-          ),
-        );
-
-        await tester.tap(find.byKey(const Key('var_def_form.type.audio')));
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('var_def_form.submit')));
-        await tester.pump();
-
-        verify(
-          () => bloc.add(
-            const VarDefsUpdateRequested(varDefId: 'v9', type: VarType.audio),
-          ),
-        ).called(1);
-      },
-    );
-
-    testWidgets(
-      'edit: sin cambiar el chip, el patch no incluye type (only-changed)',
-      (tester) async {
-        const editing = VariableDef(
-          id: 'v9',
-          name: 'cancion',
-          type: VarType.audio,
-          defaultValue: 'fanfare.mp3',
-          description: '',
-        );
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppDesignTheme.dark(),
-            home: Scaffold(
-              body: BlocProvider<VarDefsBloc>.value(
-                value: bloc,
-                child: const VarDefFormSheet(
-                  existingNames: <String>{'cancion'},
-                  editing: editing,
-                ),
-              ),
-            ),
-          ),
-        );
-
-        // Cambiar SÓLO la description; el tipo queda igual (audio).
-        await tester.enterText(
-          find.byKey(const Key('var_def_form.description')),
-          'canción del jingle',
-        );
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('var_def_form.submit')));
-        await tester.pump();
-
-        verify(
-          () => bloc.add(
-            const VarDefsUpdateRequested(
-              varDefId: 'v9',
-              description: 'canción del jingle',
-            ),
-          ),
-        ).called(1);
-      },
-    );
-  });
-
   group('VarDefFormSheet — padding inferior (teclado + system-nav)', () {
     // El sheet flota sobre el teclado virtual cuando el operador edita,
     // pero al cerrar el teclado en devices con gesture-nav (Android 15
@@ -603,7 +410,6 @@ void main() {
     const editing = VariableDef(
       id: 'v1',
       name: 'nombre',
-      type: VarType.text,
       defaultValue: 'cliente',
       description: 'Saludo personalizado',
     );

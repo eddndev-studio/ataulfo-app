@@ -457,14 +457,12 @@ void main() {
             VariableDef(
               id: 'v1',
               name: 'nombre',
-              type: VarType.text,
               defaultValue: 'cliente',
               description: 'Saludo personalizado',
             ),
             VariableDef(
               id: 'v2',
               name: 'edad',
-              type: VarType.text,
               defaultValue: '',
               description: '',
             ),
@@ -477,70 +475,6 @@ void main() {
         expect(find.text('cliente'), findsOneWidget);
         expect(find.text('Saludo personalizado'), findsOneWidget);
         expect(find.text('{{edad}}'), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      'row de variable multimedia muestra pill humanizada del tipo (set v1)',
-      (tester) async {
-        // Pill por tipo: visible para label/multimedia (informativa); para
-        // text (default semántico) se omite — el operador asume text si
-        // no hay pill, reduciendo ruido visual en el caso más común.
-        when(() => varDefsBloc.state).thenReturn(
-          const VarDefsLoaded(<VariableDef>[
-            VariableDef(
-              id: 'v1',
-              name: 'foto',
-              type: VarType.image,
-              defaultValue: '',
-              description: '',
-            ),
-            VariableDef(
-              id: 'v2',
-              name: 'cancion',
-              type: VarType.audio,
-              defaultValue: '',
-              description: '',
-            ),
-            VariableDef(
-              id: 'v3',
-              name: 'tipo_cliente',
-              type: VarType.label,
-              defaultValue: '',
-              description: '',
-            ),
-            VariableDef(
-              id: 'v4',
-              name: 'comentario',
-              type: VarType.text,
-              defaultValue: '',
-              description: '',
-            ),
-          ], 4),
-        );
-
-        await tester.pumpWidget(host());
-
-        expect(
-          find.byKey(const Key('var_defs.row.v1.type_pill')),
-          findsOneWidget,
-        );
-        expect(find.text('Imagen'), findsOneWidget);
-        expect(
-          find.byKey(const Key('var_defs.row.v2.type_pill')),
-          findsOneWidget,
-        );
-        expect(find.text('Audio'), findsOneWidget);
-        expect(
-          find.byKey(const Key('var_defs.row.v3.type_pill')),
-          findsOneWidget,
-        );
-        expect(find.text('Etiqueta'), findsOneWidget);
-        // text es el default semántico: sin pill (reduce ruido).
-        expect(
-          find.byKey(const Key('var_defs.row.v4.type_pill')),
-          findsNothing,
-        );
       },
     );
 
@@ -581,7 +515,6 @@ void main() {
             VariableDef(
               id: 'v1',
               name: 'nombre',
-              type: VarType.text,
               defaultValue: 'cliente',
               description: '',
             ),
@@ -607,7 +540,6 @@ void main() {
               VariableDef(
                 id: 'v1',
                 name: 'nombre',
-                type: VarType.text,
                 defaultValue: 'cliente',
                 description: '',
               ),
@@ -695,7 +627,6 @@ void main() {
             VariableDef(
               id: 'v1',
               name: 'nombre',
-              type: VarType.text,
               defaultValue: 'cliente',
               description: '',
             ),
@@ -722,7 +653,6 @@ void main() {
           VariableDef(
             id: 'v1',
             name: 'nombre',
-            type: VarType.text,
             defaultValue: 'cliente',
             description: 'Saludo personalizado',
           ),
@@ -759,17 +689,10 @@ void main() {
         VariableDef(
           id: 'v1',
           name: 'nombre',
-          type: VarType.text,
           defaultValue: '',
           description: '',
         ),
-        VariableDef(
-          id: 'v2',
-          name: 'edad',
-          type: VarType.text,
-          defaultValue: '',
-          description: '',
-        ),
+        VariableDef(id: 'v2', name: 'edad', defaultValue: '', description: ''),
       ];
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
       when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
@@ -787,7 +710,6 @@ void main() {
         VariableDef(
           id: 'v1',
           name: 'nombre',
-          type: VarType.text,
           defaultValue: '',
           description: '',
         ),
@@ -820,7 +742,6 @@ void main() {
           VariableDef(
             id: 'v1',
             name: 'nombre',
-            type: VarType.text,
             defaultValue: '',
             description: '',
           ),
@@ -849,7 +770,6 @@ void main() {
           VariableDef(
             id: 'v1',
             name: 'nombre',
-            type: VarType.text,
             defaultValue: '',
             description: '',
           ),

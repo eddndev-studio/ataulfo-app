@@ -38,14 +38,12 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
   Future<VariableDef> addVarDef({
     required String templateId,
     required String name,
-    required VarType type,
     required String defaultValue,
     required String description,
     required int version,
   }) => _ds.addVarDef(
     templateId: templateId,
     name: name,
-    type: type,
     defaultValue: defaultValue,
     description: description,
     version: version,
@@ -56,14 +54,12 @@ class TemplatesRepositoryImpl implements TemplatesRepository {
     required String varDefId,
     required int version,
     String? name,
-    VarType? type,
     String? defaultValue,
     String? description,
   }) => _ds.updateVarDef(
     varDefId: varDefId,
     version: version,
     name: name,
-    type: type,
     defaultValue: defaultValue,
     description: description,
   );

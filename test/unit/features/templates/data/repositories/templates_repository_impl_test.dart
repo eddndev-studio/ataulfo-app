@@ -84,7 +84,6 @@ void main() {
       VariableDef(
         id: 'v1',
         name: 'nombre',
-        type: VarType.text,
         defaultValue: 'cliente',
         description: '',
       ),
@@ -178,7 +177,6 @@ void main() {
     const newDef = VariableDef(
       id: 'vd_new',
       name: 'saldo',
-      type: VarType.text,
       defaultValue: 'x',
       description: 'saldo del cliente',
     );
@@ -188,7 +186,6 @@ void main() {
         () => ds.addVarDef(
           templateId: 't1',
           name: 'saldo',
-          type: VarType.text,
           defaultValue: 'x',
           description: 'saldo del cliente',
           version: 1,
@@ -198,7 +195,6 @@ void main() {
       final got = await repo.addVarDef(
         templateId: 't1',
         name: 'saldo',
-        type: VarType.text,
         defaultValue: 'x',
         description: 'saldo del cliente',
         version: 1,
@@ -209,7 +205,6 @@ void main() {
         () => ds.addVarDef(
           templateId: 't1',
           name: 'saldo',
-          type: VarType.text,
           defaultValue: 'x',
           description: 'saldo del cliente',
           version: 1,
@@ -222,7 +217,6 @@ void main() {
         () => ds.addVarDef(
           templateId: 't1',
           name: 'dup',
-          type: VarType.text,
           defaultValue: '',
           description: '',
           version: 1,
@@ -235,7 +229,6 @@ void main() {
         () => repo.addVarDef(
           templateId: 't1',
           name: 'dup',
-          type: VarType.text,
           defaultValue: '',
           description: '',
           version: 1,

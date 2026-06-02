@@ -31,14 +31,12 @@ const _defs = <VariableDef>[
   VariableDef(
     id: 'v1',
     name: 'tono',
-    type: VarType.text,
     defaultValue: 'neutral',
     description: 'Tono de las respuestas',
   ),
   VariableDef(
     id: 'v2',
     name: 'firma',
-    type: VarType.text,
     defaultValue: 'El equipo',
     description: 'Firma al cierre',
   ),

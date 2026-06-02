@@ -6,7 +6,6 @@ class VarDefResp {
   const VarDefResp({
     required this.id,
     required this.name,
-    required this.type,
     required this.defaultValue,
     required this.description,
   });
@@ -14,10 +13,12 @@ class VarDefResp {
   factory VarDefResp.fromJson(Map<String, dynamic> json) {
     final id = json['id'];
     final name = json['name'];
-    final type = json['type'];
-    if (id is! String || name is! String || type is! String) {
+    if (id is! String || name is! String) {
       throw const FormatException('varDefResp: clave obligatoria ausente');
     }
+    // El backend aún emite `type: "text"` por compat de wire; el cliente
+    // lo ignora — las variables son solo-texto. La clave puede estar
+    // presente o ausente sin afectar la decodificación.
     final rawDefault = json['default'];
     final rawDesc = json['description'];
     // `default` y `description` llevan omitempty en el backend: ausentes
@@ -32,7 +33,6 @@ class VarDefResp {
     return VarDefResp(
       id: id,
       name: name,
-      type: type,
       defaultValue: (rawDefault as String?) ?? '',
       description: (rawDesc as String?) ?? '',
     );
@@ -40,7 +40,6 @@ class VarDefResp {
 
   final String id;
   final String name;
-  final String type;
   final String defaultValue;
   final String description;
 }

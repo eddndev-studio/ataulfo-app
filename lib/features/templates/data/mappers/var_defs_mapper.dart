@@ -2,16 +2,12 @@ import '../../domain/entities/variable_def.dart';
 import '../dto/var_def_dto.dart';
 
 /// Traduce DTOs del listado de variable-definitions a entidades de dominio.
-/// El ArgumentError del `VarType.fromWire` se propaga sin envolver — el
-/// drift de contrato (un tipo nuevo en el backend que el cliente no
-/// conoce) rompe en boot en vez de degradar a un failure reintentable.
 class VarDefsMapper {
   const VarDefsMapper._();
 
   static VariableDef varDefRespToEntity(VarDefResp resp) => VariableDef(
     id: resp.id,
     name: resp.name,
-    type: VarType.fromWire(resp.type),
     defaultValue: resp.defaultValue,
     description: resp.description,
   );

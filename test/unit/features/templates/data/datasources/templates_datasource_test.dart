@@ -1,6 +1,5 @@
 import 'package:ataulfo/features/templates/data/datasources/templates_datasource.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
-import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -366,13 +365,11 @@ void main() {
     Map<String, dynamic> varDefJson({
       String id = 'v1',
       String name = 'nombre',
-      String type = 'text',
       String def = '',
       String description = '',
     }) => <String, dynamic>{
       'id': id,
       'name': name,
-      'type': type,
       'default': def,
       'description': description,
     };
@@ -401,7 +398,6 @@ void main() {
       expect(res.defs, hasLength(2));
       expect(res.defs[0].name, 'nombre');
       expect(res.defs[0].defaultValue, 'cliente');
-      expect(res.defs[0].type, VarType.text);
       expect(res.defs[1].name, 'edad');
     });
 
@@ -538,26 +534,6 @@ void main() {
         ds.listVarDefs('t1'),
         throwsA(isA<UnknownTemplatesFailure>()),
       );
-    });
-
-    test('tipo desconocido en el wire → ArgumentError (fail-loud)', () async {
-      // Drift de contrato: el backend introdujo un tipo nuevo. El
-      // cliente debe romper aquí en boot, no degradar.
-      when(
-        () =>
-            dio.get<Map<String, dynamic>>('/templates/t1/variable-definitions'),
-      ).thenAnswer(
-        (_) async => respMap(
-          200,
-          body: <String, dynamic>{
-            'version': 1,
-            'defs': <dynamic>[varDefJson(type: 'number')],
-          },
-          path: '/templates/t1/variable-definitions',
-        ),
-      );
-
-      await expectLater(ds.listVarDefs('t1'), throwsArgumentError);
     });
   });
 
@@ -910,13 +886,11 @@ void main() {
     Map<String, dynamic> defJson({
       String id = 'vd_new',
       String name = 'saldo',
-      String type = 'text',
       String def = 'x',
       String description = '',
     }) => <String, dynamic>{
       'id': id,
       'name': name,
-      'type': type,
       'default': def,
       'description': description,
     };
@@ -924,9 +898,10 @@ void main() {
     test(
       '201: serializa body completo y devuelve VariableDef parseada',
       () async {
-        // El backend espera {name, type, default, description, version} y
+        // El backend espera {name, default, description, version} y
         // devuelve el VarDefResp creado (sin la nueva version del Template
-        // padre — el bloc refresca con un re-list después).
+        // padre — el bloc refresca con un re-list después). El body NO
+        // lleva `type`: las variables son solo-texto.
         final captured = <Map<String, dynamic>>[];
         when(
           () => dio.post<Map<String, dynamic>>(
@@ -947,7 +922,6 @@ void main() {
         final got = await ds.addVarDef(
           templateId: 't1',
           name: 'saldo',
-          type: VarType.text,
           defaultValue: 'x',
           description: 'saldo del cliente',
           version: 1,
@@ -955,15 +929,14 @@ void main() {
 
         expect(got.id, 'vd_new');
         expect(got.name, 'saldo');
-        expect(got.type, VarType.text);
         expect(got.defaultValue, 'x');
         expect(captured.single, <String, dynamic>{
           'name': 'saldo',
-          'type': 'text',
           'default': 'x',
           'description': 'saldo del cliente',
           'version': 1,
         });
+        expect(captured.single.containsKey('type'), isFalse);
       },
     );
 
@@ -986,7 +959,6 @@ void main() {
           () => ds.addVarDef(
             templateId: 't1',
             name: 'saldo',
-            type: VarType.text,
             defaultValue: 'x',
             description: '',
             version: 1,
@@ -1012,7 +984,6 @@ void main() {
           () => ds.addVarDef(
             templateId: 't1',
             name: 'con espacio',
-            type: VarType.text,
             defaultValue: '',
             description: '',
             version: 1,
@@ -1036,7 +1007,6 @@ void main() {
         () => ds.addVarDef(
           templateId: 'desconocido',
           name: 'x',
-          type: VarType.text,
           defaultValue: '',
           description: '',
           version: 1,
@@ -1057,7 +1027,6 @@ void main() {
         () => ds.addVarDef(
           templateId: 't1',
           name: 'x',
-          type: VarType.text,
           defaultValue: '',
           description: '',
           version: 1,
@@ -1085,7 +1054,6 @@ void main() {
         () => ds.addVarDef(
           templateId: 't1',
           name: 'x',
-          type: VarType.text,
           defaultValue: '',
           description: '',
           version: 1,
@@ -1108,39 +1076,11 @@ void main() {
         () => ds.addVarDef(
           templateId: 't1',
           name: 'x',
-          type: VarType.text,
           defaultValue: '',
           description: '',
           version: 1,
         ),
         throwsA(isA<UnknownTemplatesFailure>()),
-      );
-    });
-
-    test('tipo desconocido en respuesta → ArgumentError (fail-loud)', () async {
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          '/templates/t1/variable-definitions',
-          data: any(named: 'data'),
-        ),
-      ).thenAnswer(
-        (_) async => respMap(
-          201,
-          body: defJson(type: 'number'),
-          path: '/templates/t1/variable-definitions',
-        ),
-      );
-
-      await expectLater(
-        () => ds.addVarDef(
-          templateId: 't1',
-          name: 'x',
-          type: VarType.text,
-          defaultValue: '',
-          description: '',
-          version: 1,
-        ),
-        throwsArgumentError,
       );
     });
   });

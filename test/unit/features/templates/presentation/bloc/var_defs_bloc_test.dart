@@ -12,17 +12,12 @@ const _defs = <VariableDef>[
   VariableDef(
     id: 'v1',
     name: 'nombre',
-    type: VarType.text,
     defaultValue: 'cliente',
     description: '',
   ),
 ];
 
 void main() {
-  setUpAll(() {
-    registerFallbackValue(VarType.text);
-  });
-
   late _MockRepo repo;
 
   setUp(() {
@@ -134,7 +129,6 @@ void main() {
     const addedDef = VariableDef(
       id: 'vd_new',
       name: 'saldo',
-      type: VarType.text,
       defaultValue: 'x',
       description: '',
     );
@@ -157,7 +151,6 @@ void main() {
           () => repo.addVarDef(
             templateId: 't1',
             name: 'saldo',
-            type: VarType.text,
             defaultValue: 'x',
             description: '',
             version: 2,
@@ -173,7 +166,6 @@ void main() {
         bloc.add(
           const VarDefsAddRequested(
             name: 'saldo',
-            type: VarType.text,
             defaultValue: 'x',
             description: '',
           ),
@@ -190,7 +182,6 @@ void main() {
           () => repo.addVarDef(
             templateId: 't1',
             name: 'saldo',
-            type: VarType.text,
             defaultValue: 'x',
             description: '',
             version: 2,
@@ -212,7 +203,6 @@ void main() {
           () => repo.addVarDef(
             templateId: 't1',
             name: 'dup',
-            type: VarType.text,
             defaultValue: '',
             description: '',
             version: 2,
@@ -228,7 +218,6 @@ void main() {
         bloc.add(
           const VarDefsAddRequested(
             name: 'dup',
-            type: VarType.text,
             defaultValue: '',
             description: '',
           ),
@@ -245,12 +234,7 @@ void main() {
       'AddRequested desde Loading se ignora (defensive: no hay version para CAS)',
       build: () => VarDefsBloc(repo: repo, templateId: 't1'),
       act: (bloc) => bloc.add(
-        const VarDefsAddRequested(
-          name: 'x',
-          type: VarType.text,
-          defaultValue: '',
-          description: '',
-        ),
+        const VarDefsAddRequested(name: 'x', defaultValue: '', description: ''),
       ),
       expect: () => const <VarDefsState>[],
       verify: (_) {
@@ -258,7 +242,6 @@ void main() {
           () => repo.addVarDef(
             templateId: any(named: 'templateId'),
             name: any(named: 'name'),
-            type: any(named: 'type'),
             defaultValue: any(named: 'defaultValue'),
             description: any(named: 'description'),
             version: any(named: 'version'),
@@ -280,7 +263,6 @@ void main() {
           () => repo.addVarDef(
             templateId: 't1',
             name: 'saldo',
-            type: VarType.text,
             defaultValue: 'x',
             description: '',
             version: 2,
@@ -294,7 +276,6 @@ void main() {
         bloc.add(
           const VarDefsAddRequested(
             name: 'saldo',
-            type: VarType.text,
             defaultValue: 'x',
             description: '',
           ),
@@ -342,7 +323,6 @@ void main() {
     const updatedDef = VariableDef(
       id: 'v1',
       name: 'nombre_x',
-      type: VarType.text,
       defaultValue: 'cliente',
       description: '',
     );

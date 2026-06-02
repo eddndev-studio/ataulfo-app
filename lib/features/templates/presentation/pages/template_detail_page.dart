@@ -456,14 +456,6 @@ class _VarDefRow extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (_typePillLabel(def.type) != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: AppPill.neutral(
-                        key: Key('var_defs.row.${def.id}.type_pill'),
-                        label: _typePillLabel(def.type)!,
-                      ),
-                    ),
                   if (def.description.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
@@ -625,18 +617,6 @@ class _FailedView extends StatelessWidget {
     );
   }
 }
-
-/// Label humanizado para la pill del tipo en el row de variables. `null` ⇒
-/// no pintar pill (text es el default semántico del producto y se asume
-/// cuando no hay marcado visible).
-String? _typePillLabel(VarType t) => switch (t) {
-  VarType.text => null,
-  VarType.label => 'Etiqueta',
-  VarType.image => 'Imagen',
-  VarType.video => 'Video',
-  VarType.audio => 'Audio',
-  VarType.document => 'Documento',
-};
 
 // ── Sección Flujos (S11 F1, read-only) ───────────────────────────────────────
 

@@ -341,7 +341,6 @@ void main() {
             VariableDef(
               id: 'v1',
               name: 'tono',
-              type: VarType.text,
               defaultValue: 'neutral',
               description: 'Tono',
             ),

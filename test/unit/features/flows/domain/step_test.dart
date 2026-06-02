@@ -5,8 +5,8 @@ void main() {
   group('StepType.fromWire', () {
     test('mapea el set completo de 8 valores UPPERCASE del wire', () {
       // Espejo del set del backend (domain/flow/step.go). Wire UPPERCASE
-      // intencional — inconsistente con VarType (lowercase) pero refleja
-      // el wire actual del backend. Si el backend cambia, fail-loud aquí.
+      // intencional — refleja el wire actual del backend. Si el backend
+      // cambia, fail-loud aquí.
       expect(fdom.StepType.fromWire('TEXT'), fdom.StepType.text);
       expect(fdom.StepType.fromWire('IMAGE'), fdom.StepType.image);
       expect(fdom.StepType.fromWire('VIDEO'), fdom.StepType.video);

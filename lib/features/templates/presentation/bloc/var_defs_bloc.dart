@@ -51,7 +51,6 @@ class VarDefsBloc extends Bloc<VarDefsEvent, VarDefsState> {
       await _repo.addVarDef(
         templateId: _templateId,
         name: event.name,
-        type: event.type,
         defaultValue: event.defaultValue,
         description: event.description,
         version: version,
@@ -69,7 +68,6 @@ class VarDefsBloc extends Bloc<VarDefsEvent, VarDefsState> {
         varDefId: event.varDefId,
         version: version,
         name: event.name,
-        type: event.type,
         defaultValue: event.defaultValue,
         description: event.description,
       ),
@@ -150,13 +148,11 @@ class VarDefsLoadRequested extends VarDefsEvent {
 class VarDefsAddRequested extends VarDefsEvent {
   const VarDefsAddRequested({
     required this.name,
-    required this.type,
     required this.defaultValue,
     required this.description,
   });
 
   final String name;
-  final VarType type;
   final String defaultValue;
   final String description;
 
@@ -164,12 +160,11 @@ class VarDefsAddRequested extends VarDefsEvent {
   bool operator ==(Object other) =>
       other is VarDefsAddRequested &&
       other.name == name &&
-      other.type == type &&
       other.defaultValue == defaultValue &&
       other.description == description;
 
   @override
-  int get hashCode => Object.hash(name, type, defaultValue, description);
+  int get hashCode => Object.hash(name, defaultValue, description);
 }
 
 /// Pide editar una variable-definition existente. Los campos nullables
@@ -181,14 +176,12 @@ class VarDefsUpdateRequested extends VarDefsEvent {
   const VarDefsUpdateRequested({
     required this.varDefId,
     this.name,
-    this.type,
     this.defaultValue,
     this.description,
   });
 
   final String varDefId;
   final String? name;
-  final VarType? type;
   final String? defaultValue;
   final String? description;
 
@@ -197,13 +190,11 @@ class VarDefsUpdateRequested extends VarDefsEvent {
       other is VarDefsUpdateRequested &&
       other.varDefId == varDefId &&
       other.name == name &&
-      other.type == type &&
       other.defaultValue == defaultValue &&
       other.description == description;
 
   @override
-  int get hashCode =>
-      Object.hash(varDefId, name, type, defaultValue, description);
+  int get hashCode => Object.hash(varDefId, name, defaultValue, description);
 }
 
 /// Pide eliminar una variable-definition. El backend rechaza con 409
