@@ -10,6 +10,8 @@ import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_detail_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
+import 'package:ataulfo/features/templates/domain/entities/template.dart';
+import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -22,8 +24,26 @@ class _MockBotDetailBloc extends MockBloc<BotDetailEvent, BotDetailState>
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
 
+class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
+
 Identity _identity(String role) =>
     Identity(userId: 'u1', orgId: 'o1', role: role, email: 'op@org.test');
+
+Template _tmpl({required bool aiEnabled}) => Template(
+  id: 't1',
+  orgId: 'o1',
+  name: 'Plantilla',
+  version: 1,
+  ai: AIConfig(
+    enabled: aiEnabled,
+    provider: AIProvider.openai,
+    model: 'gpt',
+    temperature: 0.7,
+    thinkingLevel: ThinkingLevel.medium,
+    systemPrompt: '',
+    contextMessages: 10,
+  ),
+);
 
 const _bot = Bot(
   id: 'b1',
@@ -44,6 +64,7 @@ void main() {
 
   late _MockBotDetailBloc bloc;
   late _MockAuthBloc authBloc;
+  late _MockTemplatesRepo templatesRepo;
 
   setUp(() {
     bloc = _MockBotDetailBloc();
@@ -52,22 +73,32 @@ void main() {
     when(
       () => authBloc.state,
     ).thenReturn(AuthAuthenticated(_identity('ADMIN')));
+    templatesRepo = _MockTemplatesRepo();
+    // El toggle de IA (S4) lee Template.ai.enabled SOLO en el render ADMIN+.
+    when(
+      () => templatesRepo.byId(any()),
+    ).thenAnswer((_) async => _tmpl(aiEnabled: true));
   });
 
   // El gateo ADMIN+ lee el rol del AuthBloc del scope; por defecto ADMIN
   // (ve los controles). `role` lo baja a WORKER para los casos de gateo.
+  // El `TemplatesRepository` cuelga del scope (RepositoryProvider) para el
+  // toggle de IA; sólo el render ADMIN+ lo consume (MAJOR 1).
   Widget host({String role = 'ADMIN'}) {
     when(() => authBloc.state).thenReturn(AuthAuthenticated(_identity(role)));
     return MaterialApp(
       theme: AppDesignTheme.dark(),
-      home: MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<BotDetailBloc>.value(value: bloc),
-          BlocProvider<AuthBloc>.value(value: authBloc),
-        ],
-        // BotDetailPage es content-only; el host envuelve en Scaffold para
-        // dar Material upstream a los widgets internos.
-        child: const Scaffold(body: BotDetailPage()),
+      home: RepositoryProvider<TemplatesRepository>.value(
+        value: templatesRepo,
+        child: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<BotDetailBloc>.value(value: bloc),
+            BlocProvider<AuthBloc>.value(value: authBloc),
+          ],
+          // BotDetailPage es content-only; el host envuelve en Scaffold para
+          // dar Material upstream a los widgets internos.
+          child: const Scaffold(body: BotDetailPage()),
+        ),
       ),
     );
   }
@@ -319,4 +350,91 @@ void main() {
       expect(find.byKey(const Key('bot_detail.edit')), findsNothing);
     });
   });
+
+  group('toggle Deshabilitar IA (S4, ADMIN+, IA efectiva)', () {
+    testWidgets('ADMIN + template.ai.enabled: switch IA operable', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final sw = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.ai')),
+      );
+      // _bot.aiDisabled == false → el switch "Deshabilitar IA" arranca apagado.
+      expect(sw.value, isFalse);
+      expect(sw.onChanged, isNotNull);
+    });
+
+    testWidgets(
+      'WORKER NO ve el switch IA y NO fetchea la Template (MAJOR 1)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+        await tester.pumpWidget(host(role: 'WORKER'));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('bot_detail.ai')), findsNothing);
+        // La carga compartida NUNCA toca el endpoint ADMIN+ de Template.
+        verifyNever(() => templatesRepo.byId(any()));
+      },
+    );
+
+    testWidgets('tap en el switch IA despacha UpdateRequested(aiDisabled)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bot_detail.ai')));
+      await tester.pump();
+
+      verify(
+        () => bloc.add(const BotDetailUpdateRequested(aiDisabled: true)),
+      ).called(1);
+    });
+
+    testWidgets('template.ai.enabled=false → switch IA inerte + explicado', (
+      tester,
+    ) async {
+      when(
+        () => templatesRepo.byId(any()),
+      ).thenAnswer((_) async => _tmpl(aiEnabled: false));
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final sw = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.ai')),
+      );
+      expect(sw.onChanged, isNull); // inerte
+      expect(find.textContaining('plantilla'), findsWidgets);
+    });
+
+    testWidgets('fetch de Template falla → switch IA sigue operable', (
+      tester,
+    ) async {
+      when(
+        () => templatesRepo.byId(any()),
+      ).thenAnswer((_) => Future<Template>.error(const _Boom()));
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final sw = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.ai')),
+      );
+      // Degrada sin falsear: el flag del bot es real, el toggle sigue operable.
+      expect(sw.onChanged, isNotNull);
+    });
+  });
+}
+
+class _Boom implements Exception {
+  const _Boom();
 }
