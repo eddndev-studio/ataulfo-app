@@ -148,6 +148,26 @@ void main() {
     // su propio widget test).
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
+    // El detalle del bot, para un rol ADMIN+, monta el toggle de IA que lee
+    // Template.ai.enabled (IA efectiva). El _identity de estos tests es OWNER,
+    // así que la ruta /bots/:id fetchea la Template — un stub la resuelve.
+    when(() => templatesRepo.byId(any())).thenAnswer(
+      (_) async => const Template(
+        id: 't1',
+        orgId: 'o1',
+        name: 'Plantilla',
+        version: 1,
+        ai: AIConfig(
+          enabled: true,
+          provider: AIProvider.openai,
+          model: 'gpt',
+          temperature: 0.7,
+          thinkingLevel: ThinkingLevel.medium,
+          systemPrompt: '',
+          contextMessages: 10,
+        ),
+      ),
+    );
     when(
       () => flowsRepo.listFlows(any()),
     ).thenAnswer((_) async => const <fdom.Flow>[]);

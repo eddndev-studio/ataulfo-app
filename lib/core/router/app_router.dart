@@ -219,13 +219,20 @@ class AppRouter {
           // lista — la cache local (RFC-0001) será la que evite el flash
           // de spinner cuando aterrice.
           final id = state.pathParameters['id']!;
-          return BlocProvider<BotDetailBloc>(
-            create: (_) =>
-                BotDetailBloc(repo: _botsRepo, id: id)
-                  ..add(const BotDetailLoadRequested()),
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Detalle del bot')),
-              body: const BotDetailPage(),
+          // El `TemplatesRepository` cuelga del scope para el toggle de IA
+          // (lee `Template.ai.enabled` para la IA efectiva). Sólo el render
+          // ADMIN+ lo consume; la carga compartida no fetchea la Template,
+          // así un WORKER (ruta WORKER+) nunca cruza ese endpoint ADMIN+.
+          return RepositoryProvider<TemplatesRepository>.value(
+            value: _templatesRepo,
+            child: BlocProvider<BotDetailBloc>(
+              create: (_) =>
+                  BotDetailBloc(repo: _botsRepo, id: id)
+                    ..add(const BotDetailLoadRequested()),
+              child: Scaffold(
+                appBar: AppBar(title: const Text('Detalle del bot')),
+                body: const BotDetailPage(),
+              ),
             ),
           );
         },

@@ -8,12 +8,13 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_pill.dart';
-import '../../../../core/design/widgets/app_switch.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_detail_bloc.dart';
+import '../widgets/bot_ai_toggle.dart';
 import '../widgets/bot_edit_sheet.dart';
+import '../widgets/bot_toggle_row.dart';
 
 /// Detalle de un Bot (S04). Consume el `BotDetailBloc` del scope; el
 /// cableado del provider y del ID lo hace el router en `/bots/:id`. Es
@@ -151,7 +152,7 @@ class _LoadedView extends StatelessWidget {
           ),
           if (isAdmin) ...<Widget>[
             const SizedBox(height: AppTokens.sp6),
-            _ToggleRow(
+            BotToggleRow(
               switchKey: const Key('bot_detail.paused'),
               label: 'Pausar bot',
               caption:
@@ -164,6 +165,8 @@ class _LoadedView extends StatelessWidget {
                       BotDetailUpdateRequested(paused: v),
                     ),
             ),
+            const SizedBox(height: AppTokens.sp5),
+            BotAiToggle(bot: bot, isMutating: isMutating),
           ],
           if (f != null) ...<Widget>[
             const SizedBox(height: AppTokens.sp4),
@@ -228,50 +231,6 @@ class _LoadedView extends StatelessWidget {
     BotsServerFailure() ||
     UnknownBotsFailure() => 'No pudimos guardar el cambio. Inténtalo de nuevo.',
   };
-}
-
-/// Fila de un toggle de configuración: etiqueta + descripción a la izquierda,
-/// [AppSwitch] a la derecha. Comparten esta forma el toggle de pausa y el de
-/// IA; `onChanged` nulo lo deja inhabilitado (mutación en vuelo).
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.switchKey,
-    required this.label,
-    required this.caption,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final Key switchKey;
-  final String label;
-  final String caption;
-  final bool value;
-  final ValueChanged<bool>? onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(label, style: textTheme.titleMedium),
-              const SizedBox(height: 2),
-              Text(
-                caption,
-                style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: AppTokens.sp4),
-        AppSwitch(key: switchKey, value: value, onChanged: onChanged),
-      ],
-    );
-  }
 }
 
 class _FailedView extends StatelessWidget {
