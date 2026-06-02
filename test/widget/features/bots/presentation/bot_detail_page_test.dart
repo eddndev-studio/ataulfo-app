@@ -3,6 +3,9 @@ import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/core/design/widgets/app_switch.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_detail_bloc.dart';
@@ -15,6 +18,12 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockBotDetailBloc extends MockBloc<BotDetailEvent, BotDetailState>
     implements BotDetailBloc {}
+
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
+
+Identity _identity(String role) =>
+    Identity(userId: 'u1', orgId: 'o1', role: role, email: 'op@org.test');
 
 const _bot = Bot(
   id: 'b1',
@@ -34,21 +43,34 @@ void main() {
   });
 
   late _MockBotDetailBloc bloc;
+  late _MockAuthBloc authBloc;
 
   setUp(() {
     bloc = _MockBotDetailBloc();
     when(() => bloc.state).thenReturn(const BotDetailLoading());
+    authBloc = _MockAuthBloc();
+    when(
+      () => authBloc.state,
+    ).thenReturn(AuthAuthenticated(_identity('ADMIN')));
   });
 
-  Widget host() => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: BlocProvider<BotDetailBloc>.value(
-      value: bloc,
-      // BotDetailPage es content-only; el host envuelve en Scaffold para
-      // dar Material upstream a los widgets internos.
-      child: const Scaffold(body: BotDetailPage()),
-    ),
-  );
+  // El gateo ADMIN+ lee el rol del AuthBloc del scope; por defecto ADMIN
+  // (ve los controles). `role` lo baja a WORKER para los casos de gateo.
+  Widget host({String role = 'ADMIN'}) {
+    when(() => authBloc.state).thenReturn(AuthAuthenticated(_identity(role)));
+    return MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<BotDetailBloc>.value(value: bloc),
+          BlocProvider<AuthBloc>.value(value: authBloc),
+        ],
+        // BotDetailPage es content-only; el host envuelve en Scaffold para
+        // dar Material upstream a los widgets internos.
+        child: const Scaffold(body: BotDetailPage()),
+      ),
+    );
+  }
 
   testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
     when(() => bloc.state).thenReturn(const BotDetailLoading());
@@ -202,5 +224,77 @@ void main() {
     await tester.pump();
 
     verify(() => bloc.add(const BotDetailLoadRequested())).called(1);
+  });
+
+  group('toggle Pausar (S2, ADMIN+)', () {
+    setUpAll(() {
+      registerFallbackValue(const BotDetailUpdateRequested());
+    });
+
+    testWidgets('ADMIN ve el AppSwitch de pausa con value=bot.paused', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+
+      final sw = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.paused')),
+      );
+      // _bot.paused == false → el switch arranca apagado.
+      expect(sw.value, isFalse);
+      expect(sw.onChanged, isNotNull);
+    });
+
+    testWidgets('WORKER NO ve el switch de pausa (gateo ADMIN+)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host(role: 'WORKER'));
+
+      expect(find.byKey(const Key('bot_detail.paused')), findsNothing);
+    });
+
+    testWidgets('tap en el switch despacha UpdateRequested(paused: true)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('bot_detail.paused')));
+      await tester.pump();
+
+      verify(
+        () => bloc.add(const BotDetailUpdateRequested(paused: true)),
+      ).called(1);
+    });
+
+    testWidgets('Mutating deshabilita el switch (onChanged null)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailMutating(_bot));
+
+      await tester.pumpWidget(host());
+
+      final sw = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.paused')),
+      );
+      expect(sw.onChanged, isNull);
+    });
+
+    testWidgets('MutationFailed(conflict) muestra copy de desactualizado', (
+      tester,
+    ) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const BotDetailMutationFailed(_bot, BotsConflictFailure()));
+
+      await tester.pumpWidget(host());
+
+      // El switch sigue visible (snapshot) y aparece el copy de conflicto.
+      expect(find.byKey(const Key('bot_detail.paused')), findsOneWidget);
+      expect(find.textContaining('desactualizada'), findsOneWidget);
+    });
   });
 }
