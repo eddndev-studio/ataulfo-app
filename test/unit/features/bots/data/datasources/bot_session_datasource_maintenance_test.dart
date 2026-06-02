@@ -103,6 +103,41 @@ void main() {
     });
   });
 
+  group('wipeCredentials (Tier B, NO gateado por paused)', () {
+    test('POST /bots/:id/wipe-credentials → 204 idempotente', () async {
+      when(
+        () => dio.post<void>(any()),
+      ).thenAnswer((_) async => ok('/bots/b1/wipe-credentials'));
+
+      await ds.wipeCredentials('b1');
+
+      final captured = verify(() => dio.post<void>(captureAny())).captured;
+      expect(captured.single, '/bots/b1/wipe-credentials');
+    });
+
+    test('404 → BotsNotFoundFailure', () async {
+      when(
+        () => dio.post<void>(any()),
+      ).thenThrow(bad(404, '/bots/b1/wipe-credentials'));
+
+      await expectLater(
+        ds.wipeCredentials('b1'),
+        throwsA(isA<BotsNotFoundFailure>()),
+      );
+    });
+
+    test('409 NO mapea a NotPaused (wipe no gatea paused) → Unknown', () async {
+      when(
+        () => dio.post<void>(any()),
+      ).thenThrow(bad(409, '/bots/b1/wipe-credentials'));
+
+      await expectLater(
+        ds.wipeCredentials('b1'),
+        throwsA(isA<UnknownBotsFailure>()),
+      );
+    });
+  });
+
   group('per-endpoint 409 (regresión): otros verbos de sesión', () {
     test(
       'stopSession con 409 sigue → UnknownBotsFailure (NO NotPaused)',
