@@ -235,4 +235,23 @@ void main() {
       );
     });
   });
+
+  group('BotsRepositoryImpl.delete', () {
+    test('delega al datasource', () async {
+      when(() => ds.delete('b1')).thenAnswer((_) async {});
+
+      await repo.delete('b1');
+
+      verify(() => ds.delete('b1')).called(1);
+    });
+
+    test('propaga BotsNotFoundFailure', () async {
+      when(() => ds.delete(any())).thenThrow(const BotsNotFoundFailure());
+
+      await expectLater(
+        repo.delete('b1'),
+        throwsA(isA<BotsNotFoundFailure>()),
+      );
+    });
+  });
 }

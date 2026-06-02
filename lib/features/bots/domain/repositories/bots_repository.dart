@@ -41,4 +41,8 @@ abstract interface class BotsRepository {
   /// `BotsInvalidCreateFailure` (422) si el nombre es inválido;
   /// `BotsNotFoundFailure` (404) si el bot origen no existe.
   Future<Bot> clone({required String id, required String name});
+
+  /// Borra un Bot (`DELETE /bots/:id`). `BotsNotFoundFailure` (404) si ya no
+  /// existe. Deja huérfanas las tablas de runtime sin FK (la UI lo advierte).
+  Future<void> delete(String id);
 }
