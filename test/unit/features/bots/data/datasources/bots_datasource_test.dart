@@ -283,6 +283,61 @@ void main() {
       },
     );
 
+    test('con identifier no vacío lo incluye en el body', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer((_) async => respMap(201, body: botJson(), path: '/bots'));
+
+      await ds.create(
+        templateId: 't1',
+        name: 'Soporte',
+        channel: BotChannel.waUnofficial,
+        identifier: '5215512345678',
+      );
+
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: <String, dynamic>{
+            'template_id': 't1',
+            'name': 'Soporte',
+            'channel': 'WA_UNOFFICIAL',
+            'identifier': '5215512345678',
+          },
+        ),
+      ).called(1);
+    });
+
+    test('con identifier vacío/null lo OMITE del body (omitempty)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer((_) async => respMap(201, body: botJson(), path: '/bots'));
+
+      await ds.create(
+        templateId: 't1',
+        name: 'Soporte',
+        channel: BotChannel.waUnofficial,
+        identifier: '  ',
+      );
+
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/bots',
+          data: <String, dynamic>{
+            'template_id': 't1',
+            'name': 'Soporte',
+            'channel': 'WA_UNOFFICIAL',
+          },
+        ),
+      ).called(1);
+    });
+
     test('422 → BotsInvalidCreateFailure', () async {
       // 422 colapsa varias causas del backend (name vacío, channel
       // desconocido, template inexistente, variables inválidas). Un solo
