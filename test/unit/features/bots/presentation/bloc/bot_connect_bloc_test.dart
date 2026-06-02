@@ -96,4 +96,36 @@ void main() {
       BotConnectReady(_link),
     ],
   );
+
+  blocTest<BotConnectBloc, BotConnectState>(
+    'StopRequested desde Ready(active) → stopSession invocado → Ready(idle)',
+    build: () {
+      when(() => repo.stopSession('b1')).thenAnswer((_) async {});
+      return BotConnectBloc(repo: repo, botId: 'b1');
+    },
+    seed: () => BotConnectReady(_link, phase: PairingPhase.active),
+    act: (bloc) => bloc.add(const BotConnectStopRequested()),
+    expect: () => <BotConnectState>[BotConnectReady(_link)],
+    verify: (_) => verify(() => repo.stopSession('b1')).called(1),
+  );
+
+  blocTest<BotConnectBloc, BotConnectState>(
+    'StopRequested idempotente: aun si stopSession falla, vuelve a idle',
+    build: () {
+      when(() => repo.stopSession('b1')).thenThrow(const BotsServerFailure());
+      return BotConnectBloc(repo: repo, botId: 'b1');
+    },
+    seed: () => BotConnectReady(_link, phase: PairingPhase.active),
+    act: (bloc) => bloc.add(const BotConnectStopRequested()),
+    expect: () => <BotConnectState>[BotConnectReady(_link)],
+    verify: (_) => verify(() => repo.stopSession('b1')).called(1),
+  );
+
+  blocTest<BotConnectBloc, BotConnectState>(
+    'StopRequested fuera de Ready se ignora (no llama stopSession)',
+    build: () => BotConnectBloc(repo: repo, botId: 'b1'),
+    act: (bloc) => bloc.add(const BotConnectStopRequested()),
+    expect: () => const <BotConnectState>[],
+    verify: (_) => verifyNever(() => repo.stopSession(any())),
+  );
 }
