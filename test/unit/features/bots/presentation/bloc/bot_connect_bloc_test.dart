@@ -281,46 +281,49 @@ void main() {
       });
     });
 
-    test('el poll SIGUE activo en RECONNECTING (transitorio, no se estanca)', () {
-      fakeAsync((async) {
-        when(
-          () => repo.issueConnectLink('b1'),
-        ).thenAnswer((_) async => _link);
-        when(() => repo.startSession('b1')).thenAnswer((_) async {});
-        var calls = 0;
-        when(() => repo.getSessionState('b1')).thenAnswer((_) async {
-          calls++;
-          return SessionStatus(
-            state: switch (calls) {
-              1 => SessionState.pairing,
-              2 => SessionState.reconnecting,
-              _ => SessionState.connected,
-            },
-          );
-        });
+    test(
+      'el poll SIGUE activo en RECONNECTING (transitorio, no se estanca)',
+      () {
+        fakeAsync((async) {
+          when(
+            () => repo.issueConnectLink('b1'),
+          ).thenAnswer((_) async => _link);
+          when(() => repo.startSession('b1')).thenAnswer((_) async {});
+          var calls = 0;
+          when(() => repo.getSessionState('b1')).thenAnswer((_) async {
+            calls++;
+            return SessionStatus(
+              state: switch (calls) {
+                1 => SessionState.pairing,
+                2 => SessionState.reconnecting,
+                _ => SessionState.connected,
+              },
+            );
+          });
 
-        final bloc = BotConnectBloc(repo: repo, botId: 'b1');
-        bloc.add(const BotConnectStarted());
-        async.flushMicrotasks();
-        bloc.add(const BotConnectPairingRequested());
-        async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 2)); // PAIRING
-        async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 2)); // RECONNECTING → debe seguir
-        async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 2)); // CONNECTED → para
-        async.flushMicrotasks();
-        expect(calls, 3);
-        bloc.close();
-        async.flushMicrotasks();
-      });
-    });
+          final bloc = BotConnectBloc(repo: repo, botId: 'b1');
+          bloc.add(const BotConnectStarted());
+          async.flushMicrotasks();
+          bloc.add(const BotConnectPairingRequested());
+          async.flushMicrotasks();
+          async.elapse(const Duration(seconds: 2)); // PAIRING
+          async.flushMicrotasks();
+          async.elapse(
+            const Duration(seconds: 2),
+          ); // RECONNECTING → debe seguir
+          async.flushMicrotasks();
+          async.elapse(const Duration(seconds: 2)); // CONNECTED → para
+          async.flushMicrotasks();
+          expect(calls, 3);
+          bloc.close();
+          async.flushMicrotasks();
+        });
+      },
+    );
 
     test('stop durante un poll en vuelo NO produce un falso qrExpired', () {
       fakeAsync((async) {
-        when(
-          () => repo.issueConnectLink('b1'),
-        ).thenAnswer((_) async => _link);
+        when(() => repo.issueConnectLink('b1')).thenAnswer((_) async => _link);
         when(() => repo.startSession('b1')).thenAnswer((_) async {});
         when(() => repo.stopSession('b1')).thenAnswer((_) async {});
         final inFlight = Completer<SessionStatus>();
