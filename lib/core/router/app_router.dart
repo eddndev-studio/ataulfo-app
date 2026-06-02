@@ -15,11 +15,13 @@ import '../../features/bots/domain/repositories/bots_repository.dart';
 import '../../features/bots/presentation/bloc/bot_connect_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_create_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
+import '../../features/bots/presentation/bloc/bot_maintenance_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_variables_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/pages/bot_connect_page.dart';
 import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
+import '../../features/bots/presentation/pages/bot_maintenance_page.dart';
 import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
 import '../../features/bots/presentation/pages/bot_variables_page.dart';
 import '../../features/conversations/domain/repositories/conversations_repository.dart';
@@ -285,6 +287,27 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Variables del bot')),
               body: const BotVariablesPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Zona Peligrosa Tier A (S04): clear-conversations / reset-sessions, que
+        // exigen paused. Sub-ruta de `/bots/:id`; gateada ADMIN+ en `_redirect`
+        // (WORKER deep-link cae al detalle). Cross-feature: Bots (paused/toggle)
+        // + BotSession (clear/reset).
+        path: '/bots/:id/maintenance',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<BotMaintenanceBloc>(
+            create: (_) => BotMaintenanceBloc(
+              botsRepo: _botsRepo,
+              sessionRepo: _botSessionRepo,
+              botId: id,
+            )..add(const BotMaintenanceLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Mantenimiento')),
+              body: const BotMaintenancePage(),
             ),
           );
         },

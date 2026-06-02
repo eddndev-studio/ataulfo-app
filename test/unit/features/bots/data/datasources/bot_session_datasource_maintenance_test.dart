@@ -104,13 +104,18 @@ void main() {
   });
 
   group('per-endpoint 409 (regresión): otros verbos de sesión', () {
-    test('stopSession con 409 sigue → UnknownBotsFailure (NO NotPaused)', () async {
-      when(() => dio.delete<void>(any())).thenThrow(bad(409, '/bots/b1/session'));
+    test(
+      'stopSession con 409 sigue → UnknownBotsFailure (NO NotPaused)',
+      () async {
+        when(
+          () => dio.delete<void>(any()),
+        ).thenThrow(bad(409, '/bots/b1/session'));
 
-      await expectLater(
-        ds.stopSession('b1'),
-        throwsA(isA<UnknownBotsFailure>()),
-      );
-    });
+        await expectLater(
+          ds.stopSession('b1'),
+          throwsA(isA<UnknownBotsFailure>()),
+        );
+      },
+    );
   });
 }

@@ -57,7 +57,8 @@ void main() {
   group('carga', () {
     blocTest<BotMaintenanceBloc, BotMaintenanceState>(
       'LoadRequested → Loaded(bot)',
-      setUp: () => when(() => botsRepo.byId('b1')).thenAnswer((_) async => _paused),
+      setUp: () =>
+          when(() => botsRepo.byId('b1')).thenAnswer((_) async => _paused),
       build: build,
       act: (b) => b.add(const BotMaintenanceLoadRequested()),
       expect: () => const <BotMaintenanceState>[BotMaintenanceLoaded(_paused)],
@@ -89,16 +90,18 @@ void main() {
         BotMaintenanceBusy(_running),
         BotMaintenanceLoaded(_paused),
       ],
-      verify: (_) =>
-          verify(() => botsRepo.update(id: 'b1', version: 3, paused: true)).called(1),
+      verify: (_) => verify(
+        () => botsRepo.update(id: 'b1', version: 3, paused: true),
+      ).called(1),
     );
   });
 
   group('clear/reset (Tier A)', () {
     blocTest<BotMaintenanceBloc, BotMaintenanceState>(
       'ClearRequested OK → Busy → OpSucceeded(clear) → Loaded',
-      setUp: () =>
-          when(() => sessionRepo.clearConversations('b1')).thenAnswer((_) async {}),
+      setUp: () => when(
+        () => sessionRepo.clearConversations('b1'),
+      ).thenAnswer((_) async {}),
       build: build,
       seed: () => const BotMaintenanceLoaded(_paused),
       act: (b) => b.add(const BotMaintenanceClearRequested()),

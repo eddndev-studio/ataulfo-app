@@ -225,6 +225,13 @@ class _LoadedView extends StatelessWidget {
               fullWidth: true,
               onPressed: () => context.push('/bots/${bot.id}/variables'),
             ),
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              key: const Key('bot_detail.maintenance'),
+              label: 'Mantenimiento',
+              fullWidth: true,
+              onPressed: () => context.push('/bots/${bot.id}/maintenance'),
+            ),
             const SizedBox(height: AppTokens.sp7),
             AppButton.tonal(
               key: const Key('bot_detail.clone'),

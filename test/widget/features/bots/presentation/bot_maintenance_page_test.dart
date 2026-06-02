@@ -116,9 +116,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      host(
-        const BotMaintenanceOpFailed(_running, BotsNotPausedFailure()),
-      ),
+      host(const BotMaintenanceOpFailed(_running, BotsNotPausedFailure())),
     );
     expect(find.textContaining('pausado'), findsWidgets);
   });
@@ -127,6 +125,6 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(host(const BotMaintenanceLoaded(_paused)));
-    expect(find.textContaining('no se reanuda'), findsOneWidget);
+    expect(find.textContaining('se reanuda solo'), findsOneWidget);
   });
 }
