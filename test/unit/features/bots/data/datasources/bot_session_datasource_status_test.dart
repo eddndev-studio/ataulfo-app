@@ -48,9 +48,9 @@ void main() {
     });
 
     test('CONNECTED sin qr → SessionStatus(connected, null)', () async {
-      when(() => dio.get<Map<String, dynamic>>('/bots/b1/session')).thenAnswer(
-        (_) async => ok(<String, dynamic>{'state': 'CONNECTED'}),
-      );
+      when(
+        () => dio.get<Map<String, dynamic>>('/bots/b1/session'),
+      ).thenAnswer((_) async => ok(<String, dynamic>{'state': 'CONNECTED'}));
 
       final s = await ds.getSessionState('b1');
 
@@ -58,32 +58,37 @@ void main() {
       expect(s.qrCode, isNull);
     });
 
-    test('DISCONNECTED ("not running") → SessionStatus(disconnected, null)', () async {
-      when(() => dio.get<Map<String, dynamic>>('/bots/b1/session')).thenAnswer(
-        (_) async => ok(<String, dynamic>{'state': 'DISCONNECTED'}),
-      );
+    test(
+      'DISCONNECTED ("not running") → SessionStatus(disconnected, null)',
+      () async {
+        when(
+          () => dio.get<Map<String, dynamic>>('/bots/b1/session'),
+        ).thenAnswer(
+          (_) async => ok(<String, dynamic>{'state': 'DISCONNECTED'}),
+        );
 
-      final s = await ds.getSessionState('b1');
-      expect(s.state, SessionState.disconnected);
-      expect(s.qrCode, isNull);
-    });
+        final s = await ds.getSessionState('b1');
+        expect(s.state, SessionState.disconnected);
+        expect(s.qrCode, isNull);
+      },
+    );
 
     test('CONNECTING y RECONNECTING parsean', () async {
-      when(() => dio.get<Map<String, dynamic>>('/bots/b1/session')).thenAnswer(
-        (_) async => ok(<String, dynamic>{'state': 'CONNECTING'}),
-      );
+      when(
+        () => dio.get<Map<String, dynamic>>('/bots/b1/session'),
+      ).thenAnswer((_) async => ok(<String, dynamic>{'state': 'CONNECTING'}));
       expect((await ds.getSessionState('b1')).state, SessionState.connecting);
 
-      when(() => dio.get<Map<String, dynamic>>('/bots/b1/session')).thenAnswer(
-        (_) async => ok(<String, dynamic>{'state': 'RECONNECTING'}),
-      );
+      when(
+        () => dio.get<Map<String, dynamic>>('/bots/b1/session'),
+      ).thenAnswer((_) async => ok(<String, dynamic>{'state': 'RECONNECTING'}));
       expect((await ds.getSessionState('b1')).state, SessionState.reconnecting);
     });
 
     test('state desconocido → UnknownBotsFailure (fail-loud)', () async {
-      when(() => dio.get<Map<String, dynamic>>('/bots/b1/session')).thenAnswer(
-        (_) async => ok(<String, dynamic>{'state': 'WAT'}),
-      );
+      when(
+        () => dio.get<Map<String, dynamic>>('/bots/b1/session'),
+      ).thenAnswer((_) async => ok(<String, dynamic>{'state': 'WAT'}));
       await expectLater(
         ds.getSessionState('b1'),
         throwsA(isA<UnknownBotsFailure>()),

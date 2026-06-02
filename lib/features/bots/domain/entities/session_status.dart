@@ -32,9 +32,7 @@ class SessionStatus {
 
   @override
   bool operator ==(Object other) =>
-      other is SessionStatus &&
-      other.state == state &&
-      other.qrCode == qrCode;
+      other is SessionStatus && other.state == state && other.qrCode == qrCode;
 
   @override
   int get hashCode => Object.hash(state, qrCode);
