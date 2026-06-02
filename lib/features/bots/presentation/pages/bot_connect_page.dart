@@ -176,6 +176,15 @@ class _PairingSection extends StatelessWidget {
                 fullWidth: true,
                 onPressed: () => _start(context),
               ),
+              const SizedBox(height: AppTokens.sp2),
+              AppButton.danger(
+                key: const Key('bot_connect.stop'),
+                label: 'Cancelar emparejamiento',
+                fullWidth: true,
+                onPressed: () => context.read<BotConnectBloc>().add(
+                  const BotConnectStopRequested(),
+                ),
+              ),
             ],
           ),
         );

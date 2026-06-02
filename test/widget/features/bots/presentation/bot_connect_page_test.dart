@@ -111,21 +111,22 @@ void main() {
     verify(() => bloc.add(const BotConnectStarted())).called(1);
   });
 
-  testWidgets('Ready(active): botón Desconectar dispara BotConnectStopRequested', (
-    tester,
-  ) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(BotConnectReady(_link, phase: PairingPhase.active));
+  testWidgets(
+    'Ready(active): botón Desconectar dispara BotConnectStopRequested',
+    (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(BotConnectReady(_link, phase: PairingPhase.active));
 
-    await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
 
-    final stop = find.byKey(const Key('bot_connect.stop'));
-    expect(stop, findsOneWidget);
-    await tester.ensureVisible(stop);
-    await tester.tap(stop);
-    await tester.pump();
+      final stop = find.byKey(const Key('bot_connect.stop'));
+      expect(stop, findsOneWidget);
+      await tester.ensureVisible(stop);
+      await tester.tap(stop);
+      await tester.pump();
 
-    verify(() => bloc.add(const BotConnectStopRequested())).called(1);
-  });
+      verify(() => bloc.add(const BotConnectStopRequested())).called(1);
+    },
+  );
 }
