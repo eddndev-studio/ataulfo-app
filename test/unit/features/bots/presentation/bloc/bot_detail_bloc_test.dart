@@ -412,8 +412,14 @@ void main() {
     );
 
     test('value-equality del evento y estado de delete', () {
-      expect(const BotDetailDeleteRequested(), const BotDetailDeleteRequested());
-      expect(const BotDetailDeleteSucceeded(), const BotDetailDeleteSucceeded());
+      expect(
+        const BotDetailDeleteRequested(),
+        const BotDetailDeleteRequested(),
+      );
+      expect(
+        const BotDetailDeleteSucceeded(),
+        const BotDetailDeleteSucceeded(),
+      );
     });
   });
 }

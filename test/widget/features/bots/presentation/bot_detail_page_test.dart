@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
@@ -475,6 +477,98 @@ void main() {
       await tester.pumpWidget(host(role: 'WORKER'));
 
       expect(find.byKey(const Key('bot_detail.clone')), findsNothing);
+    });
+  });
+
+  group('eliminar (S8, ADMIN+, Tier B)', () {
+    setUpAll(() {
+      registerFallbackValue(const BotDetailDeleteRequested());
+    });
+
+    testWidgets('ADMIN: tap Eliminar → confirma → BotDetailDeleteRequested', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      final del = find.byKey(const Key('bot_detail.delete'));
+      await tester.ensureVisible(del);
+      await tester.tap(del);
+      await tester.pumpAndSettle();
+
+      // Diálogo de confirmación fuerte: avisa de huérfanos.
+      expect(find.textContaining('huérfan'), findsOneWidget);
+      // Sin confirmar aún → no despacha.
+      verifyNever(() => bloc.add(const BotDetailDeleteRequested()));
+
+      await tester.tap(find.byKey(const Key('bot_detail.delete_confirm')));
+      await tester.pump();
+      verify(() => bloc.add(const BotDetailDeleteRequested())).called(1);
+    });
+
+    testWidgets('cancelar el diálogo NO despacha', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('bot_detail.delete')));
+      await tester.tap(find.byKey(const Key('bot_detail.delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar'));
+      await tester.pump();
+
+      verifyNever(() => bloc.add(const BotDetailDeleteRequested()));
+    });
+
+    testWidgets('WORKER no ve Eliminar bot', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host(role: 'WORKER'));
+
+      expect(find.byKey(const Key('bot_detail.delete')), findsNothing);
+    });
+
+    testWidgets('DeleteSucceeded → hace pop de la página', (tester) async {
+      final ctrl = StreamController<BotDetailState>.broadcast();
+      addTearDown(ctrl.close);
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+      whenListen(bloc, ctrl.stream, initialState: const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        RepositoryProvider<TemplatesRepository>.value(
+                          value: templatesRepo,
+                          child: MultiBlocProvider(
+                            providers: <BlocProvider<dynamic>>[
+                              BlocProvider<BotDetailBloc>.value(value: bloc),
+                              BlocProvider<AuthBloc>.value(value: authBloc),
+                            ],
+                            child: const Scaffold(body: BotDetailPage()),
+                          ),
+                        ),
+                  ),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BotDetailPage), findsOneWidget);
+
+      ctrl.add(const BotDetailDeleteSucceeded());
+      await tester.pumpAndSettle();
+      expect(find.byType(BotDetailPage), findsNothing);
     });
   });
 }

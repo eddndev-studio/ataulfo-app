@@ -250,10 +250,7 @@ void main() {
         () => ds.delete(any()),
       ).thenAnswer((_) => Future<void>.error(const BotsNotFoundFailure()));
 
-      await expectLater(
-        repo.delete('b1'),
-        throwsA(isA<BotsNotFoundFailure>()),
-      );
+      await expectLater(repo.delete('b1'), throwsA(isA<BotsNotFoundFailure>()));
     });
   });
 }

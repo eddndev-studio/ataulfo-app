@@ -45,34 +45,22 @@ void main() {
 
     test('404 → BotsNotFoundFailure', () async {
       when(() => dio.delete<void>(any())).thenThrow(bad(404));
-      await expectLater(
-        ds.delete('b1'),
-        throwsA(isA<BotsNotFoundFailure>()),
-      );
+      await expectLater(ds.delete('b1'), throwsA(isA<BotsNotFoundFailure>()));
     });
 
     test('403 → BotsForbiddenFailure', () async {
       when(() => dio.delete<void>(any())).thenThrow(bad(403));
-      await expectLater(
-        ds.delete('b1'),
-        throwsA(isA<BotsForbiddenFailure>()),
-      );
+      await expectLater(ds.delete('b1'), throwsA(isA<BotsForbiddenFailure>()));
     });
 
     test('409 (sin org activa) → UnknownBotsFailure (NO conflicto)', () async {
       when(() => dio.delete<void>(any())).thenThrow(bad(409));
-      await expectLater(
-        ds.delete('b1'),
-        throwsA(isA<UnknownBotsFailure>()),
-      );
+      await expectLater(ds.delete('b1'), throwsA(isA<UnknownBotsFailure>()));
     });
 
     test('5xx → BotsServerFailure', () async {
       when(() => dio.delete<void>(any())).thenThrow(bad(500));
-      await expectLater(
-        ds.delete('b1'),
-        throwsA(isA<BotsServerFailure>()),
-      );
+      await expectLater(ds.delete('b1'), throwsA(isA<BotsServerFailure>()));
     });
 
     test('sin conexión → BotsNetworkFailure', () async {
@@ -82,10 +70,7 @@ void main() {
           type: DioExceptionType.connectionError,
         ),
       );
-      await expectLater(
-        ds.delete('b1'),
-        throwsA(isA<BotsNetworkFailure>()),
-      );
+      await expectLater(ds.delete('b1'), throwsA(isA<BotsNetworkFailure>()));
     });
   });
 }
