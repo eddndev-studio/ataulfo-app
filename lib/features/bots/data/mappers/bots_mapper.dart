@@ -1,4 +1,5 @@
 import '../../domain/entities/bot.dart';
+import '../../domain/entities/bot_variables_snapshot.dart';
 import '../dto/bot_dto.dart';
 
 /// Traduce DTOs del wire S04 a entidades de dominio.
@@ -19,5 +20,13 @@ class BotsMapper {
     version: resp.version,
     paused: resp.paused,
     aiDisabled: resp.aiDisabled,
+  );
+
+  static BotVariablesSnapshot variablesSnapshotFromResp(
+    BotVariablesResp resp,
+  ) => BotVariablesSnapshot(
+    version: resp.version,
+    templateId: resp.templateId,
+    values: resp.values,
   );
 }

@@ -6,6 +6,7 @@ import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_create_page.dart';
@@ -325,17 +326,12 @@ void main() {
     'AuthAuthenticated(OWNER) → /bots/:id/variables monta BotVariablesPage',
     (tester) async {
       when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-      when(() => botsRepo.byId('b1')).thenAnswer(
-        (_) async => const Bot(
-          id: 'b1',
-          orgId: 'o1',
-          templateId: 't1',
-          name: 'Soporte',
-          channel: BotChannel.waUnofficial,
-          identifier: null,
+      // El editor carga vía getVariables (version+templateId+overrides), no byId.
+      when(() => botsRepo.getVariables('b1')).thenAnswer(
+        (_) async => const BotVariablesSnapshot(
           version: 3,
-          paused: false,
-          aiDisabled: false,
+          templateId: 't1',
+          values: <String, String>{},
         ),
       );
       when(() => templatesRepo.listVarDefs('t1')).thenAnswer(

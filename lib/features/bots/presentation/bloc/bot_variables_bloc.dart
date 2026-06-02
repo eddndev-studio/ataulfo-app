@@ -12,16 +12,21 @@ import '../../domain/repositories/bots_repository.dart';
 /// definiciones de variables de la plantilla ligada, que siembran el form).
 ///
 /// **MAJOR 2 — trampa de versión doble.** Como es una página aparte del
-/// `BotDetailBloc`, NO hereda el Bot cargado: debe obtenerlo él mismo vía
-/// `byId`. La carga trae DOS versiones distintas — la del Bot (de `byId`) y la
-/// del Template (de `listVarDefs`). El `PUT` DEBE enviar la del **BOT**; enviar
-/// la del template provocaría un 409 espurio o, peor, pisaría el CAS. El estado
+/// `BotDetailBloc`, NO hereda el Bot cargado: lo resuelve él mismo. La carga
+/// trae DOS versiones distintas — la del Bot (de `getVariables`) y la del
+/// Template (de `listVarDefs`). El `PUT` DEBE enviar la del **BOT**; enviar la
+/// del template provocaría un 409 espurio o, peor, pisaría el CAS. El estado
 /// `Loaded` lleva `botVersion` y el save lo usa siempre.
 ///
-/// **WRITE-ONLY (I-B6).** `botResp` no devuelve `variable_values`, así que el
-/// form NO prellena overrides guardados; siembra placeholders desde los
-/// defaults del template y el `PUT` REEMPLAZA por completo (replace
-/// autoritativo). Vaciar overrides = enviar `{}`, jamás `null`.
+/// **Precarga (replace autoritativo).** `getVariables` (`GET
+/// /bots/:id/variables`, ADMIN+) devuelve los overrides ya guardados, la
+/// `version` del Bot (CAS consistente con esos valores) y el `templateId`. El
+/// form los PRECARGA: un campo con override guardado lo muestra; uno sin
+/// override arranca vacío con el default del template como placeholder. El
+/// `PUT` REEMPLAZA por completo (el form representa el set deseado entero), así
+/// que vaciar un campo elimina su override y vaciar todo envía `{}` (jamás
+/// `null`). Precargar también evita el borrado accidental de overrides al
+/// reabrir-y-guardar.
 class BotVariablesBloc extends Bloc<BotVariablesEvent, BotVariablesState> {
   BotVariablesBloc({
     required BotsRepository botsRepo,
@@ -48,15 +53,21 @@ class BotVariablesBloc extends Bloc<BotVariablesEvent, BotVariablesState> {
     }
     try {
       // Secuencial a propósito: el `templateId` (y la `version` del bot para el
-      // CAS) salen del bot, así la página es deep-linkable sin pasarle el
-      // templateId por la ruta.
-      final bot = await _botsRepo.byId(_botId);
-      final result = await _templatesRepo.listVarDefs(bot.templateId);
+      // CAS, más los overrides ya guardados) salen de `getVariables`, así la
+      // página es deep-linkable sin pasarle el templateId por la ruta.
+      final snap = await _botsRepo.getVariables(_botId);
+      final result = await _templatesRepo.listVarDefs(snap.templateId);
       if (result.defs.isEmpty) {
         emit(const BotVariablesEmpty());
         return;
       }
-      emit(BotVariablesLoaded(defs: result.defs, botVersion: bot.version));
+      emit(
+        BotVariablesLoaded(
+          defs: result.defs,
+          botVersion: snap.version,
+          currentValues: snap.values,
+        ),
+      );
     } on BotsFailure catch (f) {
       emit(BotVariablesFailed(_botsError(f)));
     } on TemplatesFailure catch (f) {
@@ -71,17 +82,26 @@ class BotVariablesBloc extends Bloc<BotVariablesEvent, BotVariablesState> {
     final current = state;
     final List<VariableDef> defs;
     final int botVersion;
+    final Map<String, String> currentValues;
     if (current is BotVariablesLoaded) {
       defs = current.defs;
       botVersion = current.botVersion;
+      currentValues = current.currentValues;
     } else if (current is BotVariablesSaveFailed) {
       defs = current.defs;
       botVersion = current.botVersion;
+      currentValues = current.currentValues;
     } else {
       return;
     }
 
-    emit(BotVariablesSaving(defs: defs, botVersion: botVersion));
+    emit(
+      BotVariablesSaving(
+        defs: defs,
+        botVersion: botVersion,
+        currentValues: currentValues,
+      ),
+    );
     try {
       // MAJOR 2: `botVersion` (de `byId`), NUNCA la versión del template.
       // `event.values` ya viene con keys ⊆ defs (lo garantiza el form) y `{}`
@@ -94,7 +114,12 @@ class BotVariablesBloc extends Bloc<BotVariablesEvent, BotVariablesState> {
       emit(const BotVariablesSaved());
     } on BotsFailure catch (f) {
       emit(
-        BotVariablesSaveFailed(defs: defs, botVersion: botVersion, failure: f),
+        BotVariablesSaveFailed(
+          defs: defs,
+          botVersion: botVersion,
+          currentValues: currentValues,
+          failure: f,
+        ),
       );
     }
   }
@@ -186,48 +211,66 @@ class BotVariablesFailed extends BotVariablesState {
   int get hashCode => error.hashCode;
 }
 
-/// Form listo. Lleva las defs (para pintar un campo por variable) y la
-/// `botVersion` (CAS del save). El save usa SIEMPRE esta `botVersion`.
+/// Form listo. Lleva las defs (para pintar un campo por variable), la
+/// `botVersion` (CAS del save, usada SIEMPRE) y los `currentValues` (overrides
+/// ya guardados que el form PRECARGA por nombre de variable).
 class BotVariablesLoaded extends BotVariablesState {
-  const BotVariablesLoaded({required this.defs, required this.botVersion});
+  const BotVariablesLoaded({
+    required this.defs,
+    required this.botVersion,
+    this.currentValues = const <String, String>{},
+  });
 
   final List<VariableDef> defs;
   final int botVersion;
+  final Map<String, String> currentValues;
 
   @override
   bool operator ==(Object other) =>
       other is BotVariablesLoaded &&
       other.botVersion == botVersion &&
-      _listEq(other.defs, defs);
+      _listEq(other.defs, defs) &&
+      _mapEq(other.currentValues, currentValues);
   @override
-  int get hashCode => Object.hash(Object.hashAll(defs), botVersion);
+  int get hashCode =>
+      Object.hash(Object.hashAll(defs), botVersion, _mapHash(currentValues));
 }
 
 class BotVariablesSaving extends BotVariablesState {
-  const BotVariablesSaving({required this.defs, required this.botVersion});
+  const BotVariablesSaving({
+    required this.defs,
+    required this.botVersion,
+    this.currentValues = const <String, String>{},
+  });
 
   final List<VariableDef> defs;
   final int botVersion;
+  final Map<String, String> currentValues;
 
   @override
   bool operator ==(Object other) =>
       other is BotVariablesSaving &&
       other.botVersion == botVersion &&
-      _listEq(other.defs, defs);
+      _listEq(other.defs, defs) &&
+      _mapEq(other.currentValues, currentValues);
   @override
-  int get hashCode => Object.hash(Object.hashAll(defs), botVersion);
+  int get hashCode =>
+      Object.hash(Object.hashAll(defs), botVersion, _mapHash(currentValues));
 }
 
-/// Save fallido: conserva defs+version para que el form siga editable y reintente.
+/// Save fallido: conserva defs+version+currentValues para que el form siga
+/// editable, precargado y reintente.
 class BotVariablesSaveFailed extends BotVariablesState {
   const BotVariablesSaveFailed({
     required this.defs,
     required this.botVersion,
     required this.failure,
+    this.currentValues = const <String, String>{},
   });
 
   final List<VariableDef> defs;
   final int botVersion;
+  final Map<String, String> currentValues;
   final BotsFailure failure;
 
   @override
@@ -235,9 +278,15 @@ class BotVariablesSaveFailed extends BotVariablesState {
       other is BotVariablesSaveFailed &&
       other.botVersion == botVersion &&
       other.failure == failure &&
-      _listEq(other.defs, defs);
+      _listEq(other.defs, defs) &&
+      _mapEq(other.currentValues, currentValues);
   @override
-  int get hashCode => Object.hash(Object.hashAll(defs), botVersion, failure);
+  int get hashCode => Object.hash(
+    Object.hashAll(defs),
+    botVersion,
+    failure,
+    _mapHash(currentValues),
+  );
 }
 
 /// Save exitoso (transitorio): la página hace pop al detalle.
@@ -263,4 +312,14 @@ bool _mapEq(Map<String, String> a, Map<String, String> b) {
     if (b[e.key] != e.value) return false;
   }
   return true;
+}
+
+// XOR sobre las entradas: independiente del orden de iteración, así dos mapas
+// iguales (mismas entradas) producen el mismo hashCode aunque difiera el orden.
+int _mapHash(Map<String, String> m) {
+  var h = 0;
+  for (final e in m.entries) {
+    h ^= Object.hash(e.key, e.value);
+  }
+  return h;
 }

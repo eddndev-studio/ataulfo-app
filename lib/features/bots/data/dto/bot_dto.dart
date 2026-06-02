@@ -98,6 +98,52 @@ class BotUpdateReq {
   };
 }
 
+/// Respuesta de `GET /bots/:id/variables`
+/// (`ataulfo-go/internal/adapters/httpbots/dto.go` `botVariablesResp`). El
+/// editor de variables la consume para PRECARGAR los overrides guardados.
+///
+/// `variable_values` SIEMPRE es objeto (nunca `null`): un bot sin overrides
+/// emite `{}`. Se valida fail-loud que sea un map de strings — drift del
+/// contrato no se degrada en silencio.
+class BotVariablesResp {
+  const BotVariablesResp({
+    required this.version,
+    required this.templateId,
+    required this.values,
+  });
+
+  factory BotVariablesResp.fromJson(Map<String, dynamic> json) {
+    final version = json['version'];
+    final templateId = json['template_id'];
+    final raw = json['variable_values'];
+    if (version is! int || templateId is! String || raw is! Map) {
+      throw const FormatException(
+        'botVariablesResp: clave obligatoria ausente',
+      );
+    }
+    final values = <String, String>{};
+    for (final entry in raw.entries) {
+      final k = entry.key;
+      final v = entry.value;
+      if (k is! String || v is! String) {
+        throw const FormatException(
+          'botVariablesResp: variable_values debe ser map<string,string>',
+        );
+      }
+      values[k] = v;
+    }
+    return BotVariablesResp(
+      version: version,
+      templateId: templateId,
+      values: values,
+    );
+  }
+
+  final int version;
+  final String templateId;
+  final Map<String, String> values;
+}
+
 /// Body de `POST /bots/:id/clone` (`cloneReq`). El cliente provee el `name`
 /// del clon; el dominio no inventa sufijos. El clon nace con id, canal y
 /// plantilla heredados pero `version` reiniciada y sin identifier.

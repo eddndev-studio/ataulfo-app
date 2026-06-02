@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_variables_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_variables_page.dart';
@@ -73,6 +74,59 @@ void main() {
     expect(find.text('Tono de las respuestas'), findsOneWidget);
     expect(find.byKey(const Key('bot_variables.submit')), findsOneWidget);
   });
+
+  testWidgets(
+    'Loaded PRECARGA el valor guardado de cada variable (no solo placeholder)',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          state: const BotVariablesLoaded(
+            defs: _defs,
+            botVersion: 5,
+            currentValues: <String, String>{'tono': 'formal'},
+          ),
+        ),
+      );
+
+      // 'tono' tiene override guardado → el campo lo PRECARGA como texto.
+      final tono = tester.widget<AppTextField>(
+        find.byKey(const Key('bot_variables.field.tono')),
+      );
+      expect(tono.controller.text, 'formal');
+
+      // 'firma' sin override → arranca vacío (su default va de placeholder).
+      final firma = tester.widget<AppTextField>(
+        find.byKey(const Key('bot_variables.field.firma')),
+      );
+      expect(firma.controller.text, '');
+    },
+  );
+
+  testWidgets(
+    'submit SIN tocar nada PRESERVA los overrides precargados (no los borra)',
+    (tester) async {
+      // Regresión del footgun: antes el form arrancaba vacío y un
+      // reabrir-y-guardar enviaba {} (borraba TODOS los overrides). Con la
+      // precarga, guardar sin cambios reenvía el set guardado.
+      await tester.pumpWidget(
+        host(
+          state: const BotVariablesLoaded(
+            defs: _defs,
+            botVersion: 5,
+            currentValues: <String, String>{'tono': 'formal'},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('bot_variables.submit')));
+
+      verify(
+        () => bloc.add(
+          const BotVariablesSaveRequested(<String, String>{'tono': 'formal'}),
+        ),
+      ).called(1);
+    },
+  );
 
   testWidgets(
     'submit con un override → SaveRequested({tono}) omitiendo vacíos',

@@ -13,11 +13,12 @@ import '../bloc/bot_variables_bloc.dart';
 /// Editor de `variable_values` de un Bot (S04), sub-página ruteada
 /// (`/bots/:id/variables`). Content-only: el Scaffold/AppBar los aporta la ruta.
 ///
-/// WRITE-ONLY de primer orden: `botResp` no devuelve los overrides guardados,
-/// así que el form NUNCA los prellena — siembra placeholders desde los defaults
-/// del template y el `PUT` REEMPLAZA por completo. El banner lo deja explícito.
-/// Las keys editables son EXACTAMENTE las defs (un campo por variable); enviar
-/// una key fuera del set daría 422 client-side evitable.
+/// PRECARGA los overrides guardados (vía `getVariables`): un campo con override
+/// muestra su valor; uno sin override arranca vacío con el default del template
+/// como placeholder. El `PUT` REEMPLAZA por completo, así que el form
+/// representa el set deseado entero — vaciar un campo elimina su override. Las
+/// keys editables son EXACTAMENTE las defs (un campo por variable); enviar una
+/// key fuera del set daría 422 client-side evitable.
 class BotVariablesPage extends StatelessWidget {
   const BotVariablesPage({super.key});
 
@@ -34,16 +35,21 @@ class BotVariablesPage extends StatelessWidget {
           BotVariablesLoading() => const _LoadingView(),
           BotVariablesEmpty() => const _EmptyView(),
           BotVariablesFailed(error: final e) => _FailedView(error: e),
-          BotVariablesLoaded(defs: final defs) => _VariablesForm(
-            defs: defs,
-            isSaving: false,
-          ),
-          BotVariablesSaving(defs: final defs) => _VariablesForm(
-            defs: defs,
-            isSaving: true,
-          ),
-          BotVariablesSaveFailed(defs: final defs, failure: final f) =>
-            _VariablesForm(defs: defs, isSaving: false, failure: f),
+          BotVariablesLoaded(defs: final defs, currentValues: final values) =>
+            _VariablesForm(defs: defs, currentValues: values, isSaving: false),
+          BotVariablesSaving(defs: final defs, currentValues: final values) =>
+            _VariablesForm(defs: defs, currentValues: values, isSaving: true),
+          BotVariablesSaveFailed(
+            defs: final defs,
+            currentValues: final values,
+            failure: final f,
+          ) =>
+            _VariablesForm(
+              defs: defs,
+              currentValues: values,
+              isSaving: false,
+              failure: f,
+            ),
           // Transitorio: el listener ya hizo pop; un frame de spinner evita
           // reconstruir el form mientras se desmonta.
           BotVariablesSaved() => const _LoadingView(),
@@ -126,16 +132,19 @@ class _FailedView extends StatelessWidget {
 }
 
 /// Form dinámico de N campos (uno por VariableDef). Stateful: posee los
-/// controllers, keyeados por `def.id`, todos vacíos al abrir (WRITE-ONLY: no
-/// hay overrides que prellenar). El default va de placeholder (referencia).
+/// controllers, keyeados por `def.id`. Cada uno se PRECARGA con el override
+/// guardado (`currentValues[def.name]`) si existe; si no, arranca vacío y el
+/// default del template va de placeholder (referencia).
 class _VariablesForm extends StatefulWidget {
   const _VariablesForm({
     required this.defs,
+    required this.currentValues,
     required this.isSaving,
     this.failure,
   });
 
   final List<VariableDef> defs;
+  final Map<String, String> currentValues;
   final bool isSaving;
   final BotsFailure? failure;
 
@@ -149,8 +158,11 @@ class _VariablesFormState extends State<_VariablesForm> {
   @override
   void initState() {
     super.initState();
+    // Precarga por NOMBRE de variable (currentValues viene keyeado por name);
+    // los controllers se keyean por id. Sin override ⇒ vacío (placeholder).
     _controllers = <String, TextEditingController>{
-      for (final d in widget.defs) d.id: TextEditingController(),
+      for (final d in widget.defs)
+        d.id: TextEditingController(text: widget.currentValues[d.name] ?? ''),
     };
   }
 
@@ -192,9 +204,9 @@ class _VariablesFormState extends State<_VariablesForm> {
         children: <Widget>[
           AppCard(
             child: Text(
-              'Estos valores reemplazan por completo los actuales. Los valores '
-              'guardados no se muestran (limitación del servidor): lo que dejes '
-              'en blanco usará el valor por defecto de la plantilla.',
+              'Estos valores reemplazan por completo los actuales. Los campos '
+              'vienen con el valor ya configurado; lo que dejes en blanco usará '
+              'el valor por defecto de la plantilla.',
               style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
             ),
           ),

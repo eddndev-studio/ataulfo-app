@@ -1,4 +1,5 @@
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_variables_bloc.dart';
@@ -66,11 +67,20 @@ void main() {
     expect(build().state, const BotVariablesLoading());
   });
 
-  group('carga (MAJOR 2: versión del BOT, no del template)', () {
+  // getVariables resuelve {version del BOT, templateId, overrides guardados}
+  // en una sola lectura ADMIN+; la version del template (9) NUNCA se filtra.
+  const snap = BotVariablesSnapshot(
+    version: 5,
+    templateId: 't1',
+    values: <String, String>{'tono': 'formal'},
+  );
+
+  group('carga (MAJOR 2 + precarga de overrides)', () {
     blocTest<BotVariablesBloc, BotVariablesState>(
-      'load: byId + listVarDefs(bot.templateId) → Loaded(defs, botVersion=5)',
+      'load: getVariables + listVarDefs → Loaded(defs, botVersion=5, '
+      'currentValues precargados)',
       setUp: () {
-        when(() => botsRepo.byId('b1')).thenAnswer((_) async => _bot);
+        when(() => botsRepo.getVariables('b1')).thenAnswer((_) async => snap);
         // El template está en version 9 — NO debe filtrarse al PUT.
         when(
           () => templatesRepo.listVarDefs('t1'),
@@ -79,18 +89,24 @@ void main() {
       build: build,
       act: (b) => b.add(const BotVariablesLoadRequested()),
       expect: () => const <BotVariablesState>[
-        BotVariablesLoaded(defs: _defs, botVersion: 5),
+        BotVariablesLoaded(
+          defs: _defs,
+          botVersion: 5,
+          currentValues: <String, String>{'tono': 'formal'},
+        ),
       ],
       verify: (_) {
-        verify(() => botsRepo.byId('b1')).called(1);
+        verify(() => botsRepo.getVariables('b1')).called(1);
         verify(() => templatesRepo.listVarDefs('t1')).called(1);
+        // El bug original leía byId (que no trae overrides). Ya no se usa.
+        verifyNever(() => botsRepo.byId(any()));
       },
     );
 
     blocTest<BotVariablesBloc, BotVariablesState>(
       'template sin defs → Empty',
       setUp: () {
-        when(() => botsRepo.byId('b1')).thenAnswer((_) async => _bot);
+        when(() => botsRepo.getVariables('b1')).thenAnswer((_) async => snap);
         when(
           () => templatesRepo.listVarDefs('t1'),
         ).thenAnswer((_) async => (version: 9, defs: const <VariableDef>[]));
@@ -101,9 +117,9 @@ void main() {
     );
 
     blocTest<BotVariablesBloc, BotVariablesState>(
-      'byId NotFound → Failed(notFound)',
+      'getVariables NotFound → Failed(notFound)',
       setUp: () => when(
-        () => botsRepo.byId('b1'),
+        () => botsRepo.getVariables('b1'),
       ).thenThrow(const BotsNotFoundFailure()),
       build: build,
       act: (b) => b.add(const BotVariablesLoadRequested()),
@@ -116,7 +132,7 @@ void main() {
     blocTest<BotVariablesBloc, BotVariablesState>(
       'listVarDefs Forbidden → Failed(forbidden)',
       setUp: () {
-        when(() => botsRepo.byId('b1')).thenAnswer((_) async => _bot);
+        when(() => botsRepo.getVariables('b1')).thenAnswer((_) async => snap);
         when(
           () => templatesRepo.listVarDefs('t1'),
         ).thenThrow(const TemplatesForbiddenFailure());

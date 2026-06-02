@@ -1,4 +1,5 @@
 import '../entities/bot.dart';
+import '../entities/bot_variables_snapshot.dart';
 
 /// Puerto de dominio para Bots (S04). Define los verbos que el bloc puede
 /// pedir; las implementaciones viven en `data/`.
@@ -37,6 +38,13 @@ abstract interface class BotsRepository {
     bool? aiDisabled,
     Map<String, String>? variableValues,
   });
+
+  /// Lee los `variable_values` guardados de un Bot para el editor
+  /// (`GET /bots/:id/variables`, ADMIN+), junto con la `version` (CAS) y el
+  /// `templateId` (para resolver las definiciones). `BotsForbiddenFailure`
+  /// (403) si el rol no alcanza; `BotsNotFoundFailure` (404) si el bot no
+  /// existe en la org.
+  Future<BotVariablesSnapshot> getVariables(String id);
 
   /// Clona un Bot (`POST /bots/:id/clone`). Devuelve el clon con id NUEVO.
   /// `BotsInvalidCreateFailure` (422) si el nombre es inválido;

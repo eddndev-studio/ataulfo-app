@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/bot.dart';
+import '../../domain/entities/bot_variables_snapshot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../dto/bot_dto.dart';
 import '../mappers/bots_mapper.dart';
@@ -45,6 +46,14 @@ abstract interface class BotsDatasource {
     bool? aiDisabled,
     Map<String, String>? variableValues,
   });
+
+  /// `GET /bots/:id/variables` (ADMIN+) ⇒ `{version, template_id,
+  /// variable_values}`. Lectura dedicada para PRECARGAR el editor de
+  /// variables: trae los overrides ya guardados (mapa vacío si no hay), la
+  /// `version` para el CAS del `PUT` subsiguiente y el `templateId` para
+  /// resolver las definiciones. 404 si el bot no existe en la org; 403 si el
+  /// rol no alcanza (el endpoint es ADMIN+, espejo del PUT que escribe).
+  Future<BotVariablesSnapshot> getVariables(String id);
 
   /// `POST /bots/:id/clone` body `{name}` ⇒ 201. Devuelve el Bot clonado con
   /// un id NUEVO (canal y plantilla heredados, version reiniciada). 422 si el
@@ -171,6 +180,28 @@ class DioBotsDatasource implements BotsDatasource {
       rethrow;
     } on DioException catch (e) {
       throw _mapDioException(e, versionConflict: true);
+    } on FormatException {
+      throw const UnknownBotsFailure();
+    } on TypeError {
+      throw const UnknownBotsFailure();
+    }
+  }
+
+  @override
+  Future<BotVariablesSnapshot> getVariables(String id) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/bots/$id/variables');
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownBotsFailure();
+      }
+      return BotsMapper.variablesSnapshotFromResp(
+        BotVariablesResp.fromJson(body),
+      );
+    } on BotsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
     } on FormatException {
       throw const UnknownBotsFailure();
     } on TypeError {

@@ -1,4 +1,5 @@
 import '../../domain/entities/bot.dart';
+import '../../domain/entities/bot_variables_snapshot.dart';
 import '../../domain/repositories/bots_repository.dart';
 import '../datasources/bots_datasource.dart';
 
@@ -46,6 +47,9 @@ class BotsRepositoryImpl implements BotsRepository {
     aiDisabled: aiDisabled,
     variableValues: variableValues,
   );
+
+  @override
+  Future<BotVariablesSnapshot> getVariables(String id) => _ds.getVariables(id);
 
   @override
   Future<Bot> clone({required String id, required String name}) =>
