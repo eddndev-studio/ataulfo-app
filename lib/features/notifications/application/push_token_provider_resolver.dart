@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -38,7 +40,9 @@ class PushTokenProviderResolver {
     try {
       await _initFirebase();
       final messaging = _messaging();
-      await _requestNotificationPermission(messaging);
+      // Fire-and-forget: el diálogo de permiso (Android 13+) no debe bloquear el
+      // arranque ni el primer frame a la espera de la respuesta del usuario.
+      unawaited(_requestNotificationPermission(messaging));
       return FirebaseMessagingPushTokenProvider(messaging);
     } catch (_) {
       // Sin Firebase no hay push, pero el arranque no debe caer: noop.

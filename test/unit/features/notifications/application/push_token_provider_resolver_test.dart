@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/notifications/application/push_token_provider_resolver.dart';
 import 'package:ataulfo/features/notifications/data/repositories/firebase_messaging_push_token_provider.dart';
 import 'package:ataulfo/features/notifications/data/repositories/noop_push_token_provider.dart';
@@ -56,6 +58,25 @@ void main() {
     final provider = await resolver.resolve();
 
     expect(provider, isA<NoopPushTokenProvider>());
+  });
+
+  test('resolve no se bloquea esperando la respuesta del permiso', () async {
+    // El diálogo de permiso (Android 13+) puede tardar o no responderse nunca;
+    // el arranque no debe quedar bloqueado por él.
+    final pending = Completer<NotificationSettings>();
+    when(
+      () => messaging.requestPermission(),
+    ).thenAnswer((_) => pending.future);
+    final resolver = PushTokenProviderResolver(
+      isAndroid: true,
+      initFirebase: () async {},
+      messaging: () => messaging,
+    );
+
+    final provider = await resolver.resolve().timeout(const Duration(seconds: 2));
+
+    expect(provider, isA<FirebaseMessagingPushTokenProvider>());
+    verify(() => messaging.requestPermission()).called(1);
   });
 
   test('un fallo al pedir permiso no impide usar el provider real', () async {
