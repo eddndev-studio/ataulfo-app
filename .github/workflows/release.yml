@@ -1,0 +1,66 @@
+name: release
+
+# Release solo por tag de versión (p. ej. v0.1.0). Construye el APK de release
+# de Android y publica un GitHub Release con el artefacto. Corre en runners
+# alojados por GitHub (no self-hosted).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # crear el GitHub Release y subir el APK
+
+jobs:
+  release-android:
+    runs-on: ubuntu-latest
+    env:
+      # GitHub deprecó Node.js 20; este flag fuerza Node 24 en actions que aún
+      # lo declaran (mismo criterio que el workflow ci).
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: stable
+          cache: true
+
+      - name: Verify Dart/Flutter
+        run: flutter --version
+
+      # google-services.json está gitignored (no se versiona); se inyecta desde
+      # un secret base64 para que el plugin google-services pueda construir.
+      - name: Restore google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::Falta el secret GOOGLE_SERVICES_JSON (requerido para el build Android con Firebase)."
+            exit 1
+          fi
+          echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+
+      - name: Pub get
+        run: flutter pub get
+
+      # versionName desde el tag (v0.1.0 -> 0.1.0); versionCode desde el nº de run.
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            --build-name="${GITHUB_REF_NAME#v}" \
+            --build-number="${{ github.run_number }}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            build/app/outputs/flutter-apk/app-release.apk \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
