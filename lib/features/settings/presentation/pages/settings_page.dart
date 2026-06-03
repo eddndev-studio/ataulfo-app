@@ -75,6 +75,19 @@ class SettingsPage extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: AppTokens.cardGap),
+              AppCard(
+                key: const Key('settings.notifications_tile'),
+                onTap: () => context.push('/notifications'),
+                child: const Row(
+                  children: <Widget>[
+                    Icon(Icons.notifications_outlined, color: AppTokens.text2),
+                    SizedBox(width: AppTokens.sp4),
+                    Expanded(child: Text('Notificaciones')),
+                    Icon(Icons.chevron_right, color: AppTokens.text2),
+                  ],
+                ),
+              ),
               const SizedBox(height: AppTokens.sp7),
               AppButton.danger(
                 label: 'Cerrar sesión',

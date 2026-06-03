@@ -30,6 +30,11 @@ import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
 import 'package:ataulfo/features/messages/domain/entities/thread_live_event.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
+import 'package:ataulfo/features/notifications/domain/entities/notification_inbox_item.dart';
+import 'package:ataulfo/features/notifications/domain/entities/notification_preference.dart';
+import 'package:ataulfo/features/notifications/domain/repositories/notifications_repository.dart';
+import 'package:ataulfo/features/notifications/presentation/pages/notification_preferences_page.dart';
+import 'package:ataulfo/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
 import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
 import 'package:ataulfo/features/profile/presentation/pages/profile_page.dart';
@@ -85,6 +90,8 @@ class _MockCatalogRepo extends Mock implements CatalogRepository {}
 
 class _MockMediaRepo extends Mock implements MediaRepository {}
 
+class _MockNotificationsRepo extends Mock implements NotificationsRepository {}
+
 class _FakeMediaFilePicker implements MediaFilePicker {
   @override
   Future<PickedMedia?> pick() async => null;
@@ -135,6 +142,7 @@ void main() {
   late _MockMembershipsRepo membershipsRepo;
   late _MockCatalogRepo catalogRepo;
   late _MockLabelsRepo labelsRepo;
+  late _MockNotificationsRepo notificationsRepo;
   late AppRouter router;
 
   setUp(() {
@@ -150,6 +158,7 @@ void main() {
     membershipsRepo = _MockMembershipsRepo();
     catalogRepo = _MockCatalogRepo();
     labelsRepo = _MockLabelsRepo();
+    notificationsRepo = _MockNotificationsRepo();
     // Los blocs page-scoped del shell arrancan con LoadRequested al
     // construirse; los repos mock devuelven listas vacías para que los
     // loads terminen sin colgar el pumpAndSettle. El CatalogBloc se
@@ -189,6 +198,12 @@ void main() {
     // construirse; un catálogo vacío deja terminar el pumpAndSettle.
     when(labelsRepo.listLabels).thenAnswer((_) async => const <Label>[]);
     when(
+      () => notificationsRepo.listInbox(unreadOnly: true),
+    ).thenAnswer((_) async => const <NotificationInboxItem>[]);
+    when(
+      notificationsRepo.listPreferences,
+    ).thenAnswer((_) async => const <NotificationPreference>[]);
+    when(
       catalogRepo.fetch,
     ).thenAnswer((_) async => const Catalog(providers: <ProviderEntry>[]));
     // El hilo de mensajes (S15) se suscribe al stream en vivo tras cargar la
@@ -215,6 +230,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
@@ -583,6 +599,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
@@ -670,6 +687,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
@@ -703,6 +721,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
@@ -772,6 +791,7 @@ void main() {
         labelsRepository: labelsRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
+        notificationsRepository: notificationsRepo,
         mediaRepository: _MockMediaRepo(),
         mediaFilePicker: _FakeMediaFilePicker(),
         mediaThumbnailLoader: const FakeThumbnailLoader(),
@@ -843,6 +863,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
@@ -874,6 +895,36 @@ void main() {
 
       expect(find.byType(MembershipsPage), findsOneWidget);
       verify(membershipsRepo.list).called(1);
+    },
+  );
+
+  testWidgets(
+    'AuthAuthenticated → /notifications monta NotificationsPage y carga inbox',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/notifications');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NotificationsPage), findsOneWidget);
+      verify(() => notificationsRepo.listInbox(unreadOnly: true)).called(1);
+    },
+  );
+
+  testWidgets(
+    'AuthAuthenticated → /notification-preferences monta preferencias y carga',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/notification-preferences');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NotificationPreferencesPage), findsOneWidget);
+      verify(notificationsRepo.listPreferences).called(1);
     },
   );
 
@@ -930,6 +981,7 @@ void main() {
         labelsRepository: labelsRepo,
         membershipsRepository: membershipsRepo,
         catalogRepository: catalogRepo,
+        notificationsRepository: notificationsRepo,
         mediaRepository: _MockMediaRepo(),
         mediaFilePicker: _FakeMediaFilePicker(),
         mediaThumbnailLoader: const FakeThumbnailLoader(),
@@ -964,6 +1016,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
+      notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
