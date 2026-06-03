@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -39,8 +42,10 @@ import 'features/messages/data/datasources/messages_events_datasource.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
 import 'features/notifications/application/push_registration_coordinator.dart';
 import 'features/notifications/data/datasources/notifications_datasource.dart';
+import 'features/notifications/data/repositories/firebase_messaging_push_token_provider.dart';
 import 'features/notifications/data/repositories/noop_push_token_provider.dart';
 import 'features/notifications/data/repositories/notifications_repository_impl.dart';
+import 'features/notifications/domain/repositories/push_token_provider.dart';
 import 'features/profile/data/datasources/profile_datasource.dart';
 import 'features/profile/data/repositories/profile_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
@@ -69,8 +74,19 @@ import 'features/wa_labels/data/repositories/wa_labels_repository_impl.dart';
 /// (`https://api.ataulfo.app`); en desarrollo se sobreescribe con
 /// `--dart-define=AGENTIC_BASE_URL=http://10.0.2.2:8080` (localhost del
 /// emulador Android) o con la IP LAN del backend.
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Push FCM (S17) es Android-only y firebase_core no soporta Linux desktop:
+  // solo en Android se inicializa Firebase y se usa el provider real; en
+  // desktop/web cae a noop sin tocar Firebase, para no romper el arranque.
+  final PushTokenProvider pushTokens;
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    await Firebase.initializeApp();
+    pushTokens = FirebaseMessagingPushTokenProvider(FirebaseMessaging.instance);
+  } else {
+    pushTokens = const NoopPushTokenProvider();
+  }
 
   const baseUrl = String.fromEnvironment(
     'AGENTIC_BASE_URL',
@@ -184,7 +200,7 @@ void main() {
     authBloc: authBloc,
     repository: notificationsRepository,
     deviceIds: deviceIds,
-    tokens: const NoopPushTokenProvider(),
+    tokens: pushTokens,
   );
 
   // Decoramos el repo con el cache de la primera página por familia type, vivo
