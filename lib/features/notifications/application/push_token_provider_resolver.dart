@@ -50,7 +50,9 @@ class PushTokenProviderResolver {
     }
   }
 
-  Future<void> _requestNotificationPermission(FirebaseMessaging messaging) async {
+  Future<void> _requestNotificationPermission(
+    FirebaseMessaging messaging,
+  ) async {
     try {
       await messaging.requestPermission();
     } catch (_) {
