@@ -32,7 +32,7 @@ void main() {
   testWidgets(
     'login → tab Plantillas → primer template → edit → submit → detalle',
     (tester) async {
-      app.main();
+      await app.main();
 
       // Esperar a que el Splash colapse en LoginPage.
       await _pumpUntil(tester, find.byKey(const Key('login.email')));
@@ -156,7 +156,7 @@ void main() {
   testWidgets(
     'detalle: agregar → editar → eliminar variable-definition',
     (tester) async {
-      app.main();
+      await app.main();
 
       // Login — mismo lead-in que el smoke previo. No extraemos helper
       // mientras sean 2 consumers (la convención del repo extrae con
@@ -336,7 +336,7 @@ void main() {
   testWidgets(
     'flujo: tab Configuración → toggle usageLimit → save → rehidratación',
     (tester) async {
-      app.main();
+      await app.main();
 
       // Lead-in: login → tab Plantillas → primera tarjeta. Idéntico a los
       // smokes previos. Aún en regla de 2 — no extraemos helper.
