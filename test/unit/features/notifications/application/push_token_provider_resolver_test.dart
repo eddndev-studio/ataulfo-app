@@ -32,7 +32,11 @@ void main() {
     final provider = await resolver.resolve();
 
     expect(provider, isA<NoopPushTokenProvider>());
-    expect(initCalled, isFalse, reason: 'no debe tocar Firebase fuera de Android');
+    expect(
+      initCalled,
+      isFalse,
+      reason: 'no debe tocar Firebase fuera de Android',
+    );
   });
 
   test('Android con init OK usa el provider real y solicita permiso', () async {
@@ -64,16 +68,16 @@ void main() {
     // El diálogo de permiso (Android 13+) puede tardar o no responderse nunca;
     // el arranque no debe quedar bloqueado por él.
     final pending = Completer<NotificationSettings>();
-    when(
-      () => messaging.requestPermission(),
-    ).thenAnswer((_) => pending.future);
+    when(() => messaging.requestPermission()).thenAnswer((_) => pending.future);
     final resolver = PushTokenProviderResolver(
       isAndroid: true,
       initFirebase: () async {},
       messaging: () => messaging,
     );
 
-    final provider = await resolver.resolve().timeout(const Duration(seconds: 2));
+    final provider = await resolver.resolve().timeout(
+      const Duration(seconds: 2),
+    );
 
     expect(provider, isA<FirebaseMessagingPushTokenProvider>());
     verify(() => messaging.requestPermission()).called(1);
