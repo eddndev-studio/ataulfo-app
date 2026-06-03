@@ -90,6 +90,11 @@ void main() {
   // construye antes que `authBloc`, pero solo se ejecuta en runtime.
   late final AuthBloc authBloc;
 
+  // `late` difiere la captura del coordinator de push: el hook onBeforeLogout
+  // se construye antes que el coordinator (que depende de repos posteriores),
+  // pero sólo se ejecuta al cerrar sesión, cuando ya está cableado.
+  late final PushRegistrationCoordinator pushCoordinator;
+
   mainDio.interceptors.add(
     AuthInterceptor(
       retryDio: mainDio,
@@ -108,6 +113,10 @@ void main() {
   final authRepository = AuthRepositoryImpl(
     datasource: mainDs,
     storage: storage,
+    // Desregistrar el device de push mientras el Bearer sigue vivo: el hook
+    // corre antes de revocar y purgar la sesión, así el DELETE viaja
+    // autenticado y el device no queda atado al usuario saliente.
+    onBeforeLogout: () => pushCoordinator.unregisterForLogout(),
   );
   authBloc = AuthBloc(authRepository);
 
@@ -171,7 +180,7 @@ void main() {
     datasource: DioNotificationsDatasource(mainDio),
   );
 
-  final pushCoordinator = PushRegistrationCoordinator(
+  pushCoordinator = PushRegistrationCoordinator(
     authBloc: authBloc,
     repository: notificationsRepository,
     deviceIds: deviceIds,

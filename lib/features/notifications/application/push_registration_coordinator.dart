@@ -43,6 +43,21 @@ class PushRegistrationCoordinator {
     _tokenSub = null;
   }
 
+  /// Desregistra el device del push. Pensado para invocarse desde el use-case
+  /// de logout ANTES de purgar la sesión, de modo que el DELETE viaje con el
+  /// Bearer todavía vivo. No se dispara reactivamente al ver
+  /// `AuthUnauthenticated`: para entonces el storage ya está limpio y el
+  /// request iría sin token. Best-effort: absorbe cualquier fallo del repo
+  /// para no romper el teardown de sesión.
+  Future<void> unregisterForLogout() async {
+    try {
+      final deviceId = await _deviceIds.getOrCreate();
+      await _repo.unregisterPushToken(deviceId: deviceId);
+    } catch (_) {
+      // El registro de push es best-effort; un fallo aquí no debe propagarse.
+    }
+  }
+
   Future<void> _handleAuthState(AuthState state) async {
     if (state is AuthAuthenticated) {
       _authenticated = true;
@@ -52,18 +67,21 @@ class PushRegistrationCoordinator {
     }
     if (state is AuthUnauthenticated && _authenticated) {
       _authenticated = false;
-      final deviceId = await _deviceIds.getOrCreate();
-      await _repo.unregisterPushToken(deviceId: deviceId);
     }
   }
 
   Future<void> _registerToken(String? token) async {
     if (!_authenticated || token == null || token.isEmpty) return;
-    final deviceId = await _deviceIds.getOrCreate();
-    await _repo.registerPushToken(
-      deviceId: deviceId,
-      fcmToken: token,
-      platform: 'android',
-    );
+    try {
+      final deviceId = await _deviceIds.getOrCreate();
+      await _repo.registerPushToken(
+        deviceId: deviceId,
+        fcmToken: token,
+        platform: 'android',
+      );
+    } catch (_) {
+      // Best-effort: un fallo del registro no debe relanzarse ni romper el
+      // listener del stream de auth (la app no tiene guard async global).
+    }
   }
 }

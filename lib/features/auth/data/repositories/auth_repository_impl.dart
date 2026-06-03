@@ -14,11 +14,22 @@ class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl({
     required AuthDatasource datasource,
     required TokenStorage storage,
+    Future<void> Function()? onBeforeLogout,
   }) : _ds = datasource,
-       _storage = storage;
+       _storage = storage,
+       _onBeforeLogout = onBeforeLogout;
 
   final AuthDatasource _ds;
   final TokenStorage _storage;
+
+  /// Gancho que corre durante el logout MIENTRAS los tokens siguen
+  /// persistidos — antes de revocar la familia y de purgar el storage. Lo usa
+  /// la composición para limpiar estado dependiente de la sesión que requiere
+  /// un Bearer vivo (p. ej. desregistrar el device de push); de otro modo el
+  /// request viajaría sin Authorization tras el clear y el efecto fallaría
+  /// silenciosamente, dejando el device atado al usuario saliente. Best-effort:
+  /// un fallo del gancho no aborta el teardown de sesión.
+  final Future<void> Function()? _onBeforeLogout;
 
   @override
   Future<AuthTokens> login({
@@ -40,6 +51,15 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> logout() async {
     final tokens = await _storage.read();
     if (tokens == null) return;
+    final hook = _onBeforeLogout;
+    if (hook != null) {
+      try {
+        await hook();
+      } catch (_) {
+        // Best-effort: el gancho de pre-logout no debe impedir que la sesión
+        // local quede revocada y purgada. Cualquier fallo se traga aquí.
+      }
+    }
     try {
       await _ds.logout(tokens.refreshToken);
     } on AuthFailure {
