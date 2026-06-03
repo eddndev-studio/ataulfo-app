@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -38,8 +39,8 @@ import 'features/messages/data/datasources/messages_datasource.dart';
 import 'features/messages/data/datasources/messages_events_datasource.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
 import 'features/notifications/application/push_registration_coordinator.dart';
+import 'features/notifications/application/push_token_provider_resolver.dart';
 import 'features/notifications/data/datasources/notifications_datasource.dart';
-import 'features/notifications/data/repositories/noop_push_token_provider.dart';
 import 'features/notifications/data/repositories/notifications_repository_impl.dart';
 import 'features/profile/data/datasources/profile_datasource.dart';
 import 'features/profile/data/repositories/profile_repository_impl.dart';
@@ -69,8 +70,15 @@ import 'features/wa_labels/data/repositories/wa_labels_repository_impl.dart';
 /// (`https://api.ataulfo.app`); en desarrollo se sobreescribe con
 /// `--dart-define=AGENTIC_BASE_URL=http://10.0.2.2:8080` (localhost del
 /// emulador Android) o con la IP LAN del backend.
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Push FCM (S17) es Android-only y firebase_core no soporta Linux desktop:
+  // el resolver inicializa Firebase y usa el provider real solo en Android (con
+  // degradación a noop si Firebase falla), y noop directo en desktop/web.
+  final pushTokens = await PushTokenProviderResolver(
+    isAndroid: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+  ).resolve();
 
   const baseUrl = String.fromEnvironment(
     'AGENTIC_BASE_URL',
@@ -184,7 +192,7 @@ void main() {
     authBloc: authBloc,
     repository: notificationsRepository,
     deviceIds: deviceIds,
-    tokens: const NoopPushTokenProvider(),
+    tokens: pushTokens,
   );
 
   // Decoramos el repo con el cache de la primera página por familia type, vivo

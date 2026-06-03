@@ -3,6 +3,9 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Procesa google-services.json para inyectar la config de Firebase (FCM) en
+    // el build de Android. Debe ir tras los plugins de Android/Kotlin/Flutter.
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -24,7 +27,9 @@ android {
         applicationId = "studio.eddndev.ataulfo"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Firebase (firebase_core/messaging) exige minSdk 23; no bajar del
+        // default de Flutter si este ya es mayor.
+        minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

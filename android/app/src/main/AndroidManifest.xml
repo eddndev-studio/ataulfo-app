@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+ exige este permiso para MOSTRAR notificaciones push (FCM).
+         La obtención del token no lo requiere; la solicitud en runtime queda
+         pendiente del lado cliente. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Ataúlfo"
         android:name="${applicationName}"
