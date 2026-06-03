@@ -1,8 +1,12 @@
 name: release
 
 # Release solo por tag de versión (p. ej. v0.1.0). Construye el APK de release
-# de Android y publica un GitHub Release con el artefacto. Corre en runners
-# alojados por GitHub (no self-hosted).
+# de Android firmado con el keystore de release y publica un GitHub Release con
+# el artefacto.
+#
+# Corre en el runner self-hosted (VPS2): el toolchain (JDK 17, Flutter, Android
+# SDK) está pre-provisionado en la máquina, por lo que no se descarga nada por
+# run y no se consumen minutos de GitHub-hosted.
 on:
   push:
     tags: ['v*']
@@ -12,24 +16,19 @@ permissions:
 
 jobs:
   release-android:
-    runs-on: ubuntu-latest
-    env:
-      # GitHub deprecó Node.js 20; este flag fuerza Node 24 en actions que aún
-      # lo declaran (mismo criterio que el workflow ci).
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    runs-on: [self-hosted, vps2]
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.38.5'
-          channel: stable
-          cache: true
+      # El toolchain vive en la máquina; solo lo exponemos al job.
+      - name: Setup toolchain on PATH
+        run: |
+          echo "/opt/flutter/bin" >> "$GITHUB_PATH"
+          echo "/opt/android-sdk/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "/opt/android-sdk/platform-tools" >> "$GITHUB_PATH"
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=/opt/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=/opt/android-sdk" >> "$GITHUB_ENV"
 
       - name: Verify Dart/Flutter
         run: flutter --version
@@ -44,7 +43,29 @@ jobs:
             echo "::error::Falta el secret GOOGLE_SERVICES_JSON (requerido para el build Android con Firebase)."
             exit 1
           fi
-          echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          echo "$GOOGLE_SERVICES_JSON" | base64 -d > "$GITHUB_WORKSPACE/android/app/google-services.json"
+
+      # El keystore de release y sus contraseñas viven en repo Secrets (cifrados,
+      # enmascarados en logs, inyectados solo en jobs de este repo). Se decodifican
+      # al workspace efímero del job; el step de limpieza los borra al final.
+      - name: Restore release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::Falta el secret ANDROID_KEYSTORE_BASE64 (firma de release)."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/android/app/upload-keystore.jks"
+          {
+            echo "storeFile=$GITHUB_WORKSPACE/android/app/upload-keystore.jks"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > "$GITHUB_WORKSPACE/android/key.properties"
 
       - name: Pub get
         run: flutter pub get
@@ -64,3 +85,12 @@ jobs:
             build/app/outputs/flutter-apk/app-release.apk \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes
+
+      # El workspace del runner self-hosted persiste entre runs: borramos el
+      # material de firma para no dejarlo en disco en una caja compartida.
+      - name: Cleanup signing material from workspace
+        if: always()
+        run: |
+          rm -f "$GITHUB_WORKSPACE/android/app/upload-keystore.jks" \
+                "$GITHUB_WORKSPACE/android/key.properties" \
+                "$GITHUB_WORKSPACE/android/app/google-services.json"

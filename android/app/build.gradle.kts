@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -6,6 +9,16 @@ plugins {
     // Procesa google-services.json para inyectar la config de Firebase (FCM) en
     // el build de Android. Debe ir tras los plugins de Android/Kotlin/Flutter.
     id("com.google.gms.google-services")
+}
+
+// Config de firma de release leída de key.properties (no versionado: contiene
+// la ruta al keystore y sus contraseñas). Si el archivo no existe (build local
+// de desarrollo), el release cae a la firma debug y `flutter run --release`
+// sigue funcionando sin el keystore.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -38,11 +51,26 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Firma con el keystore de release cuando hay key.properties; si no,
+            // cae a la firma debug (desarrollo local sin el keystore).
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
