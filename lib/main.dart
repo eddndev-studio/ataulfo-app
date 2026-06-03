@@ -38,6 +38,7 @@ import 'features/memberships/data/repositories/memberships_repository_impl.dart'
 import 'features/messages/data/datasources/messages_datasource.dart';
 import 'features/messages/data/datasources/messages_events_datasource.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
+import 'features/notifications/application/push_display_bootstrap.dart';
 import 'features/notifications/application/push_registration_coordinator.dart';
 import 'features/notifications/application/push_token_provider_resolver.dart';
 import 'features/notifications/data/datasources/notifications_datasource.dart';
@@ -79,6 +80,9 @@ Future<void> main() async {
   final pushTokens = await PushTokenProviderResolver(
     isAndroid: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
   ).resolve();
+  // Visualización de push (foreground + background); no-op si el push real no
+  // está activo (desktop/web, o Android sin Firebase).
+  await startPushDisplay(pushTokens);
 
   const baseUrl = String.fromEnvironment(
     'AGENTIC_BASE_URL',
