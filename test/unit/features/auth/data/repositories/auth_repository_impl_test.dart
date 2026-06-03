@@ -10,8 +10,14 @@ import 'package:mocktail/mocktail.dart';
 class _MockDs extends Mock implements AuthDatasource {}
 
 class _SpyStorage implements TokenStorage {
+  _SpyStorage({this.onClear});
+
   final List<AuthTokens> saved = <AuthTokens>[];
   int clears = 0;
+
+  /// Hook para observar el orden relativo de `clear()` frente a otros
+  /// efectos (p. ej. el `onBeforeLogout`).
+  final void Function()? onClear;
 
   @override
   Future<void> save(AuthTokens tokens) async => saved.add(tokens);
@@ -20,7 +26,10 @@ class _SpyStorage implements TokenStorage {
   Future<AuthTokens?> read() async => saved.isEmpty ? null : saved.last;
 
   @override
-  Future<void> clear() async => clears++;
+  Future<void> clear() async {
+    onClear?.call();
+    clears++;
+  }
 }
 
 void main() {
@@ -160,5 +169,74 @@ void main() {
         expect(storage.clears, 1);
       },
     );
+
+    test(
+      'onBeforeLogout corre ANTES de storage.clear() (Bearer aún válido)',
+      () async {
+        // El gancho de pre-logout debe ejecutarse mientras los tokens siguen
+        // persistidos, para que cualquier request que dispare (p. ej. el
+        // desregistro del device de push) viaje con el Authorization vivo.
+        // Si corriera después de clear(), el request iría sin Bearer → 401.
+        const tokens = AuthTokens(
+          accessToken: 'a',
+          refreshToken: 'r-32',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+        );
+        var hookRanWithTokens = false;
+        final order = <String>[];
+        final spy = _SpyStorage(onClear: () => order.add('clear'));
+        await spy.save(tokens);
+        final repoWithHook = AuthRepositoryImpl(
+          datasource: ds,
+          storage: spy,
+          onBeforeLogout: () async {
+            order.add('hook');
+            hookRanWithTokens = (await spy.read()) != null;
+          },
+        );
+        when(() => ds.logout('r-32')).thenAnswer((_) async {});
+
+        await repoWithHook.logout();
+
+        expect(order, <String>['hook', 'clear']);
+        expect(hookRanWithTokens, isTrue);
+      },
+    );
+
+    test('onBeforeLogout no se invoca si no hay tokens persistidos', () async {
+      var hookCalls = 0;
+      final repoWithHook = AuthRepositoryImpl(
+        datasource: ds,
+        storage: storage,
+        onBeforeLogout: () async => hookCalls++,
+      );
+
+      await repoWithHook.logout();
+
+      expect(hookCalls, 0);
+      verifyNever(() => ds.logout(any()));
+    });
+
+    test('onBeforeLogout que lanza no aborta el teardown ni propaga', () async {
+      const tokens = AuthTokens(
+        accessToken: 'a',
+        refreshToken: 'r-32',
+        tokenType: 'Bearer',
+        expiresInSeconds: 900,
+      );
+      await storage.save(tokens);
+      final repoWithHook = AuthRepositoryImpl(
+        datasource: ds,
+        storage: storage,
+        onBeforeLogout: () async => throw StateError('boom'),
+      );
+      when(() => ds.logout('r-32')).thenAnswer((_) async {});
+
+      await repoWithHook.logout(); // No debe propagar.
+
+      verify(() => ds.logout('r-32')).called(1);
+      expect(storage.clears, 1);
+    });
   });
 }
