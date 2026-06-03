@@ -48,6 +48,11 @@ import '../../features/memberships/presentation/pages/memberships_page.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
 import '../../features/messages/presentation/bloc/messages_bloc.dart';
 import '../../features/messages/presentation/pages/message_thread_page.dart';
+import '../../features/notifications/domain/repositories/notifications_repository.dart';
+import '../../features/notifications/presentation/bloc/notification_preferences_bloc.dart';
+import '../../features/notifications/presentation/bloc/notifications_bloc.dart';
+import '../../features/notifications/presentation/pages/notification_preferences_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/profile/domain/repositories/profile_repository.dart';
 import '../../features/profile/presentation/bloc/profile_bloc.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
@@ -98,6 +103,7 @@ class AppRouter {
     required LabelsRepository labelsRepository,
     required MembershipsRepository membershipsRepository,
     required CatalogRepository catalogRepository,
+    required NotificationsRepository notificationsRepository,
     required MediaRepository mediaRepository,
     required MediaFilePicker mediaFilePicker,
     required MediaThumbnailLoader mediaThumbnailLoader,
@@ -115,6 +121,7 @@ class AppRouter {
        _labelsRepo = labelsRepository,
        _membershipsRepo = membershipsRepository,
        _catalogRepo = catalogRepository,
+       _notificationsRepo = notificationsRepository,
        _mediaRepo = mediaRepository,
        _mediaFilePicker = mediaFilePicker,
        _mediaThumbnailLoader = mediaThumbnailLoader;
@@ -133,6 +140,7 @@ class AppRouter {
   final LabelsRepository _labelsRepo;
   final MembershipsRepository _membershipsRepo;
   final CatalogRepository _catalogRepo;
+  final NotificationsRepository _notificationsRepo;
   final MediaRepository _mediaRepo;
   final MediaFilePicker _mediaFilePicker;
   final MediaThumbnailLoader _mediaThumbnailLoader;
@@ -587,6 +595,30 @@ class AppRouter {
           child: Scaffold(
             appBar: AppBar(title: const Text('Tus organizaciones')),
             body: const MembershipsPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, _) => BlocProvider<NotificationsBloc>(
+          create: (_) =>
+              NotificationsBloc(_notificationsRepo)
+                ..add(const NotificationsLoadRequested()),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Notificaciones')),
+            body: const NotificationsPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/notification-preferences',
+        builder: (context, _) => BlocProvider<NotificationPreferencesBloc>(
+          create: (_) =>
+              NotificationPreferencesBloc(_notificationsRepo)
+                ..add(const NotificationPreferencesLoadRequested()),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Preferencias')),
+            body: const NotificationPreferencesPage(),
           ),
         ),
       ),

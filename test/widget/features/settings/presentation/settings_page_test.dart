@@ -140,6 +140,60 @@ void main() {
     expect(find.text('Galería de multimedia'), findsOneWidget);
   });
 
+  testWidgets('Authenticated expone tile "Notificaciones"', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(host());
+
+    expect(
+      find.byKey(const Key('settings.notifications_tile')),
+      findsOneWidget,
+    );
+    expect(find.text('Notificaciones'), findsOneWidget);
+  });
+
+  testWidgets('tap "Notificaciones" apila /notifications (push, no go)', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    final navigated = <String>[];
+    final canPopAtDestination = <bool>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<AuthBloc>.value(
+            value: authBloc,
+            child: const Scaffold(body: SettingsPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (_, _) {
+            navigated.add('/notifications');
+            return Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  canPopAtDestination.add(Navigator.of(ctx).canPop());
+                  return const SizedBox.shrink();
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.byKey(const Key('settings.notifications_tile')));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/notifications']);
+    expect(canPopAtDestination, <bool>[true]);
+  });
+
   testWidgets('tap "Galería de multimedia" apila /media (push, no go)', (
     tester,
   ) async {

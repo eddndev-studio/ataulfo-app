@@ -1,5 +1,4 @@
 import 'package:ataulfo/app.dart';
-import 'package:ataulfo/core/design/widgets/app_background.dart';
 import 'package:ataulfo/core/router/app_router.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
@@ -10,27 +9,28 @@ import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
-import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
-import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
-import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
-import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
+import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/notifications/domain/entities/notification_inbox_item.dart';
 import 'package:ataulfo/features/notifications/domain/entities/notification_preference.dart';
 import 'package:ataulfo/features/notifications/domain/repositories/notifications_repository.dart';
+import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
+import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
+import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../support/fake_thumbnail_loader.dart';
+import '../test/support/fake_thumbnail_loader.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
@@ -70,20 +70,29 @@ class _FakeMediaFilePicker implements MediaFilePicker {
   Future<PickedMedia?> pick() async => null;
 }
 
-void main() {
-  late _MockAuthBloc authBloc;
-  late AppRouter router;
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
 
-  setUp(() {
-    authBloc = _MockAuthBloc();
-    when(() => authBloc.state).thenReturn(const AuthInitial());
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('notifications → preferences navigation', (tester) async {
+    final authBloc = _MockAuthBloc();
     final botsRepo = _MockBotsRepo();
     final templatesRepo = _MockTemplatesRepo();
+    final labelsRepo = _MockLabelsRepo();
     final membershipsRepo = _MockMembershipsRepo();
     final catalogRepo = _MockCatalogRepo();
     final notificationsRepo = _MockNotificationsRepo();
+
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
+    when(labelsRepo.listLabels).thenAnswer((_) async => const <Label>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
     when(
       catalogRepo.fetch,
@@ -94,7 +103,8 @@ void main() {
     when(
       notificationsRepo.listPreferences,
     ).thenAnswer((_) async => const <NotificationPreference>[]);
-    router = AppRouter(
+
+    final router = AppRouter(
       authBloc: authBloc,
       authRepository: _MockAuthRepo(),
       botsRepository: botsRepo,
@@ -105,7 +115,7 @@ void main() {
       flowsRepository: _MockFlowsRepo(),
       triggersRepository: _MockTriggersRepo(),
       waLabelsRepository: _MockWaLabelsRepo(),
-      labelsRepository: _MockLabelsRepo(),
+      labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
@@ -114,84 +124,31 @@ void main() {
       mediaFilePicker: _FakeMediaFilePicker(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
     );
-  });
 
-  testWidgets('AtaulfoApp cabla AppDesignTheme.dark() al MaterialApp', (
-    tester,
-  ) async {
     await tester.pumpWidget(
       AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
     );
+    await _pumpUntil(tester, find.text('Bots'));
 
-    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    // El scaffold es transparente: el fondo absoluto lo pinta AppBackground
-    // (glow radial) detrás del navigator, no el color del scaffold.
-    expect(app.theme?.scaffoldBackgroundColor, Colors.transparent);
-    expect(app.theme?.useMaterial3, isTrue);
-    expect(app.theme?.brightness, Brightness.dark);
+    router.router.go('/notifications');
+    await _pumpUntil(tester, find.text('Sin notificaciones pendientes'));
+    await tester.tap(find.text('Preferencias'));
+    await _pumpUntil(tester, find.text('Sin preferencias configuradas'));
+
+    expect(find.text('Sin preferencias configuradas'), findsOneWidget);
+    verify(notificationsRepo.listPreferences).called(1);
   });
+}
 
-  testWidgets('AtaulfoApp pinta el glow de fondo (AppBackground) detrás de '
-      'todas las rutas vía el builder del MaterialApp', (tester) async {
-    await tester.pumpWidget(
-      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
-    );
-
-    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    expect(
-      app.builder,
-      isNotNull,
-      reason: 'el builder envuelve el navigator para fijar el glow de fondo',
-    );
-    // El glow vive una sola vez, encima del navigator, fijo entre rutas.
-    expect(find.byType(AppBackground), findsOneWidget);
-  });
-
-  testWidgets('AtaulfoApp no expone darkTheme separado (producto dark-only)', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
-    );
-
-    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    expect(app.darkTheme, isNull);
-  });
-
-  // Higiene de sesión: el cache de media es un singleton de sesión; al cerrar
-  // sesión hay que purgarlo o la próxima cuenta vería el catálogo de la
-  // anterior sin reiniciar la app. AtaulfoApp dispara onSignedOut al caer a
-  // Unauthenticated; la composición lo enchufa a MediaRepository.invalidate.
-  testWidgets(
-    'AtaulfoApp dispara onSignedOut al caer la sesión a Unauthenticated',
-    (tester) async {
-      var signedOut = 0;
-      // Authenticated ANTES de Unauthenticated: el listener (listenWhen) debe
-      // filtrar el primero y disparar SÓLO en el segundo. Si filtrara mal y
-      // disparara en cada transición, signedOut sería 2 — por eso afirmamos
-      // == 1 (no >= 1): cierra la mutación de un listenWhen permisivo.
-      whenListen(
-        authBloc,
-        Stream<AuthState>.fromIterable(const <AuthState>[
-          AuthAuthenticated(
-            Identity(userId: 'u', orgId: 'o', role: 'OWNER', email: 'u@x'),
-          ),
-          AuthUnauthenticated(),
-        ]),
-        initialState: const AuthInitial(),
-      );
-
-      await tester.pumpWidget(
-        AtaulfoApp(
-          router: router,
-          authBloc: authBloc,
-          onSignedOut: () => signedOut++,
-        ),
-      );
-      await tester.pump(); // procesa Authenticated
-      await tester.pump(); // procesa Unauthenticated
-
-      expect(signedOut, 1);
-    },
-  );
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 50));
+    if (finder.evaluate().isNotEmpty) return;
+  }
+  fail('No apareció $finder en $timeout');
 }

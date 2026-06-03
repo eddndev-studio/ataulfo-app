@@ -37,6 +37,10 @@ import 'features/memberships/data/repositories/memberships_repository_impl.dart'
 import 'features/messages/data/datasources/messages_datasource.dart';
 import 'features/messages/data/datasources/messages_events_datasource.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
+import 'features/notifications/application/push_registration_coordinator.dart';
+import 'features/notifications/data/datasources/notifications_datasource.dart';
+import 'features/notifications/data/repositories/noop_push_token_provider.dart';
+import 'features/notifications/data/repositories/notifications_repository_impl.dart';
 import 'features/profile/data/datasources/profile_datasource.dart';
 import 'features/profile/data/repositories/profile_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
@@ -75,6 +79,7 @@ void main() {
 
   final kv = FlutterSecureKvStore();
   final storage = TokenStorage(kv);
+  final deviceIds = DeviceIdProvider(kv);
 
   final refreshDio = DioClient.create(baseUrl: baseUrl);
   final refreshDs = DioAuthDatasource(refreshDio);
@@ -162,6 +167,17 @@ void main() {
     datasource: DioCatalogDatasource(mainDio),
   );
 
+  final notificationsRepository = NotificationsRepositoryImpl(
+    datasource: DioNotificationsDatasource(mainDio),
+  );
+
+  final pushCoordinator = PushRegistrationCoordinator(
+    authBloc: authBloc,
+    repository: notificationsRepository,
+    deviceIds: deviceIds,
+    tokens: const NoopPushTokenProvider(),
+  );
+
   // Decoramos el repo con el cache de la primera página por familia type, vivo
   // a nivel de sesión (este singleton sobrevive a las entradas/salidas de la
   // galería, que es donde el bloc page-scoped re-listaba en cada visita). Se
@@ -208,6 +224,7 @@ void main() {
     labelsRepository: labelsRepository,
     membershipsRepository: membershipsRepository,
     catalogRepository: catalogRepository,
+    notificationsRepository: notificationsRepository,
     mediaRepository: mediaRepository,
     mediaFilePicker: mediaFilePicker,
     mediaThumbnailLoader: mediaThumbnailLoader,
@@ -217,13 +234,11 @@ void main() {
   // /auth/me, emite Authenticated o Unauthenticated. El Splash se queda
   // hasta que el primer estado no-Initial llegue.
   authBloc.add(const AuthCheckRequested());
+  unawaited(pushCoordinator.start());
 
   // Fire-and-forget: el device_id queda persistido en cuanto pueda. Los
-  // consumidores reales (refresh family, registro FCM) ocurren post-login —
-  // hay tiempo de sobra para que el primer `getOrCreate` termine antes que
-  // alguien lo lea. Nacer estable hoy evita rotar familias el día que
-  // aterrice el slice de push.
-  unawaited(DeviceIdProvider(kv).getOrCreate());
+  // consumidores post-login lo leen desde el mismo provider.
+  unawaited(deviceIds.getOrCreate());
 
   runApp(
     AtaulfoApp(
