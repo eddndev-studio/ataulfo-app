@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -41,11 +39,9 @@ import 'features/messages/data/datasources/messages_datasource.dart';
 import 'features/messages/data/datasources/messages_events_datasource.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
 import 'features/notifications/application/push_registration_coordinator.dart';
+import 'features/notifications/application/push_token_provider_resolver.dart';
 import 'features/notifications/data/datasources/notifications_datasource.dart';
-import 'features/notifications/data/repositories/firebase_messaging_push_token_provider.dart';
-import 'features/notifications/data/repositories/noop_push_token_provider.dart';
 import 'features/notifications/data/repositories/notifications_repository_impl.dart';
-import 'features/notifications/domain/repositories/push_token_provider.dart';
 import 'features/profile/data/datasources/profile_datasource.dart';
 import 'features/profile/data/repositories/profile_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
@@ -78,15 +74,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Push FCM (S17) es Android-only y firebase_core no soporta Linux desktop:
-  // solo en Android se inicializa Firebase y se usa el provider real; en
-  // desktop/web cae a noop sin tocar Firebase, para no romper el arranque.
-  final PushTokenProvider pushTokens;
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-    await Firebase.initializeApp();
-    pushTokens = FirebaseMessagingPushTokenProvider(FirebaseMessaging.instance);
-  } else {
-    pushTokens = const NoopPushTokenProvider();
-  }
+  // el resolver inicializa Firebase y usa el provider real solo en Android (con
+  // degradación a noop si Firebase falla), y noop directo en desktop/web.
+  final pushTokens = await PushTokenProviderResolver(
+    isAndroid: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+  ).resolve();
 
   const baseUrl = String.fromEnvironment(
     'AGENTIC_BASE_URL',
