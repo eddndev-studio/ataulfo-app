@@ -9,6 +9,8 @@ environment:
 dependencies:
   dio: ^5.9.2
   file_picker: ^10.3.4
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
   flutter:
     sdk: flutter
   flutter_bloc: ^9.1.1
