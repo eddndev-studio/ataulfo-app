@@ -31,6 +31,9 @@ import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/members/domain/entities/member.dart';
+import 'package:ataulfo/features/members/domain/repositories/members_repository.dart';
+import 'package:ataulfo/features/members/presentation/pages/members_page.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:ataulfo/features/memberships/presentation/pages/memberships_page.dart';
@@ -95,6 +98,8 @@ class _MockLabelsRepo extends Mock implements LabelsRepository {}
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
+
+class _MockMembersRepo extends Mock implements MembersRepository {}
 
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
 
@@ -185,6 +190,7 @@ void main() {
   late _MockFlowsRepo flowsRepo;
   late _MockTriggersRepo triggersRepo;
   late _MockMembershipsRepo membershipsRepo;
+  late _MockMembersRepo membersRepo;
   late _MockCatalogRepo catalogRepo;
   late _MockLabelsRepo labelsRepo;
   late _MockNotificationsRepo notificationsRepo;
@@ -201,6 +207,7 @@ void main() {
     flowsRepo = _MockFlowsRepo();
     triggersRepo = _MockTriggersRepo();
     membershipsRepo = _MockMembershipsRepo();
+    membersRepo = _MockMembersRepo();
     catalogRepo = _MockCatalogRepo();
     labelsRepo = _MockLabelsRepo();
     notificationsRepo = _MockNotificationsRepo();
@@ -239,6 +246,7 @@ void main() {
       () => triggersRepo.listTriggers(any()),
     ).thenAnswer((_) async => const <Trigger>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
+    when(membersRepo.list).thenAnswer((_) async => const <Member>[]);
     // El LabelsAdminBloc de la tab Etiquetas del shell dispara listLabels al
     // construirse; un catálogo vacío deja terminar el pumpAndSettle.
     when(labelsRepo.listLabels).thenAnswer((_) async => const <Label>[]);
@@ -274,6 +282,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
+      membersRepository: membersRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -700,6 +709,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
+      membersRepository: membersRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -788,6 +798,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
+      membersRepository: membersRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -822,6 +833,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
+      membersRepository: membersRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -892,6 +904,7 @@ void main() {
         waLabelsRepository: _MockWaLabelsRepo(),
         labelsRepository: labelsRepo,
         membershipsRepository: membershipsRepo,
+        membersRepository: membersRepo,
         catalogRepository: catalogRepo,
         notificationsRepository: notificationsRepo,
         mediaRepository: _MockMediaRepo(),
@@ -964,6 +977,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
+      membersRepository: membersRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -999,6 +1013,22 @@ void main() {
       verify(membershipsRepo.list).called(1);
     },
   );
+
+  testWidgets('AuthAuthenticated → /members monta MembersPage y dispara '
+      'MembersLoadRequested al construirse', (tester) async {
+    // El bloc page-scoped vive en el route builder de /members; el verify
+    // garantiza que el load arranca solo, sin que la página conozca el ciclo
+    // de vida (igual que /memberships).
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/members');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MembersPage), findsOneWidget);
+    verify(membersRepo.list).called(1);
+  });
 
   testWidgets('AuthAuthenticated → /memberships expone SwitchOrgCubit al árbol '
       '(habilita el switch in-app)', (tester) async {
@@ -1142,6 +1172,7 @@ void main() {
         waLabelsRepository: _MockWaLabelsRepo(),
         labelsRepository: labelsRepo,
         membershipsRepository: membershipsRepo,
+        membersRepository: membersRepo,
         catalogRepository: catalogRepo,
         notificationsRepository: notificationsRepo,
         mediaRepository: _MockMediaRepo(),
@@ -1177,6 +1208,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
+      membersRepository: membersRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -1408,6 +1440,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
+      membersRepository: membersRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
