@@ -13,4 +13,12 @@ class MembersRepositoryImpl implements MembersRepository {
 
   @override
   Future<List<Member>> list() => _ds.list();
+
+  @override
+  Future<void> changeRole(String membershipId, String role) =>
+      _ds.changeRole(membershipId, role);
+
+  @override
+  Future<void> removeMember(String membershipId) =>
+      _ds.removeMember(membershipId);
 }

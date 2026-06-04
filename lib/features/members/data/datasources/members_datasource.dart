@@ -14,6 +14,12 @@ abstract interface class MembersDatasource {
   /// legítimo; el llamador lo interpreta sin convertirlo en failure. Bearer y
   /// org activa los resuelve el backend desde el token.
   Future<List<Member>> list();
+
+  /// `PUT /workspace/members/{id}/role` con body `{role}`. 204 ⇒ completa.
+  Future<void> changeRole(String membershipId, String role);
+
+  /// `DELETE /workspace/members/{id}`. 204 ⇒ completa.
+  Future<void> removeMember(String membershipId);
 }
 
 class DioMembersDatasource implements MembersDatasource {
@@ -47,8 +53,34 @@ class DioMembersDatasource implements MembersDatasource {
     }
   }
 
-  /// Traduce DioException a la jerarquía sellada del feature. 403 lo emite el
-  /// guard RequireRole(ADMIN+); 409 el guard RequireActiveOrg.
+  @override
+  Future<void> changeRole(String membershipId, String role) async {
+    try {
+      await _dio.put<void>(
+        '/workspace/members/$membershipId/role',
+        data: <String, dynamic>{'role': role},
+      );
+    } on DioException catch (e) {
+      // En change-role el único 403 del servicio es el self-upgrade.
+      throw _mapMutationException(
+        e,
+        on403: const MembersSelfRoleUpgradeFailure(),
+      );
+    }
+  }
+
+  @override
+  Future<void> removeMember(String membershipId) async {
+    try {
+      await _dio.delete<void>('/workspace/members/$membershipId');
+    } on DioException catch (e) {
+      // RemoveMember no tiene 403 de servicio; un 403 sólo vendría del guard de
+      // rol de la ruta, así que se mapea al genérico (no a self-upgrade).
+      throw _mapMutationException(e, on403: const MembersForbiddenFailure());
+    }
+  }
+
+  /// Mapeo del listado: 403 = guard de rol, 409 = guard de org activa.
   MembersFailure _mapDioException(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
@@ -61,6 +93,36 @@ class DioMembersDatasource implements MembersDatasource {
         final status = e.response?.statusCode ?? 0;
         if (status == 403) return const MembersForbiddenFailure();
         if (status == 409) return const MembersNoActiveOrgFailure();
+        if (status >= 500 && status < 600) {
+          return const MembersServerFailure();
+        }
+        return const UnknownMembersFailure();
+      case DioExceptionType.cancel:
+      case DioExceptionType.badCertificate:
+      case DioExceptionType.unknown:
+        return const UnknownMembersFailure();
+    }
+  }
+
+  /// Mapeo de las mutaciones. A diferencia del listado, 409 = sole-owner (el
+  /// caller siempre tiene org activa al llegar aquí) y 404 = miembro inexistente.
+  /// El significado del 403 depende del endpoint, de ahí [on403].
+  MembersFailure _mapMutationException(
+    DioException e, {
+    required MembersFailure on403,
+  }) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return const MembersTimeoutFailure();
+      case DioExceptionType.connectionError:
+        return const MembersNetworkFailure();
+      case DioExceptionType.badResponse:
+        final status = e.response?.statusCode ?? 0;
+        if (status == 403) return on403;
+        if (status == 404) return const MembersNotFoundFailure();
+        if (status == 409) return const MembersSoleOwnerFailure();
         if (status >= 500 && status < 600) {
           return const MembersServerFailure();
         }

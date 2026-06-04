@@ -37,6 +37,25 @@ final class MembersNoActiveOrgFailure extends MembersFailure {
   const MembersNoActiveOrgFailure();
 }
 
+/// 409 en una mutación: la acción dejaría a la organización sin ningún OWNER
+/// (degradar o quitar al único dueño). Distinto de NoActiveOrg, que es el otro
+/// 409 del subárbol (el del listado) — por eso el mapeo es por-método.
+final class MembersSoleOwnerFailure extends MembersFailure {
+  const MembersSoleOwnerFailure();
+}
+
+/// 403 en change-role: el caller intenta ascender su propio rol. Es el único
+/// 403 a nivel de servicio para esa mutación (self-demote sí se permite).
+final class MembersSelfRoleUpgradeFailure extends MembersFailure {
+  const MembersSelfRoleUpgradeFailure();
+}
+
+/// 404 en una mutación: el miembro objetivo ya no existe (la lista del cliente
+/// quedó desfasada respecto al servidor).
+final class MembersNotFoundFailure extends MembersFailure {
+  const MembersNotFoundFailure();
+}
+
 /// 5xx del backend. Distinto de red: el servidor respondió, pero rompió.
 final class MembersServerFailure extends MembersFailure {
   const MembersServerFailure();
