@@ -66,7 +66,9 @@ class _ShellPageState extends State<ShellPage> {
         final body = Column(
           children: <Widget>[
             const EmailVerificationBanner(),
-            Expanded(child: IndexedStack(index: _index, children: _bodies)),
+            Expanded(
+              child: IndexedStack(index: _index, children: _bodies),
+            ),
           ],
         );
         return Scaffold(

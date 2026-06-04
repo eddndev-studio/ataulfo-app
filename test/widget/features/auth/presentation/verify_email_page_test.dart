@@ -168,26 +168,27 @@ void main() {
     },
   );
 
-  testWidgets('Succeeded notifica al callback onSucceeded con alreadyVerified', (
-    tester,
-  ) async {
-    whenListen(
-      bloc,
-      Stream<VerifyEmailState>.fromIterable(const <VerifyEmailState>[
-        VerifyEmailSucceeded(alreadyVerified: true),
-      ]),
-      initialState: const VerifyEmailInitial(),
-    );
+  testWidgets(
+    'Succeeded notifica al callback onSucceeded con alreadyVerified',
+    (tester) async {
+      whenListen(
+        bloc,
+        Stream<VerifyEmailState>.fromIterable(const <VerifyEmailState>[
+          VerifyEmailSucceeded(alreadyVerified: true),
+        ]),
+        initialState: const VerifyEmailInitial(),
+      );
 
-    bool? notifiedAlready;
-    await tester.pumpWidget(
-      host(
-        onSucceeded: ({required bool alreadyVerified}) =>
-            notifiedAlready = alreadyVerified,
-      ),
-    );
-    await tester.pump();
+      bool? notifiedAlready;
+      await tester.pumpWidget(
+        host(
+          onSucceeded: ({required bool alreadyVerified}) =>
+              notifiedAlready = alreadyVerified,
+        ),
+      );
+      await tester.pump();
 
-    expect(notifiedAlready, isTrue);
-  });
+      expect(notifiedAlready, isTrue);
+    },
+  );
 }

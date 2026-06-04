@@ -46,6 +46,5 @@ class Identity {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(userId, orgId, role, email, emailVerified);
+  int get hashCode => Object.hash(userId, orgId, role, email, emailVerified);
 }

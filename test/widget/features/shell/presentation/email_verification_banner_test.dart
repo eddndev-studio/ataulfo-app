@@ -13,8 +13,7 @@ import 'package:mocktail/mocktail.dart';
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
 
-class _MockResendCubit
-    extends MockBloc<Object, ResendVerificationState>
+class _MockResendCubit extends MockBloc<Object, ResendVerificationState>
     implements ResendVerificationCubit {}
 
 const _unverified = Identity(
@@ -39,9 +38,7 @@ void main() {
   setUp(() {
     authBloc = _MockAuthBloc();
     resendCubit = _MockResendCubit();
-    when(
-      () => resendCubit.state,
-    ).thenReturn(const ResendVerificationIdle());
+    when(() => resendCubit.state).thenReturn(const ResendVerificationIdle());
   });
 
   // Un router para resolver la navegación de "Verificar" sin montar todo el

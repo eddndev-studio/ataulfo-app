@@ -41,9 +41,7 @@ void main() {
     blocTest<ResendVerificationCubit, ResendVerificationState>(
       'fallo del backend: Sending → Failed',
       build: () {
-        when(
-          () => repo.resendVerification(),
-        ).thenThrow(const NetworkFailure());
+        when(() => repo.resendVerification()).thenThrow(const NetworkFailure());
         return ResendVerificationCubit(repo);
       },
       act: (c) => c.resend(),

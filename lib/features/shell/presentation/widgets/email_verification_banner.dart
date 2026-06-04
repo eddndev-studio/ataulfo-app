@@ -69,8 +69,7 @@ class _BannerBody extends StatelessWidget {
           ),
           AppButton.text(
             label: 'Reenviar',
-            onPressed: () =>
-                context.read<ResendVerificationCubit>().resend(),
+            onPressed: () => context.read<ResendVerificationCubit>().resend(),
           ),
           AppButton.text(
             label: 'Verificar',

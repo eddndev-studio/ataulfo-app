@@ -55,9 +55,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                   const SnackBar(content: Text('Verificación completada')),
                 );
               }
-              widget.onSucceeded?.call(
-                alreadyVerified: state.alreadyVerified,
-              );
+              widget.onSucceeded?.call(alreadyVerified: state.alreadyVerified);
             }
           },
           builder: (context, state) {

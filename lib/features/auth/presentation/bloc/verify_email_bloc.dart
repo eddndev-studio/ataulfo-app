@@ -113,8 +113,7 @@ class VerifyEmailSucceeded extends VerifyEmailState {
 
   @override
   bool operator ==(Object other) =>
-      other is VerifyEmailSucceeded &&
-      other.alreadyVerified == alreadyVerified;
+      other is VerifyEmailSucceeded && other.alreadyVerified == alreadyVerified;
 
   @override
   int get hashCode => alreadyVerified.hashCode;
