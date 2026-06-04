@@ -44,6 +44,16 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     InvalidCredentialsFailure() => LoginFailureKind.invalidCredentials,
     RateLimitedFailure() => LoginFailureKind.rateLimited,
     NetworkFailure() => LoginFailureKind.network,
+    // Las variantes de otros endpoints del arco de auth (registro,
+    // verificación, reset, switch-org, accept) no pueden surgir contra
+    // `/auth/login`; el login no las distingue y las colapsa a genérico.
+    EmailTakenFailure() ||
+    WeakPasswordFailure() ||
+    InvalidTokenFailure() ||
+    ExpiredTokenFailure() ||
+    EmailMismatchFailure() ||
+    AlreadyMemberFailure() ||
+    NotMemberFailure() ||
     UnknownAuthFailure() => LoginFailureKind.unknown,
   };
 }
