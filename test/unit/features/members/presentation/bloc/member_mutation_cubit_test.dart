@@ -99,6 +99,38 @@ void main() {
       );
     });
 
+    group('transfer', () {
+      blocTest<MemberMutationCubit, MemberMutationState>(
+        'ok → [InProgress, Success(ownershipTransferred)]',
+        build: () {
+          final repo = _MockRepo();
+          when(() => repo.transferOwnership(any())).thenAnswer((_) async {});
+          return MemberMutationCubit(repo);
+        },
+        act: (cubit) => cubit.transfer('m2'),
+        expect: () => const <MemberMutationState>[
+          MemberMutationInProgress(),
+          MemberMutationSuccess(MemberMutationAction.ownershipTransferred),
+        ],
+      );
+
+      blocTest<MemberMutationCubit, MemberMutationState>(
+        'forbidden → [InProgress, Failure(Forbidden)]',
+        build: () {
+          final repo = _MockRepo();
+          when(
+            () => repo.transferOwnership(any()),
+          ).thenThrow(const MembersForbiddenFailure());
+          return MemberMutationCubit(repo);
+        },
+        act: (cubit) => cubit.transfer('m2'),
+        expect: () => const <MemberMutationState>[
+          MemberMutationInProgress(),
+          MemberMutationFailure(MembersForbiddenFailure()),
+        ],
+      );
+    });
+
     blocTest<MemberMutationCubit, MemberMutationState>(
       'reintento tras Failure vuelve a pasar por InProgress (dos fallos '
       'idénticos siguen siendo transiciones distintas)',

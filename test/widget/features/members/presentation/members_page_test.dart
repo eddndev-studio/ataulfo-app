@@ -267,6 +267,30 @@ void main() {
     expect(find.text('Miembro eliminado'), findsOneWidget);
   });
 
+  testWidgets(
+    'mutación Success de transferir avisa "Propiedad transferida" (no el copy '
+    'de rol)',
+    (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const MembersLoaded(items: <Member>[_worker]));
+      whenListen(
+        mutation,
+        Stream<MemberMutationState>.fromIterable(const <MemberMutationState>[
+          MemberMutationInProgress(),
+          MemberMutationSuccess(MemberMutationAction.ownershipTransferred),
+        ]),
+        initialState: const MemberMutationIdle(),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.pump();
+
+      expect(find.text('Propiedad transferida'), findsOneWidget);
+      expect(find.text('Rol actualizado'), findsNothing);
+    },
+  );
+
   testWidgets('mutación Failure self-upgrade avisa con copy específico', (
     tester,
   ) async {
