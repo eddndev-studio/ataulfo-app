@@ -26,11 +26,17 @@ void main() {
     when(() => bloc.state).thenReturn(const LoginInitial());
   });
 
-  Widget host({void Function(AuthTokens)? onSucceeded}) => MaterialApp(
+  Widget host({
+    void Function(AuthTokens)? onSucceeded,
+    VoidCallback? onCreateAccount,
+  }) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: BlocProvider<LoginBloc>.value(
       value: bloc,
-      child: LoginPage(onSucceeded: onSucceeded),
+      child: LoginPage(
+        onSucceeded: onSucceeded,
+        onCreateAccount: onCreateAccount,
+      ),
     ),
   );
 
@@ -173,5 +179,15 @@ void main() {
       find.text('Algo salió mal, intenta de nuevo'),
     );
     expect(t.style?.color, AppTokens.danger);
+  });
+
+  testWidgets('"Crear cuenta" invoca onCreateAccount', (tester) async {
+    var tapped = false;
+    await tester.pumpWidget(host(onCreateAccount: () => tapped = true));
+
+    await tester.tap(find.text('Crear cuenta'));
+    await tester.pump();
+
+    expect(tapped, isTrue);
   });
 }

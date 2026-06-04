@@ -5,6 +5,7 @@ import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
+import 'package:ataulfo/features/auth/presentation/pages/register_page.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
@@ -1031,4 +1032,55 @@ void main() {
     expect(find.byType(LoginPage), findsOneWidget);
     expect(find.byType(MembershipsPage), findsNothing);
   });
+
+  testWidgets('/register (ruta pública) renderiza RegisterPage', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/register');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RegisterPage), findsOneWidget);
+  });
+
+  testWidgets('"Crear cuenta" desde el login navega a /register', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginPage), findsOneWidget);
+
+    await tester.tap(find.text('Crear cuenta'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RegisterPage), findsOneWidget);
+  });
+
+  testWidgets(
+    'deep-link directo a /register + "Ya tengo cuenta" cae al login sin '
+    'reventar la pila',
+    (tester) async {
+      // Cold deep-link: /register es ruta pública, así que un usuario sin
+      // sesión puede aterrizar ahí con la pila en un solo elemento. El back
+      // no puede hacer pop (no hay a dónde) y debe ir a /login en su lugar.
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/register');
+      await tester.pumpAndSettle();
+      expect(find.byType(RegisterPage), findsOneWidget);
+
+      await tester.tap(find.text('Ya tengo cuenta'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(find.byType(RegisterPage), findsNothing);
+    },
+  );
 }
