@@ -2,7 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/failures/auth_failure.dart';
 import '../../domain/repositories/auth_repository.dart';
-import '../util/reset_link.dart';
+import '../util/pasted_token.dart';
 
 /// Mínimo de longitud de contraseña que exige el backend en
 /// `/auth/reset-password`. El cliente lo valida antes de pegar al servidor para
@@ -31,7 +31,7 @@ class ResetPasswordBloc extends Bloc<ResetPasswordEvent, ResetPasswordState> {
     ResetPasswordSubmitted event,
     Emitter<ResetPasswordState> emit,
   ) async {
-    final token = extractResetToken(event.pastedLinkOrToken);
+    final token = extractPastedToken(event.pastedLinkOrToken);
     if (token.isEmpty) {
       emit(const ResetPasswordFailed(ResetPasswordFailureKind.invalidInput));
       return;
@@ -81,7 +81,7 @@ class ResetPasswordSubmitted extends ResetPasswordEvent {
   });
 
   /// Lo que el operador pegó: el enlace del correo o el token crudo. El bloc
-  /// lo normaliza con `extractResetToken` antes de canjear.
+  /// lo normaliza con `extractPastedToken` antes de canjear.
   final String pastedLinkOrToken;
   final String newPassword;
 
