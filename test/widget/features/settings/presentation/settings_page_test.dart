@@ -21,6 +21,27 @@ const _identity = Identity(
   email: 'op@example.com',
 );
 
+const _admin = Identity(
+  userId: 'u2',
+  orgId: 'o1',
+  role: 'ADMIN',
+  email: 'admin@example.com',
+);
+
+const _supervisor = Identity(
+  userId: 'u3',
+  orgId: 'o1',
+  role: 'SUPERVISOR',
+  email: 'sup@example.com',
+);
+
+const _worker = Identity(
+  userId: 'u4',
+  orgId: 'o1',
+  role: 'WORKER',
+  email: 'worker@example.com',
+);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(const AuthLoggedOut());
@@ -239,6 +260,90 @@ void main() {
       reason:
           'la galería debe quedar apilada sobre Settings para que el back '
           'físico vuelva al shell',
+    );
+  });
+
+  testWidgets('OWNER ve el tile admin-gated "Miembros"', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('settings.members_tile')), findsOneWidget);
+    expect(find.text('Miembros'), findsOneWidget);
+  });
+
+  testWidgets('ADMIN ve el tile admin-gated "Miembros"', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_admin));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('settings.members_tile')), findsOneWidget);
+  });
+
+  testWidgets('SUPERVISOR NO ve el tile "Miembros" (gate cosmético ADMIN+)', (
+    tester,
+  ) async {
+    // SUPERVISOR queda por debajo de ADMIN: el backend lo 403ea, así que la
+    // app no le ofrece el control. El gate es cosmético, no de seguridad.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_supervisor));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('settings.members_tile')), findsNothing);
+    expect(find.text('Miembros'), findsNothing);
+  });
+
+  testWidgets('WORKER NO ve el tile "Miembros"', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_worker));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('settings.members_tile')), findsNothing);
+  });
+
+  testWidgets('tap "Miembros" apila /members (push, no go)', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    final navigated = <String>[];
+    final canPopAtDestination = <bool>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<AuthBloc>.value(
+            value: authBloc,
+            child: const Scaffold(body: SettingsPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/members',
+          builder: (_, _) {
+            navigated.add('/members');
+            return Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  canPopAtDestination.add(Navigator.of(ctx).canPop());
+                  return const SizedBox.shrink();
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.byKey(const Key('settings.members_tile')));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/members']);
+    expect(
+      canPopAtDestination,
+      <bool>[true],
+      reason:
+          'el listado de miembros debe quedar apilado sobre Settings para que '
+          'el back físico vuelva al shell',
     );
   });
 
