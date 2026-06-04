@@ -165,6 +165,59 @@ void main() {
     });
   });
 
+  group('createOrganization', () {
+    test('OK persiste el par de la org nueva y lo retorna', () async {
+      const tokens = AuthTokens(
+        accessToken: 'a3',
+        refreshToken: 'r3',
+        tokenType: 'Bearer',
+        expiresInSeconds: 900,
+      );
+      when(
+        () => ds.createOrganization('Acme'),
+      ).thenAnswer((_) async => tokens);
+
+      final got = await repo.createOrganization('Acme');
+
+      expect(got, tokens);
+      expect(storage.saved, <AuthTokens>[tokens]);
+    });
+
+    test('falla del datasource propaga y no persiste', () async {
+      when(
+        () => ds.createOrganization(any()),
+      ).thenThrow(const UnknownAuthFailure());
+
+      await expectLater(
+        repo.createOrganization('Acme'),
+        throwsA(isA<UnknownAuthFailure>()),
+      );
+      expect(storage.saved, isEmpty);
+    });
+  });
+
+  group('renameOrganization', () {
+    test('OK delega en el datasource (sin tocar tokens)', () async {
+      when(() => ds.renameOrganization(any())).thenAnswer((_) async {});
+
+      await repo.renameOrganization('Nuevo');
+
+      verify(() => ds.renameOrganization('Nuevo')).called(1);
+      expect(storage.saved, isEmpty);
+    });
+
+    test('falla del datasource propaga', () async {
+      when(
+        () => ds.renameOrganization(any()),
+      ).thenThrow(const NetworkFailure());
+
+      await expectLater(
+        repo.renameOrganization('X'),
+        throwsA(isA<NetworkFailure>()),
+      );
+    });
+  });
+
   group('verifyEmail', () {
     test(
       'delega al datasource, devuelve alreadyVerified, sin tocar storage',
