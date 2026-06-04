@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/members/domain/entities/member.dart';
 import 'package:ataulfo/features/members/presentation/widgets/member_tile.dart';
@@ -53,5 +54,28 @@ void main() {
 
     expect(find.byKey(const Key('members.unverified_badge')), findsOneWidget);
     expect(find.byKey(const Key('members.verified_badge')), findsNothing);
+  });
+
+  testWidgets('con onTap el tile es tappable y dispara el callback', (
+    tester,
+  ) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      _host(MemberTile(member: _verified, onTap: () => taps++)),
+    );
+
+    await tester.tap(find.byType(AppCard));
+    await tester.pump();
+
+    expect(taps, 1);
+  });
+
+  testWidgets('sin onTap el tile no es tappable (look de solo lectura)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(const MemberTile(member: _verified)));
+
+    final card = tester.widget<AppCard>(find.byType(AppCard));
+    expect(card.onTap, isNull);
   });
 }
