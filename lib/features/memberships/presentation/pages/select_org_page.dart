@@ -151,9 +151,21 @@ class _SignOutFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: AppTokens.sp2),
-    child: AppButton.text(
-      label: 'Cerrar sesión',
-      onPressed: () => context.read<AuthBloc>().add(const AuthLoggedOut()),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        // Crear una org está disponible aunque ya haya orgs que elegir: un
+        // operador puede abrir una segunda organización desde aquí.
+        AppButton.tonal(
+          label: 'Crear organización',
+          onPressed: () => context.push('/create-org'),
+        ),
+        const SizedBox(height: AppTokens.sp2),
+        AppButton.text(
+          label: 'Cerrar sesión',
+          onPressed: () => context.read<AuthBloc>().add(const AuthLoggedOut()),
+        ),
+      ],
     ),
   );
 }
@@ -177,9 +189,14 @@ class _EmptyView extends StatelessWidget {
               style: textTheme.bodyLarge,
             ),
             const SizedBox(height: AppTokens.sp4),
-            // El invitado logueado sin membership cae aquí; aceptar una
-            // invitación es su única vía hacia adelante, así que el affordance
-            // vive en el estado vacío (no sólo cuando ya hay orgs que elegir).
+            // El invitado logueado sin membership cae aquí; crear una org o
+            // aceptar una invitación son sus vías hacia adelante, así que ambos
+            // affordances viven en el estado vacío (no sólo en la lista).
+            AppButton.tonal(
+              label: 'Crear organización',
+              onPressed: () => context.push('/create-org'),
+            ),
+            const SizedBox(height: AppTokens.sp2),
             AppButton.text(
               label: 'Aceptar una invitación',
               onPressed: () => context.push('/accept-invite'),

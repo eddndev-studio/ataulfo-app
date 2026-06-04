@@ -35,6 +35,17 @@ abstract interface class AuthRepository {
   /// claims llevan la org elegida) igual que el login.
   Future<AuthTokens> switchOrg(String orgId);
 
+  /// Crea una organización nueva con [name] y deja al caller OWNER. Como el
+  /// switch-org, el backend re-emite un par con la org nueva ya activa, así que
+  /// persiste el par devuelto: tras esto la sesión "vive" en la org nueva (el
+  /// llamador releerá `/auth/me` para reflejarlo).
+  Future<AuthTokens> createOrganization(String name);
+
+  /// Renombra la organización activa. No toca tokens (el id de la org no
+  /// cambia; el nombre no viaja en el JWT). El nombre fresco se observa
+  /// re-listando memberships.
+  Future<void> renameOrganization(String name);
+
   /// Acepta una invitación pendiente. No persiste tokens — la membership
   /// nueva requiere un switch-org explícito posterior.
   Future<void> acceptInvitation(String token);

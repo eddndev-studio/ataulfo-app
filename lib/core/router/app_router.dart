@@ -9,10 +9,12 @@ import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/accept_invitation_cubit.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/bloc/create_org_cubit.dart';
 import '../../features/auth/presentation/bloc/forgot_password_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/bloc/register_bloc.dart';
 import '../../features/auth/presentation/bloc/resend_verification_cubit.dart';
+import '../../features/auth/presentation/bloc/rename_org_cubit.dart';
 import '../../features/auth/presentation/bloc/reset_password_bloc.dart';
 import '../../features/auth/presentation/bloc/switch_org_cubit.dart';
 import '../../features/auth/presentation/bloc/verify_email_bloc.dart';
@@ -21,6 +23,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
 import '../../features/auth/presentation/pages/accept_invite_page.dart';
+import '../../features/auth/presentation/pages/create_org_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/bots/domain/entities/bot.dart';
 import '../../features/bots/domain/repositories/bot_session_repository.dart';
@@ -214,6 +217,19 @@ class AppRouter {
           child: Scaffold(
             appBar: AppBar(title: const Text('Selecciona una organización')),
             body: const SelectOrgPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Crear organización. Alcanzable con sesión (incluida la NoOrg, vía el
+        // allowlist del redirect: un sin-org debe poder crear su primera org).
+        // La página persiste el par nuevo y rutea al shell tras el flip.
+        path: '/create-org',
+        builder: (context, _) => BlocProvider<CreateOrgCubit>(
+          create: (_) => CreateOrgCubit(_authRepo),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Crear organización')),
+            body: const CreateOrgPage(),
           ),
         ),
       ),
@@ -766,6 +782,9 @@ class AppRouter {
             BlocProvider<SwitchOrgCubit>(
               create: (_) => SwitchOrgCubit(_authRepo),
             ),
+            BlocProvider<RenameOrgCubit>(
+              create: (_) => RenameOrgCubit(_authRepo),
+            ),
           ],
           child: Scaffold(
             appBar: AppBar(title: const Text('Tus organizaciones')),
@@ -992,11 +1011,12 @@ String? redirectForState(AuthState auth, String location) {
       return null;
     case AuthAuthenticatedNoOrg():
       // Sin org activa, todo se desvía a la selección de organización salvo la
-      // propia selección y verify/accept (que se permiten para no encerrar al
-      // operador en un loop de redirect).
+      // propia selección, verify/accept y crear-org (que se permiten para no
+      // encerrar al operador: un sin-org debe poder crear su primera org).
       if (location == '/select-org' ||
           location == '/verify-email' ||
-          location == '/accept-invite') {
+          location == '/accept-invite' ||
+          location == '/create-org') {
         return null;
       }
       return '/select-org';

@@ -777,6 +777,117 @@ void main() {
     });
   });
 
+  group('DioAuthDatasource.createOrganization', () {
+    test('201 con par de tokens → AuthTokens (org nueva activa)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/organizations',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => jsonResp('/auth/organizations', 201, body: tokenBody()),
+      );
+
+      final got = await ds.createOrganization('Acme');
+
+      expect(got, tokens);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/organizations',
+          data: <String, dynamic>{'name': 'Acme'},
+        ),
+      ).called(1);
+    });
+
+    test('body nulo → UnknownAuthFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/organizations',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer((_) async => jsonResp('/auth/organizations', 201));
+
+      await expectLater(
+        ds.createOrganization('Acme'),
+        throwsA(isA<UnknownAuthFailure>()),
+      );
+    });
+
+    test('422 (nombre inválido, defensivo) → UnknownAuthFailure', () async {
+      // La pantalla valida el nombre no-vacío; el 422 es defensa de borde y se
+      // colapsa al genérico sin contaminar el sellado AuthFailure.
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/organizations',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse('/auth/organizations', 422));
+
+      await expectLater(
+        ds.createOrganization('   '),
+        throwsA(isA<UnknownAuthFailure>()),
+      );
+    });
+  });
+
+  group('DioAuthDatasource.renameOrganization', () {
+    test('204 → completa y envía el nombre por PATCH', () async {
+      when(
+        () => dio.patch<void>(
+          '/workspace/organization',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<void>(
+          requestOptions: RequestOptions(path: '/workspace/organization'),
+          statusCode: 204,
+        ),
+      );
+
+      await ds.renameOrganization('Nuevo Nombre');
+
+      verify(
+        () => dio.patch<void>(
+          '/workspace/organization',
+          data: <String, dynamic>{'name': 'Nuevo Nombre'},
+        ),
+      ).called(1);
+    });
+
+    test('403 (no ADMIN, defensivo) → UnknownAuthFailure', () async {
+      when(
+        () => dio.patch<void>(
+          '/workspace/organization',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse('/workspace/organization', 403));
+
+      await expectLater(
+        ds.renameOrganization('X'),
+        throwsA(isA<UnknownAuthFailure>()),
+      );
+    });
+
+    test('sin conexión → NetworkFailure', () async {
+      when(
+        () => dio.patch<void>(
+          '/workspace/organization',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/workspace/organization'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        ds.renameOrganization('X'),
+        throwsA(isA<NetworkFailure>()),
+      );
+    });
+  });
+
   group('DioAuthDatasource.acceptInvitation', () {
     test('204 → completa y envía el token', () async {
       when(

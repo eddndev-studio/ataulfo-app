@@ -126,6 +126,38 @@ void main() {
   });
 
   testWidgets(
+    'Loaded vacío ofrece "Crear organización" (un sin-org crea la primera)',
+    (tester) async {
+      when(
+        () => memberships.state,
+      ).thenReturn(const MembershipsLoaded(items: <Membership>[]));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.widgetWithText(AppButton, 'Crear organización'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Loaded con orgs también ofrece "Crear organización" (no sólo vacío)',
+    (tester) async {
+      when(
+        () => memberships.state,
+      ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme]));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.widgetWithText(AppButton, 'Crear organización'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'Loaded vacío ofrece "Aceptar una invitación" (puerta del invitado sin org)',
     (tester) async {
       // El invitado logueado sin membership cae en el estado vacío; aceptar una
