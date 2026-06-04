@@ -75,9 +75,7 @@ void main() {
   });
 
   testWidgets('Loaded vacío muestra el copy de sin miembros', (tester) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const MembersLoaded(items: <Member>[]));
+    when(() => bloc.state).thenReturn(const MembersLoaded(items: <Member>[]));
 
     await tester.pumpWidget(host());
 

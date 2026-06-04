@@ -1014,24 +1014,21 @@ void main() {
     },
   );
 
-  testWidgets(
-    'AuthAuthenticated → /members monta MembersPage y dispara '
-    'MembersLoadRequested al construirse',
-    (tester) async {
-      // El bloc page-scoped vive en el route builder de /members; el verify
-      // garantiza que el load arranca solo, sin que la página conozca el ciclo
-      // de vida (igual que /memberships).
-      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+  testWidgets('AuthAuthenticated → /members monta MembersPage y dispara '
+      'MembersLoadRequested al construirse', (tester) async {
+    // El bloc page-scoped vive en el route builder de /members; el verify
+    // garantiza que el load arranca solo, sin que la página conozca el ciclo
+    // de vida (igual que /memberships).
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      router.router.go('/members');
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/members');
+    await tester.pumpAndSettle();
 
-      expect(find.byType(MembersPage), findsOneWidget);
-      verify(membersRepo.list).called(1);
-    },
-  );
+    expect(find.byType(MembersPage), findsOneWidget);
+    verify(membersRepo.list).called(1);
+  });
 
   testWidgets('AuthAuthenticated → /memberships expone SwitchOrgCubit al árbol '
       '(habilita el switch in-app)', (tester) async {

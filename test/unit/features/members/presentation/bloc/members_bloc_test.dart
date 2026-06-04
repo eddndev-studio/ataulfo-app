@@ -64,8 +64,7 @@ void main() {
         build: () {
           final repo = _MockRepo();
           when(repo.list).thenAnswer(
-            (_) =>
-                Future<List<Member>>.error(const MembersForbiddenFailure()),
+            (_) => Future<List<Member>>.error(const MembersForbiddenFailure()),
           );
           return MembersBloc(repo);
         },
