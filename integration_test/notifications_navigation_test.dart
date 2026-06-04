@@ -14,6 +14,8 @@ import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/invitations/domain/entities/invitation.dart';
+import 'package:ataulfo/features/invitations/domain/repositories/invitations_repository.dart';
 import 'package:ataulfo/features/members/domain/entities/member.dart';
 import 'package:ataulfo/features/members/domain/repositories/members_repository.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
@@ -63,6 +65,8 @@ class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
 class _MockMembersRepo extends Mock implements MembersRepository {}
 
+class _MockInvitationsRepo extends Mock implements InvitationsRepository {}
+
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
 
 class _MockMediaRepo extends Mock implements MediaRepository {}
@@ -91,6 +95,7 @@ void main() {
     final labelsRepo = _MockLabelsRepo();
     final membershipsRepo = _MockMembershipsRepo();
     final membersRepo = _MockMembersRepo();
+    final invitationsRepo = _MockInvitationsRepo();
     final catalogRepo = _MockCatalogRepo();
     final notificationsRepo = _MockNotificationsRepo();
 
@@ -100,6 +105,7 @@ void main() {
     when(labelsRepo.listLabels).thenAnswer((_) async => const <Label>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
     when(membersRepo.list).thenAnswer((_) async => const <Member>[]);
+    when(invitationsRepo.list).thenAnswer((_) async => const <Invitation>[]);
     when(
       catalogRepo.fetch,
     ).thenAnswer((_) async => const Catalog(providers: <ProviderEntry>[]));
@@ -124,6 +130,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       profileRepository: _MockProfileRepo(),

@@ -31,6 +31,10 @@ import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/invitations/domain/entities/invitation.dart';
+import 'package:ataulfo/features/invitations/domain/repositories/invitations_repository.dart';
+import 'package:ataulfo/features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
+import 'package:ataulfo/features/invitations/presentation/pages/invitations_page.dart';
 import 'package:ataulfo/features/members/domain/entities/member.dart';
 import 'package:ataulfo/features/members/domain/repositories/members_repository.dart';
 import 'package:ataulfo/features/members/presentation/bloc/member_mutation_cubit.dart';
@@ -101,6 +105,8 @@ class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
 class _MockMembersRepo extends Mock implements MembersRepository {}
+
+class _MockInvitationsRepo extends Mock implements InvitationsRepository {}
 
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
 
@@ -192,6 +198,7 @@ void main() {
   late _MockTriggersRepo triggersRepo;
   late _MockMembershipsRepo membershipsRepo;
   late _MockMembersRepo membersRepo;
+  late _MockInvitationsRepo invitationsRepo;
   late _MockCatalogRepo catalogRepo;
   late _MockLabelsRepo labelsRepo;
   late _MockNotificationsRepo notificationsRepo;
@@ -209,6 +216,7 @@ void main() {
     triggersRepo = _MockTriggersRepo();
     membershipsRepo = _MockMembershipsRepo();
     membersRepo = _MockMembersRepo();
+    invitationsRepo = _MockInvitationsRepo();
     catalogRepo = _MockCatalogRepo();
     labelsRepo = _MockLabelsRepo();
     notificationsRepo = _MockNotificationsRepo();
@@ -248,6 +256,7 @@ void main() {
     ).thenAnswer((_) async => const <Trigger>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
     when(membersRepo.list).thenAnswer((_) async => const <Member>[]);
+    when(invitationsRepo.list).thenAnswer((_) async => const <Invitation>[]);
     // El LabelsAdminBloc de la tab Etiquetas del shell dispara listLabels al
     // construirse; un catálogo vacío deja terminar el pumpAndSettle.
     when(labelsRepo.listLabels).thenAnswer((_) async => const <Label>[]);
@@ -284,6 +293,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -711,6 +721,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -800,6 +811,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -835,6 +847,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -906,6 +919,7 @@ void main() {
         labelsRepository: labelsRepo,
         membershipsRepository: membershipsRepo,
         membersRepository: membersRepo,
+        invitationsRepository: invitationsRepo,
         catalogRepository: catalogRepo,
         notificationsRepository: notificationsRepo,
         mediaRepository: _MockMediaRepo(),
@@ -979,6 +993,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -1045,6 +1060,36 @@ void main() {
 
     final page = tester.element(find.byType(MembersPage));
     expect(page.read<MemberMutationCubit>(), isNotNull);
+  });
+
+  testWidgets('AuthAuthenticated → /invitations monta InvitationsPage y '
+      'expone el InvitationMutationCubit + dispara el load', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/invitations');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InvitationsPage), findsOneWidget);
+    verify(invitationsRepo.list).called(1);
+    final page = tester.element(find.byType(InvitationsPage));
+    expect(page.read<InvitationMutationCubit>(), isNotNull);
+  });
+
+  testWidgets('AuthAuthenticated → /members ofrece "Invitar" que navega a '
+      '/invitations', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/members');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('members.invite')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InvitationsPage), findsOneWidget);
   });
 
   testWidgets('AuthAuthenticated → /memberships expone SwitchOrgCubit al árbol '
@@ -1190,6 +1235,7 @@ void main() {
         labelsRepository: labelsRepo,
         membershipsRepository: membershipsRepo,
         membersRepository: membersRepo,
+        invitationsRepository: invitationsRepo,
         catalogRepository: catalogRepo,
         notificationsRepository: notificationsRepo,
         mediaRepository: _MockMediaRepo(),
@@ -1226,6 +1272,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
@@ -1458,6 +1505,7 @@ void main() {
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       mediaRepository: _MockMediaRepo(),
