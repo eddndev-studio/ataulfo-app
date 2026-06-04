@@ -185,6 +185,26 @@ void main() {
   );
 
   testWidgets(
+    'tras un switch exitoso (Switched) los taps siguen deshabilitados',
+    (tester) async {
+      // Tras el éxito el cubit pasa a Switched (no Switching) y la página
+      // dispara AuthCheckRequested, cuyo round-trip a /auth/me deja la lista
+      // montada un instante. Si los taps se re-habilitaran ahí, un segundo tap
+      // rápido correría carrera con el switch en curso.
+      when(
+        () => memberships.state,
+      ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme, _bravo]));
+      when(() => switchOrg.state).thenReturn(const SwitchOrgSwitched('o-acme'));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.text('Bravo'), warnIfMissed: false);
+      await tester.pump();
+
+      verifyNever(() => switchOrg.switchTo(any()));
+    },
+  );
+
+  testWidgets(
     'Switched dispara AuthCheckRequested (la página flipa la sesión)',
     (tester) async {
       when(
