@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
@@ -60,6 +61,27 @@ class SettingsPage extends StatelessWidget {
                   ],
                 ),
               ),
+              // Gestión de miembros: gateada a ADMIN+ porque el backend 403ea
+              // a roles por debajo (RequireRole). El gate es cosmético —
+              // oculta un control que de todos modos fallaría—; la autoridad
+              // real sigue siendo el 403 del servidor.
+              if (isAdminOrAbove(identity.role)) ...<Widget>[
+                const SizedBox(height: AppTokens.cardGap),
+                AppCard(
+                  key: const Key('settings.members_tile'),
+                  // push (no go): apila /members sobre Settings para que el
+                  // back físico vuelva al shell, igual que el resto de tiles.
+                  onTap: () => context.push('/members'),
+                  child: const Row(
+                    children: <Widget>[
+                      Icon(Icons.people_outline, color: AppTokens.text2),
+                      SizedBox(width: AppTokens.sp4),
+                      Expanded(child: Text('Miembros')),
+                      Icon(Icons.chevron_right, color: AppTokens.text2),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: AppTokens.cardGap),
               AppCard(
                 key: const Key('settings.media_tile'),
