@@ -29,6 +29,7 @@ void main() {
   Widget host({
     void Function(AuthTokens)? onSucceeded,
     VoidCallback? onCreateAccount,
+    VoidCallback? onForgotPassword,
   }) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: BlocProvider<LoginBloc>.value(
@@ -36,6 +37,7 @@ void main() {
       child: LoginPage(
         onSucceeded: onSucceeded,
         onCreateAccount: onCreateAccount,
+        onForgotPassword: onForgotPassword,
       ),
     ),
   );
@@ -186,6 +188,18 @@ void main() {
     await tester.pumpWidget(host(onCreateAccount: () => tapped = true));
 
     await tester.tap(find.text('Crear cuenta'));
+    await tester.pump();
+
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('"¿Olvidaste tu contraseña?" invoca onForgotPassword', (
+    tester,
+  ) async {
+    var tapped = false;
+    await tester.pumpWidget(host(onForgotPassword: () => tapped = true));
+
+    await tester.tap(find.text('¿Olvidaste tu contraseña?'));
     await tester.pump();
 
     expect(tapped, isTrue);
