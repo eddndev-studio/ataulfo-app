@@ -6,6 +6,7 @@ import 'package:ataulfo/features/members/presentation/pages/bot_assignment_page.
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -56,9 +57,9 @@ void main() {
   testWidgets('Ready lista un check por bot, con el asignado marcado', (
     tester,
   ) async {
-    when(() => cubit.state).thenReturn(
-      AssignBotsReady(bots: _bots, selected: const <String>{'b2'}),
-    );
+    when(
+      () => cubit.state,
+    ).thenReturn(AssignBotsReady(bots: _bots, selected: const <String>{'b2'}));
 
     await tester.pumpWidget(host());
 
@@ -73,9 +74,9 @@ void main() {
   });
 
   testWidgets('tocar un bot dispara toggle(id)', (tester) async {
-    when(() => cubit.state).thenReturn(
-      AssignBotsReady(bots: _bots, selected: const <String>{}),
-    );
+    when(
+      () => cubit.state,
+    ).thenReturn(AssignBotsReady(bots: _bots, selected: const <String>{}));
 
     await tester.pumpWidget(host());
     await tester.tap(find.text('Uno'));
@@ -85,9 +86,9 @@ void main() {
   });
 
   testWidgets('Guardar dispara save()', (tester) async {
-    when(() => cubit.state).thenReturn(
-      AssignBotsReady(bots: _bots, selected: const <String>{'b1'}),
-    );
+    when(
+      () => cubit.state,
+    ).thenReturn(AssignBotsReady(bots: _bots, selected: const <String>{'b1'}));
 
     await tester.pumpWidget(host());
     await tester.tap(find.byKey(const Key('bot_assignment.save')));
@@ -97,9 +98,9 @@ void main() {
   });
 
   testWidgets('Ready sin bots muestra el copy de org sin bots', (tester) async {
-    when(() => cubit.state).thenReturn(
-      const AssignBotsReady(bots: <Bot>[], selected: <String>{}),
-    );
+    when(
+      () => cubit.state,
+    ).thenReturn(const AssignBotsReady(bots: <Bot>[], selected: <String>{}));
 
     await tester.pumpWidget(host());
 
@@ -123,7 +124,7 @@ void main() {
     verify(cubit.load).called(1);
   });
 
-  testWidgets('Saved cierra la pantalla y avisa', (tester) async {
+  testWidgets('Saved cierra la pantalla (pop) y avisa', (tester) async {
     whenListen(
       cubit,
       Stream<AssignBotsState>.fromIterable(const <AssignBotsState>[
@@ -133,29 +134,42 @@ void main() {
       initialState: AssignBotsReady(bots: _bots, selected: const <String>{}),
     );
 
-    final popped = <bool>[];
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppDesignTheme.dark(),
-        home: Navigator(
-          onPopPage: (route, result) {
-            popped.add(true);
-            return route.didPop(result);
-          },
-          pages: <Page<dynamic>>[
-            MaterialPage<void>(
-              child: BlocProvider<AssignBotsCubit>.value(
-                value: cubit,
-                child: const Scaffold(body: BotAssignmentPage()),
+    final router = GoRouter(
+      initialLocation: '/base',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/base',
+          builder: (_, _) => Scaffold(
+            body: Builder(
+              builder: (ctx) => Center(
+                child: ElevatedButton(
+                  onPressed: () => ctx.push('/bots'),
+                  child: const Text('go', key: Key('base-sentinel')),
+                ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
+        GoRoute(
+          path: '/bots',
+          builder: (_, _) => BlocProvider<AssignBotsCubit>.value(
+            value: cubit,
+            child: const Scaffold(body: BotAssignmentPage()),
+          ),
+        ),
+      ],
     );
-    await tester.pump();
 
+    await tester.pumpWidget(
+      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+    );
+    await tester.tap(find.byKey(const Key('base-sentinel')));
+    await tester.pumpAndSettle();
+
+    // Tras emitir Saved la página hace pop y volvemos a /base; el aviso persiste
+    // (el ScaffoldMessenger es de nivel app).
+    expect(find.byKey(const Key('base-sentinel')), findsOneWidget);
+    expect(find.byType(BotAssignmentPage), findsNothing);
     expect(find.text('Bots actualizados'), findsOneWidget);
-    expect(popped, isNotEmpty);
   });
 }
