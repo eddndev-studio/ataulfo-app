@@ -108,9 +108,14 @@ class _LoadedView extends StatelessWidget {
     final activeOrgId = auth is AuthAuthenticated ? auth.identity.orgId : '';
 
     // Un switch en curso deshabilita los taps: sin esto un segundo tap mientras
-    // el primero está en vuelo dispararía otro switch-org.
+    // el primero está en vuelo dispararía otro switch-org. Cubre también el
+    // estado de éxito (`Switched`): la página flipa la sesión vía
+    // `AuthCheckRequested`, cuyo round-trip a `/auth/me` deja esta lista montada
+    // un instante; mantener los taps muertos hasta que el redirect la desmonte
+    // evita una carrera con el switch ya consumado.
+    final switchState = context.watch<SwitchOrgCubit>().state;
     final switching =
-        context.watch<SwitchOrgCubit>().state is SwitchOrgSwitching;
+        switchState is SwitchOrgSwitching || switchState is SwitchOrgSwitched;
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
