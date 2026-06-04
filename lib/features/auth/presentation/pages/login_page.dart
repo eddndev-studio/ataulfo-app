@@ -13,13 +13,22 @@ import '../bloc/login_bloc.dart';
 /// (navegación post-login). El BlocListener garantiza que el callback se
 /// invoca exactamente una vez por transición a `LoginSucceeded`.
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, this.onSucceeded, this.onCreateAccount});
+  const LoginPage({
+    super.key,
+    this.onSucceeded,
+    this.onCreateAccount,
+    this.onForgotPassword,
+  });
 
   final void Function(AuthTokens tokens)? onSucceeded;
 
   /// Navegación a la pantalla de alta de cuenta. Opcional para tests; en la
   /// app real lo cabla el router (empuja `/register`).
   final VoidCallback? onCreateAccount;
+
+  /// Navegación al flujo de recuperación de contraseña. Opcional para tests;
+  /// en la app real lo cabla el router (empuja `/forgot-password`).
+  final VoidCallback? onForgotPassword;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -95,6 +104,10 @@ class _LoginPageState extends State<LoginPage> {
                   TextButton(
                     onPressed: submitting ? null : widget.onCreateAccount,
                     child: const Text('Crear cuenta'),
+                  ),
+                  TextButton(
+                    onPressed: submitting ? null : widget.onForgotPassword,
+                    child: const Text('¿Olvidaste tu contraseña?'),
                   ),
                   const SizedBox(height: 16),
                   if (submitting)
