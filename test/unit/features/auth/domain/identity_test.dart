@@ -74,6 +74,41 @@ void main() {
       expect(base, isNot(otherRole));
       expect(base, isNot(otherEmail));
     });
+
+    group('hasActiveOrg', () {
+      test('true cuando orgId y role no están vacíos', () {
+        const id = Identity(
+          userId: 'u1',
+          orgId: 'o1',
+          role: 'OWNER',
+          email: 'op@example.com',
+        );
+
+        expect(id.hasActiveOrg, isTrue);
+      });
+
+      test('false cuando orgId está vacío (usuario multi-membership)', () {
+        const id = Identity(
+          userId: 'u1',
+          orgId: '',
+          role: '',
+          email: 'op@example.com',
+        );
+
+        expect(id.hasActiveOrg, isFalse);
+      });
+
+      test('false cuando role está vacío aunque orgId tenga valor', () {
+        const id = Identity(
+          userId: 'u1',
+          orgId: 'o1',
+          role: '',
+          email: 'op@example.com',
+        );
+
+        expect(id.hasActiveOrg, isFalse);
+      });
+    });
   });
 
   group('AuthMapper.meRespToEntity', () {
