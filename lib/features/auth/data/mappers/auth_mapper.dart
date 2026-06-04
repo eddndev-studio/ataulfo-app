@@ -22,5 +22,6 @@ class AuthMapper {
     orgId: resp.orgId,
     role: resp.role,
     email: resp.email,
+    emailVerified: resp.emailVerified,
   );
 }

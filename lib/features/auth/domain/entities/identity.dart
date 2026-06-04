@@ -14,12 +14,19 @@ class Identity {
     required this.orgId,
     required this.role,
     required this.email,
+    this.emailVerified = false,
   });
 
   final String userId;
   final String orgId;
   final String role;
   final String email;
+
+  /// `true` cuando el correo de la cuenta está verificado. Default `false`:
+  /// una sesión cuyo `/auth/me` es anterior a este campo (o lo omite) se trata
+  /// como NO verificada, espejando la tolerancia del wire en `MeResp`. La UI lo
+  /// lee para mostrar el aviso de "verifica tu correo" mientras siga en false.
+  final bool emailVerified;
 
   /// `true` cuando la sesión tiene una org activa: ambos `orgId` y `role`
   /// vienen poblados en los claims. Un usuario con varias memberships y
@@ -34,9 +41,11 @@ class Identity {
         other.userId == userId &&
         other.orgId == orgId &&
         other.role == role &&
-        other.email == email;
+        other.email == email &&
+        other.emailVerified == emailVerified;
   }
 
   @override
-  int get hashCode => Object.hash(userId, orgId, role, email);
+  int get hashCode =>
+      Object.hash(userId, orgId, role, email, emailVerified);
 }
