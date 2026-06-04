@@ -166,16 +166,20 @@ void main() {
   });
 
   group('verifyEmail', () {
-    test('delega al datasource sin tocar storage', () async {
-      const resp = VerifyEmailResp(alreadyVerified: true);
-      when(() => ds.verifyEmail('tok')).thenAnswer((_) async => resp);
+    test(
+      'delega al datasource, devuelve alreadyVerified, sin tocar storage',
+      () async {
+        when(
+          () => ds.verifyEmail('tok'),
+        ).thenAnswer((_) async => const VerifyEmailResp(alreadyVerified: true));
 
-      final got = await repo.verifyEmail('tok');
+        final got = await repo.verifyEmail('tok');
 
-      expect(got, resp);
-      expect(storage.saved, isEmpty);
-      expect(storage.clears, 0);
-    });
+        expect(got, isTrue);
+        expect(storage.saved, isEmpty);
+        expect(storage.clears, 0);
+      },
+    );
   });
 
   group(

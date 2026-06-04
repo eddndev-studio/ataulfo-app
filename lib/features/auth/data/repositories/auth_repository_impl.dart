@@ -3,7 +3,6 @@ import '../../domain/entities/identity.dart';
 import '../../domain/failures/auth_failure.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_datasource.dart';
-import '../dto/login_dto.dart';
 import 'token_storage.dart';
 
 /// Implementación del puerto: orquesta datasource + persistencia segura.
@@ -53,7 +52,8 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<VerifyEmailResp> verifyEmail(String token) => _ds.verifyEmail(token);
+  Future<bool> verifyEmail(String token) async =>
+      (await _ds.verifyEmail(token)).alreadyVerified;
 
   @override
   Future<void> forgotPassword(String email) => _ds.forgotPassword(email);

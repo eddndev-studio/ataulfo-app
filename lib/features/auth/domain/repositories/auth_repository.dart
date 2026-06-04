@@ -1,4 +1,3 @@
-import '../../data/dto/login_dto.dart';
 import '../entities/auth_tokens.dart';
 import '../entities/identity.dart';
 
@@ -18,8 +17,9 @@ abstract interface class AuthRepository {
   });
 
   /// Canjea el token de verificación de email. No persiste tokens; devuelve
-  /// si la cuenta ya estaba verificada para que la UI ajuste el copy.
-  Future<VerifyEmailResp> verifyEmail(String token);
+  /// `true` si la cuenta YA estaba verificada (re-click idempotente) para que
+  /// la UI no muestre un éxito recién hecho, `false` si la verificó ahora.
+  Future<bool> verifyEmail(String token);
 
   /// Solicita el correo de reset de contraseña. Público (sin sesión).
   Future<void> forgotPassword(String email);
