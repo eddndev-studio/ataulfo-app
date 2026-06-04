@@ -46,6 +46,7 @@ void main() {
     auth = _MockAuthBloc();
     when(() => memberships.state).thenReturn(const MembershipsInitial());
     when(() => switchOrg.state).thenReturn(const SwitchOrgIdle());
+    when(() => switchOrg.switchTo(any())).thenAnswer((_) async {});
     when(() => auth.state).thenReturn(const AuthAuthenticatedNoOrg(_noOrg));
   });
 
