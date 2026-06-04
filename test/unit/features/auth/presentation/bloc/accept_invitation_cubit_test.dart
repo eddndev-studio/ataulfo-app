@@ -34,9 +34,7 @@ void main() {
     blocTest<AcceptInvitationCubit, AcceptInvitationState>(
       'URL completa: extrae el token del query antes de aceptar',
       build: () {
-        when(
-          () => repo.acceptInvitation('tok123'),
-        ).thenAnswer((_) async {});
+        when(() => repo.acceptInvitation('tok123')).thenAnswer((_) async {});
         return AcceptInvitationCubit(repo);
       },
       act: (c) => c.accept('https://ataulfo.app/invite?token=tok123'),
@@ -52,9 +50,7 @@ void main() {
     blocTest<AcceptInvitationCubit, AcceptInvitationState>(
       'éxito (204): Accepting → Accepted',
       build: () {
-        when(
-          () => repo.acceptInvitation('tok123'),
-        ).thenAnswer((_) async {});
+        when(() => repo.acceptInvitation('tok123')).thenAnswer((_) async {});
         return AcceptInvitationCubit(repo);
       },
       act: (c) => c.accept('tok123'),
