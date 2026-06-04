@@ -9,6 +9,7 @@ import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
 import 'package:ataulfo/features/auth/presentation/pages/accept_invite_page.dart';
+import 'package:ataulfo/features/auth/presentation/pages/create_org_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/forgot_password_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/register_page.dart';
@@ -1090,6 +1091,46 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(InvitationsPage), findsOneWidget);
+  });
+
+  testWidgets('AuthAuthenticated → /create-org monta CreateOrgPage', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/create-org');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CreateOrgPage), findsOneWidget);
+  });
+
+  testWidgets('AuthAuthenticatedNoOrg → /create-org es alcanzable (allowlist: '
+      'un usuario sin org debe poder crear la primera)', (tester) async {
+    // Sin este allowlist el redirect rebotaría /create-org a /select-org y el
+    // sin-org no tendría forma de crear su primera organización.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticatedNoOrg(_noOrg));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/create-org');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CreateOrgPage), findsOneWidget);
+  });
+
+  testWidgets('AuthAuthenticatedNoOrg → /select-org ofrece "Crear '
+      'organización" que navega a /create-org', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticatedNoOrg(_noOrg));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(AppButton, 'Crear organización'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CreateOrgPage), findsOneWidget);
   });
 
   testWidgets('AuthAuthenticated → /memberships expone SwitchOrgCubit al árbol '
