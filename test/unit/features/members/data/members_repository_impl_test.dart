@@ -86,4 +86,33 @@ void main() {
       );
     });
   });
+
+  group('MembersRepositoryImpl.transferOwnership', () {
+    test('delega al datasource con el id destino', () async {
+      when(() => ds.transferOwnership(any())).thenAnswer((_) async {});
+
+      await repo.transferOwnership('m2');
+
+      verify(() => ds.transferOwnership('m2')).called(1);
+    });
+  });
+
+  group('MembersRepositoryImpl bots', () {
+    test('assignedBots delega y devuelve la lista', () async {
+      when(
+        () => ds.assignedBots('m1'),
+      ).thenAnswer((_) async => <String>['b1']);
+
+      expect(await repo.assignedBots('m1'), <String>['b1']);
+      verify(() => ds.assignedBots('m1')).called(1);
+    });
+
+    test('assignBots delega con id y set completo', () async {
+      when(() => ds.assignBots(any(), any())).thenAnswer((_) async {});
+
+      await repo.assignBots('m1', const <String>['b1', 'b2']);
+
+      verify(() => ds.assignBots('m1', const <String>['b1', 'b2'])).called(1);
+    });
+  });
 }
