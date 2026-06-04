@@ -29,6 +29,48 @@ abstract interface class AuthDatasource {
   /// si el access caducó, el flujo de refresh transparente lo renueva
   /// antes del retry.
   Future<void> logout(String refreshToken);
+
+  /// Alta de cuenta (`POST /auth/register`). El backend crea User + org
+  /// personal + Membership OWNER y devuelve el par de tokens (201). 409 ⇒
+  /// email ya registrado; 400 ⇒ contraseña débil.
+  Future<AuthTokens> register({
+    required String email,
+    required String password,
+  });
+
+  /// Canjea el token de verificación de email (`POST /auth/verify-email`).
+  /// 404 ⇒ token inexistente/consumido; 410 ⇒ expirado. La respuesta indica
+  /// si la cuenta ya estaba verificada (re-canje idempotente del enlace).
+  Future<VerifyEmailResp> verifyEmail(String token);
+
+  /// Solicita el correo de reset (`POST /auth/forgot-password`). El backend
+  /// responde siempre 204 (no revela si el email existe). Público: no exige
+  /// Bearer.
+  Future<void> forgotPassword(String email);
+
+  /// Canjea el token de reset y fija la nueva contraseña
+  /// (`POST /auth/reset-password`). 404 ⇒ token inexistente; 410 ⇒ expirado
+  /// o ya usado; 400 ⇒ contraseña débil. Público: no exige Bearer.
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  });
+
+  /// Cambia la org activa de la sesión (`POST /auth/switch-org`). Devuelve un
+  /// par de tokens nuevo con la org elegida en los claims. 403 ⇒ el usuario
+  /// no es miembro de esa org.
+  Future<AuthTokens> switchOrg(String orgId);
+
+  /// Acepta una invitación pendiente (`POST /auth/invitations/accept`). El
+  /// backend responde 204; la nueva membership requiere un switch-org
+  /// explícito. 404 ⇒ invitación inexistente/consumida; 409 ⇒ email de la
+  /// invitación distinto al de la sesión, o ya miembro de esa org.
+  Future<void> acceptInvitation(String token);
+
+  /// Reenvía el correo de verificación al email de la sesión
+  /// (`POST /auth/resend-verification`). Requiere Bearer (lo inyecta el
+  /// interceptor); sin body. 204 al encolar.
+  Future<void> resendVerification();
 }
 
 /// Implementación contra dio. Se inyecta una instancia ya configurada con
@@ -107,6 +149,140 @@ class DioAuthDatasource implements AuthDatasource {
     } on DioException catch (e) {
       throw _mapDioException(e);
     }
+  }
+
+  @override
+  Future<AuthTokens> register({
+    required String email,
+    required String password,
+  }) async {
+    final req = RegisterReq(email: email, password: password);
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/auth/register',
+        data: req.toJson(),
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownAuthFailure();
+      }
+      return AuthMapper.tokenRespToEntity(TokenResp.fromJson(body));
+    } on DioException catch (e) {
+      throw _mapStatus(e, <int, AuthFailure>{
+        409: const EmailTakenFailure(),
+        400: const WeakPasswordFailure(),
+      });
+    } on FormatException {
+      throw const UnknownAuthFailure();
+    }
+  }
+
+  @override
+  Future<VerifyEmailResp> verifyEmail(String token) async {
+    final req = VerifyEmailReq(token: token);
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/auth/verify-email',
+        data: req.toJson(),
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownAuthFailure();
+      }
+      return VerifyEmailResp.fromJson(body);
+    } on DioException catch (e) {
+      throw _mapStatus(e, <int, AuthFailure>{
+        404: const InvalidTokenFailure(),
+        410: const ExpiredTokenFailure(),
+      });
+    } on FormatException {
+      throw const UnknownAuthFailure();
+    }
+  }
+
+  @override
+  Future<void> forgotPassword(String email) async {
+    final req = ForgotPasswordReq(email: email);
+    try {
+      await _dio.post<void>('/auth/forgot-password', data: req.toJson());
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    }
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    final req = ResetPasswordReq(token: token, newPassword: newPassword);
+    try {
+      await _dio.post<void>('/auth/reset-password', data: req.toJson());
+    } on DioException catch (e) {
+      throw _mapStatus(e, <int, AuthFailure>{
+        404: const InvalidTokenFailure(),
+        410: const ExpiredTokenFailure(),
+        400: const WeakPasswordFailure(),
+      });
+    }
+  }
+
+  @override
+  Future<AuthTokens> switchOrg(String orgId) async {
+    final req = SwitchOrgReq(orgId: orgId);
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/auth/switch-org',
+        data: req.toJson(),
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownAuthFailure();
+      }
+      return AuthMapper.tokenRespToEntity(TokenResp.fromJson(body));
+    } on DioException catch (e) {
+      throw _mapStatus(e, <int, AuthFailure>{403: const NotMemberFailure()});
+    } on FormatException {
+      throw const UnknownAuthFailure();
+    }
+  }
+
+  @override
+  Future<void> acceptInvitation(String token) async {
+    final req = AcceptInvitationReq(token: token);
+    try {
+      await _dio.post<void>('/auth/invitations/accept', data: req.toJson());
+    } on DioException catch (e) {
+      // El backend responde 409 desnudo para ambos casos (email distinto Y
+      // ya miembro) sin discriminador en el body; se mapea al más accionable
+      // (re-login con la cuenta correcta de la invitación).
+      throw _mapStatus(e, <int, AuthFailure>{
+        404: const InvalidTokenFailure(),
+        409: const EmailMismatchFailure(),
+      });
+    }
+  }
+
+  @override
+  Future<void> resendVerification() async {
+    try {
+      await _dio.post<void>('/auth/resend-verification');
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    }
+  }
+
+  /// Mapea un `DioException` a una variante de AuthFailure conocida por
+  /// endpoint: para un `badResponse` con status en [overrides], devuelve la
+  /// variante específica; cualquier otro caso (red, status no contemplado)
+  /// delega en el mapper genérico. Concentra el "status → variante" por
+  /// método sin duplicar el manejo de red/timeouts.
+  AuthFailure _mapStatus(DioException e, Map<int, AuthFailure> overrides) {
+    if (e.type == DioExceptionType.badResponse) {
+      final specific = overrides[e.response?.statusCode];
+      if (specific != null) return specific;
+    }
+    return _mapDioException(e);
   }
 
   /// Traduce DioException a la jerarquía sellada de AuthFailure.

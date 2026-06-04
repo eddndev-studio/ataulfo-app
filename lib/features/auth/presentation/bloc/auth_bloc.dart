@@ -27,7 +27,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     try {
       final identity = await _repo.me();
-      emit(AuthAuthenticated(identity));
+      // Sin org activa (usuario multi-membership con ninguna elegida) el
+      // router lo desvía a la selección en vez del home; el estado distingue
+      // los dos casos para que ese redirect no dependa de inspeccionar la
+      // identity desde el router.
+      emit(
+        identity.hasActiveOrg
+            ? AuthAuthenticated(identity)
+            : AuthAuthenticatedNoOrg(identity),
+      );
     } on AuthFailure {
       emit(const AuthUnauthenticated());
     }
@@ -92,6 +100,25 @@ class AuthAuthenticated extends AuthState {
   @override
   bool operator ==(Object other) =>
       other is AuthAuthenticated && other.identity == identity;
+
+  @override
+  int get hashCode => identity.hashCode;
+}
+
+/// Sesión válida pero SIN org activa: el usuario tiene varias memberships y
+/// no ha elegido ninguna (los claims llegan con `org_id`/`role` vacíos). El
+/// router lo desvía a la selección de organización; no es admin de nada
+/// porque no hay `role` org-scoped vigente. Estado separado de
+/// `AuthAuthenticated` (no subtipo) para que los consumidores que chequean
+/// `is AuthAuthenticated` lo traten como "autenticado sin privilegios".
+class AuthAuthenticatedNoOrg extends AuthState {
+  const AuthAuthenticatedNoOrg(this.identity);
+
+  final Identity identity;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AuthAuthenticatedNoOrg && other.identity == identity;
 
   @override
   int get hashCode => identity.hashCode;

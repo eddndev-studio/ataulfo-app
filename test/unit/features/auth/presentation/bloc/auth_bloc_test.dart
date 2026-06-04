@@ -15,7 +15,34 @@ const _identity = Identity(
   email: 'op@example.com',
 );
 
+const _noOrgIdentity = Identity(
+  userId: 'u1',
+  orgId: '',
+  role: '',
+  email: 'op@example.com',
+);
+
 void main() {
+  group('AuthAuthenticatedNoOrg', () {
+    test('value-equality por identity', () {
+      expect(
+        const AuthAuthenticatedNoOrg(_noOrgIdentity),
+        const AuthAuthenticatedNoOrg(_noOrgIdentity),
+      );
+      expect(
+        const AuthAuthenticatedNoOrg(_noOrgIdentity).hashCode,
+        const AuthAuthenticatedNoOrg(_noOrgIdentity).hashCode,
+      );
+    });
+
+    test('es distinto de AuthAuthenticated con la misma identity', () {
+      expect(
+        const AuthAuthenticatedNoOrg(_identity),
+        isNot(const AuthAuthenticated(_identity)),
+      );
+    });
+  });
+
   group('AuthBloc', () {
     test('estado inicial = AuthInitial (todavía no verificado)', () {
       final bloc = AuthBloc(_MockRepo());
@@ -45,6 +72,18 @@ void main() {
         },
         act: (bloc) => bloc.add(const AuthCheckRequested()),
         expect: () => const <AuthState>[AuthAuthenticated(_identity)],
+      );
+
+      blocTest<AuthBloc, AuthState>(
+        'con tokens + me() sin org activa → AuthAuthenticatedNoOrg(identity)',
+        build: () {
+          final repo = _MockRepo();
+          when(repo.hasTokens).thenAnswer((_) async => true);
+          when(repo.me).thenAnswer((_) async => _noOrgIdentity);
+          return AuthBloc(repo);
+        },
+        act: (bloc) => bloc.add(const AuthCheckRequested()),
+        expect: () => const <AuthState>[AuthAuthenticatedNoOrg(_noOrgIdentity)],
       );
 
       blocTest<AuthBloc, AuthState>(

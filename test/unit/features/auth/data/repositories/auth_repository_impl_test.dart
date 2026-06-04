@@ -1,4 +1,5 @@
 import 'package:ataulfo/features/auth/data/datasources/auth_datasource.dart';
+import 'package:ataulfo/features/auth/data/dto/login_dto.dart';
 import 'package:ataulfo/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:ataulfo/features/auth/data/repositories/token_storage.dart';
 import 'package:ataulfo/features/auth/domain/entities/auth_tokens.dart';
@@ -102,6 +103,127 @@ void main() {
       expect(storage.clears, 0);
     });
   });
+
+  group('register', () {
+    test('OK persiste los tokens devueltos y los retorna', () async {
+      const tokens = AuthTokens(
+        accessToken: 'a',
+        refreshToken: 'r',
+        tokenType: 'Bearer',
+        expiresInSeconds: 900,
+      );
+      when(
+        () => ds.register(email: 'new@x.com', password: 'p'),
+      ).thenAnswer((_) async => tokens);
+
+      final got = await repo.register(email: 'new@x.com', password: 'p');
+
+      expect(got, tokens);
+      expect(storage.saved, <AuthTokens>[tokens]);
+    });
+
+    test('falla del datasource propaga y no persiste tokens', () async {
+      when(
+        () => ds.register(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenThrow(const EmailTakenFailure());
+
+      await expectLater(
+        repo.register(email: 'taken@x.com', password: 'p'),
+        throwsA(isA<EmailTakenFailure>()),
+      );
+      expect(storage.saved, isEmpty);
+    });
+  });
+
+  group('switchOrg', () {
+    test('OK persiste el nuevo par de tokens y lo retorna', () async {
+      const tokens = AuthTokens(
+        accessToken: 'a2',
+        refreshToken: 'r2',
+        tokenType: 'Bearer',
+        expiresInSeconds: 900,
+      );
+      when(() => ds.switchOrg('o-789')).thenAnswer((_) async => tokens);
+
+      final got = await repo.switchOrg('o-789');
+
+      expect(got, tokens);
+      expect(storage.saved, <AuthTokens>[tokens]);
+    });
+
+    test('falla del datasource propaga y no persiste tokens', () async {
+      when(() => ds.switchOrg(any())).thenThrow(const NotMemberFailure());
+
+      await expectLater(
+        repo.switchOrg('o-foreign'),
+        throwsA(isA<NotMemberFailure>()),
+      );
+      expect(storage.saved, isEmpty);
+    });
+  });
+
+  group('verifyEmail', () {
+    test(
+      'delega al datasource, devuelve alreadyVerified, sin tocar storage',
+      () async {
+        when(
+          () => ds.verifyEmail('tok'),
+        ).thenAnswer((_) async => const VerifyEmailResp(alreadyVerified: true));
+
+        final got = await repo.verifyEmail('tok');
+
+        expect(got, isTrue);
+        expect(storage.saved, isEmpty);
+        expect(storage.clears, 0);
+      },
+    );
+  });
+
+  group(
+    'forgotPassword / resetPassword / acceptInvitation / resendVerification',
+    () {
+      test('forgotPassword delega sin tocar storage', () async {
+        when(() => ds.forgotPassword('op@x.com')).thenAnswer((_) async {});
+
+        await repo.forgotPassword('op@x.com');
+
+        verify(() => ds.forgotPassword('op@x.com')).called(1);
+        expect(storage.saved, isEmpty);
+      });
+
+      test('resetPassword delega sin tocar storage', () async {
+        when(
+          () => ds.resetPassword(token: 't', newPassword: 'n'),
+        ).thenAnswer((_) async {});
+
+        await repo.resetPassword(token: 't', newPassword: 'n');
+
+        verify(() => ds.resetPassword(token: 't', newPassword: 'n')).called(1);
+        expect(storage.saved, isEmpty);
+      });
+
+      test('acceptInvitation delega sin tocar storage', () async {
+        when(() => ds.acceptInvitation('inv')).thenAnswer((_) async {});
+
+        await repo.acceptInvitation('inv');
+
+        verify(() => ds.acceptInvitation('inv')).called(1);
+        expect(storage.saved, isEmpty);
+      });
+
+      test('resendVerification delega sin tocar storage', () async {
+        when(ds.resendVerification).thenAnswer((_) async {});
+
+        await repo.resendVerification();
+
+        verify(ds.resendVerification).called(1);
+        expect(storage.saved, isEmpty);
+      });
+    },
+  );
 
   group('logout', () {
     test('sin tokens persistidos: no llama al datasource y no falla', () async {

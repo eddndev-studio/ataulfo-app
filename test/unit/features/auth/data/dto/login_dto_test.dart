@@ -93,5 +93,108 @@ void main() {
 
       expect(() => MeResp.fromJson(wrongType), throwsFormatException);
     });
+
+    test('emailVerified = false cuando la clave email_verified está ausente', () {
+      // El campo viaja en un slice posterior del backend; mientras no esté
+      // mergeado, su ausencia se tolera con default false (no es contrato roto).
+      final json = <String, dynamic>{
+        'user_id': 'u-1',
+        'org_id': 'o-1',
+        'role': 'OWNER',
+        'email': 'op@example.com',
+      };
+
+      expect(MeResp.fromJson(json).emailVerified, isFalse);
+    });
+
+    test('emailVerified lee email_verified=true del wire', () {
+      final json = <String, dynamic>{
+        'user_id': 'u-1',
+        'org_id': 'o-1',
+        'role': 'OWNER',
+        'email': 'op@example.com',
+        'email_verified': true,
+      };
+
+      expect(MeResp.fromJson(json).emailVerified, isTrue);
+    });
+  });
+
+  group('RegisterReq', () {
+    test('serializa email y password en snake_case del wire', () {
+      const req = RegisterReq(
+        email: 'new@example.com',
+        password: 's3cret-pass',
+      );
+
+      expect(req.toJson(), <String, dynamic>{
+        'email': 'new@example.com',
+        'password': 's3cret-pass',
+      });
+    });
+  });
+
+  group('VerifyEmailReq', () {
+    test('serializa el token', () {
+      const req = VerifyEmailReq(token: 'verif-tok-32');
+
+      expect(req.toJson(), <String, dynamic>{'token': 'verif-tok-32'});
+    });
+  });
+
+  group('VerifyEmailResp', () {
+    test('parsea alreadyVerified (clave camelCase del wire)', () {
+      final resp = VerifyEmailResp.fromJson(<String, dynamic>{
+        'alreadyVerified': true,
+      });
+
+      expect(resp.alreadyVerified, isTrue);
+    });
+
+    test('lanza FormatException si alreadyVerified falta o no es bool', () {
+      expect(
+        () => VerifyEmailResp.fromJson(<String, dynamic>{}),
+        throwsFormatException,
+      );
+      expect(
+        () => VerifyEmailResp.fromJson(<String, dynamic>{'alreadyVerified': 1}),
+        throwsFormatException,
+      );
+    });
+  });
+
+  group('ForgotPasswordReq', () {
+    test('serializa el email', () {
+      const req = ForgotPasswordReq(email: 'op@example.com');
+
+      expect(req.toJson(), <String, dynamic>{'email': 'op@example.com'});
+    });
+  });
+
+  group('ResetPasswordReq', () {
+    test('serializa token y new_password en snake_case del wire', () {
+      const req = ResetPasswordReq(token: 'reset-tok', newPassword: 'n3w-pass');
+
+      expect(req.toJson(), <String, dynamic>{
+        'token': 'reset-tok',
+        'new_password': 'n3w-pass',
+      });
+    });
+  });
+
+  group('SwitchOrgReq', () {
+    test('serializa org_id en snake_case del wire', () {
+      const req = SwitchOrgReq(orgId: 'o-789');
+
+      expect(req.toJson(), <String, dynamic>{'org_id': 'o-789'});
+    });
+  });
+
+  group('AcceptInvitationReq', () {
+    test('serializa el token', () {
+      const req = AcceptInvitationReq(token: 'invite-tok');
+
+      expect(req.toJson(), <String, dynamic>{'token': 'invite-tok'});
+    });
   });
 }

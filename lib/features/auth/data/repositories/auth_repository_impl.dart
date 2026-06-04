@@ -42,6 +42,42 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AuthTokens> register({
+    required String email,
+    required String password,
+  }) async {
+    final tokens = await _ds.register(email: email, password: password);
+    await _storage.save(tokens);
+    return tokens;
+  }
+
+  @override
+  Future<bool> verifyEmail(String token) async =>
+      (await _ds.verifyEmail(token)).alreadyVerified;
+
+  @override
+  Future<void> forgotPassword(String email) => _ds.forgotPassword(email);
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) => _ds.resetPassword(token: token, newPassword: newPassword);
+
+  @override
+  Future<AuthTokens> switchOrg(String orgId) async {
+    final tokens = await _ds.switchOrg(orgId);
+    await _storage.save(tokens);
+    return tokens;
+  }
+
+  @override
+  Future<void> acceptInvitation(String token) => _ds.acceptInvitation(token);
+
+  @override
+  Future<void> resendVerification() => _ds.resendVerification();
+
+  @override
   Future<Identity> me() async => _ds.me();
 
   @override
