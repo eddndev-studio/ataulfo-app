@@ -6,6 +6,7 @@ import '../../../labels/presentation/pages/labels_admin_page.dart';
 import '../../../labels/presentation/widgets/label_edit_sheet.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../templates/presentation/pages/templates_list_page.dart';
+import '../widgets/email_verification_banner.dart';
 
 /// Shell adaptable de la app autenticada. Hospeda los tabs del producto y
 /// resuelve la navegación lateral según el ancho disponible (M3: compact
@@ -58,8 +59,16 @@ class _ShellPageState extends State<ShellPage> {
       builder: (context, constraints) {
         final useRail = constraints.maxWidth >= 600;
         // IndexedStack preserva el estado interno de cada tab (scroll
-        // de la lista, bloc compartido por el shell) entre cambios.
-        final body = IndexedStack(index: _index, children: _bodies);
+        // de la lista, bloc compartido por el shell) entre cambios. El aviso
+        // de verificación se apila ENCIMA del contenido de las tabs (sólo se
+        // pinta a sí mismo cuando el correo no está verificado), idéntico en
+        // ambos layouts (compact y rail).
+        final body = Column(
+          children: <Widget>[
+            const EmailVerificationBanner(),
+            Expanded(child: IndexedStack(index: _index, children: _bodies)),
+          ],
+        );
         return Scaffold(
           appBar: AppBar(title: Text(_tabs[_index].label)),
           body: useRail

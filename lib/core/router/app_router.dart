@@ -11,11 +11,14 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/forgot_password_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/bloc/register_bloc.dart';
+import '../../features/auth/presentation/bloc/resend_verification_cubit.dart';
 import '../../features/auth/presentation/bloc/reset_password_bloc.dart';
+import '../../features/auth/presentation/bloc/verify_email_bloc.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
+import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/bots/domain/entities/bot.dart';
 import '../../features/bots/domain/repositories/bot_session_repository.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
@@ -264,6 +267,26 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        // Canjear el token de verificación de correo. Ruta pública
+        // (deep-linkable) y permitida también con sesión: el operador puede
+        // verificar logueado desde el aviso del shell. El correo abre el
+        // SERVIDOR, no la app; el operador pega aquí el enlace o el token. Tras
+        // el canje se refresca la sesión (AuthCheckRequested) para que el
+        // `email_verified` de `/auth/me` se actualice y el aviso desaparezca, y
+        // se vuelve atrás (pop si hay pila, si no a /home; el redirect corrige a
+        // /login cuando no hay sesión).
+        path: '/verify-email',
+        builder: (context, _) => BlocProvider<VerifyEmailBloc>(
+          create: (_) => VerifyEmailBloc(_authRepo),
+          child: VerifyEmailPage(
+            onSucceeded: ({required bool alreadyVerified}) {
+              _authBloc.add(const AuthCheckRequested());
+              context.canPop() ? context.pop() : context.go('/home');
+            },
+          ),
+        ),
+      ),
+      GoRoute(
         path: '/home',
         builder: (context, _) => MultiBlocProvider(
           providers: <BlocProvider<dynamic>>[
@@ -280,6 +303,11 @@ class AppRouter {
               create: (_) =>
                   LabelsAdminBloc(repo: _labelsRepo)
                     ..add(const LabelsAdminLoadRequested()),
+            ),
+            // Cubit del reenvío de verificación, scoped al shell para que el
+            // aviso "verifica tu correo" lo dispare y reaccione a su SnackBar.
+            BlocProvider<ResendVerificationCubit>(
+              create: (_) => ResendVerificationCubit(_authRepo),
             ),
           ],
           // Blocs page-scoped a nivel del shell: cambiar de tab no
