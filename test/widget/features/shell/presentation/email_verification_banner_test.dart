@@ -126,6 +126,26 @@ void main() {
     expect(find.text('Te reenviamos el correo'), findsOneWidget);
   });
 
+  testWidgets('Failed muestra un SnackBar de error', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_unverified));
+    whenListen(
+      resendCubit,
+      Stream<ResendVerificationState>.fromIterable(
+        const <ResendVerificationState>[ResendVerificationFailed()],
+      ),
+      initialState: const ResendVerificationIdle(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(
+      find.text('No pudimos reenviar el correo, reintenta'),
+      findsOneWidget,
+    );
+    expect(find.text('Te reenviamos el correo'), findsNothing);
+  });
+
   testWidgets('Verificar navega a /verify-email', (tester) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_unverified));
 
