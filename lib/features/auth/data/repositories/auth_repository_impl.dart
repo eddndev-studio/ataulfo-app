@@ -3,6 +3,7 @@ import '../../domain/entities/identity.dart';
 import '../../domain/failures/auth_failure.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_datasource.dart';
+import '../dto/login_dto.dart';
 import 'token_storage.dart';
 
 /// Implementación del puerto: orquesta datasource + persistencia segura.
@@ -40,6 +41,41 @@ class AuthRepositoryImpl implements AuthRepository {
     await _storage.save(tokens);
     return tokens;
   }
+
+  @override
+  Future<AuthTokens> register({
+    required String email,
+    required String password,
+  }) async {
+    final tokens = await _ds.register(email: email, password: password);
+    await _storage.save(tokens);
+    return tokens;
+  }
+
+  @override
+  Future<VerifyEmailResp> verifyEmail(String token) => _ds.verifyEmail(token);
+
+  @override
+  Future<void> forgotPassword(String email) => _ds.forgotPassword(email);
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) => _ds.resetPassword(token: token, newPassword: newPassword);
+
+  @override
+  Future<AuthTokens> switchOrg(String orgId) async {
+    final tokens = await _ds.switchOrg(orgId);
+    await _storage.save(tokens);
+    return tokens;
+  }
+
+  @override
+  Future<void> acceptInvitation(String token) => _ds.acceptInvitation(token);
+
+  @override
+  Future<void> resendVerification() => _ds.resendVerification();
 
   @override
   Future<Identity> me() async => _ds.me();
