@@ -295,35 +295,51 @@ class AppRouter {
       ),
       GoRoute(
         path: '/home',
-        builder: (context, _) => MultiBlocProvider(
-          providers: <BlocProvider<dynamic>>[
-            BlocProvider<BotsBloc>(
-              create: (_) =>
-                  BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+        builder: (context, _) {
+          // El subárbol del shell se keyea por el orgId activo: al cambiar de
+          // org (switch-org), el KeyedSubtree destruye y recrea el
+          // MultiBlocProvider y sus blocs page-scoped, que recargan datos de la
+          // org nueva — sin esto, un switch dejaría las listas (bots,
+          // plantillas, etiquetas) de la org vieja vivas debajo. Se keyea por
+          // orgId SOLO, no por la identity completa: un refresh de /auth/me que
+          // sólo confirme el correo conserva el orgId, y el aviso de
+          // verificación debe actualizarse sin nukear las listas.
+          final auth = context.watch<AuthBloc>().state;
+          final orgId = auth is AuthAuthenticated ? auth.identity.orgId : '';
+          return KeyedSubtree(
+            key: ValueKey<String>(orgId),
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<BotsBloc>(
+                  create: (_) =>
+                      BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+                ),
+                BlocProvider<TemplatesBloc>(
+                  create: (_) =>
+                      TemplatesBloc(_templatesRepo)
+                        ..add(const TemplatesLoadRequested()),
+                ),
+                BlocProvider<LabelsAdminBloc>(
+                  create: (_) =>
+                      LabelsAdminBloc(repo: _labelsRepo)
+                        ..add(const LabelsAdminLoadRequested()),
+                ),
+                // Cubit del reenvío de verificación, scoped al shell para que el
+                // aviso "verifica tu correo" lo dispare y reaccione a su
+                // SnackBar.
+                BlocProvider<ResendVerificationCubit>(
+                  create: (_) => ResendVerificationCubit(_authRepo),
+                ),
+              ],
+              // Blocs page-scoped a nivel del shell: cambiar de tab no
+              // rebuildea los providers y cada lista preserva estado
+              // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
+              // El routeObserver se atraviesa al shell para que ambos list
+              // pages disparen su refresh al volver de una sub-ruta.
+              child: ShellPage(routeObserver: _routeObserver),
             ),
-            BlocProvider<TemplatesBloc>(
-              create: (_) =>
-                  TemplatesBloc(_templatesRepo)
-                    ..add(const TemplatesLoadRequested()),
-            ),
-            BlocProvider<LabelsAdminBloc>(
-              create: (_) =>
-                  LabelsAdminBloc(repo: _labelsRepo)
-                    ..add(const LabelsAdminLoadRequested()),
-            ),
-            // Cubit del reenvío de verificación, scoped al shell para que el
-            // aviso "verifica tu correo" lo dispare y reaccione a su SnackBar.
-            BlocProvider<ResendVerificationCubit>(
-              create: (_) => ResendVerificationCubit(_authRepo),
-            ),
-          ],
-          // Blocs page-scoped a nivel del shell: cambiar de tab no
-          // rebuildea los providers y cada lista preserva estado
-          // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
-          // El routeObserver se atraviesa al shell para que ambos list
-          // pages disparen su refresh al volver de una sub-ruta.
-          child: ShellPage(routeObserver: _routeObserver),
-        ),
+          );
+        },
       ),
       GoRoute(
         // Selector de plantilla para arrancar la creación de un bot desde
