@@ -9,7 +9,9 @@ import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
+import '../../features/auth/presentation/bloc/register_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/bots/domain/entities/bot.dart';
 import '../../features/bots/domain/repositories/bot_session_repository.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
@@ -197,6 +199,27 @@ class AppRouter {
               // a través de hasTokens() + me().
               _authBloc.add(const AuthCheckRequested());
             },
+            // Empuja la pantalla de alta sobre el login; "Ya tengo cuenta"
+            // hace pop para volver. El login se mantiene presentación pura
+            // (sin import de go_router): la navegación la inyecta el router.
+            onCreateAccount: () => context.push('/register'),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, _) => BlocProvider<RegisterBloc>(
+          create: (_) => RegisterBloc(_authRepo),
+          child: RegisterPage(
+            onSucceeded: (_) {
+              // El alta persiste el par de tokens (cuenta con su org personal
+              // OWNER); AuthCheckRequested dispara Authenticated y el redirect
+              // navega a /home, igual que el login.
+              _authBloc.add(const AuthCheckRequested());
+            },
+            // Vuelve al login. La pantalla se empuja desde /login, así que
+            // siempre hay algo en la pila a donde hacer pop.
+            onGoToLogin: () => context.pop(),
           ),
         ),
       ),
