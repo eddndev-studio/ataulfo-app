@@ -281,6 +281,111 @@ void main() {
     });
   });
 
+  group('AppTextField — toggle de visibilidad de contraseña', () {
+    testWidgets('default: sin obscureToggle no hay IconButton', (tester) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Contraseña',
+          hint: 'h',
+          controller: TextEditingController(),
+          obscureText: true,
+        ),
+      );
+      expect(find.byType(IconButton), findsNothing);
+    });
+
+    testWidgets('obscureToggle con obscureText muestra el icono visibility', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Contraseña',
+          hint: 'h',
+          controller: TextEditingController(),
+          obscureText: true,
+          obscureToggle: true,
+        ),
+      );
+      // Arranca enmascarado: el icono ofrece "mostrar" (visibility_outlined).
+      expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+      final inner = tester.widget<TextField>(find.byType(TextField));
+      expect(inner.obscureText, true);
+    });
+
+    testWidgets('tocar el toggle desenmascara (obscureText pasa a false)', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Contraseña',
+          hint: 'h',
+          controller: TextEditingController(),
+          obscureText: true,
+          obscureToggle: true,
+        ),
+      );
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).obscureText,
+        true,
+      );
+
+      await tester.tap(find.byType(IconButton));
+      await tester.pump();
+
+      // Tras tocar: texto visible y el icono cambia a visibility_off.
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).obscureText,
+        false,
+      );
+      expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
+    });
+
+    testWidgets('segundo toque re-enmascara (vuelve a obscureText true)', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Contraseña',
+          hint: 'h',
+          controller: TextEditingController(),
+          obscureText: true,
+          obscureToggle: true,
+        ),
+      );
+
+      await tester.tap(find.byType(IconButton));
+      await tester.pump();
+      await tester.tap(find.byType(IconButton));
+      await tester.pump();
+
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).obscureText,
+        true,
+      );
+      expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+    });
+
+    testWidgets(
+      'obscureToggle sin obscureText no renderiza el botón (nada que ocultar)',
+      (tester) async {
+        await pump(
+          tester,
+          AppTextField(
+            label: 'X',
+            hint: 'h',
+            controller: TextEditingController(),
+            obscureToggle: true,
+          ),
+        );
+        expect(find.byType(IconButton), findsNothing);
+      },
+    );
+  });
+
   group('AppTextField — forma y fondo (default)', () {
     testWidgets('píldora: borderRadius == radiusField sobre el shell', (
       tester,
