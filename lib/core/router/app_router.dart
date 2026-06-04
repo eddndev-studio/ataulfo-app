@@ -217,9 +217,12 @@ class AppRouter {
               // navega a /home, igual que el login.
               _authBloc.add(const AuthCheckRequested());
             },
-            // Vuelve al login. La pantalla se empuja desde /login, así que
-            // siempre hay algo en la pila a donde hacer pop.
-            onGoToLogin: () => context.pop(),
+            // Vuelve al login. Si la pantalla se empujó desde el login, basta
+            // un pop; pero `/register` es ruta pública (deep-linkable), así que
+            // un cold-open puede dejar la pila en un solo elemento — ahí pop
+            // reventaría y se degrada a navegar al login.
+            onGoToLogin: () =>
+                context.canPop() ? context.pop() : context.go('/login'),
           ),
         ),
       ),
