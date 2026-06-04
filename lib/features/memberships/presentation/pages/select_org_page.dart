@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -176,6 +177,14 @@ class _EmptyView extends StatelessWidget {
               style: textTheme.bodyLarge,
             ),
             const SizedBox(height: AppTokens.sp4),
+            // El invitado logueado sin membership cae aquí; aceptar una
+            // invitación es su única vía hacia adelante, así que el affordance
+            // vive en el estado vacío (no sólo cuando ya hay orgs que elegir).
+            AppButton.text(
+              label: 'Aceptar una invitación',
+              onPressed: () => context.push('/accept-invite'),
+            ),
+            const SizedBox(height: AppTokens.sp2),
             AppButton.tonal(
               label: 'Cerrar sesión',
               onPressed: () =>
