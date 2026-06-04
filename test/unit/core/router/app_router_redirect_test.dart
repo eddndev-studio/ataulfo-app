@@ -126,6 +126,19 @@ void main() {
       );
     });
 
+    test(
+      '/select-org rebota a /home (org activa nunca queda en selección)',
+      () {
+        // Tras un switch en /select-org la sesión flipa a Authenticated pero la
+        // ubicación sigue siendo /select-org; sin este rebote el operador queda
+        // varado en la pantalla de selección con una org ya activa.
+        expect(
+          redirectForState(const AuthAuthenticated(_owner), '/select-org'),
+          '/home',
+        );
+      },
+    );
+
     test('gateo ADMIN+ de sub-rutas bot-level: WORKER → detalle', () {
       expect(
         redirectForState(

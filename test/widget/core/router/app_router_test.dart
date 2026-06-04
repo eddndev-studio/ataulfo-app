@@ -30,6 +30,7 @@ import 'package:ataulfo/features/media/domain/repositories/media_repository.dart
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:ataulfo/features/memberships/presentation/pages/memberships_page.dart';
+import 'package:ataulfo/features/memberships/presentation/pages/select_org_page.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
 import 'package:ataulfo/features/messages/domain/entities/thread_live_event.dart';
@@ -114,6 +115,13 @@ const _worker = Identity(
   orgId: 'o1',
   role: 'WORKER',
   email: 'worker@example.com',
+);
+
+const _noOrg = Identity(
+  userId: 'u3',
+  orgId: '',
+  role: '',
+  email: 'op@example.com',
 );
 
 const _profile = ChatProfile(
@@ -899,6 +907,26 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MembershipsPage), findsOneWidget);
+      verify(membershipsRepo.list).called(1);
+    },
+  );
+
+  testWidgets(
+    'AuthAuthenticatedNoOrg → /select-org monta SelectOrgPage (no el placeholder) '
+    'y dispara MembershipsLoadRequested',
+    (tester) async {
+      // Sin org activa el redirect manda todo a /select-org; la ruta debe
+      // montar la página real (lista + switch), no el placeholder de solo
+      // "Cerrar sesión". El verify garantiza que el MembershipsBloc page-scoped
+      // arranca el load solo al construirse.
+      when(
+        () => authBloc.state,
+      ).thenReturn(const AuthAuthenticatedNoOrg(_noOrg));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SelectOrgPage), findsOneWidget);
       verify(membershipsRepo.list).called(1);
     },
   );
