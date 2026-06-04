@@ -7,6 +7,7 @@ import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_reposito
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
 import 'package:ataulfo/features/auth/presentation/pages/forgot_password_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/register_page.dart';
@@ -995,6 +996,26 @@ void main() {
 
       expect(find.byType(MembershipsPage), findsOneWidget);
       verify(membershipsRepo.list).called(1);
+    },
+  );
+
+  testWidgets(
+    'AuthAuthenticated → /memberships expone SwitchOrgCubit al árbol '
+    '(habilita el switch in-app)',
+    (tester) async {
+      // El switch desde /memberships necesita el SwitchOrgCubit page-scoped en
+      // el route builder; sin él la página rompería en runtime (ProviderNotFound
+      // del BlocListener). Leerlo desde el árbol de la página lo garantiza —
+      // ningún widget test aislado (que inyecta el cubit) cubre este seam.
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/memberships');
+      await tester.pumpAndSettle();
+
+      final page = tester.element(find.byType(MembershipsPage));
+      expect(page.read<SwitchOrgCubit>(), isNotNull);
     },
   );
 
