@@ -8,10 +8,14 @@ import '../../features/ai_catalog/domain/repositories/catalog_repository.dart';
 import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/bloc/forgot_password_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/bloc/register_bloc.dart';
+import '../../features/auth/presentation/bloc/reset_password_bloc.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/reset_password_page.dart';
 import '../../features/bots/domain/entities/bot.dart';
 import '../../features/bots/domain/repositories/bot_session_repository.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
@@ -189,9 +193,12 @@ class AppRouter {
       ),
       GoRoute(
         path: '/login',
-        builder: (context, _) => BlocProvider<LoginBloc>(
+        builder: (context, state) => BlocProvider<LoginBloc>(
           create: (_) => LoginBloc(_authRepo),
           child: LoginPage(
+            // El reset destructivo rebota aquí con `?reset=success` para que el
+            // login avise que la contraseña ya cambió (la sesión fue revocada).
+            justReset: state.uri.queryParameters['reset'] == 'success',
             onSucceeded: (_) {
               // El verify dispara la transición a Authenticated y el
               // redirect navega a /home. Los tokens los acaba de
@@ -203,6 +210,8 @@ class AppRouter {
             // hace pop para volver. El login se mantiene presentación pura
             // (sin import de go_router): la navegación la inyecta el router.
             onCreateAccount: () => context.push('/register'),
+            // Empuja el flujo de recuperación; el back físico vuelve al login.
+            onForgotPassword: () => context.push('/forgot-password'),
           ),
         ),
       ),
@@ -223,6 +232,34 @@ class AppRouter {
             // reventaría y se degrada a navegar al login.
             onGoToLogin: () =>
                 context.canPop() ? context.pop() : context.go('/login'),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Solicitar el correo de reset. Ruta pública (deep-linkable). El correo
+        // abre el SERVIDOR, no la app; "Ya tengo un código" empuja la pantalla
+        // de reset para que el operador pegue ahí el enlace o el token.
+        path: '/forgot-password',
+        builder: (context, _) => BlocProvider<ForgotPasswordBloc>(
+          create: (_) => ForgotPasswordBloc(_authRepo),
+          child: ForgotPasswordPage(
+            onHaveCode: () => context.push('/reset-password'),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Canjear el token de reset y fijar la nueva contraseña. Ruta pública
+        // (deep-linkable). En 204 el backend revoca TODAS las familias de
+        // refresh; la pantalla cierra la sesión local (AuthLoggedOut,
+        // idempotente si no hay tokens) y rutea al login.
+        path: '/reset-password',
+        builder: (context, _) => BlocProvider<ResetPasswordBloc>(
+          create: (_) => ResetPasswordBloc(_authRepo),
+          child: ResetPasswordPage(
+            onSucceeded: () {
+              _authBloc.add(const AuthLoggedOut());
+              context.go('/login?reset=success');
+            },
           ),
         ),
       ),

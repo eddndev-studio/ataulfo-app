@@ -13,13 +13,29 @@ import '../bloc/login_bloc.dart';
 /// (navegación post-login). El BlocListener garantiza que el callback se
 /// invoca exactamente una vez por transición a `LoginSucceeded`.
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, this.onSucceeded, this.onCreateAccount});
+  const LoginPage({
+    super.key,
+    this.onSucceeded,
+    this.onCreateAccount,
+    this.onForgotPassword,
+    this.justReset = false,
+  });
 
   final void Function(AuthTokens tokens)? onSucceeded;
 
   /// Navegación a la pantalla de alta de cuenta. Opcional para tests; en la
   /// app real lo cabla el router (empuja `/register`).
   final VoidCallback? onCreateAccount;
+
+  /// Navegación al flujo de recuperación de contraseña. Opcional para tests;
+  /// en la app real lo cabla el router (empuja `/forgot-password`).
+  final VoidCallback? onForgotPassword;
+
+  /// El operador acaba de restablecer su contraseña y aterrizó aquí (el reset
+  /// revocó todas sus sesiones). Muestra un aviso para que sepa que el cambio
+  /// surtió efecto y que debe entrar con la contraseña nueva. El router lo
+  /// activa cuando la ruta llega con `?reset=success`.
+  final bool justReset;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -66,6 +82,16 @@ class _LoginPageState extends State<LoginPage> {
                     style: textTheme.displayLarge,
                     textAlign: TextAlign.center,
                   ),
+                  if (widget.justReset) ...<Widget>[
+                    const SizedBox(height: 24),
+                    Text(
+                      'Contraseña restablecida. Inicia sesión con la nueva.',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.primary,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 48),
                   AppTextField(
                     key: const Key('login.email'),
@@ -95,6 +121,10 @@ class _LoginPageState extends State<LoginPage> {
                   TextButton(
                     onPressed: submitting ? null : widget.onCreateAccount,
                     child: const Text('Crear cuenta'),
+                  ),
+                  TextButton(
+                    onPressed: submitting ? null : widget.onForgotPassword,
+                    child: const Text('¿Olvidaste tu contraseña?'),
                   ),
                   const SizedBox(height: 16),
                   if (submitting)

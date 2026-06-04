@@ -1,11 +1,14 @@
+import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/router/app_router.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/auth/presentation/pages/forgot_password_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/register_page.dart';
+import 'package:ataulfo/features/auth/presentation/pages/reset_password_page.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
@@ -1083,4 +1086,126 @@ void main() {
       expect(find.byType(RegisterPage), findsNothing);
     },
   );
+
+  testWidgets(
+    '/forgot-password (ruta pública) renderiza ForgotPasswordPage sin sesión',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/forgot-password');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ForgotPasswordPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '/reset-password (ruta pública) renderiza ResetPasswordPage sin sesión',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/reset-password');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ResetPasswordPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '"¿Olvidaste tu contraseña?" desde el login navega a /forgot-password',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginPage), findsOneWidget);
+
+      await tester.tap(find.text('¿Olvidaste tu contraseña?'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ForgotPasswordPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '"Ya tengo un código" desde /forgot-password empuja /reset-password',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/forgot-password');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Ya tengo un código'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ResetPasswordPage), findsOneWidget);
+    },
+  );
+
+  testWidgets('reset exitoso despacha AuthLoggedOut y aterriza en el login', (
+    tester,
+  ) async {
+    // El canje revoca todas las familias de refresh en el backend: la ruta
+    // debe cerrar la sesión local (AuthLoggedOut, idempotente si no hay
+    // tokens) y rutear al login. El authRepo local se stubea para que el
+    // resetPassword del bloc page-scoped resuelva en éxito (el _MockAuthRepo
+    // inline del setUp no es alcanzable).
+    final authRepo = _MockAuthRepo();
+    when(
+      () => authRepo.resetPassword(
+        token: any(named: 'token'),
+        newPassword: any(named: 'newPassword'),
+      ),
+    ).thenAnswer((_) async {});
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+    final localRouter = AppRouter(
+      authBloc: authBloc,
+      authRepository: authRepo,
+      botsRepository: botsRepo,
+      botSessionRepository: botSessionRepo,
+      conversationsRepository: conversationsRepo,
+      messagesRepository: messagesRepo,
+      templatesRepository: templatesRepo,
+      flowsRepository: flowsRepo,
+      triggersRepository: triggersRepo,
+      waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: labelsRepo,
+      membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
+      notificationsRepository: notificationsRepo,
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
+      mediaThumbnailLoader: const FakeThumbnailLoader(),
+      profileRepository: profileRepo,
+    );
+
+    await tester.pumpWidget(_host(localRouter, authBloc));
+    await tester.pumpAndSettle();
+    localRouter.router.go('/reset-password');
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('reset.token')), 'tok123');
+    await tester.enterText(
+      find.byKey(const Key('reset.password')),
+      'hunter2-secret',
+    );
+    await tester.tap(find.byType(AppButton));
+    await tester.pumpAndSettle();
+
+    verify(() => authBloc.add(const AuthLoggedOut())).called(1);
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(ResetPasswordPage), findsNothing);
+    // El login aterriza con el aviso de éxito (?reset=success): el operador
+    // sabe que su contraseña cambió y que debe entrar con la nueva.
+    expect(
+      find.text('Contraseña restablecida. Inicia sesión con la nueva.'),
+      findsOneWidget,
+    );
+  });
 }
