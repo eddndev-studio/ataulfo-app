@@ -999,25 +999,22 @@ void main() {
     },
   );
 
-  testWidgets(
-    'AuthAuthenticated → /memberships expone SwitchOrgCubit al árbol '
-    '(habilita el switch in-app)',
-    (tester) async {
-      // El switch desde /memberships necesita el SwitchOrgCubit page-scoped en
-      // el route builder; sin él la página rompería en runtime (ProviderNotFound
-      // del BlocListener). Leerlo desde el árbol de la página lo garantiza —
-      // ningún widget test aislado (que inyecta el cubit) cubre este seam.
-      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+  testWidgets('AuthAuthenticated → /memberships expone SwitchOrgCubit al árbol '
+      '(habilita el switch in-app)', (tester) async {
+    // El switch desde /memberships necesita el SwitchOrgCubit page-scoped en
+    // el route builder; sin él la página rompería en runtime (ProviderNotFound
+    // del BlocListener). Leerlo desde el árbol de la página lo garantiza —
+    // ningún widget test aislado (que inyecta el cubit) cubre este seam.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      router.router.go('/memberships');
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/memberships');
+    await tester.pumpAndSettle();
 
-      final page = tester.element(find.byType(MembershipsPage));
-      expect(page.read<SwitchOrgCubit>(), isNotNull);
-    },
-  );
+    final page = tester.element(find.byType(MembershipsPage));
+    expect(page.read<SwitchOrgCubit>(), isNotNull);
+  });
 
   testWidgets(
     'AuthAuthenticatedNoOrg → /select-org monta SelectOrgPage (no el placeholder) '

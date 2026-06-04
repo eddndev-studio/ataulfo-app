@@ -295,7 +295,9 @@ void main() {
           items: <Membership>[_activeMembership, _otherMembership],
         ),
       );
-      when(() => switchOrg.state).thenReturn(const SwitchOrgSwitched('o-other'));
+      when(
+        () => switchOrg.state,
+      ).thenReturn(const SwitchOrgSwitched('o-other'));
 
       await tester.pumpWidget(host());
       await tester.tap(find.text('Bravo'), warnIfMissed: false);
@@ -308,9 +310,9 @@ void main() {
   testWidgets(
     'Switched flipa la sesión (AuthCheckRequested) y navega a /home',
     (tester) async {
-      when(
-        () => membershipsBloc.state,
-      ).thenReturn(const MembershipsLoaded(items: <Membership>[_otherMembership]));
+      when(() => membershipsBloc.state).thenReturn(
+        const MembershipsLoaded(items: <Membership>[_otherMembership]),
+      );
       whenListen(
         switchOrg,
         Stream<SwitchOrgState>.fromIterable(const <SwitchOrgState>[
@@ -331,9 +333,9 @@ void main() {
   testWidgets('Failed NotMember recarga la lista y avisa con SnackBar', (
     tester,
   ) async {
-    when(
-      () => membershipsBloc.state,
-    ).thenReturn(const MembershipsLoaded(items: <Membership>[_otherMembership]));
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(items: <Membership>[_otherMembership]),
+    );
     whenListen(
       switchOrg,
       Stream<SwitchOrgState>.fromIterable(const <SwitchOrgState>[
@@ -355,9 +357,9 @@ void main() {
   testWidgets('Failed genérico NO recarga la lista, solo avisa con SnackBar', (
     tester,
   ) async {
-    when(
-      () => membershipsBloc.state,
-    ).thenReturn(const MembershipsLoaded(items: <Membership>[_otherMembership]));
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(items: <Membership>[_otherMembership]),
+    );
     whenListen(
       switchOrg,
       Stream<SwitchOrgState>.fromIterable(const <SwitchOrgState>[
