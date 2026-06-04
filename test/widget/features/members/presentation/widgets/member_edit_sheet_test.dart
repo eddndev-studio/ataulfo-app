@@ -12,6 +12,13 @@ const _worker = Member(
   emailVerified: true,
   role: 'WORKER',
 );
+const _admin = Member(
+  id: 'm3',
+  userId: 'u3',
+  email: 'admin@x.com',
+  emailVerified: true,
+  role: 'ADMIN',
+);
 
 void main() {
   // Abre la hoja desde una página real (showModalBottomSheet vive en otro
@@ -20,6 +27,7 @@ void main() {
     WidgetTester tester,
     Member member, {
     required bool isSelf,
+    bool callerIsOwner = false,
   }) {
     MemberSheetResult? captured;
     var done = false;
@@ -37,6 +45,7 @@ void main() {
                         ctx,
                         member: member,
                         isSelf: isSelf,
+                        callerIsOwner: callerIsOwner,
                       );
                       done = true;
                     },
@@ -145,5 +154,73 @@ void main() {
 
     // La hoja sigue abierta; aún no hay resultado.
     expect(find.byKey(const Key('member_edit.remove')), findsOneWidget);
+  });
+
+  // --- Asignar bots (sólo WORKER) ---------------------------------------------
+
+  testWidgets('un WORKER ofrece "Asignar bots" y devuelve AssignBots', (
+    tester,
+  ) async {
+    final read = pumpHost(tester, _worker, isSelf: false);
+    await read();
+
+    expect(find.byKey(const Key('member_edit.assign_bots')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('member_edit.assign_bots')));
+    await tester.pumpAndSettle();
+
+    final result = await read();
+    expect(result, isA<MemberSheetAssignBots>());
+  });
+
+  testWidgets('un no-WORKER (ADMIN) NO ofrece "Asignar bots"', (tester) async {
+    final read = pumpHost(tester, _admin, isSelf: false);
+    await read();
+
+    expect(find.byKey(const Key('member_edit.assign_bots')), findsNothing);
+  });
+
+  // --- Transferir propiedad (sólo OWNER real, target no-self) ------------------
+
+  testWidgets(
+    'caller OWNER sobre otro miembro ofrece "Transferir propiedad" y, '
+    'confirmado, devuelve Transfer',
+    (tester) async {
+      final read = pumpHost(
+        tester,
+        _admin,
+        isSelf: false,
+        callerIsOwner: true,
+      );
+      await read();
+
+      expect(find.byKey(const Key('member_edit.transfer')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('member_edit.transfer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('member_edit.transfer_confirm')));
+      await tester.pumpAndSettle();
+
+      final result = await read();
+      expect(result, isA<MemberSheetTransfer>());
+    },
+  );
+
+  testWidgets('caller NO OWNER no ofrece "Transferir propiedad"', (
+    tester,
+  ) async {
+    final read = pumpHost(tester, _admin, isSelf: false);
+    await read();
+
+    expect(find.byKey(const Key('member_edit.transfer')), findsNothing);
+  });
+
+  testWidgets('en la propia fila no se ofrece "Transferir propiedad"', (
+    tester,
+  ) async {
+    final read = pumpHost(tester, _admin, isSelf: true, callerIsOwner: true);
+    await read();
+
+    expect(find.byKey(const Key('member_edit.transfer')), findsNothing);
   });
 }
