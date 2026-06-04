@@ -1038,6 +1038,29 @@ void main() {
   );
 
   testWidgets(
+    'desde /select-org vacío, "Aceptar una invitación" navega a /accept-invite '
+    '(la única puerta del invitado sin org propia)',
+    (tester) async {
+      // El invitado logueado sin membership aterriza en el estado vacío de
+      // /select-org; sin esta puerta quedaría varado. El botón empuja la ruta
+      // de aceptación de invitación contra el router real.
+      when(
+        () => authBloc.state,
+      ).thenReturn(const AuthAuthenticatedNoOrg(_noOrg));
+      when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectOrgPage), findsOneWidget);
+
+      await tester.tap(find.text('Aceptar una invitación'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AcceptInvitePage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'AuthAuthenticated → /notifications monta NotificationsPage y carga inbox',
     (tester) async {
       when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));

@@ -125,6 +125,25 @@ void main() {
     );
   });
 
+  testWidgets(
+    'Loaded vacío ofrece "Aceptar una invitación" (puerta del invitado sin org)',
+    (tester) async {
+      // El invitado logueado sin membership cae en el estado vacío; aceptar una
+      // invitación es su única vía hacia adelante, así que el affordance debe
+      // estar aquí (no sólo cuando ya hay orgs en la lista).
+      when(
+        () => memberships.state,
+      ).thenReturn(const MembershipsLoaded(items: <Membership>[]));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.widgetWithText(AppButton, 'Aceptar una invitación'),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('Loaded con items renderiza un OrgMembershipTile por org', (
     tester,
   ) async {
