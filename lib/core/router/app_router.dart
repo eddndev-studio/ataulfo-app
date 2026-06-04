@@ -715,15 +715,24 @@ class AppRouter {
         },
       ),
       GoRoute(
-        // Listado de orgs del operador. Entry point único hoy: tile en
-        // SettingsPage. Page-scoped: el bloc se construye y dispara
-        // LoadRequested aquí; cuando aterrice cache RFC-0001, esta capa
-        // sobrevive y la repo orquesta verdad local vs. remota.
+        // Listado de orgs del operador con cambio de organización in-app. Entry
+        // point único hoy: tile en SettingsPage. Page-scoped: el
+        // MembershipsBloc dispara LoadRequested al construirse y el
+        // SwitchOrgCubit habilita el switch (la página orquesta el flip de la
+        // sesión y la navegación al shell, ya re-keyeado, tras un switch
+        // exitoso; el cubit no conoce el AuthBloc).
         path: '/memberships',
-        builder: (context, _) => BlocProvider<MembershipsBloc>(
-          create: (_) =>
-              MembershipsBloc(_membershipsRepo)
-                ..add(const MembershipsLoadRequested()),
+        builder: (context, _) => MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<MembershipsBloc>(
+              create: (_) =>
+                  MembershipsBloc(_membershipsRepo)
+                    ..add(const MembershipsLoadRequested()),
+            ),
+            BlocProvider<SwitchOrgCubit>(
+              create: (_) => SwitchOrgCubit(_authRepo),
+            ),
+          ],
           child: Scaffold(
             appBar: AppBar(title: const Text('Tus organizaciones')),
             body: const MembershipsPage(),
