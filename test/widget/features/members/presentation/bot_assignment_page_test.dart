@@ -36,6 +36,7 @@ void main() {
     when(() => cubit.toggle(any())).thenReturn(null);
     when(cubit.load).thenAnswer((_) async {});
     when(cubit.save).thenAnswer((_) async {});
+    when(cubit.backToEditing).thenReturn(null);
   });
 
   Widget host() => MaterialApp(
@@ -122,6 +123,28 @@ void main() {
     await tester.pump();
 
     verify(cubit.load).called(1);
+  });
+
+  testWidgets('Failed(save) avisa y vuelve a edición (backToEditing)', (
+    tester,
+  ) async {
+    whenListen(
+      cubit,
+      Stream<AssignBotsState>.fromIterable(const <AssignBotsState>[
+        AssignBotsSaving(),
+        AssignBotsFailed(AssignBotsPhase.save),
+      ]),
+      initialState: AssignBotsReady(bots: _bots, selected: const <String>{}),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(
+      find.text('No pudimos guardar los cambios, reintenta'),
+      findsOneWidget,
+    );
+    verify(cubit.backToEditing).called(1);
   });
 
   testWidgets('Saved cierra la pantalla (pop) y avisa', (tester) async {

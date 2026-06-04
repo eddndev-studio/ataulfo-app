@@ -173,5 +173,36 @@ void main() {
         const AssignBotsFailed(AssignBotsPhase.save),
       ],
     );
+
+    blocTest<AssignBotsCubit, AssignBotsState>(
+      'backToEditing tras un fallo de guardado vuelve a Ready conservando la '
+      'selección (el operador reintenta sin perder lo elegido)',
+      build: () {
+        final members = _MockMembersRepo();
+        final bots = _MockBotsRepo();
+        when(bots.list).thenAnswer((_) async => _bots);
+        when(
+          () => members.assignedBots('m1'),
+        ).thenAnswer((_) async => const <String>[]);
+        when(
+          () => members.assignBots(any(), any()),
+        ).thenThrow(const MembersServerFailure());
+        return _build(members: members, bots: bots);
+      },
+      act: (cubit) async {
+        await cubit.load();
+        cubit.toggle('b1');
+        await cubit.save();
+        cubit.backToEditing();
+      },
+      expect: () => <AssignBotsState>[
+        const AssignBotsLoading(),
+        AssignBotsReady(bots: _bots, selected: const <String>{}),
+        AssignBotsReady(bots: _bots, selected: const <String>{'b1'}),
+        const AssignBotsSaving(),
+        const AssignBotsFailed(AssignBotsPhase.save),
+        AssignBotsReady(bots: _bots, selected: const <String>{'b1'}),
+      ],
+    );
   });
 }
