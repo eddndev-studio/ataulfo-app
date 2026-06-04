@@ -11,7 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockAuthBloc extends MockBloc<AuthEvent, AuthState> implements AuthBloc {}
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
 
 class _MockCubit extends MockCubit<AcceptInvitationState>
     implements AcceptInvitationCubit {}
@@ -82,16 +83,17 @@ void main() {
   }
 
   group('AcceptInvitePage — sesión', () {
-    testWidgets('AuthInitial muestra spinner (el check inicial está en vuelo)', (
-      tester,
-    ) async {
-      when(() => auth.state).thenReturn(const AuthInitial());
+    testWidgets(
+      'AuthInitial muestra spinner (el check inicial está en vuelo)',
+      (tester) async {
+        when(() => auth.state).thenReturn(const AuthInitial());
 
-      await tester.pumpWidget(host());
-      await tester.pump();
+        await tester.pumpWidget(host());
+        await tester.pump();
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    });
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      },
+    );
 
     testWidgets('AuthUnauthenticated muestra el prompt de autenticación', (
       tester,
@@ -191,7 +193,8 @@ void main() {
       when(() => cubit.state).thenReturn(const AcceptInvitationAccepting());
 
       await tester.pumpWidget(host());
-      await tester.pumpAndSettle();
+      // El spinner anima sin parar; pump() (no pumpAndSettle) evita el timeout.
+      await tester.pump();
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
@@ -263,7 +266,10 @@ void main() {
 
     testWidgets('invalidToken', (tester) async {
       await pumpFailed(tester, AcceptInvitationFailureKind.invalidToken);
-      expect(find.text('La invitación no es válida o ya expiró'), findsOneWidget);
+      expect(
+        find.text('La invitación no es válida o ya expiró'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('emailMismatch', (tester) async {
