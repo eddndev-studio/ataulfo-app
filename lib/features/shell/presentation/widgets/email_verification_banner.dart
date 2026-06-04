@@ -27,11 +27,16 @@ class EmailVerificationBanner extends StatelessWidget {
           return const SizedBox.shrink();
         }
         return BlocListener<ResendVerificationCubit, ResendVerificationState>(
-          listenWhen: (_, current) => current is ResendVerificationSent,
-          listener: (context, _) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Te reenviamos el correo')),
-            );
+          listenWhen: (_, current) =>
+              current is ResendVerificationSent ||
+              current is ResendVerificationFailed,
+          listener: (context, state) {
+            final message = state is ResendVerificationFailed
+                ? 'No pudimos reenviar el correo, reintenta'
+                : 'Te reenviamos el correo';
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(message)));
           },
           child: const _BannerBody(),
         );
