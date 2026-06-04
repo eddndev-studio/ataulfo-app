@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/ai_catalog/domain/repositories/catalog_repository.dart';
 import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
+import '../../features/auth/presentation/bloc/accept_invitation_cubit.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/forgot_password_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
@@ -19,6 +20,7 @@ import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
+import '../../features/auth/presentation/pages/accept_invite_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/bots/domain/entities/bot.dart';
 import '../../features/bots/domain/repositories/bot_session_repository.dart';
@@ -290,6 +292,24 @@ class AppRouter {
               _authBloc.add(const AuthCheckRequested());
               context.canPop() ? context.pop() : context.go('/home');
             },
+          ),
+        ),
+      ),
+      GoRoute(
+        // Canjear una invitación pendiente. Ruta pública (deep-linkable) y
+        // permitida también con sesión: el canje exige estar logueado con el
+        // correo invitado, así que la página se gobierna por el estado de la
+        // sesión (sin sesión dirige a autenticarse; con sesión muestra el
+        // formulario). Page-scoped: `AcceptInvitationCubit` se construye con el
+        // repo. La página no recibe callbacks de navegación — navega ella misma
+        // según el estado de la sesión (a /login o /register sin sesión; a la
+        // superficie de switch tras aceptar para activar la org nueva).
+        path: '/accept-invite',
+        builder: (context, _) => BlocProvider<AcceptInvitationCubit>(
+          create: (_) => AcceptInvitationCubit(_authRepo),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Aceptar invitación')),
+            body: const AcceptInvitePage(),
           ),
         ),
       ),
