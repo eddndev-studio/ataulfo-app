@@ -857,7 +857,13 @@ String? redirectForState(AuthState auth, String location) {
       }
       // Sesión válida: las rutas de entrada rebotan a /home; verify/accept se
       // permiten (el operador puede verificar o aceptar invitaciones logueado).
-      if (location == '/' || location == '/login' || location == '/register') {
+      // `/select-org` también rebota: un switch que flipa NoOrg→Authenticated
+      // deja la ubicación en la selección, y un usuario con org activa nunca
+      // debe quedarse varado ahí.
+      if (location == '/' ||
+          location == '/login' ||
+          location == '/register' ||
+          location == '/select-org') {
         return '/home';
       }
       return null;
