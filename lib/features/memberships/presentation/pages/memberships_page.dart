@@ -3,13 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_card.dart';
-import '../../../../core/design/widgets/app_pill.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/membership.dart';
 import '../bloc/memberships_bloc.dart';
+import '../widgets/org_membership_tile.dart';
 
 /// Listado de orgs del operador (S02 GET /auth/memberships). Página
 /// content-only: la ruta `/memberships` aporta Scaffold + AppBar.
@@ -69,7 +67,9 @@ class _LoadedView extends StatelessWidget {
       ),
       itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
-      itemBuilder: (_, i) => _MembershipTile(
+      // Lista de solo lectura: sin `onTap`, los tiles no son tappables. El
+      // switch in-app vive en la selección de organización, no aquí.
+      itemBuilder: (_, i) => OrgMembershipTile(
         membership: items[i],
         isActive: items[i].orgId == activeOrgId,
       ),
@@ -124,48 +124,6 @@ class _FailedView extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _MembershipTile extends StatelessWidget {
-  const _MembershipTile({required this.membership, required this.isActive});
-
-  final Membership membership;
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return AppCard(
-      child: Row(
-        children: <Widget>[
-          AppAvatar(name: membership.orgName),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(membership.orgName, style: textTheme.titleMedium),
-                const SizedBox(height: AppTokens.sp2),
-                Row(
-                  children: <Widget>[
-                    AppPill.neutral(label: membership.role),
-                    if (isActive) ...<Widget>[
-                      const SizedBox(width: AppTokens.sp2),
-                      const AppPill.primary(
-                        key: Key('memberships.active_badge'),
-                        label: 'Activa',
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
