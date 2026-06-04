@@ -74,8 +74,9 @@ void main() {
   ) async {
     await tester.pumpWidget(host());
 
-    AppButton button() =>
-        tester.widget<AppButton>(find.widgetWithText(AppButton, 'Crear cuenta'));
+    AppButton button() => tester.widget<AppButton>(
+      find.widgetWithText(AppButton, 'Crear cuenta'),
+    );
 
     // Sin texto: deshabilitado (onPressed null).
     expect(button().onPressed, isNull);

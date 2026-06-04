@@ -1033,7 +1033,9 @@ void main() {
     expect(find.byType(MembershipsPage), findsNothing);
   });
 
-  testWidgets('/register (ruta pública) renderiza RegisterPage', (tester) async {
+  testWidgets('/register (ruta pública) renderiza RegisterPage', (
+    tester,
+  ) async {
     when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
 
     await tester.pumpWidget(_host(router, authBloc));

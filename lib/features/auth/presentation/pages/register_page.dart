@@ -162,8 +162,7 @@ class _RegisterPageState extends State<RegisterPage> {
       'La contraseña debe tener al menos 12 caracteres',
     RegisterFailureKind.passwordMismatch => 'Las contraseñas no coinciden',
     RegisterFailureKind.emailTaken => 'Ese correo ya tiene una cuenta',
-    RegisterFailureKind.rateLimited =>
-      'Demasiados intentos, espera un momento',
+    RegisterFailureKind.rateLimited => 'Demasiados intentos, espera un momento',
     RegisterFailureKind.network => 'Sin conexión, reintenta',
     RegisterFailureKind.unknown => 'Algo salió mal, intenta de nuevo',
   };
