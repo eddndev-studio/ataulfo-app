@@ -82,7 +82,9 @@ void main() {
     expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
   });
 
-  testWidgets('tap Reintentar dispara MembershipsLoadRequested', (tester) async {
+  testWidgets('tap Reintentar dispara MembershipsLoadRequested', (
+    tester,
+  ) async {
     when(
       () => memberships.state,
     ).thenReturn(const MembershipsFailed(MembershipsNetworkFailure()));
@@ -91,9 +93,7 @@ void main() {
     await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
 
-    verify(
-      () => memberships.add(const MembershipsLoadRequested()),
-    ).called(1);
+    verify(() => memberships.add(const MembershipsLoadRequested())).called(1);
   });
 
   testWidgets('Loaded vacío muestra el copy de sin organizaciones', (
@@ -114,9 +114,9 @@ void main() {
   testWidgets('Loaded con items renderiza un OrgMembershipTile por org', (
     tester,
   ) async {
-    when(() => memberships.state).thenReturn(
-      const MembershipsLoaded(items: <Membership>[_acme, _bravo]),
-    );
+    when(
+      () => memberships.state,
+    ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme, _bravo]));
 
     await tester.pumpWidget(host());
 
@@ -128,9 +128,9 @@ void main() {
   testWidgets('todos los tiles son tappables (en /select-org no hay activa)', (
     tester,
   ) async {
-    when(() => memberships.state).thenReturn(
-      const MembershipsLoaded(items: <Membership>[_acme, _bravo]),
-    );
+    when(
+      () => memberships.state,
+    ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme, _bravo]));
 
     await tester.pumpWidget(host());
 
@@ -143,9 +143,9 @@ void main() {
   });
 
   testWidgets('tap en un tile dispara switchTo(orgId)', (tester) async {
-    when(() => memberships.state).thenReturn(
-      const MembershipsLoaded(items: <Membership>[_acme, _bravo]),
-    );
+    when(
+      () => memberships.state,
+    ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme, _bravo]));
 
     await tester.pumpWidget(host());
     await tester.tap(find.text('Bravo'));
@@ -157,9 +157,9 @@ void main() {
   testWidgets(
     'mientras Switching los taps se deshabilitan (evita doble-switch)',
     (tester) async {
-      when(() => memberships.state).thenReturn(
-        const MembershipsLoaded(items: <Membership>[_acme, _bravo]),
-      );
+      when(
+        () => memberships.state,
+      ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme, _bravo]));
       when(() => switchOrg.state).thenReturn(const SwitchOrgSwitching());
 
       await tester.pumpWidget(host());
@@ -170,17 +170,39 @@ void main() {
     },
   );
 
-  testWidgets('Switched dispara AuthCheckRequested (la página flipa la sesión)', (
+  testWidgets(
+    'Switched dispara AuthCheckRequested (la página flipa la sesión)',
+    (tester) async {
+      when(
+        () => memberships.state,
+      ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme]));
+      whenListen(
+        switchOrg,
+        Stream<SwitchOrgState>.fromIterable(const <SwitchOrgState>[
+          SwitchOrgSwitching(),
+          SwitchOrgSwitched('o-acme'),
+        ]),
+        initialState: const SwitchOrgIdle(),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.pump();
+
+      verify(() => auth.add(const AuthCheckRequested())).called(1);
+    },
+  );
+
+  testWidgets('Failed NotMember recarga la lista y avisa con SnackBar', (
     tester,
   ) async {
-    when(() => memberships.state).thenReturn(
-      const MembershipsLoaded(items: <Membership>[_acme]),
-    );
+    when(
+      () => memberships.state,
+    ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme]));
     whenListen(
       switchOrg,
       Stream<SwitchOrgState>.fromIterable(const <SwitchOrgState>[
         SwitchOrgSwitching(),
-        SwitchOrgSwitched('o-acme'),
+        SwitchOrgFailed(NotMemberFailure()),
       ]),
       initialState: const SwitchOrgIdle(),
     );
@@ -188,67 +210,39 @@ void main() {
     await tester.pumpWidget(host());
     await tester.pump();
 
-    verify(() => auth.add(const AuthCheckRequested())).called(1);
+    verify(() => memberships.add(const MembershipsLoadRequested())).called(1);
+    expect(find.text('Ya no eres miembro de esa organización'), findsOneWidget);
   });
 
-  testWidgets(
-    'Failed NotMember recarga la lista y avisa con SnackBar',
-    (tester) async {
-      when(() => memberships.state).thenReturn(
-        const MembershipsLoaded(items: <Membership>[_acme]),
-      );
-      whenListen(
-        switchOrg,
-        Stream<SwitchOrgState>.fromIterable(const <SwitchOrgState>[
-          SwitchOrgSwitching(),
-          SwitchOrgFailed(NotMemberFailure()),
-        ]),
-        initialState: const SwitchOrgIdle(),
-      );
+  testWidgets('Failed genérico NO recarga la lista, solo avisa con SnackBar', (
+    tester,
+  ) async {
+    when(
+      () => memberships.state,
+    ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme]));
+    whenListen(
+      switchOrg,
+      Stream<SwitchOrgState>.fromIterable(const <SwitchOrgState>[
+        SwitchOrgSwitching(),
+        SwitchOrgFailed(NetworkFailure()),
+      ]),
+      initialState: const SwitchOrgIdle(),
+    );
 
-      await tester.pumpWidget(host());
-      await tester.pump();
+    await tester.pumpWidget(host());
+    await tester.pump();
 
-      verify(
-        () => memberships.add(const MembershipsLoadRequested()),
-      ).called(1);
-      expect(
-        find.text('Ya no eres miembro de esa organización'),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets(
-    'Failed genérico NO recarga la lista, solo avisa con SnackBar',
-    (tester) async {
-      when(() => memberships.state).thenReturn(
-        const MembershipsLoaded(items: <Membership>[_acme]),
-      );
-      whenListen(
-        switchOrg,
-        Stream<SwitchOrgState>.fromIterable(const <SwitchOrgState>[
-          SwitchOrgSwitching(),
-          SwitchOrgFailed(NetworkFailure()),
-        ]),
-        initialState: const SwitchOrgIdle(),
-      );
-
-      await tester.pumpWidget(host());
-      await tester.pump();
-
-      verifyNever(() => memberships.add(any()));
-      expect(
-        find.text('No pudimos cambiar de organización, reintenta'),
-        findsOneWidget,
-      );
-    },
-  );
+    verifyNever(() => memberships.add(any()));
+    expect(
+      find.text('No pudimos cambiar de organización, reintenta'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('"Cerrar sesión" dispara AuthLoggedOut', (tester) async {
-    when(() => memberships.state).thenReturn(
-      const MembershipsLoaded(items: <Membership>[_acme]),
-    );
+    when(
+      () => memberships.state,
+    ).thenReturn(const MembershipsLoaded(items: <Membership>[_acme]));
 
     await tester.pumpWidget(host());
     await tester.tap(find.widgetWithText(AppButton, 'Cerrar sesión'));

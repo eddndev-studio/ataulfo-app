@@ -919,7 +919,9 @@ void main() {
       // montar la página real (lista + switch), no el placeholder de solo
       // "Cerrar sesión". El verify garantiza que el MembershipsBloc page-scoped
       // arranca el load solo al construirse.
-      when(() => authBloc.state).thenReturn(const AuthAuthenticatedNoOrg(_noOrg));
+      when(
+        () => authBloc.state,
+      ).thenReturn(const AuthAuthenticatedNoOrg(_noOrg));
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();

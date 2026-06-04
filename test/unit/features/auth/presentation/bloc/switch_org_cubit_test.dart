@@ -42,9 +42,7 @@ void main() {
     'NotMemberFailure colapsa a Failed llevando el failure (la página '
     'distingue para recargar la lista)',
     build: () {
-      when(
-        () => repo.switchOrg('o-gone'),
-      ).thenThrow(const NotMemberFailure());
+      when(() => repo.switchOrg('o-gone')).thenThrow(const NotMemberFailure());
       return SwitchOrgCubit(repo);
     },
     act: (cubit) => cubit.switchTo('o-gone'),

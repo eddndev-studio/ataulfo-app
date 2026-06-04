@@ -9,17 +9,17 @@ import 'package:flutter_test/flutter_test.dart';
 
 const _membership = Membership(orgId: 'o-1', orgName: 'Acme', role: 'OWNER');
 
-Widget _host(Widget child) =>
-    MaterialApp(theme: AppDesignTheme.dark(), home: Scaffold(body: child));
+Widget _host(Widget child) => MaterialApp(
+  theme: AppDesignTheme.dark(),
+  home: Scaffold(body: child),
+);
 
 void main() {
   testWidgets('pinta avatar, nombre y pill de rol (look del tile)', (
     tester,
   ) async {
     await tester.pumpWidget(
-      _host(
-        const OrgMembershipTile(membership: _membership, isActive: false),
-      ),
+      _host(const OrgMembershipTile(membership: _membership, isActive: false)),
     );
 
     expect(find.byType(AppAvatar), findsOneWidget);
@@ -27,18 +27,15 @@ void main() {
     expect(find.widgetWithText(AppPill, 'OWNER'), findsOneWidget);
   });
 
-  testWidgets(
-    'isActive muestra el badge "Activa" con su key contractual',
-    (tester) async {
-      await tester.pumpWidget(
-        _host(
-          const OrgMembershipTile(membership: _membership, isActive: true),
-        ),
-      );
+  testWidgets('isActive muestra el badge "Activa" con su key contractual', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(const OrgMembershipTile(membership: _membership, isActive: true)),
+    );
 
-      expect(find.byKey(const Key('memberships.active_badge')), findsOneWidget);
-    },
-  );
+    expect(find.byKey(const Key('memberships.active_badge')), findsOneWidget);
+  });
 
   testWidgets('sin isActive NO muestra el badge "Activa"', (tester) async {
     await tester.pumpWidget(
