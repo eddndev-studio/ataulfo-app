@@ -60,9 +60,13 @@ class InvitationsPage extends StatelessWidget {
             : 'Invitación cancelada';
         messenger.showSnackBar(SnackBar(content: Text(text)));
       case InvitationMutationFailure(failure: final failure):
-        // 404/410 significan que la lista local quedó stale: recargar.
+        // Recargamos cuando el fallo deja la lista local desfasada: 404/410 (la
+        // invitación cambió de estado en el servidor) y 5xx (un create puede
+        // haber guardado la fila aunque el correo fallara — sin endpoint de
+        // reenvío, mostrar el historial fresco es la única salida honesta).
         if (failure is InvitationsNotFoundFailure ||
-            failure is InvitationsGoneFailure) {
+            failure is InvitationsGoneFailure ||
+            failure is InvitationsServerFailure) {
           context.read<InvitationsBloc>().add(const InvitationsLoadRequested());
         }
         messenger.showSnackBar(
