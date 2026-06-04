@@ -29,11 +29,7 @@ final _bots = <Bot>[_bot('b1', 'Uno'), _bot('b2', 'Dos'), _bot('b3', 'Tres')];
 AssignBotsCubit _build({
   required MembersRepository members,
   required BotsRepository bots,
-}) => AssignBotsCubit(
-  membershipId: 'm1',
-  membersRepo: members,
-  botsRepo: bots,
-);
+}) => AssignBotsCubit(membershipId: 'm1', membersRepo: members, botsRepo: bots);
 
 void main() {
   group('AssignBotsCubit', () {
@@ -57,6 +53,7 @@ void main() {
       },
       act: (cubit) => cubit.load(),
       expect: () => <AssignBotsState>[
+        const AssignBotsLoading(),
         AssignBotsReady(bots: _bots, selected: const <String>{'b2'}),
       ],
     );
@@ -74,6 +71,7 @@ void main() {
       },
       act: (cubit) => cubit.load(),
       expect: () => const <AssignBotsState>[
+        AssignBotsLoading(),
         AssignBotsFailed(AssignBotsPhase.load),
       ],
     );
@@ -91,6 +89,7 @@ void main() {
       },
       act: (cubit) => cubit.load(),
       expect: () => const <AssignBotsState>[
+        AssignBotsLoading(),
         AssignBotsFailed(AssignBotsPhase.load),
       ],
     );
@@ -114,6 +113,7 @@ void main() {
           ..toggle('b1');
       },
       expect: () => <AssignBotsState>[
+        const AssignBotsLoading(),
         AssignBotsReady(bots: _bots, selected: const <String>{}),
         AssignBotsReady(bots: _bots, selected: const <String>{'b1'}),
         AssignBotsReady(bots: _bots, selected: const <String>{'b1', 'b3'}),
@@ -140,6 +140,7 @@ void main() {
       },
       verify: (_) {},
       expect: () => <AssignBotsState>[
+        const AssignBotsLoading(),
         AssignBotsReady(bots: _bots, selected: const <String>{'b2'}),
         AssignBotsReady(bots: _bots, selected: const <String>{'b2', 'b1'}),
         const AssignBotsSaving(),
@@ -166,6 +167,7 @@ void main() {
         await cubit.save();
       },
       expect: () => <AssignBotsState>[
+        const AssignBotsLoading(),
         AssignBotsReady(bots: _bots, selected: const <String>{}),
         const AssignBotsSaving(),
         const AssignBotsFailed(AssignBotsPhase.save),
