@@ -51,6 +51,10 @@ import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
 import '../../features/media/domain/repositories/media_repository.dart';
+import '../../features/invitations/domain/repositories/invitations_repository.dart';
+import '../../features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
+import '../../features/invitations/presentation/bloc/invitations_bloc.dart';
+import '../../features/invitations/presentation/pages/invitations_page.dart';
 import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
 import '../../features/media/presentation/bloc/media_gallery_bloc.dart';
 import '../../features/media/presentation/pages/media_gallery_page.dart';
@@ -120,6 +124,7 @@ class AppRouter {
     required LabelsRepository labelsRepository,
     required MembershipsRepository membershipsRepository,
     required MembersRepository membersRepository,
+    required InvitationsRepository invitationsRepository,
     required CatalogRepository catalogRepository,
     required NotificationsRepository notificationsRepository,
     required MediaRepository mediaRepository,
@@ -139,6 +144,7 @@ class AppRouter {
        _labelsRepo = labelsRepository,
        _membershipsRepo = membershipsRepository,
        _membersRepo = membersRepository,
+       _invitationsRepo = invitationsRepository,
        _catalogRepo = catalogRepository,
        _notificationsRepo = notificationsRepository,
        _mediaRepo = mediaRepository,
@@ -159,6 +165,7 @@ class AppRouter {
   final LabelsRepository _labelsRepo;
   final MembershipsRepository _membershipsRepo;
   final MembersRepository _membersRepo;
+  final InvitationsRepository _invitationsRepo;
   final CatalogRepository _catalogRepo;
   final NotificationsRepository _notificationsRepo;
   final MediaRepository _mediaRepo;
@@ -784,8 +791,42 @@ class AppRouter {
             ),
           ],
           child: Scaffold(
-            appBar: AppBar(title: const Text('Miembros')),
+            appBar: AppBar(
+              title: const Text('Miembros'),
+              actions: <Widget>[
+                IconButton(
+                  key: const Key('members.invite'),
+                  tooltip: 'Invitar',
+                  icon: const Icon(Icons.person_add_alt_1_outlined),
+                  onPressed: () => context.push('/invitations'),
+                ),
+              ],
+            ),
             body: const MembersPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Historial de invitaciones de la org + emitir / cancelar. Entry point:
+        // acción "Invitar" en la AppBar de /members. Page-scoped: el
+        // InvitationsBloc dispara LoadRequested al construirse y el
+        // InvitationMutationCubit habilita crear/cancelar (la página cierra el
+        // lazo recargando tras una mutación; el cubit no conoce el bloc).
+        path: '/invitations',
+        builder: (context, _) => MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<InvitationsBloc>(
+              create: (_) =>
+                  InvitationsBloc(_invitationsRepo)
+                    ..add(const InvitationsLoadRequested()),
+            ),
+            BlocProvider<InvitationMutationCubit>(
+              create: (_) => InvitationMutationCubit(_invitationsRepo),
+            ),
+          ],
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Invitaciones')),
+            body: const InvitationsPage(),
           ),
         ),
       ),

@@ -18,6 +18,8 @@ import 'package:ataulfo/features/triggers/domain/repositories/triggers_repositor
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/invitations/domain/entities/invitation.dart';
+import 'package:ataulfo/features/invitations/domain/repositories/invitations_repository.dart';
 import 'package:ataulfo/features/members/domain/entities/member.dart';
 import 'package:ataulfo/features/members/domain/repositories/members_repository.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
@@ -63,6 +65,8 @@ class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
 class _MockMembersRepo extends Mock implements MembersRepository {}
 
+class _MockInvitationsRepo extends Mock implements InvitationsRepository {}
+
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
 
 class _MockMediaRepo extends Mock implements MediaRepository {}
@@ -85,12 +89,14 @@ void main() {
     final templatesRepo = _MockTemplatesRepo();
     final membershipsRepo = _MockMembershipsRepo();
     final membersRepo = _MockMembersRepo();
+    final invitationsRepo = _MockInvitationsRepo();
     final catalogRepo = _MockCatalogRepo();
     final notificationsRepo = _MockNotificationsRepo();
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
     when(membersRepo.list).thenAnswer((_) async => const <Member>[]);
+    when(invitationsRepo.list).thenAnswer((_) async => const <Invitation>[]);
     when(
       catalogRepo.fetch,
     ).thenAnswer((_) async => const Catalog(providers: <ProviderEntry>[]));
@@ -114,6 +120,7 @@ void main() {
       labelsRepository: _MockLabelsRepo(),
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
+      invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       profileRepository: _MockProfileRepo(),
