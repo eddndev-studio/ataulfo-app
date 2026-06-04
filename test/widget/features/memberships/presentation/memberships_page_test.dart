@@ -6,6 +6,7 @@ import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/failures/auth_failure.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/rename_org_cubit.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/failures/memberships_failure.dart';
@@ -28,10 +29,20 @@ class _MockSwitchOrgCubit extends MockCubit<SwitchOrgState>
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
 
+class _MockRenameOrgCubit extends MockCubit<RenameOrgState>
+    implements RenameOrgCubit {}
+
 const _identity = Identity(
   userId: 'u1',
   orgId: 'o-active',
   role: 'OWNER',
+  email: 'op@example.com',
+);
+
+const _supervisor = Identity(
+  userId: 'u1',
+  orgId: 'o-active',
+  role: 'SUPERVISOR',
   email: 'op@example.com',
 );
 
@@ -55,15 +66,19 @@ void main() {
   late _MockMembershipsBloc membershipsBloc;
   late _MockSwitchOrgCubit switchOrg;
   late _MockAuthBloc authBloc;
+  late _MockRenameOrgCubit renameOrg;
 
   setUp(() {
     membershipsBloc = _MockMembershipsBloc();
     switchOrg = _MockSwitchOrgCubit();
     authBloc = _MockAuthBloc();
+    renameOrg = _MockRenameOrgCubit();
     when(() => membershipsBloc.state).thenReturn(const MembershipsInitial());
     when(() => switchOrg.state).thenReturn(const SwitchOrgIdle());
     when(() => switchOrg.switchTo(any())).thenAnswer((_) async {});
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+    when(() => renameOrg.state).thenReturn(const RenameOrgIdle());
+    when(() => renameOrg.rename(any())).thenAnswer((_) async {});
   });
 
   Widget host() => MaterialApp(
@@ -73,6 +88,7 @@ void main() {
         BlocProvider<MembershipsBloc>.value(value: membershipsBloc),
         BlocProvider<SwitchOrgCubit>.value(value: switchOrg),
         BlocProvider<AuthBloc>.value(value: authBloc),
+        BlocProvider<RenameOrgCubit>.value(value: renameOrg),
       ],
       // Página content-only: en aislamiento envolvemos en Scaffold para
       // tener Material upstream y AppBar real cuando la ruta la monte.
@@ -94,6 +110,7 @@ void main() {
               BlocProvider<MembershipsBloc>.value(value: membershipsBloc),
               BlocProvider<SwitchOrgCubit>.value(value: switchOrg),
               BlocProvider<AuthBloc>.value(value: authBloc),
+              BlocProvider<RenameOrgCubit>.value(value: renameOrg),
             ],
             child: const Scaffold(body: MembershipsPage()),
           ),
@@ -102,6 +119,12 @@ void main() {
           path: '/home',
           builder: (_, _) =>
               const Scaffold(body: Text('home-sentinel', key: Key('home'))),
+        ),
+        GoRoute(
+          path: '/create-org',
+          builder: (_, _) => const Scaffold(
+            body: Text('create-org-sentinel', key: Key('create-org')),
+          ),
         ),
       ],
     );
@@ -375,6 +398,126 @@ void main() {
     verifyNever(() => membershipsBloc.add(any()));
     expect(
       find.text('No pudimos cambiar de organización, reintenta'),
+      findsOneWidget,
+    );
+  });
+
+  // --- Crear / renombrar organización (S9) ------------------------------------
+
+  testWidgets('Loaded ofrece "Crear organización"', (tester) async {
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(items: <Membership>[_activeMembership]),
+    );
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('memberships.create')), findsOneWidget);
+  });
+
+  testWidgets('tap "Crear organización" navega a /create-org', (tester) async {
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(items: <Membership>[_activeMembership]),
+    );
+
+    await tester.pumpWidget(routedHost());
+    await tester.tap(find.byKey(const Key('memberships.create')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('create-org')), findsOneWidget);
+  });
+
+  testWidgets('OWNER ve "Renombrar organización"', (tester) async {
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(items: <Membership>[_activeMembership]),
+    );
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('memberships.rename')), findsOneWidget);
+  });
+
+  testWidgets('SUPERVISOR NO ve "Renombrar organización" (gate ADMIN+)', (
+    tester,
+  ) async {
+    when(
+      () => authBloc.state,
+    ).thenReturn(const AuthAuthenticated(_supervisor));
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(items: <Membership>[_activeMembership]),
+    );
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('memberships.rename')), findsNothing);
+  });
+
+  testWidgets(
+    'tap "Renombrar" abre la hoja prellenada con el nombre activo y al '
+    'guardar despacha rename',
+    (tester) async {
+      when(() => membershipsBloc.state).thenReturn(
+        const MembershipsLoaded(items: <Membership>[_activeMembership]),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('memberships.rename')));
+      await tester.pumpAndSettle();
+
+      // Prellenada con el nombre de la org activa.
+      expect(find.widgetWithText(TextField, 'Acme'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('rename_org.name')),
+        'Acme Inc.',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('rename_org.submit')));
+      await tester.pumpAndSettle();
+
+      verify(() => renameOrg.rename('Acme Inc.')).called(1);
+    },
+  );
+
+  testWidgets('Renamed recarga la lista y avisa', (tester) async {
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(items: <Membership>[_activeMembership]),
+    );
+    whenListen(
+      renameOrg,
+      Stream<RenameOrgState>.fromIterable(const <RenameOrgState>[
+        RenameOrgRenaming(),
+        RenameOrgRenamed(),
+      ]),
+      initialState: const RenameOrgIdle(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    verify(
+      () => membershipsBloc.add(const MembershipsLoadRequested()),
+    ).called(1);
+    expect(find.text('Organización renombrada'), findsOneWidget);
+  });
+
+  testWidgets('Failed al renombrar avisa con SnackBar', (tester) async {
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(items: <Membership>[_activeMembership]),
+    );
+    whenListen(
+      renameOrg,
+      Stream<RenameOrgState>.fromIterable(const <RenameOrgState>[
+        RenameOrgRenaming(),
+        RenameOrgFailed(NetworkFailure()),
+      ]),
+      initialState: const RenameOrgIdle(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(
+      find.text('Sin conexión. Revisa tu red e inténtalo de nuevo.'),
       findsOneWidget,
     );
   });
