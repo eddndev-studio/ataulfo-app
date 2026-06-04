@@ -74,9 +74,21 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+  Widget build(BuildContext context) => Center(
+    // Un /auth/memberships colgado no debe dejar al operador sin salida; el
+    // affordance de cerrar sesión acompaña al spinner durante la carga.
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+        ),
+        const SizedBox(height: AppTokens.sp4),
+        AppButton.text(
+          label: 'Cerrar sesión',
+          onPressed: () => context.read<AuthBloc>().add(const AuthLoggedOut()),
+        ),
+      ],
     ),
   );
 }
