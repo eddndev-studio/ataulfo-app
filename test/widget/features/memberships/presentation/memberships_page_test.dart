@@ -439,9 +439,7 @@ void main() {
   testWidgets('SUPERVISOR NO ve "Renombrar organización" (gate ADMIN+)', (
     tester,
   ) async {
-    when(
-      () => authBloc.state,
-    ).thenReturn(const AuthAuthenticated(_supervisor));
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_supervisor));
     when(() => membershipsBloc.state).thenReturn(
       const MembershipsLoaded(items: <Membership>[_activeMembership]),
     );

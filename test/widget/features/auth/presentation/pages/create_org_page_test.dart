@@ -1,4 +1,3 @@
-import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/features/auth/domain/failures/auth_failure.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -14,7 +13,8 @@ import 'package:mocktail/mocktail.dart';
 class _MockCreateOrgCubit extends MockCubit<CreateOrgState>
     implements CreateOrgCubit {}
 
-class _MockAuthBloc extends MockBloc<AuthEvent, AuthState> implements AuthBloc {}
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
 
 void main() {
   setUpAll(() {
@@ -74,7 +74,10 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(host());
-    await tester.enterText(find.byKey(const Key('create_org.name')), '  Acme  ');
+    await tester.enterText(
+      find.byKey(const Key('create_org.name')),
+      '  Acme  ',
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('create_org.submit')));
     await tester.pump();
