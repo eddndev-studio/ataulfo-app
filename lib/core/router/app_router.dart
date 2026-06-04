@@ -75,6 +75,7 @@ import '../../features/wa_labels/presentation/bloc/wa_labels_bloc.dart';
 import '../../features/wa_labels/presentation/pages/wa_label_mapping_page.dart';
 import '../../features/wa_labels/presentation/pages/wa_labels_page.dart';
 import '../auth/role_privilege.dart';
+import '../design/widgets/app_button.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -167,6 +168,23 @@ class AppRouter {
     observers: <NavigatorObserver>[_routeObserver],
     routes: <RouteBase>[
       GoRoute(path: '/', builder: (_, _) => const SplashPage()),
+      GoRoute(
+        // Selección de organización para el usuario multi-membership sin org
+        // activa. Placeholder mínimo: un slice posterior lo reemplaza por el
+        // switcher real (lista de orgs + switch-org). De momento sólo ofrece
+        // salir de la sesión para no encerrar al operador.
+        path: '/select-org',
+        builder: (context, _) => Scaffold(
+          appBar: AppBar(title: const Text('Selecciona una organización')),
+          body: Center(
+            child: AppButton.tonal(
+              label: 'Cerrar sesión',
+              onPressed: () =>
+                  context.read<AuthBloc>().add(const AuthLoggedOut()),
+            ),
+          ),
+        ),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, _) => BlocProvider<LoginBloc>(
@@ -697,29 +715,70 @@ class AppRouter {
     ],
   );
 
-  String? _redirect(BuildContext context, GoRouterState state) {
-    final auth = _authBloc.state;
-    final location = state.matchedLocation;
-    if (auth is AuthInitial) {
-      // Hasta que el bloc decida, sólo dejamos pasar a `/` (Splash).
-      // Cualquier intento de navegar directo a otra ruta antes del
-      // primer check vuelve a / para evitar parpadeos.
+  String? _redirect(BuildContext context, GoRouterState state) =>
+      redirectForState(_authBloc.state, state.matchedLocation);
+}
+
+/// Rutas alcanzables SIN sesión: los flujos de entrada del arco de auth. El
+/// `_redirect` las deja pasar estando `Unauthenticated` (en vez de mandar todo
+/// a `/login`) y las preserva en `AuthInitial` (un cold-open de deep-link
+/// `reset`/`accept` conserva su `?token=` en lugar de descartarse a `/`).
+const Set<String> _publicRoutes = <String>{
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/accept-invite',
+  '/verify-email',
+};
+
+/// `true` si [loc] es una ruta pública. Match por prefijo: el path base o
+/// cualquier sub-path/query (`/reset-password?token=…`) cuenta como público.
+bool _isPublic(String loc) =>
+    _publicRoutes.any((p) => loc == p || loc.startsWith('$p/') || loc.startsWith('$p?'));
+
+/// Decisión de redirect en función del estado de auth y la ubicación. Pura y
+/// `static`-equivalente (top-level) para testearse sin construir el GoRouter:
+/// el `_redirect` del router sólo le pasa el estado del bloc y la
+/// `matchedLocation`.
+@visibleForTesting
+String? redirectForState(AuthState auth, String location) {
+  switch (auth) {
+    case AuthInitial():
+      // Antes del primer check sólo conocemos el destino crudo. Una ruta
+      // pública (incluida su query con token) se preserva; cualquier otra
+      // vuelve a `/` (Splash) para evitar parpadeos hasta que el bloc decida.
+      if (_isPublic(location)) return null;
       return location == '/' ? null : '/';
-    }
-    if (auth is AuthAuthenticated) {
+    case AuthUnauthenticated():
+      // Sin sesión, sólo las rutas públicas son alcanzables; el resto va a
+      // /login.
+      return _isPublic(location) ? null : '/login';
+    case AuthAuthenticated(:final identity):
       // Gateo ADMIN+ de las sub-rutas de configuración bot-level (el backend
       // las cabla adminOnly y 403ea a WORKER). Un deep-link de WORKER cae al
       // detalle del bot en vez de pintar una pantalla que fallaría. Es gateo
       // cosmético: la autoridad real sigue siendo el 403/404 del backend.
-      if (_adminOnlyBotRoute.hasMatch(location) &&
-          !isAdminOrAbove(auth.identity.role)) {
+      if (AppRouter._adminOnlyBotRoute.hasMatch(location) &&
+          !isAdminOrAbove(identity.role)) {
         return location.substring(0, location.lastIndexOf('/'));
       }
-      // Sesión válida: las rutas públicas redirigen a /home.
-      return (location == '/' || location == '/login') ? '/home' : null;
-    }
-    // Unauthenticated: las rutas protegidas y el Splash van a /login.
-    return location == '/login' ? null : '/login';
+      // Sesión válida: las rutas de entrada rebotan a /home; verify/accept se
+      // permiten (el operador puede verificar o aceptar invitaciones logueado).
+      if (location == '/' || location == '/login' || location == '/register') {
+        return '/home';
+      }
+      return null;
+    case AuthAuthenticatedNoOrg():
+      // Sin org activa, todo se desvía a la selección de organización salvo la
+      // propia selección y verify/accept (que se permiten para no encerrar al
+      // operador en un loop de redirect).
+      if (location == '/select-org' ||
+          location == '/verify-email' ||
+          location == '/accept-invite') {
+        return null;
+      }
+      return '/select-org';
   }
 }
 
