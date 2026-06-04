@@ -1,16 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../auth/domain/failures/auth_failure.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/rename_org_cubit.dart';
 import '../../../auth/presentation/bloc/switch_org_cubit.dart';
 import '../../domain/entities/membership.dart';
 import '../bloc/memberships_bloc.dart';
 import '../widgets/org_membership_tile.dart';
+import '../widgets/rename_org_sheet.dart';
 
 /// Listado de orgs del operador con cambio de organización in-app (S02 GET
 /// /auth/memberships + switch-org). Página content-only: la ruta `/memberships`
@@ -37,14 +42,41 @@ class MembershipsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocListener<SwitchOrgCubit, SwitchOrgState>(
       listener: _onSwitchState,
-      child: BlocBuilder<MembershipsBloc, MembershipsState>(
-        builder: (context, state) => switch (state) {
-          MembershipsInitial() || MembershipsLoading() => const _LoadingView(),
-          MembershipsLoaded(items: final items) => _LoadedView(items: items),
-          MembershipsFailed() => const _FailedView(),
-        },
+      child: BlocListener<RenameOrgCubit, RenameOrgState>(
+        listener: _onRenameState,
+        child: BlocBuilder<MembershipsBloc, MembershipsState>(
+          builder: (context, state) => switch (state) {
+            MembershipsInitial() ||
+            MembershipsLoading() => const _LoadingView(),
+            MembershipsLoaded(items: final items) => _LoadedView(items: items),
+            MembershipsFailed() => const _FailedView(),
+          },
+        ),
       ),
     );
+  }
+
+  void _onRenameState(BuildContext context, RenameOrgState state) {
+    switch (state) {
+      case RenameOrgRenamed():
+        // El nombre no viaja en el JWT: recargamos memberships para verlo fresco.
+        context.read<MembershipsBloc>().add(const MembershipsLoadRequested());
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Organización renombrada')),
+        );
+      case RenameOrgFailed(failure: final f):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              f is NetworkFailure
+                  ? 'Sin conexión. Revisa tu red e inténtalo de nuevo.'
+                  : 'No pudimos renombrar la organización. Inténtalo de nuevo.',
+            ),
+          ),
+        );
+      case RenameOrgIdle() || RenameOrgRenaming():
+        break;
+    }
   }
 
   void _onSwitchState(BuildContext context, SwitchOrgState state) {
@@ -104,6 +136,7 @@ class _LoadedView extends StatelessWidget {
     // identity, devolvemos string vacío y ningún tile matchea como activo.
     final auth = context.watch<AuthBloc>().state;
     final activeOrgId = auth is AuthAuthenticated ? auth.identity.orgId : '';
+    final activeRole = auth is AuthAuthenticated ? auth.identity.role : '';
 
     // Un switch en curso deshabilita los taps: sin esto un segundo tap mientras
     // el primero está en vuelo dispararía otro switch-org. Cubre también el
@@ -114,6 +147,12 @@ class _LoadedView extends StatelessWidget {
     final switching =
         switchState is SwitchOrgSwitching || switchState is SwitchOrgSwitched;
 
+    // Nombre legible de la org activa, para precargar la hoja de renombrado.
+    final activeMatches = items.where((m) => m.orgId == activeOrgId);
+    final activeName = activeMatches.isEmpty
+        ? null
+        : activeMatches.first.orgName;
+
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(
@@ -122,9 +161,17 @@ class _LoadedView extends StatelessWidget {
         AppTokens.sp4,
         AppTokens.sp4 + context.safeBottomInset,
       ),
-      itemCount: items.length,
+      // +1 por el pie de acciones (crear / renombrar).
+      itemCount: items.length + 1,
       separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
       itemBuilder: (context, i) {
+        if (i == items.length) {
+          return _OrgActionsFooter(
+            // Renombrar es admin-gated (cosmético; el backend 403ea por debajo
+            // de ADMIN). Sin nombre activo (carrera) no se ofrece.
+            renameName: isAdminOrAbove(activeRole) ? activeName : null,
+          );
+        }
         final m = items[i];
         return OrgMembershipTile(
           membership: m,
@@ -136,6 +183,52 @@ class _LoadedView extends StatelessWidget {
               : () => context.read<SwitchOrgCubit>().switchTo(m.orgId),
         );
       },
+    );
+  }
+}
+
+/// Pie de acciones de organización: crear una nueva (siempre) y renombrar la
+/// activa (sólo si [renameName] != null, es decir ADMIN+ con un nombre activo).
+class _OrgActionsFooter extends StatelessWidget {
+  const _OrgActionsFooter({required this.renameName});
+
+  final String? renameName;
+
+  Future<void> _openRename(BuildContext context, String currentName) async {
+    final cubit = context.read<RenameOrgCubit>();
+    final newName = await RenameOrgSheet.open(
+      context,
+      currentName: currentName,
+    );
+    if (newName == null) return;
+    unawaited(cubit.rename(newName));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = renameName;
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTokens.sp2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          AppButton.tonal(
+            key: const Key('memberships.create'),
+            label: 'Crear organización',
+            fullWidth: true,
+            onPressed: () => context.push('/create-org'),
+          ),
+          if (name != null) ...<Widget>[
+            const SizedBox(height: AppTokens.sp2),
+            AppButton.text(
+              key: const Key('memberships.rename'),
+              label: 'Renombrar organización',
+              fullWidth: true,
+              onPressed: () => _openRename(context, name),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

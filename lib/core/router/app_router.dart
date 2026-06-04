@@ -14,6 +14,7 @@ import '../../features/auth/presentation/bloc/forgot_password_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/bloc/register_bloc.dart';
 import '../../features/auth/presentation/bloc/resend_verification_cubit.dart';
+import '../../features/auth/presentation/bloc/rename_org_cubit.dart';
 import '../../features/auth/presentation/bloc/reset_password_bloc.dart';
 import '../../features/auth/presentation/bloc/switch_org_cubit.dart';
 import '../../features/auth/presentation/bloc/verify_email_bloc.dart';
@@ -780,6 +781,9 @@ class AppRouter {
             ),
             BlocProvider<SwitchOrgCubit>(
               create: (_) => SwitchOrgCubit(_authRepo),
+            ),
+            BlocProvider<RenameOrgCubit>(
+              create: (_) => RenameOrgCubit(_authRepo),
             ),
           ],
           child: Scaffold(
