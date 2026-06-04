@@ -45,9 +45,11 @@ class MembersPage extends StatelessWidget {
       case MemberMutationSuccess(action: final action):
         // El cambio ya está en el backend: recargamos para reflejarlo.
         context.read<MembersBloc>().add(const MembersLoadRequested());
-        final text = action == MemberMutationAction.removed
-            ? 'Miembro eliminado'
-            : 'Rol actualizado';
+        final text = switch (action) {
+          MemberMutationAction.removed => 'Miembro eliminado',
+          MemberMutationAction.ownershipTransferred => 'Propiedad transferida',
+          MemberMutationAction.roleChanged => 'Rol actualizado',
+        };
         messenger.showSnackBar(SnackBar(content: Text(text)));
       case MemberMutationFailure(failure: final failure):
         messenger.showSnackBar(
