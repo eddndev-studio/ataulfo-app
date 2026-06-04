@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/router/app_router.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
@@ -122,6 +124,34 @@ const _noOrg = Identity(
   orgId: '',
   role: '',
   email: 'op@example.com',
+);
+
+// Dos identidades del MISMO usuario en orgs distintas: alimentan el test del
+// re-key del shell, que destruye y recrea los blocs org-scoped al cambiar de
+// org (datos de la org vieja no deben sobrevivir al switch).
+const _orgA = Identity(
+  userId: 'u1',
+  orgId: 'o-A',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
+
+const _orgB = Identity(
+  userId: 'u1',
+  orgId: 'o-B',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
+
+// Mismo orgId que _orgA, sólo cambia emailVerified: un refresh de /auth/me que
+// sólo confirme el correo NO debe reconstruir el shell (el banner de
+// verificación vive de updates de identity sin tirar las listas).
+const _orgAVerified = Identity(
+  userId: 'u1',
+  orgId: 'o-A',
+  role: 'OWNER',
+  email: 'op@example.com',
+  emailVerified: true,
 );
 
 const _profile = ChatProfile(
@@ -318,6 +348,63 @@ void main() {
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
       expect(find.byType(BotsListPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'cambiar de org reconstruye el shell: los blocs org-scoped recargan datos '
+    'de la org nueva (botsRepo.list dos veces)',
+    (tester) async {
+      // El shell /home se re-keyea por orgId: cuando el orgId activo cambia,
+      // el subárbol (MultiBlocProvider incluido) se destruye y recrea, y los
+      // blocs page-scoped vuelven a cargar — la lista de la org vieja no debe
+      // sobrevivir al switch. Drive controlado: montar bajo o-A (load #1),
+      // settle, EMITIR o-B y settle (load #2). Sin el controlador, ambas
+      // emisiones podrían coalescer antes del primer build y dar un falso
+      // called(1).
+      final controller = StreamController<AuthState>();
+      addTearDown(controller.close);
+      whenListen(
+        authBloc,
+        controller.stream,
+        initialState: const AuthAuthenticated(_orgA),
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      expect(find.byType(BotsListPage), findsOneWidget);
+
+      controller.add(const AuthAuthenticated(_orgB));
+      await tester.pumpAndSettle();
+
+      verify(botsRepo.list).called(2);
+    },
+  );
+
+  testWidgets(
+    'refresh que sólo cambia emailVerified (mismo orgId) NO reconstruye el '
+    'shell (botsRepo.list una vez)',
+    (tester) async {
+      // Guarda contra el over-rebuild: el shell se keyea por orgId SOLO, no por
+      // la identity completa. Un /auth/me que sólo confirme el correo deja el
+      // mismo orgId, así que el subárbol se conserva y los blocs NO recargan
+      // (el banner de verificación se actualiza sin nukear las listas).
+      final controller = StreamController<AuthState>();
+      addTearDown(controller.close);
+      whenListen(
+        authBloc,
+        controller.stream,
+        initialState: const AuthAuthenticated(_orgA),
+      );
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      expect(find.byType(BotsListPage), findsOneWidget);
+
+      controller.add(const AuthAuthenticated(_orgAVerified));
+      await tester.pumpAndSettle();
+
+      verify(botsRepo.list).called(1);
     },
   );
 
