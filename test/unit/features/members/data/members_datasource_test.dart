@@ -354,15 +354,13 @@ void main() {
         Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(path: '/workspace/members/m1/bots'),
           statusCode: status,
-          data: botIds == null
-              ? null
-              : <String, dynamic>{'bot_ids': botIds},
+          data: botIds == null ? null : <String, dynamic>{'bot_ids': botIds},
         );
 
     test('200 {bot_ids:[...]} → List<String>', () async {
-      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
-        (_) async => objResp(200, botIds: <dynamic>['b1', 'b2']),
-      );
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenAnswer((_) async => objResp(200, botIds: <dynamic>['b1', 'b2']));
 
       final ids = await ds.assignedBots('m1');
 

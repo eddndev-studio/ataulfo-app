@@ -118,7 +118,10 @@ void main() {
         GoRoute(
           path: '/members/:id/bots',
           builder: (_, state) => Scaffold(
-            body: Text('bots-${state.pathParameters['id']}', key: const Key('bots-sentinel')),
+            body: Text(
+              'bots-${state.pathParameters['id']}',
+              key: const Key('bots-sentinel'),
+            ),
           ),
         ),
       ],
@@ -381,27 +384,24 @@ void main() {
 
   // --- Transferir / asignar bots (S10) ----------------------------------------
 
-  testWidgets(
-    'caller OWNER transfiere (confirmado) despacha cubit.transfer',
-    (tester) async {
-      when(
-        () => auth.state,
-      ).thenReturn(const AuthAuthenticated(_ownerCaller));
-      when(
-        () => bloc.state,
-      ).thenReturn(const MembersLoaded(items: <Member>[_worker]));
+  testWidgets('caller OWNER transfiere (confirmado) despacha cubit.transfer', (
+    tester,
+  ) async {
+    when(() => auth.state).thenReturn(const AuthAuthenticated(_ownerCaller));
+    when(
+      () => bloc.state,
+    ).thenReturn(const MembersLoaded(items: <Member>[_worker]));
 
-      await tester.pumpWidget(host());
-      await tester.tap(find.byType(MemberTile));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('member_edit.transfer')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('member_edit.transfer_confirm')));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(host());
+    await tester.tap(find.byType(MemberTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('member_edit.transfer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('member_edit.transfer_confirm')));
+    await tester.pumpAndSettle();
 
-      verify(() => mutation.transfer('m2')).called(1);
-    },
-  );
+    verify(() => mutation.transfer('m2')).called(1);
+  });
 
   testWidgets('"Asignar bots" navega a /members/:id/bots', (tester) async {
     when(

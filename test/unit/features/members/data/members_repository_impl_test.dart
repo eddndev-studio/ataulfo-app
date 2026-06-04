@@ -99,9 +99,7 @@ void main() {
 
   group('MembersRepositoryImpl bots', () {
     test('assignedBots delega y devuelve la lista', () async {
-      when(
-        () => ds.assignedBots('m1'),
-      ).thenAnswer((_) async => <String>['b1']);
+      when(() => ds.assignedBots('m1')).thenAnswer((_) async => <String>['b1']);
 
       expect(await repo.assignedBots('m1'), <String>['b1']);
       verify(() => ds.assignedBots('m1')).called(1);

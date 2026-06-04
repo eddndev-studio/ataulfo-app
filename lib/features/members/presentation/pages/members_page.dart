@@ -103,7 +103,9 @@ Future<void> _openSheet(BuildContext context, Member member) async {
       unawaited(cubit.transfer(member.id));
     case MemberSheetAssignBots():
       // El picker de bots es una pantalla aparte (carga + multi-select + save).
-      if (context.mounted) context.push('/members/${member.id}/bots');
+      if (context.mounted) {
+        unawaited(context.push('/members/${member.id}/bots'));
+      }
     case null:
       break;
   }

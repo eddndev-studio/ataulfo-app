@@ -186,12 +186,7 @@ void main() {
     'caller OWNER sobre otro miembro ofrece "Transferir propiedad" y, '
     'confirmado, devuelve Transfer',
     (tester) async {
-      final read = pumpHost(
-        tester,
-        _admin,
-        isSelf: false,
-        callerIsOwner: true,
-      );
+      final read = pumpHost(tester, _admin, isSelf: false, callerIsOwner: true);
       await read();
 
       expect(find.byKey(const Key('member_edit.transfer')), findsOneWidget);
