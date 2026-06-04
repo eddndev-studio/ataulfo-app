@@ -1148,62 +1148,58 @@ void main() {
     },
   );
 
-  testWidgets(
-    'reset exitoso despacha AuthLoggedOut y aterriza en el login',
-    (tester) async {
-      // El canje revoca todas las familias de refresh en el backend: la ruta
-      // debe cerrar la sesión local (AuthLoggedOut, idempotente si no hay
-      // tokens) y rutear al login. El authRepo local se stubea para que el
-      // resetPassword del bloc page-scoped resuelva en éxito (el _MockAuthRepo
-      // inline del setUp no es alcanzable).
-      final authRepo = _MockAuthRepo();
-      when(
-        () => authRepo.resetPassword(
-          token: any(named: 'token'),
-          newPassword: any(named: 'newPassword'),
-        ),
-      ).thenAnswer((_) async {});
-      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
-      final localRouter = AppRouter(
-        authBloc: authBloc,
-        authRepository: authRepo,
-        botsRepository: botsRepo,
-        botSessionRepository: botSessionRepo,
-        conversationsRepository: conversationsRepo,
-        messagesRepository: messagesRepo,
-        templatesRepository: templatesRepo,
-        flowsRepository: flowsRepo,
-        triggersRepository: triggersRepo,
-        waLabelsRepository: _MockWaLabelsRepo(),
-        labelsRepository: labelsRepo,
-        membershipsRepository: membershipsRepo,
-        catalogRepository: catalogRepo,
-        notificationsRepository: notificationsRepo,
-        mediaRepository: _MockMediaRepo(),
-        mediaFilePicker: _FakeMediaFilePicker(),
-        mediaThumbnailLoader: const FakeThumbnailLoader(),
-        profileRepository: profileRepo,
-      );
+  testWidgets('reset exitoso despacha AuthLoggedOut y aterriza en el login', (
+    tester,
+  ) async {
+    // El canje revoca todas las familias de refresh en el backend: la ruta
+    // debe cerrar la sesión local (AuthLoggedOut, idempotente si no hay
+    // tokens) y rutear al login. El authRepo local se stubea para que el
+    // resetPassword del bloc page-scoped resuelva en éxito (el _MockAuthRepo
+    // inline del setUp no es alcanzable).
+    final authRepo = _MockAuthRepo();
+    when(
+      () => authRepo.resetPassword(
+        token: any(named: 'token'),
+        newPassword: any(named: 'newPassword'),
+      ),
+    ).thenAnswer((_) async {});
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+    final localRouter = AppRouter(
+      authBloc: authBloc,
+      authRepository: authRepo,
+      botsRepository: botsRepo,
+      botSessionRepository: botSessionRepo,
+      conversationsRepository: conversationsRepo,
+      messagesRepository: messagesRepo,
+      templatesRepository: templatesRepo,
+      flowsRepository: flowsRepo,
+      triggersRepository: triggersRepo,
+      waLabelsRepository: _MockWaLabelsRepo(),
+      labelsRepository: labelsRepo,
+      membershipsRepository: membershipsRepo,
+      catalogRepository: catalogRepo,
+      notificationsRepository: notificationsRepo,
+      mediaRepository: _MockMediaRepo(),
+      mediaFilePicker: _FakeMediaFilePicker(),
+      mediaThumbnailLoader: const FakeThumbnailLoader(),
+      profileRepository: profileRepo,
+    );
 
-      await tester.pumpWidget(_host(localRouter, authBloc));
-      await tester.pumpAndSettle();
-      localRouter.router.go('/reset-password');
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(_host(localRouter, authBloc));
+    await tester.pumpAndSettle();
+    localRouter.router.go('/reset-password');
+    await tester.pumpAndSettle();
 
-      await tester.enterText(
-        find.byKey(const Key('reset.token')),
-        'tok123',
-      );
-      await tester.enterText(
-        find.byKey(const Key('reset.password')),
-        'hunter2-secret',
-      );
-      await tester.tap(find.byType(AppButton));
-      await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('reset.token')), 'tok123');
+    await tester.enterText(
+      find.byKey(const Key('reset.password')),
+      'hunter2-secret',
+    );
+    await tester.tap(find.byType(AppButton));
+    await tester.pumpAndSettle();
 
-      verify(() => authBloc.add(const AuthLoggedOut())).called(1);
-      expect(find.byType(LoginPage), findsOneWidget);
-      expect(find.byType(ResetPasswordPage), findsNothing);
-    },
-  );
+    verify(() => authBloc.add(const AuthLoggedOut())).called(1);
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(ResetPasswordPage), findsNothing);
+  });
 }

@@ -25,8 +25,7 @@ void main() {
         when(() => repo.forgotPassword('op@x.com')).thenAnswer((_) async {});
         return ForgotPasswordBloc(repo);
       },
-      act: (b) =>
-          b.add(const ForgotPasswordSubmitted(email: 'op@x.com')),
+      act: (b) => b.add(const ForgotPasswordSubmitted(email: 'op@x.com')),
       expect: () => const <ForgotPasswordState>[
         ForgotPasswordSubmitting(),
         ForgotPasswordSent(),
@@ -61,8 +60,7 @@ void main() {
         ).thenThrow(const NetworkFailure());
         return ForgotPasswordBloc(repo);
       },
-      act: (b) =>
-          b.add(const ForgotPasswordSubmitted(email: 'op@x.com')),
+      act: (b) => b.add(const ForgotPasswordSubmitted(email: 'op@x.com')),
       expect: () => const <ForgotPasswordState>[
         ForgotPasswordSubmitting(),
         ForgotPasswordFailed(ForgotPasswordFailureKind.network),
@@ -77,8 +75,7 @@ void main() {
         ).thenThrow(const RateLimitedFailure());
         return ForgotPasswordBloc(repo);
       },
-      act: (b) =>
-          b.add(const ForgotPasswordSubmitted(email: 'op@x.com')),
+      act: (b) => b.add(const ForgotPasswordSubmitted(email: 'op@x.com')),
       expect: () => const <ForgotPasswordState>[
         ForgotPasswordSubmitting(),
         ForgotPasswordFailed(ForgotPasswordFailureKind.rateLimited),
@@ -93,8 +90,7 @@ void main() {
         ).thenThrow(const UnknownAuthFailure());
         return ForgotPasswordBloc(repo);
       },
-      act: (b) =>
-          b.add(const ForgotPasswordSubmitted(email: 'op@x.com')),
+      act: (b) => b.add(const ForgotPasswordSubmitted(email: 'op@x.com')),
       expect: () => const <ForgotPasswordState>[
         ForgotPasswordSubmitting(),
         ForgotPasswordFailed(ForgotPasswordFailureKind.unknown),

@@ -131,10 +131,7 @@ void main() {
     await tester.pumpWidget(host());
     await tester.pump();
 
-    expect(
-      find.text('El enlace caducó. Solicita uno nuevo.'),
-      findsOneWidget,
-    );
+    expect(find.text('El enlace caducó. Solicita uno nuevo.'), findsOneWidget);
   });
 
   testWidgets('Failed(passwordTooShort) muestra mensaje de longitud', (

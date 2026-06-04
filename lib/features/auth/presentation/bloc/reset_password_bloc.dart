@@ -20,8 +20,7 @@ const int _minPasswordLength = 12;
 /// (token presente, longitud) ocurre ANTES de llamar al repositorio: un envío
 /// inválido no gasta el token. Los fallos del backend re-renderizan el form con
 /// el mismo enlace para reintentar (el token NO se consume en un fallo).
-class ResetPasswordBloc
-    extends Bloc<ResetPasswordEvent, ResetPasswordState> {
+class ResetPasswordBloc extends Bloc<ResetPasswordEvent, ResetPasswordState> {
   ResetPasswordBloc(this._repo) : super(const ResetPasswordInitial()) {
     on<ResetPasswordSubmitted>(_onSubmitted);
   }
