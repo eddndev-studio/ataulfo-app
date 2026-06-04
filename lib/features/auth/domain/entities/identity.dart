@@ -21,6 +21,12 @@ class Identity {
   final String role;
   final String email;
 
+  /// `true` cuando la sesión tiene una org activa: ambos `orgId` y `role`
+  /// vienen poblados en los claims. Un usuario con varias memberships y
+  /// ninguna seleccionada llega con `orgId`/`role` vacíos (debe elegir vía
+  /// switch-org antes de operar); el router lo desvía a la selección.
+  bool get hasActiveOrg => orgId.isNotEmpty && role.isNotEmpty;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
