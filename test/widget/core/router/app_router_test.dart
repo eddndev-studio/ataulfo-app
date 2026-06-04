@@ -5,6 +5,7 @@ import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
+import 'package:ataulfo/features/auth/presentation/pages/register_page.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
@@ -1030,5 +1031,31 @@ void main() {
 
     expect(find.byType(LoginPage), findsOneWidget);
     expect(find.byType(MembershipsPage), findsNothing);
+  });
+
+  testWidgets('/register (ruta pública) renderiza RegisterPage', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/register');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RegisterPage), findsOneWidget);
+  });
+
+  testWidgets('"Crear cuenta" desde el login navega a /register', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginPage), findsOneWidget);
+
+    await tester.tap(find.text('Crear cuenta'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RegisterPage), findsOneWidget);
   });
 }
