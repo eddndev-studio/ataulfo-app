@@ -1,32 +1,100 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/member.dart';
+import '../../domain/failures/members_failure.dart';
+import '../bloc/member_mutation_cubit.dart';
 import '../bloc/members_bloc.dart';
+import '../widgets/member_edit_sheet.dart';
 import '../widgets/member_tile.dart';
 
-/// Listado de miembros de la org activa (`GET /workspace/members`). Página
+/// Listado de miembros de la org activa (`GET /workspace/members`) con gestión
+/// RBAC: tocar un miembro abre la hoja para cambiar su rol o quitarlo. Página
 /// content-only: la ruta `/members` aporta Scaffold + AppBar.
 ///
-/// De solo lectura: render del roster con rol y estado de verificación. El gate
-/// de acceso es cosmético (tile admin-gated en Settings); la autoridad real es
-/// el 403 del backend, por eso un fallo se muestra con un reintento genérico
-/// sin discriminar el status crudo.
+/// De acceso cosmético admin-gated; la autoridad real es el 403 del backend.
+/// Las mutaciones viven en el `MemberMutationCubit` del scope (la hoja sólo
+/// devuelve la intención; esta página la despacha y cierra el lazo): ante éxito
+/// recarga la lista y avisa, ante fallo traduce la causa a un aviso.
 class MembersPage extends StatelessWidget {
   const MembersPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<MembersBloc, MembersState>(
-      builder: (context, state) => switch (state) {
-        MembersInitial() || MembersLoading() => const _LoadingView(),
-        MembersLoaded(items: final items) => _LoadedView(items: items),
-        MembersFailed() => const _FailedView(),
-      },
+    return BlocListener<MemberMutationCubit, MemberMutationState>(
+      listener: _onMutationState,
+      child: BlocBuilder<MembersBloc, MembersState>(
+        builder: (context, state) => switch (state) {
+          MembersInitial() || MembersLoading() => const _LoadingView(),
+          MembersLoaded(items: final items) => _LoadedView(items: items),
+          MembersFailed() => const _FailedView(),
+        },
+      ),
     );
+  }
+
+  void _onMutationState(BuildContext context, MemberMutationState state) {
+    final messenger = ScaffoldMessenger.of(context);
+    switch (state) {
+      case MemberMutationSuccess(action: final action):
+        // El cambio ya está en el backend: recargamos para reflejarlo.
+        context.read<MembersBloc>().add(const MembersLoadRequested());
+        final text = action == MemberMutationAction.removed
+            ? 'Miembro eliminado'
+            : 'Rol actualizado';
+        messenger.showSnackBar(SnackBar(content: Text(text)));
+      case MemberMutationFailure(failure: final failure):
+        messenger.showSnackBar(
+          SnackBar(content: Text(_mutationMessage(failure))),
+        );
+      case MemberMutationIdle() || MemberMutationInProgress():
+        break;
+    }
+  }
+}
+
+/// Copy de fallo por variante. Exhaustivo sobre el sellado: una variante nueva
+/// rompe el build en vez de caer en un genérico silencioso.
+String _mutationMessage(MembersFailure f) => switch (f) {
+  MembersSelfRoleUpgradeFailure() => 'No puedes ascender tu propio rol',
+  MembersSoleOwnerFailure() =>
+    'La organización necesita al menos un propietario',
+  MembersNotFoundFailure() => 'Ese miembro ya no existe',
+  MembersForbiddenFailure() => 'No tienes permiso para esta acción',
+  MembersNetworkFailure() || MembersTimeoutFailure() =>
+    'Sin conexión. Revisa tu red e inténtalo de nuevo.',
+  MembersNoActiveOrgFailure() ||
+  MembersServerFailure() ||
+  UnknownMembersFailure() => 'Algo salió mal. Inténtalo de nuevo.',
+};
+
+Future<void> _openSheet(BuildContext context, Member member) async {
+  final auth = context.read<AuthBloc>().state;
+  final isSelf =
+      auth is AuthAuthenticated && auth.identity.userId == member.userId;
+  // Capturamos el cubit antes del await: tras cerrar la hoja no usamos el
+  // context de la página para nada que cruce el gap async.
+  final cubit = context.read<MemberMutationCubit>();
+  final result = await MemberEditSheet.open(
+    context,
+    member: member,
+    isSelf: isSelf,
+  );
+  // Fire-and-forget a propósito: el resultado de la mutación se observa por el
+  // BlocListener de la página (recarga + aviso), no por este await.
+  switch (result) {
+    case MemberSheetRoleChange(role: final role):
+      unawaited(cubit.changeRole(member.id, role));
+    case MemberSheetRemove():
+      unawaited(cubit.remove(member.id));
+    case null:
+      break;
   }
 }
 
@@ -59,7 +127,10 @@ class _LoadedView extends StatelessWidget {
       ),
       itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
-      itemBuilder: (context, i) => MemberTile(member: items[i]),
+      itemBuilder: (context, i) {
+        final m = items[i];
+        return MemberTile(member: m, onTap: () => _openSheet(context, m));
+      },
     );
   }
 }

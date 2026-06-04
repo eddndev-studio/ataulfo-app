@@ -165,4 +165,137 @@ void main() {
       await expectLater(ds.list(), throwsA(isA<UnknownMembersFailure>()));
     });
   });
+
+  Response<void> voidResp(int status) => Response<void>(
+    requestOptions: RequestOptions(path: '/workspace/members'),
+    statusCode: status,
+  );
+
+  group('DioMembersDatasource.changeRole', () {
+    test('204 → completa sin error y envía el rol en el body', () async {
+      when(
+        () => dio.put<void>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => voidResp(204));
+
+      await ds.changeRole('m1', 'ADMIN');
+
+      verify(
+        () => dio.put<void>(
+          '/workspace/members/m1/role',
+          data: const <String, dynamic>{'role': 'ADMIN'},
+        ),
+      ).called(1);
+    });
+
+    test('403 → MembersSelfRoleUpgradeFailure', () async {
+      // En change-role el único 403 del servicio es el self-upgrade.
+      when(
+        () => dio.put<void>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse(403));
+
+      await expectLater(
+        ds.changeRole('m1', 'OWNER'),
+        throwsA(isA<MembersSelfRoleUpgradeFailure>()),
+      );
+    });
+
+    test('404 → MembersNotFoundFailure', () async {
+      when(
+        () => dio.put<void>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse(404));
+
+      await expectLater(
+        ds.changeRole('m1', 'ADMIN'),
+        throwsA(isA<MembersNotFoundFailure>()),
+      );
+    });
+
+    test('409 → MembersSoleOwnerFailure', () async {
+      // Degradar al único owner: el servicio responde 409 (no NoActiveOrg).
+      when(
+        () => dio.put<void>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse(409));
+
+      await expectLater(
+        ds.changeRole('m1', 'ADMIN'),
+        throwsA(isA<MembersSoleOwnerFailure>()),
+      );
+    });
+
+    test('500 → MembersServerFailure', () async {
+      when(
+        () => dio.put<void>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse(500));
+
+      await expectLater(
+        ds.changeRole('m1', 'ADMIN'),
+        throwsA(isA<MembersServerFailure>()),
+      );
+    });
+
+    test('sin conexión → MembersNetworkFailure', () async {
+      when(() => dio.put<void>(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/workspace/members/m1/role'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        ds.changeRole('m1', 'ADMIN'),
+        throwsA(isA<MembersNetworkFailure>()),
+      );
+    });
+  });
+
+  group('DioMembersDatasource.removeMember', () {
+    test('204 → completa sin error y pega al path del miembro', () async {
+      when(
+        () => dio.delete<void>(any()),
+      ).thenAnswer((_) async => voidResp(204));
+
+      await ds.removeMember('m1');
+
+      verify(() => dio.delete<void>('/workspace/members/m1')).called(1);
+    });
+
+    test('404 → MembersNotFoundFailure', () async {
+      when(() => dio.delete<void>(any())).thenThrow(badResponse(404));
+
+      await expectLater(
+        ds.removeMember('m1'),
+        throwsA(isA<MembersNotFoundFailure>()),
+      );
+    });
+
+    test('409 → MembersSoleOwnerFailure', () async {
+      // Quitar al único owner deja la org sin dueño: 409.
+      when(() => dio.delete<void>(any())).thenThrow(badResponse(409));
+
+      await expectLater(
+        ds.removeMember('m1'),
+        throwsA(isA<MembersSoleOwnerFailure>()),
+      );
+    });
+
+    test('403 → MembersForbiddenFailure (guard de ruta, defensivo)', () async {
+      // RemoveMember no tiene 403 a nivel de servicio; un 403 sólo vendría del
+      // guard de rol de la ruta. Se mapea al genérico, no a self-upgrade.
+      when(() => dio.delete<void>(any())).thenThrow(badResponse(403));
+
+      await expectLater(
+        ds.removeMember('m1'),
+        throwsA(isA<MembersForbiddenFailure>()),
+      );
+    });
+
+    test('500 → MembersServerFailure', () async {
+      when(() => dio.delete<void>(any())).thenThrow(badResponse(500));
+
+      await expectLater(
+        ds.removeMember('m1'),
+        throwsA(isA<MembersServerFailure>()),
+      );
+    });
+  });
 }

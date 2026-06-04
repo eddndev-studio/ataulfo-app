@@ -33,6 +33,7 @@ import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dar
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/members/domain/entities/member.dart';
 import 'package:ataulfo/features/members/domain/repositories/members_repository.dart';
+import 'package:ataulfo/features/members/presentation/bloc/member_mutation_cubit.dart';
 import 'package:ataulfo/features/members/presentation/pages/members_page.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
@@ -1028,6 +1029,22 @@ void main() {
 
     expect(find.byType(MembersPage), findsOneWidget);
     verify(membersRepo.list).called(1);
+  });
+
+  testWidgets('AuthAuthenticated → /members expone MemberMutationCubit al árbol '
+      '(habilita cambiar rol / quitar)', (tester) async {
+    // Las mutaciones de la página necesitan el MemberMutationCubit page-scoped
+    // en el route builder; sin él la página rompería en runtime (el
+    // BlocListener lanzaría ProviderNotFound). Leerlo del árbol lo garantiza.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/members');
+    await tester.pumpAndSettle();
+
+    final page = tester.element(find.byType(MembersPage));
+    expect(page.read<MemberMutationCubit>(), isNotNull);
   });
 
   testWidgets('AuthAuthenticated → /memberships expone SwitchOrgCubit al árbol '

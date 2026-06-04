@@ -44,4 +44,46 @@ void main() {
       );
     });
   });
+
+  group('MembersRepositoryImpl.changeRole', () {
+    test('delega al datasource con id y rol', () async {
+      when(() => ds.changeRole(any(), any())).thenAnswer((_) async {});
+
+      await repo.changeRole('m1', 'ADMIN');
+
+      verify(() => ds.changeRole('m1', 'ADMIN')).called(1);
+    });
+
+    test('propaga la failure del datasource sin envolverla', () async {
+      when(
+        () => ds.changeRole(any(), any()),
+      ).thenThrow(const MembersSelfRoleUpgradeFailure());
+
+      await expectLater(
+        () => repo.changeRole('m1', 'OWNER'),
+        throwsA(isA<MembersSelfRoleUpgradeFailure>()),
+      );
+    });
+  });
+
+  group('MembersRepositoryImpl.removeMember', () {
+    test('delega al datasource con id', () async {
+      when(() => ds.removeMember(any())).thenAnswer((_) async {});
+
+      await repo.removeMember('m1');
+
+      verify(() => ds.removeMember('m1')).called(1);
+    });
+
+    test('propaga la failure del datasource sin envolverla', () async {
+      when(
+        () => ds.removeMember(any()),
+      ).thenThrow(const MembersSoleOwnerFailure());
+
+      await expectLater(
+        () => repo.removeMember('m1'),
+        throwsA(isA<MembersSoleOwnerFailure>()),
+      );
+    });
+  });
 }
