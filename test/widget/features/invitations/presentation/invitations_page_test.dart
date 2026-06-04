@@ -234,6 +234,34 @@ void main() {
     verifyNever(() => bloc.add(any()));
   });
 
+  testWidgets('Failure(Server) recarga: un create-500 pudo guardar la fila '
+      'aunque el correo fallara, y el copy manda a revisar el historial', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const InvitationsLoaded(items: <Invitation>[]));
+    whenListen(
+      mutation,
+      Stream<InvitationMutationState>.fromIterable(
+        const <InvitationMutationState>[
+          InvitationMutationInProgress(),
+          InvitationMutationFailure(InvitationsServerFailure()),
+        ],
+      ),
+      initialState: const InvitationMutationIdle(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    verify(() => bloc.add(const InvitationsLoadRequested())).called(1);
+    expect(
+      find.text('No pudimos confirmar la operación; revisa el historial.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Failure(Gone) avisa y recarga (la lista local quedó stale)', (
     tester,
   ) async {
