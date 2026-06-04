@@ -30,6 +30,7 @@ void main() {
     void Function(AuthTokens)? onSucceeded,
     VoidCallback? onCreateAccount,
     VoidCallback? onForgotPassword,
+    bool justReset = false,
   }) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: BlocProvider<LoginBloc>.value(
@@ -38,6 +39,7 @@ void main() {
         onSucceeded: onSucceeded,
         onCreateAccount: onCreateAccount,
         onForgotPassword: onForgotPassword,
+        justReset: justReset,
       ),
     ),
   );
@@ -203,5 +205,27 @@ void main() {
     await tester.pump();
 
     expect(tapped, isTrue);
+  });
+
+  testWidgets('justReset muestra el aviso de contraseña restablecida', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(justReset: true));
+
+    expect(
+      find.text('Contraseña restablecida. Inicia sesión con la nueva.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('sin justReset no muestra el aviso de restablecimiento', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    expect(
+      find.text('Contraseña restablecida. Inicia sesión con la nueva.'),
+      findsNothing,
+    );
   });
 }

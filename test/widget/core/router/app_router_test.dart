@@ -1201,5 +1201,11 @@ void main() {
     verify(() => authBloc.add(const AuthLoggedOut())).called(1);
     expect(find.byType(LoginPage), findsOneWidget);
     expect(find.byType(ResetPasswordPage), findsNothing);
+    // El login aterriza con el aviso de éxito (?reset=success): el operador
+    // sabe que su contraseña cambió y que debe entrar con la nueva.
+    expect(
+      find.text('Contraseña restablecida. Inicia sesión con la nueva.'),
+      findsOneWidget,
+    );
   });
 }
