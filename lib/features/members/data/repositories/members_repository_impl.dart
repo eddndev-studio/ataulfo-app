@@ -21,4 +21,16 @@ class MembersRepositoryImpl implements MembersRepository {
   @override
   Future<void> removeMember(String membershipId) =>
       _ds.removeMember(membershipId);
+
+  @override
+  Future<void> transferOwnership(String membershipId) =>
+      _ds.transferOwnership(membershipId);
+
+  @override
+  Future<List<String>> assignedBots(String membershipId) =>
+      _ds.assignedBots(membershipId);
+
+  @override
+  Future<void> assignBots(String membershipId, List<String> botIds) =>
+      _ds.assignBots(membershipId, botIds);
 }

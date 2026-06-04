@@ -17,4 +17,17 @@ abstract interface class MembersRepository {
   /// Quita al miembro [membershipId] de la organización activa. Completa sin
   /// valor en 204; lanza `MembersFailure` tipada (sole-owner, not-found, etc.).
   Future<void> removeMember(String membershipId);
+
+  /// Transfiere la propiedad de la org al miembro [membershipId] (swap: el
+  /// caller pasa a ADMIN, el destino a OWNER). Sólo un OWNER real puede; el
+  /// backend 403ea aun a un admin. Completa en 204.
+  Future<void> transferOwnership(String membershipId);
+
+  /// Ids de los bots asignados al miembro [membershipId]. Sólo relevante para
+  /// WORKER (SUPERVISOR+ ve todos). Lista vacía legítima.
+  Future<List<String>> assignedBots(String membershipId);
+
+  /// Reemplaza el set COMPLETO de bots asignados al miembro [membershipId] con
+  /// [botIds] (no es aditivo; `[]` desasigna todo). Completa en 204.
+  Future<void> assignBots(String membershipId, List<String> botIds);
 }

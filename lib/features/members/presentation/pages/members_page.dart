@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -45,9 +46,11 @@ class MembersPage extends StatelessWidget {
       case MemberMutationSuccess(action: final action):
         // El cambio ya está en el backend: recargamos para reflejarlo.
         context.read<MembersBloc>().add(const MembersLoadRequested());
-        final text = action == MemberMutationAction.removed
-            ? 'Miembro eliminado'
-            : 'Rol actualizado';
+        final text = switch (action) {
+          MemberMutationAction.removed => 'Miembro eliminado',
+          MemberMutationAction.ownershipTransferred => 'Propiedad transferida',
+          MemberMutationAction.roleChanged => 'Rol actualizado',
+        };
         messenger.showSnackBar(SnackBar(content: Text(text)));
       case MemberMutationFailure(failure: final failure):
         messenger.showSnackBar(
@@ -76,8 +79,10 @@ String _mutationMessage(MembersFailure f) => switch (f) {
 
 Future<void> _openSheet(BuildContext context, Member member) async {
   final auth = context.read<AuthBloc>().state;
-  final isSelf =
-      auth is AuthAuthenticated && auth.identity.userId == member.userId;
+  final identity = auth is AuthAuthenticated ? auth.identity : null;
+  final isSelf = identity != null && identity.userId == member.userId;
+  // Transferir propiedad exige OWNER REAL (no basta ADMIN; el backend 403ea).
+  final callerIsOwner = identity != null && identity.role == 'OWNER';
   // Capturamos el cubit antes del await: tras cerrar la hoja no usamos el
   // context de la página para nada que cruce el gap async.
   final cubit = context.read<MemberMutationCubit>();
@@ -85,6 +90,7 @@ Future<void> _openSheet(BuildContext context, Member member) async {
     context,
     member: member,
     isSelf: isSelf,
+    callerIsOwner: callerIsOwner,
   );
   // Fire-and-forget a propósito: el resultado de la mutación se observa por el
   // BlocListener de la página (recarga + aviso), no por este await.
@@ -93,6 +99,13 @@ Future<void> _openSheet(BuildContext context, Member member) async {
       unawaited(cubit.changeRole(member.id, role));
     case MemberSheetRemove():
       unawaited(cubit.remove(member.id));
+    case MemberSheetTransfer():
+      unawaited(cubit.transfer(member.id));
+    case MemberSheetAssignBots():
+      // El picker de bots es una pantalla aparte (carga + multi-select + save).
+      if (context.mounted) {
+        unawaited(context.push('/members/${member.id}/bots'));
+      }
     case null:
       break;
   }

@@ -35,10 +35,22 @@ class MemberMutationCubit extends Cubit<MemberMutationState> {
       emit(MemberMutationFailure(f));
     }
   }
+
+  Future<void> transfer(String membershipId) async {
+    emit(const MemberMutationInProgress());
+    try {
+      await _repo.transferOwnership(membershipId);
+      emit(
+        const MemberMutationSuccess(MemberMutationAction.ownershipTransferred),
+      );
+    } on MembersFailure catch (f) {
+      emit(MemberMutationFailure(f));
+    }
+  }
 }
 
 /// Qué mutación terminó bien — la página elige el copy del aviso por esto.
-enum MemberMutationAction { roleChanged, removed }
+enum MemberMutationAction { roleChanged, removed, ownershipTransferred }
 
 // States --------------------------------------------------------------------
 

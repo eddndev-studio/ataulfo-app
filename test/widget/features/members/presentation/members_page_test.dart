@@ -11,6 +11,7 @@ import 'package:ataulfo/features/members/presentation/widgets/member_tile.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -29,6 +30,14 @@ const _caller = Identity(
   orgId: 'o1',
   role: 'ADMIN',
   email: 'admin@x.com',
+);
+
+// Un caller OWNER real (habilita transferir propiedad).
+const _ownerCaller = Identity(
+  userId: 'u-owner',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'owner-caller@x.com',
 );
 
 const _owner = Member(
@@ -71,6 +80,7 @@ void main() {
     when(() => mutation.state).thenReturn(const MemberMutationIdle());
     when(() => mutation.changeRole(any(), any())).thenAnswer((_) async {});
     when(() => mutation.remove(any())).thenAnswer((_) async {});
+    when(() => mutation.transfer(any())).thenAnswer((_) async {});
     when(() => auth.state).thenReturn(const AuthAuthenticated(_caller));
   });
 
@@ -87,6 +97,40 @@ void main() {
       child: const Scaffold(body: MembersPage()),
     ),
   );
+
+  // Harness con router: "Asignar bots" navega a /members/:id/bots; en el host
+  // sin GoRouter reventaría. Un centinela permite asertar la navegación.
+  Widget routedHost() {
+    final router = GoRouter(
+      initialLocation: '/members',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/members',
+          builder: (_, _) => MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<MembersBloc>.value(value: bloc),
+              BlocProvider<MemberMutationCubit>.value(value: mutation),
+              BlocProvider<AuthBloc>.value(value: auth),
+            ],
+            child: const Scaffold(body: MembersPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/members/:id/bots',
+          builder: (_, state) => Scaffold(
+            body: Text(
+              'bots-${state.pathParameters['id']}',
+              key: const Key('bots-sentinel'),
+            ),
+          ),
+        ),
+      ],
+    );
+    return MaterialApp.router(
+      theme: AppDesignTheme.dark(),
+      routerConfig: router,
+    );
+  }
 
   testWidgets('Initial/Loading muestra spinner', (tester) async {
     when(() => bloc.state).thenReturn(const MembersLoading());
@@ -267,6 +311,30 @@ void main() {
     expect(find.text('Miembro eliminado'), findsOneWidget);
   });
 
+  testWidgets(
+    'mutación Success de transferir avisa "Propiedad transferida" (no el copy '
+    'de rol)',
+    (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const MembersLoaded(items: <Member>[_worker]));
+      whenListen(
+        mutation,
+        Stream<MemberMutationState>.fromIterable(const <MemberMutationState>[
+          MemberMutationInProgress(),
+          MemberMutationSuccess(MemberMutationAction.ownershipTransferred),
+        ]),
+        initialState: const MemberMutationIdle(),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.pump();
+
+      expect(find.text('Propiedad transferida'), findsOneWidget);
+      expect(find.text('Rol actualizado'), findsNothing);
+    },
+  );
+
   testWidgets('mutación Failure self-upgrade avisa con copy específico', (
     tester,
   ) async {
@@ -312,5 +380,41 @@ void main() {
       find.text('La organización necesita al menos un propietario'),
       findsOneWidget,
     );
+  });
+
+  // --- Transferir / asignar bots (S10) ----------------------------------------
+
+  testWidgets('caller OWNER transfiere (confirmado) despacha cubit.transfer', (
+    tester,
+  ) async {
+    when(() => auth.state).thenReturn(const AuthAuthenticated(_ownerCaller));
+    when(
+      () => bloc.state,
+    ).thenReturn(const MembersLoaded(items: <Member>[_worker]));
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.byType(MemberTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('member_edit.transfer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('member_edit.transfer_confirm')));
+    await tester.pumpAndSettle();
+
+    verify(() => mutation.transfer('m2')).called(1);
+  });
+
+  testWidgets('"Asignar bots" navega a /members/:id/bots', (tester) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const MembersLoaded(items: <Member>[_worker]));
+
+    await tester.pumpWidget(routedHost());
+    await tester.tap(find.byType(MemberTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('member_edit.assign_bots')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('bots-sentinel')), findsOneWidget);
+    expect(find.text('bots-m2'), findsOneWidget);
   });
 }

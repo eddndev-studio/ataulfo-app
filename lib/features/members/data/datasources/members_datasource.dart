@@ -20,6 +20,15 @@ abstract interface class MembersDatasource {
 
   /// `DELETE /workspace/members/{id}`. 204 ⇒ completa.
   Future<void> removeMember(String membershipId);
+
+  /// `POST /workspace/transfer-ownership` con `{to_membership_id}`. 204.
+  Future<void> transferOwnership(String membershipId);
+
+  /// `GET /workspace/members/{id}/bots` → `{bot_ids:[...]}`.
+  Future<List<String>> assignedBots(String membershipId);
+
+  /// `PUT /workspace/members/{id}/bots` con el set completo `{bot_ids}`. 204.
+  Future<void> assignBots(String membershipId, List<String> botIds);
 }
 
 class DioMembersDatasource implements MembersDatasource {
@@ -76,6 +85,53 @@ class DioMembersDatasource implements MembersDatasource {
     } on DioException catch (e) {
       // RemoveMember no tiene 403 de servicio; un 403 sólo vendría del guard de
       // rol de la ruta, así que se mapea al genérico (no a self-upgrade).
+      throw _mapMutationException(e, on403: const MembersForbiddenFailure());
+    }
+  }
+
+  @override
+  Future<void> transferOwnership(String membershipId) async {
+    try {
+      await _dio.post<void>(
+        '/workspace/transfer-ownership',
+        data: <String, dynamic>{'to_membership_id': membershipId},
+      );
+    } on DioException catch (e) {
+      // Transfer es OWNER-real-only y no-self en la UI, así que 403/422 son
+      // defensa de borde: 403→genérico, 422→Unknown (default), 404→NotFound.
+      throw _mapMutationException(e, on403: const MembersForbiddenFailure());
+    }
+  }
+
+  @override
+  Future<List<String>> assignedBots(String membershipId) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/workspace/members/$membershipId/bots',
+      );
+      final ids = res.data?['bot_ids'];
+      if (ids is! List) {
+        throw const UnknownMembersFailure();
+      }
+      return ids.cast<String>().toList(growable: false);
+    } on MembersFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapMutationException(e, on403: const MembersForbiddenFailure());
+    } on TypeError {
+      throw const UnknownMembersFailure();
+    }
+  }
+
+  @override
+  Future<void> assignBots(String membershipId, List<String> botIds) async {
+    try {
+      // El PUT lleva el set COMPLETO (reemplazo, no delta); `[]` desasigna.
+      await _dio.put<void>(
+        '/workspace/members/$membershipId/bots',
+        data: <String, dynamic>{'bot_ids': botIds},
+      );
+    } on DioException catch (e) {
       throw _mapMutationException(e, on403: const MembersForbiddenFailure());
     }
   }

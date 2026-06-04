@@ -40,6 +40,7 @@ import 'package:ataulfo/features/invitations/presentation/pages/invitations_page
 import 'package:ataulfo/features/members/domain/entities/member.dart';
 import 'package:ataulfo/features/members/domain/repositories/members_repository.dart';
 import 'package:ataulfo/features/members/presentation/bloc/member_mutation_cubit.dart';
+import 'package:ataulfo/features/members/presentation/pages/bot_assignment_page.dart';
 import 'package:ataulfo/features/members/presentation/pages/members_page.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
@@ -1062,6 +1063,22 @@ void main() {
 
     final page = tester.element(find.byType(MembersPage));
     expect(page.read<MemberMutationCubit>(), isNotNull);
+  });
+
+  testWidgets('AuthAuthenticated → /members/:id/bots monta BotAssignmentPage y '
+      'carga (bots de la org + asignados)', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+    when(
+      () => membersRepo.assignedBots(any()),
+    ).thenAnswer((_) async => const <String>[]);
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/members/m1/bots');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BotAssignmentPage), findsOneWidget);
+    verify(() => membersRepo.assignedBots('m1')).called(1);
   });
 
   testWidgets('AuthAuthenticated → /invitations monta InvitationsPage y '

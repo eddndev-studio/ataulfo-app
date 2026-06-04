@@ -298,4 +298,151 @@ void main() {
       );
     });
   });
+
+  group('DioMembersDatasource.transferOwnership', () {
+    test('204 → completa y envía {to_membership_id}', () async {
+      when(
+        () => dio.post<void>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => voidResp(204));
+
+      await ds.transferOwnership('m2');
+
+      verify(
+        () => dio.post<void>(
+          '/workspace/transfer-ownership',
+          data: const <String, dynamic>{'to_membership_id': 'm2'},
+        ),
+      ).called(1);
+    });
+
+    test('403 (no OWNER real) → MembersForbiddenFailure', () async {
+      when(
+        () => dio.post<void>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse(403));
+
+      await expectLater(
+        ds.transferOwnership('m2'),
+        throwsA(isA<MembersForbiddenFailure>()),
+      );
+    });
+
+    test('404 → MembersNotFoundFailure', () async {
+      when(
+        () => dio.post<void>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse(404));
+
+      await expectLater(
+        ds.transferOwnership('m2'),
+        throwsA(isA<MembersNotFoundFailure>()),
+      );
+    });
+
+    test('422 (self-transfer, defensivo) → UnknownMembersFailure', () async {
+      when(
+        () => dio.post<void>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse(422));
+
+      await expectLater(
+        ds.transferOwnership('m2'),
+        throwsA(isA<UnknownMembersFailure>()),
+      );
+    });
+  });
+
+  group('DioMembersDatasource.assignedBots', () {
+    Response<Map<String, dynamic>> objResp(int status, {Object? botIds}) =>
+        Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/workspace/members/m1/bots'),
+          statusCode: status,
+          data: botIds == null ? null : <String, dynamic>{'bot_ids': botIds},
+        );
+
+    test('200 {bot_ids:[...]} → List<String>', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenAnswer((_) async => objResp(200, botIds: <dynamic>['b1', 'b2']));
+
+      final ids = await ds.assignedBots('m1');
+
+      expect(ids, <String>['b1', 'b2']);
+      verify(
+        () => dio.get<Map<String, dynamic>>('/workspace/members/m1/bots'),
+      ).called(1);
+    });
+
+    test('200 {bot_ids:[]} → vacía', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenAnswer((_) async => objResp(200, botIds: <dynamic>[]));
+
+      expect(await ds.assignedBots('m1'), isEmpty);
+    });
+
+    test('404 → MembersNotFoundFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenThrow(badResponse(404));
+
+      await expectLater(
+        ds.assignedBots('m1'),
+        throwsA(isA<MembersNotFoundFailure>()),
+      );
+    });
+
+    test('body malformado → UnknownMembersFailure', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenAnswer((_) async => objResp(200));
+
+      await expectLater(
+        ds.assignedBots('m1'),
+        throwsA(isA<UnknownMembersFailure>()),
+      );
+    });
+  });
+
+  group('DioMembersDatasource.assignBots', () {
+    test('204 → completa y envía el set completo {bot_ids}', () async {
+      when(
+        () => dio.put<void>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => voidResp(204));
+
+      await ds.assignBots('m1', <String>['b1', 'b3']);
+
+      verify(
+        () => dio.put<void>(
+          '/workspace/members/m1/bots',
+          data: const <String, dynamic>{
+            'bot_ids': <String>['b1', 'b3'],
+          },
+        ),
+      ).called(1);
+    });
+
+    test('lista vacía desasigna (envía bot_ids: [])', () async {
+      when(
+        () => dio.put<void>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => voidResp(204));
+
+      await ds.assignBots('m1', const <String>[]);
+
+      verify(
+        () => dio.put<void>(
+          '/workspace/members/m1/bots',
+          data: const <String, dynamic>{'bot_ids': <String>[]},
+        ),
+      ).called(1);
+    });
+
+    test('404 → MembersNotFoundFailure', () async {
+      when(
+        () => dio.put<void>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse(404));
+
+      await expectLater(
+        ds.assignBots('m1', const <String>['b1']),
+        throwsA(isA<MembersNotFoundFailure>()),
+      );
+    });
+  });
 }

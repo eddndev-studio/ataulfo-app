@@ -62,8 +62,10 @@ import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
 import '../../features/media/presentation/bloc/media_gallery_bloc.dart';
 import '../../features/media/presentation/pages/media_gallery_page.dart';
 import '../../features/members/domain/repositories/members_repository.dart';
+import '../../features/members/presentation/bloc/assign_bots_cubit.dart';
 import '../../features/members/presentation/bloc/member_mutation_cubit.dart';
 import '../../features/members/presentation/bloc/members_bloc.dart';
+import '../../features/members/presentation/pages/bot_assignment_page.dart';
 import '../../features/members/presentation/pages/members_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
@@ -822,6 +824,23 @@ class AppRouter {
               ],
             ),
             body: const MembersPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Asignación de bots a un miembro WORKER. Se apila desde MemberEditSheet
+        // ("Asignar bots"). El AssignBotsCubit cruza dos features (bots de la org
+        // + asignación del miembro) y dispara la carga al construirse.
+        path: '/members/:id/bots',
+        builder: (context, state) => BlocProvider<AssignBotsCubit>(
+          create: (_) => AssignBotsCubit(
+            membershipId: state.pathParameters['id']!,
+            membersRepo: _membersRepo,
+            botsRepo: _botsRepo,
+          )..load(),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Asignar bots')),
+            body: const BotAssignmentPage(),
           ),
         ),
       ),
