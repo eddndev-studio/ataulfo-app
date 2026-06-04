@@ -8,6 +8,7 @@ import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
+import 'package:ataulfo/features/auth/presentation/pages/accept_invite_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/forgot_password_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/register_page.dart';
@@ -1274,6 +1275,51 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(VerifyEmailPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '/accept-invite (ruta pública) renderiza AcceptInvitePage sin sesión',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/accept-invite');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AcceptInvitePage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '/accept-invite alcanzable con AuthAuthenticatedNoOrg (allowlist del '
+    'redirect sin org activa)',
+    (tester) async {
+      when(
+        () => authBloc.state,
+      ).thenReturn(const AuthAuthenticatedNoOrg(_noOrg));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/accept-invite');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AcceptInvitePage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '/accept-invite se permite también con sesión activa (aceptar logueado)',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/accept-invite');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AcceptInvitePage), findsOneWidget);
     },
   );
 
