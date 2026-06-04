@@ -13,6 +13,7 @@ import '../../features/auth/presentation/bloc/login_bloc.dart';
 import '../../features/auth/presentation/bloc/register_bloc.dart';
 import '../../features/auth/presentation/bloc/resend_verification_cubit.dart';
 import '../../features/auth/presentation/bloc/reset_password_bloc.dart';
+import '../../features/auth/presentation/bloc/switch_org_cubit.dart';
 import '../../features/auth/presentation/bloc/verify_email_bloc.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -54,6 +55,7 @@ import '../../features/media/presentation/pages/media_gallery_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
+import '../../features/memberships/presentation/pages/select_org_page.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
 import '../../features/messages/presentation/bloc/messages_bloc.dart';
 import '../../features/messages/presentation/pages/message_thread_page.dart';
@@ -84,7 +86,6 @@ import '../../features/wa_labels/presentation/bloc/wa_labels_bloc.dart';
 import '../../features/wa_labels/presentation/pages/wa_label_mapping_page.dart';
 import '../../features/wa_labels/presentation/pages/wa_labels_page.dart';
 import '../auth/role_privilege.dart';
-import '../design/widgets/app_button.dart';
 
 /// Rutas de la app. La decisión de a qué ruta ir vive en el `redirect`
 /// del GoRouter: lee el estado del `AuthBloc` global y mapea a `/`,
@@ -179,18 +180,24 @@ class AppRouter {
       GoRoute(path: '/', builder: (_, _) => const SplashPage()),
       GoRoute(
         // Selección de organización para el usuario multi-membership sin org
-        // activa. Placeholder mínimo: un slice posterior lo reemplaza por el
-        // switcher real (lista de orgs + switch-org). De momento sólo ofrece
-        // salir de la sesión para no encerrar al operador.
+        // activa. Monta la lista de orgs (MembershipsBloc) y el switch
+        // (SwitchOrgCubit) page-scoped; la página orquesta el flip de la
+        // sesión tras un switch exitoso (el cubit no conoce el AuthBloc).
         path: '/select-org',
-        builder: (context, _) => Scaffold(
-          appBar: AppBar(title: const Text('Selecciona una organización')),
-          body: Center(
-            child: AppButton.tonal(
-              label: 'Cerrar sesión',
-              onPressed: () =>
-                  context.read<AuthBloc>().add(const AuthLoggedOut()),
+        builder: (context, _) => MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<MembershipsBloc>(
+              create: (_) =>
+                  MembershipsBloc(_membershipsRepo)
+                    ..add(const MembershipsLoadRequested()),
             ),
+            BlocProvider<SwitchOrgCubit>(
+              create: (_) => SwitchOrgCubit(_authRepo),
+            ),
+          ],
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Selecciona una organización')),
+            body: const SelectOrgPage(),
           ),
         ),
       ),
