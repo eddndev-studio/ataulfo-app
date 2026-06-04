@@ -33,6 +33,7 @@ class AppTextField extends StatefulWidget {
     this.errorText,
     this.helperText,
     this.obscureText = false,
+    this.obscureToggle = false,
     this.autocorrect = true,
   });
 
@@ -79,6 +80,13 @@ class AppTextField extends StatefulWidget {
   /// de `maxLines` ya lo cumple.
   final bool obscureText;
 
+  /// Cuando es `true` junto con [obscureText], pinta un botón de ojo al final
+  /// del campo que alterna la ocultación internamente (mostrar/ocultar la
+  /// contraseña). Default `false` ⇒ sin botón, comportamiento idéntico al
+  /// previo (backward-compatible). Sin [obscureText] no hace nada (no hay
+  /// contenido que ocultar).
+  final bool obscureToggle;
+
   /// Autocorrección del teclado. Se desactiva en campos donde el corrector
   /// estorba (email, identificadores) para que no altere lo tecleado.
   final bool autocorrect;
@@ -95,6 +103,11 @@ class _AppTextFieldState extends State<AppTextField> {
   static const double _touchTarget = 48.0;
 
   final FocusNode _focusNode = FocusNode();
+
+  // Ocultación efectiva cuando el toggle de visibilidad está activo: arranca
+  // espejando `widget.obscureText` y el botón de ojo la alterna. Sin toggle no
+  // se consulta (la ocultación la gobierna `widget.obscureText` directo).
+  late bool _obscured = widget.obscureText;
 
   @override
   void initState() {
@@ -113,6 +126,39 @@ class _AppTextFieldState extends State<AppTextField> {
   // setState (no una animación) garantiza que el borde y el glow estén
   // presentes en el primer frame tras ganar foco.
   void _onFocusChanged() => setState(() {});
+
+  // El toggle de visibilidad sólo aplica a campos enmascarados: ocultar texto
+  // ya visible no tiene sentido. Sin obscureText el botón no se pinta.
+  bool get _hasToggle => widget.obscureToggle && widget.obscureText;
+
+  // Valor de ocultación que recibe el TextField: con toggle activo lo gobierna
+  // el estado interno (alternable); sin toggle, el flag crudo del widget.
+  bool get _effectiveObscure => _hasToggle ? _obscured : widget.obscureText;
+
+  // Envuelve el campo con el botón de ojo al final cuando el toggle aplica.
+  // Sin toggle devuelve el campo intacto — los call sites no enmascarados o
+  // sin `obscureToggle` mantienen el layout previo (un único hijo en la
+  // píldora, sin Row ni IconButton).
+  Widget _withToggle(Widget field) {
+    if (!_hasToggle) return field;
+    return Row(
+      children: <Widget>[
+        Expanded(child: field),
+        IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          visualDensity: VisualDensity.compact,
+          icon: Icon(
+            _obscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            color: AppTokens.text2,
+            size: 20,
+          ),
+          // Mostrar/ocultar es un toggle del estado interno; rebuild inmediato.
+          onPressed: () => setState(() => _obscured = !_obscured),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -190,33 +236,35 @@ class _AppTextFieldState extends State<AppTextField> {
               horizontal: AppTokens.sp4,
               vertical: isMultiline ? AppTokens.sp3 : AppTokens.sp1,
             ),
-            child: TextField(
-              controller: widget.controller,
-              focusNode: _focusNode,
-              enabled: widget.enabled,
-              autofocus: widget.autofocus,
-              textInputAction: widget.textInputAction,
-              onSubmitted: widget.onSubmitted,
-              minLines: widget.minLines,
-              maxLines: widget.maxLines,
-              keyboardType: widget.keyboardType,
-              inputFormatters: widget.inputFormatters,
-              obscureText: widget.obscureText,
-              autocorrect: widget.autocorrect,
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
-              // Borderless y sin relleno/padding propios: la píldora la pinta
-              // el Container, y el padding lo gobierna SIEMPRE el shell. Un
-              // borde o un fill aquí competiría con el del contenedor y haría
-              // al campo sensible al tema de Material por debajo.
-              decoration: InputDecoration(
-                isCollapsed: true,
-                border: InputBorder.none,
-                filled: false,
-                fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.zero,
-                hintText: widget.hint,
-                hintStyle: textTheme.bodyMedium?.copyWith(
-                  color: AppTokens.text2,
+            child: _withToggle(
+              TextField(
+                controller: widget.controller,
+                focusNode: _focusNode,
+                enabled: widget.enabled,
+                autofocus: widget.autofocus,
+                textInputAction: widget.textInputAction,
+                onSubmitted: widget.onSubmitted,
+                minLines: widget.minLines,
+                maxLines: widget.maxLines,
+                keyboardType: widget.keyboardType,
+                inputFormatters: widget.inputFormatters,
+                obscureText: _effectiveObscure,
+                autocorrect: widget.autocorrect,
+                style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+                // Borderless y sin relleno/padding propios: la píldora la pinta
+                // el Container, y el padding lo gobierna SIEMPRE el shell. Un
+                // borde o un fill aquí competiría con el del contenedor y haría
+                // al campo sensible al tema de Material por debajo.
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  filled: false,
+                  fillColor: Colors.transparent,
+                  contentPadding: EdgeInsets.zero,
+                  hintText: widget.hint,
+                  hintStyle: textTheme.bodyMedium?.copyWith(
+                    color: AppTokens.text2,
+                  ),
                 ),
               ),
             ),
