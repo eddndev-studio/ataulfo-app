@@ -18,6 +18,7 @@ class LoginPage extends StatefulWidget {
     this.onSucceeded,
     this.onCreateAccount,
     this.onForgotPassword,
+    this.justReset = false,
   });
 
   final void Function(AuthTokens tokens)? onSucceeded;
@@ -29,6 +30,12 @@ class LoginPage extends StatefulWidget {
   /// Navegación al flujo de recuperación de contraseña. Opcional para tests;
   /// en la app real lo cabla el router (empuja `/forgot-password`).
   final VoidCallback? onForgotPassword;
+
+  /// El operador acaba de restablecer su contraseña y aterrizó aquí (el reset
+  /// revocó todas sus sesiones). Muestra un aviso para que sepa que el cambio
+  /// surtió efecto y que debe entrar con la contraseña nueva. El router lo
+  /// activa cuando la ruta llega con `?reset=success`.
+  final bool justReset;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -75,6 +82,16 @@ class _LoginPageState extends State<LoginPage> {
                     style: textTheme.displayLarge,
                     textAlign: TextAlign.center,
                   ),
+                  if (widget.justReset) ...<Widget>[
+                    const SizedBox(height: 24),
+                    Text(
+                      'Contraseña restablecida. Inicia sesión con la nueva.',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.primary,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 48),
                   AppTextField(
                     key: const Key('login.email'),

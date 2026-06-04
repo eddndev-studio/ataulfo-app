@@ -193,9 +193,12 @@ class AppRouter {
       ),
       GoRoute(
         path: '/login',
-        builder: (context, _) => BlocProvider<LoginBloc>(
+        builder: (context, state) => BlocProvider<LoginBloc>(
           create: (_) => LoginBloc(_authRepo),
           child: LoginPage(
+            // El reset destructivo rebota aquí con `?reset=success` para que el
+            // login avise que la contraseña ya cambió (la sesión fue revocada).
+            justReset: state.uri.queryParameters['reset'] == 'success',
             onSucceeded: (_) {
               // El verify dispara la transición a Authenticated y el
               // redirect navega a /home. Los tokens los acaba de
@@ -255,7 +258,7 @@ class AppRouter {
           child: ResetPasswordPage(
             onSucceeded: () {
               _authBloc.add(const AuthLoggedOut());
-              context.go('/login');
+              context.go('/login?reset=success');
             },
           ),
         ),
