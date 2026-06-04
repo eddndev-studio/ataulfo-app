@@ -69,7 +69,12 @@ void main() {
     await tester.tap(find.byKey(const Key('member_edit.role')));
     await tester.pumpAndSettle();
 
-    for (final role in const <String>['OWNER', 'ADMIN', 'SUPERVISOR', 'WORKER']) {
+    for (final role in const <String>[
+      'OWNER',
+      'ADMIN',
+      'SUPERVISOR',
+      'WORKER',
+    ]) {
       expect(find.text(role), findsWidgets);
     }
   });

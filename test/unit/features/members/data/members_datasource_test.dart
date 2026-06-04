@@ -180,7 +180,10 @@ void main() {
       await ds.changeRole('m1', 'ADMIN');
 
       verify(
-        () => dio.put<void>('/workspace/members/m1/role', data: const <String, dynamic>{'role': 'ADMIN'}),
+        () => dio.put<void>(
+          '/workspace/members/m1/role',
+          data: const <String, dynamic>{'role': 'ADMIN'},
+        ),
       ).called(1);
     });
 
@@ -247,7 +250,9 @@ void main() {
 
   group('DioMembersDatasource.removeMember', () {
     test('204 → completa sin error y pega al path del miembro', () async {
-      when(() => dio.delete<void>(any())).thenAnswer((_) async => voidResp(204));
+      when(
+        () => dio.delete<void>(any()),
+      ).thenAnswer((_) async => voidResp(204));
 
       await ds.removeMember('m1');
 

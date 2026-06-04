@@ -20,7 +20,8 @@ class _MockMembersBloc extends MockBloc<MembersEvent, MembersState>
 class _MockMemberMutationCubit extends MockCubit<MemberMutationState>
     implements MemberMutationCubit {}
 
-class _MockAuthBloc extends MockBloc<AuthEvent, AuthState> implements AuthBloc {}
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
 
 // El caller logueado: su userId NO coincide con _owner/_worker (no es self).
 const _caller = Identity(

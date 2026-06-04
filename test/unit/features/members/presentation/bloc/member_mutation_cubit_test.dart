@@ -10,7 +10,10 @@ class _MockRepo extends Mock implements MembersRepository {}
 void main() {
   group('MemberMutationCubit', () {
     test('estado inicial = MemberMutationIdle', () {
-      expect(MemberMutationCubit(_MockRepo()).state, const MemberMutationIdle());
+      expect(
+        MemberMutationCubit(_MockRepo()).state,
+        const MemberMutationIdle(),
+      );
     });
 
     group('changeRole', () {
@@ -35,9 +38,9 @@ void main() {
         'self-upgrade → [InProgress, Failure(SelfRoleUpgrade)]',
         build: () {
           final repo = _MockRepo();
-          when(() => repo.changeRole(any(), any())).thenThrow(
-            const MembersSelfRoleUpgradeFailure(),
-          );
+          when(
+            () => repo.changeRole(any(), any()),
+          ).thenThrow(const MembersSelfRoleUpgradeFailure());
           return MemberMutationCubit(repo);
         },
         act: (cubit) => cubit.changeRole('m1', 'OWNER'),
