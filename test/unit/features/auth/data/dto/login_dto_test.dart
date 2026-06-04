@@ -122,7 +122,10 @@ void main() {
 
   group('RegisterReq', () {
     test('serializa email y password en snake_case del wire', () {
-      const req = RegisterReq(email: 'new@example.com', password: 's3cret-pass');
+      const req = RegisterReq(
+        email: 'new@example.com',
+        password: 's3cret-pass',
+      );
 
       expect(req.toJson(), <String, dynamic>{
         'email': 'new@example.com',

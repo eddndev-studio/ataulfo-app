@@ -149,7 +149,9 @@ class _AppTextFieldState extends State<AppTextField> {
           constraints: const BoxConstraints(),
           visualDensity: VisualDensity.compact,
           icon: Icon(
-            _obscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            _obscured
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
             color: AppTokens.text2,
             size: 20,
           ),

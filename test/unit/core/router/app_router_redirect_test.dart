@@ -26,16 +26,13 @@ const _noOrg = Identity(
 
 void main() {
   group('redirectForState — AuthInitial', () {
-    test('ruta pública se preserva (no se descarta antes del primer check)', () {
-      expect(
-        redirectForState(const AuthInitial(), '/login'),
-        isNull,
-      );
-      expect(
-        redirectForState(const AuthInitial(), '/register'),
-        isNull,
-      );
-    });
+    test(
+      'ruta pública se preserva (no se descarta antes del primer check)',
+      () {
+        expect(redirectForState(const AuthInitial(), '/login'), isNull);
+        expect(redirectForState(const AuthInitial(), '/register'), isNull);
+      },
+    );
 
     test('ruta pública con query (?token=) sobrevive intacta', () {
       // El cold-open de un deep-link (reset/accept) llega antes del primer
@@ -85,10 +82,7 @@ void main() {
     });
 
     test('ruta protegida → /login', () {
-      expect(
-        redirectForState(const AuthUnauthenticated(), '/home'),
-        '/login',
-      );
+      expect(redirectForState(const AuthUnauthenticated(), '/home'), '/login');
       expect(
         redirectForState(const AuthUnauthenticated(), '/bots/b1'),
         '/login',
@@ -151,10 +145,7 @@ void main() {
 
     test('gateo ADMIN+: OWNER pasa a las sub-rutas bot-level', () {
       expect(
-        redirectForState(
-          const AuthAuthenticated(_owner),
-          '/bots/b1/variables',
-        ),
+        redirectForState(const AuthAuthenticated(_owner), '/bots/b1/variables'),
         isNull,
       );
     });

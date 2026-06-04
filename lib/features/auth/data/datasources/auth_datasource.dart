@@ -241,9 +241,7 @@ class DioAuthDatasource implements AuthDatasource {
       }
       return AuthMapper.tokenRespToEntity(TokenResp.fromJson(body));
     } on DioException catch (e) {
-      throw _mapStatus(e, <int, AuthFailure>{
-        403: const NotMemberFailure(),
-      });
+      throw _mapStatus(e, <int, AuthFailure>{403: const NotMemberFailure()});
     } on FormatException {
       throw const UnknownAuthFailure();
     }

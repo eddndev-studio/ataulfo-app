@@ -460,7 +460,9 @@ void main() {
           '/auth/register',
           data: any<Object?>(named: 'data'),
         ),
-      ).thenAnswer((_) async => jsonResp('/auth/register', 201, body: tokenBody()));
+      ).thenAnswer(
+        (_) async => jsonResp('/auth/register', 201, body: tokenBody()),
+      );
 
       final got = await ds.register(
         email: 'new@example.com',
@@ -799,53 +801,60 @@ void main() {
       ).called(1);
     });
 
-    test('404 → InvalidTokenFailure (invitación inexistente/consumida)', () async {
-      when(
-        () => dio.post<void>(
-          '/auth/invitations/accept',
-          data: any<Object?>(named: 'data'),
-        ),
-      ).thenThrow(badResponse('/auth/invitations/accept', 404));
+    test(
+      '404 → InvalidTokenFailure (invitación inexistente/consumida)',
+      () async {
+        when(
+          () => dio.post<void>(
+            '/auth/invitations/accept',
+            data: any<Object?>(named: 'data'),
+          ),
+        ).thenThrow(badResponse('/auth/invitations/accept', 404));
 
-      await expectLater(
-        ds.acceptInvitation('bad'),
-        throwsA(isA<InvalidTokenFailure>()),
-      );
-    });
+        await expectLater(
+          ds.acceptInvitation('bad'),
+          throwsA(isA<InvalidTokenFailure>()),
+        );
+      },
+    );
 
-    test('409 → EmailMismatchFailure (sesión equivocada para la invitación)', () async {
-      // El backend devuelve 409 desnudo para ambos casos (email distinto Y ya
-      // miembro); sin discriminador de body el cliente mapea al caso más
-      // accionable (re-login con la cuenta correcta).
-      when(
-        () => dio.post<void>(
-          '/auth/invitations/accept',
-          data: any<Object?>(named: 'data'),
-        ),
-      ).thenThrow(badResponse('/auth/invitations/accept', 409));
+    test(
+      '409 → EmailMismatchFailure (sesión equivocada para la invitación)',
+      () async {
+        // El backend devuelve 409 desnudo para ambos casos (email distinto Y ya
+        // miembro); sin discriminador de body el cliente mapea al caso más
+        // accionable (re-login con la cuenta correcta).
+        when(
+          () => dio.post<void>(
+            '/auth/invitations/accept',
+            data: any<Object?>(named: 'data'),
+          ),
+        ).thenThrow(badResponse('/auth/invitations/accept', 409));
 
-      await expectLater(
-        ds.acceptInvitation('mismatch'),
-        throwsA(isA<EmailMismatchFailure>()),
-      );
-    });
+        await expectLater(
+          ds.acceptInvitation('mismatch'),
+          throwsA(isA<EmailMismatchFailure>()),
+        );
+      },
+    );
   });
 
   group('DioAuthDatasource.resendVerification', () {
-    test('204 → completa sin body (Bearer lo inyecta el interceptor)', () async {
-      when(
-        () => dio.post<void>('/auth/resend-verification'),
-      ).thenAnswer(
-        (_) async => Response<void>(
-          requestOptions: RequestOptions(path: '/auth/resend-verification'),
-          statusCode: 204,
-        ),
-      );
+    test(
+      '204 → completa sin body (Bearer lo inyecta el interceptor)',
+      () async {
+        when(() => dio.post<void>('/auth/resend-verification')).thenAnswer(
+          (_) async => Response<void>(
+            requestOptions: RequestOptions(path: '/auth/resend-verification'),
+            statusCode: 204,
+          ),
+        );
 
-      await ds.resendVerification();
+        await ds.resendVerification();
 
-      verify(() => dio.post<void>('/auth/resend-verification')).called(1);
-    });
+        verify(() => dio.post<void>('/auth/resend-verification')).called(1);
+      },
+    );
 
     test('timeout → NetworkFailure', () async {
       when(() => dio.post<void>('/auth/resend-verification')).thenThrow(

@@ -178,46 +178,48 @@ void main() {
     });
   });
 
-  group('forgotPassword / resetPassword / acceptInvitation / resendVerification',
-      () {
-    test('forgotPassword delega sin tocar storage', () async {
-      when(() => ds.forgotPassword('op@x.com')).thenAnswer((_) async {});
+  group(
+    'forgotPassword / resetPassword / acceptInvitation / resendVerification',
+    () {
+      test('forgotPassword delega sin tocar storage', () async {
+        when(() => ds.forgotPassword('op@x.com')).thenAnswer((_) async {});
 
-      await repo.forgotPassword('op@x.com');
+        await repo.forgotPassword('op@x.com');
 
-      verify(() => ds.forgotPassword('op@x.com')).called(1);
-      expect(storage.saved, isEmpty);
-    });
+        verify(() => ds.forgotPassword('op@x.com')).called(1);
+        expect(storage.saved, isEmpty);
+      });
 
-    test('resetPassword delega sin tocar storage', () async {
-      when(
-        () => ds.resetPassword(token: 't', newPassword: 'n'),
-      ).thenAnswer((_) async {});
+      test('resetPassword delega sin tocar storage', () async {
+        when(
+          () => ds.resetPassword(token: 't', newPassword: 'n'),
+        ).thenAnswer((_) async {});
 
-      await repo.resetPassword(token: 't', newPassword: 'n');
+        await repo.resetPassword(token: 't', newPassword: 'n');
 
-      verify(() => ds.resetPassword(token: 't', newPassword: 'n')).called(1);
-      expect(storage.saved, isEmpty);
-    });
+        verify(() => ds.resetPassword(token: 't', newPassword: 'n')).called(1);
+        expect(storage.saved, isEmpty);
+      });
 
-    test('acceptInvitation delega sin tocar storage', () async {
-      when(() => ds.acceptInvitation('inv')).thenAnswer((_) async {});
+      test('acceptInvitation delega sin tocar storage', () async {
+        when(() => ds.acceptInvitation('inv')).thenAnswer((_) async {});
 
-      await repo.acceptInvitation('inv');
+        await repo.acceptInvitation('inv');
 
-      verify(() => ds.acceptInvitation('inv')).called(1);
-      expect(storage.saved, isEmpty);
-    });
+        verify(() => ds.acceptInvitation('inv')).called(1);
+        expect(storage.saved, isEmpty);
+      });
 
-    test('resendVerification delega sin tocar storage', () async {
-      when(ds.resendVerification).thenAnswer((_) async {});
+      test('resendVerification delega sin tocar storage', () async {
+        when(ds.resendVerification).thenAnswer((_) async {});
 
-      await repo.resendVerification();
+        await repo.resendVerification();
 
-      verify(ds.resendVerification).called(1);
-      expect(storage.saved, isEmpty);
-    });
-  });
+        verify(ds.resendVerification).called(1);
+        expect(storage.saved, isEmpty);
+      });
+    },
+  );
 
   group('logout', () {
     test('sin tokens persistidos: no llama al datasource y no falla', () async {

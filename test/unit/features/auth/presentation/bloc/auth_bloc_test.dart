@@ -83,8 +83,7 @@ void main() {
           return AuthBloc(repo);
         },
         act: (bloc) => bloc.add(const AuthCheckRequested()),
-        expect: () =>
-            const <AuthState>[AuthAuthenticatedNoOrg(_noOrgIdentity)],
+        expect: () => const <AuthState>[AuthAuthenticatedNoOrg(_noOrgIdentity)],
       );
 
       blocTest<AuthBloc, AuthState>(

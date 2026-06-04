@@ -734,8 +734,9 @@ const Set<String> _publicRoutes = <String>{
 
 /// `true` si [loc] es una ruta pública. Match por prefijo: el path base o
 /// cualquier sub-path/query (`/reset-password?token=…`) cuenta como público.
-bool _isPublic(String loc) =>
-    _publicRoutes.any((p) => loc == p || loc.startsWith('$p/') || loc.startsWith('$p?'));
+bool _isPublic(String loc) => _publicRoutes.any(
+  (p) => loc == p || loc.startsWith('$p/') || loc.startsWith('$p?'),
+);
 
 /// Decisión de redirect en función del estado de auth y la ubicación. Pura y
 /// `static`-equivalente (top-level) para testearse sin construir el GoRouter:
