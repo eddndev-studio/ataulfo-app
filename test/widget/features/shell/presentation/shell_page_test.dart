@@ -30,11 +30,15 @@ class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
 class _MockLabelsAdminBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
     implements LabelsAdminBloc {}
 
+// emailVerified: true mantiene el aviso de verificación ausente en estas
+// pruebas de layout/navegación — su presencia/ausencia se cubre en
+// email_verification_banner_test y shell_banner_test.
 const _identity = Identity(
   userId: 'u1',
   orgId: 'o1',
   role: 'OWNER',
   email: 'op@example.com',
+  emailVerified: true,
 );
 
 void main() {

@@ -9,6 +9,7 @@ import 'package:ataulfo/features/auth/presentation/pages/forgot_password_page.da
 import 'package:ataulfo/features/auth/presentation/pages/login_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/register_page.dart';
 import 'package:ataulfo/features/auth/presentation/pages/reset_password_page.dart';
+import 'package:ataulfo/features/auth/presentation/pages/verify_email_page.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
@@ -1112,6 +1113,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ResetPasswordPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '/verify-email (ruta pública) renderiza VerifyEmailPage sin sesión',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/verify-email');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VerifyEmailPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '/verify-email se permite también con sesión (verificar logueado)',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/verify-email');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VerifyEmailPage), findsOneWidget);
     },
   );
 
