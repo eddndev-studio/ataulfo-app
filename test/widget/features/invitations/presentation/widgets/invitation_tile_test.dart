@@ -29,7 +29,9 @@ Widget _host(Widget child) => MaterialApp(
 
 void main() {
   testWidgets('pinta correo, rol y estado', (tester) async {
-    await tester.pumpWidget(_host(InvitationTile(invitation: _inv(), now: _now)));
+    await tester.pumpWidget(
+      _host(InvitationTile(invitation: _inv(), now: _now)),
+    );
 
     expect(find.text('a@x.com'), findsOneWidget);
     expect(find.widgetWithText(AppPill, 'WORKER'), findsOneWidget);
@@ -39,7 +41,9 @@ void main() {
   testWidgets('PENDING no caducada NO muestra badge de expirada', (
     tester,
   ) async {
-    await tester.pumpWidget(_host(InvitationTile(invitation: _inv(), now: _now)));
+    await tester.pumpWidget(
+      _host(InvitationTile(invitation: _inv(), now: _now)),
+    );
 
     expect(find.byKey(const Key('invitation_tile.expired')), findsNothing);
   });
@@ -92,7 +96,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _host(InvitationTile(invitation: _inv(status: 'ACCEPTED'), now: _now)),
+      _host(
+        InvitationTile(
+          invitation: _inv(status: 'ACCEPTED'),
+          now: _now,
+        ),
+      ),
     );
 
     expect(find.byKey(const Key('invitation_tile.cancel')), findsNothing);

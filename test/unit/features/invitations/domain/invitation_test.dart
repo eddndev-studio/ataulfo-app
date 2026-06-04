@@ -66,10 +66,7 @@ void main() {
     test('compara instantes aunque now sea local y expiresAt UTC', () {
       // expiresAt viene UTC del wire (sufijo Z); isAfter compara instantes.
       final inv = _inv(status: 'PENDING', expiresAt: DateTime.utc(2026, 6, 1));
-      expect(
-        inv.isExpired(DateTime.utc(2026, 6, 2).toLocal()),
-        isTrue,
-      );
+      expect(inv.isExpired(DateTime.utc(2026, 6, 2).toLocal()), isTrue);
     });
   });
 }

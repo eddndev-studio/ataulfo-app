@@ -60,7 +60,10 @@ void main() {
       when(() => dio.get<List<dynamic>>('/workspace/invitations')).thenAnswer(
         (_) async => listResp(
           200,
-          body: <dynamic>[invJson(), invJson(id: 'i2', status: 'ACCEPTED')],
+          body: <dynamic>[
+            invJson(),
+            invJson(id: 'i2', status: 'ACCEPTED'),
+          ],
         ),
       );
 
@@ -85,10 +88,7 @@ void main() {
         () => dio.get<List<dynamic>>('/workspace/invitations'),
       ).thenThrow(badResponse(403));
 
-      await expectLater(
-        ds.list(),
-        throwsA(isA<InvitationsForbiddenFailure>()),
-      );
+      await expectLater(ds.list(), throwsA(isA<InvitationsForbiddenFailure>()));
     });
 
     test('500 → Server', () async {
@@ -162,21 +162,26 @@ void main() {
       );
     });
 
-    test('500 → Server (la fila pudo guardarse; el correo pudo fallar)', () async {
-      when(
-        () => dio.post<void>(any(), data: any(named: 'data')),
-      ).thenThrow(badResponse(500));
+    test(
+      '500 → Server (la fila pudo guardarse; el correo pudo fallar)',
+      () async {
+        when(
+          () => dio.post<void>(any(), data: any(named: 'data')),
+        ).thenThrow(badResponse(500));
 
-      await expectLater(
-        ds.create('a@x.com', 'ADMIN'),
-        throwsA(isA<InvitationsServerFailure>()),
-      );
-    });
+        await expectLater(
+          ds.create('a@x.com', 'ADMIN'),
+          throwsA(isA<InvitationsServerFailure>()),
+        );
+      },
+    );
   });
 
   group('DioInvitationsDatasource.cancel', () {
     test('204 → completa y pega al path de la invitación', () async {
-      when(() => dio.delete<void>(any())).thenAnswer((_) async => voidResp(204));
+      when(
+        () => dio.delete<void>(any()),
+      ).thenAnswer((_) async => voidResp(204));
 
       await ds.cancel('i1');
 

@@ -12,8 +12,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockInvitationsBloc
-    extends MockBloc<InvitationsEvent, InvitationsState>
+class _MockInvitationsBloc extends MockBloc<InvitationsEvent, InvitationsState>
     implements InvitationsBloc {}
 
 class _MockInvitationMutationCubit extends MockCubit<InvitationMutationState>
@@ -79,9 +78,9 @@ void main() {
   testWidgets('Loaded renderiza una InvitationTile por invitación', (
     tester,
   ) async {
-    when(() => bloc.state).thenReturn(
-      InvitationsLoaded(items: <Invitation>[_pending(), _accepted]),
-    );
+    when(
+      () => bloc.state,
+    ).thenReturn(InvitationsLoaded(items: <Invitation>[_pending(), _accepted]));
 
     await tester.pumpWidget(host());
 
