@@ -173,9 +173,7 @@ void main() {
         tokenType: 'Bearer',
         expiresInSeconds: 900,
       );
-      when(
-        () => ds.createOrganization('Acme'),
-      ).thenAnswer((_) async => tokens);
+      when(() => ds.createOrganization('Acme')).thenAnswer((_) async => tokens);
 
       final got = await repo.createOrganization('Acme');
 
@@ -211,8 +209,10 @@ void main() {
         () => ds.renameOrganization(any()),
       ).thenThrow(const NetworkFailure());
 
+      // Closure: rename es un delegate síncrono (=>) y mocktail.thenThrow lanza
+      // sync al invocarse; expectLater necesita la función para atraparlo.
       await expectLater(
-        repo.renameOrganization('X'),
+        () => repo.renameOrganization('X'),
         throwsA(isA<NetworkFailure>()),
       );
     });

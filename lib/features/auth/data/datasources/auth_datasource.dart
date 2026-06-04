@@ -61,6 +61,14 @@ abstract interface class AuthDatasource {
   /// no es miembro de esa org.
   Future<AuthTokens> switchOrg(String orgId);
 
+  /// Crea una organización (`POST /auth/organizations`). Devuelve un par nuevo
+  /// con la org creada ya activa, igual que el switch-org.
+  Future<AuthTokens> createOrganization(String name);
+
+  /// Renombra la organización activa (`PATCH /workspace/organization`). 204 al
+  /// aplicar; no devuelve tokens.
+  Future<void> renameOrganization(String name);
+
   /// Acepta una invitación pendiente (`POST /auth/invitations/accept`). El
   /// backend responde 204; la nueva membership requiere un switch-org
   /// explícito. 404 ⇒ invitación inexistente/consumida; 409 ⇒ email de la
@@ -244,6 +252,41 @@ class DioAuthDatasource implements AuthDatasource {
       throw _mapStatus(e, <int, AuthFailure>{403: const NotMemberFailure()});
     } on FormatException {
       throw const UnknownAuthFailure();
+    }
+  }
+
+  @override
+  Future<AuthTokens> createOrganization(String name) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/auth/organizations',
+        data: <String, dynamic>{'name': name},
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownAuthFailure();
+      }
+      return AuthMapper.tokenRespToEntity(TokenResp.fromJson(body));
+    } on DioException catch (e) {
+      // 422 (nombre inválido) cae al genérico: la pantalla valida no-vacío, así
+      // que es defensa de borde y no merece variante propia en el sellado.
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownAuthFailure();
+    }
+  }
+
+  @override
+  Future<void> renameOrganization(String name) async {
+    try {
+      await _dio.patch<void>(
+        '/workspace/organization',
+        data: <String, dynamic>{'name': name},
+      );
+    } on DioException catch (e) {
+      // 403 (no ADMIN) y 422 (nombre inválido) son defensa de borde — el gate
+      // es cosmético y la pantalla valida — y caen al genérico.
+      throw _mapDioException(e);
     }
   }
 

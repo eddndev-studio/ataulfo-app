@@ -72,6 +72,16 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AuthTokens> createOrganization(String name) async {
+    final tokens = await _ds.createOrganization(name);
+    await _storage.save(tokens);
+    return tokens;
+  }
+
+  @override
+  Future<void> renameOrganization(String name) => _ds.renameOrganization(name);
+
+  @override
   Future<void> acceptInvitation(String token) => _ds.acceptInvitation(token);
 
   @override
