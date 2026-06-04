@@ -72,6 +72,20 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
+  testWidgets(
+    'Loading conserva "Cerrar sesión" (un /auth/memberships colgado no '
+    'encierra al operador)',
+    (tester) async {
+      when(() => memberships.state).thenReturn(const MembershipsLoading());
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.widgetWithText(AppButton, 'Cerrar sesión'));
+      await tester.pump();
+
+      verify(() => auth.add(const AuthLoggedOut())).called(1);
+    },
+  );
+
   testWidgets('Failed muestra mensaje y botón Reintentar', (tester) async {
     when(
       () => memberships.state,
