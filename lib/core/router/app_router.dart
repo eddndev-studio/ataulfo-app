@@ -54,6 +54,9 @@ import '../../features/media/domain/repositories/media_repository.dart';
 import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
 import '../../features/media/presentation/bloc/media_gallery_bloc.dart';
 import '../../features/media/presentation/pages/media_gallery_page.dart';
+import '../../features/members/domain/repositories/members_repository.dart';
+import '../../features/members/presentation/bloc/members_bloc.dart';
+import '../../features/members/presentation/pages/members_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
@@ -115,6 +118,7 @@ class AppRouter {
     required WaLabelsRepository waLabelsRepository,
     required LabelsRepository labelsRepository,
     required MembershipsRepository membershipsRepository,
+    required MembersRepository membersRepository,
     required CatalogRepository catalogRepository,
     required NotificationsRepository notificationsRepository,
     required MediaRepository mediaRepository,
@@ -133,6 +137,7 @@ class AppRouter {
        _waLabelsRepo = waLabelsRepository,
        _labelsRepo = labelsRepository,
        _membershipsRepo = membershipsRepository,
+       _membersRepo = membersRepository,
        _catalogRepo = catalogRepository,
        _notificationsRepo = notificationsRepository,
        _mediaRepo = mediaRepository,
@@ -152,6 +157,7 @@ class AppRouter {
   final WaLabelsRepository _waLabelsRepo;
   final LabelsRepository _labelsRepo;
   final MembershipsRepository _membershipsRepo;
+  final MembersRepository _membersRepo;
   final CatalogRepository _catalogRepo;
   final NotificationsRepository _notificationsRepo;
   final MediaRepository _mediaRepo;
@@ -756,6 +762,20 @@ class AppRouter {
           child: Scaffold(
             appBar: AppBar(title: const Text('Tus organizaciones')),
             body: const MembershipsPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Roster de la org activa. Entry point: tile admin-gated en SettingsPage
+        // (el gate es cosmético; el backend 403ea a roles por debajo de ADMIN).
+        // Page-scoped: el MembersBloc dispara LoadRequested al construirse.
+        path: '/members',
+        builder: (context, _) => BlocProvider<MembersBloc>(
+          create: (_) =>
+              MembersBloc(_membersRepo)..add(const MembersLoadRequested()),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Miembros')),
+            body: const MembersPage(),
           ),
         ),
       ),

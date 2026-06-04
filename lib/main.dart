@@ -33,6 +33,8 @@ import 'features/media/data/datasources/media_datasource.dart';
 import 'features/media/data/repositories/caching_media_repository.dart';
 import 'features/media/data/repositories/file_picker_media_file_picker.dart';
 import 'features/media/data/repositories/media_repository_impl.dart';
+import 'features/members/data/datasources/members_datasource.dart';
+import 'features/members/data/repositories/members_repository_impl.dart';
 import 'features/memberships/data/datasources/memberships_datasource.dart';
 import 'features/memberships/data/repositories/memberships_repository_impl.dart';
 import 'features/messages/data/datasources/messages_datasource.dart';
@@ -184,6 +186,10 @@ Future<void> main() async {
     datasource: DioMembershipsDatasource(mainDio),
   );
 
+  final membersRepository = MembersRepositoryImpl(
+    datasource: DioMembersDatasource(mainDio),
+  );
+
   final catalogRepository = CatalogRepositoryImpl(
     datasource: DioCatalogDatasource(mainDio),
   );
@@ -244,6 +250,7 @@ Future<void> main() async {
     waLabelsRepository: waLabelsRepository,
     labelsRepository: labelsRepository,
     membershipsRepository: membershipsRepository,
+    membersRepository: membersRepository,
     catalogRepository: catalogRepository,
     notificationsRepository: notificationsRepository,
     mediaRepository: mediaRepository,

@@ -14,6 +14,8 @@ import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/members/domain/entities/member.dart';
+import 'package:ataulfo/features/members/domain/repositories/members_repository.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
@@ -59,6 +61,8 @@ class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
+class _MockMembersRepo extends Mock implements MembersRepository {}
+
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
 
 class _MockMediaRepo extends Mock implements MediaRepository {}
@@ -86,6 +90,7 @@ void main() {
     final templatesRepo = _MockTemplatesRepo();
     final labelsRepo = _MockLabelsRepo();
     final membershipsRepo = _MockMembershipsRepo();
+    final membersRepo = _MockMembersRepo();
     final catalogRepo = _MockCatalogRepo();
     final notificationsRepo = _MockNotificationsRepo();
 
@@ -94,6 +99,7 @@ void main() {
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
     when(labelsRepo.listLabels).thenAnswer((_) async => const <Label>[]);
     when(membershipsRepo.list).thenAnswer((_) async => const <Membership>[]);
+    when(membersRepo.list).thenAnswer((_) async => const <Member>[]);
     when(
       catalogRepo.fetch,
     ).thenAnswer((_) async => const Catalog(providers: <ProviderEntry>[]));
@@ -117,6 +123,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
+      membersRepository: membersRepo,
       catalogRepository: catalogRepo,
       notificationsRepository: notificationsRepo,
       profileRepository: _MockProfileRepo(),
