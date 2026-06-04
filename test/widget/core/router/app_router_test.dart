@@ -1060,4 +1060,27 @@ void main() {
 
     expect(find.byType(RegisterPage), findsOneWidget);
   });
+
+  testWidgets(
+    'deep-link directo a /register + "Ya tengo cuenta" cae al login sin '
+    'reventar la pila',
+    (tester) async {
+      // Cold deep-link: /register es ruta pública, así que un usuario sin
+      // sesión puede aterrizar ahí con la pila en un solo elemento. El back
+      // no puede hacer pop (no hay a dónde) y debe ir a /login en su lugar.
+      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/register');
+      await tester.pumpAndSettle();
+      expect(find.byType(RegisterPage), findsOneWidget);
+
+      await tester.tap(find.text('Ya tengo cuenta'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(find.byType(RegisterPage), findsNothing);
+    },
+  );
 }
