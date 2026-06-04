@@ -27,6 +27,17 @@ final class MemberSheetRemove extends MemberSheetResult {
   const MemberSheetRemove();
 }
 
+/// El OWNER confirmó transferir la propiedad a este miembro (swap de roles).
+final class MemberSheetTransfer extends MemberSheetResult {
+  const MemberSheetTransfer();
+}
+
+/// El admin quiere editar los bots asignados al miembro (WORKER). La página
+/// navega al picker; no es una mutación directa.
+final class MemberSheetAssignBots extends MemberSheetResult {
+  const MemberSheetAssignBots();
+}
+
 /// Hoja de gestión de un miembro: cambiar su rol o quitarlo de la organización.
 ///
 /// El picker ofrece el set completo de roles; el backend es la autoridad sobre
@@ -39,10 +50,14 @@ class MemberEditSheet extends StatefulWidget {
     super.key,
     required this.member,
     required this.isSelf,
+    this.callerIsOwner = false,
   });
 
   final Member member;
   final bool isSelf;
+
+  /// El caller es OWNER real (no basta ADMIN): habilita transferir propiedad.
+  final bool callerIsOwner;
 
   static const List<String> roleOptions = <String>[
     'OWNER',
@@ -56,12 +71,17 @@ class MemberEditSheet extends StatefulWidget {
     BuildContext context, {
     required Member member,
     required bool isSelf,
+    bool callerIsOwner = false,
   }) {
     return showModalBottomSheet<MemberSheetResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
-      builder: (_) => MemberEditSheet(member: member, isSelf: isSelf),
+      builder: (_) => MemberEditSheet(
+        member: member,
+        isSelf: isSelf,
+        callerIsOwner: callerIsOwner,
+      ),
     );
   }
 
@@ -114,6 +134,36 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
     Navigator.of(context).pop(const MemberSheetRemove());
   }
 
+  Future<void> _confirmTransfer() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Transferir la propiedad?'),
+        content: Text(
+          '"${widget.member.email}" pasará a ser OWNER de la organización y tú '
+          'quedarás como ADMIN. Sólo el nuevo OWNER podrá revertirlo. Esta '
+          'acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('member_edit.transfer_confirm'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Transferir',
+              style: TextStyle(color: AppTokens.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    Navigator.of(context).pop(const MemberSheetTransfer());
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -163,6 +213,17 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
             fullWidth: true,
             onPressed: _changed ? _save : null,
           ),
+          // Asignar bots sólo aplica a WORKER (SUPERVISOR+ ya ve todos).
+          if (widget.member.role == 'WORKER') ...<Widget>[
+            const SizedBox(height: AppTokens.sp4),
+            AppButton.tonal(
+              key: const Key('member_edit.assign_bots'),
+              label: 'Asignar bots',
+              fullWidth: true,
+              onPressed: () =>
+                  Navigator.of(context).pop(const MemberSheetAssignBots()),
+            ),
+          ],
           if (!widget.isSelf) ...<Widget>[
             const SizedBox(height: AppTokens.sp4),
             AppButton.danger(
@@ -170,6 +231,16 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
               label: 'Quitar de la organización',
               fullWidth: true,
               onPressed: _confirmRemove,
+            ),
+          ],
+          // Transferir propiedad: sólo un OWNER real, y nunca a sí mismo.
+          if (widget.callerIsOwner && !widget.isSelf) ...<Widget>[
+            const SizedBox(height: AppTokens.sp4),
+            AppButton.danger(
+              key: const Key('member_edit.transfer'),
+              label: 'Transferir propiedad',
+              fullWidth: true,
+              onPressed: _confirmTransfer,
             ),
           ],
         ],
