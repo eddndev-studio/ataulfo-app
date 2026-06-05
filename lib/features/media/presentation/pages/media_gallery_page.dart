@@ -218,8 +218,12 @@ class _Grid extends StatelessWidget {
         // Deja aire para que el FAB no tape la última fila.
         AppTokens.sp9 + context.safeBottomInset,
       ),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+      // Columnas según el ancho disponible (no 3 fijas): en móvil da ~3, en
+      // desktop ancho llena con más sin estirar las celdas. El extent acota el
+      // tamaño máximo de cada miniatura; las celdas son cuadradas (el caption
+      // del displayName flota dentro, no añade alto).
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 140,
         mainAxisSpacing: AppTokens.sp3,
         crossAxisSpacing: AppTokens.sp3,
       ),
