@@ -26,23 +26,44 @@ class TemplateDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<VarDefsBloc, VarDefsState>(
-      // Feedback global de mutaciones de var-defs. El sheet sigue
-      // montado tras una MutationFailed (operador corrige y reintenta);
-      // el snackbar verbalízale el fallo sin tirar contexto.
-      listener: (context, state) {
-        if (state is VarDefsMutationFailed) {
-          ScaffoldMessenger.of(context)
-            ..clearSnackBars()
-            ..showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'La plantilla cambió. Recarga para ver los últimos datos.',
-                ),
-              ),
-            );
-        }
-      },
+    return MultiBlocListener(
+      listeners: <BlocListener<dynamic, dynamic>>[
+        // Feedback global de mutaciones de var-defs. El sheet sigue
+        // montado tras una MutationFailed (operador corrige y reintenta);
+        // el snackbar verbalízale el fallo sin tirar contexto.
+        BlocListener<VarDefsBloc, VarDefsState>(
+          listener: (context, state) {
+            if (state is VarDefsMutationFailed) {
+              ScaffoldMessenger.of(context)
+                ..clearSnackBars()
+                ..showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'La plantilla cambió. Recarga para ver los últimos datos.',
+                    ),
+                  ),
+                );
+            }
+          },
+        ),
+        // Feedback del borrado de flujo: la lista sigue visible, sólo la
+        // mutación falló (403 sin rol, red, etc.). Operador reintenta.
+        BlocListener<FlowsBloc, FlowsState>(
+          listener: (context, state) {
+            if (state is FlowsMutationFailed) {
+              ScaffoldMessenger.of(context)
+                ..clearSnackBars()
+                ..showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'No pudimos eliminar el flujo. Intenta de nuevo.',
+                    ),
+                  ),
+                );
+            }
+          },
+        ),
+      ],
       child: BlocBuilder<TemplateDetailBloc, TemplateDetailState>(
         builder: (context, state) => switch (state) {
           TemplateDetailLoading() => const _LoadingView(),
@@ -642,6 +663,16 @@ class _FlowsSection extends StatelessWidget {
           items: fs,
           templateId: templateId,
         ),
+        // Durante/tras una mutación fallida la lista sigue visible (no se
+        // flashea Loading); el feedback del fallo lo da el SnackBar global.
+        FlowsMutating(flows: final fs) => _FlowsList(
+          items: fs,
+          templateId: templateId,
+        ),
+        FlowsMutationFailed(flows: final fs) => _FlowsList(
+          items: fs,
+          templateId: templateId,
+        ),
         FlowsFailed() => const _FlowsFailedView(),
       },
     );
@@ -719,10 +750,47 @@ class _FlowRow extends StatelessWidget {
                 label: 'Pausado',
                 dot: AppPillDot.paused,
               ),
+            // Trash icon como acción destructiva. Su propio gesture detector
+            // absorbe el tap y no compite con el onTap del row (navegar al
+            // editor) — Flutter resuelve por proximidad del hit-test.
+            IconButton(
+              key: Key('flows.row.${flow.id}.delete'),
+              icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
+              tooltip: 'Eliminar flujo',
+              onPressed: () => _confirmDeleteFlow(context, flow),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteFlow(BuildContext context, fdom.Flow flow) async {
+    final bloc = context.read<FlowsBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('flows.delete_confirm'),
+        title: const Text('Eliminar flujo'),
+        content: Text(
+          '¿Eliminar el flujo "${flow.name}"? Se borrarán también sus pasos '
+          'y disparadores. Esta acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          AppButton.text(
+            label: 'Cancelar',
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+          ),
+          AppButton.danger(
+            label: 'Eliminar',
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      bloc.add(FlowsDeleteRequested(flow.id));
+    }
   }
 }
 
