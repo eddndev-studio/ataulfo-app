@@ -1,8 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
-import 'package:ataulfo/features/media/domain/failures/media_failure.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_preview_launcher.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_thumbnail_loader.dart';
@@ -23,15 +20,13 @@ class _FakeLoader implements MediaThumbnailLoader {
   Future<Uint8List?> load(MediaAsset asset) => _result;
 }
 
-/// Launcher fake: registra qué URL se abrió y devuelve un resultado configurable.
+/// Launcher fake: registra qué URL se abrió y reporta éxito.
 class _FakeLauncher implements MediaPreviewLauncher {
-  _FakeLauncher({this.result = true});
-  final bool result;
   final List<String> opened = <String>[];
   @override
   Future<bool> open(String url) async {
     opened.add(url);
-    return result;
+    return true;
   }
 }
 
@@ -144,7 +139,7 @@ void main() {
     await tester.pump();
 
     expect(calls, isNotEmpty);
-    expect(calls.first.arguments['text'], 'tenant/orgA/media/abc.png');
+    expect((calls.first.arguments as Map)['text'], 'tenant/orgA/media/abc.png');
     expect(find.text('Referencia copiada'), findsOneWidget);
   });
 
