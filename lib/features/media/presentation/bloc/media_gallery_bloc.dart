@@ -26,6 +26,9 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     on<MediaGalleryUploadRequested>(_onUpload);
     on<MediaGallerySearchChanged>(_onSearchChanged);
     on<MediaGalleryTypeChanged>(_onTypeChanged);
+    on<MediaGallerySelectionToggled>(_onSelectionToggled);
+    on<MediaGallerySelectionCleared>(_onSelectionCleared);
+    on<MediaGalleryDeleteSelectedRequested>(_onDeleteSelected);
   }
 
   final MediaRepository _repo;
@@ -197,6 +200,61 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
       emit(MediaGalleryFailed(f));
     }
   }
+
+  /// Alterna un ref en la selección (long-press entra al modo; tap alterna). No
+  /// toca la red. Bloqueado durante un borrado en lote.
+  void _onSelectionToggled(
+    MediaGallerySelectionToggled event,
+    Emitter<MediaGalleryState> emit,
+  ) {
+    final current = state;
+    if (current is! MediaGalleryLoaded || current.isDeleting) return;
+    final next = Set<String>.of(current.selectedRefs);
+    if (!next.add(event.ref)) next.remove(event.ref);
+    emit(current.copyWith(selectedRefs: next));
+  }
+
+  /// Vacía la selección (sale del modo selección).
+  void _onSelectionCleared(
+    MediaGallerySelectionCleared event,
+    Emitter<MediaGalleryState> emit,
+  ) {
+    final current = state;
+    if (current is! MediaGalleryLoaded) return;
+    emit(current.copyWith(selectedRefs: const <String>{}));
+  }
+
+  /// Borra en lote los refs seleccionados. El endpoint borra 1 ref/llamada, así
+  /// que iteramos. Los fallos por-ref no abortan el lote: tras intentar todos,
+  /// invalidamos y re-listamos — la lista re-traída ES la verdad (lo que no se
+  /// borró sigue ahí), y la selección se limpia. Si el re-list falla, conserva
+  /// la lista visible (no colapsa a Failed) y sale del modo.
+  Future<void> _onDeleteSelected(
+    MediaGalleryDeleteSelectedRequested event,
+    Emitter<MediaGalleryState> emit,
+  ) async {
+    final current = state;
+    if (current is! MediaGalleryLoaded ||
+        current.selectedRefs.isEmpty ||
+        current.isDeleting) {
+      return;
+    }
+    emit(current.copyWith(isDeleting: true));
+    for (final ref in current.selectedRefs) {
+      try {
+        await _repo.delete(ref);
+      } on MediaFailure {
+        // Tolerante: el re-list reflejará qué sobrevivió.
+      }
+    }
+    _repo.invalidate();
+    try {
+      final page = await _repo.listAssets(type: _type, q: _queryParam);
+      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+    } on MediaFailure {
+      emit(current.copyWith(isDeleting: false, selectedRefs: const <String>{}));
+    }
+  }
 }
 
 // Events --------------------------------------------------------------------
@@ -271,6 +329,38 @@ class MediaGalleryTypeChanged extends MediaGalleryEvent {
   int get hashCode => Object.hash(MediaGalleryTypeChanged, type);
 }
 
+/// Alterna la selección de un asset por su ref BARE (modo selección múltiple).
+class MediaGallerySelectionToggled extends MediaGalleryEvent {
+  const MediaGallerySelectionToggled(this.ref);
+
+  final String ref;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MediaGallerySelectionToggled && other.ref == ref;
+  @override
+  int get hashCode => Object.hash(MediaGallerySelectionToggled, ref);
+}
+
+/// Vacía la selección (sale del modo selección).
+class MediaGallerySelectionCleared extends MediaGalleryEvent {
+  const MediaGallerySelectionCleared();
+  @override
+  bool operator ==(Object other) => other is MediaGallerySelectionCleared;
+  @override
+  int get hashCode => (MediaGallerySelectionCleared).hashCode;
+}
+
+/// Borra en lote los assets seleccionados y re-lista.
+class MediaGalleryDeleteSelectedRequested extends MediaGalleryEvent {
+  const MediaGalleryDeleteSelectedRequested();
+  @override
+  bool operator ==(Object other) =>
+      other is MediaGalleryDeleteSelectedRequested;
+  @override
+  int get hashCode => (MediaGalleryDeleteSelectedRequested).hashCode;
+}
+
 // States --------------------------------------------------------------------
 
 sealed class MediaGalleryState {
@@ -309,6 +399,8 @@ class MediaGalleryLoaded extends MediaGalleryState {
     this.isUploading = false,
     this.isRefreshing = false,
     this.uploadError,
+    this.selectedRefs = const <String>{},
+    this.isDeleting = false,
   });
 
   final List<MediaAsset> items;
@@ -318,8 +410,19 @@ class MediaGalleryLoaded extends MediaGalleryState {
   final bool isRefreshing;
   final MediaFailure? uploadError;
 
+  /// Refs BARE seleccionados (modo selección múltiple). Vacío ⇒ no hay selección
+  /// activa. [selectionMode] lo deriva.
+  final Set<String> selectedRefs;
+
+  /// Un borrado en lote en curso (bloquea acciones y muestra progreso).
+  final bool isDeleting;
+
   /// Hay más páginas sii el cursor no está vacío. Derivado, nunca un flag.
   bool get hasMore => nextCursor.isNotEmpty;
+
+  /// El modo selección está activo sii hay al menos un ref seleccionado.
+  /// Derivado: vaciar la selección sale del modo.
+  bool get selectionMode => selectedRefs.isNotEmpty;
 
   MediaGalleryLoaded copyWith({
     List<MediaAsset>? items,
@@ -329,6 +432,8 @@ class MediaGalleryLoaded extends MediaGalleryState {
     bool? isRefreshing,
     MediaFailure? uploadError,
     bool clearUploadError = false,
+    Set<String>? selectedRefs,
+    bool? isDeleting,
   }) => MediaGalleryLoaded(
     items: items ?? this.items,
     nextCursor: nextCursor ?? this.nextCursor,
@@ -336,6 +441,8 @@ class MediaGalleryLoaded extends MediaGalleryState {
     isUploading: isUploading ?? this.isUploading,
     isRefreshing: isRefreshing ?? this.isRefreshing,
     uploadError: clearUploadError ? null : (uploadError ?? this.uploadError),
+    selectedRefs: selectedRefs ?? this.selectedRefs,
+    isDeleting: isDeleting ?? this.isDeleting,
   );
 
   @override
@@ -346,7 +453,12 @@ class MediaGalleryLoaded extends MediaGalleryState {
         other.isLoadingMore != isLoadingMore ||
         other.isUploading != isUploading ||
         other.isRefreshing != isRefreshing ||
-        other.uploadError != uploadError) {
+        other.uploadError != uploadError ||
+        other.isDeleting != isDeleting) {
+      return false;
+    }
+    if (other.selectedRefs.length != selectedRefs.length ||
+        !other.selectedRefs.containsAll(selectedRefs)) {
       return false;
     }
     if (other.items.length != items.length) return false;
@@ -364,6 +476,8 @@ class MediaGalleryLoaded extends MediaGalleryState {
     isUploading,
     isRefreshing,
     uploadError,
+    Object.hashAllUnordered(selectedRefs),
+    isDeleting,
   );
 }
 

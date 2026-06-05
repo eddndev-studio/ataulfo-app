@@ -614,6 +614,68 @@ void main() {
         expect: () => <Matcher>[],
       );
     });
+
+    group('selección múltiple', () {
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'SelectionToggled agrega y, repetido, quita el ref',
+        build: () => MediaGalleryBloc(repo: _MockRepo(), picker: _MockPicker()),
+        seed: () =>
+            MediaGalleryLoaded(items: <MediaAsset>[_a, _b], nextCursor: ''),
+        act: (b) => b
+          ..add(const MediaGallerySelectionToggled('media/a'))
+          ..add(const MediaGallerySelectionToggled('media/a')),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoaded>().having(
+            (s) => s.selectedRefs,
+            'selectedRefs',
+            <String>{'media/a'},
+          ),
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.selectedRefs, 'selectedRefs', isEmpty)
+              .having((s) => s.selectionMode, 'selectionMode', isFalse),
+        ],
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'DeleteSelectedRequested borra cada ref, re-lista y limpia selección',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(() => _lastRepo.delete(any())).thenAnswer((_) async {});
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_b], nextCursor: ''),
+          );
+          return MediaGalleryBloc(repo: _lastRepo, picker: _MockPicker());
+        },
+        seed: () => MediaGalleryLoaded(
+          items: <MediaAsset>[_a, _b],
+          nextCursor: '',
+          selectedRefs: const <String>{'media/a'},
+        ),
+        act: (b) => b.add(const MediaGalleryDeleteSelectedRequested()),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoaded>().having(
+            (s) => s.isDeleting,
+            'isDeleting',
+            isTrue,
+          ),
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.items.length, 'items', 1)
+              .having((s) => s.selectedRefs, 'selectedRefs', isEmpty)
+              .having((s) => s.isDeleting, 'isDeleting', isFalse),
+        ],
+        verify: (_) {
+          verify(() => _lastRepo.delete('media/a')).called(1);
+          verify(() => _lastRepo.invalidate()).called(1);
+        },
+      );
+    });
   });
 }
 
