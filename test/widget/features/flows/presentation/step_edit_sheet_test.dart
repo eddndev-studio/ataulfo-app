@@ -6,6 +6,8 @@ import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/widgets/step_edit_sheet.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +17,15 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockBloc extends MockBloc<FlowStepsEvent, FlowStepsState>
     implements FlowStepsBloc {}
+
+class _MockLabelsBloc extends MockBloc<LabelsEvent, LabelsState>
+    implements LabelsBloc {}
+
+Label _lbl({
+  String id = 'vip',
+  String name = 'VIP',
+  String color = '#FF8800',
+}) => Label(id: id, name: name, color: color, description: '');
 
 /// Asset de prueba con un content-type/filename dado; la previewUrl difiere del
 /// ref para verificar que sólo el ref BARE (y el filename) se persisten.
@@ -44,10 +55,17 @@ void main() {
   });
 
   late _MockBloc bloc;
+  late _MockLabelsBloc labels;
 
   setUp(() {
     bloc = _MockBloc();
     when(() => bloc.state).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+    labels = _MockLabelsBloc();
+    // Catálogo poblado por default; los tests que ejercen estados del catálogo
+    // lo sobrescriben vía `labelsState`.
+    when(
+      () => labels.state,
+    ).thenReturn(LabelsLoaded(<Label>[_lbl(id: 'vip', name: 'VIP')]));
   });
 
   // El sheet con todos los controles + form CONDITIONAL_TIME (chip
@@ -62,7 +80,11 @@ void main() {
     WidgetTester tester, {
     fdom.Step? editing,
     MediaRefPicker? pickMediaRef,
+    LabelsState? labelsState,
   }) async {
+    if (labelsState != null) {
+      when(() => labels.state).thenReturn(labelsState);
+    }
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -70,8 +92,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppDesignTheme.dark(),
-        home: BlocProvider<FlowStepsBloc>.value(
-          value: bloc,
+        home: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<FlowStepsBloc>.value(value: bloc),
+            BlocProvider<LabelsBloc>.value(value: labels),
+          ],
           child: Scaffold(
             body: SafeArea(
               child: StepEditSheet(
@@ -201,8 +226,8 @@ void main() {
 
   group('StepEditSheet (Add mode · multimedia)', () {
     testWidgets(
-      'renderiza picker con 8 chips (text + 6 multimedia + conditionalTime); '
-      'default TEXT',
+      'renderiza picker con 9 chips (text + 6 multimedia + conditionalTime + '
+      'label); default TEXT',
       (tester) async {
         await pumpHost(tester);
 
@@ -215,6 +240,7 @@ void main() {
           'ptt',
           'sticker',
           'conditionalTime',
+          'label',
         ]) {
           expect(
             find.byKey(Key('step_edit.type.$id')),
@@ -826,5 +852,118 @@ void main() {
       expect(ev.content, isNull);
       expect(ev.delayMs, isNull);
     });
+  });
+
+  group('StepEditSheet (LABEL)', () {
+    Future<void> selectLabelType(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('step_edit.type.label')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('elegir tipo LABEL muestra el form (picker + acción) y oculta '
+        'content/sliders', (tester) async {
+      await pumpHost(tester);
+      await selectLabelType(tester);
+
+      expect(find.byKey(const Key('step_edit.label_form')), findsOneWidget);
+      expect(
+        find.byKey(const Key('step_edit.label_action.add')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('step_edit.label_action.remove')),
+        findsOneWidget,
+      );
+      // LABEL no envía al wire: sin campo de content ni sliders de pacing.
+      expect(find.byKey(const Key('step_edit.content')), findsNothing);
+      expect(find.byKey(const Key('step_edit.delay_slider')), findsNothing);
+      expect(find.byKey(const Key('step_edit.jitter_slider')), findsNothing);
+    });
+
+    testWidgets('submit LABEL sin elegir etiqueta es no-op', (tester) async {
+      await pumpHost(tester);
+      await selectLabelType(tester);
+
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+      verifyNever(() => bloc.add(any()));
+    });
+
+    testWidgets('elegir etiqueta (ADD por default) → submit dispatcha '
+        'AddRequested(label, metadata {label_id, action:ADD})', (tester) async {
+      await pumpHost(tester);
+      await selectLabelType(tester);
+
+      await tester.tap(
+        find.byKey(const Key('step_edit.label_picker.option.vip')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      final captured = verify(() => bloc.add(captureAny())).captured;
+      expect(captured, hasLength(1));
+      final ev = captured.single as FlowStepsAddRequested;
+      expect(ev.type, fdom.StepType.label);
+      expect(ev.content, '');
+      expect(ev.mediaRef, '');
+      expect(ev.metadataJson, isNotNull);
+      final meta = jsonDecode(ev.metadataJson!) as Map<String, dynamic>;
+      expect(meta['label_id'], 'vip');
+      expect(meta['action'], 'ADD');
+    });
+
+    testWidgets('elegir acción "Quitar etiqueta" → metadata action:REMOVE', (
+      tester,
+    ) async {
+      await pumpHost(tester);
+      await selectLabelType(tester);
+
+      await tester.tap(
+        find.byKey(const Key('step_edit.label_picker.option.vip')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('step_edit.label_action.remove')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      final captured = verify(() => bloc.add(captureAny())).captured;
+      final ev = captured.single as FlowStepsAddRequested;
+      final meta = jsonDecode(ev.metadataJson!) as Map<String, dynamic>;
+      expect(meta['action'], 'REMOVE');
+    });
+
+    testWidgets(
+      'edit LABEL: preselecciona etiqueta+acción del metadata; sin cambios '
+      'es no-op',
+      (tester) async {
+        const editing = fdom.Step(
+          id: 's-lbl',
+          flowId: 'f1',
+          type: fdom.StepType.label,
+          order: 0,
+          content: '',
+          mediaRef: '',
+          metadataJson: '{"label_id":"vip","action":"REMOVE"}',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        );
+        await pumpHost(tester, editing: editing);
+        await tester.pumpAndSettle();
+
+        // El chip REMOVE arranca seleccionado (hidratado del metadata).
+        final removeChip = tester.widget<AppChoiceChip>(
+          find.byKey(const Key('step_edit.label_action.remove')),
+        );
+        expect(removeChip.selected, isTrue);
+
+        // Sin cambios → submit no-op (only-changed del metadata).
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+        verifyNever(() => bloc.add(any()));
+      },
+    );
   });
 }

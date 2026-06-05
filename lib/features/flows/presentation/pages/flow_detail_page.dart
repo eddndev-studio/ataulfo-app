@@ -13,10 +13,13 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../labels/domain/repositories/labels_repository.dart';
+import '../../../labels/presentation/bloc/labels_bloc.dart';
 import '../../../media/domain/entities/media_asset.dart';
 import '../../../triggers/presentation/widgets/flow_triggers_tab.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import '../../domain/entities/flow.dart' as fdom;
+import '../../domain/entities/label_step_metadata.dart';
 import '../../domain/entities/step.dart' as sdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
@@ -487,11 +490,21 @@ class _StepCard extends StatelessWidget {
 /// (tap del card).
 void _openStepSheet(BuildContext context, sdom.Step? step) {
   final bloc = context.read<FlowStepsBloc>();
+  final labelsRepo = context.read<LabelsRepository>();
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (sheetCtx) => BlocProvider<FlowStepsBloc>.value(
-      value: bloc,
+    builder: (sheetCtx) => MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<FlowStepsBloc>.value(value: bloc),
+        // LabelsBloc para el selector del paso LABEL (carga única del catálogo
+        // org-scoped). Si el usuario no elige LABEL, el bloc carga igual —
+        // barato — y se descarta al cerrar el sheet.
+        BlocProvider<LabelsBloc>(
+          create: (_) =>
+              LabelsBloc(repo: labelsRepo)..add(const LabelsLoadRequested()),
+        ),
+      ],
       // Al crear o reemplazar el recurso de un step multimedia, el selector
       // abre la galería en modo picker (`/media/pick?type=<familia>`, filtrada
       // por el tipo del paso) que devuelve el MediaAsset completo vía pop. Se
@@ -532,6 +545,18 @@ class _StepBody extends StatelessWidget {
     if (t == sdom.StepType.conditionalTime) {
       return _ConditionalTimeSummary(step: step, textTheme: textTheme);
     }
+    if (t == sdom.StepType.label) {
+      return _LabelStepSummary(step: step, textTheme: textTheme);
+    }
+    if (t == sdom.StepType.unsupported) {
+      return Text(
+        'Paso no soportado — actualiza la app para verlo.',
+        style: textTheme.bodyMedium?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: AppTokens.text2,
+        ),
+      );
+    }
     // Multimedia: IMAGE / VIDEO / DOCUMENT / AUDIO / PTT / STICKER.
     if (step.mediaRef.isEmpty) {
       return Text(
@@ -558,6 +583,65 @@ class _StepBody extends StatelessWidget {
           const SizedBox(height: AppTokens.sp1),
           Text(step.content, style: textTheme.bodyMedium),
         ],
+      ],
+    );
+  }
+}
+
+/// Resumen read-only de un paso LABEL en la StepCard: la acción
+/// (Etiquetar / Quitar etiqueta) + el id de la etiqueta. El nombre legible se
+/// resuelve al entrar al editor (el catálogo no está en scope acá); el id es
+/// honesto y distingue pasos. Metadata inválida ⇒ fallback "sin configurar".
+class _LabelStepSummary extends StatelessWidget {
+  const _LabelStepSummary({required this.step, required this.textTheme});
+
+  final sdom.Step step;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final LabelStepMetadata md;
+    try {
+      md = LabelStepMetadata.fromJsonString(step.metadataJson);
+    } on FormatException {
+      return Text(
+        'Etiqueta sin configurar',
+        style: textTheme.bodyMedium?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: AppTokens.text2,
+        ),
+      );
+    }
+    final isAdd = md.action == LabelStepAction.add;
+    return Row(
+      children: <Widget>[
+        Icon(
+          isAdd ? Icons.label_outline : Icons.label_off_outlined,
+          size: 16,
+          color: AppTokens.text2,
+        ),
+        const SizedBox(width: AppTokens.sp2),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: <TextSpan>[
+                TextSpan(
+                  text: isAdd ? 'Etiquetar · ' : 'Quitar etiqueta · ',
+                  style: textTheme.bodyMedium,
+                ),
+                TextSpan(
+                  text: md.labelId,
+                  style: textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    color: AppTokens.text2,
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }

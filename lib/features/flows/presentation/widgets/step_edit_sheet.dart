@@ -20,10 +20,12 @@ import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../media/domain/entities/media_asset.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
+import '../../domain/entities/label_step_metadata.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_steps_bloc.dart';
 import 'conditional_time_form.dart';
+import 'label_step_form.dart';
 import 'step_type_label.dart';
 
 /// Abre un selector de multimedia filtrado por [family] (image|video|audio|
@@ -86,6 +88,7 @@ const List<fdom.StepType> _pickableTypes = <fdom.StepType>[
   fdom.StepType.ptt,
   fdom.StepType.sticker,
   fdom.StepType.conditionalTime,
+  fdom.StepType.label,
 ];
 
 class _StepEditSheetState extends State<StepEditSheet> {
@@ -110,6 +113,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
   /// el form arranca con su seed default — el operador verá un warning
   /// implícito al notar que el form no refleja la config guardada.
   ConditionalTimeMetadata? _ctInitial;
+
+  /// Último `metadataJson` emitido por el form LABEL. `null` = sin etiqueta
+  /// seleccionada (gatea el submit). Solo aplica cuando `_type == label`.
+  String? _labelMetadataJson;
+
+  /// Metadata hidratada del step original al editar un LABEL; se pasa al form
+  /// como `initial`. Parse fallido ⇒ null (el form arranca sin selección).
+  LabelStepMetadata? _labelInitial;
 
   /// Nombre real del documento elegido (clave `media_filename` del metadata).
   /// Sólo aplica a DOCUMENT: el backend lo usa para `DocumentMessage.FileName`.
@@ -144,6 +155,18 @@ class _StepEditSheetState extends State<StepEditSheet> {
     if (ed != null && ed.type == fdom.StepType.document) {
       _docFilenameInitial = _filenameFromMetadata(ed.metadataJson);
       _pickedFilename = _docFilenameInitial;
+    }
+    if (ed != null && ed.type == fdom.StepType.label) {
+      try {
+        _labelInitial = LabelStepMetadata.fromJsonString(ed.metadataJson);
+        // El form re-emitirá esto en su primer frame, pero hidratamos el gate
+        // ya para que el submit arranque habilitado sin esperar al callback.
+        _labelMetadataJson = ed.metadataJson;
+      } on FormatException {
+        // metadata corrupto: el form arranca sin selección. El operador
+        // re-elige etiqueta y acción.
+        _labelInitial = null;
+      }
     }
   }
 
@@ -199,9 +222,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
   }
 
   bool get _isMultimedia =>
-      _type != fdom.StepType.text && _type != fdom.StepType.conditionalTime;
+      _type != fdom.StepType.text &&
+      _type != fdom.StepType.conditionalTime &&
+      _type != fdom.StepType.label &&
+      _type != fdom.StepType.unsupported;
 
   bool get _isConditionalTime => _type == fdom.StepType.conditionalTime;
+
+  bool get _isLabel => _type == fdom.StepType.label;
 
   List<int> _availableOrdersFromState(FlowStepsState s) =>
       _availableOrdersFromStateImpl(s, widget.editing?.id);
@@ -244,6 +272,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
   /// `metadataJson` no-null (sin días vacíos, from<to, etc.).
   bool get _isSubmittable {
     if (_isConditionalTime) return _ctMetadataJson != null;
+    if (_isLabel) return _labelMetadataJson != null;
     if (_isMultimedia) return _mediaCtrl.text.trim().isNotEmpty;
     return _contentCtrl.text.trim().isNotEmpty;
   }
@@ -259,12 +288,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
         FlowStepsAddRequested(
           type: _type,
           mediaRef: _isMultimedia ? mediaRef : '',
-          content: _isConditionalTime ? '' : content,
+          content: (_isConditionalTime || _isLabel) ? '' : content,
           delayMs: _delayMs,
           jitterPct: _jitterPct,
           aiOnly: _aiOnly,
           metadataJson: _isConditionalTime
               ? _ctMetadataJson
+              : _isLabel
+              ? _labelMetadataJson
               : _documentMetadataJson(),
         ),
       );
@@ -273,8 +304,8 @@ class _StepEditSheetState extends State<StepEditSheet> {
 
     // Modo edit: only-changed. Diff contra el editing original; si
     // nada cambió, no-op (la UI evita el round-trip).
-    final newContent = _isConditionalTime
-        ? null // CT no edita content vía sheet — el form maneja todo.
+    final newContent = (_isConditionalTime || _isLabel)
+        ? null // CT/LABEL no editan content vía sheet — su form maneja todo.
         : content != ed.content
         ? content
         : null;
@@ -303,6 +334,17 @@ class _StepEditSheetState extends State<StepEditSheet> {
         // El form gates submit con metadataJson != null, así que un
         // parse fail aquí sería bug. Lo dejamos pasar como cambio.
         newMetadata = _ctMetadataJson;
+      }
+    } else if (_isLabel && _labelMetadataJson != null) {
+      // Comparación semántica contra el original (label_id + action), para no
+      // mandar un PATCH si nada cambió.
+      try {
+        final current = LabelStepMetadata.fromJsonString(_labelMetadataJson!);
+        if (_labelInitial == null || current != _labelInitial) {
+          newMetadata = _labelMetadataJson;
+        }
+      } on FormatException {
+        newMetadata = _labelMetadataJson;
       }
     } else if (_type == fdom.StepType.document) {
       // DOCUMENT: el media_filename viaja sólo si cambió respecto al original
@@ -405,6 +447,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
                       onChanged: (json) =>
                           setState(() => _ctMetadataJson = json),
                     ),
+                  ] else if (_isLabel) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    LabelStepForm(
+                      initial: _labelInitial,
+                      enabled: !isMutating,
+                      onChanged: (json) =>
+                          setState(() => _labelMetadataJson = json),
+                    ),
                   ] else ...<Widget>[
                     if (_isMultimedia) ...<Widget>[
                       const SizedBox(height: AppTokens.sp4),
@@ -439,34 +489,39 @@ class _StepEditSheetState extends State<StepEditSheet> {
                       maxLines: 4,
                     ),
                   ],
-                  const SizedBox(height: AppTokens.sp4),
-                  _SliderField(
-                    sliderKey: const Key('step_edit.delay_slider'),
-                    label: 'Retraso',
-                    valueLabel: _delaySecondsLabel(_delayMs),
-                    helper:
-                        'Cuánto espera el bot antes de enviar el paso (0–5 min).',
-                    value: _delayMs.toDouble(),
-                    min: 0,
-                    max: _maxDelayMs.toDouble(),
-                    divisions: 60,
-                    enabled: !isMutating,
-                    onChanged: (v) => setState(() => _delayMs = v.round()),
-                  ),
-                  const SizedBox(height: AppTokens.sp4),
-                  _SliderField(
-                    sliderKey: const Key('step_edit.jitter_slider'),
-                    label: 'Variación',
-                    valueLabel: '$_jitterPct%',
-                    helper:
-                        'Aleatoriedad sobre el retraso para sonar humano (±%).',
-                    value: _jitterPct.toDouble(),
-                    min: 0,
-                    max: _maxJitterPct.toDouble(),
-                    divisions: _maxJitterPct,
-                    enabled: !isMutating,
-                    onChanged: (v) => setState(() => _jitterPct = v.round()),
-                  ),
+                  // delay/jitter son pacing del envío al wire: un paso LABEL no
+                  // envía nada (side-effect invisible), así que sus sliders no
+                  // aplican y se ocultan.
+                  if (!_isLabel) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    _SliderField(
+                      sliderKey: const Key('step_edit.delay_slider'),
+                      label: 'Retraso',
+                      valueLabel: _delaySecondsLabel(_delayMs),
+                      helper:
+                          'Cuánto espera el bot antes de enviar el paso (0–5 min).',
+                      value: _delayMs.toDouble(),
+                      min: 0,
+                      max: _maxDelayMs.toDouble(),
+                      divisions: 60,
+                      enabled: !isMutating,
+                      onChanged: (v) => setState(() => _delayMs = v.round()),
+                    ),
+                    const SizedBox(height: AppTokens.sp4),
+                    _SliderField(
+                      sliderKey: const Key('step_edit.jitter_slider'),
+                      label: 'Variación',
+                      valueLabel: '$_jitterPct%',
+                      helper:
+                          'Aleatoriedad sobre el retraso para sonar humano (±%).',
+                      value: _jitterPct.toDouble(),
+                      min: 0,
+                      max: _maxJitterPct.toDouble(),
+                      divisions: _maxJitterPct,
+                      enabled: !isMutating,
+                      onChanged: (v) => setState(() => _jitterPct = v.round()),
+                    ),
+                  ],
                   const SizedBox(height: AppTokens.sp4),
                   Row(
                     key: const Key('step_edit.ai_only_switch'),
