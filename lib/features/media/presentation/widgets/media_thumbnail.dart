@@ -67,22 +67,68 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
         onTap: widget.onTap,
         child: AspectRatio(
           aspectRatio: 1,
-          child: FutureBuilder<Uint8List?>(
-            future: _bytes,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return _loading();
-              }
-              final bytes = snapshot.data;
-              if (bytes == null) return _placeholder();
-              return Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                // Bytes corruptos (o no-imagen, p. ej. un PDF): mismo placeholder
-                // en vez del ícono roto de Flutter.
-                errorBuilder: (_, _, _) => _placeholder(),
-              );
-            },
+          // El visual (imagen/placeholder/spinner) llena la celda; el caption
+          // con el displayName flota abajo sobre un scrim para ser legible sea
+          // cual sea el contenido. Misma rotulación en todos los tipos: el
+          // alias (o filename) identifica el asset sin abrir el detalle.
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              FutureBuilder<Uint8List?>(
+                future: _bytes,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return _loading();
+                  }
+                  final bytes = snapshot.data;
+                  if (bytes == null) return _placeholder();
+                  return Image.memory(
+                    bytes,
+                    fit: BoxFit.cover,
+                    // Bytes corruptos (o no-imagen, p. ej. un PDF): mismo
+                    // placeholder en vez del ícono roto de Flutter.
+                    errorBuilder: (_, _, _) => _placeholder(),
+                  );
+                },
+              ),
+              _caption(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Caption inferior con el [MediaAsset.displayName] (alias o, si vacío,
+  /// filename) sobre un scrim degradado para legibilidad sobre cualquier
+  /// imagen. Vacío ⇒ no se pinta nada.
+  Widget _caption() {
+    final name = widget.asset.displayName.trim();
+    if (name.isEmpty) return const SizedBox.shrink();
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp2,
+          vertical: AppTokens.sp1,
+        ),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[Color(0x00000000), Color(0xCC000000)],
+          ),
+        ),
+        child: Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -101,44 +147,23 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
   );
 
   /// Placeholder cuando no hay bytes que pintar: un ícono según el tipo de
-  /// contenido sobre la superficie de la card. Para documentos añade el filename
-  /// bajo el ícono (un PDF/Office no tiene miniatura, así que el nombre es la
-  /// única identidad visual útil); para imagen/video/audio el ícono basta
-  /// (las miniaturas reales de video/audio quedan diferidas).
+  /// contenido sobre la superficie de la card. El nombre del asset NO va aquí
+  /// (lo aporta el caption inferior común a todas las miniaturas); las
+  /// miniaturas reales de video/audio quedan diferidas, así que el ícono es la
+  /// identidad visual del tipo.
   Widget _placeholder() {
     final asset = widget.asset;
-    final name = asset.filename.trim();
-    final showName = _isDocument(asset.contentType) && name.isNotEmpty;
     return Container(
       key: Key('media_thumbnail.placeholder.${asset.ref}'),
       color: AppTokens.surface2,
-      padding: const EdgeInsets.all(AppTokens.sp2),
       alignment: Alignment.center,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(_iconFor(asset.contentType), color: AppTokens.text2, size: 28),
-          if (showName) ...<Widget>[
-            const SizedBox(height: AppTokens.sp1),
-            Text(
-              name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppTokens.text2, fontSize: 10),
-            ),
-          ],
-        ],
+      child: Icon(
+        _iconFor(asset.contentType),
+        color: AppTokens.text2,
+        size: 28,
       ),
     );
   }
-
-  /// Familia "documento": application/* y text/* (PDF, Office, texto/CSV). Es la
-  /// única familia cuya miniatura no es renderizable, así que se etiqueta con el
-  /// nombre del archivo.
-  static bool _isDocument(String contentType) =>
-      contentType.startsWith('application/') || contentType.startsWith('text/');
 
   /// Ícono representativo por familia de `contentType`. Un tipo no catalogado
   /// cae al genérico de archivo.

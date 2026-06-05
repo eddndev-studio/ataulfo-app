@@ -53,10 +53,12 @@ final _png1x1 = Uint8List.fromList(<int>[
 MediaAsset _asset({
   String contentType = 'image/png',
   String filename = 'foto.png',
+  String alias = '',
 }) => MediaAsset(
   ref: 'tenant/o/media/x',
   previewUrl: 'https://x/sig',
   filename: filename,
+  alias: alias,
   contentType: contentType,
   size: 1,
   createdAt: DateTime.utc(2026, 1, 1),
@@ -113,6 +115,35 @@ void main() {
 
     expect(find.byIcon(Icons.picture_as_pdf_outlined), findsOneWidget);
     expect(find.text('informe-q3.pdf'), findsOneWidget);
+  });
+
+  testWidgets('caption muestra el displayName (alias) sobre la miniatura', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        _asset(alias: 'Mi logo', filename: 'IMG_2231.png'),
+        _FakeLoader(Future<Uint8List?>.value(_png1x1)),
+      ),
+    );
+    await tester.pump();
+
+    // La imagen se pinta y el caption rotula con el alias (no el filename).
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.text('Mi logo'), findsOneWidget);
+    expect(find.text('IMG_2231.png'), findsNothing);
+  });
+
+  testWidgets('caption cae al filename cuando no hay alias', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        _asset(filename: 'foto.png'),
+        _FakeLoader(Future<Uint8List?>.value(_png1x1)),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('foto.png'), findsOneWidget);
   });
 
   testWidgets('mientras el loader está pendiente ⇒ spinner', (tester) async {

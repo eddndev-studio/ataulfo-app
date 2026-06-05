@@ -97,6 +97,25 @@ void main() {
     expect(find.byType(MediaThumbnail), findsNWidgets(2));
   });
 
+  testWidgets('el grid usa columnas responsivas (MaxCrossAxisExtent)', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      MediaGalleryLoaded(
+        items: <MediaAsset>[_asset('media/a', previewUrl: 'https://signed/a')],
+        nextCursor: '',
+      ),
+    );
+    await tester.pumpWidget(host());
+
+    final grid = tester.widget<GridView>(find.byType(GridView));
+    expect(
+      grid.gridDelegate,
+      isA<SliverGridDelegateWithMaxCrossAxisExtent>(),
+      reason: 'columnas según ancho (desktop ancho ⇒ más columnas), no 3 fijas',
+    );
+  });
+
   testWidgets('Loaded vacío muestra empty state (sin miniaturas)', (
     tester,
   ) async {
@@ -245,8 +264,11 @@ void main() {
   testWidgets(
     'hasMore + scroll al fondo dispara MediaGalleryLoadMoreRequested',
     (tester) async {
+      // Suficientes filas para que el grid scrollee con CUALQUIER nº de
+      // columnas (el delegate responsivo da más columnas en superficies anchas,
+      // así que 20 ítems cabrían sin scroll en 800px de test).
       final items = List<MediaAsset>.generate(
-        20,
+        60,
         (i) => _asset('media/$i', previewUrl: null),
       );
       when(
