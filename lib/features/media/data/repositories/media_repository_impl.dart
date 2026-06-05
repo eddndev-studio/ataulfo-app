@@ -24,6 +24,9 @@ class MediaRepositoryImpl implements MediaRepository {
       _ds.listAssets(cursor: cursor, limit: limit, type: type);
 
   @override
+  Future<void> delete(String ref) => _ds.delete(ref);
+
+  @override
   void invalidate() {
     // Sin estado local: nada que descartar.
   }

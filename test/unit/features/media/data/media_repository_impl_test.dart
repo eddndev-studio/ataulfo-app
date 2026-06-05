@@ -51,6 +51,14 @@ void main() {
     verify(() => ds.listAssets(cursor: 'c', limit: 10)).called(1);
   });
 
+  test('delete delega al datasource con el ref', () async {
+    when(() => ds.delete(any())).thenAnswer((_) async {});
+
+    await repo.delete('tenant/org/media/x.png');
+
+    verify(() => ds.delete('tenant/org/media/x.png')).called(1);
+  });
+
   test('invalidate es no-op: no toca el datasource ni lanza', () {
     expect(repo.invalidate, returnsNormally);
     verifyZeroInteractions(ds);

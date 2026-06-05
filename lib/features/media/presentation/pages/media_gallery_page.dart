@@ -18,7 +18,12 @@ import '../widgets/media_thumbnail.dart';
 /// y el bloc decide si hay algo que cargar. El callback [onSelect] (opcional)
 /// permite reusar la pantalla como picker: recibe el [MediaAsset] completo.
 class MediaGalleryPage extends StatelessWidget {
-  const MediaGalleryPage({super.key, required this.loader, this.onSelect});
+  const MediaGalleryPage({
+    super.key,
+    required this.loader,
+    this.onSelect,
+    this.onOpenDetail,
+  });
 
   /// Resuelve los bytes de cada miniatura (cache local por ref → red). Inyectado
   /// desde la composición para que el cache de bytes sea un singleton de sesión.
@@ -27,9 +32,15 @@ class MediaGalleryPage extends StatelessWidget {
   /// Selección de un asset (picker). Recibe el [MediaAsset] completo (ref +
   /// content_type + filename) para que el caller alinee tipo↔asset y persista
   /// el filename del documento. El CONSUMIDOR debe usar `asset.ref` (BARE) como
-  /// identidad y NUNCA persistir `asset.previewUrl` (firmada efímera). Null ⇒ la
-  /// galería es sólo visor.
+  /// identidad y NUNCA persistir `asset.previewUrl` (firmada efímera). Null ⇒ no
+  /// es picker (modo browse: ver [onOpenDetail]).
   final ValueChanged<MediaAsset>? onSelect;
+
+  /// Abre el detalle de un asset (modo browse). Devuelve `true` si el detalle
+  /// reportó un cambio (borrado/renombrado) ⇒ la galería se refresca. Tiene
+  /// prioridad menor que [onSelect]: si hay picker, el tap selecciona. Null y sin
+  /// [onSelect] ⇒ la galería es sólo visor (tap inerte).
+  final Future<bool> Function(MediaAsset asset)? onOpenDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +63,7 @@ class MediaGalleryPage extends StatelessWidget {
           MediaGalleryLoaded() => _LoadedView(
             state: state,
             onSelect: onSelect,
+            onOpenDetail: onOpenDetail,
             loader: loader,
           ),
           MediaGalleryFailed() => const _FailedView(),
@@ -111,11 +123,13 @@ class _LoadedView extends StatefulWidget {
   const _LoadedView({
     required this.state,
     required this.onSelect,
+    required this.onOpenDetail,
     required this.loader,
   });
 
   final MediaGalleryLoaded state;
   final ValueChanged<MediaAsset>? onSelect;
+  final Future<bool> Function(MediaAsset asset)? onOpenDetail;
   final MediaThumbnailLoader loader;
 
   @override
@@ -176,6 +190,7 @@ class _LoadedViewState extends State<_LoadedView> {
                   controller: _controller,
                   state: state,
                   onSelect: widget.onSelect,
+                  onOpenDetail: widget.onOpenDetail,
                   loader: widget.loader,
                 ),
         ),
@@ -194,12 +209,14 @@ class _Grid extends StatelessWidget {
     required this.controller,
     required this.state,
     required this.onSelect,
+    required this.onOpenDetail,
     required this.loader,
   });
 
   final ScrollController controller;
   final MediaGalleryLoaded state;
   final ValueChanged<MediaAsset>? onSelect;
+  final Future<bool> Function(MediaAsset asset)? onOpenDetail;
   final MediaThumbnailLoader loader;
 
   @override
@@ -246,12 +263,29 @@ class _Grid extends StatelessWidget {
         return MediaThumbnail(
           asset: asset,
           loader: loader,
-          // El picker recibe el MediaAsset completo; el consumidor extrae el ref
-          // BARE (identidad) y el filename, nunca persiste la previewUrl.
-          onTap: onSelect == null ? null : () => onSelect!(asset),
+          onTap: _tapHandler(context, asset),
         );
       },
     );
+  }
+
+  /// Gesto del tap según el modo. Picker ([onSelect]): selecciona (el consumidor
+  /// usa `asset.ref` BARE, nunca persiste la previewUrl). Browse ([onOpenDetail]):
+  /// abre el detalle y, si reportó un cambio (borrado/renombrado), refresca la
+  /// galería. Sin ninguno ⇒ tap inerte (sólo visor). El `context` aquí está bajo
+  /// el [MediaGalleryBloc], así que puede despachar el refresh.
+  VoidCallback? _tapHandler(BuildContext context, MediaAsset asset) {
+    if (onSelect != null) return () => onSelect!(asset);
+    final open = onOpenDetail;
+    if (open == null) return null;
+    return () async {
+      final changed = await open(asset);
+      if (changed && context.mounted) {
+        context.read<MediaGalleryBloc>().add(
+          const MediaGalleryRefreshRequested(),
+        );
+      }
+    };
   }
 }
 

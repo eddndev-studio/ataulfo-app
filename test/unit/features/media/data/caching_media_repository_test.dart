@@ -246,6 +246,49 @@ void main() {
       },
     );
 
+    test(
+      'delete delega al inner y limpia la primera página cacheada',
+      () async {
+        stubList(_page(<String>['media/a']));
+        when(() => inner.delete(any())).thenAnswer((_) async {});
+        final repo = build();
+
+        await repo.listAssets(type: 'image'); // inner list (1)
+        await repo.delete('media/a');
+        await repo.listAssets(type: 'image'); // miss → inner list (2)
+
+        verify(() => inner.delete('media/a')).called(1);
+        verify(
+          () => inner.listAssets(
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+            type: 'image',
+          ),
+        ).called(2);
+      },
+    );
+
+    test('delete fallido NO invalida (el catálogo no cambió)', () async {
+      stubList(_page(<String>['media/a']));
+      when(() => inner.delete(any())).thenThrow(const MediaNotFoundFailure());
+      final repo = build();
+
+      await repo.listAssets(type: 'image'); // inner list (1)
+      await expectLater(
+        repo.delete('media/a'),
+        throwsA(isA<MediaNotFoundFailure>()),
+      );
+      await repo.listAssets(type: 'image'); // sigue cacheado: sin inner extra
+
+      verify(
+        () => inner.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: 'image',
+        ),
+      ).called(1);
+    });
+
     test('subida fallida NO invalida (el catálogo no cambió)', () async {
       stubList(_page(<String>['media/a']));
       when(
