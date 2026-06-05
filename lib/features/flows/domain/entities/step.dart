@@ -1,13 +1,18 @@
-/// Tipo de un Step dentro de un Flow (S11). 8 valores espejo del backend
+/// Tipo de un Step dentro de un Flow (S11). Espejo del backend
 /// (`ataulfo-go/internal/domain/flow/step.go`):
 /// - 6 multimedia/contenido directo: TEXT, IMAGE, VIDEO, DOCUMENT, AUDIO,
 ///   PTT, STICKER.
 /// - 1 ramificación: CONDITIONAL_TIME (evalúa ventanas horarias para
 ///   bifurcar el flow).
+/// - 1 acción: LABEL (aplica/quita una etiqueta interna sobre el chat;
+///   su payload vive en metadata `{label_id, action}`).
 ///
-/// Política de wire: tokens **UPPERCASE** canonical (refleja el wire
-/// actual del backend, no se silencia). Cualquier token con casing
-/// distinto o fuera del set es drift de contrato y rompe fail-loud.
+/// Política de wire: tokens **UPPERCASE** canonical. Un token que esta
+/// versión de la app no conoce (un tipo futuro del backend, o casing
+/// distinto) degrada a [unsupported] en vez de romper la carga del flujo:
+/// el paso se renderiza como "actualiza la app" y los demás se preservan.
+/// Es la ÚNICA excepción a la política fail-loud, acotada a StepType — un
+/// flujo no debe volverse inabrible por un tipo de paso nuevo.
 enum StepType {
   text,
   image,
@@ -16,7 +21,13 @@ enum StepType {
   audio,
   ptt,
   sticker,
-  conditionalTime;
+  conditionalTime,
+  label,
+
+  /// Centinela para un token de wire desconocido. No se crea desde la UI
+  /// (no está en el picker) ni se serializa (toWire lanza): solo aparece al
+  /// LEER un flujo con un tipo que esta versión no soporta.
+  unsupported;
 
   static StepType fromWire(String raw) => switch (raw) {
     'TEXT' => StepType.text,
@@ -27,7 +38,8 @@ enum StepType {
     'PTT' => StepType.ptt,
     'STICKER' => StepType.sticker,
     'CONDITIONAL_TIME' => StepType.conditionalTime,
-    _ => throw ArgumentError.value(raw, 'StepType.fromWire'),
+    'LABEL' => StepType.label,
+    _ => StepType.unsupported,
   };
 
   String toWire() => switch (this) {
@@ -39,6 +51,12 @@ enum StepType {
     StepType.ptt => 'PTT',
     StepType.sticker => 'STICKER',
     StepType.conditionalTime => 'CONDITIONAL_TIME',
+    StepType.label => 'LABEL',
+    StepType.unsupported => throw ArgumentError.value(
+      this,
+      'StepType.toWire',
+      'unsupported no tiene token de wire',
+    ),
   };
 }
 

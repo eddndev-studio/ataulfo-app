@@ -155,7 +155,10 @@ class _StepEditSheetState extends State<StepEditSheet> {
     fdom.StepType.video => 'video',
     fdom.StepType.audio || fdom.StepType.ptt => 'audio',
     fdom.StepType.document => 'document',
-    fdom.StepType.text || fdom.StepType.conditionalTime => null,
+    fdom.StepType.text ||
+    fdom.StepType.conditionalTime ||
+    fdom.StepType.label ||
+    fdom.StepType.unsupported => null,
   };
 
   /// Extrae `media_filename` de un metadata JSON (objeto). Ausente/corrupto ⇒

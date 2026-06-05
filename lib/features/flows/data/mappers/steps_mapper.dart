@@ -2,9 +2,9 @@ import '../../domain/entities/step.dart' as fdom;
 import '../dto/step_dto.dart';
 
 /// Traduce DTOs del listado de steps a entidades de dominio.
-/// El ArgumentError del `StepType.fromWire` se propaga sin envolver — el
-/// drift de contrato (un tipo nuevo en el backend que el cliente no
-/// conoce) rompe en boot en vez de degradar a un failure reintentable.
+/// Un `type` que el cliente no conoce (tipo futuro del backend) degrada a
+/// `StepType.unsupported` vía `fromWire` — el flujo carga igual y el paso se
+/// renderiza como "actualiza la app", sin perder los demás pasos.
 class StepsMapper {
   const StepsMapper._();
 
