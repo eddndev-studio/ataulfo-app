@@ -831,6 +831,104 @@ void main() {
     );
   });
 
+  // ── Sección Flujos · borrado de flujo (#5) ─────────────────────────────────
+  group('Sección Flujos · borrado de flujo', () {
+    const seeded = <flows.Flow>[
+      flows.Flow(
+        id: 'f1',
+        templateId: 't-1',
+        name: 'Bienvenida',
+        isActive: true,
+        version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
+      ),
+    ];
+
+    testWidgets('Loaded con flujos: cada row expone botón borrar', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(seeded));
+
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.row.f1.delete')));
+
+      expect(find.byKey(const Key('flows.row.f1.delete')), findsOneWidget);
+    });
+
+    testWidgets('tap borrar abre confirm dialog (no dispatch inmediato)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(seeded));
+
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.row.f1.delete')));
+      await tester.tap(find.byKey(const Key('flows.row.f1.delete')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('flows.delete_confirm')), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Cancelar'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Eliminar'), findsOneWidget);
+      verifyNever(() => flowsBloc.add(any()));
+    });
+
+    testWidgets('tap Cancelar: cierra el dialog, no dispatcha', (tester) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(seeded));
+
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.row.f1.delete')));
+      await tester.tap(find.byKey(const Key('flows.row.f1.delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('flows.delete_confirm')), findsNothing);
+      verifyNever(() => flowsBloc.add(any()));
+    });
+
+    testWidgets('tap Eliminar: dispatcha FlowsDeleteRequested + cierra', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(seeded));
+
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('flows.row.f1.delete')));
+      await tester.tap(find.byKey(const Key('flows.row.f1.delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      verify(() => flowsBloc.add(const FlowsDeleteRequested('f1'))).called(1);
+      expect(find.byKey(const Key('flows.delete_confirm')), findsNothing);
+    });
+
+    testWidgets('FlowsMutationFailed muestra SnackBar de feedback', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+      final controller = StreamController<FlowsState>.broadcast();
+      addTearDown(controller.close);
+      whenListen<FlowsState>(
+        flowsBloc,
+        controller.stream,
+        initialState: const FlowsLoaded(seeded),
+      );
+
+      await tester.pumpWidget(host());
+      controller.add(
+        const FlowsMutationFailed(seeded, FlowsForbiddenFailure()),
+      );
+      await tester.pump();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+    });
+  });
+
   // ── Botón "Crear bot" (mini-S04a) ──────────────────────────────────────────
   group('botón Crear bot', () {
     setUp(() {
