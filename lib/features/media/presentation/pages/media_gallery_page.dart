@@ -314,6 +314,9 @@ class _LoadedViewState extends State<_LoadedView> {
         // borrar en lote. Sustituye al FAB de subida mientras está activa.
         if (state.selectionMode)
           _SelectionBar(count: state.selectedRefs.length),
+        // Progreso de subida en lote: "Subiendo N de M…" + barra.
+        if (state.uploadTotal > 0)
+          _UploadProgressBar(done: state.uploadDone, total: state.uploadTotal),
         Expanded(
           child: Stack(
             children: <Widget>[
@@ -363,6 +366,46 @@ class _LoadedViewState extends State<_LoadedView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Barra de progreso de una subida en lote: "Subiendo N de M…" + barra. La
+/// barra es indeterminada hasta el primer archivo (done 0), luego proporcional.
+class _UploadProgressBar extends StatelessWidget {
+  const _UploadProgressBar({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTokens.surface3,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp4,
+              vertical: AppTokens.sp2,
+            ),
+            child: Row(
+              children: <Widget>[
+                Text(
+                  'Subiendo $done de $total…',
+                  style: const TextStyle(color: AppTokens.text1),
+                ),
+              ],
+            ),
+          ),
+          LinearProgressIndicator(
+            value: done == 0 ? null : done / total,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppTokens.primary),
+            backgroundColor: AppTokens.surface2,
+          ),
+        ],
+      ),
     );
   }
 }

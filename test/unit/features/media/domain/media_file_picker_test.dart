@@ -12,6 +12,10 @@ class _FakePicker implements MediaFilePicker {
   final PickedMedia? _result;
   @override
   Future<PickedMedia?> pick() async => _result;
+
+  @override
+  Future<List<PickedMedia>> pickMultiple() async =>
+      _result == null ? const <PickedMedia>[] : <PickedMedia>[_result];
 }
 
 void main() {

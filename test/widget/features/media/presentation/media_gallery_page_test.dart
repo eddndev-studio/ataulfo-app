@@ -397,6 +397,24 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('subida en lote muestra el progreso "Subiendo N de M"', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const MediaGalleryLoaded(
+        items: <MediaAsset>[],
+        nextCursor: '',
+        isUploading: true,
+        uploadTotal: 3,
+        uploadDone: 1,
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+    expect(find.text('Subiendo 1 de 3…'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+  });
+
   testWidgets('FAB de subida dispara MediaGalleryUploadRequested', (
     tester,
   ) async {

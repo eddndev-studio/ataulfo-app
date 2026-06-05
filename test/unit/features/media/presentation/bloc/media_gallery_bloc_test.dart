@@ -401,7 +401,9 @@ void main() {
         build: () {
           _lastRepo = _MockRepo();
           final picker = _MockPicker();
-          when(() => picker.pick()).thenAnswer((_) async => null);
+          when(
+            () => picker.pickMultiple(),
+          ).thenAnswer((_) async => const <PickedMedia>[]);
           return build(_lastRepo, picker);
         },
         seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: ''),
@@ -422,7 +424,9 @@ void main() {
         build: () {
           final repo = _MockRepo();
           final picker = _MockPicker();
-          when(() => picker.pick()).thenAnswer((_) async => _picked);
+          when(
+            () => picker.pickMultiple(),
+          ).thenAnswer((_) async => <PickedMedia>[_picked]);
           when(
             () => repo.upload(
               bytes: any(named: 'bytes'),
@@ -449,6 +453,14 @@ void main() {
             items: <MediaAsset>[_a],
             nextCursor: '',
             isUploading: true,
+            uploadTotal: 1,
+          ),
+          MediaGalleryLoaded(
+            items: <MediaAsset>[_a],
+            nextCursor: '',
+            isUploading: true,
+            uploadTotal: 1,
+            uploadDone: 1,
           ),
           MediaGalleryLoaded(items: <MediaAsset>[_c, _a], nextCursor: ''),
         ],
@@ -459,7 +471,9 @@ void main() {
         build: () {
           _lastRepo = _MockRepo();
           final picker = _MockPicker();
-          when(() => picker.pick()).thenAnswer((_) async => _picked);
+          when(
+            () => picker.pickMultiple(),
+          ).thenAnswer((_) async => <PickedMedia>[_picked]);
           when(
             () => _lastRepo.upload(
               bytes: any(named: 'bytes'),
@@ -490,42 +504,105 @@ void main() {
       );
 
       blocTest<MediaGalleryBloc, MediaGalleryState>(
-        'fallo de subida: uploadError transitorio en Loaded, NO Failed (lista intacta)',
+        'fallo de subida: re-lista (verdad) y uploadError transitorio, NO Failed',
         build: () {
           _lastRepo = _MockRepo();
           final picker = _MockPicker();
-          when(() => picker.pick()).thenAnswer((_) async => _picked);
+          when(
+            () => picker.pickMultiple(),
+          ).thenAnswer((_) async => <PickedMedia>[_picked]);
           when(
             () => _lastRepo.upload(
               bytes: any(named: 'bytes'),
               filename: any(named: 'filename'),
             ),
           ).thenThrow(const MediaTooLargeFailure());
+          // El lote SIEMPRE re-lista al final (verdad: qué sí subió). Aquí nada
+          // subió, así que la lista re-traída es la previa.
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
+          );
           return build(_lastRepo, picker);
         },
         seed: () =>
             MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: 'cur-1'),
         act: (b) => b.add(const MediaGalleryUploadRequested()),
-        expect: () => <MediaGalleryState>[
-          MediaGalleryLoaded(
-            items: <MediaAsset>[_a],
-            nextCursor: 'cur-1',
-            isUploading: true,
-          ),
-          MediaGalleryLoaded(
-            items: <MediaAsset>[_a],
-            nextCursor: 'cur-1',
-            uploadError: const MediaTooLargeFailure(),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.isUploading, 'isUploading', isTrue)
+              .having((s) => s.uploadDone, 'uploadDone', 0),
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.isUploading, 'isUploading', isTrue)
+              .having((s) => s.uploadDone, 'uploadDone', 1),
+          isA<MediaGalleryLoaded>().having(
+            (s) => s.uploadError,
+            'uploadError',
+            isA<MediaTooLargeFailure>(),
           ),
         ],
-        verify: (_) {
-          // En fallo de subida no se re-lista.
-          verifyNever(
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'multi-archivo: sube cada uno con progreso y re-lista una vez',
+        build: () {
+          _lastRepo = _MockRepo();
+          final picker = _MockPicker();
+          when(
+            () => picker.pickMultiple(),
+          ).thenAnswer((_) async => <PickedMedia>[_picked, _picked]);
+          when(
+            () => _lastRepo.upload(
+              bytes: any(named: 'bytes'),
+              filename: any(named: 'filename'),
+            ),
+          ).thenAnswer(
+            (_) async => const UploadedMedia(ref: 'media/c', previewUrl: null),
+          );
+          when(
             () => _lastRepo.listAssets(
               cursor: any(named: 'cursor'),
               limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
             ),
+          ).thenAnswer(
+            (_) async =>
+                MediaPage(assets: <MediaAsset>[_c, _a], nextCursor: ''),
           );
+          return build(_lastRepo, picker);
+        },
+        seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: ''),
+        act: (b) => b.add(const MediaGalleryUploadRequested()),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.uploadTotal, 'uploadTotal', 2)
+              .having((s) => s.uploadDone, 'uploadDone', 0),
+          isA<MediaGalleryLoaded>().having(
+            (s) => s.uploadDone,
+            'uploadDone',
+            1,
+          ),
+          isA<MediaGalleryLoaded>().having(
+            (s) => s.uploadDone,
+            'uploadDone',
+            2,
+          ),
+          isA<MediaGalleryLoaded>().having((s) => s.items.length, 'items', 2),
+        ],
+        verify: (_) {
+          verify(
+            () => _lastRepo.upload(
+              bytes: any(named: 'bytes'),
+              filename: any(named: 'filename'),
+            ),
+          ).called(2);
         },
       );
     });

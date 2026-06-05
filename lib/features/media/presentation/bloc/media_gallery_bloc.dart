@@ -121,28 +121,64 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     MediaGalleryUploadRequested event,
     Emitter<MediaGalleryState> emit,
   ) async {
-    final picked = await _picker.pick();
-    // Cancelación: no-op. No subimos ni tocamos el estado.
-    if (picked == null) return;
+    final picked = await _picker.pickMultiple();
+    // Cancelación / sin archivos: no-op.
+    if (picked.isEmpty) return;
 
     final current = state;
     final base = current is MediaGalleryLoaded
         ? current
         : const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: '');
-    emit(base.copyWith(isUploading: true, clearUploadError: true));
+    final total = picked.length;
+    emit(
+      base.copyWith(
+        isUploading: true,
+        uploadTotal: total,
+        uploadDone: 0,
+        clearUploadError: true,
+      ),
+    );
+    // Subida secuencial con progreso. Un archivo que falla NO aborta el lote:
+    // guardamos el último error y seguimos; el re-list final muestra la verdad
+    // (lo que sí subió) y el error transitorio dispara el snackbar.
+    MediaFailure? lastError;
+    var done = 0;
+    for (final p in picked) {
+      try {
+        await _repo.upload(bytes: p.bytes, filename: p.filename);
+      } on MediaFailure catch (f) {
+        lastError = f;
+      }
+      done++;
+      emit(
+        base.copyWith(
+          isUploading: true,
+          uploadTotal: total,
+          uploadDone: done,
+          clearUploadError: true,
+        ),
+      );
+    }
+    // Re-listamos para mostrar los assets con la verdad del servidor (no
+    // fabricamos MediaAsset desde UploadedMedia). Respetamos familia + búsqueda.
     try {
-      await _repo.upload(bytes: picked.bytes, filename: picked.filename);
-      // No fabricamos un MediaAsset desde el UploadedMedia (sólo trae ref+url,
-      // sin metadata): re-listamos para mostrar el asset con la verdad del
-      // servidor. Respetamos el filtro de familia y la búsqueda activa para no
-      // traer ajenos al picker ni romper el filtro visible.
       final page = await _repo.listAssets(type: _type, q: _queryParam);
-      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+      emit(
+        MediaGalleryLoaded(
+          items: page.assets,
+          nextCursor: page.nextCursor,
+          uploadError: lastError,
+        ),
+      );
     } on MediaFailure catch (f) {
-      // El fallo de subida NO colapsa a Failed (eso vaciaría la galería):
-      // viaja como error transitorio sobre el Loaded actual; la UI lo muestra
-      // (snackbar) y la lista sigue intacta.
-      emit(base.copyWith(isUploading: false, uploadError: f));
+      emit(
+        base.copyWith(
+          isUploading: false,
+          uploadTotal: 0,
+          uploadDone: 0,
+          uploadError: lastError ?? f,
+        ),
+      );
     }
   }
 
@@ -401,6 +437,8 @@ class MediaGalleryLoaded extends MediaGalleryState {
     this.uploadError,
     this.selectedRefs = const <String>{},
     this.isDeleting = false,
+    this.uploadTotal = 0,
+    this.uploadDone = 0,
   });
 
   final List<MediaAsset> items;
@@ -409,6 +447,12 @@ class MediaGalleryLoaded extends MediaGalleryState {
   final bool isUploading;
   final bool isRefreshing;
   final MediaFailure? uploadError;
+
+  /// Progreso de una subida en lote: [uploadDone] de [uploadTotal] archivos
+  /// completados. [uploadTotal] 0 ⇒ no hay subida en lote en curso. La UI
+  /// muestra "Subiendo done/total" cuando total > 0.
+  final int uploadTotal;
+  final int uploadDone;
 
   /// Refs BARE seleccionados (modo selección múltiple). Vacío ⇒ no hay selección
   /// activa. [selectionMode] lo deriva.
@@ -434,6 +478,8 @@ class MediaGalleryLoaded extends MediaGalleryState {
     bool clearUploadError = false,
     Set<String>? selectedRefs,
     bool? isDeleting,
+    int? uploadTotal,
+    int? uploadDone,
   }) => MediaGalleryLoaded(
     items: items ?? this.items,
     nextCursor: nextCursor ?? this.nextCursor,
@@ -443,6 +489,8 @@ class MediaGalleryLoaded extends MediaGalleryState {
     uploadError: clearUploadError ? null : (uploadError ?? this.uploadError),
     selectedRefs: selectedRefs ?? this.selectedRefs,
     isDeleting: isDeleting ?? this.isDeleting,
+    uploadTotal: uploadTotal ?? this.uploadTotal,
+    uploadDone: uploadDone ?? this.uploadDone,
   );
 
   @override
@@ -454,7 +502,9 @@ class MediaGalleryLoaded extends MediaGalleryState {
         other.isUploading != isUploading ||
         other.isRefreshing != isRefreshing ||
         other.uploadError != uploadError ||
-        other.isDeleting != isDeleting) {
+        other.isDeleting != isDeleting ||
+        other.uploadTotal != uploadTotal ||
+        other.uploadDone != uploadDone) {
       return false;
     }
     if (other.selectedRefs.length != selectedRefs.length ||
@@ -478,6 +528,8 @@ class MediaGalleryLoaded extends MediaGalleryState {
     uploadError,
     Object.hashAllUnordered(selectedRefs),
     isDeleting,
+    uploadTotal,
+    uploadDone,
   );
 }
 
