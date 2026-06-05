@@ -204,6 +204,8 @@ void main() {
       waLabels: <WaLabel>[
         _wa(),
         _wa(id: '1001'),
+        _wa(id: '1002'),
+        _wa(id: '1003'),
       ],
       mappings: mappings,
       internalLabels: <Label>[
@@ -266,6 +268,28 @@ void main() {
         }).selectableLabelsFor('1000').map((l) => l.id),
         contains('uuid-vip'),
       );
+    });
+
+    test('mapeo huérfano (su etiqueta WhatsApp fue borrada) NO bloquea su label', () {
+      // La etiqueta WhatsApp 1001 fue borrada (ausente de waLabels) pero su fila
+      // de mapeo a uuid-spam sobrevivió huérfana. No debe bloquear uuid-spam al
+      // editar otra etiqueta — si no, esa org-label queda inseleccionable para
+      // siempre (defensa cliente; el backend ya limpia el mapeo en label.wa.removed).
+      final d = WaMappingData(
+        waLabels: <WaLabel>[
+          _wa(),
+          _wa(id: '1002'),
+        ],
+        mappings: const <String, String>{'1001': 'uuid-spam'},
+        internalLabels: <Label>[
+          _il(id: 'uuid-vip', name: 'VIP'),
+          _il(id: 'uuid-spam', name: 'Spam'),
+        ],
+      );
+      expect(d.selectableLabelsFor('1000').map((l) => l.id).toList(), <String>[
+        'uuid-vip',
+        'uuid-spam',
+      ]);
     });
   });
 }
