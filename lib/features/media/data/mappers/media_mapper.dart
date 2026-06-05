@@ -18,6 +18,7 @@ class MediaMapper {
     ref: resp.ref,
     previewUrl: resp.url,
     filename: resp.filename,
+    alias: resp.alias,
     contentType: resp.contentType,
     size: resp.size,
     createdAt: DateTime.parse(resp.createdAt),

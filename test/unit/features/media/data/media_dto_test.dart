@@ -45,6 +45,24 @@ void main() {
       expect(r.createdAt, '2026-05-30T12:00:00Z');
     });
 
+    test('alias presente => capturado', () {
+      final r = MediaAssetResp.fromJson(valid()..['alias'] = 'Mi logo');
+      expect(r.alias, 'Mi logo');
+    });
+
+    test('alias ausente => "" (omitempty del wire)', () {
+      expect(MediaAssetResp.fromJson(valid()).alias, '');
+    });
+
+    test('alias null => "" (omitempty)', () {
+      expect(MediaAssetResp.fromJson(valid()..['alias'] = null).alias, '');
+    });
+
+    test('alias de tipo equivocado => FormatException', () {
+      final j = valid()..['alias'] = 42;
+      expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));
+    });
+
     test('filename ausente => FormatException', () {
       final j = valid()..remove('filename');
       expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));

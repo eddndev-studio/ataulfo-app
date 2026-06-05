@@ -38,6 +38,49 @@ void main() {
       expect(a.previewUrl, isNull);
       expect(a.ref, 'tenant/org/media/abc.png');
     });
+
+    test('alias por defecto vacío (no requerido)', () {
+      expect(build().alias, '');
+    });
+
+    test('displayName = alias cuando no está vacío', () {
+      final a = MediaAsset(
+        ref: 'r',
+        previewUrl: null,
+        filename: 'IMG_2231.jpg',
+        alias: 'Mi logo',
+        contentType: 'image/jpeg',
+        size: 1,
+        createdAt: createdAt,
+      );
+      expect(a.displayName, 'Mi logo');
+    });
+
+    test('displayName = filename cuando alias vacío', () {
+      expect(build().displayName, 'abc.png');
+    });
+
+    test('alias distinto => instancias distintas (igualdad de valor)', () {
+      final a = MediaAsset(
+        ref: 'r',
+        previewUrl: null,
+        filename: 'f',
+        alias: 'uno',
+        contentType: 'image/png',
+        size: 1,
+        createdAt: createdAt,
+      );
+      final b = MediaAsset(
+        ref: 'r',
+        previewUrl: null,
+        filename: 'f',
+        alias: 'dos',
+        contentType: 'image/png',
+        size: 1,
+        createdAt: createdAt,
+      );
+      expect(a, isNot(b));
+    });
   });
 
   group('UploadedMedia', () {

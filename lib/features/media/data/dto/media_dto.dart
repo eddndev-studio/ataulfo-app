@@ -39,12 +39,14 @@ class MediaAssetResp {
     required this.size,
     required this.createdAt,
     this.url,
+    this.alias = '',
   });
 
   factory MediaAssetResp.fromJson(Map<String, dynamic> json) {
     final ref = json['ref'];
     final url = json['url'];
     final filename = json['filename'];
+    final alias = json['alias'];
     final contentType = json['content_type'];
     final size = json['size'];
     final createdAt = json['created_at'];
@@ -58,10 +60,16 @@ class MediaAssetResp {
     if (url != null && url is! String) {
       throw const FormatException('mediaAssetResp: url no es String ni null');
     }
+    // alias es omitempty del wire: ausente o null ⇒ "" (sin alias). Presente y
+    // no-String es un contrato roto.
+    if (alias != null && alias is! String) {
+      throw const FormatException('mediaAssetResp: alias no es String ni null');
+    }
     return MediaAssetResp(
       ref: ref,
       url: url as String?,
       filename: filename,
+      alias: (alias as String?) ?? '',
       contentType: contentType,
       size: size,
       createdAt: createdAt,
@@ -75,6 +83,10 @@ class MediaAssetResp {
   final String? url;
 
   final String filename;
+
+  /// Nombre amistoso editable (omitempty del wire ⇒ "" cuando no hay alias).
+  final String alias;
+
   final String contentType;
   final int size;
 
