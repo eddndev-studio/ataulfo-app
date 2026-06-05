@@ -94,3 +94,60 @@ jobs:
           rm -f "$GITHUB_WORKSPACE/android/app/upload-keystore.jks" \
                 "$GITHUB_WORKSPACE/android/key.properties" \
                 "$GITHUB_WORKSPACE/android/app/google-services.json"
+
+  # Build de escritorio Linux (x64), empaquetado y adjuntado AL MISMO release.
+  # Depende de release-android: así el GitHub Release ya existe y este job solo
+  # sube su artefacto (gh release upload) en vez de competir por crearlo. Si el
+  # build Linux falla, el APK ya quedó publicado — no se bloquea mutuamente.
+  release-linux:
+    needs: release-android
+    runs-on: [self-hosted, vps2]
+    steps:
+      - uses: actions/checkout@v5
+
+      # Solo Flutter en PATH: el desktop build no necesita Android SDK/JDK ni
+      # material de firma. El toolchain nativo (clang, cmake, ninja, GTK-3,
+      # libsecret) está pre-provisionado en VPS2, igual que Flutter/Android.
+      - name: Setup Flutter on PATH
+        run: echo "/opt/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Dart/Flutter
+        run: flutter --version
+
+      # Idempotente: asegura el target linux-desktop por si la config global del
+      # runner no lo tuviera habilitado. No descarga nada si ya está activo.
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Pub get
+        run: flutter pub get
+
+      # versionName desde el tag (v0.2.0 -> 0.2.0), consistente con el APK.
+      - name: Build release Linux
+        run: |
+          flutter build linux --release \
+            --build-name="${GITHUB_REF_NAME#v}"
+
+      # tar.gz del bundle ejecutable (binario + data/ + lib/). El nombre lleva
+      # versión y arquitectura para distinguir descargas del release.
+      - name: Package Linux bundle
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          tar -czf "ataulfo-${ver}-linux-x64.tar.gz" \
+            -C build/linux/x64/release bundle
+          ls -lh "ataulfo-${ver}-linux-x64.tar.gz"
+          sha256sum "ataulfo-${ver}-linux-x64.tar.gz"
+
+      - name: Upload Linux artifact to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          gh release upload "${GITHUB_REF_NAME}" \
+            "ataulfo-${ver}-linux-x64.tar.gz" --clobber
+
+      # Higiene en la caja compartida: el tarball no es sensible, pero no lo
+      # dejamos acumulándose en el workspace persistente del runner.
+      - name: Cleanup artifact from workspace
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE"/ataulfo-*-linux-x64.tar.gz
