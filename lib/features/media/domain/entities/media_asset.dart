@@ -16,6 +16,7 @@ class MediaAsset {
     required this.contentType,
     required this.size,
     required this.createdAt,
+    this.alias = '',
   });
 
   /// Identificador BARE canónico del archivo. Sin esquema ni query de firma.
@@ -25,8 +26,19 @@ class MediaAsset {
   /// emite (omitempty del wire).
   final String? previewUrl;
 
+  /// Nombre original de subida (inmutable).
   final String filename;
+
+  /// Nombre amistoso editable, SEPARADO del [filename]. Vacío (default) ⇒ la UI
+  /// muestra el [filename]. Es presentación, jamás identidad (esa es [ref]).
+  final String alias;
+
   final String contentType;
+
+  /// Nombre a mostrar en la galería: el [alias] si no está vacío, si no el
+  /// [filename] original. Centraliza la regla I-MA3 para que ningún widget la
+  /// reimplemente.
+  String get displayName => alias.isNotEmpty ? alias : filename;
 
   /// Tamaño en bytes reportado por el servidor.
   final int size;
@@ -41,14 +53,22 @@ class MediaAsset {
         other.ref == ref &&
         other.previewUrl == previewUrl &&
         other.filename == filename &&
+        other.alias == alias &&
         other.contentType == contentType &&
         other.size == size &&
         other.createdAt == createdAt;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(ref, previewUrl, filename, contentType, size, createdAt);
+  int get hashCode => Object.hash(
+    ref,
+    previewUrl,
+    filename,
+    alias,
+    contentType,
+    size,
+    createdAt,
+  );
 }
 
 /// Resultado MÍNIMO de una subida (`POST /upload`). El backend sólo devuelve

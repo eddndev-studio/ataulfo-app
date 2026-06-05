@@ -49,6 +49,32 @@ void main() {
       expect(asset.ref, 'tenant/org/media/x.png');
     });
 
+    test('alias del wire => entity.alias; ausente => ""', () {
+      final withAlias = MediaMapper.assetRespToEntity(
+        MediaAssetResp.fromJson(<String, dynamic>{
+          'ref': 'r',
+          'alias': 'Mi logo',
+          'filename': 'orig.png',
+          'content_type': 'image/png',
+          'size': 1,
+          'created_at': '2026-05-30T12:00:00Z',
+        }),
+      );
+      expect(withAlias.alias, 'Mi logo');
+
+      final noAlias = MediaMapper.assetRespToEntity(
+        MediaAssetResp.fromJson(<String, dynamic>{
+          'ref': 'r',
+          'filename': 'orig.png',
+          'content_type': 'image/png',
+          'size': 1,
+          'created_at': '2026-05-30T12:00:00Z',
+        }),
+      );
+      expect(noAlias.alias, '');
+      expect(noAlias.displayName, 'orig.png');
+    });
+
     test('created_at ISO-8601 => DateTime (UTC del wire)', () {
       final resp = MediaAssetResp.fromJson(<String, dynamic>{
         'ref': 'r',
