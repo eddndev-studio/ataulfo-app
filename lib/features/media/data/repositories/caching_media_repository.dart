@@ -103,11 +103,19 @@ class CachingMediaRepository implements MediaRepository {
   }
 
   @override
-  Future<MediaPage> listAssets({String? cursor, int? limit, String? type}) {
-    // Sólo la primera página se memoiza/persiste; las páginas profundas van a la
-    // red (cachearlas desincronizaría la paginación) y jamás tocan el disco.
-    if (cursor != null) {
-      return _inner.listAssets(cursor: cursor, limit: limit, type: type);
+  Future<MediaPage> listAssets({
+    String? cursor,
+    int? limit,
+    String? type,
+    String? q,
+  }) {
+    // Sólo la primera página SIN búsqueda se memoiza/persiste. Las páginas
+    // profundas (cursor) y las búsquedas (q no vacío) van siempre a la red:
+    // cachearlas por `type` las desincronizaría (el resultado depende del
+    // cursor o del término) y jamás tocan el disco.
+    final searching = q != null && q.isNotEmpty;
+    if (cursor != null || searching) {
+      return _inner.listAssets(cursor: cursor, limit: limit, type: type, q: q);
     }
     final cached = _firstPageByType[type];
     if (cached != null && _now().difference(cached.at) < _ttl) {

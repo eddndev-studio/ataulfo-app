@@ -22,10 +22,16 @@ abstract interface class MediaDatasource {
     required String filename,
   });
 
-  /// `GET /media-assets?cursor=&limit=&type=` paginado. Devuelve una página
+  /// `GET /media-assets?cursor=&limit=&type=&q=` paginado. Devuelve una página
   /// (assets + nextCursor opaco). [type] filtra por familia del content-type
-  /// (image|video|audio|document); null ⇒ sin filtro (todo el catálogo).
-  Future<MediaPage> listAssets({String? cursor, int? limit, String? type});
+  /// (image|video|audio|document); null ⇒ sin filtro. [q] filtra por nombre
+  /// (filename o alias, subcadena case-insensitive); null/vacío ⇒ sin búsqueda.
+  Future<MediaPage> listAssets({
+    String? cursor,
+    int? limit,
+    String? type,
+    String? q,
+  });
 
   /// `DELETE /upload/<ref>` (204). Da de baja el asset por su [ref] BARE (que
   /// viaja en el path). El backend borra el objeto y la fila del catálogo. El
@@ -80,15 +86,18 @@ class DioMediaDatasource implements MediaDatasource {
     String? cursor,
     int? limit,
     String? type,
+    String? q,
   }) async {
     try {
       // Omitimos cada clave cuando el valor es null (null-aware element): el
       // backend distingue "sin cursor" (primera página) de un cursor vacío, y
-      // "sin type" (todo el catálogo) de una familia concreta.
+      // "sin type" (todo el catálogo) de una familia concreta. q vacío también
+      // se omite (sin búsqueda) para no mandar un ?q= inútil.
       final query = <String, dynamic>{
         'cursor': ?cursor,
         'limit': ?limit,
         'type': ?type,
+        'q': ?(q != null && q.isNotEmpty ? q : null),
       };
       final res = await _dio.get<Map<String, dynamic>>(
         '/media-assets',

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -44,30 +46,106 @@ class MediaGalleryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Un error de subida es transitorio: lo anunciamos con un snackbar y la
-    // lista sigue intacta (no colapsa a un estado de error terminal).
-    return BlocListener<MediaGalleryBloc, MediaGalleryState>(
-      listenWhen: (prev, curr) =>
-          curr is MediaGalleryLoaded && curr.uploadError != null,
-      listener: (context, state) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(content: Text('No pudimos subir el archivo')),
-          );
-      },
-      child: BlocBuilder<MediaGalleryBloc, MediaGalleryState>(
-        builder: (context, state) => switch (state) {
-          MediaGalleryInitial() ||
-          MediaGalleryLoading() => const _LoadingView(),
-          MediaGalleryLoaded() => _LoadedView(
-            state: state,
-            onSelect: onSelect,
-            onOpenDetail: onOpenDetail,
-            loader: loader,
+    // El campo de búsqueda vive ARRIBA del switch de estado: persiste mientras
+    // la lista carga/se vacía, para poder limpiar una búsqueda sin resultados.
+    // Un error de subida es transitorio: snackbar y la lista sigue intacta.
+    return Column(
+      children: <Widget>[
+        const _SearchField(),
+        Expanded(
+          child: BlocListener<MediaGalleryBloc, MediaGalleryState>(
+            listenWhen: (prev, curr) =>
+                curr is MediaGalleryLoaded && curr.uploadError != null,
+            listener: (context, state) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  const SnackBar(content: Text('No pudimos subir el archivo')),
+                );
+            },
+            child: BlocBuilder<MediaGalleryBloc, MediaGalleryState>(
+              builder: (context, state) => switch (state) {
+                MediaGalleryInitial() ||
+                MediaGalleryLoading() => const _LoadingView(),
+                MediaGalleryLoaded() => _LoadedView(
+                  state: state,
+                  onSelect: onSelect,
+                  onOpenDetail: onOpenDetail,
+                  loader: loader,
+                ),
+                MediaGalleryFailed() => const _FailedView(),
+              },
+            ),
           ),
-          MediaGalleryFailed() => const _FailedView(),
-        },
+        ),
+      ],
+    );
+  }
+}
+
+/// Campo de búsqueda por nombre (filename/alias). Debounced: dispara
+/// [MediaGallerySearchChanged] 300 ms tras la última tecla, para no listar en
+/// cada pulsación. El botón de limpiar resetea la búsqueda al instante.
+class _SearchField extends StatefulWidget {
+  const _SearchField();
+
+  @override
+  State<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<_SearchField> {
+  final TextEditingController _controller = TextEditingController();
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      context.read<MediaGalleryBloc>().add(MediaGallerySearchChanged(value));
+    });
+    setState(() {}); // refresca la visibilidad del botón limpiar
+  }
+
+  void _clear() {
+    _debounce?.cancel();
+    _controller.clear();
+    context.read<MediaGalleryBloc>().add(const MediaGallerySearchChanged(''));
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppTokens.sp4,
+        AppTokens.sp3,
+        AppTokens.sp4,
+        0,
+      ),
+      child: TextField(
+        key: const Key('media_gallery.search_field'),
+        controller: _controller,
+        onChanged: _onChanged,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'Buscar por nombre',
+          prefixIcon: const Icon(Icons.search, size: 20),
+          suffixIcon: _controller.text.isEmpty
+              ? null
+              : IconButton(
+                  key: const Key('media_gallery.search_clear'),
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: _clear,
+                ),
+        ),
       ),
     );
   }

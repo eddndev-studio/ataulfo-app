@@ -20,8 +20,12 @@ class MediaRepositoryImpl implements MediaRepository {
   }) => _ds.upload(bytes: bytes, filename: filename);
 
   @override
-  Future<MediaPage> listAssets({String? cursor, int? limit, String? type}) =>
-      _ds.listAssets(cursor: cursor, limit: limit, type: type);
+  Future<MediaPage> listAssets({
+    String? cursor,
+    int? limit,
+    String? type,
+    String? q,
+  }) => _ds.listAssets(cursor: cursor, limit: limit, type: type, q: q);
 
   @override
   Future<void> delete(String ref) => _ds.delete(ref);

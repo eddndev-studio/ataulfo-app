@@ -103,6 +103,30 @@ void main() {
       },
     );
 
+    test('búsqueda (q no vacío) NUNCA se cachea: siempre delega', () async {
+      when(
+        () => inner.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: any(named: 'type'),
+          q: any(named: 'q'),
+        ),
+      ).thenAnswer((_) async => _page(<String>['media/x']));
+      final repo = build();
+
+      await repo.listAssets(type: 'image', q: 'logo');
+      await repo.listAssets(type: 'image', q: 'logo');
+
+      verify(
+        () => inner.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: 'image',
+          q: 'logo',
+        ),
+      ).called(2);
+    });
+
     test('cursor != null NUNCA se cachea: siempre delega al inner', () async {
       stubList(_page(<String>['media/b'], nextCursor: 'c2'));
       final repo = build();

@@ -249,6 +249,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('búsqueda: escribir despacha SearchChanged tras el debounce', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
+    );
+    await tester.pumpWidget(host());
+
+    await tester.enterText(
+      find.byKey(const Key('media_gallery.search_field')),
+      'logo',
+    );
+    // Antes del debounce no se despacha.
+    await tester.pump(const Duration(milliseconds: 100));
+    verifyNever(() => bloc.add(const MediaGallerySearchChanged('logo')));
+    // Tras el debounce, sí.
+    await tester.pump(const Duration(milliseconds: 300));
+    verify(() => bloc.add(const MediaGallerySearchChanged('logo'))).called(1);
+  });
+
+  testWidgets('búsqueda: limpiar despacha SearchChanged("") al instante', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
+    );
+    await tester.pumpWidget(host());
+
+    await tester.enterText(
+      find.byKey(const Key('media_gallery.search_field')),
+      'logo',
+    );
+    await tester
+        .pump(); // muestra el botón limpiar (cancela el debounce al tocar)
+    await tester.tap(find.byKey(const Key('media_gallery.search_clear')));
+    await tester.pump();
+
+    verify(() => bloc.add(const MediaGallerySearchChanged(''))).called(1);
+    // El término 'logo' nunca se despachó (debounce cancelado por el clear).
+    verifyNever(() => bloc.add(const MediaGallerySearchChanged('logo')));
+  });
+
   testWidgets('FAB de subida dispara MediaGalleryUploadRequested', (
     tester,
   ) async {

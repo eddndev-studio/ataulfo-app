@@ -346,6 +346,56 @@ void main() {
       expect(captured.single, <String, dynamic>{'type': 'video'});
     });
 
+    test('q provisto => ?q= en el query (búsqueda por nombre)', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/media-assets',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => mapResp(
+          '/media-assets',
+          200,
+          body: <String, dynamic>{'assets': <dynamic>[], 'next_cursor': ''},
+        ),
+      );
+
+      await ds.listAssets(q: 'logo');
+
+      final captured = verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/media-assets',
+          queryParameters: captureAny(named: 'queryParameters'),
+        ),
+      ).captured;
+      expect(captured.single, <String, dynamic>{'q': 'logo'});
+    });
+
+    test('q vacío => se omite (no ?q= inútil)', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/media-assets',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => mapResp(
+          '/media-assets',
+          200,
+          body: <String, dynamic>{'assets': <dynamic>[], 'next_cursor': ''},
+        ),
+      );
+
+      await ds.listAssets(q: '');
+
+      final captured = verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/media-assets',
+          queryParameters: captureAny(named: 'queryParameters'),
+        ),
+      ).captured;
+      expect(captured.single, <String, dynamic>{});
+    });
+
     test(
       'cursor/limit omitidos => query params vacíos (sin claves null)',
       () async {

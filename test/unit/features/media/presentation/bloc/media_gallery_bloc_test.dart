@@ -529,6 +529,49 @@ void main() {
         },
       );
     });
+
+    group('búsqueda (MediaGallerySearchChanged)', () {
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'cambia el término ⇒ [Loading, Loaded] y pasa q= al repo',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
+          );
+          return MediaGalleryBloc(repo: _lastRepo, picker: _MockPicker());
+        },
+        act: (b) => b.add(const MediaGallerySearchChanged('logo')),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoading>(),
+          isA<MediaGalleryLoaded>(),
+        ],
+        verify: (_) {
+          verify(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: 'logo',
+            ),
+          ).called(1);
+        },
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'término que tras trim no cambia ⇒ no recarga (no emite)',
+        build: () => MediaGalleryBloc(repo: _MockRepo(), picker: _MockPicker()),
+        // El query arranca vacío; '   ' trimmea a '' == activo ⇒ guard, sin emit.
+        act: (b) => b.add(const MediaGallerySearchChanged('   ')),
+        expect: () => <Matcher>[],
+      );
+    });
   });
 }
 
