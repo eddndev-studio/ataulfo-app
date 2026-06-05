@@ -31,8 +31,15 @@ void main() {
   late _MockBloc bloc;
   setUp(() => bloc = _MockBloc());
 
+  // Incluye 1001/1002 como etiquetas WhatsApp ACTIVAS: los tests que verifican
+  // "tomado por OTRA etiqueta" mapean a esas, y solo los mapeos de etiquetas
+  // activas bloquean (un mapeo a una WA-label ausente sería huérfano e inerte).
   WaMappingData dataWith(Map<String, String> mappings) => WaMappingData(
-    waLabels: <WaLabel>[_wa()],
+    waLabels: <WaLabel>[
+      _wa(),
+      _wa(id: '1001'),
+      _wa(id: '1002'),
+    ],
     mappings: mappings,
     internalLabels: <Label>[
       _il(),

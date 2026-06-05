@@ -182,9 +182,14 @@ class WaMappingData {
   /// sin esperar al rechazo del servidor.
   List<Label> selectableLabelsFor(String waLabelId) {
     final own = mappings[waLabelId];
+    // Solo los mapeos de etiquetas WhatsApp ACTIVAS bloquean una org-label. Un
+    // mapeo huérfano (su etiqueta WhatsApp fue borrada ⇒ ausente de waLabels)
+    // dejaría su org-label inseleccionable para siempre; lo ignoramos. Defensa
+    // de cliente: el backend ya limpia el mapeo al recibir label.wa.removed.
+    final activeWa = <String>{for (final w in waLabels) w.waLabelId};
     final takenByOthers = <String>{
       for (final e in mappings.entries)
-        if (e.key != waLabelId) e.value,
+        if (e.key != waLabelId && activeWa.contains(e.key)) e.value,
     }..remove(own);
     return <Label>[
       for (final l in internalLabels)
