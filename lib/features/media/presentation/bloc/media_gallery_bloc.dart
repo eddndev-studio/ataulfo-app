@@ -24,10 +24,21 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     on<MediaGalleryLoadMoreRequested>(_onLoadMore);
     on<MediaGalleryRefreshRequested>(_onRefresh);
     on<MediaGalleryUploadRequested>(_onUpload);
+    on<MediaGallerySearchChanged>(_onSearchChanged);
   }
 
   final MediaRepository _repo;
   final MediaFilePicker _picker;
+
+  /// Término de búsqueda activo (filename o alias). Vacío ⇒ sin búsqueda. Se
+  /// aplica a TODAS las páginas (primera, load-more, refresh, re-list tras subir)
+  /// para que la paginación no mezcle resultados filtrados y sin filtrar. La UI
+  /// lo cambia (debounced) vía [MediaGallerySearchChanged].
+  String _query = '';
+
+  /// El `q` que viaja al repo: null cuando no hay búsqueda (vacío), para que la
+  /// query omita `?q=` y el caching memoice la primera página sin filtro.
+  String? get _queryParam => _query.isEmpty ? null : _query;
 
   /// Familia de content-type por la que se filtra el catálogo (image|video|
   /// audio|document). null ⇒ galería completa (modo browse); no-null ⇒ la
@@ -63,6 +74,7 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
       final page = await _repo.listAssets(
         cursor: current.nextCursor,
         type: _type,
+        q: _queryParam,
       );
       // Append sin duplicar: la página nueva se concatena al final.
       emit(
@@ -118,8 +130,9 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
       await _repo.upload(bytes: picked.bytes, filename: picked.filename);
       // No fabricamos un MediaAsset desde el UploadedMedia (sólo trae ref+url,
       // sin metadata): re-listamos para mostrar el asset con la verdad del
-      // servidor. Respetamos el filtro de familia para no traer ajenos al picker.
-      final page = await _repo.listAssets(type: _type);
+      // servidor. Respetamos el filtro de familia y la búsqueda activa para no
+      // traer ajenos al picker ni romper el filtro visible.
+      final page = await _repo.listAssets(type: _type, q: _queryParam);
       emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
     } on MediaFailure catch (f) {
       // El fallo de subida NO colapsa a Failed (eso vaciaría la galería):
@@ -130,12 +143,36 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
   }
 
   /// Carga la primera página y emite Loaded; un `MediaFailure` colapsa a Failed
-  /// (terminal: no hay lista previa que preservar en la carga inicial).
+  /// (terminal: no hay lista previa que preservar en la carga inicial). Aplica
+  /// el filtro de familia y la búsqueda activa.
   Future<void> _fetchFirstPage(Emitter<MediaGalleryState> emit) async {
     try {
-      final page = await _repo.listAssets(type: _type);
+      final page = await _repo.listAssets(type: _type, q: _queryParam);
       emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
     } on MediaFailure catch (f) {
+      emit(MediaGalleryFailed(f));
+    }
+  }
+
+  /// Cambia el término de búsqueda y recarga la primera página. Guard de
+  /// no-cambio: un término igual al activo no recarga. Guard de obsolescencia:
+  /// si llega un término más nuevo mientras este fetch estaba en vuelo, su
+  /// resultado se descarta (last-search-wins) — necesario porque el handler es
+  /// concurrente y la red puede reordenar respuestas. La UI hace debounce.
+  Future<void> _onSearchChanged(
+    MediaGallerySearchChanged event,
+    Emitter<MediaGalleryState> emit,
+  ) async {
+    final q = event.query.trim();
+    if (q == _query) return;
+    _query = q;
+    emit(const MediaGalleryLoading());
+    try {
+      final page = await _repo.listAssets(type: _type, q: _queryParam);
+      if (_query != q) return; // un search más nuevo ganó
+      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+    } on MediaFailure catch (f) {
+      if (_query != q) return;
       emit(MediaGalleryFailed(f));
     }
   }
@@ -183,6 +220,20 @@ class MediaGalleryUploadRequested extends MediaGalleryEvent {
   bool operator ==(Object other) => other is MediaGalleryUploadRequested;
   @override
   int get hashCode => (MediaGalleryUploadRequested).hashCode;
+}
+
+/// Cambia el término de búsqueda (filename/alias) y recarga la primera página.
+/// La UI lo despacha con debounce; el bloc descarta resultados obsoletos.
+class MediaGallerySearchChanged extends MediaGalleryEvent {
+  const MediaGallerySearchChanged(this.query);
+
+  final String query;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MediaGallerySearchChanged && other.query == query;
+  @override
+  int get hashCode => Object.hash(MediaGallerySearchChanged, query);
 }
 
 // States --------------------------------------------------------------------

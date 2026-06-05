@@ -17,9 +17,15 @@ abstract interface class MediaRepository {
 
   /// Lista una página del catálogo (`GET /media-assets`). [cursor] vacío/null
   /// pide la primera página; [limit] acota el tamaño; [type] filtra por familia
-  /// del content-type (image|video|audio|document), null ⇒ sin filtro.
+  /// del content-type (image|video|audio|document), null ⇒ sin filtro; [q]
+  /// filtra por nombre (filename o alias), null/vacío ⇒ sin búsqueda.
   /// `MediaPage.nextCursor` vacío ⇒ no hay más páginas.
-  Future<MediaPage> listAssets({String? cursor, int? limit, String? type});
+  Future<MediaPage> listAssets({
+    String? cursor,
+    int? limit,
+    String? type,
+    String? q,
+  });
 
   /// Da de baja un asset por su [ref] BARE (`DELETE /upload/<ref>`). El backend
   /// borra el objeto y la fila del catálogo. Lanza `MediaNotFoundFailure` (404,
