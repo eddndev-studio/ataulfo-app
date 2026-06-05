@@ -8,28 +8,29 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockRepo extends Mock implements FlowsRepository {}
 
-const _flows = <Flow>[
-  Flow(
-    id: 'f1',
-    templateId: 't1',
-    name: 'Bienvenida',
-    isActive: true,
-    version: 1,
-    cooldownMs: 0,
-    usageLimit: 0,
-    excludesFlows: <String>[],
-  ),
-  Flow(
-    id: 'f2',
-    templateId: 't1',
-    name: 'Despedida',
-    isActive: false,
-    version: 2,
-    cooldownMs: 0,
-    usageLimit: 0,
-    excludesFlows: <String>[],
-  ),
-];
+const _flow1 = Flow(
+  id: 'f1',
+  templateId: 't1',
+  name: 'Bienvenida',
+  isActive: true,
+  version: 1,
+  cooldownMs: 0,
+  usageLimit: 0,
+  excludesFlows: <String>[],
+);
+
+const _flow2 = Flow(
+  id: 'f2',
+  templateId: 't1',
+  name: 'Despedida',
+  isActive: false,
+  version: 2,
+  cooldownMs: 0,
+  usageLimit: 0,
+  excludesFlows: <String>[],
+);
+
+const _flows = <Flow>[_flow1, _flow2];
 
 void main() {
   late _MockRepo repo;
@@ -104,6 +105,53 @@ void main() {
         FlowsLoaded(_flows),
       ],
       verify: (_) => verify(() => repo.listFlows('t1')).called(2),
+    );
+
+    blocTest<FlowsBloc, FlowsState>(
+      'DeleteRequested ok → Mutating(snapshot) → Loading → Loaded(refetch)',
+      build: () {
+        when(() => repo.deleteFlow('f1')).thenAnswer((_) async {});
+        when(
+          () => repo.listFlows('t1'),
+        ).thenAnswer((_) async => const <Flow>[_flow2]);
+        return FlowsBloc(repo: repo, templateId: 't1');
+      },
+      seed: () => const FlowsLoaded(_flows),
+      act: (bloc) => bloc.add(const FlowsDeleteRequested('f1')),
+      expect: () => const <FlowsState>[
+        FlowsMutating(_flows),
+        FlowsLoading(),
+        FlowsLoaded(<Flow>[_flow2]),
+      ],
+      verify: (_) {
+        verify(() => repo.deleteFlow('f1')).called(1);
+        verify(() => repo.listFlows('t1')).called(1);
+      },
+    );
+
+    blocTest<FlowsBloc, FlowsState>(
+      'DeleteRequested falla → Mutating → MutationFailed (lista intacta, sin refetch)',
+      build: () {
+        when(
+          () => repo.deleteFlow('f1'),
+        ).thenAnswer((_) => Future<void>.error(const FlowsForbiddenFailure()));
+        return FlowsBloc(repo: repo, templateId: 't1');
+      },
+      seed: () => const FlowsLoaded(_flows),
+      act: (bloc) => bloc.add(const FlowsDeleteRequested('f1')),
+      expect: () => const <FlowsState>[
+        FlowsMutating(_flows),
+        FlowsMutationFailed(_flows, FlowsForbiddenFailure()),
+      ],
+      verify: (_) => verifyNever(() => repo.listFlows(any())),
+    );
+
+    blocTest<FlowsBloc, FlowsState>(
+      'DeleteRequested sin lista vigente (Loading inicial) → no-op',
+      build: () => FlowsBloc(repo: repo, templateId: 't1'),
+      act: (bloc) => bloc.add(const FlowsDeleteRequested('f1')),
+      expect: () => const <FlowsState>[],
+      verify: (_) => verifyNever(() => repo.deleteFlow(any())),
     );
 
     test('Loaded value-equality', () {
