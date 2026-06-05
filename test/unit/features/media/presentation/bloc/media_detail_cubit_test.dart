@@ -48,6 +48,47 @@ void main() {
   );
 
   blocTest<MediaDetailCubit, MediaDetailState>(
+    'setAlias ok ⇒ refleja el alias normalizado del server + changed=true',
+    build: () {
+      // El server normaliza (trim): devuelve "Mi logo" aunque el input traiga
+      // espacios. El cubit refleja el valor del server, no el crudo.
+      when(
+        () => repo.setAlias(any(), any()),
+      ).thenAnswer((_) async => 'Mi logo');
+      return MediaDetailCubit(repo: repo, asset: _asset);
+    },
+    act: (c) => c.setAlias('  Mi logo  '),
+    expect: () => <Matcher>[
+      isA<MediaDetailState>().having((s) => s.busy, 'busy', isTrue),
+      isA<MediaDetailState>()
+          .having((s) => s.busy, 'busy', isFalse)
+          .having((s) => s.changed, 'changed', isTrue)
+          .having((s) => s.asset.alias, 'asset.alias', 'Mi logo'),
+    ],
+    verify: (_) => verify(
+      () => repo.setAlias('tenant/org/media/x.png', '  Mi logo  '),
+    ).called(1),
+  );
+
+  blocTest<MediaDetailCubit, MediaDetailState>(
+    'setAlias falla ⇒ [busy, error] sin changed',
+    build: () {
+      when(
+        () => repo.setAlias(any(), any()),
+      ).thenThrow(const MediaForbiddenFailure());
+      return MediaDetailCubit(repo: repo, asset: _asset);
+    },
+    act: (c) => c.setAlias('x'),
+    expect: () => <Matcher>[
+      isA<MediaDetailState>().having((s) => s.busy, 'busy', isTrue),
+      isA<MediaDetailState>()
+          .having((s) => s.busy, 'busy', isFalse)
+          .having((s) => s.changed, 'changed', isFalse)
+          .having((s) => s.error, 'error', isA<MediaForbiddenFailure>()),
+    ],
+  );
+
+  blocTest<MediaDetailCubit, MediaDetailState>(
     'deleteAsset falla ⇒ [busy, error] sin deleted (la página no hace pop)',
     build: () {
       when(() => repo.delete(any())).thenThrow(const MediaForbiddenFailure());

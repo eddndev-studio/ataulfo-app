@@ -289,6 +289,25 @@ void main() {
       ).called(1);
     });
 
+    test('setAlias delega al inner y limpia la cache', () async {
+      stubList(_page(<String>['media/a']));
+      when(() => inner.setAlias(any(), any())).thenAnswer((_) async => 'X');
+      final repo = build();
+
+      await repo.listAssets(type: 'image'); // inner list (1)
+      await repo.setAlias('media/a', 'X');
+      await repo.listAssets(type: 'image'); // miss → inner list (2)
+
+      verify(() => inner.setAlias('media/a', 'X')).called(1);
+      verify(
+        () => inner.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: 'image',
+        ),
+      ).called(2);
+    });
+
     test('subida fallida NO invalida (el catálogo no cambió)', () async {
       stubList(_page(<String>['media/a']));
       when(

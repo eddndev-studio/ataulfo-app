@@ -40,6 +40,19 @@ class MediaAsset {
   /// reimplemente.
   String get displayName => alias.isNotEmpty ? alias : filename;
 
+  /// Copia con campos sobreescritos. El uso principal es actualizar el [alias]
+  /// in-place tras un rename sin re-listar (el resto de campos son inmutables
+  /// para un mismo [ref]).
+  MediaAsset copyWith({String? alias}) => MediaAsset(
+    ref: ref,
+    previewUrl: previewUrl,
+    filename: filename,
+    alias: alias ?? this.alias,
+    contentType: contentType,
+    size: size,
+    createdAt: createdAt,
+  );
+
   /// Tamaño en bytes reportado por el servidor.
   final int size;
 

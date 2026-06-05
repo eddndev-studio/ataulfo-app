@@ -513,6 +513,82 @@ void main() {
       await expectLater(ds.delete(ref), throwsA(isA<MediaNetworkFailure>()));
     });
   });
+
+  group('DioMediaDatasource.setAlias', () {
+    const ref = 'tenant/org/media/abc.png';
+
+    test(
+      '200 {ref, alias} => PATCH /media-assets/<ref> body{alias} + alias',
+      () async {
+        when(
+          () => dio.patch<Map<String, dynamic>>(
+            '/media-assets/$ref',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => mapResp(
+            '/media-assets/$ref',
+            200,
+            body: <String, dynamic>{'ref': ref, 'alias': 'Mi logo'},
+          ),
+        );
+
+        final result = await ds.setAlias(ref, 'Mi logo');
+
+        expect(result, 'Mi logo');
+        final captured = verify(
+          () => dio.patch<Map<String, dynamic>>(
+            '/media-assets/$ref',
+            data: captureAny(named: 'data'),
+          ),
+        ).captured;
+        expect(captured.single, <String, dynamic>{'alias': 'Mi logo'});
+      },
+    );
+
+    test('alias vacío en la respuesta => "" (limpiado)', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer(
+        (_) async => mapResp(
+          '/media-assets/$ref',
+          200,
+          body: <String, dynamic>{'ref': ref, 'alias': ''},
+        ),
+      );
+      expect(await ds.setAlias(ref, ''), '');
+    });
+
+    test('404 => MediaNotFoundFailure', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse('/media-assets/$ref', 404));
+      await expectLater(
+        ds.setAlias(ref, 'x'),
+        throwsA(isA<MediaNotFoundFailure>()),
+      );
+    });
+
+    test('403 => MediaForbiddenFailure', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse('/media-assets/$ref', 403));
+      await expectLater(
+        ds.setAlias(ref, 'x'),
+        throwsA(isA<MediaForbiddenFailure>()),
+      );
+    });
+
+    test('400 (alias inválido) => UnknownMediaFailure', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenThrow(badResponse('/media-assets/$ref', 400));
+      await expectLater(
+        ds.setAlias(ref, 'x'),
+        throwsA(isA<UnknownMediaFailure>()),
+      );
+    });
+  });
 }
 
 Response<void> mapVoidResp(String path, int status) => Response<void>(

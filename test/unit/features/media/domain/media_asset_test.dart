@@ -60,6 +60,28 @@ void main() {
       expect(build().displayName, 'abc.png');
     });
 
+    test('copyWith(alias:) cambia sólo el alias; resto intacto', () {
+      final base = build(previewUrl: 'https://x/p');
+      final renamed = base.copyWith(alias: 'Nuevo');
+      expect(renamed.alias, 'Nuevo');
+      expect(renamed.ref, base.ref);
+      expect(renamed.filename, base.filename);
+      expect(renamed.previewUrl, base.previewUrl);
+      expect(renamed.contentType, base.contentType);
+      expect(renamed.size, base.size);
+      expect(renamed.createdAt, base.createdAt);
+    });
+
+    test('copyWith() sin args => instancia igual', () {
+      final base = build();
+      expect(base.copyWith(), base);
+    });
+
+    test('copyWith puede limpiar el alias a vacío', () {
+      final withAlias = build().copyWith(alias: 'algo');
+      expect(withAlias.copyWith(alias: '').alias, '');
+    });
+
     test('alias distinto => instancias distintas (igualdad de valor)', () {
       final a = MediaAsset(
         ref: 'r',
