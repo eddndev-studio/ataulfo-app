@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
 import '../../domain/entities/media_asset.dart';
+import '../../domain/repositories/media_preview_launcher.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../bloc/media_detail_cubit.dart';
 import '../media_format.dart';
@@ -20,9 +22,17 @@ import '../media_format.dart';
 /// ícono del tipo. La `previewUrl` efímera NO es identidad; esa es
 /// [MediaAsset.ref].
 class MediaDetailPage extends StatelessWidget {
-  const MediaDetailPage({super.key, required this.loader});
+  const MediaDetailPage({
+    super.key,
+    required this.loader,
+    required this.launcher,
+  });
 
   final MediaThumbnailLoader loader;
+
+  /// Abre en el visor del sistema lo que no se renderiza inline (video, audio,
+  /// documentos). La imagen se previsualiza inline; el resto delega aquí.
+  final MediaPreviewLauncher launcher;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +91,10 @@ class MediaDetailPage extends StatelessWidget {
                   padding: const EdgeInsets.all(AppTokens.sp4),
                   children: <Widget>[
                     _Preview(asset: asset, loader: loader),
+                    if (_canOpenExternally(asset)) ...<Widget>[
+                      const SizedBox(height: AppTokens.sp4),
+                      _openButton(context, asset),
+                    ],
                     const SizedBox(height: AppTokens.sp5),
                     _MetadataCard(asset: asset),
                   ],
@@ -115,6 +129,34 @@ class MediaDetailPage extends StatelessWidget {
       builder: (_) => _AliasEditDialog(initial: cubit.state.asset.alias),
     );
     if (result != null) await cubit.setAlias(result);
+  }
+
+  /// Se puede abrir en el visor del sistema lo NO renderizado inline (no imagen)
+  /// que tenga una URL de preview firmada.
+  bool _canOpenExternally(MediaAsset asset) =>
+      !asset.contentType.startsWith('image/') &&
+      (asset.previewUrl?.isNotEmpty ?? false);
+
+  /// Botón de previsualización externa: "Reproducir" para video/audio, "Abrir"
+  /// para documentos. Lanza la URL firmada en el visor del sistema; si falla,
+  /// avisa con un snackbar.
+  Widget _openButton(BuildContext context, MediaAsset asset) {
+    final ct = asset.contentType;
+    final playable = ct.startsWith('video/') || ct.startsWith('audio/');
+    return AppButton.filled(
+      label: playable ? 'Reproducir' : 'Abrir',
+      icon: playable ? Icons.play_arrow : Icons.open_in_new,
+      onPressed: () async {
+        final ok = await launcher.open(asset.previewUrl!);
+        if (!ok && context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(content: Text('No se pudo abrir el archivo')),
+            );
+        }
+      },
+    );
   }
 
   /// Confirma antes de borrar (acción irreversible) y delega al cubit.

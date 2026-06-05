@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/failures/media_failure.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_preview_launcher.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_thumbnail_loader.dart';
 import 'package:ataulfo/features/media/presentation/bloc/media_detail_cubit.dart';
@@ -20,6 +21,18 @@ class _FakeLoader implements MediaThumbnailLoader {
   final Future<Uint8List?> _result;
   @override
   Future<Uint8List?> load(MediaAsset asset) => _result;
+}
+
+/// Launcher fake: registra qué URL se abrió y devuelve un resultado configurable.
+class _FakeLauncher implements MediaPreviewLauncher {
+  _FakeLauncher({this.result = true});
+  final bool result;
+  final List<String> opened = <String>[];
+  @override
+  Future<bool> open(String url) async {
+    opened.add(url);
+    return result;
+  }
 }
 
 // PNG 1x1 transparente válido.
@@ -52,12 +65,14 @@ Widget _host(
   MediaAsset asset, {
   MediaThumbnailLoader? loader,
   MediaRepository? repo,
+  MediaPreviewLauncher? launcher,
 }) => MaterialApp(
   theme: AppDesignTheme.dark(),
   home: BlocProvider<MediaDetailCubit>(
     create: (_) => MediaDetailCubit(repo: repo ?? _MockRepo(), asset: asset),
     child: MediaDetailPage(
       loader: loader ?? _FakeLoader(Future<Uint8List?>.value(_png1x1)),
+      launcher: launcher ?? _FakeLauncher(),
     ),
   ),
 );
@@ -228,6 +243,7 @@ void main() {
                             MediaDetailCubit(repo: repo, asset: _asset()),
                         child: MediaDetailPage(
                           loader: _FakeLoader(Future<Uint8List?>.value(null)),
+                          launcher: _FakeLauncher(),
                         ),
                       ),
                     ),
@@ -253,6 +269,45 @@ void main() {
     expect(find.byType(MediaDetailPage), findsNothing); // hizo pop
     expect(popResult, isTrue); // devolvió "cambió"
   });
+
+  testWidgets('video ⇒ botón Reproducir abre la previewUrl en el visor', (
+    tester,
+  ) async {
+    final launcher = _FakeLauncher();
+    await tester.pumpWidget(
+      _host(
+        _asset(contentType: 'video/mp4', filename: 'clip.mp4'),
+        loader: _FakeLoader(Future<Uint8List?>.value(null)),
+        launcher: launcher,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Reproducir'), findsOneWidget);
+    await tester.tap(find.text('Reproducir'));
+    await tester.pump();
+
+    expect(launcher.opened, <String>['https://x/sig']); // la previewUrl firmada
+  });
+
+  testWidgets('documento ⇒ botón Abrir', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        _asset(contentType: 'application/pdf', filename: 'doc.pdf'),
+        loader: _FakeLoader(Future<Uint8List?>.value(null)),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Abrir'), findsOneWidget);
+    expect(find.text('Reproducir'), findsNothing);
+  });
+
+  testWidgets('imagen ⇒ sin botón externo (preview inline)', (tester) async {
+    await tester.pumpWidget(_host(_asset(contentType: 'image/png')));
+    await tester.pump();
+    expect(find.text('Reproducir'), findsNothing);
+    expect(find.text('Abrir'), findsNothing);
+  });
 }
 
 /// Empuja el detalle sobre una pila de navegación (para observar el pop) y
@@ -277,6 +332,7 @@ Future<void> _pushDetail(
                           MediaDetailCubit(repo: repo, asset: _asset()),
                       child: MediaDetailPage(
                         loader: _FakeLoader(Future<Uint8List?>.value(null)),
+                        launcher: _FakeLauncher(),
                       ),
                     ),
                   ),

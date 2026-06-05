@@ -58,6 +58,7 @@ import '../../features/invitations/domain/repositories/invitations_repository.da
 import '../../features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
 import '../../features/invitations/presentation/bloc/invitations_bloc.dart';
 import '../../features/invitations/presentation/pages/invitations_page.dart';
+import '../../features/media/data/repositories/url_launcher_media_preview_launcher.dart';
 import '../../features/media/domain/entities/media_asset.dart';
 import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
 import '../../features/media/presentation/bloc/media_detail_cubit.dart';
@@ -935,7 +936,10 @@ class AppRouter {
           }
           return BlocProvider<MediaDetailCubit>(
             create: (_) => MediaDetailCubit(repo: _mediaRepo, asset: asset),
-            child: MediaDetailPage(loader: _mediaThumbnailLoader),
+            child: MediaDetailPage(
+              loader: _mediaThumbnailLoader,
+              launcher: const UrlLauncherMediaPreviewLauncher(),
+            ),
           );
         },
       ),
