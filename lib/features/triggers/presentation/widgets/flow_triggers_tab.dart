@@ -210,6 +210,10 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final isText = trigger.triggerType == TriggerType.text;
+    final monoStyle = t.bodyMedium?.copyWith(
+      fontFamily: 'monospace',
+      fontFamilyFallback: const <String>['RobotoMono', 'Courier', 'monospace'],
+    );
     return Padding(
       key: Key('flow_triggers.row.${trigger.id}'),
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
@@ -220,18 +224,25 @@ class _Row extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
               Expanded(
-                child: Text(
-                  isText ? trigger.keyword : trigger.labelId,
-                  style: t.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    fontFamilyFallback: const <String>[
-                      'RobotoMono',
-                      'Courier',
-                      'monospace',
-                    ],
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                child: isText
+                    ? Text(
+                        trigger.keyword,
+                        style: monoStyle,
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    : BlocBuilder<LabelsBloc, LabelsState>(
+                        builder: (context, lblState) {
+                          final (text, mono) = _labelDisplay(
+                            trigger.labelId,
+                            lblState,
+                          );
+                          return Text(
+                            text,
+                            style: mono ? monoStyle : t.bodyMedium,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
+                      ),
               ),
               if (trigger.isActive)
                 AppPill.primary(
@@ -311,6 +322,21 @@ class _FailedView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Resuelve el `labelId` de un trigger LABEL a texto presentable, junto con
+/// si debe renderizarse en monospace. Con el catálogo cargado: el nombre si el
+/// id existe, o "Etiqueta eliminada" si no. Mientras carga o falló no podemos
+/// afirmar ausencia, así que mostramos el id crudo (monospace) como placeholder
+/// — nunca "eliminada", para no flashear texto erróneo antes de tener catálogo.
+(String, bool) _labelDisplay(String labelId, LabelsState state) {
+  if (state is LabelsLoaded) {
+    for (final l in state.labels) {
+      if (l.id == labelId) return (l.name, false);
+    }
+    return ('Etiqueta eliminada', false);
+  }
+  return (labelId, true);
 }
 
 String _matchLabel(MatchType m) => switch (m) {

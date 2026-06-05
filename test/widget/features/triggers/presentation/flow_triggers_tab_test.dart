@@ -57,6 +57,26 @@ Trigger _text({
   updatedAt: DateTime.utc(2026, 5, 1),
 );
 
+Trigger _label({
+  String id = 'lt1',
+  String labelId = 'vip',
+  String flowId = 'f1',
+  LabelAction action = LabelAction.add,
+}) => Trigger(
+  id: id,
+  templateId: 'tpl1',
+  flowId: flowId,
+  triggerType: TriggerType.label,
+  matchType: null,
+  keyword: '',
+  labelId: labelId,
+  labelAction: action,
+  scope: TriggerScope.both,
+  isActive: true,
+  createdAt: DateTime.utc(2026, 5, 1),
+  updatedAt: DateTime.utc(2026, 5, 1),
+);
+
 /// `FlowTriggersBody` es la unidad bajo prueba: consumer-only, espera
 /// el `TriggersBloc` en el árbol. El wrapper `FlowTriggersTab` que
 /// construye el bloc se cubre por separado en el cycle de cableado del
@@ -70,9 +90,12 @@ Widget _harness({
   required _MockTriggersBloc triggers,
   required fdom.Flow flow,
   _MockLabelsBloc? labels,
+  LabelsState? labelsState,
 }) {
   final lbls = labels ?? _MockLabelsBloc();
-  when(() => lbls.state).thenReturn(LabelsLoaded(<Label>[_lbl()]));
+  when(
+    () => lbls.state,
+  ).thenReturn(labelsState ?? LabelsLoaded(<Label>[_lbl()]));
   return MaterialApp(
     theme: AppDesignTheme.dark(),
     home: MultiBlocProvider(
@@ -228,6 +251,74 @@ void main() {
 
     expect(find.text('Editar disparador'), findsOneWidget);
     expect(find.byKey(const Key('trigger_edit.flow_fixed')), findsOneWidget);
+  });
+
+  group('Row de trigger LABEL resuelve labelId → nombre', () {
+    testWidgets('catálogo cargado y presente: muestra el nombre, no el id', (
+      tester,
+    ) async {
+      when(() => triggers.state).thenReturn(
+        TriggersLoaded(<Trigger>[
+          _label(id: 'lt', labelId: 'vip', flowId: 'f1'),
+        ]),
+      );
+
+      await tester.pumpWidget(
+        _harness(
+          triggers: triggers,
+          flow: _flow(id: 'f1'),
+          labelsState: LabelsLoaded(<Label>[_lbl(id: 'vip', name: 'VIP')]),
+        ),
+      );
+
+      expect(find.text('VIP'), findsOneWidget);
+      // El id crudo NUNCA debe quedar visible.
+      expect(find.text('vip'), findsNothing);
+    });
+
+    testWidgets('catálogo cargado y ausente: muestra "Etiqueta eliminada"', (
+      tester,
+    ) async {
+      when(() => triggers.state).thenReturn(
+        TriggersLoaded(<Trigger>[
+          _label(id: 'lt', labelId: 'ghost', flowId: 'f1'),
+        ]),
+      );
+
+      await tester.pumpWidget(
+        _harness(
+          triggers: triggers,
+          flow: _flow(id: 'f1'),
+          labelsState: LabelsLoaded(<Label>[_lbl(id: 'vip', name: 'VIP')]),
+        ),
+      );
+
+      expect(find.text('Etiqueta eliminada'), findsOneWidget);
+      expect(find.text('ghost'), findsNothing);
+    });
+
+    testWidgets('catálogo cargando: NO muestra "eliminada" (evita flash)', (
+      tester,
+    ) async {
+      when(() => triggers.state).thenReturn(
+        TriggersLoaded(<Trigger>[
+          _label(id: 'lt', labelId: 'vip', flowId: 'f1'),
+        ]),
+      );
+
+      await tester.pumpWidget(
+        _harness(
+          triggers: triggers,
+          flow: _flow(id: 'f1'),
+          labelsState: const LabelsLoading(),
+        ),
+      );
+
+      // Mientras el catálogo carga no podemos afirmar que la etiqueta no
+      // existe; mostramos el id como placeholder, nunca "Etiqueta eliminada".
+      expect(find.text('Etiqueta eliminada'), findsNothing);
+      expect(find.text('vip'), findsOneWidget);
+    });
   });
 
   group('FlowTriggersTab · cableado del catálogo al sheet', () {
