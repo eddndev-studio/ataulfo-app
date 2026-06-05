@@ -192,4 +192,57 @@ void main() {
     // Re-resolvió al cambiar el ref (no sirvió la resolución vieja).
     expect(loader.requested, <String>['tenant/o/media/x', 'tenant/o/media/y']);
   });
+
+  testWidgets(
+    'aparece la miniatura (null→source) con el mismo ref ⇒ re-resuelve el poster',
+    (tester) async {
+      // Loader que sólo devuelve bytes si el asset tiene fuente de miniatura:
+      // simula un video que entra sin derivar y luego recibe su poster.
+      final loader = _SourceAwareLoader(_png1x1);
+      MediaAsset video({String? thumb}) => MediaAsset(
+        ref: 'tenant/o/media/clip.mp4',
+        previewUrl: 'https://x/clip.mp4', // original, no renderable
+        filename: 'clip.mp4',
+        contentType: 'video/mp4',
+        size: 1,
+        createdAt: DateTime.utc(2026, 1, 1),
+        thumbnailUrl: thumb,
+      );
+      Widget at(MediaAsset a) => MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 120,
+              height: 120,
+              child: MediaThumbnail(
+                key: const Key('t'),
+                asset: a,
+                loader: loader,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Sin derivar ⇒ placeholder (ícono de video), sin Image.
+      await tester.pumpWidget(at(video(thumb: null)));
+      await tester.pump();
+      expect(find.byType(Image), findsNothing);
+
+      // Llega el poster con el MISMO ref ⇒ debe re-resolver y pintar la imagen.
+      await tester.pumpWidget(at(video(thumb: 'https://x/poster.jpg')));
+      await tester.pump();
+      expect(find.byType(Image), findsOneWidget);
+    },
+  );
+}
+
+/// Loader que responde según haya o no fuente de miniatura renderable.
+class _SourceAwareLoader implements MediaThumbnailLoader {
+  _SourceAwareLoader(this._bytes);
+  final Uint8List _bytes;
+  @override
+  Future<Uint8List?> load(MediaAsset asset) async =>
+      asset.thumbnailSourceUrl == null ? null : _bytes;
 }

@@ -45,6 +45,8 @@ MediaAsset _asset({
   String filename = 'foto.png',
   String alias = '',
   int size = 1536,
+  String? thumbnailUrl,
+  int? durationMs,
 }) => MediaAsset(
   ref: 'tenant/orgA/media/abc.png',
   previewUrl: 'https://x/sig',
@@ -53,6 +55,8 @@ MediaAsset _asset({
   contentType: contentType,
   size: size,
   createdAt: DateTime.utc(2026, 6, 5, 14, 30),
+  thumbnailUrl: thumbnailUrl,
+  durationMs: durationMs,
 );
 
 // Detalle como home (display/copy: no requiere pila de navegación).
@@ -112,6 +116,45 @@ void main() {
     );
     await tester.pump();
     expect(find.byIcon(Icons.picture_as_pdf_outlined), findsOneWidget);
+  });
+
+  testWidgets('video con duración ⇒ fila Duración formateada', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        _asset(
+          contentType: 'video/mp4',
+          filename: 'clip.mp4',
+          durationMs: 65000,
+        ),
+        loader: _FakeLoader(Future<Uint8List?>.value(null)),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Duración'), findsOneWidget);
+    expect(find.text('1:05'), findsOneWidget); // formatDuration(65000)
+  });
+
+  testWidgets('sin duración (imagen) ⇒ no hay fila Duración', (tester) async {
+    await tester.pumpWidget(_host(_asset()));
+    await tester.pump();
+    expect(find.text('Duración'), findsNothing);
+  });
+
+  testWidgets('video con poster ⇒ preview pinta Image (no sólo el ícono)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        _asset(
+          contentType: 'video/mp4',
+          filename: 'clip.mp4',
+          thumbnailUrl: 'https://x/poster.jpg',
+        ),
+        loader: _FakeLoader(Future<Uint8List?>.value(_png1x1)),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(Image), findsOneWidget);
   });
 
   testWidgets('copiar ref ⇒ Clipboard.setData con el ref BARE + snackbar', (

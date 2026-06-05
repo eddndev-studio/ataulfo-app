@@ -55,10 +55,17 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
   @override
   void didUpdateWidget(MediaThumbnail oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // El grid recicla widgets: si el ref cambia, re-resolver. (Los bytes de un
-    // mismo ref son inmutables, así que sólo el cambio de ref importa.)
+    // El grid recicla widgets: re-resolver si el ref cambia. También si la
+    // miniatura APARECE para el mismo ref (un video/audio que entró sin derivar
+    // y al re-listar ya trae su poster): pasar de "sin fuente" a "con fuente"
+    // dispara la resolución, sin re-resolver en cada rotación de la firma (la
+    // previewUrl/thumbnailUrl cambian por request, pero eso no debe re-bajar).
+    final gainedSource =
+        oldWidget.asset.thumbnailSourceUrl == null &&
+        widget.asset.thumbnailSourceUrl != null;
     if (oldWidget.asset.ref != widget.asset.ref ||
-        oldWidget.loader != widget.loader) {
+        oldWidget.loader != widget.loader ||
+        gainedSource) {
       _bytes = widget.loader.load(widget.asset);
     }
   }
@@ -173,9 +180,9 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
 
   /// Placeholder cuando no hay bytes que pintar: un ícono según el tipo de
   /// contenido sobre la superficie de la card. El nombre del asset NO va aquí
-  /// (lo aporta el caption inferior común a todas las miniaturas); las
-  /// miniaturas reales de video/audio quedan diferidas, así que el ícono es la
-  /// identidad visual del tipo.
+  /// (lo aporta el caption inferior común a todas las miniaturas). Video/audio
+  /// muestran su poster/forma de onda cuando el backend ya los derivó; mientras
+  /// tanto (o para documentos) el ícono es la identidad visual del tipo.
   Widget _placeholder() {
     final asset = widget.asset;
     return Container(

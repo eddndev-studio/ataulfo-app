@@ -25,6 +25,32 @@ void main() {
     });
   });
 
+  group('formatDuration', () {
+    test('menos de un minuto ⇒ m:ss', () {
+      expect(formatDuration(5000), '0:05');
+      expect(formatDuration(59000), '0:59');
+    });
+
+    test('minutos:segundos con padding de segundos', () {
+      expect(formatDuration(65000), '1:05');
+      expect(formatDuration(600000), '10:00');
+    });
+
+    test('una hora o más ⇒ h:mm:ss', () {
+      expect(formatDuration(3600000), '1:00:00');
+      expect(formatDuration(3661000), '1:01:01');
+    });
+
+    test('trunca milisegundos al segundo inferior', () {
+      expect(formatDuration(3900), '0:03');
+    });
+
+    test('cero o negativo (defensivo) ⇒ 0:00', () {
+      expect(formatDuration(0), '0:00');
+      expect(formatDuration(-1), '0:00');
+    });
+  });
+
   group('formatDate', () {
     test('dd/MM/yyyy HH:mm con padding de dos dígitos', () {
       // Formatea los campos del DateTime dado tal cual (el call-site decide si

@@ -18,6 +18,21 @@ String formatBytes(int bytes) {
   return '${value.toStringAsFixed(1)} ${units[unit]}';
 }
 
+/// Duración legible de un medio a partir de sus milisegundos. `m:ss` por debajo
+/// de una hora; `h:mm:ss` a partir de una hora. Trunca al segundo inferior.
+/// Cero o negativo (defensivo) ⇒ `0:00`. El call-site sólo la muestra cuando
+/// hay duración conocida (`> 0`); este `0:00` es la red de seguridad.
+String formatDuration(int milliseconds) {
+  if (milliseconds <= 0) return '0:00';
+  final totalSeconds = milliseconds ~/ 1000;
+  final h = totalSeconds ~/ 3600;
+  final m = (totalSeconds % 3600) ~/ 60;
+  final s = totalSeconds % 60;
+  String two(int n) => n.toString().padLeft(2, '0');
+  if (h > 0) return '$h:${two(m)}:${two(s)}';
+  return '$m:${two(s)}';
+}
+
 /// Fecha/hora como `dd/MM/yyyy HH:mm`, formateando los campos del [dt] tal cual
 /// (UTC o local según lo que pase el call-site). Padding de dos dígitos.
 String formatDate(DateTime dt) {

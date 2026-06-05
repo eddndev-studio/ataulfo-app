@@ -63,6 +63,32 @@ void main() {
       expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));
     });
 
+    test('thumbnail_url + duration_ms presentes => capturados', () {
+      final r = MediaAssetResp.fromJson(
+        valid()
+          ..['thumbnail_url'] = 'https://x/thumb'
+          ..['duration_ms'] = 4200,
+      );
+      expect(r.thumbnailUrl, 'https://x/thumb');
+      expect(r.durationMs, 4200);
+    });
+
+    test('thumbnail_url + duration_ms ausentes => null (omitempty)', () {
+      final r = MediaAssetResp.fromJson(valid());
+      expect(r.thumbnailUrl, isNull);
+      expect(r.durationMs, isNull);
+    });
+
+    test('thumbnail_url de tipo equivocado => FormatException', () {
+      final j = valid()..['thumbnail_url'] = 7;
+      expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));
+    });
+
+    test('duration_ms de tipo equivocado => FormatException', () {
+      final j = valid()..['duration_ms'] = 'long';
+      expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));
+    });
+
     test('filename ausente => FormatException', () {
       final j = valid()..remove('filename');
       expect(() => MediaAssetResp.fromJson(j), throwsA(isA<FormatException>()));

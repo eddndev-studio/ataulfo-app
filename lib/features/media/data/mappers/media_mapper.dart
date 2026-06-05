@@ -22,6 +22,8 @@ class MediaMapper {
     contentType: resp.contentType,
     size: resp.size,
     createdAt: DateTime.parse(resp.createdAt),
+    thumbnailUrl: resp.thumbnailUrl,
+    durationMs: resp.durationMs,
   );
 
   static MediaPage listRespToPage(MediaListResp resp) => MediaPage(

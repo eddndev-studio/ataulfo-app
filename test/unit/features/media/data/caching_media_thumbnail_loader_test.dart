@@ -35,6 +35,16 @@ MediaAsset _asset({String? previewUrl}) => MediaAsset(
   createdAt: DateTime.utc(2026, 1, 1),
 );
 
+MediaAsset _video({String? previewUrl, String? thumbnailUrl}) => MediaAsset(
+  ref: 'tenant/o/media/clip.mp4',
+  previewUrl: previewUrl,
+  filename: 'clip.mp4',
+  contentType: 'video/mp4',
+  size: 9,
+  createdAt: DateTime.utc(2026, 1, 1),
+  thumbnailUrl: thumbnailUrl,
+);
+
 void main() {
   final cached = Uint8List.fromList(<int>[7, 7, 7]);
   final fetched = Uint8List.fromList(<int>[1, 2, 3]);
@@ -78,6 +88,53 @@ void main() {
       expect(out, fetched);
       expect(store.writes, <String>['tenant/o/media/abc.png']);
       expect(await store.read('tenant/o/media/abc.png'), fetched);
+    },
+  );
+
+  test(
+    'video con thumbnailUrl: descarga el POSTER (no el original) y lo cachea por ref',
+    () async {
+      final store = _FakeStore();
+      final loader = CachingMediaThumbnailLoader(
+        store: store,
+        download: (url) async {
+          // Debe pedir el poster derivado, NUNCA el archivo de video original.
+          expect(url, 'https://x/poster.jpg');
+          return fetched;
+        },
+      );
+
+      final out = await loader.load(
+        _video(
+          previewUrl: 'https://x/clip.mp4', // original, no renderable
+          thumbnailUrl: 'https://x/poster.jpg',
+        ),
+      );
+
+      expect(out, fetched);
+      expect(store.writes, <String>['tenant/o/media/clip.mp4']);
+    },
+  );
+
+  test(
+    'video sin thumbnailUrl: null y NO descarga el original (evita bajar el video entero)',
+    () async {
+      final store = _FakeStore();
+      var downloads = 0;
+      final loader = CachingMediaThumbnailLoader(
+        store: store,
+        download: (url) async {
+          downloads++;
+          return fetched;
+        },
+      );
+
+      expect(
+        await loader.load(_video(previewUrl: 'https://x/clip.mp4')),
+        isNull,
+      );
+      expect(downloads, 0);
+      expect(store.writes, isEmpty);
     },
   );
 
