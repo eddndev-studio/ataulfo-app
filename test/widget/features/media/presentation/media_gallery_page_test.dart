@@ -291,6 +291,44 @@ void main() {
     verifyNever(() => bloc.add(const MediaGallerySearchChanged('logo')));
   });
 
+  testWidgets('tabs de tipo: tap a una familia despacha TypeChanged', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: BlocProvider<MediaGalleryBloc>.value(
+          value: bloc,
+          child: const Scaffold(
+            body: MediaGalleryPage(
+              loader: FakeThumbnailLoader(),
+              showTypeTabs: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const Key('media_gallery.type_chip.all')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('media_gallery.type_chip.image')));
+    await tester.pump();
+    verify(() => bloc.add(const MediaGalleryTypeChanged('image'))).called(1);
+  });
+
+  testWidgets('sin showTypeTabs no se renderizan las tabs', (tester) async {
+    when(() => bloc.state).thenReturn(
+      const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
+    );
+    await tester.pumpWidget(host()); // showTypeTabs por defecto false
+    expect(find.byKey(const Key('media_gallery.type_chip.all')), findsNothing);
+  });
+
   testWidgets('FAB de subida dispara MediaGalleryUploadRequested', (
     tester,
   ) async {

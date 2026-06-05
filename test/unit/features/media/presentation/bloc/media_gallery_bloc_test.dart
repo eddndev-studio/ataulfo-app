@@ -572,6 +572,48 @@ void main() {
         expect: () => <Matcher>[],
       );
     });
+
+    group('filtro por tipo dinámico (MediaGalleryTypeChanged)', () {
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'cambia la familia ⇒ [Loading, Loaded] y pasa type= al repo',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
+          );
+          return MediaGalleryBloc(repo: _lastRepo, picker: _MockPicker());
+        },
+        act: (b) => b.add(const MediaGalleryTypeChanged('video')),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoading>(),
+          isA<MediaGalleryLoaded>(),
+        ],
+        verify: (_) {
+          verify(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: 'video',
+              q: any(named: 'q'),
+            ),
+          ).called(1);
+        },
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'misma familia que la activa (null en browse) ⇒ no recarga',
+        build: () => MediaGalleryBloc(repo: _MockRepo(), picker: _MockPicker()),
+        act: (b) => b.add(const MediaGalleryTypeChanged(null)),
+        expect: () => <Matcher>[],
+      );
+    });
   });
 }
 
