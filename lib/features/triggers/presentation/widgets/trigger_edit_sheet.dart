@@ -4,8 +4,9 @@
 // selección. Son helpers privados de este sheet y solo se usan aquí:
 // repartirlos en archivos hermanos obligaría a compartir estructuras
 // privadas sin ganancia de reutilización. El selector de etiqueta, en
-// cambio, sí salió a `label_picker.dart` por ser una unidad autónoma con
-// estado propio (consume el `LabelsBloc`).
+// cambio, vive en la feature `labels` (`labels/.../label_picker.dart`) por
+// ser una unidad autónoma con estado propio (consume el `LabelsBloc`),
+// reutilizable por disparadores y por el paso LABEL de los flujos.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -17,8 +18,8 @@ import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../domain/entities/trigger.dart';
 import '../../domain/failures/triggers_failure.dart';
+import '../../../labels/presentation/widgets/label_picker.dart';
 import '../bloc/triggers_bloc.dart';
-import 'label_picker.dart';
 
 /// Modal sheet de creación/edición de un Trigger. El sheet vive siempre
 /// dentro del editor de un flujo concreto: `scopedFlow` es el Flow del

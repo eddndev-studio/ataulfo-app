@@ -10,6 +10,8 @@ import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_detail_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/pages/flow_detail_page.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/triggers/presentation/widgets/flow_triggers_tab.dart';
@@ -26,6 +28,8 @@ class _MockStepsBloc extends MockBloc<FlowStepsEvent, FlowStepsState>
     implements FlowStepsBloc {}
 
 class _MockTriggersRepo extends Mock implements TriggersRepository {}
+
+class _MockLabelsRepo extends Mock implements LabelsRepository {}
 
 const _flow = flows.Flow(
   id: 'f1',
@@ -47,11 +51,13 @@ void main() {
   late _MockDetailBloc detailBloc;
   late _MockStepsBloc stepsBloc;
   late _MockTriggersRepo triggersRepo;
+  late _MockLabelsRepo labelsRepo;
 
   setUp(() {
     detailBloc = _MockDetailBloc();
     stepsBloc = _MockStepsBloc();
     triggersRepo = _MockTriggersRepo();
+    labelsRepo = _MockLabelsRepo();
     when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
     when(() => stepsBloc.state).thenReturn(const FlowStepsLoading());
     // Mantiene el TriggersBloc (creado lazy por FlowTriggersTab) en
@@ -59,12 +65,18 @@ void main() {
     when(
       () => triggersRepo.listTriggers(any()),
     ).thenAnswer((_) => Completer<List<Trigger>>().future);
+    // El LabelsBloc lo crea `_openStepSheet` al abrir el sheet (para el paso
+    // LABEL); el catálogo vacío basta para los tests que solo abren el sheet.
+    when(() => labelsRepo.listLabels()).thenAnswer((_) async => <Label>[]);
   });
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: RepositoryProvider<TriggersRepository>.value(
-      value: triggersRepo,
+    home: MultiRepositoryProvider(
+      providers: <RepositoryProvider<dynamic>>[
+        RepositoryProvider<TriggersRepository>.value(value: triggersRepo),
+        RepositoryProvider<LabelsRepository>.value(value: labelsRepo),
+      ],
       child: MultiBlocProvider(
         providers: <BlocProvider<dynamic>>[
           BlocProvider<FlowDetailBloc>.value(value: detailBloc),

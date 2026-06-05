@@ -41,11 +41,14 @@ void main() {
       },
     );
 
-    test('type desconocido propaga ArgumentError (fail-loud)', () {
+    test('type desconocido degrada a StepType.unsupported (no crashea)', () {
+      // Un tipo que el cliente no conoce ya no rompe el mapeo del listado:
+      // degrada a `unsupported` para que el flujo cargue y los demás pasos se
+      // preserven (se renderiza como "actualiza la app").
       const resp = StepResp(
         id: 's1',
         flowId: 'f1',
-        type: 'TOOL',
+        type: 'FUTURE_TYPE',
         order: 0,
         content: '',
         mediaRef: '',
@@ -54,7 +57,10 @@ void main() {
         jitterPct: 0,
         aiOnly: false,
       );
-      expect(() => StepsMapper.stepRespToEntity(resp), throwsArgumentError);
+      expect(
+        StepsMapper.stepRespToEntity(resp).type,
+        fdom.StepType.unsupported,
+      );
     });
   });
 
