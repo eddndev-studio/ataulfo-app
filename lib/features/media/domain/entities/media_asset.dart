@@ -17,14 +17,28 @@ class MediaAsset {
     required this.size,
     required this.createdAt,
     this.alias = '',
+    this.thumbnailUrl,
+    this.durationMs,
   });
 
   /// Identificador BARE canónico del archivo. Sin esquema ni query de firma.
   final String ref;
 
   /// URL firmada de previsualización (efímera). `null` cuando el backend no la
-  /// emite (omitempty del wire).
+  /// emite (omitempty del wire). Para una imagen es la imagen misma; para
+  /// video/audio es el ARCHIVO ORIGINAL (no renderable como imagen) — la
+  /// miniatura renderable de esos vive en [thumbnailUrl].
   final String? previewUrl;
+
+  /// URL firmada (efímera) de la MINIATURA derivada por el backend: el poster
+  /// de un video o la forma de onda de un audio. `null` cuando no hay derivado
+  /// (aún sin generar, o tipo sin miniatura como imagen/documento). NUNCA
+  /// identidad —como [previewUrl], expira—.
+  final String? thumbnailUrl;
+
+  /// Duración del medio en milisegundos (video/audio). `null` cuando no se
+  /// conoce o no aplica (imagen/documento).
+  final int? durationMs;
 
   /// Nombre original de subida (inmutable).
   final String filename;
@@ -40,9 +54,22 @@ class MediaAsset {
   /// reimplemente.
   String get displayName => alias.isNotEmpty ? alias : filename;
 
+  /// URL de una imagen RENDERABLE para la miniatura del grid: el poster/forma
+  /// de onda derivado ([thumbnailUrl]) si existe; si no, la [previewUrl] SÓLO
+  /// cuando el asset es una imagen (su preview ES la imagen). Para video/audio/
+  /// documento sin derivado ⇒ `null`, y el consumidor cae al ícono por tipo.
+  /// Centraliza la regla para que ni el loader ni los widgets la reimplementen.
+  String? get thumbnailSourceUrl {
+    final t = thumbnailUrl;
+    if (t != null && t.isNotEmpty) return t;
+    if (contentType.startsWith('image/')) return previewUrl;
+    return null;
+  }
+
   /// Copia con campos sobreescritos. El uso principal es actualizar el [alias]
   /// in-place tras un rename sin re-listar (el resto de campos son inmutables
-  /// para un mismo [ref]).
+  /// para un mismo [ref]). Los derivados ([thumbnailUrl]/[durationMs]) se
+  /// conservan: un rename no debe perder la miniatura ya resuelta.
   MediaAsset copyWith({String? alias}) => MediaAsset(
     ref: ref,
     previewUrl: previewUrl,
@@ -51,6 +78,8 @@ class MediaAsset {
     contentType: contentType,
     size: size,
     createdAt: createdAt,
+    thumbnailUrl: thumbnailUrl,
+    durationMs: durationMs,
   );
 
   /// Tamaño en bytes reportado por el servidor.
@@ -69,7 +98,9 @@ class MediaAsset {
         other.alias == alias &&
         other.contentType == contentType &&
         other.size == size &&
-        other.createdAt == createdAt;
+        other.createdAt == createdAt &&
+        other.thumbnailUrl == thumbnailUrl &&
+        other.durationMs == durationMs;
   }
 
   @override
@@ -81,6 +112,8 @@ class MediaAsset {
     contentType,
     size,
     createdAt,
+    thumbnailUrl,
+    durationMs,
   );
 }
 

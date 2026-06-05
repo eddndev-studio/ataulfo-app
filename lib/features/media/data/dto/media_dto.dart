@@ -40,6 +40,8 @@ class MediaAssetResp {
     required this.createdAt,
     this.url,
     this.alias = '',
+    this.thumbnailUrl,
+    this.durationMs,
   });
 
   factory MediaAssetResp.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,8 @@ class MediaAssetResp {
     final contentType = json['content_type'];
     final size = json['size'];
     final createdAt = json['created_at'];
+    final thumbnailUrl = json['thumbnail_url'];
+    final durationMs = json['duration_ms'];
     if (ref is! String ||
         filename is! String ||
         contentType is! String ||
@@ -65,6 +69,18 @@ class MediaAssetResp {
     if (alias != null && alias is! String) {
       throw const FormatException('mediaAssetResp: alias no es String ni null');
     }
+    // thumbnail_url y duration_ms son omitempty (sólo presentes para assets ya
+    // derivados): ausente/null ⇒ null; presente de tipo equivocado ⇒ contrato roto.
+    if (thumbnailUrl != null && thumbnailUrl is! String) {
+      throw const FormatException(
+        'mediaAssetResp: thumbnail_url no es String ni null',
+      );
+    }
+    if (durationMs != null && durationMs is! int) {
+      throw const FormatException(
+        'mediaAssetResp: duration_ms no es int ni null',
+      );
+    }
     return MediaAssetResp(
       ref: ref,
       url: url as String?,
@@ -73,6 +89,8 @@ class MediaAssetResp {
       contentType: contentType,
       size: size,
       createdAt: createdAt,
+      thumbnailUrl: thumbnailUrl as String?,
+      durationMs: durationMs as int?,
     );
   }
 
@@ -92,6 +110,13 @@ class MediaAssetResp {
 
   /// ISO-8601 crudo del wire; el mapper lo parsea a `DateTime`.
   final String createdAt;
+
+  /// URL firmada de la miniatura derivada (poster/forma de onda), o `null`
+  /// (omitempty: sólo presente para assets ya derivados).
+  final String? thumbnailUrl;
+
+  /// Duración del medio en ms, o `null` (omitempty: sin duración conocida).
+  final int? durationMs;
 }
 
 /// Envelope del listado: `{ "assets": [...], "next_cursor": "<opaco|"">" }`.
