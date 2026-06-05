@@ -25,6 +25,7 @@ class MediaGalleryPage extends StatelessWidget {
     required this.loader,
     this.onSelect,
     this.onOpenDetail,
+    this.showTypeTabs = false,
   });
 
   /// Resuelve los bytes de cada miniatura (cache local por ref → red). Inyectado
@@ -44,6 +45,11 @@ class MediaGalleryPage extends StatelessWidget {
   /// [onSelect] ⇒ la galería es sólo visor (tap inerte).
   final Future<bool> Function(MediaAsset asset)? onOpenDetail;
 
+  /// Muestra las tabs de filtro por familia (image|video|audio|document). Sólo
+  /// en browse: en el picker el tipo lo fija el paso de flujo y cambiarlo
+  /// rompería esa restricción, así que ahí queda en false.
+  final bool showTypeTabs;
+
   @override
   Widget build(BuildContext context) {
     // El campo de búsqueda vive ARRIBA del switch de estado: persiste mientras
@@ -52,6 +58,7 @@ class MediaGalleryPage extends StatelessWidget {
     return Column(
       children: <Widget>[
         const _SearchField(),
+        if (showTypeTabs) const _TypeTabs(),
         Expanded(
           child: BlocListener<MediaGalleryBloc, MediaGalleryState>(
             listenWhen: (prev, curr) =>
@@ -189,6 +196,60 @@ class _FailedView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Tabs de filtro por familia (browse). Mantiene la familia seleccionada
+/// localmente (el bloc no la expone en su estado) y despacha
+/// [MediaGalleryTypeChanged] al cambiar. 'Todos' = sin filtro (null).
+class _TypeTabs extends StatefulWidget {
+  const _TypeTabs();
+
+  @override
+  State<_TypeTabs> createState() => _TypeTabsState();
+}
+
+class _TypeTabsState extends State<_TypeTabs> {
+  static const List<(String?, String)> _families = <(String?, String)>[
+    (null, 'Todos'),
+    ('image', 'Imágenes'),
+    ('video', 'Video'),
+    ('audio', 'Audio'),
+    ('document', 'Documentos'),
+  ];
+
+  String? _selected;
+
+  void _select(String? family) {
+    if (family == _selected) return;
+    setState(() => _selected = family);
+    context.read<MediaGalleryBloc>().add(MediaGalleryTypeChanged(family));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp4,
+          vertical: AppTokens.sp2,
+        ),
+        children: <Widget>[
+          for (final (String? family, String label) in _families)
+            Padding(
+              padding: const EdgeInsets.only(right: AppTokens.sp2),
+              child: ChoiceChip(
+                key: Key('media_gallery.type_chip.${family ?? 'all'}'),
+                label: Text(label),
+                selected: _selected == family,
+                onSelected: (_) => _select(family),
+              ),
+            ),
+        ],
       ),
     );
   }

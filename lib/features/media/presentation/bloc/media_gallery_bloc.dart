@@ -25,6 +25,7 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     on<MediaGalleryRefreshRequested>(_onRefresh);
     on<MediaGalleryUploadRequested>(_onUpload);
     on<MediaGallerySearchChanged>(_onSearchChanged);
+    on<MediaGalleryTypeChanged>(_onTypeChanged);
   }
 
   final MediaRepository _repo;
@@ -41,11 +42,11 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
   String? get _queryParam => _query.isEmpty ? null : _query;
 
   /// Familia de content-type por la que se filtra el catálogo (image|video|
-  /// audio|document). null ⇒ galería completa (modo browse); no-null ⇒ la
-  /// galería se usa como picker filtrado por el tipo del paso de flujo. Se fija
-  /// al construir y se aplica a TODAS las páginas (primera, load-more, refresh,
-  /// re-list tras subir) para que la paginación no mezcle familias.
-  final String? _type;
+  /// audio|document). null ⇒ galería completa. Se inicializa al construir: en el
+  /// picker queda fijo (el tipo del paso de flujo; la UI no muestra tabs ahí) y
+  /// en browse arranca null y lo cambian las tabs vía [MediaGalleryTypeChanged].
+  /// Se aplica a TODAS las páginas para que la paginación no mezcle familias.
+  String? _type;
 
   Future<void> _onLoad(
     MediaGalleryLoadRequested event,
@@ -176,6 +177,26 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
       emit(MediaGalleryFailed(f));
     }
   }
+
+  /// Cambia la familia filtrada (tabs de browse) y recarga la primera página,
+  /// preservando la búsqueda activa. Guards de no-cambio y de obsolescencia,
+  /// como la búsqueda (taps rápidos podrían reordenar respuestas).
+  Future<void> _onTypeChanged(
+    MediaGalleryTypeChanged event,
+    Emitter<MediaGalleryState> emit,
+  ) async {
+    if (event.type == _type) return;
+    _type = event.type;
+    emit(const MediaGalleryLoading());
+    try {
+      final page = await _repo.listAssets(type: event.type, q: _queryParam);
+      if (_type != event.type) return; // un cambio de tipo más nuevo ganó
+      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+    } on MediaFailure catch (f) {
+      if (_type != event.type) return;
+      emit(MediaGalleryFailed(f));
+    }
+  }
 }
 
 // Events --------------------------------------------------------------------
@@ -234,6 +255,20 @@ class MediaGallerySearchChanged extends MediaGalleryEvent {
       other is MediaGallerySearchChanged && other.query == query;
   @override
   int get hashCode => Object.hash(MediaGallerySearchChanged, query);
+}
+
+/// Cambia la familia filtrada (image|video|audio|document, o null = todas) y
+/// recarga la primera página. Sólo lo despachan las tabs de browse.
+class MediaGalleryTypeChanged extends MediaGalleryEvent {
+  const MediaGalleryTypeChanged(this.type);
+
+  final String? type;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MediaGalleryTypeChanged && other.type == type;
+  @override
+  int get hashCode => Object.hash(MediaGalleryTypeChanged, type);
 }
 
 // States --------------------------------------------------------------------

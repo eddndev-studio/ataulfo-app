@@ -912,6 +912,7 @@ class AppRouter {
             // refresca. El picker usa onSelect (pop con el ref); aquí onOpenDetail.
             body: MediaGalleryPage(
               loader: _mediaThumbnailLoader,
+              showTypeTabs: true,
               onOpenDetail: (asset) async =>
                   (await context.push<bool>('/media/detail', extra: asset)) ??
                   false,
