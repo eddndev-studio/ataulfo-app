@@ -1215,6 +1215,100 @@ void main() {
     });
   });
 
+  group('DioFlowsDatasource.deleteFlow', () {
+    test('204 OK — request path correcto', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response<void>(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          statusCode: 204,
+        ),
+      );
+
+      await ds.deleteFlow('f1');
+
+      final captured = verify(
+        () => dio.delete<void>(captureAny(), options: any(named: 'options')),
+      ).captured;
+      expect(captured[0], '/flows/f1');
+    });
+
+    test('404 NO se mapea a failure — idempotente', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/flows/f1'),
+            statusCode: 404,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      // No debe lanzar — el DELETE es idempotente HTTP.
+      await ds.deleteFlow('f1');
+    });
+
+    test('403 → FlowsForbiddenFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/flows/f1'),
+            statusCode: 403,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteFlow('f1'),
+        throwsA(isA<FlowsForbiddenFailure>()),
+      );
+    });
+
+    test('connectionError → FlowsNetworkFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteFlow('f1'),
+        throwsA(isA<FlowsNetworkFailure>()),
+      );
+    });
+
+    test('5xx → FlowsServerFailure', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/flows/f1'),
+            statusCode: 500,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      await expectLater(
+        () => ds.deleteFlow('f1'),
+        throwsA(isA<FlowsServerFailure>()),
+      );
+    });
+  });
+
   group('DioFlowsDatasource.updateFlow happy path', () {
     test(
       '200 con body devuelve Flow mapeado y PUT al path correcto con documento completo',
