@@ -19,6 +19,15 @@ class FilePickerMediaFilePicker implements MediaFilePicker {
     final result = await FilePicker.platform.pickFiles(withData: true);
     return pickedFromResult(result);
   }
+
+  @override
+  Future<List<PickedMedia>> pickMultiple() async {
+    final result = await FilePicker.platform.pickFiles(
+      withData: true,
+      allowMultiple: true,
+    );
+    return pickedListFromResult(result);
+  }
 }
 
 /// Mapea el resultado de `file_picker` al puerto. Devuelve null cuando el
@@ -33,4 +42,17 @@ PickedMedia? pickedFromResult(FilePickerResult? result) {
   final bytes = file.bytes;
   if (bytes == null) return null;
   return PickedMedia(bytes: bytes, filename: file.name);
+}
+
+/// Mapea un resultado multi-archivo al puerto. Cancelar (`result == null`) o
+/// ningún archivo ⇒ lista vacía. Los archivos sin bytes se omiten (defensa:
+/// `withData` debería poblarlos; no se sube un [PickedMedia] con bytes nulos).
+@visibleForTesting
+List<PickedMedia> pickedListFromResult(FilePickerResult? result) {
+  if (result == null) return const <PickedMedia>[];
+  return <PickedMedia>[
+    for (final file in result.files)
+      if (file.bytes case final bytes?)
+        PickedMedia(bytes: bytes, filename: file.name),
+  ];
 }

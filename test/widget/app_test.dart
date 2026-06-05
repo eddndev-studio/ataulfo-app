@@ -76,6 +76,9 @@ class _MockNotificationsRepo extends Mock implements NotificationsRepository {}
 class _FakeMediaFilePicker implements MediaFilePicker {
   @override
   Future<PickedMedia?> pick() async => null;
+
+  @override
+  Future<List<PickedMedia>> pickMultiple() async => const <PickedMedia>[];
 }
 
 void main() {

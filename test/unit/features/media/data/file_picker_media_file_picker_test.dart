@@ -40,4 +40,39 @@ void main() {
       },
     );
   });
+
+  group('pickedListFromResult (multi-archivo)', () {
+    test('mapea TODOS los archivos con bytes', () {
+      final a = Uint8List.fromList([1, 2]);
+      final b = Uint8List.fromList([3, 4, 5]);
+      final result = FilePickerResult([
+        PlatformFile(name: 'a.png', size: a.length, bytes: a),
+        PlatformFile(name: 'b.pdf', size: b.length, bytes: b),
+      ]);
+
+      final picked = pickedListFromResult(result);
+
+      expect(picked, hasLength(2));
+      expect(picked[0].filename, 'a.png');
+      expect(picked[0].bytes, a);
+      expect(picked[1].filename, 'b.pdf');
+    });
+
+    test('result null (cancelado) ⇒ lista vacía', () {
+      expect(pickedListFromResult(null), isEmpty);
+    });
+
+    test('omite los archivos sin bytes, conserva el resto', () {
+      final a = Uint8List.fromList([1, 2]);
+      final result = FilePickerResult([
+        PlatformFile(name: 'ok.png', size: a.length, bytes: a),
+        PlatformFile(name: 'sinbytes.bin', size: 0), // bytes null ⇒ se omite
+      ]);
+
+      final picked = pickedListFromResult(result);
+
+      expect(picked, hasLength(1));
+      expect(picked.single.filename, 'ok.png');
+    });
+  });
 }
