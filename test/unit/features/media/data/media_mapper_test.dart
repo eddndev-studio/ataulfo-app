@@ -75,6 +75,37 @@ void main() {
       expect(noAlias.displayName, 'orig.png');
     });
 
+    test(
+      'thumbnail_url + duration_ms del wire => entity; ausentes => null',
+      () {
+        final withDeriv = MediaMapper.assetRespToEntity(
+          MediaAssetResp.fromJson(<String, dynamic>{
+            'ref': 'tenant/o/media/v.mp4',
+            'filename': 'v.mp4',
+            'content_type': 'video/mp4',
+            'size': 1,
+            'created_at': '2026-05-30T12:00:00Z',
+            'thumbnail_url': 'https://cdn/thumb.jpg',
+            'duration_ms': 4200,
+          }),
+        );
+        expect(withDeriv.thumbnailUrl, 'https://cdn/thumb.jpg');
+        expect(withDeriv.durationMs, 4200);
+
+        final noDeriv = MediaMapper.assetRespToEntity(
+          MediaAssetResp.fromJson(<String, dynamic>{
+            'ref': 'r',
+            'filename': 'f',
+            'content_type': 'image/png',
+            'size': 1,
+            'created_at': '2026-05-30T12:00:00Z',
+          }),
+        );
+        expect(noDeriv.thumbnailUrl, isNull);
+        expect(noDeriv.durationMs, isNull);
+      },
+    );
+
     test('created_at ISO-8601 => DateTime (UTC del wire)', () {
       final resp = MediaAssetResp.fromJson(<String, dynamic>{
         'ref': 'r',

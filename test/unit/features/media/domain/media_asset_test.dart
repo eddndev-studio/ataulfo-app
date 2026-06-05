@@ -82,6 +82,100 @@ void main() {
       expect(withAlias.copyWith(alias: '').alias, '');
     });
 
+    test(
+      'thumbnailSourceUrl: imagen usa previewUrl (su preview ES la imagen)',
+      () {
+        final img = MediaAsset(
+          ref: 'r',
+          previewUrl: 'https://x/img',
+          filename: 'a.png',
+          contentType: 'image/png',
+          size: 1,
+          createdAt: createdAt,
+        );
+        expect(img.thumbnailSourceUrl, 'https://x/img');
+      },
+    );
+
+    test(
+      'thumbnailSourceUrl: video con thumbnailUrl usa el poster, NO el original',
+      () {
+        final vid = MediaAsset(
+          ref: 'r',
+          previewUrl:
+              'https://x/video.mp4', // el archivo original, no renderable
+          filename: 'v.mp4',
+          contentType: 'video/mp4',
+          size: 1,
+          createdAt: createdAt,
+          thumbnailUrl: 'https://x/poster.jpg',
+          durationMs: 4200,
+        );
+        expect(vid.thumbnailSourceUrl, 'https://x/poster.jpg');
+      },
+    );
+
+    test(
+      'thumbnailSourceUrl: video sin thumbnailUrl => null (cae al ícono)',
+      () {
+        final vid = MediaAsset(
+          ref: 'r',
+          previewUrl: 'https://x/video.mp4',
+          filename: 'v.mp4',
+          contentType: 'video/mp4',
+          size: 1,
+          createdAt: createdAt,
+        );
+        expect(vid.thumbnailSourceUrl, isNull);
+      },
+    );
+
+    test('thumbnailSourceUrl: documento sin thumbnailUrl => null', () {
+      final doc = MediaAsset(
+        ref: 'r',
+        previewUrl: 'https://x/doc.pdf',
+        filename: 'd.pdf',
+        contentType: 'application/pdf',
+        size: 1,
+        createdAt: createdAt,
+      );
+      expect(doc.thumbnailSourceUrl, isNull);
+    });
+
+    test(
+      'copyWith preserva thumbnailUrl + durationMs (rename no los pierde)',
+      () {
+        final vid = MediaAsset(
+          ref: 'r',
+          previewUrl: 'https://x/video.mp4',
+          filename: 'v.mp4',
+          contentType: 'video/mp4',
+          size: 1,
+          createdAt: createdAt,
+          thumbnailUrl: 'https://x/poster.jpg',
+          durationMs: 4200,
+        );
+        final renamed = vid.copyWith(alias: 'Clip');
+        expect(renamed.thumbnailUrl, 'https://x/poster.jpg');
+        expect(renamed.durationMs, 4200);
+        expect(renamed.alias, 'Clip');
+      },
+    );
+
+    test('derivados distintos => instancias distintas (igualdad de valor)', () {
+      MediaAsset withThumb(String? t) => MediaAsset(
+        ref: 'r',
+        previewUrl: null,
+        filename: 'v.mp4',
+        contentType: 'video/mp4',
+        size: 1,
+        createdAt: createdAt,
+        thumbnailUrl: t,
+      );
+      expect(withThumb('a'), isNot(withThumb('b')));
+      expect(withThumb('a'), withThumb('a'));
+    });
+
     test('alias distinto => instancias distintas (igualdad de valor)', () {
       final a = MediaAsset(
         ref: 'r',
