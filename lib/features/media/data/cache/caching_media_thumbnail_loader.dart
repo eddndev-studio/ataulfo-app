@@ -30,7 +30,11 @@ class CachingMediaThumbnailLoader implements MediaThumbnailLoader {
     final cached = await _store.read(asset.ref);
     if (cached != null) return cached;
 
-    final url = asset.previewUrl;
+    // La fuente de la miniatura es una IMAGEN renderable: para video/audio el
+    // poster/forma de onda derivado, para imágenes la previewUrl. Para los
+    // tipos sin derivado (video/audio aún sin procesar, documentos) es null y
+    // se cae al placeholder — sin bajar el archivo original entero.
+    final url = asset.thumbnailSourceUrl;
     if (url == null) return null;
 
     final bytes = await _download(url);

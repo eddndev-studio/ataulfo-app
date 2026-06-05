@@ -255,7 +255,10 @@ class _Preview extends StatefulWidget {
 class _PreviewState extends State<_Preview> {
   late final Future<Uint8List?> _bytes = widget.loader.load(widget.asset);
 
-  bool get _isImage => widget.asset.contentType.startsWith('image/');
+  /// Hay una imagen renderable que pintar: la imagen misma, o el poster/forma
+  /// de onda derivado de un video/audio. Sin fuente (documento, o video/audio
+  /// aún sin derivar) ⇒ ícono del tipo.
+  bool get _hasRenderable => widget.asset.thumbnailSourceUrl != null;
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +273,7 @@ class _PreviewState extends State<_Preview> {
         child: Container(
           color: AppTokens.surface2,
           alignment: Alignment.center,
-          child: _isImage ? _image() : _typeIcon(),
+          child: _hasRenderable ? _image() : _typeIcon(),
         ),
       ),
     );
@@ -335,6 +338,8 @@ class _MetadataCard extends StatelessWidget {
           if (asset.alias.isNotEmpty) _row('Alias', asset.alias),
           _row('Tipo', asset.contentType),
           _row('Tamaño', formatBytes(asset.size)),
+          if ((asset.durationMs ?? 0) > 0)
+            _row('Duración', formatDuration(asset.durationMs!)),
           _row('Subido', formatDate(asset.createdAt.toLocal())),
           const Divider(height: AppTokens.sp6, color: AppTokens.surface3),
           _RefRow(ref: asset.ref),
