@@ -315,10 +315,10 @@ void main() {
     );
 
     testWidgets(
-      'DOCUMENT: el picker se abre con family="document" y el filename del '
-      'asset viaja como media_filename en el metadata (cliente de B4)',
+      'DOCUMENT: el picker se abre SIN filtro de familia (cualquier archivo, '
+      'p. ej. audio enviado como documento) y el filename viaja en media_filename',
       (tester) async {
-        String? gotFamily;
+        String? gotFamily = 'sentinel';
         await pumpHost(
           tester,
           pickMediaRef: (_, family) async {
@@ -338,8 +338,9 @@ void main() {
         await tester.tap(find.byKey(const Key('step_edit.submit')));
         await tester.pump();
 
-        // El sheet derivó la familia del tipo del paso y la pasó al picker.
-        expect(gotFamily, 'document');
+        // DOCUMENT no filtra por familia: permite adjuntar cualquier asset
+        // (incl. audio) para enviarlo como archivo descargable.
+        expect(gotFamily, isNull);
 
         final captured = verify(() => bloc.add(captureAny())).captured;
         expect(captured, hasLength(1));
