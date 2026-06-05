@@ -60,6 +60,7 @@ import '../../features/invitations/presentation/bloc/invitations_bloc.dart';
 import '../../features/invitations/presentation/pages/invitations_page.dart';
 import '../../features/media/domain/entities/media_asset.dart';
 import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
+import '../../features/media/presentation/bloc/media_detail_cubit.dart';
 import '../../features/media/presentation/bloc/media_gallery_bloc.dart';
 import '../../features/media/presentation/pages/media_detail_page.dart';
 import '../../features/media/presentation/pages/media_gallery_page.dart';
@@ -906,20 +907,23 @@ class AppRouter {
                 ..add(const MediaGalleryLoadRequested()),
           child: Scaffold(
             appBar: AppBar(title: const Text('Galería de multimedia')),
-            // En modo browse "seleccionar" un asset abre su detalle (en el
-            // picker, onSelect hace pop con el ref). Reusa el mismo gesto del
-            // grid sin acoplar la página al router.
+            // En modo browse, tocar un asset abre su detalle; si el detalle
+            // reporta un cambio (borrado/renombrado) al hacer pop, la página se
+            // refresca. El picker usa onSelect (pop con el ref); aquí onOpenDetail.
             body: MediaGalleryPage(
               loader: _mediaThumbnailLoader,
-              onSelect: (asset) => context.push('/media/detail', extra: asset),
+              onOpenDetail: (asset) async =>
+                  (await context.push<bool>('/media/detail', extra: asset)) ??
+                  false,
             ),
           ),
         ),
       ),
       GoRoute(
-        // Detalle de un asset: previsualización + metadata + copiar ref. Se
-        // alcanza por push con el MediaAsset en `extra`; un acceso sin extra
-        // (deep-link directo) cae a un estado vacío en vez de crashear.
+        // Detalle de un asset: previsualización + metadata + copiar ref + borrar.
+        // Se alcanza por push con el MediaAsset en `extra`; un acceso sin extra
+        // (deep-link directo) cae a un estado vacío en vez de crashear. El
+        // MediaDetailCubit (con el repo) gobierna las mutaciones del detalle.
         path: '/media/detail',
         builder: (context, state) {
           final asset = state.extra;
@@ -928,7 +932,10 @@ class AppRouter {
               body: Center(child: Text('Archivo no disponible')),
             );
           }
-          return MediaDetailPage(asset: asset, loader: _mediaThumbnailLoader);
+          return BlocProvider<MediaDetailCubit>(
+            create: (_) => MediaDetailCubit(repo: _mediaRepo, asset: asset),
+            child: MediaDetailPage(loader: _mediaThumbnailLoader),
+          );
         },
       ),
       GoRoute(

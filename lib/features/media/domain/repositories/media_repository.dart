@@ -21,6 +21,13 @@ abstract interface class MediaRepository {
   /// `MediaPage.nextCursor` vacío ⇒ no hay más páginas.
   Future<MediaPage> listAssets({String? cursor, int? limit, String? type});
 
+  /// Da de baja un asset por su [ref] BARE (`DELETE /upload/<ref>`). El backend
+  /// borra el objeto y la fila del catálogo. Lanza `MediaNotFoundFailure` (404,
+  /// ref inexistente/ajeno), `MediaForbiddenFailure` (403, cross-tenant) y las
+  /// variantes de red/server. Una implementación con cache debe invalidar tras
+  /// el éxito (el asset borrado deja de existir en cualquier familia).
+  Future<void> delete(String ref);
+
   /// Descarta cualquier verdad local cacheada: la próxima lectura va a la
   /// fuente. Verbo del puerto (no detalle de implementación): una implementación
   /// sin cache lo cumple como no-op. Lo invoca quien necesita forzar frescura

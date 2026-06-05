@@ -26,6 +26,12 @@ abstract interface class MediaDatasource {
   /// (assets + nextCursor opaco). [type] filtra por familia del content-type
   /// (image|video|audio|document); null ⇒ sin filtro (todo el catálogo).
   Future<MediaPage> listAssets({String? cursor, int? limit, String? type});
+
+  /// `DELETE /upload/<ref>` (204). Da de baja el asset por su [ref] BARE (que
+  /// viaja en el path). El backend borra el objeto y la fila del catálogo. El
+  /// 404 (ref inexistente/ajeno) y el 403 (cross-tenant) se mapean a fallos
+  /// tipados.
+  Future<void> delete(String ref);
 }
 
 class DioMediaDatasource implements MediaDatasource {
@@ -95,6 +101,17 @@ class DioMediaDatasource implements MediaDatasource {
     } on TypeError {
       // `cast<Map<String,dynamic>>` rompe si el wire mete un tipo inesperado.
       throw const UnknownMediaFailure();
+    }
+  }
+
+  @override
+  Future<void> delete(String ref) async {
+    try {
+      // El ref BARE (tenant/<org>/media/<id>[.<ext>]) va en el path; el backend
+      // valida tenant y da de baja objeto + fila de catálogo (204).
+      await _dio.delete<void>('/upload/$ref');
+    } on DioException catch (e) {
+      throw _mapDioException(e);
     }
   }
 

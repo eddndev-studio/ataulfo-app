@@ -468,4 +468,54 @@ void main() {
       await expectLater(ds.listAssets(), throwsA(isA<UnknownMediaFailure>()));
     });
   });
+
+  group('DioMediaDatasource.delete', () {
+    const ref = 'tenant/org/media/abc.png';
+
+    test('204 => DELETE /upload/<ref> (ref BARE en el path)', () async {
+      when(
+        () => dio.delete<void>('/upload/$ref'),
+      ).thenAnswer((_) async => mapVoidResp('/upload/$ref', 204));
+
+      await ds.delete(ref);
+
+      verify(() => dio.delete<void>('/upload/$ref')).called(1);
+    });
+
+    test('403 => MediaForbiddenFailure', () async {
+      when(
+        () => dio.delete<void>(any()),
+      ).thenThrow(badResponse('/upload/$ref', 403));
+      await expectLater(ds.delete(ref), throwsA(isA<MediaForbiddenFailure>()));
+    });
+
+    test('404 => MediaNotFoundFailure', () async {
+      when(
+        () => dio.delete<void>(any()),
+      ).thenThrow(badResponse('/upload/$ref', 404));
+      await expectLater(ds.delete(ref), throwsA(isA<MediaNotFoundFailure>()));
+    });
+
+    test('500 => MediaServerFailure', () async {
+      when(
+        () => dio.delete<void>(any()),
+      ).thenThrow(badResponse('/upload/$ref', 500));
+      await expectLater(ds.delete(ref), throwsA(isA<MediaServerFailure>()));
+    });
+
+    test('connectionError => MediaNetworkFailure', () async {
+      when(() => dio.delete<void>(any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/upload/$ref'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+      await expectLater(ds.delete(ref), throwsA(isA<MediaNetworkFailure>()));
+    });
+  });
 }
+
+Response<void> mapVoidResp(String path, int status) => Response<void>(
+  requestOptions: RequestOptions(path: path),
+  statusCode: status,
+);

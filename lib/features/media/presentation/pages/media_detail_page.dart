@@ -1,42 +1,116 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../domain/entities/media_asset.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
+import '../bloc/media_detail_cubit.dart';
 import '../media_format.dart';
 
 /// Detalle de un asset de la galería: previsualización + metadata + copiar la
-/// referencia BARE (lo que los flujos persisten). Página completa (aporta su
-/// propio Scaffold/AppBar) para abrirse con un push desde el grid.
+/// referencia BARE + borrar. Cubit-driven: el [MediaDetailCubit] (inyectado por
+/// la ruta con el asset abierto) es la verdad mostrada, así una mutación (borrar;
+/// renombrar se añade aparte) refleja sin recargar. Al borrar con éxito la
+/// página hace pop devolviendo `true` para que la galería se refresque.
 ///
 /// La previsualización de imagen reusa el [MediaThumbnailLoader] (no hay
-/// resolución "full" separada: el backend sirve un solo objeto, así que los
-/// mismos bytes que la miniatura son la imagen completa) dentro de un
-/// [InteractiveViewer] para zoom/pan. Video/audio/documento muestran el ícono
-/// del tipo: la reproducción inline llega en un slice aparte. La `previewUrl`
-/// efímera NO se usa como identidad; la identidad es [MediaAsset.ref].
+/// resolución "full" separada: los mismos bytes que la miniatura son la imagen
+/// completa) dentro de un [InteractiveViewer]. Video/audio/documento muestran el
+/// ícono del tipo. La `previewUrl` efímera NO es identidad; esa es
+/// [MediaAsset.ref].
 class MediaDetailPage extends StatelessWidget {
-  const MediaDetailPage({super.key, required this.asset, required this.loader});
+  const MediaDetailPage({super.key, required this.loader});
 
-  final MediaAsset asset;
   final MediaThumbnailLoader loader;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(asset.displayName, overflow: TextOverflow.ellipsis),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppTokens.sp4),
-        children: <Widget>[
-          _Preview(asset: asset, loader: loader),
-          const SizedBox(height: AppTokens.sp5),
-          _MetadataCard(asset: asset),
+    return BlocConsumer<MediaDetailCubit, MediaDetailState>(
+      listenWhen: (prev, curr) =>
+          prev.deleted != curr.deleted || prev.error != curr.error,
+      listener: (context, state) {
+        if (state.deleted) {
+          Navigator.of(context).pop(true);
+          return;
+        }
+        if (state.error != null) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(content: Text('No pudimos borrar el archivo')),
+            );
+        }
+      },
+      builder: (context, state) {
+        final asset = state.asset;
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(asset.displayName, overflow: TextOverflow.ellipsis),
+            actions: <Widget>[
+              IconButton(
+                key: const Key('media_detail.delete'),
+                tooltip: 'Borrar',
+                icon: const Icon(Icons.delete_outline),
+                color: AppTokens.danger,
+                onPressed: state.busy ? null : () => _confirmDelete(context),
+              ),
+            ],
+          ),
+          body: Stack(
+            children: <Widget>[
+              ListView(
+                padding: const EdgeInsets.all(AppTokens.sp4),
+                children: <Widget>[
+                  _Preview(asset: asset, loader: loader),
+                  const SizedBox(height: AppTokens.sp5),
+                  _MetadataCard(asset: asset),
+                ],
+              ),
+              if (state.busy)
+                const Positioned.fill(
+                  child: ColoredBox(
+                    color: Color(0x66000000),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTokens.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Confirma antes de borrar (acción irreversible) y delega al cubit.
+  Future<void> _confirmDelete(BuildContext context) async {
+    final cubit = context.read<MediaDetailCubit>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Borrar archivo'),
+        content: const Text(
+          'Se quitará de la galería y de cualquier flujo que lo use. Esta '
+          'acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Borrar'),
+          ),
         ],
       ),
     );
+    if (ok == true) await cubit.deleteAsset();
   }
 }
 

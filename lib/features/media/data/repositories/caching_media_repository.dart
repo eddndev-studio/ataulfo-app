@@ -85,6 +85,15 @@ class CachingMediaRepository implements MediaRepository {
   }
 
   @override
+  Future<void> delete(String ref) async {
+    await _inner.delete(ref);
+    // Tras un borrado exitoso, el asset desaparece de ALGUNA familia: limpiamos
+    // todos los buckets (igual que upload). Un borrado que falló no cambió el
+    // catálogo, así que propaga sin invalidar (no se llega a esta línea).
+    invalidate();
+  }
+
+  @override
   Future<MediaPage> listAssets({String? cursor, int? limit, String? type}) {
     // Sólo la primera página se memoiza/persiste; las páginas profundas van a la
     // red (cachearlas desincronizaría la paginación) y jamás tocan el disco.
