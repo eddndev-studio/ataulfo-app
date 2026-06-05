@@ -172,12 +172,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
 
   /// Familia de content-type por la que filtrar el picker, derivada del tipo del
   /// paso. STICKER usa el contenedor de imagen; AUDIO/PTT comparten audio.
-  /// TEXT/CONDITIONAL_TIME no llevan media ⇒ null.
+  /// DOCUMENT no filtra (null): un paso documento envía cualquier archivo como
+  /// adjunto descargable, así que el picker ofrece toda la galería (p. ej. para
+  /// mandar un audio como documento). TEXT/CONDITIONAL_TIME no llevan media ⇒ null.
   static String? _mediaFamilyFor(fdom.StepType type) => switch (type) {
     fdom.StepType.image || fdom.StepType.sticker => 'image',
     fdom.StepType.video => 'video',
     fdom.StepType.audio || fdom.StepType.ptt => 'audio',
-    fdom.StepType.document => 'document',
+    fdom.StepType.document ||
     fdom.StepType.text ||
     fdom.StepType.conditionalTime ||
     fdom.StepType.label ||
