@@ -72,6 +72,9 @@ class FlowsRepositoryImpl implements FlowsRepository {
   Future<void> deleteStep(String stepId) => _ds.deleteStep(stepId);
 
   @override
+  Future<void> deleteFlow(String flowId) => _ds.deleteFlow(flowId);
+
+  @override
   Future<Flow> updateFlow({
     required String flowId,
     required int version,

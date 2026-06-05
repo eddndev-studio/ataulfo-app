@@ -88,4 +88,10 @@ abstract interface class FlowsRepository {
     required int usageLimit,
     required List<String> excludesFlows,
   });
+
+  /// Elimina un Flow por id. Idempotente: si el flow no existe, no falla.
+  /// El backend borra en cascada los steps y triggers del flow. RBAC del
+  /// backend (CRUD de Flow = ADMIN+) rechaza con 403
+  /// → `FlowsForbiddenFailure`.
+  Future<void> deleteFlow(String flowId);
 }

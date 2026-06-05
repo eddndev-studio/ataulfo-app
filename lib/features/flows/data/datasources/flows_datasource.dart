@@ -128,6 +128,13 @@ abstract interface class FlowsDatasource {
     required int usageLimit,
     required List<String> excludesFlows,
   });
+
+  /// `DELETE /flows/:flowId` idempotente. El backend responde 204 exista o
+  /// no el flow (borra en cascada sus steps y triggers). 404 se trata como
+  /// éxito (defensa por si llegara). 403 → `FlowsForbiddenFailure` (CRUD de
+  /// Flow = ADMIN+). 5xx → Server, red → Network. Acción destructiva: la UI
+  /// confirma antes de invocar.
+  Future<void> deleteFlow(String flowId);
 }
 
 class DioFlowsDatasource implements FlowsDatasource {
@@ -375,6 +382,22 @@ class DioFlowsDatasource implements FlowsDatasource {
         return;
       }
       throw _mapStepRouteDioException(e);
+    }
+  }
+
+  @override
+  Future<void> deleteFlow(String flowId) async {
+    try {
+      await _dio.delete<void>('/flows/$flowId');
+    } on FlowsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      // 404 = idempotente (el flow ya no estaba). No es failure.
+      if (e.type == DioExceptionType.badResponse &&
+          e.response?.statusCode == 404) {
+        return;
+      }
+      throw _mapDioException(e);
     }
   }
 
