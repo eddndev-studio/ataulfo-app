@@ -58,8 +58,10 @@ import '../../features/invitations/domain/repositories/invitations_repository.da
 import '../../features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
 import '../../features/invitations/presentation/bloc/invitations_bloc.dart';
 import '../../features/invitations/presentation/pages/invitations_page.dart';
+import '../../features/media/domain/entities/media_asset.dart';
 import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
 import '../../features/media/presentation/bloc/media_gallery_bloc.dart';
+import '../../features/media/presentation/pages/media_detail_page.dart';
 import '../../features/media/presentation/pages/media_gallery_page.dart';
 import '../../features/members/domain/repositories/members_repository.dart';
 import '../../features/members/presentation/bloc/assign_bots_cubit.dart';
@@ -904,9 +906,30 @@ class AppRouter {
                 ..add(const MediaGalleryLoadRequested()),
           child: Scaffold(
             appBar: AppBar(title: const Text('Galería de multimedia')),
-            body: MediaGalleryPage(loader: _mediaThumbnailLoader),
+            // En modo browse "seleccionar" un asset abre su detalle (en el
+            // picker, onSelect hace pop con el ref). Reusa el mismo gesto del
+            // grid sin acoplar la página al router.
+            body: MediaGalleryPage(
+              loader: _mediaThumbnailLoader,
+              onSelect: (asset) => context.push('/media/detail', extra: asset),
+            ),
           ),
         ),
+      ),
+      GoRoute(
+        // Detalle de un asset: previsualización + metadata + copiar ref. Se
+        // alcanza por push con el MediaAsset en `extra`; un acceso sin extra
+        // (deep-link directo) cae a un estado vacío en vez de crashear.
+        path: '/media/detail',
+        builder: (context, state) {
+          final asset = state.extra;
+          if (asset is! MediaAsset) {
+            return const Scaffold(
+              body: Center(child: Text('Archivo no disponible')),
+            );
+          }
+          return MediaDetailPage(asset: asset, loader: _mediaThumbnailLoader);
+        },
       ),
       GoRoute(
         // La misma galería en modo selección: un `push` a esta ruta abre el

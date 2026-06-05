@@ -1,0 +1,37 @@
+import 'package:ataulfo/features/media/presentation/media_format.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('formatBytes', () {
+    test('bytes crudos por debajo de 1 KiB', () {
+      expect(formatBytes(0), '0 B');
+      expect(formatBytes(512), '512 B');
+      expect(formatBytes(1023), '1023 B');
+    });
+
+    test('KiB con un decimal', () {
+      expect(formatBytes(1024), '1.0 KB');
+      expect(formatBytes(1536), '1.5 KB');
+    });
+
+    test('MiB y GiB con un decimal', () {
+      expect(formatBytes(1024 * 1024), '1.0 MB');
+      expect(formatBytes(5 * 1024 * 1024), '5.0 MB');
+      expect(formatBytes(1024 * 1024 * 1024), '1.0 GB');
+    });
+
+    test('negativo (defensivo) ⇒ 0 B', () {
+      expect(formatBytes(-1), '0 B');
+    });
+  });
+
+  group('formatDate', () {
+    test('dd/MM/yyyy HH:mm con padding de dos dígitos', () {
+      // Formatea los campos del DateTime dado tal cual (el call-site decide si
+      // pasa UTC o local); así el test es determinista sin depender del TZ.
+      expect(formatDate(DateTime(2026, 6, 5, 14, 30)), '05/06/2026 14:30');
+      expect(formatDate(DateTime(2026, 12, 31, 9, 5)), '31/12/2026 09:05');
+      expect(formatDate(DateTime(2026, 1, 1, 0, 0)), '01/01/2026 00:00');
+    });
+  });
+}
