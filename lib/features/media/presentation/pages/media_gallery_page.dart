@@ -308,38 +308,135 @@ class _LoadedViewState extends State<_LoadedView> {
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
-    return Stack(
+    return Column(
       children: <Widget>[
-        RefreshIndicator(
-          onRefresh: () async {
-            final bloc = context.read<MediaGalleryBloc>();
-            bloc.add(const MediaGalleryRefreshRequested());
-            // Espera el fin del refresh: un Loaded ya no-refrescando (siempre
-            // se emite gracias a la señal transitoria, aun si los datos no
-            // cambian) o un Failed terminal.
-            await bloc.stream.firstWhere(
-              (s) =>
-                  (s is MediaGalleryLoaded && !s.isRefreshing) ||
-                  s is MediaGalleryFailed,
-            );
-          },
-          child: state.items.isEmpty
-              ? const _EmptyView()
-              : _Grid(
-                  controller: _controller,
-                  state: state,
-                  onSelect: widget.onSelect,
-                  onOpenDetail: widget.onOpenDetail,
-                  loader: widget.loader,
+        // Barra de selección (sólo en modo selección): contador + limpiar +
+        // borrar en lote. Sustituye al FAB de subida mientras está activa.
+        if (state.selectionMode)
+          _SelectionBar(count: state.selectedRefs.length),
+        Expanded(
+          child: Stack(
+            children: <Widget>[
+              RefreshIndicator(
+                onRefresh: () async {
+                  final bloc = context.read<MediaGalleryBloc>();
+                  bloc.add(const MediaGalleryRefreshRequested());
+                  // Espera el fin del refresh: un Loaded ya no-refrescando
+                  // (siempre se emite gracias a la señal transitoria, aun si los
+                  // datos no cambian) o un Failed terminal.
+                  await bloc.stream.firstWhere(
+                    (s) =>
+                        (s is MediaGalleryLoaded && !s.isRefreshing) ||
+                        s is MediaGalleryFailed,
+                  );
+                },
+                child: state.items.isEmpty
+                    ? const _EmptyView()
+                    : _Grid(
+                        controller: _controller,
+                        state: state,
+                        onSelect: widget.onSelect,
+                        onOpenDetail: widget.onOpenDetail,
+                        loader: widget.loader,
+                      ),
+              ),
+              if (!state.selectionMode)
+                Positioned(
+                  right: AppTokens.sp4,
+                  bottom: AppTokens.sp4 + context.safeBottomInset,
+                  child: _UploadFab(isUploading: state.isUploading),
                 ),
-        ),
-        Positioned(
-          right: AppTokens.sp4,
-          bottom: AppTokens.sp4 + context.safeBottomInset,
-          child: _UploadFab(isUploading: state.isUploading),
+              if (state.isDeleting)
+                const Positioned.fill(
+                  child: ColoredBox(
+                    color: Color(0x66000000),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTokens.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );
+  }
+}
+
+/// Barra contextual del modo selección: cuántos hay, limpiar y borrar en lote
+/// (con confirmación). Despacha al [MediaGalleryBloc].
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final bloc = context.read<MediaGalleryBloc>();
+    return Material(
+      color: AppTokens.surface3,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp2),
+        child: Row(
+          children: <Widget>[
+            IconButton(
+              key: const Key('media_gallery.selection_clear'),
+              tooltip: 'Cancelar selección',
+              icon: const Icon(Icons.close),
+              onPressed: () => bloc.add(const MediaGallerySelectionCleared()),
+            ),
+            Expanded(
+              child: Text(
+                '$count seleccionado${count == 1 ? '' : 's'}',
+                style: const TextStyle(
+                  color: AppTokens.text1,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            IconButton(
+              key: const Key('media_gallery.selection_delete'),
+              tooltip: 'Borrar seleccionados',
+              icon: const Icon(Icons.delete_outline),
+              color: AppTokens.danger,
+              onPressed: () => _confirmBatchDelete(context, bloc, count),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmBatchDelete(
+    BuildContext context,
+    MediaGalleryBloc bloc,
+    int count,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Borrar $count archivo${count == 1 ? '' : 's'}'),
+        content: const Text(
+          'Se quitarán de la galería y de cualquier flujo que los use. Esta '
+          'acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Borrar'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) bloc.add(const MediaGalleryDeleteSelectedRequested());
   }
 }
 
@@ -399,10 +496,23 @@ class _Grid extends StatelessWidget {
           );
         }
         final MediaAsset asset = items[i];
+        // La selección múltiple es de browse (no picker): long-press entra/
+        // alterna; en modo selección el tap también alterna. Fuera de selección,
+        // el tap abre detalle (browse) o selecciona-y-popea (picker).
+        final canSelect = onSelect == null;
+        final VoidCallback? onLongPress = canSelect
+            ? () => context.read<MediaGalleryBloc>().add(
+                MediaGallerySelectionToggled(asset.ref),
+              )
+            : null;
         return MediaThumbnail(
           asset: asset,
           loader: loader,
-          onTap: _tapHandler(context, asset),
+          selected: state.selectedRefs.contains(asset.ref),
+          onLongPress: onLongPress,
+          onTap: (canSelect && state.selectionMode)
+              ? onLongPress
+              : _tapHandler(context, asset),
         );
       },
     );

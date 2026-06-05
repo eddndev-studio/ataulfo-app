@@ -329,6 +329,74 @@ void main() {
     expect(find.byKey(const Key('media_gallery.type_chip.all')), findsNothing);
   });
 
+  testWidgets('long-press a una miniatura (browse) dispara SelectionToggled', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      MediaGalleryLoaded(
+        items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+        nextCursor: '',
+      ),
+    );
+    await tester.pumpWidget(host()); // browse (sin onSelect)
+    await tester.pump();
+
+    await tester.longPress(find.byType(MediaThumbnail));
+    await tester.pump();
+
+    verify(
+      () => bloc.add(const MediaGallerySelectionToggled('media/a')),
+    ).called(1);
+  });
+
+  testWidgets('modo selección: barra con contador + check + limpiar', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      MediaGalleryLoaded(
+        items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+        nextCursor: '',
+        selectedRefs: const <String>{'media/a'},
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(find.text('1 seleccionado'), findsOneWidget);
+    expect(
+      find.byIcon(Icons.check_circle),
+      findsOneWidget,
+    ); // overlay selección
+
+    await tester.tap(find.byKey(const Key('media_gallery.selection_clear')));
+    await tester.pump();
+    verify(() => bloc.add(const MediaGallerySelectionCleared())).called(1);
+  });
+
+  testWidgets('modo selección: borrar pide confirmación y despacha el lote', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      MediaGalleryLoaded(
+        items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+        nextCursor: '',
+        selectedRefs: const <String>{'media/a'},
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('media_gallery.selection_delete')));
+    await tester.pumpAndSettle();
+    expect(find.text('Borrar 1 archivo'), findsOneWidget);
+
+    await tester.tap(find.text('Borrar'));
+    await tester.pumpAndSettle();
+    verify(
+      () => bloc.add(const MediaGalleryDeleteSelectedRequested()),
+    ).called(1);
+  });
+
   testWidgets('FAB de subida dispara MediaGalleryUploadRequested', (
     tester,
   ) async {

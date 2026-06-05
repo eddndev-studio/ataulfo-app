@@ -25,11 +25,19 @@ class MediaThumbnail extends StatefulWidget {
     required this.asset,
     required this.loader,
     this.onTap,
+    this.onLongPress,
+    this.selected = false,
   });
 
   final MediaAsset asset;
   final MediaThumbnailLoader loader;
   final VoidCallback? onTap;
+
+  /// Long-press (entra/alterna el modo selección). Null ⇒ sin selección (picker).
+  final VoidCallback? onLongPress;
+
+  /// Seleccionado en el modo selección múltiple: tinte + check sobre la celda.
+  final bool selected;
 
   @override
   State<MediaThumbnail> createState() => _MediaThumbnailState();
@@ -65,6 +73,7 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
         child: AspectRatio(
           aspectRatio: 1,
           // El visual (imagen/placeholder/spinner) llena la celda; el caption
@@ -92,12 +101,28 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
                 },
               ),
               _caption(),
+              if (widget.selected) _selectedOverlay(),
             ],
           ),
         ),
       ),
     );
   }
+
+  /// Overlay de selección: tinte de la primaria sobre la celda + check en la
+  /// esquina. Sólo visible cuando [MediaThumbnail.selected].
+  Widget _selectedOverlay() => const Positioned.fill(
+    child: ColoredBox(
+      color: AppTokens.primaryGlow,
+      child: Align(
+        alignment: Alignment.topRight,
+        child: Padding(
+          padding: EdgeInsets.all(AppTokens.sp1),
+          child: Icon(Icons.check_circle, color: AppTokens.primary, size: 22),
+        ),
+      ),
+    ),
+  );
 
   /// Caption inferior con el [MediaAsset.displayName] (alias o, si vacío,
   /// filename) sobre un scrim degradado para legibilidad sobre cualquier
