@@ -165,6 +165,47 @@ void main() {
     verifyNever(() => repo.delete(any()));
   });
 
+  testWidgets('renombrar: editar y guardar llama repo.setAlias y refleja', (
+    tester,
+  ) async {
+    final repo = _MockRepo();
+    when(() => repo.setAlias(any(), any())).thenAnswer((_) async => 'Nuevo');
+    await tester.pumpWidget(_host(_asset(filename: 'orig.png'), repo: repo));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('media_detail.edit_alias')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('media_detail.alias_field')),
+      'Nuevo',
+    );
+    await tester.tap(find.text('Guardar'));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.setAlias('tenant/orgA/media/abc.png', 'Nuevo')).called(1);
+    // El alias mostrado se actualizó (fila Alias + título displayName).
+    expect(find.text('Nuevo'), findsWidgets);
+  });
+
+  testWidgets('renombrar y volver ⇒ pop devuelve true (changed)', (
+    tester,
+  ) async {
+    final repo = _MockRepo();
+    when(() => repo.setAlias(any(), any())).thenAnswer((_) async => 'Nuevo');
+    final popResult = await _openEditSaveAndBack(tester, repo);
+    expect(popResult, isTrue);
+  });
+
+  testWidgets('volver sin cambios ⇒ pop devuelve false', (tester) async {
+    final repo = _MockRepo();
+    bool? popResult;
+    await _pushDetail(tester, repo, (r) => popResult = r);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.byType(MediaDetailPage), findsNothing);
+    expect(popResult, isFalse);
+  });
+
   testWidgets('borrado exitoso ⇒ la página hace pop devolviendo true', (
     tester,
   ) async {
@@ -212,4 +253,63 @@ void main() {
     expect(find.byType(MediaDetailPage), findsNothing); // hizo pop
     expect(popResult, isTrue); // devolvió "cambió"
   });
+}
+
+/// Empuja el detalle sobre una pila de navegación (para observar el pop) y
+/// reporta el resultado vía [onPop].
+Future<void> _pushDetail(
+  WidgetTester tester,
+  MediaRepository repo,
+  void Function(bool?) onPop,
+) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () async {
+                final r = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute<bool>(
+                    builder: (_) => BlocProvider<MediaDetailCubit>(
+                      create: (_) =>
+                          MediaDetailCubit(repo: repo, asset: _asset()),
+                      child: MediaDetailPage(
+                        loader: _FakeLoader(Future<Uint8List?>.value(null)),
+                      ),
+                    ),
+                  ),
+                );
+                onPop(r);
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('open'));
+  await tester.pumpAndSettle();
+}
+
+/// Empuja el detalle, renombra (guardar) y vuelve; devuelve el resultado del pop.
+Future<bool?> _openEditSaveAndBack(
+  WidgetTester tester,
+  MediaRepository repo,
+) async {
+  bool? popResult;
+  await _pushDetail(tester, repo, (r) => popResult = r);
+  await tester.tap(find.byKey(const Key('media_detail.edit_alias')));
+  await tester.pumpAndSettle();
+  await tester.enterText(
+    find.byKey(const Key('media_detail.alias_field')),
+    'Nuevo',
+  );
+  await tester.tap(find.text('Guardar'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byType(BackButton));
+  await tester.pumpAndSettle();
+  return popResult;
 }

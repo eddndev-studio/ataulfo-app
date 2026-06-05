@@ -94,6 +94,15 @@ class CachingMediaRepository implements MediaRepository {
   }
 
   @override
+  Future<String> setAlias(String ref, String alias) async {
+    final result = await _inner.setAlias(ref, alias);
+    // El displayName listado cambió: invalida para que la próxima lista traiga
+    // el alias nuevo. Un fallo propaga sin invalidar (no se llega aquí).
+    invalidate();
+    return result;
+  }
+
+  @override
   Future<MediaPage> listAssets({String? cursor, int? limit, String? type}) {
     // Sólo la primera página se memoiza/persiste; las páginas profundas van a la
     // red (cachearlas desincronizaría la paginación) y jamás tocan el disco.

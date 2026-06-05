@@ -13,24 +13,32 @@ class MediaDetailState {
     required this.asset,
     this.busy = false,
     this.deleted = false,
+    this.changed = false,
     this.error,
   });
 
   final MediaAsset asset;
   final bool busy;
   final bool deleted;
+
+  /// True si una mutación visible para la galería (renombrar alias) ocurrió. La
+  /// página hace pop devolviendo este flag para que la galería se refresque. El
+  /// borrado va por [deleted] (pop con true inmediato).
+  final bool changed;
   final MediaFailure? error;
 
   MediaDetailState copyWith({
     MediaAsset? asset,
     bool? busy,
     bool? deleted,
+    bool? changed,
     MediaFailure? error,
     bool clearError = false,
   }) => MediaDetailState(
     asset: asset ?? this.asset,
     busy: busy ?? this.busy,
     deleted: deleted ?? this.deleted,
+    changed: changed ?? this.changed,
     error: clearError ? null : (error ?? this.error),
   );
 
@@ -40,10 +48,11 @@ class MediaDetailState {
       other.asset == asset &&
       other.busy == busy &&
       other.deleted == deleted &&
+      other.changed == changed &&
       other.error == error;
 
   @override
-  int get hashCode => Object.hash(asset, busy, deleted, error);
+  int get hashCode => Object.hash(asset, busy, deleted, changed, error);
 }
 
 /// Cubit de las mutaciones del detalle de un asset (borrar; renombrar alias se
@@ -63,6 +72,26 @@ class MediaDetailCubit extends Cubit<MediaDetailState> {
     try {
       await _repo.delete(state.asset.ref);
       emit(state.copyWith(busy: false, deleted: true));
+    } on MediaFailure catch (f) {
+      emit(state.copyWith(busy: false, error: f));
+    }
+  }
+
+  /// Renombra el alias. El server devuelve el alias normalizado (trim), que se
+  /// refleja in-place en el asset mostrado y marca `changed` para que la galería
+  /// se refresque al volver. Un fallo viaja como error transitorio.
+  Future<void> setAlias(String alias) async {
+    if (state.busy) return;
+    emit(state.copyWith(busy: true, clearError: true));
+    try {
+      final normalized = await _repo.setAlias(state.asset.ref, alias);
+      emit(
+        state.copyWith(
+          asset: state.asset.copyWith(alias: normalized),
+          busy: false,
+          changed: true,
+        ),
+      );
     } on MediaFailure catch (f) {
       emit(state.copyWith(busy: false, error: f));
     }

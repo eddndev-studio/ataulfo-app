@@ -59,6 +59,20 @@ void main() {
     verify(() => ds.delete('tenant/org/media/x.png')).called(1);
   });
 
+  test(
+    'setAlias delega al datasource y devuelve el alias normalizado',
+    () async {
+      when(() => ds.setAlias(any(), any())).thenAnswer((_) async => 'Normal');
+
+      final r = await repo.setAlias('tenant/org/media/x.png', '  Normal  ');
+
+      expect(r, 'Normal');
+      verify(
+        () => ds.setAlias('tenant/org/media/x.png', '  Normal  '),
+      ).called(1);
+    },
+  );
+
   test('invalidate es no-op: no toca el datasource ni lanza', () {
     expect(repo.invalidate, returnsNormally);
     verifyZeroInteractions(ds);

@@ -28,6 +28,13 @@ abstract interface class MediaRepository {
   /// el éxito (el asset borrado deja de existir en cualquier familia).
   Future<void> delete(String ref);
 
+  /// Fija el alias editable de un asset (`PATCH /media-assets/<ref>`). Devuelve
+  /// el alias YA NORMALIZADO por el server. Lanza `MediaNotFoundFailure` (404),
+  /// `MediaForbiddenFailure` (403) y las variantes de red/server. Una
+  /// implementación con cache debe invalidar tras el éxito (el `displayName`
+  /// listado cambió).
+  Future<String> setAlias(String ref, String alias);
+
   /// Descarta cualquier verdad local cacheada: la próxima lectura va a la
   /// fuente. Verbo del puerto (no detalle de implementación): una implementación
   /// sin cache lo cumple como no-op. Lo invoca quien necesita forzar frescura

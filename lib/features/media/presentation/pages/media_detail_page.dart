@@ -26,65 +26,95 @@ class MediaDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<MediaDetailCubit, MediaDetailState>(
-      listenWhen: (prev, curr) =>
-          prev.deleted != curr.deleted || prev.error != curr.error,
-      listener: (context, state) {
-        if (state.deleted) {
-          Navigator.of(context).pop(true);
-          return;
-        }
-        if (state.error != null) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              const SnackBar(content: Text('No pudimos borrar el archivo')),
-            );
-        }
+    // PopScope FUERA del BlocConsumer: la galería se refresca al volver sólo si
+    // hubo cambio (renombrado). canPop:false ⇒ el back del AppBar/sistema entra
+    // por el handler y hace pop con el flag (leído on-demand, sin que el consumer
+    // rebuilds durante el pop toque un cubit ya dispuesto). El borrado hace
+    // pop(true) aparte desde el listener.
+    return PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        final changed = context.read<MediaDetailCubit>().state.changed;
+        Navigator.of(context).pop(changed);
       },
-      builder: (context, state) {
-        final asset = state.asset;
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(asset.displayName, overflow: TextOverflow.ellipsis),
-            actions: <Widget>[
-              IconButton(
-                key: const Key('media_detail.delete'),
-                tooltip: 'Borrar',
-                icon: const Icon(Icons.delete_outline),
-                color: AppTokens.danger,
-                onPressed: state.busy ? null : () => _confirmDelete(context),
-              ),
-            ],
-          ),
-          body: Stack(
-            children: <Widget>[
-              ListView(
-                padding: const EdgeInsets.all(AppTokens.sp4),
-                children: <Widget>[
-                  _Preview(asset: asset, loader: loader),
-                  const SizedBox(height: AppTokens.sp5),
-                  _MetadataCard(asset: asset),
-                ],
-              ),
-              if (state.busy)
-                const Positioned.fill(
-                  child: ColoredBox(
-                    color: Color(0x66000000),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppTokens.primary,
+      child: BlocConsumer<MediaDetailCubit, MediaDetailState>(
+        listenWhen: (prev, curr) =>
+            prev.deleted != curr.deleted || prev.error != curr.error,
+        listener: (context, state) {
+          if (state.deleted) {
+            Navigator.of(context).pop(true);
+            return;
+          }
+          if (state.error != null) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                const SnackBar(content: Text('No pudimos completar la acción')),
+              );
+          }
+        },
+        builder: (context, state) {
+          final asset = state.asset;
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(asset.displayName, overflow: TextOverflow.ellipsis),
+              actions: <Widget>[
+                IconButton(
+                  key: const Key('media_detail.edit_alias'),
+                  tooltip: 'Renombrar',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: state.busy ? null : () => _editAlias(context),
+                ),
+                IconButton(
+                  key: const Key('media_detail.delete'),
+                  tooltip: 'Borrar',
+                  icon: const Icon(Icons.delete_outline),
+                  color: AppTokens.danger,
+                  onPressed: state.busy ? null : () => _confirmDelete(context),
+                ),
+              ],
+            ),
+            body: Stack(
+              children: <Widget>[
+                ListView(
+                  padding: const EdgeInsets.all(AppTokens.sp4),
+                  children: <Widget>[
+                    _Preview(asset: asset, loader: loader),
+                    const SizedBox(height: AppTokens.sp5),
+                    _MetadataCard(asset: asset),
+                  ],
+                ),
+                if (state.busy)
+                  const Positioned.fill(
+                    child: ColoredBox(
+                      color: Color(0x66000000),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTokens.primary,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
+  }
+
+  /// Abre un diálogo para renombrar el alias (prefijado con el actual) y delega
+  /// al cubit. Un alias vacío limpia el nombre amistoso (vuelve al filename).
+  Future<void> _editAlias(BuildContext context) async {
+    final cubit = context.read<MediaDetailCubit>();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _AliasEditDialog(initial: cubit.state.asset.alias),
+    );
+    if (result != null) await cubit.setAlias(result);
   }
 
   /// Confirma antes de borrar (acción irreversible) y delega al cubit.
@@ -111,6 +141,59 @@ class MediaDetailPage extends StatelessWidget {
       ),
     );
     if (ok == true) await cubit.deleteAsset();
+  }
+}
+
+/// Diálogo de edición de alias. Es un StatefulWidget para que el
+/// [TextEditingController] viva y se libere con el ciclo del diálogo (disponerlo
+/// fuera de su `dispose` corre la carrera de usarlo tras liberarlo durante el
+/// teardown). Hace pop con el texto al guardar, o sin valor al cancelar.
+class _AliasEditDialog extends StatefulWidget {
+  const _AliasEditDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_AliasEditDialog> createState() => _AliasEditDialogState();
+}
+
+class _AliasEditDialogState extends State<_AliasEditDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initial,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Renombrar'),
+      content: TextField(
+        key: const Key('media_detail.alias_field'),
+        controller: _controller,
+        autofocus: true,
+        maxLength: 200,
+        decoration: const InputDecoration(
+          labelText: 'Alias',
+          hintText: 'Nombre amistoso (vacío = nombre original)',
+        ),
+        onSubmitted: (v) => Navigator.of(context).pop(v),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Guardar'),
+        ),
+      ],
+    );
   }
 }
 

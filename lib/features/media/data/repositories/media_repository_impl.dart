@@ -27,6 +27,9 @@ class MediaRepositoryImpl implements MediaRepository {
   Future<void> delete(String ref) => _ds.delete(ref);
 
   @override
+  Future<String> setAlias(String ref, String alias) => _ds.setAlias(ref, alias);
+
+  @override
   void invalidate() {
     // Sin estado local: nada que descartar.
   }

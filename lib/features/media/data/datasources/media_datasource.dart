@@ -32,6 +32,13 @@ abstract interface class MediaDatasource {
   /// 404 (ref inexistente/ajeno) y el 403 (cross-tenant) se mapean a fallos
   /// tipados.
   Future<void> delete(String ref);
+
+  /// `PATCH /media-assets/<ref>` body `{alias}`. Fija el alias editable del
+  /// asset. Devuelve el alias YA NORMALIZADO por el server (trim aplicado), para
+  /// que el caller alinee su modelo con la verdad persistida. 404 (ref
+  /// inexistente/ajeno), 403 (cross-tenant) y 400 (alias inválido) → fallos
+  /// tipados.
+  Future<String> setAlias(String ref, String alias);
 }
 
 class DioMediaDatasource implements MediaDatasource {
@@ -112,6 +119,35 @@ class DioMediaDatasource implements MediaDatasource {
       await _dio.delete<void>('/upload/$ref');
     } on DioException catch (e) {
       throw _mapDioException(e);
+    }
+  }
+
+  @override
+  Future<String> setAlias(String ref, String alias) async {
+    try {
+      final res = await _dio.patch<Map<String, dynamic>>(
+        '/media-assets/$ref',
+        data: <String, dynamic>{'alias': alias},
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownMediaFailure();
+      }
+      final returned = body['alias'];
+      // El handler devuelve {ref, alias} (alias normalizado, siempre presente).
+      // Defensivo: si llega ausente o de otro tipo, lo tratamos como vacío.
+      if (returned != null && returned is! String) {
+        throw const UnknownMediaFailure();
+      }
+      return (returned as String?) ?? '';
+    } on MediaFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownMediaFailure();
+    } on TypeError {
+      throw const UnknownMediaFailure();
     }
   }
 
