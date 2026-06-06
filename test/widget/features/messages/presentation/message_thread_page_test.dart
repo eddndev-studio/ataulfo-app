@@ -470,6 +470,31 @@ void main() {
     },
   );
 
+  group('reaccionar (long-press)', () {
+    testWidgets('long-press abre el picker; elegir emoji dispatcha react', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[msg(externalId: 'm1', content: 'hola')],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('hola'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('reaction.pick.m1.👍')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('reaction.pick.m1.👍')));
+      await tester.pumpAndSettle();
+      verify(
+        () => bloc.add(
+          const MessagesReactRequested(messageId: 'm1', emoji: '👍'),
+        ),
+      ).called(1);
+    });
+  });
+
   group('composer (envío)', () {
     const loadedEmpty = MessagesLoaded(
       items: <Message>[],

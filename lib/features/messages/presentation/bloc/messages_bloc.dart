@@ -47,6 +47,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     on<MessagesSendRequested>(_onSend);
     on<MessagesSendRetryRequested>(_onRetry);
     on<MessagesSendDiscarded>(_onDiscard);
+    on<MessagesReactRequested>(_onReact);
   }
 
   static String _uuidV4() => const Uuid().v4();
@@ -322,6 +323,26 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     await _dispatchSend(retrying, emit);
   }
 
+  /// Reacciona a un mensaje. Best-effort: la reacción se materializa por el eco
+  /// SSE (el backend la persiste y publica como OUTBOUND `type=reaction`, que el
+  /// hilo ya sabe doblar sobre su target). Un fallo es silencioso —no corrompe
+  /// el hilo; el operador puede reintentar—. `emoji` vacío quita la reacción.
+  Future<void> _onReact(
+    MessagesReactRequested event,
+    Emitter<MessagesState> emit,
+  ) async {
+    try {
+      await _repo.react(
+        _botId,
+        _chatLid,
+        messageId: event.messageId,
+        emoji: event.emoji,
+      );
+    } on MessagesFailure {
+      // Best-effort: una reacción fallida no altera el hilo.
+    }
+  }
+
   /// Descarta una burbuja pendiente (típicamente fallida) sin enviar nada.
   void _onDiscard(MessagesSendDiscarded event, Emitter<MessagesState> emit) {
     final current = state;
@@ -509,6 +530,23 @@ class MessagesSendDiscarded extends MessagesEvent {
       other is MessagesSendDiscarded && other.clientToken == clientToken;
   @override
   int get hashCode => clientToken.hashCode;
+}
+
+/// El operador reacciona al mensaje `messageId` con `emoji` (S09); `emoji` vacío
+/// quita la reacción previa.
+class MessagesReactRequested extends MessagesEvent {
+  const MessagesReactRequested({required this.messageId, required this.emoji});
+
+  final String messageId;
+  final String emoji;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MessagesReactRequested &&
+      other.messageId == messageId &&
+      other.emoji == emoji;
+  @override
+  int get hashCode => Object.hash(messageId, emoji);
 }
 
 // States --------------------------------------------------------------------

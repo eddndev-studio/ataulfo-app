@@ -363,6 +363,53 @@ String _pendingErrorText(MessagesFailure f) => switch (f) {
   _ => 'No se pudo enviar',
 };
 
+/// Emojis de reacción rápida del hilo (estilo mensajería).
+const List<String> _quickReactions = <String>[
+  '👍',
+  '❤️',
+  '😂',
+  '😮',
+  '😢',
+  '🙏',
+];
+
+/// Hoja inferior con los emojis de reacción rápida. Al elegir uno despacha
+/// `MessagesReactRequested` para ese mensaje; la reacción aparece por el eco SSE
+/// (el bloc no la pinta optimista). Captura el bloc ANTES del await del sheet.
+Future<void> _showReactionPicker(BuildContext context, String messageId) async {
+  final bloc = context.read<MessagesBloc>();
+  final emoji = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: AppTokens.surface1,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp4,
+          vertical: AppTokens.sp5,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: <Widget>[
+            for (final e in _quickReactions)
+              InkWell(
+                key: Key('reaction.pick.$messageId.$e'),
+                borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+                onTap: () => Navigator.of(sheetContext).pop(e),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppTokens.sp2),
+                  child: Text(e, style: const TextStyle(fontSize: 28)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (emoji != null) {
+    bloc.add(MessagesReactRequested(messageId: messageId, emoji: emoji));
+  }
+}
+
 /// Burbuja de un mensaje. INBOUND a la izquierda (`surface2`), OUTBOUND a la
 /// derecha (`surface3`). En grupos, el INBOUND muestra el autor (`senderLid`).
 /// El texto se pinta directo; la media va por `_MediaContent`. El OUTBOUND
@@ -405,54 +452,57 @@ class _MessageBubble extends StatelessWidget {
               : CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTokens.sp4,
-                  vertical: AppTokens.sp3,
+            GestureDetector(
+              onLongPress: () => _showReactionPicker(context, m.externalId),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.78,
                 ),
-                decoration: BoxDecoration(
-                  color: isOutbound ? AppTokens.surface3 : AppTokens.surface2,
-                  borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    if (isGroupInbound) ...<Widget>[
-                      Text(
-                        m.senderLid,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: AppTokens.primary,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTokens.sp4,
+                    vertical: AppTokens.sp3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isOutbound ? AppTokens.surface3 : AppTokens.surface2,
+                    borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      if (isGroupInbound) ...<Widget>[
+                        Text(
+                          m.senderLid,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: AppTokens.primary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                    ],
-                    if (m.quotedId != null) ...<Widget>[
-                      _QuotedPreview(parentId: m.externalId, quoted: quoted),
-                      const SizedBox(height: AppTokens.sp1),
-                    ],
-                    if (isText)
-                      Text(m.content, style: textTheme.bodyLarge)
-                    else
-                      _MediaContent(message: m),
-                    const SizedBox(height: AppTokens.sp1),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(_hhmm(m.timestampMs), style: caption),
-                        if (isOutbound && m.status != null) ...<Widget>[
-                          const SizedBox(width: AppTokens.sp2),
-                          _statusTick(m.status!),
-                        ],
+                        const SizedBox(height: 2),
                       ],
-                    ),
-                  ],
+                      if (m.quotedId != null) ...<Widget>[
+                        _QuotedPreview(parentId: m.externalId, quoted: quoted),
+                        const SizedBox(height: AppTokens.sp1),
+                      ],
+                      if (isText)
+                        Text(m.content, style: textTheme.bodyLarge)
+                      else
+                        _MediaContent(message: m),
+                      const SizedBox(height: AppTokens.sp1),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(_hhmm(m.timestampMs), style: caption),
+                          if (isOutbound && m.status != null) ...<Widget>[
+                            const SizedBox(width: AppTokens.sp2),
+                            _statusTick(m.status!),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

@@ -903,6 +903,57 @@ void main() {
       await b.close();
     });
 
+    blocTest<MessagesBloc, MessagesState>(
+      'react despacha repo.react con messageId+emoji y no emite',
+      build: () {
+        when(
+          () => repo.react(
+            'b1',
+            'lid-1',
+            messageId: any(named: 'messageId'),
+            emoji: any(named: 'emoji'),
+          ),
+        ).thenAnswer((_) async {});
+        return build();
+      },
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) =>
+          b.add(const MessagesReactRequested(messageId: 'm1', emoji: '👍')),
+      expect: () => const <MessagesState>[],
+      verify: (_) {
+        verify(
+          () => repo.react('b1', 'lid-1', messageId: 'm1', emoji: '👍'),
+        ).called(1);
+      },
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'un fallo de react no emite ni crashea (best-effort)',
+      build: () {
+        when(
+          () => repo.react(
+            'b1',
+            'lid-1',
+            messageId: any(named: 'messageId'),
+            emoji: any(named: 'emoji'),
+          ),
+        ).thenThrow(const MessagesWireFailure());
+        return build();
+      },
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) =>
+          b.add(const MessagesReactRequested(messageId: 'm1', emoji: '👍')),
+      expect: () => const <MessagesState>[],
+    );
+
     test('eco SSE después del 200 → deduplicado por externalId', () async {
       when(
         () => repo.thread(
