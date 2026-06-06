@@ -43,6 +43,7 @@ import '../../features/bots/presentation/pages/bot_variables_page.dart';
 import '../../features/conversations/domain/repositories/conversations_repository.dart';
 import '../../features/conversations/presentation/bloc/conversations_bloc.dart';
 import '../../features/conversations/presentation/pages/conversations_list_page.dart';
+import '../../features/flow_run/domain/repositories/flow_run_repository.dart';
 import '../../features/flows/domain/repositories/flows_repository.dart';
 import '../../features/flows/presentation/bloc/flow_create_bloc.dart';
 import '../../features/flows/presentation/bloc/flow_detail_bloc.dart';
@@ -129,6 +130,7 @@ class AppRouter {
     required ProfileRepository profileRepository,
     required TemplatesRepository templatesRepository,
     required FlowsRepository flowsRepository,
+    required FlowRunRepository flowRunRepository,
     required TriggersRepository triggersRepository,
     required WaLabelsRepository waLabelsRepository,
     required LabelsRepository labelsRepository,
@@ -149,6 +151,7 @@ class AppRouter {
        _profileRepo = profileRepository,
        _templatesRepo = templatesRepository,
        _flowsRepo = flowsRepository,
+       _flowRunRepo = flowRunRepository,
        _triggersRepo = triggersRepository,
        _waLabelsRepo = waLabelsRepository,
        _labelsRepo = labelsRepository,
@@ -170,6 +173,7 @@ class AppRouter {
   final ProfileRepository _profileRepo;
   final TemplatesRepository _templatesRepo;
   final FlowsRepository _flowsRepo;
+  final FlowRunRepository _flowRunRepo;
   final TriggersRepository _triggersRepo;
   final WaLabelsRepository _waLabelsRepo;
   final LabelsRepository _labelsRepo;
@@ -601,6 +605,7 @@ class AppRouter {
               RepositoryProvider<WaLabelsRepository>.value(
                 value: _waLabelsRepo,
               ),
+              RepositoryProvider<FlowRunRepository>.value(value: _flowRunRepo),
             ],
             child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[

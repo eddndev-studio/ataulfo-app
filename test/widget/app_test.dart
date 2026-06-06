@@ -12,6 +12,7 @@ import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
+import 'package:ataulfo/features/flow_run/domain/repositories/flow_run_repository.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
@@ -54,6 +55,8 @@ class _MockProfileRepo extends Mock implements ProfileRepository {}
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
 class _MockFlowsRepo extends Mock implements FlowsRepository {}
+
+class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
 
 class _MockTriggersRepo extends Mock implements TriggersRepository {}
 
@@ -118,6 +121,7 @@ void main() {
       messagesRepository: _MockMessagesRepo(),
       templatesRepository: templatesRepo,
       flowsRepository: _MockFlowsRepo(),
+      flowRunRepository: _MockFlowRunRepo(),
       triggersRepository: _MockTriggersRepo(),
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: _MockLabelsRepo(),

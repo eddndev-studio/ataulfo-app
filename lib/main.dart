@@ -21,6 +21,8 @@ import 'features/bots/data/repositories/bot_session_repository_impl.dart';
 import 'features/bots/data/repositories/bots_repository_impl.dart';
 import 'features/conversations/data/datasources/conversations_datasource.dart';
 import 'features/conversations/data/repositories/conversations_repository_impl.dart';
+import 'features/flow_run/data/datasources/flow_run_datasource.dart';
+import 'features/flow_run/data/repositories/flow_run_repository_impl.dart';
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/labels/data/datasources/labels_datasource.dart';
@@ -165,6 +167,10 @@ Future<void> main() async {
     datasource: DioFlowsDatasource(mainDio),
   );
 
+  final flowRunRepository = FlowRunRepositoryImpl(
+    DioFlowRunDatasource(mainDio),
+  );
+
   final triggersRepository = TriggersRepositoryImpl(
     datasource: DioTriggersDatasource(mainDio),
   );
@@ -252,6 +258,7 @@ Future<void> main() async {
     profileRepository: profileRepository,
     templatesRepository: templatesRepository,
     flowsRepository: flowsRepository,
+    flowRunRepository: flowRunRepository,
     triggersRepository: triggersRepository,
     waLabelsRepository: waLabelsRepository,
     labelsRepository: labelsRepository,

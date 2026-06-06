@@ -29,6 +29,7 @@ import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
+import 'package:ataulfo/features/flow_run/domain/repositories/flow_run_repository.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
@@ -98,6 +99,8 @@ class _MockProfileRepo extends Mock implements ProfileRepository {}
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
 
 class _MockFlowsRepo extends Mock implements FlowsRepository {}
+
+class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
 
 class _MockTriggersRepo extends Mock implements TriggersRepository {}
 
@@ -201,6 +204,7 @@ void main() {
   late _MockProfileRepo profileRepo;
   late _MockTemplatesRepo templatesRepo;
   late _MockFlowsRepo flowsRepo;
+  late _MockFlowRunRepo flowRunRepo;
   late _MockTriggersRepo triggersRepo;
   late _MockMembershipsRepo membershipsRepo;
   late _MockMembersRepo membersRepo;
@@ -219,6 +223,7 @@ void main() {
     profileRepo = _MockProfileRepo();
     templatesRepo = _MockTemplatesRepo();
     flowsRepo = _MockFlowsRepo();
+    flowRunRepo = _MockFlowRunRepo();
     triggersRepo = _MockTriggersRepo();
     membershipsRepo = _MockMembershipsRepo();
     membersRepo = _MockMembersRepo();
@@ -294,6 +299,7 @@ void main() {
       messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
@@ -726,6 +732,7 @@ void main() {
       messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
@@ -816,6 +823,7 @@ void main() {
       messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
@@ -852,6 +860,7 @@ void main() {
       messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
@@ -924,6 +933,7 @@ void main() {
         messagesRepository: messagesRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
+        flowRunRepository: flowRunRepo,
         triggersRepository: triggersRepo,
         waLabelsRepository: _MockWaLabelsRepo(),
         labelsRepository: labelsRepo,
@@ -998,6 +1008,7 @@ void main() {
       messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
@@ -1309,6 +1320,7 @@ void main() {
         messagesRepository: messagesRepo,
         templatesRepository: templatesRepo,
         flowsRepository: flowsRepo,
+        flowRunRepository: flowRunRepo,
         triggersRepository: triggersRepo,
         waLabelsRepository: _MockWaLabelsRepo(),
         labelsRepository: labelsRepo,
@@ -1346,6 +1358,7 @@ void main() {
       messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
@@ -1579,6 +1592,7 @@ void main() {
       messagesRepository: messagesRepo,
       templatesRepository: templatesRepo,
       flowsRepository: flowsRepo,
+      flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
       labelsRepository: labelsRepo,
