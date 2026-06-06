@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../conversations/domain/entities/conversation.dart';
+import '../../../flow_run/presentation/widgets/flow_run_sheet.dart';
 import '../../../wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import '../bloc/profile_bloc.dart';
 
@@ -41,6 +42,15 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       titleSpacing: 0,
       actions: <Widget>[
+        // Correr un flujo sobre este chat (S11). El `FlowRunRepository` lo
+        // provee la ruta. Acción operativa del monitor (WORKER+ en el backend).
+        IconButton(
+          key: const Key('thread.run_flow'),
+          tooltip: 'Correr un flujo',
+          icon: const Icon(Icons.play_circle_outline),
+          onPressed: () =>
+              FlowRunSheet.open(context, botId: botId, chatLid: chatLid),
+        ),
         // Etiquetar este chat con etiquetas de WhatsApp (reusa el sheet de la
         // lista de conversaciones). El `WaLabelsRepository` lo provee la ruta.
         IconButton(

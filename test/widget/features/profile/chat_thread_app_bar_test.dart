@@ -2,6 +2,9 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
 import 'package:ataulfo/features/profile/presentation/bloc/profile_bloc.dart';
+import 'package:ataulfo/features/flow_run/domain/entities/runnable_flow.dart';
+import 'package:ataulfo/features/flow_run/domain/repositories/flow_run_repository.dart';
+import 'package:ataulfo/features/flow_run/presentation/widgets/flow_run_sheet.dart';
 import 'package:ataulfo/features/profile/presentation/widgets/chat_thread_app_bar.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
@@ -18,6 +21,8 @@ class _MockProfileBloc extends MockBloc<ProfileEvent, ProfileState>
     implements ProfileBloc {}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
+
+class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
 
 void main() {
   late _MockProfileBloc bloc;
@@ -190,6 +195,41 @@ void main() {
       await tester.tap(find.byKey(const Key('thread.labels')));
       await tester.pumpAndSettle();
       expect(find.byType(WaChatLabelsSheet), findsOneWidget);
+    });
+  });
+
+  group('correr flujo', () {
+    testWidgets('muestra el botón de correr flujo', (tester) async {
+      when(() => bloc.state).thenReturn(const ProfileLoading());
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('thread.run_flow')), findsOneWidget);
+    });
+
+    testWidgets('tocar abre el sheet de correr flujo', (tester) async {
+      final runRepo = _MockFlowRunRepo();
+      when(
+        () => runRepo.listRunnable(any()),
+      ).thenAnswer((_) async => <RunnableFlow>[]);
+      when(() => bloc.state).thenReturn(const ProfileLoading());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: RepositoryProvider<FlowRunRepository>.value(
+            value: runRepo,
+            child: BlocProvider<ProfileBloc>.value(
+              value: bloc,
+              child: const Scaffold(
+                appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
+                body: SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('thread.run_flow')));
+      await tester.pumpAndSettle();
+      expect(find.byType(FlowRunSheet), findsOneWidget);
     });
   });
 }
