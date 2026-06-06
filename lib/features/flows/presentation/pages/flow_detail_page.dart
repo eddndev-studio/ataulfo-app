@@ -24,6 +24,7 @@ import '../../domain/entities/step.dart' as sdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
 import '../bloc/flow_steps_bloc.dart';
+import '../bloc/media_names_cubit.dart';
 import '../media_step_name.dart';
 import '../widgets/conditional_time_day_mapping.dart';
 import '../widgets/flow_settings_tab.dart';
@@ -568,32 +569,38 @@ class _StepBody extends StatelessWidget {
         ),
       );
     }
-    // Nombre legible del recurso: el `media_filename` guardado al elegirlo; sin
-    // él, la cola corta del ref BARE (en monospace, señal de que es un id, no un
+    // Nombre legible del recurso. Prioridad: el alias EN VIVO del catálogo
+    // (resuelto por ref vía MediaNamesCubit) → el `media_filename` guardado al
+    // elegirlo → la cola corta del ref BARE en monospace (señal de id, no
     // nombre). El ref completo con el path del tenant nunca se muestra.
-    final (mediaText, mono) = mediaStepDisplay(
-      mediaRef: step.mediaRef,
-      metadataJson: step.metadataJson,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          mediaText,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: mono
-              ? textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  color: AppTokens.text2,
-                )
-              : textTheme.bodyMedium,
-        ),
-        if (step.content.isNotEmpty) ...<Widget>[
-          const SizedBox(height: AppTokens.sp1),
-          Text(step.content, style: textTheme.bodyMedium),
-        ],
-      ],
+    return BlocBuilder<MediaNamesCubit, MediaNamesState>(
+      builder: (context, namesState) {
+        final (mediaText, mono) = mediaStepDisplay(
+          mediaRef: step.mediaRef,
+          metadataJson: step.metadataJson,
+          resolvedName: namesState.nameFor(step.mediaRef),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              mediaText,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: mono
+                  ? textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'monospace',
+                      color: AppTokens.text2,
+                    )
+                  : textTheme.bodyMedium,
+            ),
+            if (step.content.isNotEmpty) ...<Widget>[
+              const SizedBox(height: AppTokens.sp1),
+              Text(step.content, style: textTheme.bodyMedium),
+            ],
+          ],
+        );
+      },
     );
   }
 }
