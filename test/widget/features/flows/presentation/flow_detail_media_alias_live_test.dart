@@ -173,8 +173,7 @@ void main() {
           q: any(named: 'q'),
         ),
       ).thenAnswer(
-        (_) async =>
-            const MediaPage(assets: <MediaAsset>[], nextCursor: ''),
+        (_) async => const MediaPage(assets: <MediaAsset>[], nextCursor: ''),
       );
 
       await tester.pumpWidget(host());
