@@ -589,27 +589,39 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final chatLid = state.pathParameters['chatLid']!;
-          return MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<MessagesBloc>(
-                create: (_) => MessagesBloc(
-                  repo: _messagesRepo,
-                  botId: id,
-                  chatLid: chatLid,
-                )..add(const MessagesLoadRequested()),
-              ),
-              // El perfil alimenta el header (avatar + nombre real) y se
-              // re-monta en la pantalla de perfil; dos cargas hoy, la cache
-              // RFC-0001 las absorberá.
-              BlocProvider<ProfileBloc>(
-                create: (_) =>
-                    ProfileBloc(repo: _profileRepo, botId: id, chatLid: chatLid)
-                      ..add(const ProfileLoadRequested()),
+          // El repo y el picker de media cuelgan del scope para que el composer
+          // adjunte imágenes (pick → upload → ref → send type:image).
+          return MultiRepositoryProvider(
+            providers: <RepositoryProvider<dynamic>>[
+              RepositoryProvider<MediaRepository>.value(value: _mediaRepo),
+              RepositoryProvider<MediaFilePicker>.value(
+                value: _mediaFilePicker,
               ),
             ],
-            child: Scaffold(
-              appBar: ChatThreadAppBar(botId: id, chatLid: chatLid),
-              body: const MessageThreadPage(),
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<MessagesBloc>(
+                  create: (_) => MessagesBloc(
+                    repo: _messagesRepo,
+                    botId: id,
+                    chatLid: chatLid,
+                  )..add(const MessagesLoadRequested()),
+                ),
+                // El perfil alimenta el header (avatar + nombre real) y se
+                // re-monta en la pantalla de perfil; dos cargas hoy, la cache
+                // RFC-0001 las absorberá.
+                BlocProvider<ProfileBloc>(
+                  create: (_) => ProfileBloc(
+                    repo: _profileRepo,
+                    botId: id,
+                    chatLid: chatLid,
+                  )..add(const ProfileLoadRequested()),
+                ),
+              ],
+              child: Scaffold(
+                appBar: ChatThreadAppBar(botId: id, chatLid: chatLid),
+                body: const MessageThreadPage(),
+              ),
             ),
           );
         },

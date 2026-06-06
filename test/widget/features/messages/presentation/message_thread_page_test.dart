@@ -1,6 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
@@ -13,6 +18,10 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockMessagesBloc extends MockBloc<MessagesEvent, MessagesState>
     implements MessagesBloc {}
+
+class _MockFilePicker extends Mock implements MediaFilePicker {}
+
+class _MockMediaRepo extends Mock implements MediaRepository {}
 
 Message msg({
   String externalId = 'e1',
@@ -41,7 +50,10 @@ Message msg({
 );
 
 void main() {
-  setUpAll(() => registerFallbackValue(const MessagesLoadRequested()));
+  setUpAll(() {
+    registerFallbackValue(const MessagesLoadRequested());
+    registerFallbackValue(Uint8List(0));
+  });
 
   late _MockMessagesBloc bloc;
 
@@ -636,6 +648,87 @@ void main() {
       await tester.tap(find.byKey(const Key('message.pending.ct-9.discard')));
       await tester.pump();
       verify(() => bloc.add(const MessagesSendDiscarded('ct-9'))).called(1);
+    });
+  });
+
+  group('adjuntar imagen', () {
+    late _MockFilePicker picker;
+    late _MockMediaRepo mediaRepo;
+
+    setUp(() {
+      picker = _MockFilePicker();
+      mediaRepo = _MockMediaRepo();
+      when(() => bloc.state).thenReturn(
+        const MessagesLoaded(
+          items: <Message>[],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+    });
+
+    Widget hostMedia() => MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: MultiRepositoryProvider(
+        providers: <RepositoryProvider<dynamic>>[
+          RepositoryProvider<MediaFilePicker>.value(value: picker),
+          RepositoryProvider<MediaRepository>.value(value: mediaRepo),
+        ],
+        child: BlocProvider<MessagesBloc>.value(
+          value: bloc,
+          child: const Scaffold(body: MessageThreadPage()),
+        ),
+      ),
+    );
+
+    testWidgets('pick + upload → envía type:image con ref y caption', (
+      tester,
+    ) async {
+      when(() => picker.pick()).thenAnswer(
+        (_) async => PickedMedia(
+          bytes: Uint8List.fromList(<int>[1, 2, 3]),
+          filename: 'foto.jpg',
+        ),
+      );
+      when(
+        () => mediaRepo.upload(
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+        ),
+      ).thenAnswer(
+        (_) async => const UploadedMedia(ref: 'ref-abc', previewUrl: null),
+      );
+      await tester.pumpWidget(hostMedia());
+      await tester.enterText(
+        find.byKey(const Key('composer.input')),
+        'mira esto',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('composer.attach')));
+      await tester.pumpAndSettle();
+      verify(
+        () => bloc.add(
+          const MessagesSendRequested(
+            type: 'image',
+            content: 'mira esto',
+            mediaRef: 'ref-abc',
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('cancelar el picker no sube ni envía', (tester) async {
+      when(() => picker.pick()).thenAnswer((_) async => null);
+      await tester.pumpWidget(hostMedia());
+      await tester.tap(find.byKey(const Key('composer.attach')));
+      await tester.pumpAndSettle();
+      verifyNever(
+        () => mediaRepo.upload(
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+        ),
+      );
+      verifyNever(() => bloc.add(any(that: isA<MessagesSendRequested>())));
     });
   });
 }
