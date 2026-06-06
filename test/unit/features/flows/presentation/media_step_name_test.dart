@@ -80,5 +80,34 @@ void main() {
       expect(text, 'zzz999.png');
       expect(mono, isTrue);
     });
+
+    test('resolvedName (alias del catálogo) tiene prioridad sobre todo', () {
+      final (text, mono) = mediaStepDisplay(
+        mediaRef: 'tenant/org1/media/zzz999.ogg',
+        // Aunque el metadata tuviera un filename, el alias en vivo gana.
+        metadataJson: '{"media_filename":"audio-subido.ogg"}',
+        resolvedName: 'Saludo de bienvenida',
+      );
+      expect(text, 'Saludo de bienvenida');
+      expect(mono, isFalse);
+    });
+
+    test('resolvedName null/vacío ⇒ cae a media_filename y luego al ref', () {
+      final (t1, m1) = mediaStepDisplay(
+        mediaRef: 'tenant/org1/media/zzz999.ogg',
+        metadataJson: '{"media_filename":"audio.ogg"}',
+        resolvedName: null,
+      );
+      expect(t1, 'audio.ogg');
+      expect(m1, isFalse);
+
+      final (t2, m2) = mediaStepDisplay(
+        mediaRef: 'tenant/org1/media/zzz999.ogg',
+        metadataJson: '{}',
+        resolvedName: '',
+      );
+      expect(t2, 'zzz999.ogg');
+      expect(m2, isTrue);
+    });
   });
 }
