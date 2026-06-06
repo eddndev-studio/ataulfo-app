@@ -72,6 +72,7 @@ import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
+import 'package:ataulfo/features/quick_replies/domain/repositories/quick_replies_repository.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -107,6 +108,16 @@ class _MockTriggersRepo extends Mock implements TriggersRepository {}
 class _MockLabelsRepo extends Mock implements LabelsRepository {}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
+
+class _MockQuickRepliesRepo extends Mock implements QuickRepliesRepository {}
+
+// El hilo monta un QuickRepliesBloc que dispara listCatalog al construirse
+// (alimenta el selector ⚡); un catálogo vacío deja terminar el pumpAndSettle.
+_MockQuickRepliesRepo _quickRepliesRepo() {
+  final r = _MockQuickRepliesRepo();
+  when(() => r.listCatalog(any())).thenAnswer((_) async => <Never>[]);
+  return r;
+}
 
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
@@ -302,6 +313,7 @@ void main() {
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
@@ -735,6 +747,7 @@ void main() {
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
@@ -826,6 +839,7 @@ void main() {
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
@@ -863,6 +877,7 @@ void main() {
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
@@ -936,6 +951,7 @@ void main() {
         flowRunRepository: flowRunRepo,
         triggersRepository: triggersRepo,
         waLabelsRepository: _MockWaLabelsRepo(),
+        quickRepliesRepository: _quickRepliesRepo(),
         labelsRepository: labelsRepo,
         membershipsRepository: membershipsRepo,
         membersRepository: membersRepo,
@@ -1011,6 +1027,7 @@ void main() {
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
@@ -1323,6 +1340,7 @@ void main() {
         flowRunRepository: flowRunRepo,
         triggersRepository: triggersRepo,
         waLabelsRepository: _MockWaLabelsRepo(),
+        quickRepliesRepository: _quickRepliesRepo(),
         labelsRepository: labelsRepo,
         membershipsRepository: membershipsRepo,
         membersRepository: membersRepo,
@@ -1361,6 +1379,7 @@ void main() {
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
@@ -1595,6 +1614,7 @@ void main() {
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
       waLabelsRepository: _MockWaLabelsRepo(),
+      quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,

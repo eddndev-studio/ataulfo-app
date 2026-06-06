@@ -55,6 +55,8 @@ import 'features/templates/data/datasources/templates_datasource.dart';
 import 'features/templates/data/repositories/templates_repository_impl.dart';
 import 'features/triggers/data/datasources/triggers_datasource.dart';
 import 'features/triggers/data/repositories/triggers_repository_impl.dart';
+import 'features/quick_replies/data/datasources/quick_replies_catalog_datasource.dart';
+import 'features/quick_replies/data/repositories/quick_replies_repository_impl.dart';
 import 'features/wa_labels/data/datasources/wa_assoc_datasource.dart';
 import 'features/wa_labels/data/datasources/wa_catalog_datasource.dart';
 import 'features/wa_labels/data/datasources/wa_label_events_datasource.dart';
@@ -185,6 +187,12 @@ Future<void> main() async {
     events: DioWaLabelEventsDatasource(mainDio),
   );
 
+  // Respuestas rápidas WhatsApp Business (S23): catálogo de solo lectura per-bot
+  // que el composer del hilo ofrece en el selector ⚡.
+  final quickRepliesRepository = QuickRepliesRepositoryImpl(
+    catalog: DioQuickRepliesCatalogDatasource(mainDio),
+  );
+
   // Labels internos (S10): el selector del mapeo WA↔interno los lista.
   final labelsRepository = LabelsRepositoryImpl(
     datasource: DioLabelsDatasource(mainDio),
@@ -261,6 +269,7 @@ Future<void> main() async {
     flowRunRepository: flowRunRepository,
     triggersRepository: triggersRepository,
     waLabelsRepository: waLabelsRepository,
+    quickRepliesRepository: quickRepliesRepository,
     labelsRepository: labelsRepository,
     membershipsRepository: membershipsRepository,
     membersRepository: membersRepository,
