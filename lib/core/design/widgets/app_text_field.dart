@@ -113,6 +113,16 @@ class _AppTextFieldState extends State<AppTextField> {
   void initState() {
     super.initState();
     _focusNode.addListener(_onFocusChanged);
+    // Un controller pre-llenado (`TextEditingController(text: …)`) nace con la
+    // selección en offset -1 (inválida). Al ganar foco, la plataforma trata esa
+    // selección inválida seleccionando TODO el texto, lo que impide al operador
+    // colocar el cursor para editar. Normalizamos el caret al final del texto:
+    // así el primer foco posiciona el cursor (y un tap posterior lo recoloca
+    // donde se toque) en vez de seleccionar todo.
+    final c = widget.controller;
+    if (c.text.isNotEmpty && !c.selection.isValid) {
+      c.selection = TextSelection.collapsed(offset: c.text.length);
+    }
   }
 
   @override

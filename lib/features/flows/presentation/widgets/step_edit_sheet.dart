@@ -753,6 +753,9 @@ class _MediaField extends StatelessWidget {
     // hace setState y re-renderiza con el chip seleccionado. El filename viaja
     // por onPicked. NUNCA se persiste asset.previewUrl (firmada efímera).
     controller.text = ref;
+    // Asignar `.text` deja la selección en offset -1 (inválida); enfocar el
+    // campo seleccionaría todo. Colapsamos el caret al final para poder editar.
+    controller.selection = TextSelection.collapsed(offset: ref.length);
     onPicked(asset);
   }
 

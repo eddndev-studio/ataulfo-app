@@ -459,6 +459,36 @@ void main() {
     });
   });
 
+  group('AppTextField — selección al pre-llenar', () {
+    testWidgets(
+      'controller pre-llenado: el cursor arranca colapsado al final (no '
+      'select-all al enfocar)',
+      (tester) async {
+        final c = TextEditingController(text: 'Soporte VIP');
+        // Un controller construido con texto trae selección inválida (offset
+        // -1): es justo lo que dispara el select-all de plataforma al enfocar.
+        expect(c.selection.isValid, isFalse);
+
+        await pump(tester, AppTextField(label: 'X', hint: 'h', controller: c));
+
+        // Tras montar, AppTextField normaliza el caret al final del texto, de
+        // modo que el primer foco coloque el cursor en vez de seleccionar todo.
+        expect(
+          c.selection,
+          const TextSelection.collapsed(offset: 'Soporte VIP'.length),
+        );
+      },
+    );
+
+    testWidgets('controller vacío: no se fuerza selección', (tester) async {
+      final c = TextEditingController();
+      await pump(tester, AppTextField(label: 'X', hint: 'h', controller: c));
+      // Sin texto no hay nada que seleccionar; no inventamos un caret.
+      expect(c.text, isEmpty);
+      expect(c.selection.isValid, isFalse);
+    });
+  });
+
   group('AppTextField — foco', () {
     testWidgets(
       'enfocado: borde 2px primary + glow (boxShadow con primaryGlow)',
