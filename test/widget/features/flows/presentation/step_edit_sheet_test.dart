@@ -308,6 +308,9 @@ void main() {
               delayMs: 0,
               jitterPct: 0,
               aiOnly: false,
+              // El nombre del archivo viaja junto con el ref para mostrarlo en
+              // la lista de pasos (el _asset por default es 'file.png').
+              metadataJson: '{"media_filename":"file.png"}',
             ),
           ),
         ).called(1);
@@ -355,7 +358,8 @@ void main() {
     );
 
     testWidgets(
-      'IMAGE: no escribe media_filename en el metadata (sólo DOCUMENT lo usa)',
+      'IMAGE: escribe media_filename en el metadata (para mostrar el nombre del '
+      'recurso en la lista de pasos)',
       (tester) async {
         await pumpHost(
           tester,
@@ -372,7 +376,9 @@ void main() {
 
         final captured = verify(() => bloc.add(captureAny())).captured;
         final ev = captured.single as FlowStepsAddRequested;
-        expect(ev.metadataJson, isNull);
+        expect(ev.metadataJson, isNotNull);
+        final meta = jsonDecode(ev.metadataJson!) as Map<String, dynamic>;
+        expect(meta['media_filename'], 'foto.png');
       },
     );
 
@@ -630,7 +636,13 @@ void main() {
 
         verify(
           () => bloc.add(
-            const FlowStepsUpdateRequested(stepId: 's-img', mediaRef: nuevoRef),
+            const FlowStepsUpdateRequested(
+              stepId: 's-img',
+              mediaRef: nuevoRef,
+              // El media_filename del nuevo asset acompaña al ref reemplazado
+              // (el _asset por default es 'file.png').
+              metadataJson: '{"media_filename":"file.png"}',
+            ),
           ),
         ).called(1);
       },
@@ -683,6 +695,7 @@ void main() {
               stepId: 's-img',
               mediaRef: nuevoRef,
               content: 'caption nuevo',
+              metadataJson: '{"media_filename":"file.png"}',
             ),
           ),
         ).called(1);
