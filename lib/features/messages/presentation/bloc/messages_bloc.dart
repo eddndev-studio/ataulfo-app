@@ -74,6 +74,13 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     emit(const MessagesLoading());
     try {
       final page = await _repo.thread(_botId, _chatLid);
+      // Navegar fuera del hilo durante la carga inicial cierra este bloc
+      // page-scoped. Sin esta guarda, al resolver el fetch arrancaríamos la
+      // suscripción en vivo (fuga de conexión SSE, nunca cancelada) y
+      // mandaríamos palomitas de leído REALES tras salir el operador.
+      if (isClosed) {
+        return;
+      }
       emit(
         MessagesLoaded(
           items: page.messages,
@@ -261,20 +268,33 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         _chatLid,
         cursor: current.prevCursor,
       );
+      // Relee el estado FRESCO tras el await (como `_dispatchSend`): durante el
+      // fetch del tramo viejo pudo entrar un evento en vivo (`_onLive`/
+      // `_onStatus`) o un envío (`_onSend`) que mutó el hilo. Prependerlo sobre
+      // el snapshot `current` capturado antes del await borraría esas mutaciones.
+      final s = state;
+      if (s is! MessagesLoaded) {
+        return;
+      }
       // El tramo viejo es estrictamente anterior (keyset `<`): se prepende sin
       // solape ni dedup. Ambas listas vienen en ASC.
       emit(
         MessagesLoaded(
-          items: <Message>[...older.messages, ...current.items],
+          items: <Message>[...older.messages, ...s.items],
           prevCursor: older.prevCursor,
           isLoadingOlder: false,
-          pending: current.pending,
+          pending: s.pending,
         ),
       );
     } on MessagesFailure {
       // Fallar al cargar más viejos NO derriba el hilo ya pintado: se apaga el
-      // spinner y se conserva el estado (el usuario puede reintentar el scroll).
-      emit(current.copyWith(isLoadingOlder: false));
+      // spinner y se conserva el estado FRESCO (el usuario puede reintentar el
+      // scroll). Releer el estado evita pisar eventos en vivo del intervalo.
+      final s = state;
+      if (s is! MessagesLoaded) {
+        return;
+      }
+      emit(s.copyWith(isLoadingOlder: false));
     }
   }
 

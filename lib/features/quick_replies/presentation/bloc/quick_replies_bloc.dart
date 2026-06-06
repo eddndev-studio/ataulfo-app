@@ -5,16 +5,21 @@ import '../../domain/failures/quick_replies_failure.dart';
 import '../../domain/repositories/quick_replies_repository.dart';
 
 /// Bloc del catálogo de respuestas rápidas WhatsApp de un bot (S23). Se construye
-/// con el `botId` (la ruta del hilo lo aporta) y carga el catálogo una vez al
-/// montarse: el composer lee el último estado para ofrecer las respuestas en el
-/// selector ⚡.
+/// con el `botId` (la ruta del hilo lo aporta) y carga el catálogo al montarse:
+/// el composer lee el último estado para ofrecer las respuestas en el selector ⚡.
+///
+/// **Caché de sesión + stale-while-revalidate.** El repo cachea el catálogo por
+/// bot durante la sesión. Si ya hay catálogo cacheado, el bloc SIEMBRA su estado
+/// inicial en `Loaded` (sin el "cargando" de varios segundos al reabrir el hilo)
+/// y la carga revalida en silencio: no re-emite `Loading` ni borra el catálogo
+/// si la revalidación falla. La primera apertura (sin caché) sí muestra el
+/// spinner. Reabrir el hilo deja de mostrar la pantalla de carga.
 ///
 /// SOLO LECTURA y SIN realtime: a diferencia del catálogo de etiquetas (S21), no
 /// se abre un segundo stream SSE por hilo. Las respuestas rápidas casi nunca
 /// cambian mientras se atiende una conversación, y abrir otra conexión a
 /// `/events/stream` (que el backend ya expone para `quick_reply.*`) duplicaría el
-/// fan-out por hilo sin beneficio real. La actualización en vivo queda diferida;
-/// reabrir el hilo recarga el catálogo.
+/// fan-out por hilo sin beneficio real. La actualización en vivo queda diferida.
 ///
 /// El estado conserva el espejo COMPLETO (incluidos tombstones `deleted:true`);
 /// el selector filtra los activos.
@@ -24,8 +29,18 @@ class QuickRepliesBloc extends Bloc<QuickRepliesEvent, QuickRepliesState> {
     required String botId,
   }) : _repo = repo,
        _botId = botId,
-       super(const QuickRepliesLoading()) {
+       super(_seed(repo, botId)) {
     on<QuickRepliesLoadRequested>(_onLoad);
+  }
+
+  /// Estado inicial: `Loaded` si el repo ya tiene el catálogo cacheado de este
+  /// bot (reapertura ⇒ sin flash de carga), o `Loading` en frío. `[]` cacheada
+  /// siembra `Loaded([])` (bot sin respuestas), distinto de `null` (sin caché).
+  static QuickRepliesState _seed(QuickRepliesRepository repo, String botId) {
+    final cached = repo.cachedCatalog(botId);
+    return cached == null
+        ? const QuickRepliesLoading()
+        : QuickRepliesLoaded(cached);
   }
 
   final QuickRepliesRepository _repo;
@@ -38,14 +53,26 @@ class QuickRepliesBloc extends Bloc<QuickRepliesEvent, QuickRepliesState> {
     QuickRepliesLoadRequested event,
     Emitter<QuickRepliesState> emit,
   ) async {
-    if (state is! QuickRepliesLoading) {
+    final hadData = state is QuickRepliesLoaded;
+    // Solo re-mostramos el spinner al reintentar desde un fallo. En frío el seed
+    // ya es `Loading`; con datos (caché) revalidamos en silencio, sin flash.
+    if (state is QuickRepliesFailed) {
       emit(const QuickRepliesLoading());
     }
     try {
-      final items = await _repo.listCatalog(_botId);
-      emit(QuickRepliesLoaded(items));
+      final next = QuickRepliesLoaded(await _repo.listCatalog(_botId));
+      // Revalidación idéntica al estado actual (caché ya fresca) ⇒ no re-emitir:
+      // la primera emisión del bloc no se deduplica por valor, así que el guard
+      // evita un evento redundante al reabrir un hilo sin cambios.
+      if (state != next) {
+        emit(next);
+      }
     } on QuickRepliesFailure catch (f) {
-      emit(QuickRepliesFailed(f));
+      // Una revalidación fallida NO borra un catálogo ya cargado: el selector
+      // sigue ofreciendo la última copia buena. El error solo aflora en frío.
+      if (!hadData) {
+        emit(QuickRepliesFailed(f));
+      }
     }
   }
 }

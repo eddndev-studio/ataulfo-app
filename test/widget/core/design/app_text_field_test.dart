@@ -459,6 +459,60 @@ void main() {
     });
   });
 
+  group('AppTextField — selección al enfocar un campo pre-llenado', () {
+    testWidgets('al ganar foco, el caret se colapsa al final (no select-all)', (
+      tester,
+    ) async {
+      final c = TextEditingController(text: 'Soporte VIP');
+      // Un controller construido con texto trae selección inválida (offset
+      // -1): es justo lo que dispara el select-all de plataforma al enfocar.
+      expect(c.selection.isValid, isFalse);
+
+      await pump(
+        tester,
+        AppTextField(label: 'X', hint: 'h', controller: c, autofocus: true),
+      );
+      await tester.pump(); // asienta el foco (autofocus) y su listener
+
+      // Al enfocar, AppTextField normaliza el caret al final del texto, de
+      // modo que el foco coloque el cursor en vez de seleccionar todo.
+      expect(
+        c.selection,
+        const TextSelection.collapsed(offset: 'Soporte VIP'.length),
+      );
+    });
+
+    testWidgets('enfocar con controller vacío deja el caret natural (0)', (
+      tester,
+    ) async {
+      final c = TextEditingController();
+      await pump(
+        tester,
+        AppTextField(label: 'X', hint: 'h', controller: c, autofocus: true),
+      );
+      await tester.pump();
+      // Sin texto no hay nada que seleccionar: nuestra normalización no aplica
+      // y el caret queda donde el framework lo pone al enfocar un campo vacío
+      // (offset 0), no en un valor inventado.
+      expect(c.text, isEmpty);
+      expect(c.selection, const TextSelection.collapsed(offset: 0));
+    });
+
+    testWidgets('no pisa una selección ya válida (no fuerza al final)', (
+      tester,
+    ) async {
+      final c = TextEditingController(text: 'hola')
+        ..selection = const TextSelection.collapsed(offset: 1);
+      await pump(
+        tester,
+        AppTextField(label: 'X', hint: 'h', controller: c, autofocus: true),
+      );
+      await tester.pump();
+      // La selección válida del usuario (caret en 1) se respeta.
+      expect(c.selection, const TextSelection.collapsed(offset: 1));
+    });
+  });
+
   group('AppTextField — foco', () {
     testWidgets(
       'enfocado: borde 2px primary + glow (boxShadow con primaryGlow)',

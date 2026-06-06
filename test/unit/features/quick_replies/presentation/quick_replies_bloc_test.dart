@@ -23,12 +23,31 @@ QuickReply _qr({
 void main() {
   late _MockRepo repo;
 
-  setUp(() => repo = _MockRepo());
+  setUp(() {
+    repo = _MockRepo();
+    // Por defecto: sin caché (frío). Los tests warm lo sobreescriben.
+    when(() => repo.cachedCatalog(any())).thenReturn(null);
+  });
 
   QuickRepliesBloc build() => QuickRepliesBloc(repo: repo, botId: 'b1');
 
-  test('estado inicial es Loading', () {
+  test('estado inicial es Loading (frío, sin caché)', () {
     expect(build().state, const QuickRepliesLoading());
+  });
+
+  test('siembra Loaded desde la caché de sesión (sin flash de carga)', () {
+    when(
+      () => repo.cachedCatalog('b1'),
+    ).thenReturn(<QuickReply>[_qr(), _qr(id: '62', deleted: true)]);
+    expect(
+      build().state,
+      QuickRepliesLoaded(<QuickReply>[_qr(), _qr(id: '62', deleted: true)]),
+    );
+  });
+
+  test('caché vacía siembra Loaded([]) (bot sin respuestas), no Loading', () {
+    when(() => repo.cachedCatalog('b1')).thenReturn(const <QuickReply>[]);
+    expect(build().state, const QuickRepliesLoaded(<QuickReply>[]));
   });
 
   test('expone el botId con que se construyó', () {
@@ -97,5 +116,48 @@ void main() {
       const QuickRepliesLoading(),
       QuickRepliesLoaded(<QuickReply>[_qr()]),
     ],
+  );
+
+  // Stale-while-revalidate: sembrado desde caché, la carga revalida en silencio.
+  blocTest<QuickRepliesBloc, QuickRepliesState>(
+    'warm: revalida sin re-emitir Loading (datos nuevos → Loaded directo)',
+    build: () {
+      when(() => repo.cachedCatalog('b1')).thenReturn(<QuickReply>[_qr()]);
+      when(() => repo.listCatalog('b1')).thenAnswer(
+        (_) async => <QuickReply>[_qr(), _qr(id: '62', message: 'Adiós')],
+      );
+      return build();
+    },
+    act: (b) => b.add(const QuickRepliesLoadRequested()),
+    expect: () => <QuickRepliesState>[
+      QuickRepliesLoaded(<QuickReply>[_qr(), _qr(id: '62', message: 'Adiós')]),
+    ],
+  );
+
+  blocTest<QuickRepliesBloc, QuickRepliesState>(
+    'warm: misma data → no re-emite (sin parpadeo)',
+    build: () {
+      when(() => repo.cachedCatalog('b1')).thenReturn(<QuickReply>[_qr()]);
+      when(
+        () => repo.listCatalog('b1'),
+      ).thenAnswer((_) async => <QuickReply>[_qr()]);
+      return build();
+    },
+    act: (b) => b.add(const QuickRepliesLoadRequested()),
+    expect: () => const <QuickRepliesState>[],
+  );
+
+  blocTest<QuickRepliesBloc, QuickRepliesState>(
+    'warm: revalidación fallida conserva la caché (no Failed)',
+    build: () {
+      when(() => repo.cachedCatalog('b1')).thenReturn(<QuickReply>[_qr()]);
+      when(
+        () => repo.listCatalog('b1'),
+      ).thenThrow(const QuickRepliesServerFailure());
+      return build();
+    },
+    act: (b) => b.add(const QuickRepliesLoadRequested()),
+    expect: () => const <QuickRepliesState>[],
+    verify: (b) => expect(b.state, QuickRepliesLoaded(<QuickReply>[_qr()])),
   );
 }

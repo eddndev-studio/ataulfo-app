@@ -981,4 +981,106 @@ void main() {
       await b.close();
     });
   });
+
+  group('Concurrencia: estado fresco bajo awaits', () {
+    late Completer<MessagePage> olderGate;
+    setUp(() => olderGate = Completer<MessagePage>());
+
+    Future<void> tick() =>
+        Future<void>.delayed(const Duration(milliseconds: 20));
+
+    // _onOlder parquea en el fetch del tramo viejo; durante ese await pueden
+    // entrar eventos en vivo (la suscripción SSE sigue activa). Al resumir, el
+    // tramo viejo debe prependerse sobre el estado FRESCO, no sobre el snapshot
+    // capturado antes del await — si no, el mensaje en vivo se perdería.
+    blocTest<MessagesBloc, MessagesState>(
+      'un mensaje en vivo llegado durante el fetch de tramo viejo NO se pierde',
+      build: () {
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: '300:m3',
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer((_) => olderGate.future);
+        return build();
+      },
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m4', 400), msg('m5', 500)],
+        prevCursor: '300:m3',
+        isLoadingOlder: false,
+      ),
+      act: (b) async {
+        b.add(const MessagesOlderRequested());
+        await tick(); // entra al await del fetch
+        b.add(MessagesLiveReceived(msg('m6', 600))); // en vivo durante el fetch
+        await tick();
+        olderGate.complete(
+          MessagePage(
+            messages: <Message>[msg('m2', 200), msg('m3', 300)],
+            prevCursor: null,
+          ),
+        );
+        await tick();
+      },
+      expect: () => <MessagesState>[
+        MessagesLoaded(
+          items: <Message>[msg('m4', 400), msg('m5', 500)],
+          prevCursor: '300:m3',
+          isLoadingOlder: true,
+        ),
+        MessagesLoaded(
+          items: <Message>[msg('m4', 400), msg('m5', 500), msg('m6', 600)],
+          prevCursor: '300:m3',
+          isLoadingOlder: true,
+        ),
+        MessagesLoaded(
+          items: <Message>[
+            msg('m2', 200),
+            msg('m3', 300),
+            msg('m4', 400),
+            msg('m5', 500),
+            msg('m6', 600),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      ],
+    );
+
+    // Navegar fuera del hilo durante la carga inicial cierra el bloc page-scoped.
+    // Al resolver el fetch, _onLoad NO debe abrir la suscripción en vivo (fuga de
+    // conexión SSE) ni marcar leído (palomitas REALES tras salir el operador).
+    test(
+      'close() durante la carga inicial → no abre live ni marca leído',
+      () async {
+        final gate = Completer<MessagePage>();
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer((_) => gate.future);
+        final b = build();
+        b.add(const MessagesLoadRequested());
+        await tick(); // _onLoad emite Loading y parquea en el await de thread
+        await b.close(); // navega fuera ANTES de resolver
+        gate.complete(
+          MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: null),
+        );
+        await tick();
+        verifyNever(() => repo.live(any()));
+        verifyNever(
+          () => repo.markRead(
+            any(),
+            any(),
+            upToMessageId: any(named: 'upToMessageId'),
+          ),
+        );
+      },
+    );
+  });
 }

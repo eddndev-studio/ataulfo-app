@@ -125,7 +125,23 @@ class _AppTextFieldState extends State<AppTextField> {
   // Rebuild inmediato del shell hacia su estado enfocado/desenfocado. Un
   // setState (no una animación) garantiza que el borde y el glow estén
   // presentes en el primer frame tras ganar foco.
-  void _onFocusChanged() => setState(() {});
+  void _onFocusChanged() {
+    // Al GANAR foco, un controller pre-llenado (`TextEditingController(text:…)`)
+    // trae la selección en offset -1 (inválida); la plataforma la trata
+    // seleccionando TODO el texto, lo que impide colocar el cursor para editar.
+    // Colapsamos el caret al final: el primer foco posiciona el cursor (y un tap
+    // posterior lo recoloca donde se toque). Sólo al ganar foco y sólo si la
+    // selección es inválida — nunca pisamos una selección que el usuario ya hizo.
+    // Se hace aquí (no en initState) porque mutar el controller durante el build
+    // notificaría a sus listeners (el padre) en pleno build → setState ilegal.
+    if (_focusNode.hasFocus) {
+      final c = widget.controller;
+      if (c.text.isNotEmpty && !c.selection.isValid) {
+        c.selection = TextSelection.collapsed(offset: c.text.length);
+      }
+    }
+    setState(() {});
+  }
 
   // El toggle de visibilidad sólo aplica a campos enmascarados: ocultar texto
   // ya visible no tiene sentido. Sin obscureText el botón no se pinta.
