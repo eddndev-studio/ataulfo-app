@@ -204,6 +204,8 @@ void main() {
       expect(ev.mediaRef, isNot(signedUrl));
       // Only-changed: el caption no se tocó.
       expect(ev.content, isNull);
+      // El media_filename del nuevo asset acompaña al ref reemplazado.
+      expect(ev.metadataJson, contains('zzz999.png'));
     },
   );
 }

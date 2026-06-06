@@ -24,6 +24,7 @@ import '../../domain/entities/label_step_metadata.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_steps_bloc.dart';
+import '../media_step_name.dart';
 import 'conditional_time_form.dart';
 import 'label_step_form.dart';
 import 'step_type_label.dart';
@@ -122,13 +123,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
   /// como `initial`. Parse fallido ⇒ null (el form arranca sin selección).
   LabelStepMetadata? _labelInitial;
 
-  /// Nombre real del documento elegido (clave `media_filename` del metadata).
-  /// Sólo aplica a DOCUMENT: el backend lo usa para `DocumentMessage.FileName`.
-  /// Se actualiza al elegir un asset; al editar se hidrata del metadata
-  /// existente. [_docFilenameInitial] guarda el valor original para el diff
-  /// only-changed del PATCH.
+  /// Nombre real del archivo elegido (clave `media_filename` del metadata). Se
+  /// guarda para CUALQUIER paso multimedia: el backend lo usa como
+  /// `DocumentMessage.FileName` en DOCUMENT, y el cliente lo muestra como nombre
+  /// del recurso en la lista de pasos para los demás tipos. Se setea al elegir
+  /// un asset y viaja junto con el `mediaRef` (cambia sólo al elegir otro
+  /// recurso).
   String? _pickedFilename;
-  String? _docFilenameInitial;
 
   @override
   void initState() {
@@ -151,10 +152,6 @@ class _StepEditSheetState extends State<StepEditSheet> {
         // operador puede notar el desajuste y reconfigurar.
         _ctInitial = null;
       }
-    }
-    if (ed != null && ed.type == fdom.StepType.document) {
-      _docFilenameInitial = _filenameFromMetadata(ed.metadataJson);
-      _pickedFilename = _docFilenameInitial;
     }
     if (ed != null && ed.type == fdom.StepType.label) {
       try {
@@ -186,27 +183,13 @@ class _StepEditSheetState extends State<StepEditSheet> {
     fdom.StepType.unsupported => null,
   };
 
-  /// Extrae `media_filename` de un metadata JSON (objeto). Ausente/corrupto ⇒
-  /// null (el sheet sigue usable; el backend cae al nombre por defecto).
-  static String? _filenameFromMetadata(String metadataJson) {
-    if (metadataJson.trim().isEmpty) return null;
-    try {
-      final decoded = jsonDecode(metadataJson);
-      if (decoded is Map<String, dynamic>) {
-        final name = decoded['media_filename'];
-        if (name is String && name.trim().isNotEmpty) return name;
-      }
-    } on FormatException {
-      return null;
-    }
-    return null;
-  }
-
-  /// Metadata JSON a persistir para un DOCUMENT con filename conocido:
-  /// `{"media_filename": "..."}`. Sin filename ⇒ null (no se escribe metadata).
-  String? _documentMetadataJson() {
+  /// Metadata JSON con el nombre del recurso de un paso multimedia:
+  /// `{"media_filename": "..."}`. No multimedia, o sin filename conocido ⇒ null
+  /// (no se escribe metadata). El nombre identifica al mismo asset que el
+  /// `mediaRef`, así que viaja junto con él.
+  String? _mediaMetadataJson() {
     final name = _pickedFilename?.trim();
-    if (_type != fdom.StepType.document || name == null || name.isEmpty) {
+    if (!_isMultimedia || name == null || name.isEmpty) {
       return null;
     }
     return jsonEncode(<String, dynamic>{'media_filename': name});
@@ -298,7 +281,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
               ? _ctMetadataJson
               : _isLabel
               ? _labelMetadataJson
-              : _documentMetadataJson(),
+              : _mediaMetadataJson(),
         ),
       );
       return;
@@ -348,12 +331,12 @@ class _StepEditSheetState extends State<StepEditSheet> {
       } on FormatException {
         newMetadata = _labelMetadataJson;
       }
-    } else if (_type == fdom.StepType.document) {
-      // DOCUMENT: el media_filename viaja sólo si cambió respecto al original
-      // (re-pick de otro asset). Sin cambio ⇒ no se manda metadata (el backend
-      // conserva el existente). Comparación por valor del filename.
-      if ((_pickedFilename ?? '') != (_docFilenameInitial ?? '')) {
-        newMetadata = _documentMetadataJson();
+    } else if (_isMultimedia) {
+      // El media_filename acompaña al ref: cambia sólo cuando se elige otro
+      // recurso (otro ref). Si el ref no cambió, el nombre tampoco ⇒ no se manda
+      // metadata y el backend conserva el existente.
+      if (newMediaRef != null) {
+        newMetadata = _mediaMetadataJson();
       }
     }
 
@@ -830,7 +813,7 @@ class _MediaField extends StatelessWidget {
                     Text(
                       // Cola corta del ref (display-only). La fuente de verdad
                       // sigue siendo el ref BARE completo en el controller.
-                      _shortRef(ref),
+                      shortMediaRef(ref),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(
@@ -853,15 +836,6 @@ class _MediaField extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Cola corta del ref BARE para mostrar en el chip (display-only): el último
-/// segmento del path (el nombre/id del archivo). Si el ref no tiene `/`, se
-/// muestra completo. NUNCA se persiste esta forma corta — sólo se pinta.
-String _shortRef(String ref) {
-  final slash = ref.lastIndexOf('/');
-  if (slash < 0 || slash == ref.length - 1) return ref;
-  return ref.substring(slash + 1);
 }
 
 /// Extrae los `order` de los steps vigentes del bloc state para los

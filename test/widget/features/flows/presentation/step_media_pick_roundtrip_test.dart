@@ -200,6 +200,9 @@ void main() {
       expect(ev.mediaRef, bareRef);
       expect(ev.mediaRef, isNot(signedUrl));
       expect(ev.content, '');
+      // El nombre del archivo del asset acompaña al ref para mostrarlo en la
+      // lista de pasos (NO la previewUrl ni el ref como nombre).
+      expect(ev.metadataJson, contains('zzz999.png'));
     },
   );
 }
