@@ -295,9 +295,13 @@ Future<void> main() async {
     AtaulfoApp(
       router: router,
       authBloc: authBloc,
-      // Al cerrar sesión, purga el cache de media para no servir el catálogo de
-      // una cuenta a la siguiente sin reiniciar la app.
-      onSignedOut: mediaRepository.invalidate,
+      // Al cerrar sesión, purga las cachés de sesión (media y respuestas
+      // rápidas) para no servir el catálogo de una cuenta a la siguiente sin
+      // reiniciar la app.
+      onSignedOut: () {
+        mediaRepository.invalidate();
+        quickRepliesRepository.invalidate();
+      },
     ),
   );
 }
