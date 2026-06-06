@@ -79,6 +79,13 @@ class _MessageComposerState extends State<MessageComposer> {
         bytes: picked.bytes,
         filename: picked.filename,
       );
+      // El hilo pudo cerrarse o transitar a Loading/Failed durante la subida
+      // (multi-segundo), desmontando el composer y disponiendo `_ctrl`. Sin esta
+      // guarda, `_ctrl.clear()` tocaría un controller dispuesto. Espeja el guard
+      // que ya tiene el `finally`.
+      if (!mounted) {
+        return;
+      }
       bloc.add(
         MessagesSendRequested(
           type: 'image',
