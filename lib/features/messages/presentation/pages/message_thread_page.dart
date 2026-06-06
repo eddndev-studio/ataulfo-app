@@ -20,9 +20,10 @@ import '../widgets/message_composer.dart';
 /// los aporta la ruta.
 ///
 /// Abre en la cola (mensajes recientes, abajo) y carga hacia arriba al hacer
-/// scroll al tope. Sólo lectura (enviar es rebanada posterior). La media se
-/// renderiza por tipo: imagen/sticker desde la URL firmada, el resto como
-/// tarjeta de tipo.
+/// scroll al tope; al abrir marca el chat como leído. Lleva el composer de
+/// envío al fondo (`MessageComposer`) y pinta burbujas optimistas
+/// pendientes/fallidas. La media se renderiza por tipo: imagen/sticker desde la
+/// URL firmada, el resto como tarjeta de tipo.
 class MessageThreadPage extends StatelessWidget {
   const MessageThreadPage({super.key});
 

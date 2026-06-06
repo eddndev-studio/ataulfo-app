@@ -83,9 +83,26 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
       // El realtime arranca DESPUÉS de pintar la cola: así `_onLive` sólo
       // corre sobre un `MessagesLoaded` y no compite con la carga inicial.
       _startLive();
+      // Abrir el hilo lo marca como leído (decisión de producto: al abrir, no
+      // al responder). Best-effort y silencioso.
+      _markReadOnOpen();
     } on MessagesFailure catch (f) {
       emit(MessagesFailed(f));
     }
+  }
+
+  /// Marca el chat como leído al abrirlo. Envía palomitas de leído REALES al
+  /// contacto, así que es un efecto de un solo disparo por apertura (no en la
+  /// paginación ni en el refetch de reconexión). Best-effort y silencioso: no
+  /// emite estado —el badge de no-leídos vive en la lista, que se refresca al
+  /// volver— y un fallo no toca el hilo. `Future.sync` envuelve la llamada para
+  /// que un throw (incluso síncrono) caiga en `catchError` y no escape.
+  void _markReadOnOpen() {
+    unawaited(
+      Future<int>.sync(
+        () => _repo.markRead(_botId, _chatLid),
+      ).catchError((Object _) => 0),
+    );
   }
 
   /// Abre (o reabre) la suscripción al stream en vivo del bot. Reentrante: una

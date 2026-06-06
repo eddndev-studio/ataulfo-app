@@ -72,6 +72,15 @@ void main() {
     when(
       () => repo.live(any()),
     ).thenAnswer((_) => const Stream<ThreadLiveEvent>.empty());
+    // mark-read es best-effort y se dispara al abrir (load OK); por defecto
+    // devuelve 0 para no romper los tests que no lo observan.
+    when(
+      () => repo.markRead(
+        any(),
+        any(),
+        upToMessageId: any(named: 'upToMessageId'),
+      ),
+    ).thenAnswer((_) async => 0);
   });
 
   tearDown(() => liveController.close());
@@ -126,6 +135,68 @@ void main() {
       expect: () => <MessagesState>[
         const MessagesLoading(),
         const MessagesFailed(MessagesServerFailure()),
+      ],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'al abrir (load OK) dispara mark-read best-effort',
+      build: () {
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => MessagePage(
+            messages: <Message>[msg('m1', 100)],
+            prevCursor: null,
+          ),
+        );
+        return build();
+      },
+      act: (b) => b.add(const MessagesLoadRequested()),
+      verify: (_) {
+        verify(
+          () => repo.markRead('b1', 'lid-1', upToMessageId: null),
+        ).called(1);
+      },
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'un fallo de mark-read NO afecta el hilo cargado',
+      build: () {
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => MessagePage(
+            messages: <Message>[msg('m1', 100)],
+            prevCursor: null,
+          ),
+        );
+        when(
+          () => repo.markRead(
+            'b1',
+            'lid-1',
+            upToMessageId: any(named: 'upToMessageId'),
+          ),
+        ).thenThrow(const MessagesNotConnectedFailure());
+        return build();
+      },
+      act: (b) => b.add(const MessagesLoadRequested()),
+      expect: () => <MessagesState>[
+        const MessagesLoading(),
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100)],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
       ],
     );
   });
