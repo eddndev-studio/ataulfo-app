@@ -545,4 +545,318 @@ void main() {
       ],
     );
   });
+
+  group('Envío optimista', () {
+    // Un OUTBOUND del operador ya persistido: lo que devuelve `repo.send` y/o
+    // llega como eco SSE del chat abierto.
+    Message sent(String ext, {String content = 'hola', int ts = 900}) =>
+        Message(
+          externalId: ext,
+          chatLid: 'lid-1',
+          senderLid: 'me',
+          kind: MessageKind.dm,
+          direction: MessageDirection.outbound,
+          type: 'text',
+          content: content,
+          mediaRef: null,
+          quotedId: null,
+          timestampMs: ts,
+          status: MessageStatus.sent,
+        );
+
+    // Bloc con generador de clientToken determinista (para asertar el token y
+    // verificar que el reintento reusa EL MISMO).
+    MessagesBloc buildTok(String token) => MessagesBloc(
+      repo: repo,
+      botId: 'b1',
+      chatLid: 'lid-1',
+      clientTokenFactory: () => token,
+    );
+
+    void stubSend(Message result) {
+      when(
+        () => repo.send(
+          'b1',
+          'lid-1',
+          clientToken: any(named: 'clientToken'),
+          type: any(named: 'type'),
+          content: any(named: 'content'),
+          mediaRef: any(named: 'mediaRef'),
+        ),
+      ).thenAnswer((_) async => result);
+    }
+
+    Future<void> tick() =>
+        Future<void>.delayed(const Duration(milliseconds: 20));
+
+    blocTest<MessagesBloc, MessagesState>(
+      'éxito → [pending(enviando), reconciliado con el Message]',
+      build: () {
+        stubSend(sent('AG-1'));
+        return buildTok('ct-1');
+      },
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) =>
+          b.add(const MessagesSendRequested(type: 'text', content: 'hola')),
+      expect: () => <MessagesState>[
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100)],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: const <PendingSend>[
+            PendingSend(clientToken: 'ct-1', type: 'text', content: 'hola'),
+          ],
+        ),
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100), sent('AG-1')],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      ],
+      verify: (_) {
+        verify(
+          () => repo.send(
+            'b1',
+            'lid-1',
+            clientToken: 'ct-1',
+            type: 'text',
+            content: 'hola',
+            mediaRef: null,
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'fallo → la burbuja pendiente queda marcada como fallida',
+      build: () {
+        when(
+          () => repo.send(
+            'b1',
+            'lid-1',
+            clientToken: any(named: 'clientToken'),
+            type: any(named: 'type'),
+            content: any(named: 'content'),
+            mediaRef: any(named: 'mediaRef'),
+          ),
+        ).thenThrow(const MessagesNotConnectedFailure());
+        return buildTok('ct-1');
+      },
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+      act: (b) =>
+          b.add(const MessagesSendRequested(type: 'text', content: 'hola')),
+      expect: () => <MessagesState>[
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100)],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: const <PendingSend>[
+            PendingSend(clientToken: 'ct-1', type: 'text', content: 'hola'),
+          ],
+        ),
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100)],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: const <PendingSend>[
+            PendingSend(
+              clientToken: 'ct-1',
+              type: 'text',
+              content: 'hola',
+              failure: MessagesNotConnectedFailure(),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'reintento reusa el MISMO clientToken y reconcilia',
+      build: () {
+        when(
+          () => repo.send(
+            'b1',
+            'lid-1',
+            clientToken: any(named: 'clientToken'),
+            type: any(named: 'type'),
+            content: any(named: 'content'),
+            mediaRef: any(named: 'mediaRef'),
+          ),
+        ).thenAnswer((_) async => sent('AG-2', content: 'hey'));
+        return build();
+      },
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+        pending: const <PendingSend>[
+          PendingSend(
+            clientToken: 'ct-9',
+            type: 'text',
+            content: 'hey',
+            failure: MessagesNotConnectedFailure(),
+          ),
+        ],
+      ),
+      act: (b) => b.add(const MessagesSendRetryRequested('ct-9')),
+      expect: () => <MessagesState>[
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100)],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: const <PendingSend>[
+            PendingSend(clientToken: 'ct-9', type: 'text', content: 'hey'),
+          ],
+        ),
+        MessagesLoaded(
+          items: <Message>[
+            msg('m1', 100),
+            sent('AG-2', content: 'hey'),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      ],
+      verify: (_) {
+        verify(
+          () => repo.send(
+            'b1',
+            'lid-1',
+            clientToken: 'ct-9',
+            type: 'text',
+            content: 'hey',
+            mediaRef: null,
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'descartar quita la burbuja fallida',
+      build: build,
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+        pending: const <PendingSend>[
+          PendingSend(
+            clientToken: 'ct-9',
+            type: 'text',
+            content: 'hey',
+            failure: MessagesNotConnectedFailure(),
+          ),
+        ],
+      ),
+      act: (b) => b.add(const MessagesSendDiscarded('ct-9')),
+      expect: () => <MessagesState>[
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100)],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      ],
+    );
+
+    blocTest<MessagesBloc, MessagesState>(
+      'un evento en vivo conserva las burbujas pendientes',
+      build: build,
+      seed: () => MessagesLoaded(
+        items: <Message>[msg('m1', 100)],
+        prevCursor: null,
+        isLoadingOlder: false,
+        pending: const <PendingSend>[
+          PendingSend(clientToken: 'ct-1', type: 'text', content: 'hola'),
+        ],
+      ),
+      act: (b) => b.add(MessagesLiveReceived(msg('m2', 200))),
+      expect: () => <MessagesState>[
+        MessagesLoaded(
+          items: <Message>[msg('m1', 100), msg('m2', 200)],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: const <PendingSend>[
+            PendingSend(clientToken: 'ct-1', type: 'text', content: 'hola'),
+          ],
+        ),
+      ],
+    );
+
+    // Carrera: el eco SSE del envío llega ANTES del 200. El mensaje real entra
+    // por `_onLive`; al resolver el 200 se reconcilia sin duplicar (lee el
+    // estado FRESCO, no uno capturado antes del await) y limpia la pendiente.
+    test('eco SSE antes del 200 → sin duplicado, pending limpio', () async {
+      when(
+        () => repo.thread(
+          'b1',
+          'lid-1',
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: null),
+      );
+      when(() => repo.live('b1')).thenAnswer((_) => liveController.stream);
+      final completer = Completer<Message>();
+      when(
+        () => repo.send(
+          'b1',
+          'lid-1',
+          clientToken: any(named: 'clientToken'),
+          type: any(named: 'type'),
+          content: any(named: 'content'),
+          mediaRef: any(named: 'mediaRef'),
+        ),
+      ).thenAnswer((_) => completer.future);
+      final b = buildTok('ct-1');
+      b.add(const MessagesLoadRequested());
+      await tick();
+      b.add(const MessagesSendRequested(type: 'text', content: 'hola'));
+      await tick();
+      liveController.add(LiveMessage(sent('AG-9'))); // eco primero
+      await tick();
+      completer.complete(sent('AG-9')); // 200 con el MISMO externalId
+      await tick();
+      final s = b.state as MessagesLoaded;
+      expect(s.items.where((m) => m.externalId == 'AG-9'), hasLength(1));
+      expect(s.items.map((m) => m.externalId), <String>['m1', 'AG-9']);
+      expect(s.pending, isEmpty);
+      await b.close();
+    });
+
+    test('eco SSE después del 200 → deduplicado por externalId', () async {
+      when(
+        () => repo.thread(
+          'b1',
+          'lid-1',
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: null),
+      );
+      when(() => repo.live('b1')).thenAnswer((_) => liveController.stream);
+      stubSend(sent('AG-9'));
+      final b = buildTok('ct-1');
+      b.add(const MessagesLoadRequested());
+      await tick();
+      b.add(const MessagesSendRequested(type: 'text', content: 'hola'));
+      await tick(); // el 200 ya reconcilió
+      liveController.add(LiveMessage(sent('AG-9'))); // eco tardío
+      await tick();
+      final s = b.state as MessagesLoaded;
+      expect(s.items.where((m) => m.externalId == 'AG-9'), hasLength(1));
+      expect(s.pending, isEmpty);
+      await b.close();
+    });
+  });
 }

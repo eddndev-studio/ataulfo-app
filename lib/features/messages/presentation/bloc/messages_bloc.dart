@@ -1,6 +1,12 @@
+// Nota de tamaño (>400 LOC): este archivo concentra la máquina de estados
+// cohesiva del hilo —carga + paginación + realtime (mensajes y receipts) +
+// envío optimista con reconciliación contra el eco SSE—. Partirla dispersaría
+// lógica fuertemente acoplada: todas las transiciones comparten `MessagesLoaded`
+// y su invariante de dedup por `externalId`, así que se conserva junta.
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../domain/entities/message.dart';
 import '../../domain/entities/thread_live_event.dart';
@@ -27,20 +33,31 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     required MessagesRepository repo,
     required String botId,
     required String chatLid,
+    String Function()? clientTokenFactory,
   }) : _repo = repo,
        _botId = botId,
        _chatLid = chatLid,
+       _newToken = clientTokenFactory ?? _uuidV4,
        super(const MessagesInitial()) {
     on<MessagesLoadRequested>(_onLoad);
     on<MessagesOlderRequested>(_onOlder);
     on<MessagesLiveReceived>(_onLive);
     on<MessagesStatusReceived>(_onStatus);
     on<MessagesReconnected>(_onReconnected);
+    on<MessagesSendRequested>(_onSend);
+    on<MessagesSendRetryRequested>(_onRetry);
+    on<MessagesSendDiscarded>(_onDiscard);
   }
+
+  static String _uuidV4() => const Uuid().v4();
 
   final MessagesRepository _repo;
   final String _botId;
   final String _chatLid;
+
+  /// Genera la idempotency-key (`clientToken`) de cada envío. Inyectable para
+  /// tests deterministas; por defecto un UUID v4.
+  final String Function() _newToken;
 
   StreamSubscription<ThreadLiveEvent>? _liveSub;
 
@@ -110,13 +127,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
       return;
     }
     // Los mensajes en vivo son los más nuevos: se anexan al final (ASC).
-    emit(
-      MessagesLoaded(
-        items: <Message>[...current.items, m],
-        prevCursor: current.prevCursor,
-        isLoadingOlder: current.isLoadingOlder,
-      ),
-    );
+    emit(current.copyWith(items: <Message>[...current.items, m]));
   }
 
   /// Aplica un receipt en vivo (`message.status`): localiza el OUTBOUND por
@@ -142,13 +153,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     }
     final items = List<Message>.of(current.items);
     items[i] = items[i].withStatus(advanced);
-    emit(
-      MessagesLoaded(
-        items: items,
-        prevCursor: current.prevCursor,
-        isLoadingOlder: current.isLoadingOlder,
-      ),
-    );
+    emit(current.copyWith(items: items));
   }
 
   /// Tras reconectar el stream en vivo, reconcilia contra la verdad HTTP: el SSE
@@ -205,13 +210,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
           final byTime = a.timestampMs.compareTo(b.timestampMs);
           return byTime != 0 ? byTime : a.externalId.compareTo(b.externalId);
         });
-      emit(
-        MessagesLoaded(
-          items: merged,
-          prevCursor: current.prevCursor,
-          isLoadingOlder: current.isLoadingOlder,
-        ),
-      );
+      emit(current.copyWith(items: merged));
     } on MessagesFailure {
       // Refetch best-effort: una reconexión sin red no debe derribar el hilo.
     } finally {
@@ -237,13 +236,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         current.isLoadingOlder) {
       return;
     }
-    emit(
-      MessagesLoaded(
-        items: current.items,
-        prevCursor: current.prevCursor,
-        isLoadingOlder: true,
-      ),
-    );
+    emit(current.copyWith(isLoadingOlder: true));
     try {
       final older = await _repo.thread(
         _botId,
@@ -257,16 +250,125 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
           items: <Message>[...older.messages, ...current.items],
           prevCursor: older.prevCursor,
           isLoadingOlder: false,
+          pending: current.pending,
         ),
       );
     } on MessagesFailure {
       // Fallar al cargar más viejos NO derriba el hilo ya pintado: se apaga el
       // spinner y se conserva el estado (el usuario puede reintentar el scroll).
+      emit(current.copyWith(isLoadingOlder: false));
+    }
+  }
+
+  /// Envía un mensaje del operador con UI optimista. Pinta de inmediato una
+  /// burbuja pendiente (clave: el `clientToken` recién generado — ni el 200 ni
+  /// el eco SSE lo traen) y dispara el POST; `_dispatchSend` reconcilia.
+  Future<void> _onSend(
+    MessagesSendRequested event,
+    Emitter<MessagesState> emit,
+  ) async {
+    final current = state;
+    if (current is! MessagesLoaded) {
+      return;
+    }
+    final pending = PendingSend(
+      clientToken: _newToken(),
+      type: event.type,
+      content: event.content,
+      mediaRef: event.mediaRef,
+    );
+    emit(current.copyWith(pending: <PendingSend>[...current.pending, pending]));
+    await _dispatchSend(pending, emit);
+  }
+
+  /// Reintenta un envío fallido REUSANDO su `clientToken` (idempotencia: si el
+  /// mensaje llegó a salir, el backend devuelve 200 con el Message ya
+  /// persistido en vez de duplicar). Re-marca la burbuja como enviando y
+  /// redispara.
+  Future<void> _onRetry(
+    MessagesSendRetryRequested event,
+    Emitter<MessagesState> emit,
+  ) async {
+    final current = state;
+    if (current is! MessagesLoaded) {
+      return;
+    }
+    final i = current.pending.indexWhere(
+      (p) => p.clientToken == event.clientToken,
+    );
+    if (i < 0) {
+      return;
+    }
+    final retrying = current.pending[i].asSending();
+    final pending = List<PendingSend>.of(current.pending)..[i] = retrying;
+    emit(current.copyWith(pending: pending));
+    await _dispatchSend(retrying, emit);
+  }
+
+  /// Descarta una burbuja pendiente (típicamente fallida) sin enviar nada.
+  void _onDiscard(MessagesSendDiscarded event, Emitter<MessagesState> emit) {
+    final current = state;
+    if (current is! MessagesLoaded) {
+      return;
+    }
+    emit(
+      current.copyWith(
+        pending: current.pending
+            .where((p) => p.clientToken != event.clientToken)
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  /// POST del envío. Tras el await relee el estado FRESCO: entre el envío y su
+  /// resolución pudo entrar un evento en vivo que mutó el hilo (incl. el eco SSE
+  /// del propio envío). Reconcilia la burbuja con el Message del 200 —o lo deja
+  /// si el eco ya lo agregó (dedup por externalId)— y, si falla, marca la
+  /// burbuja como fallida sin tocar el hilo.
+  Future<void> _dispatchSend(
+    PendingSend pending,
+    Emitter<MessagesState> emit,
+  ) async {
+    try {
+      final msg = await _repo.send(
+        _botId,
+        _chatLid,
+        clientToken: pending.clientToken,
+        type: pending.type,
+        content: pending.content,
+        mediaRef: pending.mediaRef,
+      );
+      if (isClosed) {
+        return;
+      }
+      final s = state;
+      if (s is! MessagesLoaded) {
+        return;
+      }
+      final cleared = s.pending
+          .where((p) => p.clientToken != pending.clientToken)
+          .toList(growable: false);
+      final already = s.items.any((x) => x.externalId == msg.externalId);
       emit(
-        MessagesLoaded(
-          items: current.items,
-          prevCursor: current.prevCursor,
-          isLoadingOlder: false,
+        s.copyWith(
+          items: already ? s.items : <Message>[...s.items, msg],
+          pending: cleared,
+        ),
+      );
+    } on MessagesFailure catch (f) {
+      if (isClosed) {
+        return;
+      }
+      final s = state;
+      if (s is! MessagesLoaded) {
+        return;
+      }
+      emit(
+        s.copyWith(
+          pending: <PendingSend>[
+            for (final p in s.pending)
+              if (p.clientToken == pending.clientToken) p.asFailed(f) else p,
+          ],
         ),
       );
     }
@@ -343,6 +445,55 @@ class MessagesReconnected extends MessagesEvent {
   int get hashCode => (MessagesReconnected).hashCode;
 }
 
+/// El operador pide enviar un mensaje (S09). `type` es `text`/`image`; para
+/// imagen `mediaRef` es el ref BARE ya subido y `content` el caption opcional.
+class MessagesSendRequested extends MessagesEvent {
+  const MessagesSendRequested({
+    required this.type,
+    required this.content,
+    this.mediaRef,
+  });
+
+  final String type;
+  final String content;
+  final String? mediaRef;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MessagesSendRequested &&
+      other.type == type &&
+      other.content == content &&
+      other.mediaRef == mediaRef;
+  @override
+  int get hashCode => Object.hash(type, content, mediaRef);
+}
+
+/// Reintenta un envío fallido reusando su `clientToken` (idempotente).
+class MessagesSendRetryRequested extends MessagesEvent {
+  const MessagesSendRetryRequested(this.clientToken);
+
+  final String clientToken;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MessagesSendRetryRequested && other.clientToken == clientToken;
+  @override
+  int get hashCode => clientToken.hashCode;
+}
+
+/// Descarta una burbuja pendiente/fallida sin enviarla.
+class MessagesSendDiscarded extends MessagesEvent {
+  const MessagesSendDiscarded(this.clientToken);
+
+  final String clientToken;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MessagesSendDiscarded && other.clientToken == clientToken;
+  @override
+  int get hashCode => clientToken.hashCode;
+}
+
 // States --------------------------------------------------------------------
 
 sealed class MessagesState {
@@ -370,6 +521,7 @@ class MessagesLoaded extends MessagesState {
     required this.items,
     required this.prevCursor,
     required this.isLoadingOlder,
+    this.pending = const <PendingSend>[],
   });
 
   /// Mensajes acumulados en orden ascendente (más viejo→más nuevo).
@@ -381,7 +533,26 @@ class MessagesLoaded extends MessagesState {
   /// Hay un tramo más viejo cargándose (spinner arriba, hilo visible).
   final bool isLoadingOlder;
 
+  /// Envíos optimistas en vuelo o fallidos, en orden de emisión. Se pintan como
+  /// burbujas salientes al fondo del hilo hasta que el 200 los reconcilia con
+  /// su Message (por wamid) o el operador los reintenta/descarta.
+  final List<PendingSend> pending;
+
   bool get hasMore => prevCursor != null;
+
+  /// Copia conservando `prevCursor` (que sólo cambia en la paginación, donde el
+  /// estado se construye explícito): así un cambio de `items`/`pending` no puede
+  /// borrar el cursor por la ambigüedad null de un copyWith genérico.
+  MessagesLoaded copyWith({
+    List<Message>? items,
+    bool? isLoadingOlder,
+    List<PendingSend>? pending,
+  }) => MessagesLoaded(
+    items: items ?? this.items,
+    prevCursor: prevCursor,
+    isLoadingOlder: isLoadingOlder ?? this.isLoadingOlder,
+    pending: pending ?? this.pending,
+  );
 
   @override
   bool operator ==(Object other) {
@@ -393,12 +564,72 @@ class MessagesLoaded extends MessagesState {
     for (var i = 0; i < items.length; i++) {
       if (other.items[i] != items[i]) return false;
     }
+    if (other.pending.length != pending.length) return false;
+    for (var i = 0; i < pending.length; i++) {
+      if (other.pending[i] != pending[i]) return false;
+    }
     return true;
   }
 
   @override
+  int get hashCode => Object.hash(
+    Object.hashAll(items),
+    prevCursor,
+    isLoadingOlder,
+    Object.hashAll(pending),
+  );
+}
+
+/// Un envío optimista del operador: en vuelo (`failure == null`) o fallido. Se
+/// identifica por su `clientToken` (idempotency-key) porque ni el 200 ni el eco
+/// SSE lo traen — sólo así se reconcilia la burbuja con el Message real.
+class PendingSend {
+  const PendingSend({
+    required this.clientToken,
+    required this.type,
+    required this.content,
+    this.mediaRef,
+    this.failure,
+  });
+
+  final String clientToken;
+  final String type;
+  final String content;
+  final String? mediaRef;
+
+  /// `null` mientras está en vuelo; no-null si el envío falló (la burbuja ofrece
+  /// reintentar/descartar).
+  final MessagesFailure? failure;
+
+  bool get isFailed => failure != null;
+
+  PendingSend asSending() => PendingSend(
+    clientToken: clientToken,
+    type: type,
+    content: content,
+    mediaRef: mediaRef,
+  );
+
+  PendingSend asFailed(MessagesFailure f) => PendingSend(
+    clientToken: clientToken,
+    type: type,
+    content: content,
+    mediaRef: mediaRef,
+    failure: f,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is PendingSend &&
+      other.clientToken == clientToken &&
+      other.type == type &&
+      other.content == content &&
+      other.mediaRef == mediaRef &&
+      other.failure == failure;
+
+  @override
   int get hashCode =>
-      Object.hash(Object.hashAll(items), prevCursor, isLoadingOlder);
+      Object.hash(clientToken, type, content, mediaRef, failure);
 }
 
 class MessagesFailed extends MessagesState {
