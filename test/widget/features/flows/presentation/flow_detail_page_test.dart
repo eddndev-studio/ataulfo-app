@@ -9,6 +9,7 @@ import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_detail_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
+import 'package:ataulfo/features/flows/presentation/bloc/media_names_cubit.dart';
 import 'package:ataulfo/features/flows/presentation/pages/flow_detail_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
@@ -31,6 +32,9 @@ class _MockTriggersRepo extends Mock implements TriggersRepository {}
 
 class _MockLabelsRepo extends Mock implements LabelsRepository {}
 
+class _MockMediaNamesCubit extends MockCubit<MediaNamesState>
+    implements MediaNamesCubit {}
+
 const _flow = flows.Flow(
   id: 'f1',
   templateId: 't1',
@@ -52,14 +56,19 @@ void main() {
   late _MockStepsBloc stepsBloc;
   late _MockTriggersRepo triggersRepo;
   late _MockLabelsRepo labelsRepo;
+  late _MockMediaNamesCubit mediaNamesCubit;
 
   setUp(() {
     detailBloc = _MockDetailBloc();
     stepsBloc = _MockStepsBloc();
     triggersRepo = _MockTriggersRepo();
     labelsRepo = _MockLabelsRepo();
+    mediaNamesCubit = _MockMediaNamesCubit();
     when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
     when(() => stepsBloc.state).thenReturn(const FlowStepsLoading());
+    // Resolutor de nombres por default vacío (sin cargar): los pasos
+    // multimedia caen a su respaldo (media_filename / cola corta del ref).
+    when(() => mediaNamesCubit.state).thenReturn(const MediaNamesState());
     // Mantiene el TriggersBloc (creado lazy por FlowTriggersTab) en
     // Loading sin timers vivos al cerrar el test.
     when(
@@ -81,6 +90,7 @@ void main() {
         providers: <BlocProvider<dynamic>>[
           BlocProvider<FlowDetailBloc>.value(value: detailBloc),
           BlocProvider<FlowStepsBloc>.value(value: stepsBloc),
+          BlocProvider<MediaNamesCubit>.value(value: mediaNamesCubit),
         ],
         child: const Scaffold(body: FlowDetailPage()),
       ),
@@ -250,6 +260,49 @@ void main() {
       // tenant completo.
       expect(find.text('zzz999.png'), findsOneWidget);
       expect(find.textContaining('tenant/org1/media'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'StepCard multimedia muestra el alias EN VIVO del catálogo (resuelto por '
+    'ref), por encima del ref y del media_filename guardado',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's-audio',
+            flowId: 'f1',
+            type: fdom.StepType.ptt,
+            order: 0,
+            content: '',
+            mediaRef: 'tenant/org1/media/9y1gq8fq8f68g69696wv.ogg',
+            // Aunque hubiera un filename guardado, el alias en vivo manda.
+            metadataJson: '{"media_filename":"grabacion.ogg"}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+      // El catálogo resolvió ese ref al alias que el usuario editó en la galería.
+      when(() => mediaNamesCubit.state).thenReturn(
+        const MediaNamesState(
+          namesByRef: <String, String>{
+            'tenant/org1/media/9y1gq8fq8f68g69696wv.ogg':
+                'Saludo de bienvenida',
+          },
+          loaded: true,
+        ),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.text('Saludo de bienvenida'), findsOneWidget);
+      expect(find.textContaining('9y1gq8fq8f68g69696wv'), findsNothing);
+      expect(find.textContaining('grabacion.ogg'), findsNothing);
     },
   );
 

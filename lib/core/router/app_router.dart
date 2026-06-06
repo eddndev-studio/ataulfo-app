@@ -48,6 +48,7 @@ import '../../features/flows/presentation/bloc/flow_create_bloc.dart';
 import '../../features/flows/presentation/bloc/flow_detail_bloc.dart';
 import '../../features/flows/presentation/bloc/flow_steps_bloc.dart';
 import '../../features/flows/presentation/bloc/flows_bloc.dart';
+import '../../features/flows/presentation/bloc/media_names_cubit.dart';
 import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
@@ -760,6 +761,12 @@ class AppRouter {
                   create: (_) =>
                       FlowStepsBloc(repo: _flowsRepo, flowId: id)
                         ..add(const FlowStepsLoadRequested()),
+                ),
+                // Resuelve el ref BARE de cada paso multimedia al nombre/alias
+                // EN VIVO del catálogo, para que la lista muestre el nombre
+                // legible en vez del id. Carga al abrir el flujo.
+                BlocProvider<MediaNamesCubit>(
+                  create: (_) => MediaNamesCubit(repo: _mediaRepo)..load(),
                 ),
               ],
               child: Scaffold(
