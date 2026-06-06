@@ -1052,32 +1052,35 @@ void main() {
     // Navegar fuera del hilo durante la carga inicial cierra el bloc page-scoped.
     // Al resolver el fetch, _onLoad NO debe abrir la suscripción en vivo (fuga de
     // conexión SSE) ni marcar leído (palomitas REALES tras salir el operador).
-    test('close() durante la carga inicial → no abre live ni marca leído', () async {
-      final gate = Completer<MessagePage>();
-      when(
-        () => repo.thread(
-          'b1',
-          'lid-1',
-          cursor: any(named: 'cursor'),
-          limit: any(named: 'limit'),
-        ),
-      ).thenAnswer((_) => gate.future);
-      final b = build();
-      b.add(const MessagesLoadRequested());
-      await tick(); // _onLoad emite Loading y parquea en el await de thread
-      await b.close(); // navega fuera ANTES de resolver
-      gate.complete(
-        MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: null),
-      );
-      await tick();
-      verifyNever(() => repo.live(any()));
-      verifyNever(
-        () => repo.markRead(
-          any(),
-          any(),
-          upToMessageId: any(named: 'upToMessageId'),
-        ),
-      );
-    });
+    test(
+      'close() durante la carga inicial → no abre live ni marca leído',
+      () async {
+        final gate = Completer<MessagePage>();
+        when(
+          () => repo.thread(
+            'b1',
+            'lid-1',
+            cursor: any(named: 'cursor'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer((_) => gate.future);
+        final b = build();
+        b.add(const MessagesLoadRequested());
+        await tick(); // _onLoad emite Loading y parquea en el await de thread
+        await b.close(); // navega fuera ANTES de resolver
+        gate.complete(
+          MessagePage(messages: <Message>[msg('m1', 100)], prevCursor: null),
+        );
+        await tick();
+        verifyNever(() => repo.live(any()));
+        verifyNever(
+          () => repo.markRead(
+            any(),
+            any(),
+            upToMessageId: any(named: 'upToMessageId'),
+          ),
+        );
+      },
+    );
   });
 }

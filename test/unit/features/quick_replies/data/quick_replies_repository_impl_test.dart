@@ -61,20 +61,26 @@ void main() {
       expect(repo.cachedCatalog('b1'), items);
     });
 
-    test('caché vacía ([]) ≠ sin caché (null): se distingue el bot vacío', () async {
-      when(
-        () => catalog.listCatalog('b1'),
-      ).thenAnswer((_) async => const <QuickReply>[]);
-      await repo.listCatalog('b1');
-      expect(repo.cachedCatalog('b1'), isNotNull);
-      expect(repo.cachedCatalog('b1'), isEmpty);
-    });
+    test(
+      'caché vacía ([]) ≠ sin caché (null): se distingue el bot vacío',
+      () async {
+        when(
+          () => catalog.listCatalog('b1'),
+        ).thenAnswer((_) async => const <QuickReply>[]);
+        await repo.listCatalog('b1');
+        expect(repo.cachedCatalog('b1'), isNotNull);
+        expect(repo.cachedCatalog('b1'), isEmpty);
+      },
+    );
 
     test('un fallo de consulta NO escribe la caché', () async {
       when(
         () => catalog.listCatalog('b1'),
       ).thenThrow(const QuickRepliesServerFailure());
-      await expectLater(() => repo.listCatalog('b1'), throwsA(isA<QuickRepliesFailure>()));
+      await expectLater(
+        () => repo.listCatalog('b1'),
+        throwsA(isA<QuickRepliesFailure>()),
+      );
       expect(repo.cachedCatalog('b1'), isNull);
     });
 

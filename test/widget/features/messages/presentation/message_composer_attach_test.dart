@@ -77,9 +77,9 @@ void main() {
     'await de upload)',
     (tester) async {
       final upload = Completer<UploadedMedia>();
-      when(
-        picker.pick,
-      ).thenAnswer((_) async => PickedMedia(bytes: Uint8List(0), filename: 'a.png'));
+      when(picker.pick).thenAnswer(
+        (_) async => PickedMedia(bytes: Uint8List(0), filename: 'a.png'),
+      );
       when(
         () => mediaRepo.upload(
           bytes: any(named: 'bytes'),
@@ -89,7 +89,8 @@ void main() {
 
       await tester.pumpWidget(host(show: true));
       await tester.tap(find.byKey(const Key('composer.attach')));
-      await tester.pump(); // resuelve pick() y entra al await de upload (en vuelo)
+      await tester
+          .pump(); // resuelve pick() y entra al await de upload (en vuelo)
 
       // Desmonta el composer con la subida AÚN en vuelo: dispone _ctrl.
       await tester.pumpWidget(host(show: false));
