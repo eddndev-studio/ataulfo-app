@@ -6,6 +6,8 @@ import '../../../../core/design/tokens.dart';
 import '../../../media/domain/failures/media_failure.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../../media/domain/repositories/media_repository.dart';
+import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
+import '../../../quick_replies/presentation/widgets/quick_replies_sheet.dart';
 import '../bloc/messages_bloc.dart';
 
 /// Caja de redacción del hilo: campo de texto multilínea + botón enviar. Vive al
@@ -102,6 +104,55 @@ class _MessageComposerState extends State<MessageComposer> {
     _ => 'No se pudo subir la imagen',
   };
 
+  /// Abre el selector ⚡ de respuestas rápidas e inserta la elegida. Lee el último
+  /// estado del catálogo (cargado al abrir el hilo): si aún no cargó o no hay
+  /// respuestas activas, avisa con un SnackBar en vez de abrir un sheet vacío.
+  /// Captura el bloc/messenger ANTES del primer await.
+  Future<void> _quickReply() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final state = context.read<QuickRepliesBloc>().state;
+    if (state is! QuickRepliesLoaded) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Cargando respuestas rápidas…')),
+      );
+      return;
+    }
+    final active = state.items.where((q) => !q.deleted).toList(growable: false);
+    if (active.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No hay respuestas rápidas guardadas')),
+      );
+      return;
+    }
+    final message = await QuickRepliesSheet.open(context, active);
+    if (!mounted || message == null) {
+      return;
+    }
+    _insert(message);
+  }
+
+  /// Inserta texto en la posición del cursor, o al final si el campo nunca se
+  /// enfocó. Un `TextEditingController` recién creado tiene
+  /// `selection.offset == -1` (inválida); insertar por `replaceRange` con ese
+  /// offset lanzaría `RangeError`, así que se distingue ese caso.
+  void _insert(String text) {
+    final current = _ctrl.text;
+    final sel = _ctrl.selection;
+    if (!sel.isValid) {
+      final next = current + text;
+      _ctrl.value = TextEditingValue(
+        text: next,
+        selection: TextSelection.collapsed(offset: next.length),
+      );
+      return;
+    }
+    final next = current.replaceRange(sel.start, sel.end, text);
+    _ctrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: sel.start + text.length),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canSend = _ctrl.text.trim().isNotEmpty;
@@ -131,6 +182,13 @@ class _MessageComposerState extends State<MessageComposer> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.image_outlined),
+          ),
+          IconButton(
+            key: const Key('composer.quickreply'),
+            tooltip: 'Respuestas rápidas',
+            color: AppTokens.text2,
+            onPressed: _quickReply,
+            icon: const Icon(Icons.bolt),
           ),
           Expanded(
             child: TextField(

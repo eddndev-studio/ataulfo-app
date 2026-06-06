@@ -89,6 +89,8 @@ import '../../features/profile/domain/repositories/profile_repository.dart';
 import '../../features/profile/presentation/bloc/profile_bloc.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/widgets/chat_thread_app_bar.dart';
+import '../../features/quick_replies/domain/repositories/quick_replies_repository.dart';
+import '../../features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
@@ -133,6 +135,7 @@ class AppRouter {
     required FlowRunRepository flowRunRepository,
     required TriggersRepository triggersRepository,
     required WaLabelsRepository waLabelsRepository,
+    required QuickRepliesRepository quickRepliesRepository,
     required LabelsRepository labelsRepository,
     required MembershipsRepository membershipsRepository,
     required MembersRepository membersRepository,
@@ -154,6 +157,7 @@ class AppRouter {
        _flowRunRepo = flowRunRepository,
        _triggersRepo = triggersRepository,
        _waLabelsRepo = waLabelsRepository,
+       _quickRepliesRepo = quickRepliesRepository,
        _labelsRepo = labelsRepository,
        _membershipsRepo = membershipsRepository,
        _membersRepo = membersRepository,
@@ -176,6 +180,7 @@ class AppRouter {
   final FlowRunRepository _flowRunRepo;
   final TriggersRepository _triggersRepo;
   final WaLabelsRepository _waLabelsRepo;
+  final QuickRepliesRepository _quickRepliesRepo;
   final LabelsRepository _labelsRepo;
   final MembershipsRepository _membershipsRepo;
   final MembersRepository _membersRepo;
@@ -615,6 +620,13 @@ class AppRouter {
                     botId: id,
                     chatLid: chatLid,
                   )..add(const MessagesLoadRequested()),
+                ),
+                // Catálogo de respuestas rápidas WhatsApp del bot: carga al abrir
+                // el hilo para que el selector ⚡ del composer las ofrezca.
+                BlocProvider<QuickRepliesBloc>(
+                  create: (_) =>
+                      QuickRepliesBloc(repo: _quickRepliesRepo, botId: id)
+                        ..add(const QuickRepliesLoadRequested()),
                 ),
                 // El perfil alimenta el header (avatar + nombre real) y se
                 // re-monta en la pantalla de perfil; dos cargas hoy, la cache
