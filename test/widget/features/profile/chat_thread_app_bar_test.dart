@@ -3,6 +3,11 @@ import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
 import 'package:ataulfo/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:ataulfo/features/profile/presentation/widgets/chat_thread_app_bar.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_live_event.dart';
+import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
+import 'package:ataulfo/features/wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,6 +16,8 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockProfileBloc extends MockBloc<ProfileEvent, ProfileState>
     implements ProfileBloc {}
+
+class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
 void main() {
   late _MockProfileBloc bloc;
@@ -64,7 +71,17 @@ void main() {
   ) async {
     when(() => bloc.state).thenReturn(const ProfileLoading());
     await tester.pumpWidget(host());
-    expect(find.byType(InkWell), findsOneWidget);
+    // El header (bajo el Semantics "Ver perfil") es tappable; el botón de
+    // etiquetas del app bar aporta su propio ink, así que se acota al header.
+    expect(
+      find.descendant(
+        of: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.hint == 'Ver perfil',
+        ),
+        matching: find.byType(InkWell),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('GROUP sin displayName cae a "Grupo"', (tester) async {
@@ -133,5 +150,46 @@ void main() {
     );
     expect(sem.properties.button, isTrue);
     expect(sem.properties.label, 'Alice');
+  });
+
+  group('etiquetas de WhatsApp', () {
+    testWidgets('muestra el botón de etiquetas', (tester) async {
+      when(() => bloc.state).thenReturn(const ProfileLoading());
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('thread.labels')), findsOneWidget);
+    });
+
+    testWidgets('tocar abre el sheet de etiquetas del chat', (tester) async {
+      final waRepo = _MockWaLabelsRepo();
+      when(
+        () => waRepo.listCatalog(any()),
+      ).thenAnswer((_) async => <WaLabel>[]);
+      when(
+        () => waRepo.listChatAssocs(any()),
+      ).thenAnswer((_) async => <WaChatAssoc>[]);
+      when(
+        () => waRepo.liveEvents(any()),
+      ).thenAnswer((_) => const Stream<WaLabelLiveEvent>.empty());
+      when(() => bloc.state).thenReturn(const ProfileLoading());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: RepositoryProvider<WaLabelsRepository>.value(
+            value: waRepo,
+            child: BlocProvider<ProfileBloc>.value(
+              value: bloc,
+              child: const Scaffold(
+                appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
+                body: SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('thread.labels')));
+      await tester.pumpAndSettle();
+      expect(find.byType(WaChatLabelsSheet), findsOneWidget);
+    });
   });
 }

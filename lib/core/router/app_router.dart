@@ -590,12 +590,16 @@ class AppRouter {
           final id = state.pathParameters['id']!;
           final chatLid = state.pathParameters['chatLid']!;
           // El repo y el picker de media cuelgan del scope para que el composer
-          // adjunte imágenes (pick → upload → ref → send type:image).
+          // adjunte imágenes (pick → upload → ref → send type:image). El repo de
+          // etiquetas WA cuelga para el sheet de etiquetas por chat del app bar.
           return MultiRepositoryProvider(
             providers: <RepositoryProvider<dynamic>>[
               RepositoryProvider<MediaRepository>.value(value: _mediaRepo),
               RepositoryProvider<MediaFilePicker>.value(
                 value: _mediaFilePicker,
+              ),
+              RepositoryProvider<WaLabelsRepository>.value(
+                value: _waLabelsRepo,
               ),
             ],
             child: MultiBlocProvider(

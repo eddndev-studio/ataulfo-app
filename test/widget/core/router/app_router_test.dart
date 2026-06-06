@@ -695,9 +695,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ChatThreadAppBar), findsOneWidget);
 
+    // Acota al InkWell del header (bajo el Semantics "Ver perfil"): el botón de
+    // etiquetas del app bar aporta su propio ink.
     await tester.tap(
       find.descendant(
-        of: find.byType(ChatThreadAppBar),
+        of: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.hint == 'Ver perfil',
+        ),
         matching: find.byType(InkWell),
       ),
     );

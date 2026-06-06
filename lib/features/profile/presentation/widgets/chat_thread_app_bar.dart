@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
+import '../../../conversations/domain/entities/conversation.dart';
+import '../../../wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import '../bloc/profile_bloc.dart';
 
 /// App bar del hilo de mensajes con identidad real: avatar (foto) + nombre del
@@ -23,11 +25,36 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
+  /// `kind` del chat para el sheet de etiquetas: del perfil cargado (fuente
+  /// autoritativa) o, mientras carga, derivado del chatLid (los grupos llevan
+  /// `@g.us`).
+  ConversationKind _kindFrom(ProfileState state) {
+    final isGroup = state is ProfileLoaded
+        ? state.profile.isGroup
+        : chatLid.contains('@g.us');
+    return isGroup ? ConversationKind.group : ConversationKind.dm;
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return AppBar(
       titleSpacing: 0,
+      actions: <Widget>[
+        // Etiquetar este chat con etiquetas de WhatsApp (reusa el sheet de la
+        // lista de conversaciones). El `WaLabelsRepository` lo provee la ruta.
+        IconButton(
+          key: const Key('thread.labels'),
+          tooltip: 'Etiquetas de WhatsApp',
+          icon: const Icon(Icons.label_outline),
+          onPressed: () => WaChatLabelsSheet.open(
+            context,
+            botId: botId,
+            chatLid: chatLid,
+            kind: _kindFrom(context.read<ProfileBloc>().state),
+          ),
+        ),
+      ],
       title: BlocBuilder<ProfileBloc, ProfileState>(
         builder: (context, state) {
           final (String name, String? photo) = switch (state) {
