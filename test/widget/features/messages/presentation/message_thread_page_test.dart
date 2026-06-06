@@ -1,6 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
+import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
@@ -13,6 +18,10 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockMessagesBloc extends MockBloc<MessagesEvent, MessagesState>
     implements MessagesBloc {}
+
+class _MockFilePicker extends Mock implements MediaFilePicker {}
+
+class _MockMediaRepo extends Mock implements MediaRepository {}
 
 Message msg({
   String externalId = 'e1',
@@ -41,7 +50,10 @@ Message msg({
 );
 
 void main() {
-  setUpAll(() => registerFallbackValue(const MessagesLoadRequested()));
+  setUpAll(() {
+    registerFallbackValue(const MessagesLoadRequested());
+    registerFallbackValue(Uint8List(0));
+  });
 
   late _MockMessagesBloc bloc;
 
@@ -456,8 +468,10 @@ void main() {
       );
       await tester.pumpWidget(host());
 
+      // El composer añade su propio Scrollable (TextField multilínea); la lista
+      // del hilo es la primera en el árbol.
       final pos = tester
-          .state<ScrollableState>(find.byType(Scrollable))
+          .state<ScrollableState>(find.byType(Scrollable).first)
           .position;
       pos.jumpTo(pos.maxScrollExtent);
       await tester.pump();
@@ -467,4 +481,254 @@ void main() {
       ).called(greaterThanOrEqualTo(1));
     },
   );
+
+  group('reaccionar (long-press)', () {
+    testWidgets('long-press abre el picker; elegir emoji dispatcha react', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[msg(externalId: 'm1', content: 'hola')],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('hola'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('reaction.pick.m1.👍')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('reaction.pick.m1.👍')));
+      await tester.pumpAndSettle();
+      verify(
+        () => bloc.add(
+          const MessagesReactRequested(messageId: 'm1', emoji: '👍'),
+        ),
+      ).called(1);
+    });
+  });
+
+  group('composer (envío)', () {
+    const loadedEmpty = MessagesLoaded(
+      items: <Message>[],
+      prevCursor: null,
+      isLoadingOlder: false,
+    );
+
+    testWidgets('Loaded muestra el composer (input + enviar)', (tester) async {
+      when(() => bloc.state).thenReturn(loadedEmpty);
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('composer.input')), findsOneWidget);
+      expect(find.byKey(const Key('composer.send')), findsOneWidget);
+    });
+
+    testWidgets('Loading y Failed ocultan el composer', (tester) async {
+      when(() => bloc.state).thenReturn(const MessagesLoading());
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('composer.input')), findsNothing);
+
+      when(
+        () => bloc.state,
+      ).thenReturn(const MessagesFailed(MessagesNetworkFailure()));
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('composer.input')), findsNothing);
+    });
+
+    testWidgets('escribir + enviar dispatcha MessagesSendRequested y limpia', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(loadedEmpty);
+      await tester.pumpWidget(host());
+      await tester.enterText(
+        find.byKey(const Key('composer.input')),
+        'hola mundo',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('composer.send')));
+      await tester.pump();
+      verify(
+        () => bloc.add(
+          const MessagesSendRequested(type: 'text', content: 'hola mundo'),
+        ),
+      ).called(1);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('composer.input')))
+            .controller!
+            .text,
+        '',
+      );
+    });
+
+    testWidgets('enviar con sólo espacios no dispatcha', (tester) async {
+      when(() => bloc.state).thenReturn(loadedEmpty);
+      await tester.pumpWidget(host());
+      await tester.enterText(find.byKey(const Key('composer.input')), '   ');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('composer.send')));
+      await tester.pump();
+      verifyNever(() => bloc.add(any(that: isA<MessagesSendRequested>())));
+    });
+
+    testWidgets('burbuja pendiente (enviando) se pinta con ícono de reloj', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[msg(externalId: 'm1')],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: const <PendingSend>[
+            PendingSend(
+              clientToken: 'ct-1',
+              type: 'text',
+              content: 'pendiente',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(host());
+      final bubble = find.byKey(const Key('message.pending.ct-1'));
+      expect(bubble, findsOneWidget);
+      expect(
+        find.descendant(of: bubble, matching: find.text('pendiente')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: bubble, matching: find.byIcon(Icons.schedule)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('pending vacío + items vacíos NO muestra el empty state', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const MessagesLoaded(
+          items: <Message>[],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: <PendingSend>[
+            PendingSend(
+              clientToken: 'ct-1',
+              type: 'text',
+              content: 'sólo esto',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('messages.empty')), findsNothing);
+      expect(find.byKey(const Key('message.pending.ct-1')), findsOneWidget);
+    });
+
+    testWidgets('burbuja fallida ofrece reintentar y descartar', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const MessagesLoaded(
+          items: <Message>[],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: <PendingSend>[
+            PendingSend(
+              clientToken: 'ct-9',
+              type: 'text',
+              content: 'falló esto',
+              failure: MessagesNotConnectedFailure(),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('message.pending.ct-9.retry')));
+      await tester.pump();
+      verify(
+        () => bloc.add(const MessagesSendRetryRequested('ct-9')),
+      ).called(1);
+      await tester.tap(find.byKey(const Key('message.pending.ct-9.discard')));
+      await tester.pump();
+      verify(() => bloc.add(const MessagesSendDiscarded('ct-9'))).called(1);
+    });
+  });
+
+  group('adjuntar imagen', () {
+    late _MockFilePicker picker;
+    late _MockMediaRepo mediaRepo;
+
+    setUp(() {
+      picker = _MockFilePicker();
+      mediaRepo = _MockMediaRepo();
+      when(() => bloc.state).thenReturn(
+        const MessagesLoaded(
+          items: <Message>[],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+    });
+
+    Widget hostMedia() => MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: MultiRepositoryProvider(
+        providers: <RepositoryProvider<dynamic>>[
+          RepositoryProvider<MediaFilePicker>.value(value: picker),
+          RepositoryProvider<MediaRepository>.value(value: mediaRepo),
+        ],
+        child: BlocProvider<MessagesBloc>.value(
+          value: bloc,
+          child: const Scaffold(body: MessageThreadPage()),
+        ),
+      ),
+    );
+
+    testWidgets('pick + upload → envía type:image con ref y caption', (
+      tester,
+    ) async {
+      when(() => picker.pick()).thenAnswer(
+        (_) async => PickedMedia(
+          bytes: Uint8List.fromList(<int>[1, 2, 3]),
+          filename: 'foto.jpg',
+        ),
+      );
+      when(
+        () => mediaRepo.upload(
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+        ),
+      ).thenAnswer(
+        (_) async => const UploadedMedia(ref: 'ref-abc', previewUrl: null),
+      );
+      await tester.pumpWidget(hostMedia());
+      await tester.enterText(
+        find.byKey(const Key('composer.input')),
+        'mira esto',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('composer.attach')));
+      await tester.pumpAndSettle();
+      verify(
+        () => bloc.add(
+          const MessagesSendRequested(
+            type: 'image',
+            content: 'mira esto',
+            mediaRef: 'ref-abc',
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('cancelar el picker no sube ni envía', (tester) async {
+      when(() => picker.pick()).thenAnswer((_) async => null);
+      await tester.pumpWidget(hostMedia());
+      await tester.tap(find.byKey(const Key('composer.attach')));
+      await tester.pumpAndSettle();
+      verifyNever(
+        () => mediaRepo.upload(
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+        ),
+      );
+      verifyNever(() => bloc.add(any(that: isA<MessagesSendRequested>())));
+    });
+  });
 }

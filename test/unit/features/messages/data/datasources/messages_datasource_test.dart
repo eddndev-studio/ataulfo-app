@@ -77,6 +77,62 @@ void main() {
     ),
   ).captured;
 
+  // --- helpers de POST (write path: send / mark-read / react) ---
+
+  Response<Map<String, dynamic>> postResp(
+    int status, {
+    Map<String, dynamic>? body,
+  }) => Response<Map<String, dynamic>>(
+    requestOptions: RequestOptions(path: '/p'),
+    statusCode: status,
+    data: body,
+  );
+
+  DioException postBad(int status) => DioException(
+    requestOptions: RequestOptions(path: '/p'),
+    response: Response<dynamic>(
+      requestOptions: RequestOptions(path: '/p'),
+      statusCode: status,
+    ),
+    type: DioExceptionType.badResponse,
+  );
+
+  void stubPost(Response<Map<String, dynamic>> r) {
+    when(
+      () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+    ).thenAnswer((_) async => r);
+  }
+
+  void stubPostThrow(Object e) {
+    when(
+      () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+    ).thenThrow(e);
+  }
+
+  List<dynamic> capturedPost() => verify(
+    () => dio.post<Map<String, dynamic>>(
+      captureAny(),
+      data: captureAny(named: 'data'),
+    ),
+  ).captured;
+
+  void stubPostVoid(int status) {
+    when(() => dio.post<void>(any(), data: any(named: 'data'))).thenAnswer(
+      (_) async => Response<void>(
+        requestOptions: RequestOptions(path: '/p'),
+        statusCode: status,
+      ),
+    );
+  }
+
+  void stubPostVoidThrow(Object e) {
+    when(() => dio.post<void>(any(), data: any(named: 'data'))).thenThrow(e);
+  }
+
+  List<dynamic> capturedPostVoid() => verify(
+    () => dio.post<void>(captureAny(), data: captureAny(named: 'data')),
+  ).captured;
+
   group('DioMessagesDatasource.thread', () {
     test('200 {messages, prevCursor} → MessagePage', () async {
       stub(
@@ -238,6 +294,247 @@ void main() {
       await expectLater(
         ds.thread('b1', 'lid-1'),
         throwsA(isA<UnknownMessagesFailure>()),
+      );
+    });
+  });
+
+  group('DioMessagesDatasource.send', () {
+    Map<String, dynamic> sentMsg() => <String, dynamic>{
+      'externalId': 'AG-1',
+      'chatLid': 'lid-1',
+      'senderLid': 'me',
+      'kind': 'DM',
+      'direction': 'OUTBOUND',
+      'type': 'text',
+      'content': 'hola',
+      'timestampMs': 1800,
+      'status': 'SENT',
+    };
+
+    test('200 MessageResp → Message OUTBOUND con wamid', () async {
+      stubPost(postResp(200, body: sentMsg()));
+      final m = await ds.send(
+        'b1',
+        'lid-1',
+        clientToken: 'ct-1',
+        type: 'text',
+        content: 'hola',
+      );
+      expect(m.externalId, 'AG-1');
+      expect(m.direction, MessageDirection.outbound);
+      expect(m.status, MessageStatus.sent);
+    });
+
+    test('path + body de texto (sin mediaRef)', () async {
+      stubPost(postResp(200, body: sentMsg()));
+      await ds.send(
+        'b1',
+        'lid-1',
+        clientToken: 'ct-1',
+        type: 'text',
+        content: 'hola',
+      );
+      final c = capturedPost();
+      expect(c[0], '/sessions/b1/lid-1/messages/send');
+      expect(c[1], <String, dynamic>{
+        'clientToken': 'ct-1',
+        'type': 'text',
+        'content': 'hola',
+      });
+    });
+
+    test('imagen → body con mediaRef', () async {
+      stubPost(postResp(200, body: sentMsg()..['type'] = 'image'));
+      await ds.send(
+        'b1',
+        'lid-1',
+        clientToken: 'ct-2',
+        type: 'image',
+        content: '',
+        mediaRef: 'ref-9',
+      );
+      final c = capturedPost();
+      expect(c[1], <String, dynamic>{
+        'clientToken': 'ct-2',
+        'type': 'image',
+        'content': '',
+        'mediaRef': 'ref-9',
+      });
+    });
+
+    test('chatLid con `@` → segmento percent-encodeado', () async {
+      stubPost(postResp(200, body: sentMsg()));
+      await ds.send(
+        'b1',
+        '12036@g.us',
+        clientToken: 'ct',
+        type: 'text',
+        content: 'x',
+      );
+      final c = capturedPost();
+      expect(c[0], '/sessions/b1/12036%40g.us/messages/send');
+    });
+
+    test('422 → MessagesValidationFailure', () async {
+      stubPostThrow(postBad(422));
+      await expectLater(
+        ds.send('b1', 'lid-1', clientToken: 'ct', type: 'text', content: 'x'),
+        throwsA(isA<MessagesValidationFailure>()),
+      );
+    });
+
+    test('409 → MessagesConflictFailure', () async {
+      stubPostThrow(postBad(409));
+      await expectLater(
+        ds.send('b1', 'lid-1', clientToken: 'ct', type: 'text', content: 'x'),
+        throwsA(isA<MessagesConflictFailure>()),
+      );
+    });
+
+    test('404 (fresh-chat / bot) → MessagesNotFoundFailure', () async {
+      stubPostThrow(postBad(404));
+      await expectLater(
+        ds.send('b1', 'lid-1', clientToken: 'ct', type: 'text', content: 'x'),
+        throwsA(isA<MessagesNotFoundFailure>()),
+      );
+    });
+
+    test('423 (bot pausado) → MessagesBotPausedFailure', () async {
+      stubPostThrow(postBad(423));
+      await expectLater(
+        ds.send('b1', 'lid-1', clientToken: 'ct', type: 'text', content: 'x'),
+        throwsA(isA<MessagesBotPausedFailure>()),
+      );
+    });
+
+    test('503 (bot no corriendo) → MessagesNotConnectedFailure', () async {
+      stubPostThrow(postBad(503));
+      await expectLater(
+        ds.send('b1', 'lid-1', clientToken: 'ct', type: 'text', content: 'x'),
+        throwsA(isA<MessagesNotConnectedFailure>()),
+      );
+    });
+
+    test('502 (wire) → MessagesWireFailure', () async {
+      stubPostThrow(postBad(502));
+      await expectLater(
+        ds.send('b1', 'lid-1', clientToken: 'ct', type: 'text', content: 'x'),
+        throwsA(isA<MessagesWireFailure>()),
+      );
+    });
+
+    test('timeout → MessagesTimeoutFailure', () async {
+      stubPostThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/x'),
+          type: DioExceptionType.sendTimeout,
+        ),
+      );
+      await expectLater(
+        ds.send('b1', 'lid-1', clientToken: 'ct', type: 'text', content: 'x'),
+        throwsA(isA<MessagesTimeoutFailure>()),
+      );
+    });
+
+    test('body nulo → UnknownMessagesFailure', () async {
+      stubPost(postResp(200));
+      await expectLater(
+        ds.send('b1', 'lid-1', clientToken: 'ct', type: 'text', content: 'x'),
+        throwsA(isA<UnknownMessagesFailure>()),
+      );
+    });
+  });
+
+  group('DioMessagesDatasource.markRead', () {
+    test('200 {markedCount} → conteo', () async {
+      stubPost(postResp(200, body: <String, dynamic>{'markedCount': 3}));
+      expect(await ds.markRead('b1', 'lid-1'), 3);
+    });
+
+    test('sin upToMessageId → body vacío, path mark-read', () async {
+      stubPost(postResp(200, body: <String, dynamic>{'markedCount': 0}));
+      await ds.markRead('b1', 'lid-1');
+      final c = capturedPost();
+      expect(c[0], '/sessions/b1/lid-1/mark-read');
+      expect(c[1], <String, dynamic>{});
+    });
+
+    test('con upToMessageId → viaja en el body', () async {
+      stubPost(postResp(200, body: <String, dynamic>{'markedCount': 2}));
+      await ds.markRead('b1', 'lid-1', upToMessageId: 'm9');
+      final c = capturedPost();
+      expect(c[1], <String, dynamic>{'upToMessageId': 'm9'});
+    });
+
+    test('404 → MessagesNotFoundFailure', () async {
+      stubPostThrow(postBad(404));
+      await expectLater(
+        ds.markRead('b1', 'lid-1'),
+        throwsA(isA<MessagesNotFoundFailure>()),
+      );
+    });
+
+    test('503 → MessagesNotConnectedFailure', () async {
+      stubPostThrow(postBad(503));
+      await expectLater(
+        ds.markRead('b1', 'lid-1'),
+        throwsA(isA<MessagesNotConnectedFailure>()),
+      );
+    });
+
+    test('markedCount ausente → UnknownMessagesFailure', () async {
+      stubPost(postResp(200, body: <String, dynamic>{}));
+      await expectLater(
+        ds.markRead('b1', 'lid-1'),
+        throwsA(isA<UnknownMessagesFailure>()),
+      );
+    });
+  });
+
+  group('DioMessagesDatasource.react', () {
+    test('204 → completa; path + body', () async {
+      stubPostVoid(204);
+      await ds.react('b1', 'lid-1', messageId: 'm1', emoji: '👍');
+      final c = capturedPostVoid();
+      expect(c[0], '/sessions/b1/lid-1/react');
+      expect(c[1], <String, dynamic>{'messageId': 'm1', 'emoji': '👍'});
+    });
+
+    test('emoji vacío (remover) permitido', () async {
+      stubPostVoid(204);
+      await ds.react('b1', 'lid-1', messageId: 'm1', emoji: '');
+      final c = capturedPostVoid();
+      expect(c[1], <String, dynamic>{'messageId': 'm1', 'emoji': ''});
+    });
+
+    test('chatLid con `@` → segmento percent-encodeado', () async {
+      stubPostVoid(204);
+      await ds.react('b1', '12036@g.us', messageId: 'm1', emoji: '😀');
+      final c = capturedPostVoid();
+      expect(c[0], '/sessions/b1/12036%40g.us/react');
+    });
+
+    test('404 → MessagesNotFoundFailure', () async {
+      stubPostVoidThrow(postBad(404));
+      await expectLater(
+        ds.react('b1', 'lid-1', messageId: 'm1', emoji: 'x'),
+        throwsA(isA<MessagesNotFoundFailure>()),
+      );
+    });
+
+    test('502 → MessagesWireFailure', () async {
+      stubPostVoidThrow(postBad(502));
+      await expectLater(
+        ds.react('b1', 'lid-1', messageId: 'm1', emoji: 'x'),
+        throwsA(isA<MessagesWireFailure>()),
+      );
+    });
+
+    test('422 → MessagesValidationFailure', () async {
+      stubPostVoidThrow(postBad(422));
+      await expectLater(
+        ds.react('b1', 'lid-1', messageId: 'm1', emoji: 'x'),
+        throwsA(isA<MessagesValidationFailure>()),
       );
     });
   });
