@@ -33,14 +33,22 @@ String shortMediaRef(String ref) {
 }
 
 /// Texto a mostrar para el recurso de un paso multimedia en la lista de pasos,
-/// junto con si debe renderizarse en monospace. Prefiere el nombre real del
-/// archivo (`media_filename` del metadata); si no hay uno guardado, cae a la
-/// cola corta del ref BARE en monospace (placeholder honesto: es un id, no un
-/// nombre). El caller garantiza `mediaRef` no vacío.
+/// junto con si debe renderizarse en monospace. Prioridad:
+///   1. [resolvedName] — el nombre EN VIVO del catálogo (alias o filename del
+///      asset, resuelto por su ref). Es la verdad presentable: refleja el alias
+///      que el usuario editó en la galería.
+///   2. `media_filename` del metadata — nombre capturado al elegir el recurso;
+///      sirve de respaldo cuando el catálogo aún no cargó o el asset se borró.
+///   3. cola corta del ref BARE, en monospace (placeholder honesto: es un id).
+/// El caller garantiza `mediaRef` no vacío.
 (String text, bool mono) mediaStepDisplay({
   required String mediaRef,
   required String metadataJson,
+  String? resolvedName,
 }) {
+  if (resolvedName != null && resolvedName.isNotEmpty) {
+    return (resolvedName, false);
+  }
   final name = mediaFilenameFromMetadata(metadataJson);
   if (name != null && name.isNotEmpty) return (name, false);
   return (shortMediaRef(mediaRef), true);
