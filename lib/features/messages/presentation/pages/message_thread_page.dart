@@ -1,13 +1,18 @@
+// Nota de tamaño (>400 LOC): este archivo concentra el render cohesivo del
+// hilo —burbujas inbound/outbound, citas, reacciones, media por tipo, ticks de
+// entrega y burbujas optimistas pendientes/fallidas—. Son piezas acopladas por
+// el mismo layout de lista invertida; partirlas dispersaría la presentación sin
+// ganar claridad. El composer sí vive aparte (`MessageComposer`).
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/failures/messages_failure.dart';
 import '../../domain/reactions.dart';
 import '../bloc/messages_bloc.dart';
+import '../widgets/message_composer.dart';
 
 /// Hilo de mensajes de una conversación (S09 `GET
 /// /sessions/:botId/:chatLid/messages`). Consume el `MessagesBloc` del scope
@@ -24,22 +29,33 @@ class MessageThreadPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<MessagesBloc, MessagesState>(
-      builder: (context, state) => switch (state) {
-        MessagesInitial() || MessagesLoading() => const _LoadingView(),
-        MessagesLoaded(
-          items: final items,
-          prevCursor: final prevCursor,
-          isLoadingOlder: final isLoadingOlder,
-        ) =>
-          items.isEmpty
-              ? const _EmptyView()
-              : _ThreadView(
-                  items: items,
-                  hasMore: prevCursor != null,
-                  isLoadingOlder: isLoadingOlder,
-                ),
-        MessagesFailed(failure: final f) => _FailedView(failure: f),
-      },
+      builder: (context, state) => Column(
+        children: <Widget>[
+          Expanded(
+            child: switch (state) {
+              MessagesInitial() || MessagesLoading() => const _LoadingView(),
+              MessagesLoaded(
+                items: final items,
+                prevCursor: final prevCursor,
+                isLoadingOlder: final isLoadingOlder,
+                pending: final pending,
+              ) =>
+                (items.isEmpty && pending.isEmpty)
+                    ? const _EmptyView()
+                    : _ThreadView(
+                        items: items,
+                        pending: pending,
+                        hasMore: prevCursor != null,
+                        isLoadingOlder: isLoadingOlder,
+                      ),
+              MessagesFailed(failure: final f) => _FailedView(failure: f),
+            },
+          ),
+          // El composer sólo con hilo cargado: enviar exige una conversación
+          // abierta (en Loading/Failed no hay a dónde escribir).
+          if (state is MessagesLoaded) const MessageComposer(),
+        ],
+      ),
     );
   }
 }
@@ -121,11 +137,16 @@ class _FailedView extends StatelessWidget {
 class _ThreadView extends StatelessWidget {
   const _ThreadView({
     required this.items,
+    required this.pending,
     required this.hasMore,
     required this.isLoadingOlder,
   });
 
   final List<Message> items;
+
+  /// Envíos optimistas en vuelo o fallidos; se pintan como burbujas salientes
+  /// al fondo del hilo (lo más nuevo), bajo el último mensaje real.
+  final List<PendingSend> pending;
   final bool hasMore;
   final bool isLoadingOlder;
 
@@ -152,22 +173,29 @@ class _ThreadView extends StatelessWidget {
     // contra la ventana cargada. Un citado fuera de la ventana queda sin
     // resolver (la burbuja muestra el fallback).
     final byId = <String, Message>{for (final m in renderable) m.externalId: m};
+    // Las pendientes son lo más nuevo: en la lista invertida (índice 0 = fondo)
+    // ocupan el tramo inicial, en orden nueva→vieja, BAJO el último mensaje real.
+    final pendingNewestFirst = pending.reversed.toList(growable: false);
+    final pendingCount = pendingNewestFirst.length;
+    final realCount = newestFirst.length;
     return NotificationListener<ScrollNotification>(
       onNotification: (n) => _onScroll(context, n),
       child: ListView.builder(
         reverse: true,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-          AppTokens.sp4,
-          AppTokens.sp4,
-          AppTokens.sp4,
-          AppTokens.sp4 + context.safeBottomInset,
-        ),
-        itemCount: newestFirst.length + (isLoadingOlder ? 1 : 0),
+        // El padding inferior NO suma el safe-area: el composer (abajo) lo
+        // absorbe; sumarlo aquí dejaría un hueco doble sobre el composer.
+        padding: const EdgeInsets.all(AppTokens.sp4),
+        itemCount: pendingCount + realCount + (isLoadingOlder ? 1 : 0),
         itemBuilder: (context, i) {
+          // Tramo inferior (índices [0, pendingCount)): burbujas optimistas.
+          if (i < pendingCount) {
+            return _PendingBubble(pending: pendingNewestFirst[i]);
+          }
+          final j = i - pendingCount;
           // El item extra cae al final de la lista invertida ⇒ se pinta arriba:
           // el spinner de "cargando más viejos".
-          if (i == newestFirst.length) {
+          if (j == realCount) {
             return const Padding(
               key: Key('messages.older_loading'),
               padding: EdgeInsets.all(AppTokens.sp4),
@@ -185,7 +213,7 @@ class _ThreadView extends StatelessWidget {
               ),
             );
           }
-          final m = newestFirst[i];
+          final m = newestFirst[j];
           return _MessageBubble(
             message: m,
             quoted: m.quotedId == null ? null : byId[m.quotedId],
@@ -196,6 +224,143 @@ class _ThreadView extends StatelessWidget {
     );
   }
 }
+
+/// Burbuja de un envío optimista (S09): en vuelo muestra "Enviando" + reloj; si
+/// falló, el motivo y acciones de reintentar/descartar. Siempre a la derecha
+/// (OUTBOUND del operador). Su `Key` la indexa por `clientToken`.
+class _PendingBubble extends StatelessWidget {
+  const _PendingBubble({required this.pending});
+
+  final PendingSend pending;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final p = pending;
+    final caption = textTheme.bodyMedium?.copyWith(
+      color: AppTokens.text2,
+      fontSize: AppTokens.captionSize,
+    );
+    // Texto de la burbuja: el contenido, o una etiqueta para imagen sin caption.
+    final body = p.type == 'text' || p.content.isNotEmpty
+        ? p.content
+        : '[imagen]';
+    return Align(
+      key: Key('message.pending.${p.clientToken}'),
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp4,
+              vertical: AppTokens.sp3,
+            ),
+            decoration: BoxDecoration(
+              color: AppTokens.surface3,
+              borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(body, style: textTheme.bodyLarge),
+                const SizedBox(height: AppTokens.sp1),
+                if (p.isFailed)
+                  _PendingFailed(pending: p, caption: caption)
+                else
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text('Enviando', style: caption),
+                      const SizedBox(width: AppTokens.sp2),
+                      const Icon(
+                        Icons.schedule,
+                        size: 14,
+                        color: AppTokens.text2,
+                        semanticLabel: 'Enviando',
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pie de una burbuja fallida: motivo legible + reintentar/descartar.
+class _PendingFailed extends StatelessWidget {
+  const _PendingFailed({required this.pending, required this.caption});
+
+  final PendingSend pending;
+  final TextStyle? caption;
+
+  @override
+  Widget build(BuildContext context) {
+    final token = pending.clientToken;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.error_outline,
+              size: 14,
+              color: AppTokens.danger,
+              semanticLabel: 'No enviado',
+            ),
+            const SizedBox(width: AppTokens.sp1),
+            Flexible(
+              child: Text(
+                _pendingErrorText(pending.failure!),
+                style: caption?.copyWith(color: AppTokens.danger),
+              ),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            TextButton(
+              key: Key('message.pending.$token.retry'),
+              onPressed: () => context.read<MessagesBloc>().add(
+                MessagesSendRetryRequested(token),
+              ),
+              child: const Text('Reintentar'),
+            ),
+            TextButton(
+              key: Key('message.pending.$token.discard'),
+              onPressed: () => context.read<MessagesBloc>().add(
+                MessagesSendDiscarded(token),
+              ),
+              child: const Text('Descartar'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Motivo legible del fallo de un envío para el operador.
+String _pendingErrorText(MessagesFailure f) => switch (f) {
+  MessagesNotFoundFailure() =>
+    'No se pudo enviar: la conversación no está disponible',
+  MessagesBotPausedFailure() => 'El bot está pausado',
+  MessagesNotConnectedFailure() => 'El bot no está conectado',
+  MessagesValidationFailure() => 'Mensaje inválido',
+  MessagesForbiddenFailure() => 'No tienes permiso para enviar',
+  MessagesNetworkFailure() || MessagesTimeoutFailure() => 'Sin conexión',
+  _ => 'No se pudo enviar',
+};
 
 /// Burbuja de un mensaje. INBOUND a la izquierda (`surface2`), OUTBOUND a la
 /// derecha (`surface3`). En grupos, el INBOUND muestra el autor (`senderLid`).

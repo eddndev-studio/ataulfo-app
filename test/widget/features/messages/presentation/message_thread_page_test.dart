@@ -456,8 +456,10 @@ void main() {
       );
       await tester.pumpWidget(host());
 
+      // El composer añade su propio Scrollable (TextField multilínea); la lista
+      // del hilo es la primera en el árbol.
       final pos = tester
-          .state<ScrollableState>(find.byType(Scrollable))
+          .state<ScrollableState>(find.byType(Scrollable).first)
           .position;
       pos.jumpTo(pos.maxScrollExtent);
       await tester.pump();
@@ -467,4 +469,148 @@ void main() {
       ).called(greaterThanOrEqualTo(1));
     },
   );
+
+  group('composer (envío)', () {
+    const loadedEmpty = MessagesLoaded(
+      items: <Message>[],
+      prevCursor: null,
+      isLoadingOlder: false,
+    );
+
+    testWidgets('Loaded muestra el composer (input + enviar)', (tester) async {
+      when(() => bloc.state).thenReturn(loadedEmpty);
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('composer.input')), findsOneWidget);
+      expect(find.byKey(const Key('composer.send')), findsOneWidget);
+    });
+
+    testWidgets('Loading y Failed ocultan el composer', (tester) async {
+      when(() => bloc.state).thenReturn(const MessagesLoading());
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('composer.input')), findsNothing);
+
+      when(
+        () => bloc.state,
+      ).thenReturn(const MessagesFailed(MessagesNetworkFailure()));
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('composer.input')), findsNothing);
+    });
+
+    testWidgets('escribir + enviar dispatcha MessagesSendRequested y limpia', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(loadedEmpty);
+      await tester.pumpWidget(host());
+      await tester.enterText(
+        find.byKey(const Key('composer.input')),
+        'hola mundo',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('composer.send')));
+      await tester.pump();
+      verify(
+        () => bloc.add(
+          const MessagesSendRequested(type: 'text', content: 'hola mundo'),
+        ),
+      ).called(1);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('composer.input')))
+            .controller!
+            .text,
+        '',
+      );
+    });
+
+    testWidgets('enviar con sólo espacios no dispatcha', (tester) async {
+      when(() => bloc.state).thenReturn(loadedEmpty);
+      await tester.pumpWidget(host());
+      await tester.enterText(find.byKey(const Key('composer.input')), '   ');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('composer.send')));
+      await tester.pump();
+      verifyNever(() => bloc.add(any(that: isA<MessagesSendRequested>())));
+    });
+
+    testWidgets('burbuja pendiente (enviando) se pinta con ícono de reloj', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[msg(externalId: 'm1')],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: const <PendingSend>[
+            PendingSend(
+              clientToken: 'ct-1',
+              type: 'text',
+              content: 'pendiente',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(host());
+      final bubble = find.byKey(const Key('message.pending.ct-1'));
+      expect(bubble, findsOneWidget);
+      expect(
+        find.descendant(of: bubble, matching: find.text('pendiente')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: bubble, matching: find.byIcon(Icons.schedule)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('pending vacío + items vacíos NO muestra el empty state', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const MessagesLoaded(
+          items: <Message>[],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: <PendingSend>[
+            PendingSend(
+              clientToken: 'ct-1',
+              type: 'text',
+              content: 'sólo esto',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('messages.empty')), findsNothing);
+      expect(find.byKey(const Key('message.pending.ct-1')), findsOneWidget);
+    });
+
+    testWidgets('burbuja fallida ofrece reintentar y descartar', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const MessagesLoaded(
+          items: <Message>[],
+          prevCursor: null,
+          isLoadingOlder: false,
+          pending: <PendingSend>[
+            PendingSend(
+              clientToken: 'ct-9',
+              type: 'text',
+              content: 'falló esto',
+              failure: MessagesNotConnectedFailure(),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('message.pending.ct-9.retry')));
+      await tester.pump();
+      verify(
+        () => bloc.add(const MessagesSendRetryRequested('ct-9')),
+      ).called(1);
+      await tester.tap(find.byKey(const Key('message.pending.ct-9.discard')));
+      await tester.pump();
+      verify(() => bloc.add(const MessagesSendDiscarded('ct-9'))).called(1);
+    });
+  });
 }
