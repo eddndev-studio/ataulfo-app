@@ -197,8 +197,59 @@ void main() {
       expect(find.text('Texto'), findsOneWidget);
       expect(find.text('Imagen'), findsOneWidget);
       expect(find.text('Hola {{name}}'), findsOneWidget);
-      expect(find.textContaining('example.com/x.png'), findsWidgets);
+      // Sin media_filename guardado, el paso multimedia cae a la cola corta del
+      // ref (último segmento), nunca el ref/URL completo.
+      expect(find.text('x.png'), findsOneWidget);
+      expect(find.textContaining('example.com'), findsNothing);
       expect(find.widgetWithText(AppPill, 'Solo IA'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'StepCard multimedia muestra el nombre del archivo (media_filename) cuando '
+    'está guardado; sin él, la cola corta del ref — nunca el ref completo',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's-doc',
+            flowId: 'f1',
+            type: fdom.StepType.document,
+            order: 0,
+            content: '',
+            mediaRef: 'tenant/org1/media/abc123.pdf',
+            metadataJson: '{"media_filename":"Contrato 2026.pdf"}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 's-img',
+            flowId: 'f1',
+            type: fdom.StepType.image,
+            order: 1,
+            content: '',
+            mediaRef: 'tenant/org1/media/zzz999.png',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      // DOCUMENT con media_filename → nombre legible, NUNCA el id/ref del path.
+      expect(find.text('Contrato 2026.pdf'), findsOneWidget);
+      expect(find.textContaining('abc123'), findsNothing);
+      // IMAGE sin media_filename → cola corta del ref BARE, nunca el path del
+      // tenant completo.
+      expect(find.text('zzz999.png'), findsOneWidget);
+      expect(find.textContaining('tenant/org1/media'), findsNothing);
     },
   );
 
