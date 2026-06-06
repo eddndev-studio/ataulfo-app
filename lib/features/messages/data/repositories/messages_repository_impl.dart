@@ -1,3 +1,4 @@
+import '../../domain/entities/message.dart';
 import '../../domain/entities/message_page.dart';
 import '../../domain/entities/thread_live_event.dart';
 import '../../domain/repositories/messages_repository.dart';
@@ -25,6 +26,35 @@ class MessagesRepositoryImpl implements MessagesRepository {
     String? cursor,
     int? limit,
   }) => _ds.thread(botId, chatLid, cursor: cursor, limit: limit);
+
+  @override
+  Future<Message> send(
+    String botId,
+    String chatLid, {
+    required String clientToken,
+    required String type,
+    String content = '',
+    String? mediaRef,
+  }) => _ds.send(
+    botId,
+    chatLid,
+    clientToken: clientToken,
+    type: type,
+    content: content,
+    mediaRef: mediaRef,
+  );
+
+  @override
+  Future<int> markRead(String botId, String chatLid, {String? upToMessageId}) =>
+      _ds.markRead(botId, chatLid, upToMessageId: upToMessageId);
+
+  @override
+  Future<void> react(
+    String botId,
+    String chatLid, {
+    required String messageId,
+    required String emoji,
+  }) => _ds.react(botId, chatLid, messageId: messageId, emoji: emoji);
 
   @override
   Stream<ThreadLiveEvent> live(String botId) => _events.threadEvents(botId);

@@ -1,3 +1,4 @@
+import '../entities/message.dart';
 import '../entities/message_page.dart';
 import '../entities/thread_live_event.dart';
 
@@ -17,6 +18,31 @@ abstract interface class MessagesRepository {
     String chatLid, {
     String? cursor,
     int? limit,
+  });
+
+  /// Envía un mensaje del operador (S09). `clientToken` es idempotency-key;
+  /// `type` es `text`/`image` (con `mediaRef` para imagen, `content` opcional
+  /// como caption). Devuelve el Message persistido. Lanza `MessagesFailure`.
+  Future<Message> send(
+    String botId,
+    String chatLid, {
+    required String clientToken,
+    required String type,
+    String content,
+    String? mediaRef,
+  });
+
+  /// Marca como leídos los INBOUND del chat (S09): todos, o hasta
+  /// `upToMessageId` inclusive. Devuelve `markedCount`.
+  Future<int> markRead(String botId, String chatLid, {String? upToMessageId});
+
+  /// Reacciona al mensaje `messageId` con `emoji` (S09); `emoji` vacío quita la
+  /// reacción previa.
+  Future<void> react(
+    String botId,
+    String chatLid, {
+    required String messageId,
+    required String emoji,
   });
 
   /// Stream de eventos en vivo del bot (SSE S15: `message.inbound` +
