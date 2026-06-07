@@ -6,14 +6,18 @@ import '../tokens.dart';
 ///
 /// Dos estados mutuamente excluyentes según [selected]:
 /// - **unselected**: superficie transparente con borde hairline ([AppTokens
-///   .divider]) y label en [AppTokens.text1]. Es una opción latente.
-/// - **selected**: relleno [AppTokens.primary] con un check a la izquierda;
-///   label e ícono en [AppTokens.onPrimary] porque viven sobre fill amarillo
-///   y el primer plano debe ser oscuro para contraste.
+///   .divider]) y label en [AppTokens.text2]. Es una opción latente.
+/// - **selected**: TINTE de marca (fondo [AppTokens.primary] al 16% + borde y
+///   label/ícono en [AppTokens.primary]) con un check a la izquierda. Es
+///   deliberadamente discreto: un chip de selección NO debe usar el fill
+///   amarillo pleno —eso es lenguaje de CTA— y competir con los botones de
+///   acción. El guiño cálido comunica "activo" sin gritar.
 ///
 /// Radio [AppTokens.radiusChip] (8) — más cuadrado que el pill de los botones,
-/// para diferenciar visualmente un filtro de una acción. `onSelected` null
-/// deshabilita el chip: baja el tinte a 0.4 y bloquea el tap.
+/// para diferenciar visualmente un filtro de una acción. El borde de 1px existe
+/// en ambos estados (divider / primary) para que la geometría no salte al
+/// seleccionar. `onSelected` null deshabilita el chip: baja el tinte a 0.4 y
+/// bloquea el tap.
 ///
 /// El tap no alterna el estado por sí mismo: emite `onSelected(!selected)` y
 /// es el consumer quien decide el nuevo [selected]. Así el chip es controlado,
@@ -35,7 +39,7 @@ class AppChoiceChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final disabled = onSelected == null;
     final radius = BorderRadius.circular(AppTokens.radiusChip);
-    final foreground = selected ? AppTokens.onPrimary : AppTokens.text1;
+    final foreground = selected ? AppTokens.primary : AppTokens.text2;
 
     final chip = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 48),
@@ -52,11 +56,17 @@ class AppChoiceChip extends StatelessWidget {
               vertical: AppTokens.sp2,
             ),
             decoration: BoxDecoration(
-              // El fill solo existe seleccionado; sin selección la superficie
-              // es transparente y el chip se delimita por el borde hairline.
-              color: selected ? AppTokens.primary : Colors.transparent,
+              // Selección discreta: TINTE de marca (primary al 16%), no el fill
+              // amarillo pleno tipo CTA. Sin selección, transparente. El borde
+              // de 1px existe siempre (primary / divider) para que la geometría
+              // no salte al seleccionar.
+              color: selected
+                  ? AppTokens.primary.withValues(alpha: 0.16)
+                  : Colors.transparent,
               borderRadius: radius,
-              border: selected ? null : Border.all(color: AppTokens.divider),
+              border: Border.all(
+                color: selected ? AppTokens.primary : AppTokens.divider,
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

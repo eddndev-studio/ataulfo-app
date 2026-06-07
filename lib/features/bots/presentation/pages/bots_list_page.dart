@@ -164,25 +164,19 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
   }
 }
 
-/// Bloque introductorio: título grande + descripción corta. El AppBar del shell
-/// ya muestra "Bots"; este header lo repite como protagonista de la pantalla.
+/// Lead descriptivo de la pantalla. El AppBar del shell ya titula "Bots", así
+/// que aquí NO se repite el título (evita la redundancia de interfaz): solo el
+/// texto que explica la sección.
 class _Header extends StatelessWidget {
   const _Header();
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Column(
+    return Text(
+      'Configura agentes para automatizar conversaciones, tareas y flujos.',
       key: const Key('bots.header'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text('Bots', style: textTheme.displayLarge),
-        const SizedBox(height: AppTokens.sp2),
-        Text(
-          'Configura agentes para automatizar conversaciones, tareas y flujos.',
-          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-        ),
-      ],
+      style: textTheme.bodyLarge?.copyWith(color: AppTokens.text2),
     );
   }
 }
@@ -201,37 +195,57 @@ class _CreateBotCard extends StatelessWidget {
     return AppCard.gradient(
       key: const Key('bots.create_cta'),
       onTap: onTap,
-      padding: const EdgeInsets.all(AppTokens.cardPadding),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Crea un bot para tu flujo',
-                  style: textTheme.titleMedium?.copyWith(
-                    color: AppTokens.onPrimary,
+      // padding 0: el padding real lo pone la columna de contenido; la marca de
+      // agua debe poder sangrar hasta los bordes de la card antes del recorte.
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+        child: Stack(
+          children: <Widget>[
+            // Marca de agua: glifo grande anclado a la derecha, escalado al alto
+            // de la card y recortado por el borde, a baja opacidad sobre el
+            // gradiente. Decorativo ⇒ excluido del árbol semántico. (Cuando
+            // exista una ilustración de marca propia, reemplaza a este ícono.)
+            Positioned(
+              top: 0,
+              bottom: 0,
+              right: -28,
+              child: ExcludeSemantics(
+                child: FittedBox(
+                  fit: BoxFit.fitHeight,
+                  child: Icon(
+                    Icons.smart_toy,
+                    color: AppTokens.onPrimary.withValues(alpha: 0.14),
                   ),
                 ),
-                const SizedBox(height: AppTokens.sp2),
-                Text(
-                  'Define proveedor, instrucciones y comportamiento.',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: AppTokens.onPrimary,
-                  ),
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                const _NewBotAffordance(),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppTokens.sp4),
-          // Glifo de entidad (NO avatar de perfil): un bot no es una persona.
-          // En reposo (tile oscuro) contrasta sobre el gradiente cálido.
-          const AppEntityIcon(icon: Icons.smart_toy_outlined),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(AppTokens.cardPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    'Crea un bot para tu flujo',
+                    style: textTheme.titleMedium?.copyWith(
+                      color: AppTokens.onPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppTokens.sp2),
+                  Text(
+                    'Define proveedor, instrucciones y comportamiento.',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppTokens.onPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  const _NewBotAffordance(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
