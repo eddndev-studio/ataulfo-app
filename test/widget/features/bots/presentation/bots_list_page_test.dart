@@ -159,6 +159,32 @@ void main() {
     expect(navigated, <String>['/bots/new']);
   });
 
+  testWidgets(
+    'la card-CTA tiene estructura de botón: ícono +, título y chevron',
+    (tester) async {
+      tall(tester);
+      when(
+        () => bloc.state,
+      ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+
+      await tester.pumpWidget(host());
+
+      final cta = find.byKey(const Key('bots.create_cta'));
+      expect(
+        find.descendant(of: cta, matching: find.text('Nuevo bot')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cta, matching: find.byIcon(Icons.add)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cta, matching: find.byIcon(Icons.chevron_right)),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('el buscador filtra por nombre', (tester) async {
     tall(tester);
     when(
