@@ -33,6 +33,7 @@ import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_maintenance_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_variables_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
+import '../../features/bots/presentation/bot_create_draft.dart';
 import '../../features/bots/presentation/pages/bot_connect_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_maintenance_page.dart';
@@ -377,35 +378,42 @@ class AppRouter {
               value: _botsRepo,
               child: KeyedSubtree(
                 key: ValueKey<String>(orgId),
-                child: MultiBlocProvider(
-                  providers: <BlocProvider<dynamic>>[
-                    BlocProvider<BotsBloc>(
-                      create: (_) =>
-                          BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
-                    ),
-                    BlocProvider<TemplatesBloc>(
-                      create: (_) =>
-                          TemplatesBloc(_templatesRepo)
-                            ..add(const TemplatesLoadRequested()),
-                    ),
-                    BlocProvider<LabelsAdminBloc>(
-                      create: (_) =>
-                          LabelsAdminBloc(repo: _labelsRepo)
-                            ..add(const LabelsAdminLoadRequested()),
-                    ),
-                    // Cubit del reenvío de verificación, scoped al shell para que el
-                    // aviso "verifica tu correo" lo dispare y reaccione a su
-                    // SnackBar.
-                    BlocProvider<ResendVerificationCubit>(
-                      create: (_) => ResendVerificationCubit(_authRepo),
-                    ),
-                  ],
-                  // Blocs page-scoped a nivel del shell: cambiar de tab no
-                  // rebuildea los providers y cada lista preserva estado
-                  // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
-                  // El routeObserver se atraviesa al shell para que ambos list
-                  // pages disparen su refresh al volver de una sub-ruta.
-                  child: ShellPage(routeObserver: _routeObserver),
+                // El borrador del wizard de creación de bot es estado de la org
+                // activa: vive DENTRO del subárbol keyeado por orgId, así un
+                // switch-org lo descarta (un borrador con la plantilla de la org
+                // A no debe asomar en la org B).
+                child: RepositoryProvider<BotCreateDraftStore>(
+                  create: (_) => BotCreateDraftStore(),
+                  child: MultiBlocProvider(
+                    providers: <BlocProvider<dynamic>>[
+                      BlocProvider<BotsBloc>(
+                        create: (_) =>
+                            BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+                      ),
+                      BlocProvider<TemplatesBloc>(
+                        create: (_) =>
+                            TemplatesBloc(_templatesRepo)
+                              ..add(const TemplatesLoadRequested()),
+                      ),
+                      BlocProvider<LabelsAdminBloc>(
+                        create: (_) =>
+                            LabelsAdminBloc(repo: _labelsRepo)
+                              ..add(const LabelsAdminLoadRequested()),
+                      ),
+                      // Cubit del reenvío de verificación, scoped al shell para que el
+                      // aviso "verifica tu correo" lo dispare y reaccione a su
+                      // SnackBar.
+                      BlocProvider<ResendVerificationCubit>(
+                        create: (_) => ResendVerificationCubit(_authRepo),
+                      ),
+                    ],
+                    // Blocs page-scoped a nivel del shell: cambiar de tab no
+                    // rebuildea los providers y cada lista preserva estado
+                    // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
+                    // El routeObserver se atraviesa al shell para que ambos list
+                    // pages disparen su refresh al volver de una sub-ruta.
+                    child: ShellPage(routeObserver: _routeObserver),
+                  ),
                 ),
               ),
             ),

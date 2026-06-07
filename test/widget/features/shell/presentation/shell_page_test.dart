@@ -2,6 +2,7 @@ import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
+import 'package:ataulfo/features/bots/presentation/bot_create_draft.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
@@ -379,14 +380,17 @@ void main() {
         MaterialApp(
           home: RepositoryProvider<BotsRepository>.value(
             value: botsRepo,
-            child: MultiBlocProvider(
-              providers: <BlocProvider<dynamic>>[
-                BlocProvider<AuthBloc>.value(value: authBloc),
-                BlocProvider<BotsBloc>.value(value: botsBloc),
-                BlocProvider<TemplatesBloc>.value(value: templatesBloc),
-                BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
-              ],
-              child: const ShellPage(),
+            child: RepositoryProvider<BotCreateDraftStore>(
+              create: (_) => BotCreateDraftStore(),
+              child: MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<AuthBloc>.value(value: authBloc),
+                  BlocProvider<BotsBloc>.value(value: botsBloc),
+                  BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+                  BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
+                ],
+                child: const ShellPage(),
+              ),
             ),
           ),
         ),

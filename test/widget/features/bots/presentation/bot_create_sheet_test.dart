@@ -9,6 +9,7 @@ import 'package:ataulfo/core/design/widgets/provider_badge.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_create_bloc.dart';
+import 'package:ataulfo/features/bots/presentation/bot_create_draft.dart';
 import 'package:ataulfo/features/bots/presentation/widgets/bot_create_sheet.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
@@ -115,6 +116,40 @@ void main() {
         BlocProvider<TemplatesBloc>.value(value: tplBloc),
       ],
       child: const Scaffold(body: BotCreateSheet()),
+    ),
+  );
+
+  // Hoja del flujo libre CON store de borrador inyectado (lo que hace `.open`
+  // en el flujo del FAB / empty-state, dentro del subárbol del shell).
+  Widget draftHost({required BotCreateDraftStore store}) => MaterialApp(
+    theme: AppDesignTheme.dark(),
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<BotCreateBloc>.value(value: botBloc),
+        BlocProvider<TemplatesBloc>.value(value: tplBloc),
+      ],
+      child: Scaffold(body: BotCreateSheet(draftStore: store)),
+    ),
+  );
+
+  // Empuja la hoja sobre una ruta real (Navigator con pila) para poder cerrar
+  // con pop. `onClose` recibe el resultado del pop.
+  Widget pushHost(Widget sheet, {void Function(Bot?)? onClose}) => MaterialApp(
+    theme: AppDesignTheme.dark(),
+    home: Builder(
+      builder: (ctx) => Scaffold(
+        body: Center(
+          child: ElevatedButton(
+            onPressed: () async {
+              final result = await Navigator.of(
+                ctx,
+              ).push<Bot>(MaterialPageRoute<Bot>(builder: (_) => sheet));
+              onClose?.call(result);
+            },
+            child: const Text('open'),
+          ),
+        ),
+      ),
     ),
   );
 
@@ -396,5 +431,158 @@ void main() {
 
     expect(find.text('Nuevo bot'), findsNothing, reason: 'cerró');
     expect(returned, _bot);
+  });
+
+  group('borrador (draft) del wizard', () {
+    testWidgets('restaura plantilla + nombre + identificador al abrir', (
+      tester,
+    ) async {
+      tall(tester);
+      final store = BotCreateDraftStore()
+        ..save(
+          const BotCreateDraft(template: _t1, name: 'Bot X', identifier: '55'),
+        );
+
+      await tester.pumpWidget(draftHost(store: store));
+
+      // Con plantilla restaurada arranca directo en el paso de nombre.
+      expect(find.text('Nuevo bot'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('bot_create.template_chip')),
+          matching: find.text('Soporte ventas'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Bot X'), findsOneWidget);
+      expect(find.text('55'), findsOneWidget);
+      expect(submitButton(tester).onPressed, isNotNull);
+    });
+
+    testWidgets('persiste el progreso y sobrevive al cierre del modal', (
+      tester,
+    ) async {
+      tall(tester);
+      final store = BotCreateDraftStore();
+      await tester.pumpWidget(draftHost(store: store));
+
+      await tester.tap(find.byKey(const Key('bot_create.pick.t2')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('bot_create.field.name')),
+        'Bot Y',
+      );
+      await tester.pump();
+
+      // Cierre del modal: la hoja se desmonta. El borrador debe sobrevivir.
+      await tester.pumpWidget(const SizedBox());
+
+      expect(store.current?.template, _t2);
+      expect(store.current?.name, 'Bot Y');
+    });
+
+    testWidgets('limpia el borrador al crear con éxito', (tester) async {
+      tall(tester);
+      final store = BotCreateDraftStore()
+        ..save(const BotCreateDraft(template: _t1, name: 'Bot'));
+      final controller = StreamController<BotCreateState>();
+      addTearDown(controller.close);
+      whenListen(
+        botBloc,
+        controller.stream,
+        initialState: const BotCreateInitial(),
+      );
+
+      await tester.pumpWidget(
+        pushHost(
+          MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<BotCreateBloc>.value(value: botBloc),
+              BlocProvider<TemplatesBloc>.value(value: tplBloc),
+            ],
+            child: Scaffold(body: BotCreateSheet(draftStore: store)),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      controller.add(const BotCreateSucceeded(_bot));
+      await tester.pumpAndSettle();
+
+      expect(store.current, isNull);
+    });
+
+    testWidgets('"Descartar" limpia el borrador y cierra la hoja', (
+      tester,
+    ) async {
+      tall(tester);
+      final store = BotCreateDraftStore()
+        ..save(const BotCreateDraft(template: _t1, name: 'Bot'));
+
+      Bot? returned;
+      var popped = false;
+      await tester.pumpWidget(
+        pushHost(
+          MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<BotCreateBloc>.value(value: botBloc),
+              BlocProvider<TemplatesBloc>.value(value: tplBloc),
+            ],
+            child: Scaffold(body: BotCreateSheet(draftStore: store)),
+          ),
+          onClose: (r) {
+            returned = r;
+            popped = true;
+          },
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nuevo bot'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('bot_create.discard')));
+      await tester.pumpAndSettle();
+
+      expect(store.current, isNull);
+      expect(find.text('Nuevo bot'), findsNothing, reason: 'cerró');
+      expect(popped, isTrue);
+      expect(returned, isNull);
+    });
+
+    testWidgets('"Descartar" aparece sólo cuando hay contenido', (
+      tester,
+    ) async {
+      tall(tester);
+      final store = BotCreateDraftStore();
+      await tester.pumpWidget(draftHost(store: store));
+
+      // Paso de selección sin nada elegido → nada que descartar.
+      expect(find.text('Elegir plantilla'), findsOneWidget);
+      expect(find.byKey(const Key('bot_create.discard')), findsNothing);
+
+      // Al elegir plantilla ya hay contenido → aparece "Descartar".
+      await tester.tap(find.byKey(const Key('bot_create.pick.t1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bot_create.discard')), findsOneWidget);
+    });
+
+    testWidgets('flujo bloqueado no usa borrador ni ofrece "Descartar"', (
+      tester,
+    ) async {
+      tall(tester);
+      // nameHost NO inyecta store: el flujo bloqueado (desde el detalle de la
+      // plantilla) no lee ni escribe borradores.
+      await tester.pumpWidget(nameHost());
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('bot_create.template_chip')),
+          matching: find.text('Soporte ventas'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('bot_create.discard')), findsNothing);
+    });
   });
 }
