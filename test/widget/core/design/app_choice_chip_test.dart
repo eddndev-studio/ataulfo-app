@@ -42,7 +42,7 @@ void main() {
 
   group('AppChoiceChip — unselected vs selected', () {
     testWidgets(
-      'unselected: fondo transparent, borde divider y label en text1',
+      'unselected: fondo transparent, borde divider y label en text2',
       (tester) async {
         await pumpChip(
           tester,
@@ -52,7 +52,8 @@ void main() {
         final d = c.decoration as BoxDecoration;
         expect(d.color, Colors.transparent);
         expect(d.border?.top.color, AppTokens.divider);
-        expect(labelStyle(tester, 'Diario')?.color, AppTokens.text1);
+        // Opción latente: label en text2 (secundario), no text1.
+        expect(labelStyle(tester, 'Diario')?.color, AppTokens.text2);
       },
     );
 
@@ -64,31 +65,34 @@ void main() {
       expect(find.byIcon(Icons.check), findsNothing);
     });
 
-    testWidgets('selected: fondo primary y label en onPrimary', (tester) async {
+    testWidgets('selected: tinte primary (fondo primary@16% + borde y label '
+        'primary), no fill lleno tipo CTA', (tester) async {
       await pumpChip(
         tester,
         AppChoiceChip(label: 'Diario', selected: true, onSelected: (_) {}),
       );
       final c = chipContainer(tester);
       final d = c.decoration as BoxDecoration;
-      expect(d.color, AppTokens.primary);
-      expect(labelStyle(tester, 'Diario')?.color, AppTokens.onPrimary);
+      // Selección discreta: tinte, no el fill amarillo pleno (que compite con
+      // los CTAs). Geometría consistente: borde 1px en ambos estados.
+      expect(d.color, AppTokens.primary.withValues(alpha: 0.16));
+      expect(d.border?.top.color, AppTokens.primary);
+      expect(labelStyle(tester, 'Diario')?.color, AppTokens.primary);
     });
 
-    testWidgets(
-      'selected: muestra el check (Icons.check) tintado en onPrimary',
-      (tester) async {
-        // El check vive sobre el fill amarillo: foreground oscuro onPrimary,
-        // nunca blanco. Va a la izquierda del label.
-        await pumpChip(
-          tester,
-          AppChoiceChip(label: 'Diario', selected: true, onSelected: (_) {}),
-        );
-        expect(find.byIcon(Icons.check), findsOneWidget);
-        final check = tester.widget<Icon>(find.byIcon(Icons.check));
-        expect(check.color, AppTokens.onPrimary);
-      },
-    );
+    testWidgets('selected: muestra el check (Icons.check) tintado en primary', (
+      tester,
+    ) async {
+      // Tinte primary: el check va en primary (no onPrimary), a juego con el
+      // label y el borde. A la izquierda del label.
+      await pumpChip(
+        tester,
+        AppChoiceChip(label: 'Diario', selected: true, onSelected: (_) {}),
+      );
+      expect(find.byIcon(Icons.check), findsOneWidget);
+      final check = tester.widget<Icon>(find.byIcon(Icons.check));
+      expect(check.color, AppTokens.primary);
+    });
   });
 
   group('AppChoiceChip — geometría', () {

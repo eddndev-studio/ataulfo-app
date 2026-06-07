@@ -86,7 +86,8 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('Loaded muestra header "Bots" + descripción', (tester) async {
+  testWidgets('Loaded muestra el lead descriptivo (sin título "Bots" '
+      'redundante: el AppBar del shell ya lo dice)', (tester) async {
     tall(tester);
     when(
       () => bloc.state,
@@ -94,8 +95,10 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.text('Bots'), findsOneWidget);
     expect(find.byKey(const Key('bots.header')), findsOneWidget);
+    expect(find.textContaining('Configura agentes'), findsOneWidget);
+    // El contenido NO repite "Bots" (lo titula el AppBar del shell).
+    expect(find.text('Bots'), findsNothing);
   });
 
   testWidgets('Loaded con bots: una card-tile por bot con AppEntityIcon (NO '
