@@ -1,0 +1,161 @@
+import 'package:flutter/material.dart';
+
+import '../tokens.dart';
+
+/// Header rico de una sección (Bots / Plantillas): una tarjeta full-bleed con
+/// el fondo PRIMARIO (gradiente vertical) que reemplaza al AppBar. Va pegada al
+/// borde superior — solo las esquinas inferiores son redondeadas — y muestra el
+/// saludo, el acceso al perfil y el título de la sección. El avatar invierte el
+/// lenguaje de color (círculo oscuro con glifo ámbar) para resaltar sobre el
+/// gradiente.
+///
+/// Deliberadamente NO incluye acción de crear (la aporta el FAB del shell) ni
+/// de buscar (el buscador vive siempre visible debajo del header): duplicarlas
+/// aquí sería ruido.
+///
+/// Es full-bleed: el consumidor lo monta SIN el padding lateral del layout (el
+/// padding interno lo pone la propia tarjeta). El padding superior reserva el
+/// inset de status bar (`MediaQuery`) para que el contenido no quede bajo el
+/// notch cuando va sin AppBar.
+class AppHeaderCard extends StatelessWidget {
+  const AppHeaderCard({
+    super.key,
+    required this.greeting,
+    required this.title,
+    required this.avatarInitial,
+    required this.onAvatarTap,
+    required this.watermark,
+  });
+
+  final String greeting;
+  final String title;
+  final String avatarInitial;
+  final VoidCallback onAvatarTap;
+  final IconData watermark;
+
+  /// Gradiente de marca VERTICAL (ámbar arriba → naranja abajo), específico de
+  /// este header. No reutiliza `brandGradient` (diagonal) a propósito.
+  static const LinearGradient _gradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: <Color>[AppTokens.primary, AppTokens.accent],
+  );
+
+  TextStyle _t(double size, FontWeight w, {double alpha = 1.0}) => TextStyle(
+    fontFamily: AppTokens.fontSans,
+    fontSize: size,
+    fontWeight: w,
+    height: 1.15,
+    color: AppTokens.onPrimary.withValues(alpha: alpha),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(28),
+        bottomRight: Radius.circular(28),
+      ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(gradient: _gradient),
+        child: Stack(
+          children: <Widget>[
+            // Marca de agua: glifo grande de la sección, recortado y a baja
+            // opacidad. Decorativo ⇒ fuera del árbol semántico.
+            Positioned(
+              top: -10,
+              bottom: -10,
+              right: -30,
+              child: ExcludeSemantics(
+                child: Icon(
+                  watermark,
+                  size: 200,
+                  color: AppTokens.onPrimary.withValues(alpha: 0.10),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppTokens.sp5,
+                topInset + AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.sp6,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          greeting,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _t(15, FontWeight.w600, alpha: 0.9),
+                        ),
+                      ),
+                      const SizedBox(width: AppTokens.sp2),
+                      _DarkCircle(
+                        key: const Key('header.avatar'),
+                        onTap: onAvatarTap,
+                        semanticLabel: 'Perfil',
+                        child: Text(
+                          avatarInitial,
+                          style: const TextStyle(
+                            fontFamily: AppTokens.fontSans,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppTokens.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTokens.sp6),
+                  Text(title, style: _t(34, FontWeight.w700)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Botón circular oscuro con glifo ámbar, sobre el gradiente. Toca → onTap.
+class _DarkCircle extends StatelessWidget {
+  const _DarkCircle({
+    super.key,
+    required this.child,
+    required this.onTap,
+    required this.semanticLabel,
+  });
+
+  final Widget child;
+  final VoidCallback onTap;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: Material(
+        color: AppTokens.onPrimary,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(child: ExcludeSemantics(child: child)),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_header_card.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/templates_bloc.dart';
@@ -16,6 +19,17 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
     implements TemplatesBloc {}
+
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
+
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+  emailVerified: true,
+);
 
 const _aiOn = AIConfig(
   enabled: true,
@@ -69,16 +83,23 @@ void main() {
   });
 
   late _MockTemplatesBloc bloc;
+  late _MockAuthBloc authBloc;
 
   setUp(() {
     bloc = _MockTemplatesBloc();
     when(() => bloc.state).thenReturn(const TemplatesInitial());
+    authBloc = _MockAuthBloc();
+    // El header rico saluda con el nombre derivado del email de la sesión.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
   });
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: BlocProvider<TemplatesBloc>.value(
-      value: bloc,
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<AuthBloc>.value(value: authBloc),
+        BlocProvider<TemplatesBloc>.value(value: bloc),
+      ],
       child: const Scaffold(body: TemplatesListPage()),
     ),
   );
@@ -100,16 +121,23 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('header descriptivo sin título redundante (lo pone el shell)', (
-    tester,
-  ) async {
-    loaded(const <Template>[_t1]);
-    await tester.pumpWidget(host());
+  testWidgets(
+    'Loaded monta el header rico full-bleed con título "Plantillas"',
+    (tester) async {
+      loaded(const <Template>[_t1]);
+      await tester.pumpWidget(host());
 
-    expect(find.byKey(const Key('templates.header')), findsOneWidget);
-    // El AppBar del shell ya dice "Plantillas"; el contenido no lo repite.
-    expect(find.text('Plantillas'), findsNothing);
-  });
+      // El AppHeaderCard reemplaza al AppBar del shell para esta sección.
+      expect(find.byType(AppHeaderCard), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AppHeaderCard),
+          matching: find.text('Plantillas'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('Loaded renderiza un tile por template (sin ListTile M3)', (
     tester,
@@ -122,64 +150,6 @@ void main() {
     expect(find.text('Soporte'), findsOneWidget);
     expect(find.text('Ventas'), findsOneWidget);
     expect(find.byType(ListTile), findsNothing);
-  });
-
-  testWidgets('CTA de creación presente sobre la lista', (tester) async {
-    loaded(const <Template>[_t1]);
-    await tester.pumpWidget(host());
-
-    expect(find.byKey(const Key('templates.create_cta')), findsOneWidget);
-  });
-
-  testWidgets('tap en la CTA navega a /templates/new', (tester) async {
-    final navigated = <String>[];
-    final router = GoRouter(
-      initialLocation: '/',
-      routes: <RouteBase>[
-        GoRoute(
-          path: '/',
-          builder: (_, _) => BlocProvider<TemplatesBloc>.value(
-            value: bloc,
-            child: const Scaffold(body: TemplatesListPage()),
-          ),
-        ),
-        GoRoute(
-          path: '/templates/new',
-          builder: (_, _) {
-            navigated.add('/templates/new');
-            return const Scaffold(body: SizedBox.shrink());
-          },
-        ),
-      ],
-    );
-    loaded(const <Template>[_t1]);
-
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-    await tester.tap(find.byKey(const Key('templates.create_cta')));
-    await tester.pumpAndSettle();
-
-    expect(navigated, <String>['/templates/new']);
-  });
-
-  testWidgets('la CTA tiene estructura de botón: ícono +, título y chevron', (
-    tester,
-  ) async {
-    loaded(const <Template>[_t1]);
-    await tester.pumpWidget(host());
-
-    final cta = find.byKey(const Key('templates.create_cta'));
-    expect(
-      find.descendant(of: cta, matching: find.text('Nueva plantilla')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: cta, matching: find.byIcon(Icons.add)),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: cta, matching: find.byIcon(Icons.chevron_right)),
-      findsOneWidget,
-    );
   });
 
   testWidgets('tile con counts muestra bots/flujos/variables (pluralizado)', (
@@ -344,8 +314,11 @@ void main() {
         routes: <RouteBase>[
           GoRoute(
             path: '/',
-            builder: (_, _) => BlocProvider<TemplatesBloc>.value(
-              value: bloc,
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                BlocProvider<TemplatesBloc>.value(value: bloc),
+              ],
               child: const Scaffold(body: TemplatesListPage()),
             ),
           ),
@@ -392,8 +365,11 @@ void main() {
           MaterialApp(
             theme: AppDesignTheme.dark(),
             navigatorObservers: <NavigatorObserver>[observer],
-            home: BlocProvider<TemplatesBloc>.value(
-              value: bloc,
+            home: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                BlocProvider<TemplatesBloc>.value(value: bloc),
+              ],
               child: Scaffold(body: TemplatesListPage(routeObserver: observer)),
             ),
           ),

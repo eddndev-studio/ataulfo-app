@@ -14,9 +14,12 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
+import '../../../../core/util/user_greeting.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/template.dart';
 import '../bloc/templates_bloc.dart';
 
@@ -35,9 +38,12 @@ enum _TemplateFilter { all, withAi, withoutAi }
 /// stack tras un pop. Sin observer la page funciona idéntico — composición
 /// opcional, no contrato obligatorio.
 class TemplatesListPage extends StatefulWidget {
-  const TemplatesListPage({super.key, this.routeObserver});
+  const TemplatesListPage({super.key, this.routeObserver, this.onOpenSettings});
 
   final RouteObserver<PageRoute<dynamic>>? routeObserver;
+
+  /// Acción del avatar del header → abrir Ajustes. La aporta el shell.
+  final VoidCallback? onOpenSettings;
 
   @override
   State<TemplatesListPage> createState() => _TemplatesListPageState();
@@ -122,159 +128,63 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
     );
   }
 
+  String _emailFromSession(BuildContext context) {
+    final state = context.read<AuthBloc>().state;
+    return switch (state) {
+      AuthAuthenticated(:final identity) => identity.email,
+      AuthAuthenticatedNoOrg(:final identity) => identity.email,
+      _ => '',
+    };
+  }
+
   Widget _buildLoaded(BuildContext context, List<Template> items) {
     final filtered = _applyFilters(items);
+    final user = userGreeting(_emailFromSession(context));
     return RefreshIndicator(
       onRefresh: () => _refresh(context),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-          AppTokens.sp5,
-          AppTokens.sp5,
-          AppTokens.sp5,
-          AppTokens.sp5 + context.safeBottomInset,
-        ),
+        // Sin padding aquí: el header es full-bleed y va pegado arriba.
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const _Header(),
-            const SizedBox(height: AppTokens.sp5),
-            _CreateTemplateCard(onTap: () => context.push('/templates/new')),
-            const SizedBox(height: AppTokens.sp5),
-            _SearchField(controller: _searchCtrl),
-            const SizedBox(height: AppTokens.sp4),
-            _FilterChips(
-              selected: _filter,
-              onSelected: (f) => setState(() => _filter = f),
-            ),
-            const SizedBox(height: AppTokens.sp5),
-            if (filtered.isEmpty)
-              const _NoResults()
-            else
-              for (final template in filtered) ...<Widget>[
-                _TemplateTile(template: template),
-                const SizedBox(height: AppTokens.cardGap),
-              ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Lead descriptivo de la pantalla. El AppBar del shell ya titula "Plantillas",
-/// así que aquí NO se repite el título (evita la redundancia de interfaz).
-class _Header extends StatelessWidget {
-  const _Header();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Text(
-      'Define el comportamiento que tus bots heredan: IA, flujos y variables.',
-      key: const Key('templates.header'),
-      style: textTheme.bodyLarge?.copyWith(color: AppTokens.text2),
-    );
-  }
-}
-
-/// CTA principal: la única card con gradiente de marca. Toda la card es UN
-/// botón tappable → `/templates/new` (mismo destino que el FAB del shell). La
-/// estructura —ícono-botón a la izquierda, título + descripción al centro,
-/// chevron a la derecha— hace que se lea como un botón pleno, no como una card
-/// con una pastilla de acción suelta dentro. La marca de agua es un glifo
-/// decorativo a la derecha, recortado por el borde.
-class _CreateTemplateCard extends StatelessWidget {
-  const _CreateTemplateCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return AppCard.gradient(
-      key: const Key('templates.create_cta'),
-      onTap: onTap,
-      // padding 0: el padding real lo pone la fila; la marca de agua debe poder
-      // sangrar hasta los bordes de la card antes del recorte.
-      padding: EdgeInsets.zero,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-        child: Stack(
-          children: <Widget>[
-            Positioned(
-              top: 0,
-              bottom: 0,
-              right: -28,
-              child: ExcludeSemantics(
-                child: FittedBox(
-                  fit: BoxFit.fitHeight,
-                  child: Icon(
-                    Icons.description,
-                    color: AppTokens.onPrimary.withValues(alpha: 0.14),
-                  ),
-                ),
-              ),
+            AppHeaderCard(
+              greeting: user.greeting,
+              title: 'Plantillas',
+              avatarInitial: user.initial,
+              onAvatarTap: widget.onOpenSettings ?? () {},
+              watermark: Icons.description,
             ),
             Padding(
-              padding: const EdgeInsets.all(AppTokens.cardPadding),
-              child: Row(
+              padding: EdgeInsets.fromLTRB(
+                AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.sp5 + context.safeBottomInset,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const _CtaIconButton(),
-                  const SizedBox(width: AppTokens.sp4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          'Nueva plantilla',
-                          style: textTheme.titleMedium?.copyWith(
-                            color: AppTokens.onPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: AppTokens.sp1),
-                        Text(
-                          'Crea una plantilla desde cero y define el '
-                          'comportamiento.',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: AppTokens.onPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
+                  _SearchField(controller: _searchCtrl),
+                  const SizedBox(height: AppTokens.sp4),
+                  _FilterChips(
+                    selected: _filter,
+                    onSelected: (f) => setState(() => _filter = f),
                   ),
-                  const SizedBox(width: AppTokens.sp3),
-                  const Icon(Icons.chevron_right, color: AppTokens.onPrimary),
+                  const SizedBox(height: AppTokens.sp5),
+                  if (filtered.isEmpty)
+                    const _NoResults()
+                  else
+                    for (final template in filtered) ...<Widget>[
+                      _TemplateTile(template: template),
+                      const SizedBox(height: AppTokens.cardGap),
+                    ],
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Ícono-botón cuadrado de la card-CTA: cuadrado oscuro (`onPrimary`) con un
-/// "+" en ámbar. Es el ancla visual que comunica "toda la card es un botón".
-/// Decorativo (la card ya porta la semántica de acción).
-class _CtaIconButton extends StatelessWidget {
-  const _CtaIconButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: Container(
-        width: 48,
-        height: 48,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppTokens.onPrimary,
-          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-        ),
-        child: const Icon(Icons.add, color: AppTokens.primary, size: 26),
       ),
     );
   }
