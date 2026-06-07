@@ -218,6 +218,16 @@ class _AppTextFieldState extends State<AppTextField> {
           ]
         : null;
 
+    // El glow de foco es un boxShadow detrás de la caja. Con el fill translúcido
+    // (`input` = gris al 60%) la sombra se veía A TRAVÉS hacia el interior, como
+    // un glow interno. Al enfocar (única situación con glow) compactamos el fill
+    // a su equivalente OPACO (input compuesto sobre bgBase): la parte interna de
+    // la sombra queda tapada y solo se ve el halo por fuera del borde. En reposo
+    // y en error se conserva el fill translúcido (no hay sombra que sangre).
+    final fillColor = (focused && !hasError)
+        ? Color.alphaBlend(AppTokens.input, AppTokens.bgBase)
+        : AppTokens.input;
+
     final labelColor = hasError ? AppTokens.danger : AppTokens.text2;
     final helperOrError = widget.errorText ?? widget.helperText;
     final helperColor = hasError ? AppTokens.danger : AppTokens.text2;
@@ -243,7 +253,7 @@ class _AppTextFieldState extends State<AppTextField> {
             // y crece hacia abajo.
             alignment: isMultiline ? Alignment.topLeft : Alignment.centerLeft,
             decoration: BoxDecoration(
-              color: AppTokens.input,
+              color: fillColor,
               borderRadius: radius,
               border: Border.all(color: borderColor, width: 2),
               boxShadow: boxShadow,

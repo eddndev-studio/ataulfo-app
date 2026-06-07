@@ -541,6 +541,29 @@ void main() {
         expect(shadow.first.color, AppTokens.primaryGlow);
       },
     );
+
+    testWidgets(
+      'enfocado: el fill es OPACO (el glow queda por fuera, no sangra adentro)',
+      (tester) async {
+        await pump(
+          tester,
+          AppTextField(
+            label: 'X',
+            hint: 'h',
+            controller: TextEditingController(),
+            autofocus: true,
+          ),
+        );
+        await tester.pump();
+
+        // El glow es un boxShadow detrás de la caja; con fill translúcido se
+        // veía a través hacia el interior. En foco el fill se vuelve opaco
+        // (input compuesto sobre bgBase) para que solo se vea el halo externo.
+        final fill = shellDecoration(tester).color!;
+        expect(fill.a, 1.0);
+        expect(fill, Color.alphaBlend(AppTokens.input, AppTokens.bgBase));
+      },
+    );
   });
 
   group('AppTextField — error', () {
