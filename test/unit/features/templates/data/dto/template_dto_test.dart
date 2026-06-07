@@ -126,8 +126,7 @@ void main() {
     test('counts presente pero con clave faltante lanza FormatException', () {
       expect(
         () => TemplateResp.fromJson(
-          tplJson()
-            ..['counts'] = <String, dynamic>{'bots': 1, 'flows': 2},
+          tplJson()..['counts'] = <String, dynamic>{'bots': 1, 'flows': 2},
         ),
         throwsA(isA<FormatException>()),
       );
