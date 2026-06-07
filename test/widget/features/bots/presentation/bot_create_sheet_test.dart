@@ -567,6 +567,21 @@ void main() {
       expect(find.byKey(const Key('bot_create.discard')), findsOneWidget);
     });
 
+    testWidgets('"Descartar" se deshabilita durante el submit', (tester) async {
+      tall(tester);
+      when(() => botBloc.state).thenReturn(const BotCreateSubmitting());
+      final store = BotCreateDraftStore()
+        ..save(const BotCreateDraft(template: _t1, name: 'Bot'));
+
+      await tester.pumpWidget(draftHost(store: store));
+
+      // En vuelo no se puede abandonar (el bot podría crearse igual en server).
+      final btn = tester.widget<TextButton>(
+        find.byKey(const Key('bot_create.discard')),
+      );
+      expect(btn.onPressed, isNull);
+    });
+
     testWidgets('flujo bloqueado no usa borrador ni ofrece "Descartar"', (
       tester,
     ) async {

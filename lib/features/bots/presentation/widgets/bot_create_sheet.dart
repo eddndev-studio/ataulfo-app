@@ -483,7 +483,10 @@ class _NameStep extends StatelessWidget {
             const SizedBox(height: AppTokens.sp4),
             _FailedView(failure: failure!),
           ],
-          if (onDiscard != null) _DiscardButton(onPressed: onDiscard!),
+          if (onDiscard != null)
+            // En vuelo se deshabilita (como "volver"): abandonar a media
+            // creación dejaría el bot posiblemente creado en el server.
+            _DiscardButton(onPressed: submitting ? null : onDiscard),
         ],
       ),
     );
@@ -492,11 +495,11 @@ class _NameStep extends StatelessWidget {
 
 /// Acción secundaria, explícita y separada de cualquier gesto de "cerrar":
 /// tira el borrador en curso. Cerrar el modal (tap fuera, swipe, back) conserva
-/// el progreso; sólo este botón lo descarta.
+/// el progreso; sólo este botón lo descarta. `onPressed` nulo lo deshabilita.
 class _DiscardButton extends StatelessWidget {
   const _DiscardButton({required this.onPressed});
 
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
