@@ -101,16 +101,17 @@ class AppTokens {
   /// Fondo absoluto de la app: glow radial cálido anclado en el borde
   /// INFERIOR que se disuelve en [bgBase] hacia arriba. Compuesto de los tokens
   /// de marca (primary→accent) sobre el fondo base; las pantallas se montan
-  /// encima con app bars transparentes. El centro va cerca del borde inferior
-  /// para que el calor quede en la base y el cuerpo superior respire en oscuro.
+  /// encima con app bars transparentes. El centro va en el borde inferior y el
+  /// radio es chico (~bottom 20% de la vista) para que el calor sea una franja
+  /// baja y el cuerpo respire en oscuro.
   ///
   /// Va a intensidad plena: las paradas cálidas son la marca pura (primary→
   /// accent), no atenuadas. La última parada queda en [bgBase], así que el
   /// gradiente sigue siendo opaco de extremo a extremo (no necesita capa base
   /// extra). Es una capa de fondo: el contenido scrollea encima.
   static const RadialGradient backgroundGlow = RadialGradient(
-    center: Alignment(0.0, 0.8),
-    radius: 1.15,
+    center: Alignment(0.0, 1.0),
+    radius: 0.5,
     colors: <Color>[primary, accent, bgBase],
     stops: <double>[0.0, 0.45, 0.9],
   );

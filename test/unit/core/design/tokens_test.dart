@@ -64,13 +64,14 @@ void main() {
     });
 
     test(
-      'backgroundGlow es radial anclado abajo, marca a intensidad plena',
+      'backgroundGlow es radial anclado al borde inferior, marca plena y acotado',
       () {
-        // El glow nace en el borde INFERIOR (center y positivo) y va a
-        // intensidad 1: las paradas cálidas son la marca pura (primary/accent),
-        // no atenuadas; la última parada queda en bgBase puro.
+        // El glow nace en el borde INFERIOR (center y=1.0) con radio chico
+        // (~bottom 20%) y va a intensidad 1: las paradas cálidas son la marca
+        // pura (primary/accent), no atenuadas; la última parada queda en bgBase.
         const g = AppTokens.backgroundGlow;
-        expect(g.center, const Alignment(0.0, 0.8));
+        expect(g.center, const Alignment(0.0, 1.0));
+        expect(g.radius, 0.5);
         expect(g.colors, <Color>[
           AppTokens.primary,
           AppTokens.accent,
