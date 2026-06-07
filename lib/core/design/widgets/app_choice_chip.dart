@@ -43,7 +43,10 @@ class AppChoiceChip extends StatelessWidget {
     final foreground = selected ? AppTokens.primary : AppTokens.text2;
 
     final chip = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 48),
+      // Cápsula compacta: 36 de piso (en vez de 48) para que el filtro no se
+      // vea con exceso de aire vertical y quede proporcionado con su altura de
+      // texto, conservando un objetivo táctil razonable.
+      constraints: const BoxConstraints(minHeight: 36),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -54,7 +57,7 @@ class AppChoiceChip extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(
               horizontal: AppTokens.sp3,
-              vertical: AppTokens.sp2,
+              vertical: AppTokens.sp1,
             ),
             decoration: BoxDecoration(
               // Selección discreta: TINTE de marca (primary al 16%), no el fill
