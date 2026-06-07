@@ -107,6 +107,28 @@ void main() {
       final d = c.decoration as BoxDecoration;
       expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusPill));
     });
+
+    testWidgets('compacto: padding vertical reducido y altura < 44', (
+      tester,
+    ) async {
+      await pumpChip(
+        tester,
+        AppChoiceChip(label: 'x', selected: false, onSelected: (_) {}),
+      );
+      final c = chipContainer(tester);
+      expect(
+        c.padding,
+        const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp3,
+          vertical: AppTokens.sp1,
+        ),
+      );
+      // La cápsula deja de estirarse a 48: el filtro se ve más bajo y proporcionado.
+      expect(
+        tester.getSize(find.byType(AppChoiceChip)).height,
+        lessThan(44),
+      );
+    });
   });
 
   group('AppChoiceChip — estados', () {
