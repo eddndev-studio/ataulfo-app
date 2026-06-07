@@ -96,14 +96,16 @@ void main() {
   });
 
   group('AppChoiceChip — geometría', () {
-    testWidgets('radio AppTokens.radiusChip (8)', (tester) async {
+    testWidgets('radio AppTokens.radiusPill (cápsula)', (tester) async {
+      // El chip es una cápsula como el resto de la familia de toggles: un
+      // borde cuadrado disuena con los demás componentes (botones/pills full).
       await pumpChip(
         tester,
         AppChoiceChip(label: 'x', selected: false, onSelected: (_) {}),
       );
       final c = chipContainer(tester);
       final d = c.decoration as BoxDecoration;
-      expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusChip));
+      expect(d.borderRadius, BorderRadius.circular(AppTokens.radiusPill));
     });
   });
 
