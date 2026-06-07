@@ -63,22 +63,21 @@ void main() {
       expect(AppTokens.primaryGlow, const Color(0x59EDB900));
     });
 
-    test(
-      'backgroundGlow es radial anclado al borde inferior, marca plena y acotado',
-      () {
-        // El glow nace en el borde INFERIOR (center y=1.0) con radio chico
-        // (~bottom 20%) y va a intensidad 1: las paradas cálidas son la marca
-        // pura (primary/accent), no atenuadas; la última parada queda en bgBase.
-        const g = AppTokens.backgroundGlow;
-        expect(g.center, const Alignment(0.0, 1.0));
-        expect(g.radius, 0.5);
-        expect(g.colors, <Color>[
-          AppTokens.primary,
-          AppTokens.accent,
-          AppTokens.bgBase,
-        ]);
-      },
-    );
+    test('backgroundGlowLayers: amanecer premium en 3 capas anclado arriba', () {
+      // Glow en capas (ambiente profundo → halo → núcleo) que nace del borde
+      // SUPERIOR. Cada capa es un radial cálido que se desvanece a alpha 0 para
+      // fundirse con el oscuro del cuerpo.
+      final layers = AppTokens.backgroundGlowLayers;
+      expect(layers.length, 3);
+      for (final g in layers) {
+        // Anclado arriba: el centro está sobre el borde superior (y negativo).
+        expect((g.center as Alignment).y, lessThan(0.0));
+        // Premium: cada capa se funde (última parada a alpha 0).
+        expect(g.colors.last.a, 0.0);
+      }
+      // La capa núcleo (última) arranca casi opaca: el sol brillante.
+      expect(layers.last.colors.first.a, greaterThan(0.9));
+    });
   });
 
   group('AppTokens — text', () {

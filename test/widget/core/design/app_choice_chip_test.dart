@@ -124,10 +124,7 @@ void main() {
         ),
       );
       // La cápsula deja de estirarse a 48: el filtro se ve más bajo y proporcionado.
-      expect(
-        tester.getSize(find.byType(AppChoiceChip)).height,
-        lessThan(44),
-      );
+      expect(tester.getSize(find.byType(AppChoiceChip)).height, lessThan(44));
     });
   });
 
