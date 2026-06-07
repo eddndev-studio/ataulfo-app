@@ -178,9 +178,12 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// CTA principal: la única card con gradiente de marca. Toda la card es tappable
-/// → `/templates/new` (mismo destino que el FAB del shell). La marca de agua es
-/// un glifo decorativo a la derecha, recortado por el borde.
+/// CTA principal: la única card con gradiente de marca. Toda la card es UN
+/// botón tappable → `/templates/new` (mismo destino que el FAB del shell). La
+/// estructura —ícono-botón a la izquierda, título + descripción al centro,
+/// chevron a la derecha— hace que se lea como un botón pleno, no como una card
+/// con una pastilla de acción suelta dentro. La marca de agua es un glifo
+/// decorativo a la derecha, recortado por el borde.
 class _CreateTemplateCard extends StatelessWidget {
   const _CreateTemplateCard({required this.onTap});
 
@@ -192,8 +195,8 @@ class _CreateTemplateCard extends StatelessWidget {
     return AppCard.gradient(
       key: const Key('templates.create_cta'),
       onTap: onTap,
-      // padding 0: el padding real lo pone la columna; la marca de agua debe
-      // poder sangrar hasta los bordes de la card antes del recorte.
+      // padding 0: el padding real lo pone la fila; la marca de agua debe poder
+      // sangrar hasta los bordes de la card antes del recorte.
       padding: EdgeInsets.zero,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppTokens.radiusCard),
@@ -215,25 +218,35 @@ class _CreateTemplateCard extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.all(AppTokens.cardPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: <Widget>[
-                  Text(
-                    'Crea una plantilla',
-                    style: textTheme.titleMedium?.copyWith(
-                      color: AppTokens.onPrimary,
+                  const _CtaIconButton(),
+                  const SizedBox(width: AppTokens.sp4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          'Nueva plantilla',
+                          style: textTheme.titleMedium?.copyWith(
+                            color: AppTokens.onPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: AppTokens.sp1),
+                        Text(
+                          'Crea una plantilla desde cero y define el '
+                          'comportamiento.',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: AppTokens.onPrimary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: AppTokens.sp2),
-                  Text(
-                    'El plano que comparten tus bots: IA, flujos y variables.',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.onPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: AppTokens.sp4),
-                  const _NewTemplateAffordance(),
+                  const SizedBox(width: AppTokens.sp3),
+                  const Icon(Icons.chevron_right, color: AppTokens.onPrimary),
                 ],
               ),
             ),
@@ -244,36 +257,24 @@ class _CreateTemplateCard extends StatelessWidget {
   }
 }
 
-/// Pastilla oscura "Nueva plantilla" sobre el gradiente: afordancia de acción de
-/// la card-CTA. Fondo `onPrimary` (oscuro) para resaltar contra el ámbar.
-class _NewTemplateAffordance extends StatelessWidget {
-  const _NewTemplateAffordance();
+/// Ícono-botón cuadrado de la card-CTA: cuadrado oscuro (`onPrimary`) con un
+/// "+" en ámbar. Es el ancla visual que comunica "toda la card es un botón".
+/// Decorativo (la card ya porta la semántica de acción).
+class _CtaIconButton extends StatelessWidget {
+  const _CtaIconButton();
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.sp4,
-        vertical: AppTokens.sp2,
-      ),
-      decoration: BoxDecoration(
-        color: AppTokens.onPrimary,
-        borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Icon(Icons.add, size: 18, color: AppTokens.text1),
-          const SizedBox(width: AppTokens.sp1),
-          Text(
-            'Nueva plantilla',
-            style: textTheme.bodyMedium?.copyWith(
-              color: AppTokens.text1,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+    return ExcludeSemantics(
+      child: Container(
+        width: 48,
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppTokens.onPrimary,
+          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+        ),
+        child: const Icon(Icons.add, color: AppTokens.primary, size: 26),
       ),
     );
   }
