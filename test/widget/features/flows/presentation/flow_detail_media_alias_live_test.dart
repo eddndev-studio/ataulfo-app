@@ -161,6 +161,70 @@ void main() {
   );
 
   testWidgets(
+    'reordenar un paso multimedia no rompe (sin ProviderNotFound al elevar al '
+    'overlay del drag)',
+    (tester) async {
+      // ≥2 pasos ⇒ ReorderableListView. El proveedor MediaNamesCubit vive bajo
+      // el Navigator (como en el router real), pero el overlay del drag está
+      // por ENCIMA: si la tarjeta multimedia hace el lookup del cubit dentro
+      // del item reordenable, al elevarse al overlay lanza ProviderNotFound y
+      // Flutter pinta el RenderErrorBox gris estirado.
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's-text',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'Hola',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 1000,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 's-audio',
+            flowId: 'f1',
+            type: fdom.StepType.ptt,
+            order: 1,
+            content: '',
+            mediaRef: _audioRef,
+            metadataJson: '{"media_filename":"grabacion-cruda.ogg"}',
+            delayMs: 1000,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+      );
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      // Inicia el drag desde el handle del paso de audio y muévelo: esto eleva
+      // el item al overlay y reconstruye su subárbol en ese contexto.
+      final handle = find.byKey(
+        const Key('flow_detail.step_card.drag_handle.s-audio'),
+      );
+      final gesture = await tester.startGesture(tester.getCenter(handle));
+      await tester.pump(const Duration(milliseconds: 200));
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'cadena real: catálogo sin el ref ⇒ cae al media_filename guardado',
     (tester) async {
       // El catálogo no contiene el asset del paso (p. ej. borrado): la lista
