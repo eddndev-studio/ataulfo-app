@@ -98,26 +98,21 @@ class AppTokens {
   /// Tinte del glow de foco (campos) y de la sombra del FAB. `primary` al ~35%.
   static const Color primaryGlow = _Yellow.s700a35;
 
-  /// Fondo absoluto de la app: glow radial cálido anclado arriba que se
-  /// disuelve en [bgBase]. Compuesto de los tokens de marca (primary→accent)
-  /// sobre el fondo base; las pantallas se montan encima con app bars
-  /// transparentes. El centro va cerca del borde superior para que el calor
-  /// quede en la cabecera y el cuerpo respire en oscuro.
+  /// Fondo absoluto de la app: glow radial cálido anclado en el borde
+  /// INFERIOR que se disuelve en [bgBase] hacia arriba. Compuesto de los tokens
+  /// de marca (primary→accent) sobre el fondo base; las pantallas se montan
+  /// encima con app bars transparentes. El centro va cerca del borde inferior
+  /// para que el calor quede en la base y el cuerpo superior respire en oscuro.
   ///
-  /// Va a intensidad baja: cada parada cálida se mezcla solo ~35% hacia la
-  /// marca desde [bgBase] (equivalente a pintar el glow a ~35% de opacidad
-  /// sobre la base), de modo que el calor sea sutil y el texto encima respire.
-  /// Sigue siendo opaco —no necesita capa de base extra—, por eso usa `lerp`
-  /// y no alpha.
-  static final RadialGradient backgroundGlow = RadialGradient(
-    center: const Alignment(0.0, -0.8),
+  /// Va a intensidad plena: las paradas cálidas son la marca pura (primary→
+  /// accent), no atenuadas. La última parada queda en [bgBase], así que el
+  /// gradiente sigue siendo opaco de extremo a extremo (no necesita capa base
+  /// extra). Es una capa de fondo: el contenido scrollea encima.
+  static const RadialGradient backgroundGlow = RadialGradient(
+    center: Alignment(0.0, 0.8),
     radius: 1.15,
-    colors: <Color>[
-      Color.lerp(bgBase, primary, 0.35)!,
-      Color.lerp(bgBase, accent, 0.35)!,
-      bgBase,
-    ],
-    stops: const <double>[0.0, 0.45, 0.9],
+    colors: <Color>[primary, accent, bgBase],
+    stops: <double>[0.0, 0.45, 0.9],
   );
 
   // ── Section accents ───────────────────────────────────────────────────────
