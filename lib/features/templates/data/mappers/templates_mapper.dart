@@ -25,5 +25,13 @@ class TemplatesMapper {
     name: resp.name,
     version: resp.version,
     ai: aiConfigDtoToEntity(resp.ai),
+    counts: resp.counts == null ? null : _countsDtoToEntity(resp.counts!),
   );
+
+  static TemplateCounts _countsDtoToEntity(TemplateCountsDto dto) =>
+      TemplateCounts(
+        bots: dto.bots,
+        flows: dto.flows,
+        variables: dto.variables,
+      );
 }

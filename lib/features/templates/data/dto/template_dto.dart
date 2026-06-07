@@ -13,6 +13,7 @@ class TemplateResp {
     required this.name,
     required this.version,
     required this.ai,
+    this.counts,
   });
 
   factory TemplateResp.fromJson(Map<String, dynamic> json) {
@@ -28,12 +29,20 @@ class TemplateResp {
         ai is! Map<String, dynamic>) {
       throw const FormatException('templateResp: clave obligatoria ausente');
     }
+    // `counts` es aditivo y solo viaja en GET /templates. Ausente ⇒ null
+    // (entidad única); presente pero malformado ⇒ FormatException (igual
+    // disciplina fail-loud que el resto del DTO).
+    final countsRaw = json['counts'];
+    final counts = countsRaw is Map<String, dynamic>
+        ? TemplateCountsDto.fromJson(countsRaw)
+        : null;
     return TemplateResp(
       id: id,
       orgId: orgId,
       name: name,
       version: version,
       ai: AiConfigDto.fromJson(ai),
+      counts: counts,
     );
   }
 
@@ -42,6 +51,32 @@ class TemplateResp {
   final String name;
   final int version;
   final AiConfigDto ai;
+  final TemplateCountsDto? counts;
+}
+
+/// DTO del objeto `counts` de templateResp (solo en el listado). Conteo de
+/// agregados hijos de la Template. Claves enteras y obligatorias cuando el
+/// objeto está presente.
+class TemplateCountsDto {
+  const TemplateCountsDto({
+    required this.bots,
+    required this.flows,
+    required this.variables,
+  });
+
+  factory TemplateCountsDto.fromJson(Map<String, dynamic> json) {
+    final bots = json['bots'];
+    final flows = json['flows'];
+    final variables = json['variables'];
+    if (bots is! int || flows is! int || variables is! int) {
+      throw const FormatException('templateCounts: clave obligatoria ausente');
+    }
+    return TemplateCountsDto(bots: bots, flows: flows, variables: variables);
+  }
+
+  final int bots;
+  final int flows;
+  final int variables;
 }
 
 /// DTO del objeto `ai` anidado en templateResp (S12).
