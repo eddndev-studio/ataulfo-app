@@ -11,10 +11,16 @@ import '../../domain/entities/flow.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
 
+/// Milisegundos por hora: el cooldown se expone en horas pero el wire es ms.
+const int _kMsPerHour = 60 * 60 * 1000;
+
+/// Tope del cooldown en horas (5 días). Espeja FlowMaxCooldownMs del backend.
+const int _kMaxCooldownHours = 120;
+
 /// Tab "Configuración" del editor de flujo (S11). Edita los tres gates
-/// del flow: `cooldownMs` (slider 0–300s), `usageLimit` (number field,
-/// 0 = sin límite) y `excludesFlows[]` (multi-select de chips con los
-/// otros flujos de la Template).
+/// del flow: `cooldownMs` (slider en horas, 0–120h = hasta 5 días),
+/// `usageLimit` (number field, 0 = sin límite) y `excludesFlows[]`
+/// (multi-select de chips con los otros flujos de la Template).
 ///
 /// Lee el snapshot del `FlowDetailBloc` (Loaded / SettingsSaving /
 /// SettingsSaveFailed) y delega el guardado al mismo bloc vía
@@ -102,10 +108,14 @@ class _SettingsForm extends StatefulWidget {
 }
 
 class _SettingsFormState extends State<_SettingsForm> {
-  // El slider expone cooldown en SEGUNDOS (0–300) para legibilidad
-  // humana; al guardar lo convertimos a ms. Reading inicial: ms del
-  // wire ÷ 1000 redondeado.
-  late double _cooldownSeconds;
+  // El slider expone el cooldown en HORAS (0–120 = hasta 5 días) para
+  // legibilidad humana; al guardar lo convertimos a ms. Lectura inicial: ms
+  // del wire ÷ 1h redondeado. El valor inicial en horas se guarda aparte para
+  // (a) el dirty-check por horas y (b) preservar el ms original EXACTO cuando
+  // el operador no toca el slider — un cooldown legacy sub-hora redondea a 0h
+  // pero no debe zerarse al guardar otro campo.
+  late double _cooldownHours;
+  late final int _initialCooldownHours;
 
   late final TextEditingController _usageLimitCtrl;
   late Set<String> _excludes;
@@ -113,7 +123,10 @@ class _SettingsFormState extends State<_SettingsForm> {
   @override
   void initState() {
     super.initState();
-    _cooldownSeconds = (widget.flow.cooldownMs / 1000).clamp(0, 300).toDouble();
+    _initialCooldownHours = (widget.flow.cooldownMs / _kMsPerHour)
+        .round()
+        .clamp(0, _kMaxCooldownHours);
+    _cooldownHours = _initialCooldownHours.toDouble();
     _usageLimitCtrl = TextEditingController(
       // 0 ⇒ campo vacío para que el placeholder "Sin límite" sea visible.
       text: widget.flow.usageLimit > 0 ? widget.flow.usageLimit.toString() : '',
@@ -136,7 +149,12 @@ class _SettingsFormState extends State<_SettingsForm> {
     super.dispose();
   }
 
-  int get _cooldownMs => (_cooldownSeconds * 1000).round();
+  // Si el operador no tocó el slider (mismas horas que al cargar), preserva el
+  // ms original EXACTO (no zera un cooldown legacy sub-hora). Tocado ⇒ el valor
+  // en horas manda.
+  int get _cooldownMs => _cooldownHours.round() == _initialCooldownHours
+      ? widget.flow.cooldownMs
+      : _cooldownHours.round() * _kMsPerHour;
 
   int get _usageLimit => int.tryParse(_usageLimitCtrl.text.trim()) ?? 0;
 
@@ -149,7 +167,7 @@ class _SettingsFormState extends State<_SettingsForm> {
   }
 
   bool get _isDirty {
-    if (_cooldownMs != widget.flow.cooldownMs) return true;
+    if (_cooldownHours.round() != _initialCooldownHours) return true;
     if (_usageLimit != widget.flow.usageLimit) return true;
     final snapshot = <String>[...widget.flow.excludesFlows]..sort();
     final local = _excludesSorted;
@@ -185,8 +203,8 @@ class _SettingsFormState extends State<_SettingsForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           _CooldownField(
-            seconds: _cooldownSeconds,
-            onChanged: (v) => setState(() => _cooldownSeconds = v),
+            hours: _cooldownHours,
+            onChanged: (v) => setState(() => _cooldownHours = v),
             textTheme: textTheme,
           ),
           const SizedBox(height: AppTokens.sp6),
@@ -228,25 +246,22 @@ class _SettingsFormState extends State<_SettingsForm> {
 
 class _CooldownField extends StatelessWidget {
   const _CooldownField({
-    required this.seconds,
+    required this.hours,
     required this.onChanged,
     required this.textTheme,
   });
 
-  final double seconds;
+  final double hours;
   final ValueChanged<double> onChanged;
   final TextTheme textTheme;
 
   @override
   Widget build(BuildContext context) {
-    final label = seconds == 0
-        ? 'Cooldown · Sin espera entre ejecuciones'
-        : 'Cooldown · ${seconds.toStringAsFixed(0)}s entre ejecuciones';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          label,
+          _label(hours.round()),
           style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
         ),
         const SizedBox(height: AppTokens.sp2),
@@ -259,15 +274,27 @@ class _CooldownField extends StatelessWidget {
           ),
           child: Slider(
             key: const Key('flow_settings.cooldown.slider'),
-            value: seconds,
+            value: hours,
             min: 0,
-            max: 300,
-            divisions: 60,
+            max: _kMaxCooldownHours.toDouble(),
+            // Granularidad de 1 hora en todo el rango [0, 5 días].
+            divisions: _kMaxCooldownHours,
             onChanged: onChanged,
           ),
         ),
       ],
     );
+  }
+
+  /// Label humanizado del cooldown en horas: "Sin espera" (0), "Xh" (<24h),
+  /// "Xd" / "Xd Yh" (días). El swatch de horas se compone con días para que
+  /// 5 días se lea "5d" y 25h se lea "1d 1h".
+  static String _label(int hours) {
+    if (hours == 0) return 'Cooldown · Sin espera entre ejecuciones';
+    final days = hours ~/ 24;
+    final rem = hours % 24;
+    final parts = <String>[if (days > 0) '${days}d', if (rem > 0) '${rem}h'];
+    return 'Cooldown · ${parts.join(' ')} entre ejecuciones';
   }
 }
 

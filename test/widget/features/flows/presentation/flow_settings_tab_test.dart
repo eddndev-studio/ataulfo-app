@@ -461,4 +461,111 @@ void main() {
       expect(btnPostSave.onPressed, isNull);
     });
   });
+
+  group('FlowSettingsTab — cooldown en horas (hasta 5 días)', () {
+    testWidgets('cooldown de 5 días muestra label "5d"', (tester) async {
+      when(() => bloc.state).thenReturn(
+        FlowDetailLoaded(
+          _flow(cooldownMs: 5 * 24 * 60 * 60 * 1000),
+          const <fdom.Flow>[],
+          siblingsFailed: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.textContaining('5d'), findsOneWidget);
+    });
+
+    testWidgets('cooldown de 2h muestra label "2h"', (tester) async {
+      when(() => bloc.state).thenReturn(
+        FlowDetailLoaded(
+          _flow(cooldownMs: 2 * 60 * 60 * 1000),
+          const <fdom.Flow>[],
+          siblingsFailed: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.textContaining('2h'), findsOneWidget);
+    });
+
+    testWidgets('cooldown de 25h muestra label "1d 1h"', (tester) async {
+      when(() => bloc.state).thenReturn(
+        FlowDetailLoaded(
+          _flow(cooldownMs: 25 * 60 * 60 * 1000),
+          const <fdom.Flow>[],
+          siblingsFailed: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.textContaining('1d 1h'), findsOneWidget);
+    });
+
+    testWidgets(
+      'arrastrar el slider al máximo y guardar manda cooldownMs de 5 días',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          FlowDetailLoaded(
+            _flow(cooldownMs: 0),
+            const <fdom.Flow>[],
+            siblingsFailed: false,
+          ),
+        );
+        await tester.pumpWidget(host());
+
+        // Arrastra a la derecha más allá del ancho del slider → tope (120h).
+        await tester.drag(
+          find.byKey(const Key('flow_settings.cooldown.slider')),
+          const Offset(2000, 0),
+        );
+        await tester.pump();
+
+        await tester.tap(find.byKey(const Key('flow_settings.save_button')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const FlowDetailUpdateSettingsRequested(
+              cooldownMs: 5 * 24 * 60 * 60 * 1000,
+              usageLimit: 0,
+              excludesFlows: <String>[],
+            ),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'cooldown sub-hora intacto se PRESERVA al guardar otro campo (no se pone en 0)',
+      (tester) async {
+        // Un cooldown legacy de 5s redondea a 0h en la escala de horas, pero si
+        // el operador NO toca el slider, guardar otro campo debe preservar el
+        // valor original exacto en vez de zerarlo.
+        when(() => bloc.state).thenReturn(
+          FlowDetailLoaded(
+            _flow(cooldownMs: 5000, usageLimit: 0),
+            const <fdom.Flow>[],
+            siblingsFailed: false,
+          ),
+        );
+        await tester.pumpWidget(host());
+
+        await tester.enterText(
+          find.byKey(const Key('flow_settings.usage_limit.field')),
+          '5',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('flow_settings.save_button')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const FlowDetailUpdateSettingsRequested(
+              cooldownMs: 5000,
+              usageLimit: 5,
+              excludesFlows: <String>[],
+            ),
+          ),
+        ).called(1);
+      },
+    );
+  });
 }
