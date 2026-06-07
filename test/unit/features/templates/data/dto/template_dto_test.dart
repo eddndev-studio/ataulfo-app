@@ -100,5 +100,36 @@ void main() {
         throwsA(isA<FormatException>()),
       );
     });
+
+    test('counts presente: parsea bots/flows/variables (listado)', () {
+      final r = TemplateResp.fromJson(
+        tplJson()
+          ..['counts'] = <String, dynamic>{
+            'bots': 3,
+            'flows': 12,
+            'variables': 4,
+          },
+      );
+      expect(r.counts, isNotNull);
+      expect(r.counts!.bots, 3);
+      expect(r.counts!.flows, 12);
+      expect(r.counts!.variables, 4);
+    });
+
+    test('counts ausente ⇒ null (respuesta de entidad única)', () {
+      // GET /templates/:id, POST, PUT, duplicate no traen counts: el campo
+      // es opcional y queda null sin romper el parseo.
+      final r = TemplateResp.fromJson(tplJson());
+      expect(r.counts, isNull);
+    });
+
+    test('counts presente pero con clave faltante lanza FormatException', () {
+      expect(
+        () => TemplateResp.fromJson(
+          tplJson()..['counts'] = <String, dynamic>{'bots': 1, 'flows': 2},
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
   });
 }

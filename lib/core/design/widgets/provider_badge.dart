@@ -18,14 +18,17 @@ class ProviderBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      _labelOf(provider),
+      labelOf(provider),
       style: Theme.of(
         context,
       ).textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
     );
   }
 
-  static String _labelOf(AIProvider p) => switch (p) {
+  /// Label humanizado del proveedor. Público para que otros componentes
+  /// (p. ej. el badge de IA del listado de plantillas) reusen el mismo mapeo
+  /// sin duplicarlo.
+  static String labelOf(AIProvider p) => switch (p) {
     AIProvider.openai => 'OpenAI',
     AIProvider.gemini => 'Gemini',
     AIProvider.minimax => 'MiniMax',
