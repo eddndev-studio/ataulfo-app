@@ -28,12 +28,14 @@ void main() {
     String name = 'Soporte',
     int version = 1,
     AiConfigDto? ai,
+    TemplateCountsDto? counts,
   }) => TemplateResp(
     id: id,
     orgId: orgId,
     name: name,
     version: version,
     ai: ai ?? aiDto(),
+    counts: counts,
   );
 
   group('TemplatesMapper.aiConfigDtoToEntity', () {
@@ -84,6 +86,23 @@ void main() {
       expect(t.version, 5);
       expect(t.ai.provider, AIProvider.gemini);
       expect(t.ai.thinkingLevel, ThinkingLevel.low);
+    });
+
+    test('counts presente se mapea al value object de dominio', () {
+      final t = TemplatesMapper.templateRespToEntity(
+        tplResp(
+          counts: const TemplateCountsDto(bots: 3, flows: 12, variables: 4),
+        ),
+      );
+      expect(t.counts, isNotNull);
+      expect(t.counts!.bots, 3);
+      expect(t.counts!.flows, 12);
+      expect(t.counts!.variables, 4);
+    });
+
+    test('counts ausente ⇒ Template.counts null', () {
+      final t = TemplatesMapper.templateRespToEntity(tplResp());
+      expect(t.counts, isNull);
     });
   });
 }
