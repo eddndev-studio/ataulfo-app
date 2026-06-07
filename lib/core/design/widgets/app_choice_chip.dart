@@ -13,11 +13,12 @@ import '../tokens.dart';
 ///   amarillo pleno —eso es lenguaje de CTA— y competir con los botones de
 ///   acción. El guiño cálido comunica "activo" sin gritar.
 ///
-/// Radio [AppTokens.radiusChip] (8) — más cuadrado que el pill de los botones,
-/// para diferenciar visualmente un filtro de una acción. El borde de 1px existe
-/// en ambos estados (divider / primary) para que la geometría no salte al
-/// seleccionar. `onSelected` null deshabilita el chip: baja el tinte a 0.4 y
-/// bloquea el tap.
+/// Radio [AppTokens.radiusPill] (cápsula) — en línea con el resto de la
+/// familia de toggles (botones, pills): un borde cuadrado disonaba con los
+/// demás componentes. La distinción filtro/acción la dan el tinte y el borde,
+/// no la forma. El borde de 1px existe en ambos estados (divider / primary)
+/// para que la geometría no salte al seleccionar. `onSelected` null deshabilita
+/// el chip: baja el tinte a 0.4 y bloquea el tap.
 ///
 /// El tap no alterna el estado por sí mismo: emite `onSelected(!selected)` y
 /// es el consumer quien decide el nuevo [selected]. Así el chip es controlado,
@@ -38,7 +39,7 @@ class AppChoiceChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onSelected == null;
-    final radius = BorderRadius.circular(AppTokens.radiusChip);
+    final radius = BorderRadius.circular(AppTokens.radiusPill);
     final foreground = selected ? AppTokens.primary : AppTokens.text2;
 
     final chip = ConstrainedBox(
