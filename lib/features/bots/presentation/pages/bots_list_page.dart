@@ -14,8 +14,11 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/util/user_greeting.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
 import '../bloc/bots_bloc.dart';
 
@@ -33,9 +36,13 @@ enum _BotFilter { all, active, paused }
 /// `BotsRefreshRequested` cuando una sub-ruta (create/edit) vuelve al stack
 /// tras un pop. Sin observer, la page funciona idéntico — composición opcional.
 class BotsListPage extends StatefulWidget {
-  const BotsListPage({super.key, this.routeObserver});
+  const BotsListPage({super.key, this.routeObserver, this.onOpenSettings});
 
   final RouteObserver<PageRoute<dynamic>>? routeObserver;
+
+  /// Acción del avatar del header → abrir Ajustes. La aporta el shell (que
+  /// controla los tabs). Sin ella, el avatar es no-op.
+  final VoidCallback? onOpenSettings;
 
   @override
   State<BotsListPage> createState() => _BotsListPageState();
@@ -124,162 +131,64 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
     );
   }
 
+  String _emailFromSession(BuildContext context) {
+    final state = context.read<AuthBloc>().state;
+    return switch (state) {
+      AuthAuthenticated(:final identity) => identity.email,
+      AuthAuthenticatedNoOrg(:final identity) => identity.email,
+      _ => '',
+    };
+  }
+
   Widget _buildLoaded(BuildContext context, List<Bot> items) {
     final filtered = _applyFilters(items);
+    final user = userGreeting(_emailFromSession(context));
     return RefreshIndicator(
       onRefresh: () => _refresh(context),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-          AppTokens.sp5,
-          AppTokens.sp5,
-          AppTokens.sp5,
-          AppTokens.sp5 + context.safeBottomInset,
-        ),
+        // Sin padding aquí: el header es full-bleed y va pegado arriba. El
+        // resto del contenido lleva su propio padding más abajo.
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const _Header(),
-            const SizedBox(height: AppTokens.sp5),
-            _CreateBotCard(onTap: () => context.push('/bots/new')),
-            const SizedBox(height: AppTokens.sp5),
-            _SearchField(controller: _searchCtrl),
-            const SizedBox(height: AppTokens.sp4),
-            _FilterChips(
-              selected: _filter,
-              onSelected: (f) => setState(() => _filter = f),
-            ),
-            const SizedBox(height: AppTokens.sp5),
-            if (filtered.isEmpty)
-              const _NoResults()
-            else
-              for (final bot in filtered) ...<Widget>[
-                _BotTile(bot: bot),
-                const SizedBox(height: AppTokens.cardGap),
-              ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Lead descriptivo de la pantalla. El AppBar del shell ya titula "Bots", así
-/// que aquí NO se repite el título (evita la redundancia de interfaz): solo el
-/// texto que explica la sección.
-class _Header extends StatelessWidget {
-  const _Header();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Text(
-      'Configura agentes para automatizar conversaciones, tareas y flujos.',
-      key: const Key('bots.header'),
-      style: textTheme.bodyLarge?.copyWith(color: AppTokens.text2),
-    );
-  }
-}
-
-/// CTA principal de la pantalla: la única card con gradiente de marca. Toda la
-/// card es UN botón tappable → `/bots/new` (mismo destino que el FAB del shell).
-/// La estructura —ícono-botón a la izquierda, título + descripción al centro,
-/// chevron a la derecha— hace que se lea como un botón pleno, no como una card
-/// con una pastilla de acción suelta dentro.
-class _CreateBotCard extends StatelessWidget {
-  const _CreateBotCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return AppCard.gradient(
-      key: const Key('bots.create_cta'),
-      onTap: onTap,
-      // padding 0: el padding real lo pone la fila; la marca de agua debe poder
-      // sangrar hasta los bordes de la card antes del recorte.
-      padding: EdgeInsets.zero,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-        child: Stack(
-          children: <Widget>[
-            // Marca de agua: glifo grande anclado a la derecha, escalado al alto
-            // de la card y recortado por el borde, a baja opacidad sobre el
-            // gradiente. Decorativo ⇒ excluido del árbol semántico. (Cuando
-            // exista una ilustración de marca propia, reemplaza a este ícono.)
-            Positioned(
-              top: 0,
-              bottom: 0,
-              right: -28,
-              child: ExcludeSemantics(
-                child: FittedBox(
-                  fit: BoxFit.fitHeight,
-                  child: Icon(
-                    Icons.smart_toy,
-                    color: AppTokens.onPrimary.withValues(alpha: 0.14),
-                  ),
-                ),
-              ),
+            AppHeaderCard(
+              greeting: user.greeting,
+              title: 'Agentes',
+              avatarInitial: user.initial,
+              onAvatarTap: widget.onOpenSettings ?? () {},
+              watermark: Icons.smart_toy,
             ),
             Padding(
-              padding: const EdgeInsets.all(AppTokens.cardPadding),
-              child: Row(
+              padding: EdgeInsets.fromLTRB(
+                AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.sp5 + context.safeBottomInset,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const _CtaIconButton(),
-                  const SizedBox(width: AppTokens.sp4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          'Nuevo bot',
-                          style: textTheme.titleMedium?.copyWith(
-                            color: AppTokens.onPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: AppTokens.sp1),
-                        Text(
-                          'Crea un bot desde cero y define su comportamiento.',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: AppTokens.onPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
+                  _SearchField(controller: _searchCtrl),
+                  const SizedBox(height: AppTokens.sp4),
+                  _FilterChips(
+                    selected: _filter,
+                    onSelected: (f) => setState(() => _filter = f),
                   ),
-                  const SizedBox(width: AppTokens.sp3),
-                  const Icon(Icons.chevron_right, color: AppTokens.onPrimary),
+                  const SizedBox(height: AppTokens.sp5),
+                  if (filtered.isEmpty)
+                    const _NoResults()
+                  else
+                    for (final bot in filtered) ...<Widget>[
+                      _BotTile(bot: bot),
+                      const SizedBox(height: AppTokens.cardGap),
+                    ],
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Ícono-botón cuadrado de la card-CTA: cuadrado oscuro (`onPrimary`) con un
-/// "+" en ámbar. Es el ancla visual que comunica "toda la card es un botón".
-/// Decorativo (la card ya porta la semántica de acción).
-class _CtaIconButton extends StatelessWidget {
-  const _CtaIconButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: Container(
-        width: 48,
-        height: 48,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppTokens.onPrimary,
-          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-        ),
-        child: const Icon(Icons.add, color: AppTokens.primary, size: 26),
       ),
     );
   }

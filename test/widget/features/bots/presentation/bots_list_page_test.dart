@@ -5,7 +5,10 @@ import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
+import 'package:ataulfo/core/design/widgets/app_header_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
@@ -19,6 +22,17 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
     implements BotsBloc {}
+
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
+
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+  emailVerified: true,
+);
 
 const _b1 = Bot(
   id: 'b1',
@@ -49,10 +63,14 @@ void main() {
   });
 
   late _MockBotsBloc bloc;
+  late _MockAuthBloc authBloc;
 
   setUp(() {
     bloc = _MockBotsBloc();
     when(() => bloc.state).thenReturn(const BotsInitial());
+    authBloc = _MockAuthBloc();
+    // El header rico saluda con el nombre derivado del email de la sesión.
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
   });
 
   // Viewport alto: el contenido (header + CTA + buscador + filtros + lista)
@@ -67,8 +85,11 @@ void main() {
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: BlocProvider<BotsBloc>.value(
-      value: bloc,
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<AuthBloc>.value(value: authBloc),
+        BlocProvider<BotsBloc>.value(value: bloc),
+      ],
       // BotsListPage es content-only; el shell aporta Scaffold/AppBar/FAB.
       // En aislamiento envolvemos en Scaffold para tener Material upstream.
       child: const Scaffold(body: BotsListPage()),
@@ -86,8 +107,9 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('Loaded muestra el lead descriptivo (sin título "Bots" '
-      'redundante: el AppBar del shell ya lo dice)', (tester) async {
+  testWidgets('Loaded monta el header rico full-bleed con título "Agentes"', (
+    tester,
+  ) async {
     tall(tester);
     when(
       () => bloc.state,
@@ -95,10 +117,15 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.byKey(const Key('bots.header')), findsOneWidget);
-    expect(find.textContaining('Configura agentes'), findsOneWidget);
-    // El contenido NO repite "Bots" (lo titula el AppBar del shell).
-    expect(find.text('Bots'), findsNothing);
+    // El AppHeaderCard reemplaza al AppBar del shell para esta sección.
+    expect(find.byType(AppHeaderCard), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AppHeaderCard),
+        matching: find.text('Agentes'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Loaded con bots: una card-tile por bot con AppEntityIcon (NO '
@@ -120,70 +147,6 @@ void main() {
     expect(find.byType(AppEntityIcon), findsWidgets);
     expect(find.byType(ListTile), findsNothing);
   });
-
-  testWidgets('card-CTA de creación presente y navega a /bots/new al tocarla', (
-    tester,
-  ) async {
-    tall(tester);
-    when(
-      () => bloc.state,
-    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
-
-    final navigated = <String>[];
-    final router = GoRouter(
-      initialLocation: '/',
-      routes: <RouteBase>[
-        GoRoute(
-          path: '/',
-          builder: (_, _) => BlocProvider<BotsBloc>.value(
-            value: bloc,
-            child: const Scaffold(body: BotsListPage()),
-          ),
-        ),
-        GoRoute(
-          path: '/bots/new',
-          builder: (_, _) {
-            navigated.add('/bots/new');
-            return const Scaffold(body: SizedBox.shrink());
-          },
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
-    );
-    await tester.tap(find.byKey(const Key('bots.create_cta')));
-    await tester.pumpAndSettle();
-
-    expect(navigated, <String>['/bots/new']);
-  });
-
-  testWidgets(
-    'la card-CTA tiene estructura de botón: ícono +, título y chevron',
-    (tester) async {
-      tall(tester);
-      when(
-        () => bloc.state,
-      ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
-
-      await tester.pumpWidget(host());
-
-      final cta = find.byKey(const Key('bots.create_cta'));
-      expect(
-        find.descendant(of: cta, matching: find.text('Nuevo bot')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: cta, matching: find.byIcon(Icons.add)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: cta, matching: find.byIcon(Icons.chevron_right)),
-        findsOneWidget,
-      );
-    },
-  );
 
   testWidgets('el buscador filtra por nombre', (tester) async {
     tall(tester);
@@ -298,8 +261,11 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/',
-          builder: (_, _) => BlocProvider<BotsBloc>.value(
-            value: bloc,
+          builder: (_, _) => MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<AuthBloc>.value(value: authBloc),
+              BlocProvider<BotsBloc>.value(value: bloc),
+            ],
             child: const Scaffold(body: BotsListPage()),
           ),
         ),
@@ -372,8 +338,11 @@ void main() {
         routes: <RouteBase>[
           GoRoute(
             path: '/',
-            builder: (_, _) => BlocProvider<BotsBloc>.value(
-              value: bloc,
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                BlocProvider<BotsBloc>.value(value: bloc),
+              ],
               child: const Scaffold(body: BotsListPage()),
             ),
           ),
@@ -425,8 +394,11 @@ void main() {
           MaterialApp(
             theme: AppDesignTheme.dark(),
             navigatorObservers: <NavigatorObserver>[observer],
-            home: BlocProvider<BotsBloc>.value(
-              value: bloc,
+            home: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                BlocProvider<BotsBloc>.value(value: bloc),
+              ],
               child: Scaffold(body: BotsListPage(routeObserver: observer)),
             ),
           ),

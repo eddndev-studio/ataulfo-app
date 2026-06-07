@@ -45,13 +45,24 @@ class _ShellPageState extends State<ShellPage> {
   // reciben el routeObserver del widget. Late + final mantiene el mismo
   // requisito de "se construye una sola vez al primer build".
   late final List<Widget> _bodies = <Widget>[
-    BotsListPage(routeObserver: widget.routeObserver),
-    TemplatesListPage(routeObserver: widget.routeObserver),
+    BotsListPage(
+      routeObserver: widget.routeObserver,
+      onOpenSettings: () => _select(3),
+    ),
+    TemplatesListPage(
+      routeObserver: widget.routeObserver,
+      onOpenSettings: () => _select(3),
+    ),
     const LabelsAdminPage(),
     const SettingsPage(),
   ];
 
   void _select(int i) => setState(() => _index = i);
+
+  /// Las tabs con header rico propio (Bots/Plantillas) NO usan el AppBar del
+  /// shell: la tarjeta-header full-bleed ES su encabezado. El resto conserva el
+  /// AppBar con el título del tab.
+  bool get _hasOwnHeader => _index == 0 || _index == 1;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +83,9 @@ class _ShellPageState extends State<ShellPage> {
           ],
         );
         return Scaffold(
-          appBar: AppBar(title: Text(_tabs[_index].label)),
+          appBar: _hasOwnHeader
+              ? null
+              : AppBar(title: Text(_tabs[_index].label)),
           body: useRail
               ? Row(
                   children: <Widget>[

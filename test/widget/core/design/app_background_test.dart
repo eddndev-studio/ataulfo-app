@@ -6,7 +6,9 @@ import 'package:ataulfo/core/design/widgets/app_background.dart';
 
 void main() {
   group('AppBackground', () {
-    testWidgets('pinta el glow radial del kit sobre el lienzo', (tester) async {
+    testWidgets('pinta el lienzo base + las capas del glow amanecer', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const Directionality(
           textDirection: TextDirection.ltr,
@@ -14,14 +16,29 @@ void main() {
         ),
       );
 
-      final box = tester.widget<DecoratedBox>(
-        find.descendant(
-          of: find.byType(AppBackground),
-          matching: find.byType(DecoratedBox),
-        ),
+      // Lienzo base en bgBase.
+      final base = tester.widget<ColoredBox>(
+        find
+            .descendant(
+              of: find.byType(AppBackground),
+              matching: find.byType(ColoredBox),
+            )
+            .first,
       );
-      final decoration = box.decoration as BoxDecoration;
-      expect(decoration.gradient, AppTokens.backgroundGlow);
+      expect(base.color, AppTokens.bgBase);
+
+      // Una capa (DecoratedBox con gradiente) por cada capa del token, en orden.
+      final gradients = tester
+          .widgetList<DecoratedBox>(
+            find.descendant(
+              of: find.byType(AppBackground),
+              matching: find.byType(DecoratedBox),
+            ),
+          )
+          .map((b) => (b.decoration as BoxDecoration).gradient)
+          .whereType<Gradient>()
+          .toList();
+      expect(gradients, AppTokens.backgroundGlowLayers);
     });
 
     testWidgets('renderiza su child', (tester) async {
