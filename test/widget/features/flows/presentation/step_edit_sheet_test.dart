@@ -166,12 +166,66 @@ void main() {
           () => bloc.add(
             const FlowStepsAddRequested(
               content: 'Hola {{name}}',
-              delayMs: 0,
+              delayMs: 1000,
               jitterPct: 0,
               aiOnly: false,
             ),
           ),
         ).called(1);
+      },
+    );
+
+    testWidgets(
+      'nuevo paso arranca con delay 1s (no 0) y submit manda delayMs=1000',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.delayMs, 1000);
+      },
+    );
+
+    testWidgets(
+      'editar un paso legacy con delay 0 lo sube al piso (1s) al guardar',
+      (tester) async {
+        const legacy = fdom.Step(
+          id: 's-legacy',
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: 'old',
+          mediaRef: '',
+          metadataJson: '{}',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        );
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[legacy]));
+        await pumpHost(tester, editing: legacy);
+
+        // Cambia solo el content; el delay legacy 0 se cura al piso al guardar.
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'nuevo',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        final ev = captured.single as FlowStepsUpdateRequested;
+        expect(ev.delayMs, 1000);
       },
     );
 
@@ -305,7 +359,7 @@ void main() {
               type: fdom.StepType.image,
               mediaRef: bareRef,
               content: '',
-              delayMs: 0,
+              delayMs: 1000,
               jitterPct: 0,
               aiOnly: false,
               // El nombre del archivo viaja junto con el ref para mostrarlo en
@@ -541,7 +595,8 @@ void main() {
       content: 'caption original',
       mediaRef: 'https://x/orig.png',
       metadataJson: '{}',
-      delayMs: 0,
+      // ≥1s: valor normal de un paso que envía al wire bajo el piso de delay.
+      delayMs: 1000,
       jitterPct: 0,
       aiOnly: false,
     );
@@ -806,7 +861,8 @@ void main() {
       metadataJson:
           '{"tz":"UTC","windows":[{"days":[1,2],"from":"08:00",'
           '"to":"12:00"}],"on_match_order":0,"on_else_order":1}',
-      delayMs: 0,
+      // ≥1s: CONDITIONAL_TIME es no-LABEL, sujeto al piso de delay.
+      delayMs: 1000,
       jitterPct: 0,
       aiOnly: false,
     );
@@ -925,6 +981,25 @@ void main() {
       final meta = jsonDecode(ev.metadataJson!) as Map<String, dynamic>;
       expect(meta['label_id'], 'vip');
       expect(meta['action'], 'ADD');
+    });
+
+    testWidgets('nuevo paso LABEL manda delayMs 0 (exento del piso)', (
+      tester,
+    ) async {
+      await pumpHost(tester);
+      await selectLabelType(tester);
+
+      await tester.tap(
+        find.byKey(const Key('step_edit.label_picker.option.vip')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      final captured = verify(() => bloc.add(captureAny())).captured;
+      final ev = captured.single as FlowStepsAddRequested;
+      // LABEL no envía al wire: el piso de 1s no aplica, su delay queda en 0.
+      expect(ev.delayMs, 0);
     });
 
     testWidgets('elegir acción "Quitar etiqueta" → metadata action:REMOVE', (

@@ -47,10 +47,10 @@ typedef MediaRefPicker =
 /// dispatcha UpdateRequested only-changed (campos sin cambio no viajan
 /// al backend) y si nada cambió el submit es no-op.
 ///
-/// Rangos espejan al validador del backend: `delayMs` 0..5 min,
-/// `jitterPct` 0..100%. Cualquier ajuste de límite debe hacerse primero
-/// en `ataulfo-go/internal/domain/flow/step.go` (StepMaxDelayMs /
-/// StepMaxJitterPct).
+/// Rangos espejan al validador del backend: `delayMs` 1s..5 min (LABEL exento:
+/// no envía al wire), `jitterPct` 0..100%. Cualquier ajuste de límite debe
+/// hacerse primero en `ataulfo-go/internal/domain/flow/step.go`
+/// (StepMinDelayMs / StepMaxDelayMs / StepMaxJitterPct).
 ///
 /// El sheet escucha el `FlowStepsBloc`:
 /// - Mutating ⇒ submit bloqueado con loading.
@@ -93,6 +93,7 @@ const List<fdom.StepType> _pickableTypes = <fdom.StepType>[
 ];
 
 class _StepEditSheetState extends State<StepEditSheet> {
+  static const int _minDelayMs = 1000;
   static const int _maxDelayMs = 5 * 60 * 1000;
   static const int _maxJitterPct = 100;
 
@@ -138,7 +139,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
     _contentCtrl = TextEditingController(text: ed?.content ?? '');
     _mediaCtrl = TextEditingController(text: ed?.mediaRef ?? '');
     _type = ed?.type ?? fdom.StepType.text;
-    _delayMs = ed?.delayMs ?? 0;
+    // Un paso que envía al wire arranca en el piso de 1s; un paso legacy con
+    // delay 0 ya guardado sube al piso al abrir el editor (se cura al guardar,
+    // y mantiene el valor dentro del rango del slider). LABEL no usa pacing
+    // (slider oculto), conserva su valor.
+    _delayMs = ed?.delayMs ?? _minDelayMs;
+    if (_type != fdom.StepType.label && _delayMs < _minDelayMs) {
+      _delayMs = _minDelayMs;
+    }
     _jitterPct = ed?.jitterPct ?? 0;
     _aiOnly = ed?.aiOnly ?? false;
     _contentCtrl.addListener(_onContentChanged);
@@ -274,7 +282,8 @@ class _StepEditSheetState extends State<StepEditSheet> {
           type: _type,
           mediaRef: _isMultimedia ? mediaRef : '',
           content: (_isConditionalTime || _isLabel) ? '' : content,
-          delayMs: _delayMs,
+          // LABEL no envía al wire: el piso de 1s no aplica, su delay queda en 0.
+          delayMs: _isLabel ? 0 : _delayMs,
           jitterPct: _jitterPct,
           aiOnly: _aiOnly,
           metadataJson: _isConditionalTime
@@ -484,11 +493,12 @@ class _StepEditSheetState extends State<StepEditSheet> {
                       label: 'Retraso',
                       valueLabel: _delaySecondsLabel(_delayMs),
                       helper:
-                          'Cuánto espera el bot antes de enviar el paso (0–5 min).',
+                          'Cuánto espera el bot antes de enviar el paso (1 s a 5 min).',
                       value: _delayMs.toDouble(),
-                      min: 0,
+                      min: _minDelayMs.toDouble(),
                       max: _maxDelayMs.toDouble(),
-                      divisions: 60,
+                      // Granularidad de 1 s en todo el rango [1 s, 5 min].
+                      divisions: (_maxDelayMs - _minDelayMs) ~/ 1000,
                       enabled: !isMutating,
                       onChanged: (v) => setState(() => _delayMs = v.round()),
                     ),
