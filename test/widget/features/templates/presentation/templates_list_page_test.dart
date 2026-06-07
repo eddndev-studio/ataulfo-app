@@ -161,6 +161,27 @@ void main() {
     expect(navigated, <String>['/templates/new']);
   });
 
+  testWidgets('la CTA tiene estructura de botón: ícono +, título y chevron', (
+    tester,
+  ) async {
+    loaded(const <Template>[_t1]);
+    await tester.pumpWidget(host());
+
+    final cta = find.byKey(const Key('templates.create_cta'));
+    expect(
+      find.descendant(of: cta, matching: find.text('Nueva plantilla')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: cta, matching: find.byIcon(Icons.add)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: cta, matching: find.byIcon(Icons.chevron_right)),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('tile con counts muestra bots/flujos/variables (pluralizado)', (
     tester,
   ) async {

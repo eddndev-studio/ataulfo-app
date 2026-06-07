@@ -182,8 +182,10 @@ class _Header extends StatelessWidget {
 }
 
 /// CTA principal de la pantalla: la única card con gradiente de marca. Toda la
-/// card es tappable → `/bots/new` (mismo destino que el FAB del shell). El
-/// "Nuevo bot" es una afordancia visual, no un segundo target.
+/// card es UN botón tappable → `/bots/new` (mismo destino que el FAB del shell).
+/// La estructura —ícono-botón a la izquierda, título + descripción al centro,
+/// chevron a la derecha— hace que se lea como un botón pleno, no como una card
+/// con una pastilla de acción suelta dentro.
 class _CreateBotCard extends StatelessWidget {
   const _CreateBotCard({required this.onTap});
 
@@ -195,8 +197,8 @@ class _CreateBotCard extends StatelessWidget {
     return AppCard.gradient(
       key: const Key('bots.create_cta'),
       onTap: onTap,
-      // padding 0: el padding real lo pone la columna de contenido; la marca de
-      // agua debe poder sangrar hasta los bordes de la card antes del recorte.
+      // padding 0: el padding real lo pone la fila; la marca de agua debe poder
+      // sangrar hasta los bordes de la card antes del recorte.
       padding: EdgeInsets.zero,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppTokens.radiusCard),
@@ -222,25 +224,34 @@ class _CreateBotCard extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.all(AppTokens.cardPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: <Widget>[
-                  Text(
-                    'Crea un bot para tu flujo',
-                    style: textTheme.titleMedium?.copyWith(
-                      color: AppTokens.onPrimary,
+                  const _CtaIconButton(),
+                  const SizedBox(width: AppTokens.sp4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          'Nuevo bot',
+                          style: textTheme.titleMedium?.copyWith(
+                            color: AppTokens.onPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: AppTokens.sp1),
+                        Text(
+                          'Crea un bot desde cero y define su comportamiento.',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: AppTokens.onPrimary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: AppTokens.sp2),
-                  Text(
-                    'Define proveedor, instrucciones y comportamiento.',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.onPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: AppTokens.sp4),
-                  const _NewBotAffordance(),
+                  const SizedBox(width: AppTokens.sp3),
+                  const Icon(Icons.chevron_right, color: AppTokens.onPrimary),
                 ],
               ),
             ),
@@ -251,36 +262,24 @@ class _CreateBotCard extends StatelessWidget {
   }
 }
 
-/// Pastilla oscura "Nuevo bot" sobre el gradiente: afordancia de acción de la
-/// card-CTA. Su fondo usa `onPrimary` (oscuro) para resaltar contra el ámbar.
-class _NewBotAffordance extends StatelessWidget {
-  const _NewBotAffordance();
+/// Ícono-botón cuadrado de la card-CTA: cuadrado oscuro (`onPrimary`) con un
+/// "+" en ámbar. Es el ancla visual que comunica "toda la card es un botón".
+/// Decorativo (la card ya porta la semántica de acción).
+class _CtaIconButton extends StatelessWidget {
+  const _CtaIconButton();
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.sp4,
-        vertical: AppTokens.sp2,
-      ),
-      decoration: BoxDecoration(
-        color: AppTokens.onPrimary,
-        borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Icon(Icons.add, size: 18, color: AppTokens.text1),
-          const SizedBox(width: AppTokens.sp1),
-          Text(
-            'Nuevo bot',
-            style: textTheme.bodyMedium?.copyWith(
-              color: AppTokens.text1,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+    return ExcludeSemantics(
+      child: Container(
+        width: 48,
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppTokens.onPrimary,
+          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+        ),
+        child: const Icon(Icons.add, color: AppTokens.primary, size: 26),
       ),
     );
   }
