@@ -4,7 +4,7 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
-import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
@@ -55,11 +55,21 @@ void main() {
     when(() => bloc.state).thenReturn(const BotsInitial());
   });
 
+  // Viewport alto: el contenido (header + CTA + buscador + filtros + lista)
+  // supera el alto default de flutter_test (600), y la lista se construye
+  // eager para que los `find` lleguen a tiles fuera del fold.
+  void tall(WidgetTester tester) {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+  }
+
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: BlocProvider<BotsBloc>.value(
       value: bloc,
-      // BotsListPage es content-only; el shell aporta Scaffold/AppBar.
+      // BotsListPage es content-only; el shell aporta Scaffold/AppBar/FAB.
       // En aislamiento envolvemos en Scaffold para tener Material upstream.
       child: const Scaffold(body: BotsListPage()),
     ),
@@ -76,26 +86,141 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('Loaded con N bots renderiza una AppCard por cada uno', (
-    tester,
-  ) async {
+  testWidgets('Loaded muestra header "Bots" + descripción', (tester) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    expect(find.text('Bots'), findsOneWidget);
+    expect(find.byKey(const Key('bots.header')), findsOneWidget);
+  });
+
+  testWidgets('Loaded con bots: una card-tile por bot con AppEntityIcon (NO '
+      'AppAvatar)', (tester) async {
+    tall(tester);
     when(
       () => bloc.state,
     ).thenReturn(const BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false));
 
     await tester.pumpWidget(host());
 
+    expect(find.byKey(const Key('bots.tile.b1')), findsOneWidget);
+    expect(find.byKey(const Key('bots.tile.b2')), findsOneWidget);
     expect(find.text('Soporte'), findsOneWidget);
     expect(find.text('Cobranza'), findsOneWidget);
-    expect(find.byType(AppCard), findsNWidgets(2));
-    // Los ListTile M3 ya no deben aparecer.
-    expect(find.byType(ListTile), findsNothing);
-    // Cada tile lleva su AppAvatar (sin Material CircleAvatar).
-    expect(find.byType(AppAvatar), findsNWidgets(2));
+    // Un bot NO es un perfil: glifo de entidad, nunca avatar de perfil.
+    expect(find.byType(AppAvatar), findsNothing);
     expect(find.byType(CircleAvatar), findsNothing);
+    expect(find.byType(AppEntityIcon), findsWidgets);
+    expect(find.byType(ListTile), findsNothing);
   });
 
-  testWidgets('bot pausado muestra AppPill neutral "Pausado"', (tester) async {
+  testWidgets('card-CTA de creación presente y navega a /bots/new al tocarla', (
+    tester,
+  ) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+
+    final navigated = <String>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<BotsBloc>.value(
+            value: bloc,
+            child: const Scaffold(body: BotsListPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/bots/new',
+          builder: (_, _) {
+            navigated.add('/bots/new');
+            return const Scaffold(body: SizedBox.shrink());
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+    );
+    await tester.tap(find.byKey(const Key('bots.create_cta')));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/bots/new']);
+  });
+
+  testWidgets('el buscador filtra por nombre', (tester) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    await tester.enterText(find.byType(TextField), 'cob');
+    await tester.pump();
+
+    expect(find.byKey(const Key('bots.tile.b2')), findsOneWidget);
+    expect(find.byKey(const Key('bots.tile.b1')), findsNothing);
+  });
+
+  testWidgets('filtro "Pausados" muestra solo bots pausados', (tester) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    await tester.tap(find.byKey(const Key('bots.filter.paused')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('bots.tile.b2')), findsOneWidget); // Cobranza
+    expect(find.byKey(const Key('bots.tile.b1')), findsNothing); // Soporte
+  });
+
+  testWidgets('filtro "Activos" muestra solo bots activos', (tester) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    await tester.tap(find.byKey(const Key('bots.filter.active')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('bots.tile.b1')), findsOneWidget); // Soporte
+    expect(find.byKey(const Key('bots.tile.b2')), findsNothing); // Cobranza
+  });
+
+  testWidgets('búsqueda sin coincidencias muestra "sin resultados"', (
+    tester,
+  ) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    await tester.enterText(find.byType(TextField), 'zzz-no-existe');
+    await tester.pump();
+
+    expect(find.byKey(const Key('bots.no_results')), findsOneWidget);
+    expect(find.byKey(const Key('bots.tile.b1')), findsNothing);
+    expect(find.byKey(const Key('bots.tile.b2')), findsNothing);
+  });
+
+  testWidgets('bot pausado muestra AppPill "Pausado"', (tester) async {
+    tall(tester);
     when(
       () => bloc.state,
     ).thenReturn(const BotsLoaded(items: <Bot>[_b2], isRefreshing: false));
@@ -103,11 +228,11 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.widgetWithText(AppPill, 'Pausado'), findsOneWidget);
-    // El icono pause_circle legacy desaparece — el estado vive en el pill.
     expect(find.byIcon(Icons.pause_circle), findsNothing);
   });
 
-  testWidgets('bot activo muestra AppPill primary "Activo"', (tester) async {
+  testWidgets('bot activo muestra AppPill "Activo"', (tester) async {
+    tall(tester);
     when(
       () => bloc.state,
     ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
@@ -117,7 +242,10 @@ void main() {
     expect(find.widgetWithText(AppPill, 'Activo'), findsOneWidget);
   });
 
-  testWidgets('Loaded vacío muestra empty state (sin tiles)', (tester) async {
+  testWidgets('Loaded vacío muestra empty state glass con CTA "Crear bot"', (
+    tester,
+  ) async {
+    tall(tester);
     when(
       () => bloc.state,
     ).thenReturn(const BotsLoaded(items: <Bot>[], isRefreshing: false));
@@ -126,9 +254,46 @@ void main() {
 
     expect(find.text('Soporte'), findsNothing);
     expect(find.byKey(const Key('bots.empty')), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Crear bot'), findsOneWidget);
   });
 
-  testWidgets('Failed muestra mensaje genérico y botón Reintentar', (
+  testWidgets('empty: CTA "Crear bot" navega a /bots/new', (tester) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[], isRefreshing: false));
+
+    final navigated = <String>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<BotsBloc>.value(
+            value: bloc,
+            child: const Scaffold(body: BotsListPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/bots/new',
+          builder: (_, _) {
+            navigated.add('/bots/new');
+            return const Scaffold(body: SizedBox.shrink());
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+    );
+    await tester.tap(find.widgetWithText(AppButton, 'Crear bot'));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/bots/new']);
+  });
+
+  testWidgets('Failed muestra card de error y botón Reintentar', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(const BotsFailed(BotsNetworkFailure()));
@@ -150,33 +315,27 @@ void main() {
     verify(() => bloc.add(const BotsLoadRequested())).called(1);
   });
 
-  testWidgets('isRefreshing: true muestra la lista visible (no la oculta)', (
+  testWidgets('isRefreshing: true mantiene la lista visible (no la oculta)', (
     tester,
   ) async {
+    tall(tester);
     when(
       () => bloc.state,
     ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: true));
 
     await tester.pumpWidget(host());
 
-    // El contrato del shape `BotsLoaded(isRefreshing)` es justamente este:
-    // la lista permanece visible mientras el spinner del RefreshIndicator
-    // hace overlay (timing del overlay no es testeable de forma estable).
     expect(find.text('Soporte'), findsOneWidget);
   });
 
   testWidgets(
     'tap en un tile apila el detalle: navega Y deja back disponible',
     (tester) async {
+      tall(tester);
       when(
         () => bloc.state,
       ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
 
-      // Espejo del test del listado de Templates: además de verificar la
-      // navegación, el destino observa Navigator.canPop() para detectar
-      // si la fuente apiló (push) o reemplazó la pila (go). go() saca
-      // al usuario de la app con el back físico — el bug del smoke
-      // device en V2314.
       final navigated = <String>[];
       final canPopAtDestination = <bool>[];
       final router = GoRouter(
@@ -206,8 +365,10 @@ void main() {
         ],
       );
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-      await tester.tap(find.text('Soporte'));
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+      );
+      await tester.tap(find.byKey(const Key('bots.tile.b1')));
       await tester.pumpAndSettle();
 
       expect(navigated, <String>['/bots/b1']);
@@ -222,13 +383,10 @@ void main() {
   );
 
   group('auto-refresh al volver al listado (RouteAware)', () {
-    // Mismo patrón que TemplatesListPage: tras pop de una sub-ruta
-    // (e.g. /bots/new, /bots/:id), el shell vuelve al foreground y la
-    // page dispara BotsRefreshRequested para alinear el bloc con el
-    // backend sin pull-to-refresh manual.
     testWidgets(
       'al popear la ruta encima del listado, dispatcha BotsRefreshRequested',
       (tester) async {
+        tall(tester);
         final observer = RouteObserver<PageRoute<dynamic>>();
         when(
           () => bloc.state,
@@ -265,6 +423,7 @@ void main() {
     testWidgets(
       'sin routeObserver (default null), no observa ni dispatcha — composición opcional',
       (tester) async {
+        tall(tester);
         when(
           () => bloc.state,
         ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
