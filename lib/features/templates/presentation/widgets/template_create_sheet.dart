@@ -1,24 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../domain/entities/template.dart';
 import '../../domain/failures/templates_failure.dart';
+import '../../domain/repositories/templates_repository.dart';
 import '../bloc/template_create_bloc.dart';
 
-/// Página para crear una Template. Consume el `TemplateCreateBloc` del scope;
-/// el cableado del provider lo hace el router en `/templates/new`. Es
-/// content-only: el Scaffold y el AppBar los aporta la ruta.
-class TemplateCreatePage extends StatefulWidget {
-  const TemplateCreatePage({super.key});
+/// Hoja de creación de una Template. Reemplaza a la pantalla dedicada: el mismo
+/// formulario (nombre + crear) vive ahora en un bottom sheet. Al crear con
+/// éxito CIERRA devolviendo la Template creada vía `Navigator.pop`; quien la
+/// abre decide la navegación (típicamente empujar el detalle), lo que evita el
+/// footgun de navegar desde un contexto que muere al cerrar la hoja.
+///
+/// Un modal vive en otro subárbol del Navigator —fuera de los providers del
+/// shell—, así que el repositorio se LEE en el call site y se inyecta al bloc
+/// de la hoja con `create:`.
+class TemplateCreateSheet extends StatefulWidget {
+  const TemplateCreateSheet({super.key});
+
+  /// Abre la hoja y resuelve con la Template creada, o `null` si se descartó
+  /// sin crear. El llamador (FAB, empty-state) navega con el resultado.
+  static Future<Template?> open(BuildContext context) {
+    final repo = context.read<TemplatesRepository>();
+    return showModalBottomSheet<Template>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => BlocProvider<TemplateCreateBloc>(
+        create: (_) => TemplateCreateBloc(repo: repo),
+        child: const TemplateCreateSheet(),
+      ),
+    );
+  }
 
   @override
-  State<TemplateCreatePage> createState() => _TemplateCreatePageState();
+  State<TemplateCreateSheet> createState() => _TemplateCreateSheetState();
 }
 
-class _TemplateCreatePageState extends State<TemplateCreatePage> {
+class _TemplateCreateSheetState extends State<TemplateCreateSheet> {
   final TextEditingController _ctrl = TextEditingController();
   bool _canSubmit = false;
 
@@ -50,24 +73,28 @@ class _TemplateCreatePageState extends State<TemplateCreatePage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return BlocConsumer<TemplateCreateBloc, TemplateCreateState>(
       listener: (context, state) {
         if (state is TemplateCreateSucceeded) {
-          // pushReplacement: reemplaza /templates/new con el detalle
-          // (back del detalle NO vuelve al formulario que ya cumplió su
-          // función) pero preserva el shell debajo, así el back físico
-          // de Android vuelve al listado. context.go() aplastaría la
-          // pila y sacaría al usuario de la app.
-          context.pushReplacement('/templates/${state.template.id}');
+          Navigator.of(context).pop(state.template);
         }
       },
       builder: (context, state) {
         final submitting = state is TemplateCreateSubmitting;
-        return Padding(
-          padding: const EdgeInsets.all(AppTokens.sp6),
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            AppTokens.sp6,
+            AppTokens.sp6,
+            AppTokens.sp6,
+            AppTokens.sp6 + context.sheetBottomInset,
+          ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
+              Text('Nueva plantilla', style: textTheme.titleLarge),
+              const SizedBox(height: AppTokens.sp4),
               AppTextField(
                 key: const Key('template_create.field.name'),
                 label: 'Nombre de la plantilla',
@@ -84,9 +111,7 @@ class _TemplateCreatePageState extends State<TemplateCreatePage> {
               AppButton.filled(
                 key: const Key('template_create.submit'),
                 label: 'Crear',
-                // El primitivo bloquea el tap cuando loading=true sin
-                // nullificar onPressed: pasamos el callback inalterado
-                // y dejamos el gate de submitting al primitivo.
+                fullWidth: true,
                 onPressed: _canSubmit ? _submit : null,
                 loading: submitting,
               ),

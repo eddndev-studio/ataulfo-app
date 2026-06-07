@@ -11,8 +11,11 @@ import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
+import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
+import 'package:ataulfo/features/templates/domain/entities/template.dart';
+import 'package:ataulfo/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -25,6 +28,11 @@ class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
+
+class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
+    implements TemplatesBloc {}
+
+class _MockBotsRepository extends Mock implements BotsRepository {}
 
 const _identity = Identity(
   userId: 'u1',
@@ -249,43 +257,40 @@ void main() {
     expect(find.widgetWithText(AppButton, 'Crear bot'), findsOneWidget);
   });
 
-  testWidgets('empty: CTA "Crear bot" navega a /bots/new', (tester) async {
+  testWidgets('empty: CTA "Crear bot" abre la hoja de creación', (
+    tester,
+  ) async {
     tall(tester);
     when(
       () => bloc.state,
     ).thenReturn(const BotsLoaded(items: <Bot>[], isRefreshing: false));
+    final tplBloc = _MockTemplatesBloc();
+    when(() => tplBloc.state).thenReturn(
+      const TemplatesLoaded(items: <Template>[], isRefreshing: false),
+    );
+    final botsRepo = _MockBotsRepository();
 
-    final navigated = <String>[];
-    final router = GoRouter(
-      initialLocation: '/',
-      routes: <RouteBase>[
-        GoRoute(
-          path: '/',
-          builder: (_, _) => MultiBlocProvider(
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: RepositoryProvider<BotsRepository>.value(
+          value: botsRepo,
+          child: MultiBlocProvider(
             providers: <BlocProvider<dynamic>>[
               BlocProvider<AuthBloc>.value(value: authBloc),
               BlocProvider<BotsBloc>.value(value: bloc),
+              BlocProvider<TemplatesBloc>.value(value: tplBloc),
             ],
             child: const Scaffold(body: BotsListPage()),
           ),
         ),
-        GoRoute(
-          path: '/bots/new',
-          builder: (_, _) {
-            navigated.add('/bots/new');
-            return const Scaffold(body: SizedBox.shrink());
-          },
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+      ),
     );
     await tester.tap(find.widgetWithText(AppButton, 'Crear bot'));
     await tester.pumpAndSettle();
 
-    expect(navigated, <String>['/bots/new']);
+    // La hoja (wizard de bot) arranca en el paso de selección de plantilla.
+    expect(find.text('Elegir plantilla'), findsOneWidget);
   });
 
   testWidgets('Failed muestra card de error y botón Reintentar', (

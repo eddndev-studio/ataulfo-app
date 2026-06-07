@@ -29,16 +29,13 @@ import '../../features/bots/domain/entities/bot.dart';
 import '../../features/bots/domain/repositories/bot_session_repository.dart';
 import '../../features/bots/domain/repositories/bots_repository.dart';
 import '../../features/bots/presentation/bloc/bot_connect_bloc.dart';
-import '../../features/bots/presentation/bloc/bot_create_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_maintenance_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_variables_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/pages/bot_connect_page.dart';
-import '../../features/bots/presentation/pages/bot_create_page.dart';
 import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_maintenance_page.dart';
-import '../../features/bots/presentation/pages/bot_template_picker_page.dart';
 import '../../features/bots/presentation/pages/bot_variables_page.dart';
 import '../../features/conversations/domain/repositories/conversations_repository.dart';
 import '../../features/conversations/presentation/bloc/conversations_bloc.dart';
@@ -94,12 +91,10 @@ import '../../features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
-import '../../features/templates/presentation/bloc/template_create_bloc.dart';
 import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
 import '../../features/templates/presentation/bloc/template_edit_bloc.dart';
 import '../../features/templates/presentation/bloc/templates_bloc.dart';
 import '../../features/templates/presentation/bloc/var_defs_bloc.dart';
-import '../../features/templates/presentation/pages/template_create_page.dart';
 import '../../features/templates/presentation/pages/template_detail_page.dart';
 import '../../features/templates/presentation/pages/template_edit_page.dart';
 import '../../features/triggers/domain/repositories/triggers_repository.dart';
@@ -372,63 +367,50 @@ class AppRouter {
           // verificación debe actualizarse sin nukear las listas.
           final auth = context.watch<AuthBloc>().state;
           final orgId = auth is AuthAuthenticated ? auth.identity.orgId : '';
-          return KeyedSubtree(
-            key: ValueKey<String>(orgId),
-            child: MultiBlocProvider(
-              providers: <BlocProvider<dynamic>>[
-                BlocProvider<BotsBloc>(
-                  create: (_) =>
-                      BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+          // Los repos de plantillas y bots cuelgan del scope del shell para
+          // que las hojas de creación (FAB / empty-state) las construyan: un
+          // bottom sheet vive fuera de este subárbol de providers, así que el
+          // call site las lee aquí y las inyecta al bloc de la hoja.
+          return RepositoryProvider<TemplatesRepository>.value(
+            value: _templatesRepo,
+            child: RepositoryProvider<BotsRepository>.value(
+              value: _botsRepo,
+              child: KeyedSubtree(
+                key: ValueKey<String>(orgId),
+                child: MultiBlocProvider(
+                  providers: <BlocProvider<dynamic>>[
+                    BlocProvider<BotsBloc>(
+                      create: (_) =>
+                          BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+                    ),
+                    BlocProvider<TemplatesBloc>(
+                      create: (_) =>
+                          TemplatesBloc(_templatesRepo)
+                            ..add(const TemplatesLoadRequested()),
+                    ),
+                    BlocProvider<LabelsAdminBloc>(
+                      create: (_) =>
+                          LabelsAdminBloc(repo: _labelsRepo)
+                            ..add(const LabelsAdminLoadRequested()),
+                    ),
+                    // Cubit del reenvío de verificación, scoped al shell para que el
+                    // aviso "verifica tu correo" lo dispare y reaccione a su
+                    // SnackBar.
+                    BlocProvider<ResendVerificationCubit>(
+                      create: (_) => ResendVerificationCubit(_authRepo),
+                    ),
+                  ],
+                  // Blocs page-scoped a nivel del shell: cambiar de tab no
+                  // rebuildea los providers y cada lista preserva estado
+                  // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
+                  // El routeObserver se atraviesa al shell para que ambos list
+                  // pages disparen su refresh al volver de una sub-ruta.
+                  child: ShellPage(routeObserver: _routeObserver),
                 ),
-                BlocProvider<TemplatesBloc>(
-                  create: (_) =>
-                      TemplatesBloc(_templatesRepo)
-                        ..add(const TemplatesLoadRequested()),
-                ),
-                BlocProvider<LabelsAdminBloc>(
-                  create: (_) =>
-                      LabelsAdminBloc(repo: _labelsRepo)
-                        ..add(const LabelsAdminLoadRequested()),
-                ),
-                // Cubit del reenvío de verificación, scoped al shell para que el
-                // aviso "verifica tu correo" lo dispare y reaccione a su
-                // SnackBar.
-                BlocProvider<ResendVerificationCubit>(
-                  create: (_) => ResendVerificationCubit(_authRepo),
-                ),
-              ],
-              // Blocs page-scoped a nivel del shell: cambiar de tab no
-              // rebuildea los providers y cada lista preserva estado
-              // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
-              // El routeObserver se atraviesa al shell para que ambos list
-              // pages disparen su refresh al volver de una sub-ruta.
-              child: ShellPage(routeObserver: _routeObserver),
+              ),
             ),
           );
         },
-      ),
-      GoRoute(
-        // Selector de plantilla para arrancar la creación de un bot desde
-        // la tab Bots (sin plantilla previa). El `TemplatesBloc` se monta
-        // page-scoped aquí -- no reusamos el del shell porque la ruta vive
-        // fuera del subárbol de `/home`, así que el provider ascendente
-        // no llega. Esto significa una segunda llamada GET /templates al
-        // entrar al selector; la cache de RFC-0001 lo absorberá cuando
-        // aterrice.
-        //
-        // DEBE ir antes de `/bots/:id` -- GoRouter matchea en orden de
-        // declaración y `:id` capturaría `new` como ID válido, montando
-        // el detalle con id="new" en lugar del selector.
-        path: '/bots/new',
-        builder: (context, _) => BlocProvider<TemplatesBloc>(
-          create: (_) =>
-              TemplatesBloc(_templatesRepo)
-                ..add(const TemplatesLoadRequested()),
-          child: Scaffold(
-            appBar: AppBar(title: const Text('Elegir plantilla')),
-            body: const BotTemplatePickerPage(),
-          ),
-        ),
       ),
       GoRoute(
         path: '/bots/:id',
@@ -668,40 +650,36 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/templates/new',
-        builder: (context, _) => BlocProvider<TemplateCreateBloc>(
-          create: (_) => TemplateCreateBloc(repo: _templatesRepo),
-          child: Scaffold(
-            appBar: AppBar(title: const Text('Crear plantilla')),
-            body: const TemplateCreatePage(),
-          ),
-        ),
-      ),
-      GoRoute(
         path: '/templates/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<TemplateDetailBloc>(
-                create: (_) =>
-                    TemplateDetailBloc(repo: _templatesRepo, id: id)
-                      ..add(const TemplateDetailLoadRequested()),
+          // El repo de bots cuelga del scope para que el CTA "Crear bot" del
+          // detalle abra la hoja de creación (con esta plantilla ya elegida)
+          // sin reconsultar el backend ni navegar a una pantalla aparte.
+          return RepositoryProvider<BotsRepository>.value(
+            value: _botsRepo,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<TemplateDetailBloc>(
+                  create: (_) =>
+                      TemplateDetailBloc(repo: _templatesRepo, id: id)
+                        ..add(const TemplateDetailLoadRequested()),
+                ),
+                BlocProvider<VarDefsBloc>(
+                  create: (_) =>
+                      VarDefsBloc(repo: _templatesRepo, templateId: id)
+                        ..add(const VarDefsLoadRequested()),
+                ),
+                BlocProvider<FlowsBloc>(
+                  create: (_) =>
+                      FlowsBloc(repo: _flowsRepo, templateId: id)
+                        ..add(const FlowsLoadRequested()),
+                ),
+              ],
+              child: Scaffold(
+                appBar: AppBar(title: const Text('Detalle de plantilla')),
+                body: const TemplateDetailPage(),
               ),
-              BlocProvider<VarDefsBloc>(
-                create: (_) =>
-                    VarDefsBloc(repo: _templatesRepo, templateId: id)
-                      ..add(const VarDefsLoadRequested()),
-              ),
-              BlocProvider<FlowsBloc>(
-                create: (_) =>
-                    FlowsBloc(repo: _flowsRepo, templateId: id)
-                      ..add(const FlowsLoadRequested()),
-              ),
-            ],
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Detalle de plantilla')),
-              body: const TemplateDetailPage(),
             ),
           );
         },
@@ -1008,32 +986,6 @@ class AppRouter {
               body: MediaGalleryPage(
                 onSelect: (asset) => context.pop(asset),
                 loader: _mediaThumbnailLoader,
-              ),
-            ),
-          );
-        },
-      ),
-      GoRoute(
-        // Crear bot dentro del namespace de su Template padre. Forzar el
-        // templateId como path param es la garantía estructural de que el
-        // formulario (`BotCreatePage`) siempre nace ligado a una plantilla
-        // concreta. La entrada sin plantilla previa vive en `/bots/new`,
-        // que monta el selector y -- una vez elegida -- hace
-        // pushReplacement a esta ruta. El templateName viaja como query
-        // opcional para que el chip pueda mostrar el nombre real sin
-        // reconsultar el backend; en su ausencia (deep-link directo a
-        // la URL), el page exhibe un copy fallback.
-        path: '/templates/:templateId/bots/new',
-        builder: (context, state) {
-          final templateId = state.pathParameters['templateId']!;
-          final templateName = state.uri.queryParameters['name'];
-          return BlocProvider<BotCreateBloc>(
-            create: (_) => BotCreateBloc(repo: _botsRepo),
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Crear bot')),
-              body: BotCreatePage(
-                templateId: templateId,
-                templateName: templateName,
               ),
             ),
           );

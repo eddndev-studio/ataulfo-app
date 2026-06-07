@@ -20,10 +20,8 @@ import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
-import 'package:ataulfo/features/bots/presentation/pages/bot_create_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_maintenance_page.dart';
-import 'package:ataulfo/features/bots/presentation/pages/bot_template_picker_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_variables_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
@@ -65,7 +63,6 @@ import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/templates_bloc.dart';
-import 'package:ataulfo/features/templates/presentation/pages/template_create_page.dart';
 import 'package:ataulfo/features/templates/presentation/pages/template_detail_page.dart';
 import 'package:ataulfo/features/templates/presentation/pages/template_edit_page.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
@@ -810,57 +807,6 @@ void main() {
     verify(() => templatesRepo.listVarDefs('t1')).called(1);
   });
 
-  testWidgets('AuthAuthenticated → /templates/new muestra TemplateCreatePage', (
-    tester,
-  ) async {
-    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-
-    await tester.pumpWidget(_host(router, authBloc));
-    await tester.pumpAndSettle();
-    router.router.go('/templates/new');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TemplateCreatePage), findsOneWidget);
-  });
-
-  testWidgets('AuthUnauthenticated + deep-link a /templates/new → /login', (
-    tester,
-  ) async {
-    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
-    router = AppRouter(
-      authBloc: authBloc,
-      authRepository: _MockAuthRepo(),
-      botsRepository: botsRepo,
-      botSessionRepository: botSessionRepo,
-      conversationsRepository: conversationsRepo,
-      messagesRepository: messagesRepo,
-      templatesRepository: templatesRepo,
-      flowsRepository: flowsRepo,
-      flowRunRepository: flowRunRepo,
-      triggersRepository: triggersRepo,
-      waLabelsRepository: _MockWaLabelsRepo(),
-      quickRepliesRepository: _quickRepliesRepo(),
-      labelsRepository: labelsRepo,
-      membershipsRepository: membershipsRepo,
-      membersRepository: membersRepo,
-      invitationsRepository: invitationsRepo,
-      catalogRepository: catalogRepo,
-      notificationsRepository: notificationsRepo,
-      mediaRepository: _MockMediaRepo(),
-      mediaFilePicker: _FakeMediaFilePicker(),
-      mediaThumbnailLoader: const FakeThumbnailLoader(),
-      profileRepository: profileRepo,
-    );
-
-    await tester.pumpWidget(_host(router, authBloc));
-    await tester.pumpAndSettle();
-    router.router.go('/templates/new');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(LoginPage), findsOneWidget);
-    expect(find.byType(TemplateCreatePage), findsNothing);
-  });
-
   testWidgets('AuthUnauthenticated + deep-link a /templates/:id → /login', (
     tester,
   ) async {
@@ -897,156 +843,6 @@ void main() {
 
     expect(find.byType(LoginPage), findsOneWidget);
     expect(find.byType(TemplateDetailPage), findsNothing);
-  });
-
-  testWidgets(
-    'AuthAuthenticated → /templates/:templateId/bots/new monta BotCreatePage '
-    'con templateId del path y templateName del query',
-    (tester) async {
-      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      router.router.go('/templates/t1/bots/new?name=Soporte%20ventas');
-      await tester.pumpAndSettle();
-
-      final page = tester.widget<BotCreatePage>(find.byType(BotCreatePage));
-      expect(page.templateId, 't1');
-      expect(page.templateName, 'Soporte ventas');
-    },
-  );
-
-  testWidgets(
-    'AuthAuthenticated → /templates/:templateId/bots/new sin query name → '
-    'BotCreatePage con templateName null (deep-link sin nombre)',
-    (tester) async {
-      // Permite la entrada deep-link directa por URL: el page muestra
-      // el copy fallback en el chip en lugar de exponer el UUID.
-      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      router.router.go('/templates/t1/bots/new');
-      await tester.pumpAndSettle();
-
-      final page = tester.widget<BotCreatePage>(find.byType(BotCreatePage));
-      expect(page.templateId, 't1');
-      expect(page.templateName, isNull);
-    },
-  );
-
-  testWidgets(
-    'AuthUnauthenticated + deep-link a /templates/:id/bots/new → /login',
-    (tester) async {
-      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
-      router = AppRouter(
-        authBloc: authBloc,
-        authRepository: _MockAuthRepo(),
-        botsRepository: botsRepo,
-        botSessionRepository: botSessionRepo,
-        conversationsRepository: conversationsRepo,
-        messagesRepository: messagesRepo,
-        templatesRepository: templatesRepo,
-        flowsRepository: flowsRepo,
-        flowRunRepository: flowRunRepo,
-        triggersRepository: triggersRepo,
-        waLabelsRepository: _MockWaLabelsRepo(),
-        quickRepliesRepository: _quickRepliesRepo(),
-        labelsRepository: labelsRepo,
-        membershipsRepository: membershipsRepo,
-        membersRepository: membersRepo,
-        invitationsRepository: invitationsRepo,
-        catalogRepository: catalogRepo,
-        notificationsRepository: notificationsRepo,
-        mediaRepository: _MockMediaRepo(),
-        mediaFilePicker: _FakeMediaFilePicker(),
-        mediaThumbnailLoader: const FakeThumbnailLoader(),
-        profileRepository: profileRepo,
-      );
-
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      router.router.go('/templates/t1/bots/new?name=X');
-      await tester.pumpAndSettle();
-
-      expect(find.byType(LoginPage), findsOneWidget);
-      expect(find.byType(BotCreatePage), findsNothing);
-    },
-  );
-
-  testWidgets('AuthAuthenticated → /bots/new monta BotTemplatePickerPage', (
-    tester,
-  ) async {
-    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-
-    await tester.pumpWidget(_host(router, authBloc));
-    await tester.pumpAndSettle();
-    router.router.go('/bots/new');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(BotTemplatePickerPage), findsOneWidget);
-  });
-
-  testWidgets(
-    'AuthAuthenticated → /bots/new expone TemplatesBloc page-scoped y '
-    'dispara TemplatesLoadRequested al construirse',
-    (tester) async {
-      // Bloc page-scoped (no reusa el del shell): si lo movieran a un
-      // ámbito superior, el test del bloc sigue verde pero el contador
-      // de list() en `setUp` se mantiene en una sola llamada -- aquí
-      // exigimos una llamada adicional disparada por el route builder.
-      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      // Tras /home el repo ya recibió una llamada (TemplatesBloc del shell).
-      // Limpiamos para verificar exactamente la llamada del picker.
-      clearInteractions(templatesRepo);
-      router.router.go('/bots/new');
-      await tester.pumpAndSettle();
-
-      final picker = tester.element(find.byType(BotTemplatePickerPage));
-      expect(picker.read<TemplatesBloc>(), isNotNull);
-      verify(templatesRepo.list).called(1);
-    },
-  );
-
-  testWidgets('AuthUnauthenticated + deep-link a /bots/new → /login', (
-    tester,
-  ) async {
-    when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
-    router = AppRouter(
-      authBloc: authBloc,
-      authRepository: _MockAuthRepo(),
-      botsRepository: botsRepo,
-      botSessionRepository: botSessionRepo,
-      conversationsRepository: conversationsRepo,
-      messagesRepository: messagesRepo,
-      templatesRepository: templatesRepo,
-      flowsRepository: flowsRepo,
-      flowRunRepository: flowRunRepo,
-      triggersRepository: triggersRepo,
-      waLabelsRepository: _MockWaLabelsRepo(),
-      quickRepliesRepository: _quickRepliesRepo(),
-      labelsRepository: labelsRepo,
-      membershipsRepository: membershipsRepo,
-      membersRepository: membersRepo,
-      invitationsRepository: invitationsRepo,
-      catalogRepository: catalogRepo,
-      notificationsRepository: notificationsRepo,
-      mediaRepository: _MockMediaRepo(),
-      mediaFilePicker: _FakeMediaFilePicker(),
-      mediaThumbnailLoader: const FakeThumbnailLoader(),
-      profileRepository: profileRepo,
-    );
-
-    await tester.pumpWidget(_host(router, authBloc));
-    await tester.pumpAndSettle();
-    router.router.go('/bots/new');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(LoginPage), findsOneWidget);
-    expect(find.byType(BotTemplatePickerPage), findsNothing);
   });
 
   testWidgets(
