@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
+import '../../../bots/presentation/widgets/bot_create_sheet.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../domain/entities/template.dart';
@@ -588,13 +591,15 @@ class _CreateBotButton extends StatelessWidget {
       key: const Key('template_detail.create_bot_button'),
       label: 'Crear bot',
       icon: Icons.smart_toy_outlined,
-      onPressed: () {
-        // El nombre viaja como query param URL-encoded para que el form
-        // pueda mostrar el chip de plantilla sin pedirla otra vez al
-        // backend. push (no go) apila el form sobre el shell + detalle,
-        // así el back físico de Android vuelve a este detalle.
-        final name = Uri.encodeQueryComponent(template.name);
-        context.push('/templates/${template.id}/bots/new?name=$name');
+      onPressed: () async {
+        // Abre la hoja de creación con esta plantilla ya elegida (salta el
+        // paso de selección). Al crear, la hoja devuelve el bot y aquí se
+        // empuja su detalle sobre el shell + este detalle, así el back
+        // físico vuelve a esta plantilla.
+        final bot = await BotCreateSheet.open(context, template: template);
+        if (bot != null && context.mounted) {
+          unawaited(context.push('/bots/${bot.id}'));
+        }
       },
     );
   }

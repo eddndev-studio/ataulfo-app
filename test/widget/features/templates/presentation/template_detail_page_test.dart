@@ -6,6 +6,7 @@ import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flows_bloc.dart';
@@ -36,6 +37,8 @@ class _MockFlowsBloc extends MockBloc<FlowsEvent, FlowsState>
 
 class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
     implements TriggersBloc {}
+
+class _MockBotsRepository extends Mock implements BotsRepository {}
 
 const _tpl = Template(
   id: 't1',
@@ -950,24 +953,20 @@ void main() {
     });
 
     testWidgets(
-      'tap navega a /templates/:id/bots/new?name=... preservando el shell '
-      '(canPop=true en destino)',
+      'tap abre la hoja de creación de bot con esta plantilla ya elegida '
+      '(salta el paso de selección)',
       (tester) async {
-        // El nombre de la plantilla viaja en query param para que el form
-        // pueda mostrar el chip sin volver a golpear el backend.
-        // La aserción canPop() == true en el destino es el guard
-        // contractual que detecta regresiones a context.go() sin pasar por
-        // device.
         when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+        final botsRepo = _MockBotsRepository();
 
-        final canPopAtDestination = <bool>[];
-        String? destinationUri;
-        final router = GoRouter(
-          initialLocation: '/',
-          routes: <RouteBase>[
-            GoRoute(
-              path: '/',
-              builder: (_, _) => MultiBlocProvider(
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            // El repo de bots cuelga del scope (como en la ruta real) para que
+            // la hoja construya su BotCreateBloc.
+            home: RepositoryProvider<BotsRepository>.value(
+              value: botsRepo,
+              child: MultiBlocProvider(
                 providers: <BlocProvider<dynamic>>[
                   BlocProvider<TemplateDetailBloc>.value(value: bloc),
                   BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
@@ -977,33 +976,11 @@ void main() {
                 child: const Scaffold(body: TemplateDetailPage()),
               ),
             ),
-            GoRoute(
-              path: '/templates/:templateId/bots/new',
-              builder: (_, state) {
-                destinationUri = state.uri.toString();
-                return Scaffold(
-                  body: Builder(
-                    builder: (ctx) {
-                      canPopAtDestination.add(Navigator.of(ctx).canPop());
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-
-        await tester.pumpWidget(
-          MaterialApp.router(
-            theme: AppDesignTheme.dark(),
-            routerConfig: router,
           ),
         );
         await tester.pumpAndSettle();
-        // El detalle migrado al DS es más alto que el test surface (800×600);
-        // el botón vive después del scroll. ensureVisible scrollea el
-        // SingleChildScrollView hasta que el botón sea hit-testable.
+        // El detalle es más alto que el test surface; el botón vive tras el
+        // scroll. ensureVisible lo trae a un punto hit-testable.
         await tester.ensureVisible(
           find.byKey(const Key('template_detail.create_bot_button')),
         );
@@ -1013,21 +990,17 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        // Con la plantilla preseleccionada la hoja arranca en el paso de
+        // nombre (no en el selector) y la resume en su chip.
+        expect(find.text('Nuevo bot'), findsOneWidget);
+        expect(find.text('Elegir plantilla'), findsNothing);
         expect(
-          destinationUri,
-          '/templates/t1/bots/new?name=Soporte',
-          reason:
-              'la URL debe llevar templateId como path y templateName como '
-              'query param URL-encoded',
+          find.descendant(
+            of: find.byKey(const Key('bot_create.template_chip')),
+            matching: find.text('Soporte'),
+          ),
+          findsOneWidget,
         );
-        expect(
-          canPopAtDestination,
-          <bool>[true],
-          reason:
-              'el botón debe usar push (no go) para que el back físico '
-              'vuelva al detalle de plantilla en lugar de salir de la app',
-        );
-        unawaited(Future<void>.value());
       },
     );
   });

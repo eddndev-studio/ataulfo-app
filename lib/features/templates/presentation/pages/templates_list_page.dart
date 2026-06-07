@@ -4,6 +4,8 @@
 // split compartiría estructuras privadas entre archivos hermanos sin reuso
 // real. Si crece más, el primer corte es extraer _TemplateTile + _MetricsRow a
 // `widgets/template_tile.dart`.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +24,7 @@ import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/template.dart';
 import '../bloc/templates_bloc.dart';
+import '../widgets/template_create_sheet.dart';
 
 /// Filtro por presencia de IA. Estado de UI local (client-side sobre la lista
 /// ya cargada), no del bloc: el backend devuelve todas las plantillas y el
@@ -462,7 +465,16 @@ class _EmptyView extends StatelessWidget {
                         label: 'Crear plantilla',
                         icon: Icons.add,
                         fullWidth: true,
-                        onPressed: () => context.push('/templates/new'),
+                        onPressed: () async {
+                          final template = await TemplateCreateSheet.open(
+                            context,
+                          );
+                          if (template != null && context.mounted) {
+                            unawaited(
+                              context.push('/templates/${template.id}'),
+                            );
+                          }
+                        },
                       ),
                     ],
                   ),

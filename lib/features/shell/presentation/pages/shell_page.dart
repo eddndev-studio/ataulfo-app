@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../bots/presentation/pages/bots_list_page.dart';
+import '../../../bots/presentation/widgets/bot_create_sheet.dart';
 import '../../../labels/presentation/pages/labels_admin_page.dart';
 import '../../../labels/presentation/widgets/label_edit_sheet.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../templates/presentation/pages/templates_list_page.dart';
+import '../../../templates/presentation/widgets/template_create_sheet.dart';
 import '../widgets/email_verification_banner.dart';
 
 /// Shell adaptable de la app autenticada. Hospeda los tabs del producto y
@@ -132,22 +136,31 @@ class _TabSpec {
   final IconData icon;
 }
 
-/// FAB por tab. La tab Bots arranca el flujo "crear bot" abriendo el
-/// selector de plantilla; la tab Plantillas arranca el formulario de
-/// creación. Ambos usan push (no go) para preservar el shell debajo de
-/// la pila: el back físico cancela la operación y vuelve al listado. La
-/// tab Etiquetas abre la hoja de creación in situ (modal sobre el shell,
-/// sin navegar): el catálogo se gestiona dentro de la propia tab.
+/// FAB por tab. Bots y Plantillas abren su hoja de creación (bottom sheet)
+/// in situ sobre el shell; al crear con éxito la hoja devuelve la entidad y
+/// aquí se empuja su detalle. No navegan a una pantalla intermedia: el back
+/// físico cierra la hoja sin salir del listado. La tab Etiquetas abre su
+/// propia hoja de creación.
 Widget? _fab(BuildContext context, int index) => switch (index) {
   0 => FloatingActionButton(
-    key: const Key('shell.fab.bot_template_picker'),
-    onPressed: () => context.push('/bots/new'),
+    key: const Key('shell.fab.bot_create'),
+    onPressed: () async {
+      final bot = await BotCreateSheet.open(context);
+      if (bot != null && context.mounted) {
+        unawaited(context.push('/bots/${bot.id}'));
+      }
+    },
     tooltip: 'Crear bot',
     child: const Icon(Icons.add),
   ),
   1 => FloatingActionButton(
     key: const Key('shell.fab.template_create'),
-    onPressed: () => context.push('/templates/new'),
+    onPressed: () async {
+      final template = await TemplateCreateSheet.open(context);
+      if (template != null && context.mounted) {
+        unawaited(context.push('/templates/${template.id}'));
+      }
+    },
     tooltip: 'Crear plantilla',
     child: const Icon(Icons.add),
   ),

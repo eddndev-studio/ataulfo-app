@@ -4,6 +4,8 @@
 // compartiría estructuras privadas entre archivos hermanos sin reuso real. Si
 // crece más, el primer corte es extraer _BotTile + _StatusPill a
 // `widgets/bot_tile.dart`.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +23,7 @@ import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
 import '../bloc/bots_bloc.dart';
+import '../widgets/bot_create_sheet.dart';
 
 /// Filtro por estado del listado. Es estado de UI local (client-side sobre la
 /// lista ya cargada), no del bloc: el backend devuelve todos los bots y el
@@ -401,7 +404,12 @@ class _EmptyView extends StatelessWidget {
                         label: 'Crear bot',
                         icon: Icons.add,
                         fullWidth: true,
-                        onPressed: () => context.push('/bots/new'),
+                        onPressed: () async {
+                          final bot = await BotCreateSheet.open(context);
+                          if (bot != null && context.mounted) {
+                            unawaited(context.push('/bots/${bot.id}'));
+                          }
+                        },
                       ),
                     ],
                   ),

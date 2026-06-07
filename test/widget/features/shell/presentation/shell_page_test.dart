@@ -1,6 +1,7 @@
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
@@ -9,13 +10,13 @@ import 'package:ataulfo/features/labels/presentation/pages/labels_admin_page.dar
 import 'package:ataulfo/features/settings/presentation/pages/settings_page.dart';
 import 'package:ataulfo/features/shell/presentation/pages/shell_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
+import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:ataulfo/features/templates/presentation/pages/templates_list_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
@@ -29,6 +30,10 @@ class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
 
 class _MockLabelsAdminBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
     implements LabelsAdminBloc {}
+
+class _MockBotsRepository extends Mock implements BotsRepository {}
+
+class _MockTemplatesRepository extends Mock implements TemplatesRepository {}
 
 // emailVerified: true mantiene el aviso de verificación ausente en estas
 // pruebas de layout/navegación — su presencia/ausencia se cubre en
@@ -227,10 +232,7 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      expect(
-        find.byKey(const Key('shell.fab.bot_template_picker')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('shell.fab.bot_create')), findsOneWidget);
       expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
     });
 
@@ -241,10 +243,7 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      expect(
-        find.byKey(const Key('shell.fab.bot_template_picker')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('shell.fab.bot_create')), findsOneWidget);
     });
 
     testWidgets('tab Plantillas (phone) expone FAB de crear plantilla', (
@@ -363,30 +362,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
-      expect(
-        find.byKey(const Key('shell.fab.bot_template_picker')),
-        findsNothing,
-      );
+      expect(find.byKey(const Key('shell.fab.bot_create')), findsNothing);
       expect(find.byType(FloatingActionButton), findsNothing);
     });
 
-    testWidgets('tap FAB en tab Bots apila /bots/new sobre el shell '
-        '(back desde el picker vuelve al shell, NO sale de la app)', (
+    testWidgets('tap FAB en tab Bots abre la hoja de creación (wizard)', (
       tester,
     ) async {
       useViewport(tester, widthDp: 420);
 
-      // Mismo contrato que el FAB de plantillas: push (no go) para que
-      // canPop()==true en el destino. Si el FAB usara go() el back físico
-      // sacaría al operador de la app en lugar de cancelar la selección.
-      final navigated = <String>[];
-      final canPopAtDestination = <bool>[];
-      final router = GoRouter(
-        initialLocation: '/',
-        routes: <RouteBase>[
-          GoRoute(
-            path: '/',
-            builder: (_, _) => MultiBlocProvider(
+      // El FAB ya no navega a una pantalla: abre el bottom sheet de creación
+      // sobre el shell. El repo de bots y el TemplatesBloc del shell (que el
+      // paso de selección consume) deben estar en el árbol.
+      final botsRepo = _MockBotsRepository();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RepositoryProvider<BotsRepository>.value(
+            value: botsRepo,
+            child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<AuthBloc>.value(value: authBloc),
                 BlocProvider<BotsBloc>.value(value: botsBloc),
@@ -396,52 +389,27 @@ void main() {
               child: const ShellPage(),
             ),
           ),
-          GoRoute(
-            path: '/bots/new',
-            builder: (_, _) {
-              navigated.add('/bots/new');
-              return Scaffold(
-                body: Builder(
-                  builder: (ctx) {
-                    canPopAtDestination.add(Navigator.of(ctx).canPop());
-                    return const SizedBox.shrink();
-                  },
-                ),
-              );
-            },
-          ),
-        ],
+        ),
       );
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-      await tester.tap(find.byKey(const Key('shell.fab.bot_template_picker')));
+      await tester.tap(find.byKey(const Key('shell.fab.bot_create')));
       await tester.pumpAndSettle();
 
-      expect(navigated, <String>['/bots/new']);
-      expect(
-        canPopAtDestination,
-        <bool>[true],
-        reason:
-            'el selector debe quedar apilado sobre el shell para que el '
-            'back físico cancele la elección y vuelva al listado',
-      );
+      // El wizard arranca en el paso de selección de plantilla.
+      expect(find.text('Elegir plantilla'), findsOneWidget);
     });
 
-    testWidgets('tap FAB en tab Plantillas apila /templates/new sobre el shell '
-        '(back sin crear vuelve al shell, NO sale de la app)', (tester) async {
+    testWidgets('tap FAB en tab Plantillas abre la hoja de creación', (
+      tester,
+    ) async {
       useViewport(tester, widthDp: 420);
 
-      // Reproducción del bug del smoke device V2314: con context.go()
-      // el shell se aplasta y back sin crear sale de la app. Con push()
-      // el shell queda debajo (canPop = true en el destino).
-      final navigated = <String>[];
-      final canPopAtDestination = <bool>[];
-      final router = GoRouter(
-        initialLocation: '/',
-        routes: <RouteBase>[
-          GoRoute(
-            path: '/',
-            builder: (_, _) => MultiBlocProvider(
+      final tplRepo = _MockTemplatesRepository();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RepositoryProvider<TemplatesRepository>.value(
+            value: tplRepo,
+            child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<AuthBloc>.value(value: authBloc),
                 BlocProvider<BotsBloc>.value(value: botsBloc),
@@ -451,37 +419,15 @@ void main() {
               child: const ShellPage(),
             ),
           ),
-          GoRoute(
-            path: '/templates/new',
-            builder: (_, _) {
-              navigated.add('/templates/new');
-              return Scaffold(
-                body: Builder(
-                  builder: (ctx) {
-                    canPopAtDestination.add(Navigator.of(ctx).canPop());
-                    return const SizedBox.shrink();
-                  },
-                ),
-              );
-            },
-          ),
-        ],
+        ),
       );
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await tester.tap(find.text('Plantillas'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('shell.fab.template_create')));
       await tester.pumpAndSettle();
 
-      expect(navigated, <String>['/templates/new']);
-      expect(
-        canPopAtDestination,
-        <bool>[true],
-        reason:
-            'el formulario debe quedar apilado sobre el shell para que '
-            'el back físico cancele la creación y vuelva al listado',
-      );
+      expect(find.text('Nueva plantilla'), findsOneWidget);
     });
 
     testWidgets(
