@@ -12,6 +12,7 @@ import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
+import 'package:ataulfo/features/bots/presentation/bot_create_draft.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -275,13 +276,16 @@ void main() {
         theme: AppDesignTheme.dark(),
         home: RepositoryProvider<BotsRepository>.value(
           value: botsRepo,
-          child: MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<AuthBloc>.value(value: authBloc),
-              BlocProvider<BotsBloc>.value(value: bloc),
-              BlocProvider<TemplatesBloc>.value(value: tplBloc),
-            ],
-            child: const Scaffold(body: BotsListPage()),
+          child: RepositoryProvider<BotCreateDraftStore>(
+            create: (_) => BotCreateDraftStore(),
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                BlocProvider<BotsBloc>.value(value: bloc),
+                BlocProvider<TemplatesBloc>.value(value: tplBloc),
+              ],
+              child: const Scaffold(body: BotsListPage()),
+            ),
           ),
         ),
       ),
