@@ -279,6 +279,12 @@ class _StepsListView extends StatelessWidget {
       AppTokens.sp6 + context.safeBottomInset,
     );
     final bloc = context.read<FlowStepsBloc>();
+    // Resuelve los nombres EN VIVO del catálogo UNA vez, POR ENCIMA del
+    // ReorderableListView, y se los pasa a cada tarjeta como dato plano. Si el
+    // lookup del cubit viviera dentro del item reordenable, al arrastrarlo el
+    // item se eleva al overlay del Navigator (fuera del scope del provider) y
+    // el lookup lanzaría ProviderNotFound → RenderErrorBox gris estirado.
+    final namesState = context.watch<MediaNamesCubit>().state;
 
     if (steps.isEmpty) {
       return SingleChildScrollView(
@@ -313,7 +319,10 @@ class _StepsListView extends StatelessWidget {
               const _MutatingInlineSpinner(),
               const SizedBox(height: AppTokens.sp3),
             ],
-            _StepCard(step: steps.first),
+            _StepCard(
+              step: steps.first,
+              resolvedMediaName: namesState.nameFor(steps.first.mediaRef),
+            ),
           ],
         ),
       );
@@ -339,7 +348,11 @@ class _StepsListView extends StatelessWidget {
               return Padding(
                 key: ValueKey<String>('flow_detail.step_card.row.${s.id}'),
                 padding: const EdgeInsets.only(bottom: AppTokens.sp3),
-                child: _StepCard(step: s, dragIndex: i),
+                child: _StepCard(
+                  step: s,
+                  dragIndex: i,
+                  resolvedMediaName: namesState.nameFor(s.mediaRef),
+                ),
               );
             },
             onReorder: (oldIdx, newIdx) {
@@ -420,10 +433,15 @@ class _StepsFailedView extends StatelessWidget {
 /// captura el gesto antes del InkWell (se monta como sibling del área
 /// tappable), así que long-press/drag sobre el handle no abre el sheet.
 class _StepCard extends StatelessWidget {
-  const _StepCard({required this.step, this.dragIndex});
+  const _StepCard({required this.step, this.dragIndex, this.resolvedMediaName});
 
   final sdom.Step step;
   final int? dragIndex;
+
+  /// Nombre EN VIVO del recurso multimedia ya resuelto por el caller (lee el
+  /// `MediaNamesCubit` por encima del listado). Plano a propósito: ver
+  /// [_StepBody.resolvedMediaName].
+  final String? resolvedMediaName;
 
   @override
   Widget build(BuildContext context) {
@@ -442,7 +460,11 @@ class _StepCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppTokens.sp2),
-        _StepBody(step: step, textTheme: textTheme),
+        _StepBody(
+          step: step,
+          textTheme: textTheme,
+          resolvedMediaName: resolvedMediaName,
+        ),
         const SizedBox(height: AppTokens.sp3),
         Wrap(
           spacing: AppTokens.sp2,
@@ -527,10 +549,23 @@ void _openStepSheet(BuildContext context, sdom.Step? step) {
 /// muestra TZ + ventanas formateadas + destinos onMatch/onElse. Si el
 /// metadata no parsea (corrupto/legacy), cae a un fallback honesto.
 class _StepBody extends StatelessWidget {
-  const _StepBody({required this.step, required this.textTheme});
+  const _StepBody({
+    required this.step,
+    required this.textTheme,
+    this.resolvedMediaName,
+  });
 
   final sdom.Step step;
   final TextTheme textTheme;
+
+  /// Nombre EN VIVO del recurso (alias/filename del catálogo) ya resuelto por
+  /// el caller, que lee el `MediaNamesCubit` POR ENCIMA del `ReorderableListView`.
+  /// Se recibe como dato plano —no se hace lookup del cubit aquí— para que el
+  /// subárbol de la tarjeta sea autocontenido: al reordenar, el item se eleva al
+  /// overlay del Navigator (fuera del scope del provider) y un lookup ahí
+  /// lanzaría ProviderNotFound (RenderErrorBox gris estirado). null ⇒ aún
+  /// cargando o asset borrado (el respaldo por paso decide el texto).
+  final String? resolvedMediaName;
 
   @override
   Widget build(BuildContext context) {
@@ -570,37 +605,34 @@ class _StepBody extends StatelessWidget {
       );
     }
     // Nombre legible del recurso. Prioridad: el alias EN VIVO del catálogo
-    // (resuelto por ref vía MediaNamesCubit) → el `media_filename` guardado al
-    // elegirlo → la cola corta del ref BARE en monospace (señal de id, no
-    // nombre). El ref completo con el path del tenant nunca se muestra.
-    return BlocBuilder<MediaNamesCubit, MediaNamesState>(
-      builder: (context, namesState) {
-        final (mediaText, mono) = mediaStepDisplay(
-          mediaRef: step.mediaRef,
-          metadataJson: step.metadataJson,
-          resolvedName: namesState.nameFor(step.mediaRef),
-        );
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              mediaText,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: mono
-                  ? textTheme.bodyMedium?.copyWith(
-                      fontFamily: 'monospace',
-                      color: AppTokens.text2,
-                    )
-                  : textTheme.bodyMedium,
-            ),
-            if (step.content.isNotEmpty) ...<Widget>[
-              const SizedBox(height: AppTokens.sp1),
-              Text(step.content, style: textTheme.bodyMedium),
-            ],
-          ],
-        );
-      },
+    // (resuelto por ref vía MediaNamesCubit, leído por el caller) → el
+    // `media_filename` guardado al elegirlo → la cola corta del ref BARE en
+    // monospace (señal de id, no nombre). El ref completo con el path del
+    // tenant nunca se muestra.
+    final (mediaText, mono) = mediaStepDisplay(
+      mediaRef: step.mediaRef,
+      metadataJson: step.metadataJson,
+      resolvedName: resolvedMediaName,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          mediaText,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: mono
+              ? textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'monospace',
+                  color: AppTokens.text2,
+                )
+              : textTheme.bodyMedium,
+        ),
+        if (step.content.isNotEmpty) ...<Widget>[
+          const SizedBox(height: AppTokens.sp1),
+          Text(step.content, style: textTheme.bodyMedium),
+        ],
+      ],
     );
   }
 }
