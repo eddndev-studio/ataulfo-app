@@ -5,15 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_pill.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_detail_bloc.dart';
 import '../widgets/bot_ai_toggle.dart';
 import '../widgets/bot_clone_sheet.dart';
+import '../widgets/bot_detail_header.dart';
 import '../widgets/bot_edit_sheet.dart';
 import '../widgets/bot_toggle_row.dart';
 
@@ -74,11 +73,42 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+  Widget build(BuildContext context) => const _BackScaffold(
+    child: Center(
+      child: CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+      ),
     ),
   );
+}
+
+/// Envuelve los estados sin header (carga/error) con un retorno claro arriba a
+/// la izquierda. La ruta ya no aporta AppBar; sin esto el operador quedaría
+/// atrapado si la carga cuelga o el bot falla. El glifo va en color de texto
+/// (no el círculo oscuro del header) para leerse sobre el fondo oscuro.
+class _BackScaffold extends StatelessWidget {
+  const _BackScaffold({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Positioned.fill(child: child),
+        SafeArea(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: IconButton(
+              tooltip: 'Volver',
+              icon: const Icon(Icons.arrow_back, color: AppTokens.text1),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _LoadedView extends StatelessWidget {
@@ -105,155 +135,125 @@ class _LoadedView extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final f = failure;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6 + context.safeBottomInset,
-      ),
+      // Sin padding aquí: el header es full-bleed y va pegado arriba. El resto
+      // del contenido lleva su propio padding más abajo.
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              AppAvatar(name: bot.name, size: 64),
-              const SizedBox(width: AppTokens.sp4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(bot.name, style: textTheme.titleLarge),
-                    const SizedBox(height: 2),
-                    Text(
-                      _channelLabel(bot.channel),
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: AppTokens.text2,
-                      ),
+          BotDetailHeader(
+            name: bot.name,
+            channelLabel: _channelLabel(bot.channel),
+            version: bot.version,
+            paused: bot.paused,
+            aiDisabled: bot.aiDisabled,
+            identifier: bot.identifier,
+            onBack: () => Navigator.of(context).maybePop(),
+            showEdit: isAdmin,
+            onEdit: isMutating
+                ? null
+                : () => BotEditSheet.openEdit(context, bot),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppTokens.sp6,
+              AppTokens.sp6,
+              AppTokens.sp6,
+              AppTokens.sp6 + context.safeBottomInset,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                // Versión, estado, IA e identificador viven ahora EN el header
+                // (cápsulas glass sobre el gradiente). Aquí abajo: controles.
+                if (isAdmin) ...<Widget>[
+                  BotToggleRow(
+                    switchKey: const Key('bot_detail.paused'),
+                    label: 'Pausar bot',
+                    caption:
+                        'Pausado, el bot deja de procesar mensajes hasta que lo '
+                        'reanudes; no se reanuda solo.',
+                    value: bot.paused,
+                    onChanged: isMutating
+                        ? null
+                        : (v) => context.read<BotDetailBloc>().add(
+                            BotDetailUpdateRequested(paused: v),
+                          ),
+                  ),
+                  const SizedBox(height: AppTokens.sp5),
+                  BotAiToggle(bot: bot, isMutating: isMutating),
+                ],
+                if (f != null) ...<Widget>[
+                  const SizedBox(height: AppTokens.sp4),
+                  Text(
+                    _failureMessage(f),
+                    key: const Key('bot_detail.mutation_error'),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppTokens.danger,
                     ),
-                  ],
+                  ),
+                ],
+                const SizedBox(height: AppTokens.sp7),
+                AppButton.tonal(
+                  label: 'Conversaciones',
+                  fullWidth: true,
+                  onPressed: () => context.push('/bots/${bot.id}/sessions'),
                 ),
-              ),
-              if (isAdmin)
-                IconButton(
-                  key: const Key('bot_detail.edit'),
-                  tooltip: 'Editar bot',
-                  icon: const Icon(Icons.edit_outlined, color: AppTokens.text2),
-                  onPressed: isMutating
-                      ? null
-                      : () => BotEditSheet.openEdit(context, bot),
+                const SizedBox(height: AppTokens.sp3),
+                AppButton.tonal(
+                  label: 'Etiquetas de WhatsApp',
+                  fullWidth: true,
+                  onPressed: () => context.push('/bots/${bot.id}/wa-labels'),
                 ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp6),
-          Wrap(
-            spacing: AppTokens.sp2,
-            runSpacing: AppTokens.sp2,
-            children: <Widget>[
-              AppPill.outline(label: 'v${bot.version}'),
-              if (bot.paused)
-                const AppPill.neutral(label: 'Pausado', dot: AppPillDot.paused)
-              else
-                const AppPill.primary(label: 'Activo', dot: AppPillDot.active),
-              // IA off es estado de configuración, no error → neutral.
-              // El pill solo aparece cuando aiDisabled=true; el caso default
-              // (IA habilitada) no se verbaliza para no saturar el header.
-              if (bot.aiDisabled)
-                const AppPill.neutral(
-                  label: 'IA deshabilitada',
-                  dot: AppPillDot.paused,
+                const SizedBox(height: AppTokens.sp3),
+                AppButton.filled(
+                  label: 'Conectar WhatsApp',
+                  fullWidth: true,
+                  onPressed: () => context.push(
+                    '/bots/${bot.id}/connect?channel=${bot.channel.toWire()}',
+                  ),
                 ),
-            ],
-          ),
-          if (isAdmin) ...<Widget>[
-            const SizedBox(height: AppTokens.sp6),
-            BotToggleRow(
-              switchKey: const Key('bot_detail.paused'),
-              label: 'Pausar bot',
-              caption:
-                  'Pausado, el bot deja de procesar mensajes hasta que lo '
-                  'reanudes; no se reanuda solo.',
-              value: bot.paused,
-              onChanged: isMutating
-                  ? null
-                  : (v) => context.read<BotDetailBloc>().add(
-                      BotDetailUpdateRequested(paused: v),
-                    ),
-            ),
-            const SizedBox(height: AppTokens.sp5),
-            BotAiToggle(bot: bot, isMutating: isMutating),
-          ],
-          if (f != null) ...<Widget>[
-            const SizedBox(height: AppTokens.sp4),
-            Text(
-              _failureMessage(f),
-              key: const Key('bot_detail.mutation_error'),
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
-            ),
-          ],
-          if (bot.identifier != null) ...<Widget>[
-            const SizedBox(height: AppTokens.sp6),
-            Text(
-              'Identificador',
-              style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
-            ),
-            const SizedBox(height: AppTokens.sp1),
-            SelectableText(bot.identifier!, style: textTheme.bodyMedium),
-          ],
-          const SizedBox(height: AppTokens.sp7),
-          AppButton.tonal(
-            label: 'Conversaciones',
-            fullWidth: true,
-            onPressed: () => context.push('/bots/${bot.id}/sessions'),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          AppButton.tonal(
-            label: 'Etiquetas de WhatsApp',
-            fullWidth: true,
-            onPressed: () => context.push('/bots/${bot.id}/wa-labels'),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          AppButton.filled(
-            label: 'Conectar WhatsApp',
-            fullWidth: true,
-            onPressed: () => context.push(
-              '/bots/${bot.id}/connect?channel=${bot.channel.toWire()}',
+                if (isAdmin) ...<Widget>[
+                  const SizedBox(height: AppTokens.sp3),
+                  AppButton.tonal(
+                    key: const Key('bot_detail.variables'),
+                    label: 'Variables',
+                    fullWidth: true,
+                    onPressed: () => context.push('/bots/${bot.id}/variables'),
+                  ),
+                  const SizedBox(height: AppTokens.sp3),
+                  AppButton.tonal(
+                    key: const Key('bot_detail.maintenance'),
+                    label: 'Mantenimiento',
+                    fullWidth: true,
+                    onPressed: () =>
+                        context.push('/bots/${bot.id}/maintenance'),
+                  ),
+                  const SizedBox(height: AppTokens.sp7),
+                  AppButton.tonal(
+                    key: const Key('bot_detail.clone'),
+                    label: 'Clonar bot',
+                    fullWidth: true,
+                    onPressed: isMutating
+                        ? null
+                        : () => BotCloneSheet.open(
+                            context,
+                            onCloned: (newId) => context.push('/bots/$newId'),
+                          ),
+                  ),
+                  const SizedBox(height: AppTokens.sp3),
+                  AppButton.danger(
+                    key: const Key('bot_detail.delete'),
+                    label: 'Eliminar bot',
+                    fullWidth: true,
+                    onPressed: isMutating
+                        ? null
+                        : () => _confirmDelete(context, bot),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (isAdmin) ...<Widget>[
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.tonal(
-              key: const Key('bot_detail.variables'),
-              label: 'Variables',
-              fullWidth: true,
-              onPressed: () => context.push('/bots/${bot.id}/variables'),
-            ),
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.tonal(
-              key: const Key('bot_detail.maintenance'),
-              label: 'Mantenimiento',
-              fullWidth: true,
-              onPressed: () => context.push('/bots/${bot.id}/maintenance'),
-            ),
-            const SizedBox(height: AppTokens.sp7),
-            AppButton.tonal(
-              key: const Key('bot_detail.clone'),
-              label: 'Clonar bot',
-              fullWidth: true,
-              onPressed: isMutating
-                  ? null
-                  : () => BotCloneSheet.open(
-                      context,
-                      onCloned: (newId) => context.push('/bots/$newId'),
-                    ),
-            ),
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.danger(
-              key: const Key('bot_detail.delete'),
-              label: 'Eliminar bot',
-              fullWidth: true,
-              onPressed: isMutating ? null : () => _confirmDelete(context, bot),
-            ),
-          ],
         ],
       ),
     );
@@ -328,30 +328,32 @@ class _FailedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final isNotFound = failure is BotsNotFoundFailure;
     final textTheme = Theme.of(context).textTheme;
-    return Center(
-      key: isNotFound
-          ? const Key('bot_detail.error.not_found')
-          : const Key('bot_detail.error.generic'),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              isNotFound
-                  ? 'Este bot ya no existe en tu organización'
-                  : 'No pudimos cargar el detalle del bot',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyLarge,
-            ),
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.tonal(
-              label: 'Reintentar',
-              onPressed: () => context.read<BotDetailBloc>().add(
-                const BotDetailLoadRequested(),
+    return _BackScaffold(
+      child: Center(
+        key: isNotFound
+            ? const Key('bot_detail.error.not_found')
+            : const Key('bot_detail.error.generic'),
+        child: Padding(
+          padding: const EdgeInsets.all(AppTokens.sp6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                isNotFound
+                    ? 'Este bot ya no existe en tu organización'
+                    : 'No pudimos cargar el detalle del bot',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyLarge,
               ),
-            ),
-          ],
+              const SizedBox(height: AppTokens.sp3),
+              AppButton.tonal(
+                label: 'Reintentar',
+                onPressed: () => context.read<BotDetailBloc>().add(
+                  const BotDetailLoadRequested(),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
