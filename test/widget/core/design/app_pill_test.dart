@@ -63,6 +63,20 @@ void main() {
       expect(d.border?.top.width, 1);
       expect(labelStyle(tester, 'v 1.2')?.color, AppTokens.text2);
     });
+
+    testWidgets('glass: velo oscuro translúcido + fg onPrimary', (
+      tester,
+    ) async {
+      await pumpPill(tester, const AppPill.glass(label: 'v3'));
+      final c = pillContainer(tester);
+      final d = c.decoration as BoxDecoration;
+      // Cápsula de vidrio para fondos vivos (el gradiente de marca): velo
+      // oscuro translúcido (onPrimary @ 0.16) con label onPrimary, hermana de
+      // AppCard.glass. Sin gradiente propio.
+      expect(d.color, AppTokens.onPrimary.withValues(alpha: 0.16));
+      expect(d.gradient, isNull);
+      expect(labelStyle(tester, 'v3')?.color, AppTokens.onPrimary);
+    });
   });
 
   group('AppPill — geometría', () {

@@ -190,6 +190,12 @@ class AppTokens {
   static const double cardPadding = sp5;
   static const double cardGap = 14.0;
 
+  // ── Layout ────────────────────────────────────────────────────────────────
+  /// Ancho máximo del contenido. En pantallas anchas (desktop) la UI se centra
+  /// a este ancho —se ve como una app de teléfono— en vez de estirarse a toda
+  /// la ventana; en móvil es transparente (el max supera el ancho real).
+  static const double maxContentWidth = 450.0;
+
   // ── Typography ──────────────────────────────────────────────────────────
   static const String fontSans = 'DMSans';
 

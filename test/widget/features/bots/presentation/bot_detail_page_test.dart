@@ -116,7 +116,7 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets('Loaded muestra nombre, canal y AppAvatar(size: 64)', (
+  testWidgets('Loaded: header gradiente muestra nombre y canal, sin avatar', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
@@ -125,26 +125,57 @@ void main() {
 
     expect(find.text('Soporte'), findsOneWidget);
     expect(find.text('WhatsApp'), findsOneWidget);
-    // El header usa AppAvatar grande (no CircleAvatar de Material).
-    final avatar = tester.widget<AppAvatar>(find.byType(AppAvatar));
-    expect(avatar.size, 64);
-    expect(avatar.name, 'Soporte');
+    // Un bot no es una persona: el header NO lleva avatar/inicial (se leía como
+    // placeholder de foto de perfil). La marca de agua del robot + el nombre
+    // grande bastan. Sin AppAvatar ni CircleAvatar; sin inicial suelta.
+    expect(find.byType(AppAvatar), findsNothing);
     expect(find.byType(CircleAvatar), findsNothing);
+    expect(find.text('S'), findsNothing);
   });
 
-  testWidgets('Loaded muestra version como AppPill.outline', (tester) async {
+  testWidgets('Loaded: el header tiene botón de volver (key bot_detail.back)', (
+    tester,
+  ) async {
+    // La ruta /bots/:id deja de aportar AppBar: el header full-bleed es el
+    // encabezado y debe ofrecer su propio retorno. maybePop en la raíz del
+    // host es no-op, así que el tap no debe lanzar.
+    when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+    await tester.pumpWidget(host());
+
+    final back = find.byKey(const Key('bot_detail.back'));
+    expect(back, findsOneWidget);
+    await tester.tap(back);
+    await tester.pump();
+  });
+
+  testWidgets('Loaded: el header muestra la versión como AppPill (glass)', (
+    tester,
+  ) async {
     when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
     await tester.pumpWidget(host());
 
     // La versión sale del modelo CAS: el operador la lee para sospechar
-    // colisiones si reporta un bug post-edit. Migra a Pill outline para
-    // no traer Chip de Material al detalle.
+    // colisiones si reporta un bug post-edit. Vive ahora EN la tarjeta del
+    // header como cápsula glass; sin traer Chip de Material.
     expect(find.widgetWithText(AppPill, 'v3'), findsOneWidget);
     expect(find.byType(Chip), findsNothing);
   });
 
-  testWidgets('Loaded(paused=false) muestra AppPill primary "Activo"', (
+  testWidgets('Loaded: el header muestra el identificador del bot', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+    await tester.pumpWidget(host());
+
+    // El identificador del canal (p.ej. el número de WhatsApp) se migró a la
+    // tarjeta del header como cápsula glass.
+    expect(find.widgetWithText(AppPill, '52155...'), findsOneWidget);
+  });
+
+  testWidgets('Loaded(paused=false) muestra AppPill (glass) "Activo"', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
@@ -155,7 +186,7 @@ void main() {
     expect(find.widgetWithText(AppPill, 'Pausado'), findsNothing);
   });
 
-  testWidgets('Loaded(paused=true) muestra AppPill neutral "Pausado"', (
+  testWidgets('Loaded(paused=true) muestra AppPill (glass) "Pausado"', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(

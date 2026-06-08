@@ -6,8 +6,8 @@ import '../tokens.dart';
 enum AppPillDot { active, paused, danger }
 
 /// Variantes visuales del [AppPill]. Privada — los callsites usan los
-/// constructores con nombre (.primary, .neutral, .danger, .outline).
-enum _AppPillVariant { primary, neutral, danger, outline }
+/// constructores con nombre (.primary, .neutral, .danger, .outline, .glass).
+enum _AppPillVariant { primary, neutral, danger, outline, glass }
 
 /// Primitivo Pill / Badge del design system.
 ///
@@ -29,6 +29,13 @@ class AppPill extends StatelessWidget {
 
   const AppPill.outline({super.key, required this.label, this.dot})
     : _variant = _AppPillVariant.outline;
+
+  /// Cápsula de vidrio para fondos vivos (el gradiente de marca): velo oscuro
+  /// translúcido con label `onPrimary`. Hermana de `AppCard.glass`; reemplaza a
+  /// las demás variantes cuando el pill va SOBRE el gradiente (donde el fill
+  /// amarillo de `.primary` o el surface oscuro de `.neutral` no leerían).
+  const AppPill.glass({super.key, required this.label, this.dot})
+    : _variant = _AppPillVariant.glass;
 
   final String label;
   final _AppPillVariant _variant;
@@ -115,6 +122,13 @@ class AppPill extends StatelessWidget {
           foreground: AppTokens.text2,
           border: Border.all(color: AppTokens.divider),
         );
+      // Velo oscuro translúcido sobre el fill cálido: el primer plano oscuro
+      // (onPrimary) lee sobre el ámbar y la cápsula sólo agrupa/separa.
+      case _AppPillVariant.glass:
+        return _AppPillColors(
+          background: AppTokens.onPrimary.withValues(alpha: 0.16),
+          foreground: AppTokens.onPrimary,
+        );
     }
   }
 
@@ -123,6 +137,18 @@ class AppPill extends StatelessWidget {
     // oscuro (onPrimary) para ser visible; un dot cálido se perdería.
     if (variant == _AppPillVariant.primary) {
       return AppTokens.onPrimary;
+    }
+    // En la cápsula glass (sobre el gradiente) los dots cálidos se perderían:
+    // activo = onPrimary sólido, pausado = el mismo atenuado.
+    if (variant == _AppPillVariant.glass) {
+      switch (dot) {
+        case AppPillDot.active:
+          return AppTokens.onPrimary;
+        case AppPillDot.paused:
+          return AppTokens.onPrimary.withValues(alpha: 0.45);
+        case AppPillDot.danger:
+          return AppTokens.danger;
+      }
     }
     switch (dot) {
       case AppPillDot.active:

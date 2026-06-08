@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/design/app_design_theme.dart';
 import 'core/design/widgets/app_background.dart';
+import 'core/design/widgets/app_content_width.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 
@@ -47,9 +48,12 @@ class AtaulfoApp extends StatelessWidget {
           routerConfig: router.router,
           // El glow radial es el fondo absoluto de la app: se pinta una sola
           // vez detrás del navigator y queda fijo mientras las rutas (con
-          // scaffolds transparentes) transicionan encima.
-          builder: (context, child) =>
-              AppBackground(child: child ?? const SizedBox.shrink()),
+          // scaffolds transparentes) transicionan encima. El contenido se
+          // restringe al ancho máximo (centrado en desktop) POR DENTRO del
+          // glow, para que el fondo llene los costados libres.
+          builder: (context, child) => AppBackground(
+            child: AppContentWidth(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
     );

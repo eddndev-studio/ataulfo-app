@@ -438,10 +438,9 @@ class AppRouter {
               create: (_) =>
                   BotDetailBloc(repo: _botsRepo, id: id)
                     ..add(const BotDetailLoadRequested()),
-              child: Scaffold(
-                appBar: AppBar(title: const Text('Detalle del bot')),
-                body: const BotDetailPage(),
-              ),
+              // Sin AppBar: el header full-bleed con gradiente ES el encabezado
+              // (la página aporta su propio retorno en los tres estados).
+              child: const Scaffold(body: BotDetailPage()),
             ),
           );
         },
