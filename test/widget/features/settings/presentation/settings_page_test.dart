@@ -347,16 +347,39 @@ void main() {
     );
   });
 
-  testWidgets('tap Cerrar sesión dispara AuthLoggedOut en el bloc', (
+  testWidgets('Cerrar sesión pide confirmación antes de despachar el logout', (
     tester,
   ) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(host());
     await tester.tap(find.widgetWithText(AppButton, 'Cerrar sesión'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+
+    // El tap abre el diálogo; el logout NO se despacha todavía.
+    expect(find.byType(AlertDialog), findsOneWidget);
+    verifyNever(() => authBloc.add(const AuthLoggedOut()));
+
+    await tester.tap(find.byKey(const Key('settings.logout_confirm')));
+    await tester.pumpAndSettle();
 
     verify(() => authBloc.add(const AuthLoggedOut())).called(1);
+  });
+
+  testWidgets('Cancelar en la confirmación NO cierra la sesión', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.widgetWithText(AppButton, 'Cerrar sesión'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    verifyNever(() => authBloc.add(const AuthLoggedOut()));
   });
 
   testWidgets('non-Authenticated renderiza vacío (trust router redirect)', (

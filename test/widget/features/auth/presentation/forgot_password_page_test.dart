@@ -58,6 +58,35 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('campo vacío: el botón de envío está deshabilitado', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    // Mismo gate de no-vacío que RegisterPage: sin email no hay nada que
+    // enviar, y el AppButton deshabilitado (onPressed null) lo comunica.
+    final button = tester.widget<AppButton>(find.byType(AppButton));
+    expect(button.onPressed, isNull);
+
+    await tester.tap(find.byType(AppButton));
+    await tester.pump();
+
+    verifyNever(() => bloc.add(any()));
+  });
+
+  testWidgets('con email tecleado el botón se habilita', (tester) async {
+    await tester.pumpWidget(host());
+
+    await tester.enterText(
+      find.byKey(const Key('forgot.email')),
+      'op@example.com',
+    );
+    await tester.pump();
+
+    final button = tester.widget<AppButton>(find.byType(AppButton));
+    expect(button.onPressed, isNotNull);
+  });
+
   testWidgets('estado Submitting muestra el botón en loading', (tester) async {
     whenListen(
       bloc,

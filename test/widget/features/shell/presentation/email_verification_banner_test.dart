@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/resend_verification_cubit.dart';
@@ -108,6 +109,30 @@ void main() {
     await tester.pump();
 
     verify(() => resendCubit.resend()).called(1);
+  });
+
+  testWidgets('Sending: Reenviar muestra loading y bloquea re-taps', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_unverified));
+    when(
+      () => resendCubit.state,
+    ).thenReturn(const ResendVerificationSending());
+    when(() => resendCubit.resend()).thenAnswer((_) async {});
+
+    await tester.pumpWidget(host());
+
+    // El botón comunica el envío en curso (spinner inline del AppButton)…
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // …y bloquea el tap mientras tanto: nada de reenvíos en ráfaga.
+    final resendBtn = find.byWidgetPredicate(
+      (w) => w is AppButton && w.label == 'Reenviar',
+    );
+    await tester.tap(resendBtn);
+    await tester.pump();
+
+    verifyNever(() => resendCubit.resend());
   });
 
   testWidgets('Sent muestra el SnackBar de reenvío', (tester) async {
