@@ -153,7 +153,19 @@ class _LoadedView extends StatelessWidget {
         ? null
         : activeMatches.first.orgName;
 
-    return ListView.separated(
+    return Column(
+      children: <Widget>[
+        // Cambio de organización en vuelo: barra fina arriba de la lista —
+        // los taps ya están deshabilitados, pero sin esta señal el tile
+        // tocado parece ignorado.
+        if (switching)
+          const LinearProgressIndicator(
+            key: Key('memberships.switching'),
+            color: AppTokens.primary,
+            backgroundColor: Colors.transparent,
+          ),
+        Expanded(
+          child: ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(
         AppTokens.sp4,
@@ -183,6 +195,9 @@ class _LoadedView extends StatelessWidget {
               : () => context.read<SwitchOrgCubit>().switchTo(m.orgId),
         );
       },
+          ),
+        ),
+      ],
     );
   }
 }

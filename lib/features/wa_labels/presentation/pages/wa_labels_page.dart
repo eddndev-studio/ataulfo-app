@@ -133,10 +133,10 @@ class _WaLabelTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    // onTap nativo del AppCard: ripple/highlight del InkWell interno
+    // (el GestureDetector externo dejaba el tap sin feedback visual).
+    return AppCard(
       onTap: () => WaLabelEditSheet.openEdit(context, label),
-      child: AppCard(
         child: Row(
           children: <Widget>[
             WaLabelSwatch(colorIndex: label.color),
@@ -152,7 +152,6 @@ class _WaLabelTile extends StatelessWidget {
             const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
           ],
         ),
-      ),
     );
   }
 }

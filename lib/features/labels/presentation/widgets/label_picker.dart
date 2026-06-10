@@ -190,8 +190,9 @@ class _LabelOptionTile extends StatelessWidget {
       onTap: enabled ? onTap : null,
       borderRadius: BorderRadius.circular(AppTokens.radiusSm),
       child: Padding(
+        // sp3 vertical ⇒ fila ≥44px: piso táctil para acertar con el pulgar.
         padding: const EdgeInsets.symmetric(
-          vertical: AppTokens.sp2,
+          vertical: AppTokens.sp3,
           horizontal: AppTokens.sp1,
         ),
         child: Row(
@@ -234,7 +235,7 @@ class _UnknownOption extends StatelessWidget {
     return Padding(
       key: Key('$keyPrefix.unknown'),
       padding: const EdgeInsets.symmetric(
-        vertical: AppTokens.sp2,
+        vertical: AppTokens.sp3,
         horizontal: AppTokens.sp1,
       ),
       child: Row(
@@ -249,16 +250,13 @@ class _UnknownOption extends StatelessWidget {
                   'Etiqueta desconocida',
                   style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
                 ),
+                // El rawId NO se renderiza (es ruido para el operador) pero
+                // sigue viajando aguas arriba: el submit lo preserva.
                 Text(
-                  rawId,
+                  'Fue eliminada del catálogo. Elige otra etiqueta.',
                   style: textTheme.bodySmall?.copyWith(
                     color: AppTokens.text2,
-                    fontFamily: 'monospace',
-                    fontFamilyFallback: const <String>[
-                      'RobotoMono',
-                      'Courier',
-                      'monospace',
-                    ],
+                    fontStyle: FontStyle.italic,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

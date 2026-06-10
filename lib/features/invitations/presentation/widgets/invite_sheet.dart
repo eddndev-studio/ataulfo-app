@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/i18n/role_labels.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 
@@ -63,7 +64,12 @@ class _InviteSheetState extends State<InviteSheet> {
     super.dispose();
   }
 
-  bool get _canSubmit => _emailCtrl.text.trim().isNotEmpty;
+  /// Forma mínima de email: algo@algo.punto-algo, sin terminar en punto.
+  /// El veredicto final es del backend; este gate sólo evita el round-trip
+  /// de un typo obvio.
+  static final RegExp _emailShape = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s.]+$');
+
+  bool get _canSubmit => _emailShape.hasMatch(_emailCtrl.text.trim());
 
   void _submit() {
     if (!_canSubmit) return;
@@ -108,7 +114,7 @@ class _InviteSheetState extends State<InviteSheet> {
             key: const Key('invite.role'),
             initialValue: _role,
             items: InviteSheet.roleOptions
-                .map((r) => DropdownMenuItem<String>(value: r, child: Text(r)))
+                .map((r) => DropdownMenuItem<String>(value: r, child: Text(roleLabel(r))))
                 .toList(growable: false),
             onChanged: (v) {
               if (v != null) setState(() => _role = v);

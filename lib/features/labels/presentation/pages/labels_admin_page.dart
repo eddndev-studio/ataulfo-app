@@ -93,10 +93,10 @@ class _LabelTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final hasDescription = label.description.trim().isNotEmpty;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    // onTap nativo del AppCard: ripple/highlight del InkWell interno
+    // (el GestureDetector externo dejaba el tap sin feedback visual).
+    return AppCard(
       onTap: () => LabelEditSheet.openEdit(context, label),
-      child: AppCard(
         child: Row(
           children: <Widget>[
             LabelDot(hex: label.color),
@@ -129,7 +129,6 @@ class _LabelTile extends StatelessWidget {
             const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
           ],
         ),
-      ),
     );
   }
 }

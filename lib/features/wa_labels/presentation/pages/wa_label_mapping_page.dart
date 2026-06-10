@@ -64,7 +64,17 @@ class _LoadedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final waLabels = data.waLabels;
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: () async {
+        final bloc = context.read<WaLabelMappingBloc>();
+        bloc.add(const WaMappingLoadRequested());
+        await bloc.stream.firstWhere(
+          (s) => s is WaMappingLoaded || s is WaMappingFailed,
+          orElse: () => bloc.state,
+        );
+      },
+      child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(
         AppTokens.sp4,
         AppTokens.sp4,
@@ -98,7 +108,8 @@ class _LoadedView extends StatelessWidget {
             ),
             const SizedBox(height: AppTokens.cardGap),
           ],
-      ],
+        ],
+      ),
     );
   }
 }
@@ -124,10 +135,10 @@ class _MappingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final m = mapped;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    // onTap nativo del AppCard: ripple/highlight del InkWell interno
+    // (el GestureDetector externo dejaba el tap sin feedback visual).
+    return AppCard(
       onTap: () => WaMappingSelectorSheet.open(context, waLabel),
-      child: AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -182,7 +193,6 @@ class _MappingRow extends StatelessWidget {
               ),
           ],
         ),
-      ),
     );
   }
 }

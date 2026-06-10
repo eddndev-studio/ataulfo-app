@@ -96,7 +96,17 @@ class WaChatLabelsBloc extends Bloc<WaChatLabelsEvent, WaChatLabelsState> {
     if (snap == null) {
       return;
     }
-    emit(WaChatLabelsMutating(catalog: snap.$1, associated: snap.$2));
+    // Optimista: el checkbox cambia YA (el push a WhatsApp tarda 1-3s y el
+    // sheet pinta `associated` del Mutating); el spinner del título queda
+    // como confirmación de sincronización. Si el push falla, rollback al
+    // snapshot pre-toggle.
+    final next = Set<String>.of(snap.$2);
+    if (event.associate) {
+      next.add(event.waLabelId);
+    } else {
+      next.remove(event.waLabelId);
+    }
+    emit(WaChatLabelsMutating(catalog: snap.$1, associated: next));
     try {
       await _repo.labelChat(
         botId: _botId,
@@ -105,12 +115,6 @@ class WaChatLabelsBloc extends Bloc<WaChatLabelsEvent, WaChatLabelsState> {
         kind: _kind,
         labeled: event.associate,
       );
-      final next = Set<String>.of(snap.$2);
-      if (event.associate) {
-        next.add(event.waLabelId);
-      } else {
-        next.remove(event.waLabelId);
-      }
       emit(WaChatLabelsLoaded(catalog: snap.$1, associated: next));
     } on WaLabelsFailure catch (f) {
       emit(

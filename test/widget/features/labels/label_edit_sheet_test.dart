@@ -58,7 +58,7 @@ void main() {
   }
 
   testWidgets('los swatches de color dan área táctil ≥44px', (tester) async {
-    await pumpCreate(tester);
+    await tester.pumpWidget(host(null));
 
     final swatch = find.byKey(const Key('label_palette.0'));
     expect(swatch, findsOneWidget);

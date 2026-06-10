@@ -66,7 +66,10 @@ void main() {
       const Offset(0, 300),
       1000,
     );
+    // El indicador arma → dispara onRefresh tras asentar su animación.
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 600));
     verify(() => bloc.add(const WaMappingLoadRequested())).called(1);
   });
 

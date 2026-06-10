@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/i18n/role_labels.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
@@ -43,8 +44,8 @@ class InvitationTile extends StatelessWidget {
                   spacing: AppTokens.sp2,
                   runSpacing: AppTokens.sp2,
                   children: <Widget>[
-                    AppPill.neutral(label: invitation.role),
-                    AppPill.outline(label: invitation.status),
+                    AppPill.neutral(label: roleLabel(invitation.role)),
+                    AppPill.outline(label: invitationStatusLabel(invitation.status)),
                     if (expired)
                       const AppPill.danger(
                         key: Key('invitation_tile.expired'),

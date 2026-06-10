@@ -79,10 +79,10 @@ void main() {
     await tester.pumpAndSettle();
 
     for (final role in const <String>[
-      'OWNER',
-      'ADMIN',
-      'SUPERVISOR',
-      'WORKER',
+      'Propietario',
+      'Administrador',
+      'Supervisor',
+      'Agente',
     ]) {
       expect(find.text(role), findsWidgets);
     }

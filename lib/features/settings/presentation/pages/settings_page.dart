@@ -7,6 +7,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/i18n/role_labels.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Pantalla de Settings mínima del shell: muestra el perfil real del
@@ -71,7 +72,7 @@ class SettingsPage extends StatelessWidget {
                 children: <Widget>[
                   const Text('Rol'),
                   const SizedBox(width: AppTokens.sp3),
-                  AppPill.primary(label: identity.role),
+                  AppPill.primary(label: roleLabel(identity.role)),
                 ],
               ),
               const SizedBox(height: AppTokens.sp6),

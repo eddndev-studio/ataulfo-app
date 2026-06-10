@@ -13,16 +13,33 @@ class NotificationPreferencesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<
+    return BlocConsumer<
       NotificationPreferencesBloc,
       NotificationPreferencesState
     >(
+      listener: (context, state) {
+        if (state is NotificationPreferencesSaveFailed) {
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'No pudimos guardar tu preferencia. Intenta de nuevo.',
+                ),
+              ),
+            );
+        }
+      },
       builder: (context, state) {
         return switch (state) {
           NotificationPreferencesInitial() ||
           NotificationPreferencesLoading() => const _PreferencesLoading(),
           NotificationPreferencesLoaded(:final preferences, :final saving) =>
             _PreferencesList(preferences: preferences, saving: saving),
+          // Tras un fallo de guardado la lista sigue viva con las prefs
+          // originales (el switch ya se ve revertido); el SnackBar avisa.
+          NotificationPreferencesSaveFailed(:final preferences) =>
+            _PreferencesList(preferences: preferences, saving: false),
           NotificationPreferencesFailed() => const _PreferencesError(),
         };
       },
