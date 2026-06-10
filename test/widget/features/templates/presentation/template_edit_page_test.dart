@@ -567,7 +567,8 @@ void main() {
 
         await tester.tap(find.byKey(const Key('template_edit.field.provider')));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('OPENAI').last);
+        // El item visible es el label humano del DS, no el wire id.
+        await tester.tap(find.text('OpenAI').last);
         await tester.pumpAndSettle();
 
         // Post-condición: modelo cambió al defaultModel de OPENAI.
@@ -615,7 +616,8 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('template_edit.field.provider')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('OPENAI').last);
+      // El item visible es el label humano del DS, no el wire id.
+        await tester.tap(find.text('OpenAI').last);
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(

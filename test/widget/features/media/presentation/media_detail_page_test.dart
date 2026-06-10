@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_preview_launcher.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
@@ -202,6 +203,22 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repo.delete('tenant/orgA/media/abc.png')).called(1);
+  });
+
+  testWidgets('el diálogo de borrado enfatiza la acción destructiva (DS)', (
+    tester,
+  ) async {
+    // Cancelar=AppButton.text, Borrar=AppButton.danger: el confirmador
+    // destructivo debe distinguirse visualmente, no ser un TextButton plano.
+    final repo = _MockRepo();
+    await tester.pumpWidget(_host(_asset(), repo: repo));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('media_detail.delete')));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppButton, 'Borrar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Cancelar'), findsOneWidget);
   });
 
   testWidgets('cancelar el diálogo NO borra', (tester) async {

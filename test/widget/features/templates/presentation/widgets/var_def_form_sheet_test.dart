@@ -523,5 +523,46 @@ void main() {
         verifyNever(() => bloc.add(any(that: isA<VarDefsUpdateRequested>())));
       },
     );
+
+    testWidgets(
+      'submit sin cambios CIERRA el sheet (no deja al operador colgado)',
+      (tester) async {
+        // El no-op sigue sin dispatchar, pero "Guardar" debe responder:
+        // cerrar el sheet, consistente con el auto-pop del éxito.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => ElevatedButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => BlocProvider<VarDefsBloc>.value(
+                        value: bloc,
+                        child: Scaffold(
+                          body: VarDefFormSheet(
+                            existingNames: <String>{'nombre', 'edad'},
+                            editing: editing,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('var_def_form.submit')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('var_def_form.submit')), findsNothing);
+        verifyNever(() => bloc.add(any(that: isA<VarDefsUpdateRequested>())));
+      },
+    );
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
@@ -483,5 +484,101 @@ void main() {
     expect(find.byType(SnackBar), findsOneWidget);
     // La lista sigue visible (no colapsó a un estado de error terminal).
     expect(find.byType(MediaThumbnail), findsOneWidget);
+  });
+
+  group('barrido UX galería', () {
+    testWidgets('las tabs de tipo usan AppChoiceChip del design system', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
+      );
+      await tester.pumpWidget(host());
+
+      expect(find.byType(AppChoiceChip), findsNWidgets(5));
+      expect(find.byType(ChoiceChip), findsNothing);
+    });
+
+    testWidgets('fallo de load-more muestra fila de error con Reintentar', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a')],
+          nextCursor: 'cur-1',
+          loadMoreError: const MediaNetworkFailure(),
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      expect(find.text('No se pudo cargar más'), findsOneWidget);
+      await tester.ensureVisible(find.text('Reintentar'));
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+
+      verify(
+        () => bloc.add(const MediaGalleryLoadMoreRequested()),
+      ).called(1);
+    });
+
+    testWidgets('overlay de borrado en lote muestra el progreso X de Y', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a')],
+          nextCursor: '',
+          isDeleting: true,
+          deleteTotal: 3,
+          deleteDone: 1,
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      expect(find.text('Borrando 1 de 3…'), findsOneWidget);
+    });
+
+    testWidgets('vacío FILTRADO ofrece limpiar filtros (no el copy de galería virgen)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const MediaGalleryLoaded(
+          items: <MediaAsset>[],
+          nextCursor: '',
+          query: 'zzz',
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      expect(find.text('Sin resultados para esta búsqueda'), findsOneWidget);
+      expect(
+        find.text('Todavía no hay archivos en la galería'),
+        findsNothing,
+      );
+
+      await tester.tap(find.text('Limpiar filtros'));
+      await tester.pump();
+      verify(() => bloc.add(const MediaGallerySearchChanged(''))).called(1);
+      verify(() => bloc.add(const MediaGalleryTypeChanged(null))).called(1);
+    });
+
+    testWidgets('confirmación de borrado en lote usa AppButton.danger', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a')],
+          nextCursor: '',
+          selectedRefs: const <String>{'media/a'},
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('media_gallery.selection_delete')));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(AppButton, 'Borrar'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Cancelar'), findsOneWidget);
+    });
   });
 }
