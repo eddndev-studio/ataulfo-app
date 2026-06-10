@@ -19,6 +19,7 @@ class FlowResp {
     required this.cooldownMs,
     required this.usageLimit,
     required this.excludesFlows,
+    this.aiInvocable = false,
   });
 
   factory FlowResp.fromJson(Map<String, dynamic> json) {
@@ -26,6 +27,9 @@ class FlowResp {
     final templateId = json['templateId'];
     final name = json['name'];
     final isActive = json['isActive'];
+    // Tolerante (no fail-loud): un backend previo al campo no lo sirve y la
+    // app debe degradar a false durante la ventana de despliegue.
+    final aiInvocable = json['aiInvocable'];
     final version = json['version'];
     final cooldownMs = json['cooldownMs'];
     final usageLimit = json['usageLimit'];
@@ -54,6 +58,7 @@ class FlowResp {
       templateId: templateId,
       name: name,
       isActive: isActive,
+      aiInvocable: aiInvocable is bool ? aiInvocable : false,
       version: version,
       cooldownMs: cooldownMs,
       usageLimit: usageLimit,
@@ -65,6 +70,7 @@ class FlowResp {
   final String templateId;
   final String name;
   final bool isActive;
+  final bool aiInvocable;
   final int version;
   final int cooldownMs;
   final int usageLimit;

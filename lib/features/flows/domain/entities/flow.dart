@@ -24,12 +24,19 @@ class Flow {
     required this.cooldownMs,
     required this.usageLimit,
     required this.excludesFlows,
+    this.aiInvocable = false,
   });
 
   final String id;
   final String templateId;
   final String name;
   final bool isActive;
+
+  /// Allowlist del agente IA (S11 RF#17): sólo los flows marcados pueden ser
+  /// listados/ejecutados por el agente conversacional. Default `false` —
+  /// que un LLM dispare un flujo es opt-in explícito del operador.
+  final bool aiInvocable;
+
   final int version;
   final int cooldownMs;
   final int usageLimit;
@@ -43,6 +50,7 @@ class Flow {
         other.templateId != templateId ||
         other.name != name ||
         other.isActive != isActive ||
+        other.aiInvocable != aiInvocable ||
         other.version != version ||
         other.cooldownMs != cooldownMs ||
         other.usageLimit != usageLimit) {
@@ -61,6 +69,7 @@ class Flow {
     templateId,
     name,
     isActive,
+    aiInvocable,
     version,
     cooldownMs,
     usageLimit,

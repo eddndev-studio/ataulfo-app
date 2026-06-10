@@ -10,6 +10,7 @@ class FlowsMapper {
     templateId: resp.templateId,
     name: resp.name,
     isActive: resp.isActive,
+    aiInvocable: resp.aiInvocable,
     version: resp.version,
     cooldownMs: resp.cooldownMs,
     usageLimit: resp.usageLimit,
