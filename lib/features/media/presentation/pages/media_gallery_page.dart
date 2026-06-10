@@ -637,12 +637,9 @@ class _EmptyView extends StatelessWidget {
                           Builder(
                             builder: (context) => AppButton.text(
                               label: 'Limpiar filtros',
-                              onPressed: () =>
-                                  context.read<MediaGalleryBloc>()
-                                    ..add(
-                                      const MediaGallerySearchChanged(''),
-                                    )
-                                    ..add(const MediaGalleryTypeChanged(null)),
+                              onPressed: () => context.read<MediaGalleryBloc>()
+                                ..add(const MediaGallerySearchChanged(''))
+                                ..add(const MediaGalleryTypeChanged(null)),
                             ),
                           ),
                         ],

@@ -530,9 +530,7 @@ void main() {
       await tester.tap(find.text('Reintentar'));
       await tester.pump();
 
-      verify(
-        () => bloc.add(const MediaGalleryLoadMoreRequested()),
-      ).called(1);
+      verify(() => bloc.add(const MediaGalleryLoadMoreRequested())).called(1);
     });
 
     testWidgets('overlay de borrado en lote muestra el progreso X de Y', (
@@ -552,29 +550,30 @@ void main() {
       expect(find.text('Borrando 1 de 3…'), findsOneWidget);
     });
 
-    testWidgets('vacío FILTRADO ofrece limpiar filtros (no el copy de galería virgen)', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(
-        const MediaGalleryLoaded(
-          items: <MediaAsset>[],
-          nextCursor: '',
-          query: 'zzz',
-        ),
-      );
-      await tester.pumpWidget(host());
+    testWidgets(
+      'vacío FILTRADO ofrece limpiar filtros (no el copy de galería virgen)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          const MediaGalleryLoaded(
+            items: <MediaAsset>[],
+            nextCursor: '',
+            query: 'zzz',
+          ),
+        );
+        await tester.pumpWidget(host());
 
-      expect(find.text('Sin resultados para esta búsqueda'), findsOneWidget);
-      expect(
-        find.text('Todavía no hay archivos en la galería'),
-        findsNothing,
-      );
+        expect(find.text('Sin resultados para esta búsqueda'), findsOneWidget);
+        expect(
+          find.text('Todavía no hay archivos en la galería'),
+          findsNothing,
+        );
 
-      await tester.tap(find.text('Limpiar filtros'));
-      await tester.pump();
-      verify(() => bloc.add(const MediaGallerySearchChanged(''))).called(1);
-      verify(() => bloc.add(const MediaGalleryTypeChanged(null))).called(1);
-    });
+        await tester.tap(find.text('Limpiar filtros'));
+        await tester.pump();
+        verify(() => bloc.add(const MediaGallerySearchChanged(''))).called(1);
+        verify(() => bloc.add(const MediaGalleryTypeChanged(null))).called(1);
+      },
+    );
 
     testWidgets('confirmación de borrado en lote usa AppButton.danger', (
       tester,

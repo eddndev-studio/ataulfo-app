@@ -58,31 +58,31 @@ class _NotificationsList extends StatelessWidget {
         );
       },
       child: ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(AppTokens.sp6),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Wrap(
-            alignment: WrapAlignment.end,
-            spacing: AppTokens.sp3,
-            runSpacing: AppTokens.sp3,
-            children: <Widget>[
-              const _PreferencesButton(),
-              AppButton.tonal(
-                label: 'Marcar todo leído',
-                icon: Icons.done_all_outlined,
-                onPressed: () => context.read<NotificationsBloc>().add(
-                  const NotificationsMarkAllReadRequested(),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(AppTokens.sp6),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Wrap(
+              alignment: WrapAlignment.end,
+              spacing: AppTokens.sp3,
+              runSpacing: AppTokens.sp3,
+              children: <Widget>[
+                const _PreferencesButton(),
+                AppButton.tonal(
+                  label: 'Marcar todo leído',
+                  icon: Icons.done_all_outlined,
+                  onPressed: () => context.read<NotificationsBloc>().add(
+                    const NotificationsMarkAllReadRequested(),
+                  ),
                 ),
-              ),
-            ],
-          );
-        }
-        final item = items[index - 1];
-        return _NotificationItem(item: item);
-      },
-      separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
-      itemCount: items.length + 1,
+              ],
+            );
+          }
+          final item = items[index - 1];
+          return _NotificationItem(item: item);
+        },
+        separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
+        itemCount: items.length + 1,
       ),
     );
   }

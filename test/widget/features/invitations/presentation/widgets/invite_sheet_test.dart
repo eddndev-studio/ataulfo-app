@@ -68,7 +68,8 @@ void main() {
     expect(
       submit.onPressed,
       isNull,
-      reason: 'sin @ con texto a ambos lados y punto en el dominio, '
+      reason:
+          'sin @ con texto a ambos lados y punto en el dominio, '
           'el backend lo rechazaría: mejor gatear local',
     );
   });

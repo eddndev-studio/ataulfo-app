@@ -137,21 +137,21 @@ class _WaLabelTile extends StatelessWidget {
     // (el GestureDetector externo dejaba el tap sin feedback visual).
     return AppCard(
       onTap: () => WaLabelEditSheet.openEdit(context, label),
-        child: Row(
-          children: <Widget>[
-            WaLabelSwatch(colorIndex: label.color),
-            const SizedBox(width: AppTokens.sp4),
-            Expanded(
-              child: Text(
-                label.name,
-                style: textTheme.titleMedium,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+      child: Row(
+        children: <Widget>[
+          WaLabelSwatch(colorIndex: label.color),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Text(
+              label.name,
+              style: textTheme.titleMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
-          ],
-        ),
+          ),
+          const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
+        ],
+      ),
     );
   }
 }

@@ -114,7 +114,12 @@ class _InviteSheetState extends State<InviteSheet> {
             key: const Key('invite.role'),
             initialValue: _role,
             items: InviteSheet.roleOptions
-                .map((r) => DropdownMenuItem<String>(value: r, child: Text(roleLabel(r))))
+                .map(
+                  (r) => DropdownMenuItem<String>(
+                    value: r,
+                    child: Text(roleLabel(r)),
+                  ),
+                )
                 .toList(growable: false),
             onChanged: (v) {
               if (v != null) setState(() => _role = v);

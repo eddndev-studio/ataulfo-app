@@ -177,8 +177,7 @@ class _ConversationTile extends StatelessWidget {
         ? _previewLabel(c.lastMessageType, c.lastMessagePreview)
         : 'Sin mensajes';
     final hasUnread = c.unreadCount > 0;
-    final showSecondaryRow =
-        (secondary != null && secondary.isNotEmpty) || hasUnread;
+    final showSecondaryRow = secondary.isNotEmpty || hasUnread;
 
     final pills = <Widget>[
       if (c.isMarkedUnread) const AppPill.primary(label: 'No leído'),
@@ -233,7 +232,7 @@ class _ConversationTile extends StatelessWidget {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          secondary ?? '',
+                          secondary,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: textTheme.bodyMedium?.copyWith(
@@ -326,4 +325,3 @@ String _previewLabel(String? type, String? preview) {
     _ => '[$type]',
   };
 }
-

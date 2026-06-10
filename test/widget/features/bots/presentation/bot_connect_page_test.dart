@@ -189,10 +189,7 @@ void main() {
 
       // El borrado es asíncrono y sin estado propio en el bloc: el SnackBar
       // es el único feedback de que la acción se registró.
-      expect(
-        find.textContaining('Credenciales borradas'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Credenciales borradas'), findsOneWidget);
     });
 
     testWidgets('WABA: la sección wipe está oculta', (tester) async {

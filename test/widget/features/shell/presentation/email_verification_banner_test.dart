@@ -115,9 +115,7 @@ void main() {
     tester,
   ) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_unverified));
-    when(
-      () => resendCubit.state,
-    ).thenReturn(const ResendVerificationSending());
+    when(() => resendCubit.state).thenReturn(const ResendVerificationSending());
     when(() => resendCubit.resend()).thenAnswer((_) async {});
 
     await tester.pumpWidget(host());

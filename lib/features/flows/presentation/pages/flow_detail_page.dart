@@ -307,9 +307,7 @@ class _StepsListView extends StatelessWidget {
     // el paso LABEL muestre el nombre y no el UUID.
     final labelsState = context.watch<LabelsBloc>().state;
     final labelNames = labelsState is LabelsLoaded
-        ? <String, String>{
-            for (final l in labelsState.labels) l.id: l.name,
-          }
+        ? <String, String>{for (final l in labelsState.labels) l.id: l.name}
         : const <String, String>{};
 
     if (steps.isEmpty) {

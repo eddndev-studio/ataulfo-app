@@ -170,7 +170,9 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
     final textTheme = Theme.of(context).textTheme;
     final items = MemberEditSheet.roleOptions
         // value crudo del contrato; sólo el texto visible se humaniza.
-        .map((r) => DropdownMenuItem<String>(value: r, child: Text(roleLabel(r))))
+        .map(
+          (r) => DropdownMenuItem<String>(value: r, child: Text(roleLabel(r))),
+        )
         .toList(growable: false);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(

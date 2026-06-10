@@ -45,7 +45,9 @@ class InvitationTile extends StatelessWidget {
                   runSpacing: AppTokens.sp2,
                   children: <Widget>[
                     AppPill.neutral(label: roleLabel(invitation.role)),
-                    AppPill.outline(label: invitationStatusLabel(invitation.status)),
+                    AppPill.outline(
+                      label: invitationStatusLabel(invitation.status),
+                    ),
                     if (expired)
                       const AppPill.danger(
                         key: Key('invitation_tile.expired'),

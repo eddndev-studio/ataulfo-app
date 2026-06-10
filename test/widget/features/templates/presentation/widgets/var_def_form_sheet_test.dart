@@ -539,7 +539,7 @@ void main() {
                     MaterialPageRoute<void>(
                       builder: (_) => BlocProvider<VarDefsBloc>.value(
                         value: bloc,
-                        child: Scaffold(
+                        child: const Scaffold(
                           body: VarDefFormSheet(
                             existingNames: <String>{'nombre', 'edad'},
                             editing: editing,

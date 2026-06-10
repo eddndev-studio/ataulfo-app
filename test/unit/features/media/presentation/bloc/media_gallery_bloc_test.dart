@@ -769,7 +769,8 @@ void main() {
               q: any(named: 'q'),
             ),
           ).thenAnswer(
-            (_) async => MediaPage(assets: const <MediaAsset>[], nextCursor: ''),
+            (_) async =>
+                const MediaPage(assets: <MediaAsset>[], nextCursor: ''),
           );
           return MediaGalleryBloc(repo: _lastRepo, picker: _MockPicker());
         },

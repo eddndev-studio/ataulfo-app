@@ -97,38 +97,38 @@ class _LabelTile extends StatelessWidget {
     // (el GestureDetector externo dejaba el tap sin feedback visual).
     return AppCard(
       onTap: () => LabelEditSheet.openEdit(context, label),
-        child: Row(
-          children: <Widget>[
-            LabelDot(hex: label.color),
-            const SizedBox(width: AppTokens.sp4),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
+      child: Row(
+        children: <Widget>[
+          LabelDot(hex: label.color),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  label.name,
+                  style: textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (hasDescription) ...<Widget>[
+                  const SizedBox(height: AppTokens.sp1),
                   Text(
-                    label.name,
-                    style: textTheme.titleMedium,
-                    maxLines: 1,
+                    label.description,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppTokens.text2,
+                    ),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (hasDescription) ...<Widget>[
-                    const SizedBox(height: AppTokens.sp1),
-                    Text(
-                      label.description,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppTokens.text2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
-          ],
-        ),
+          ),
+          const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
+        ],
+      ),
     );
   }
 }

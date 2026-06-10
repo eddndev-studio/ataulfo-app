@@ -34,33 +34,33 @@ class MessageThreadPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return _ReactFailuresListener(
       child: BlocBuilder<MessagesBloc, MessagesState>(
-      builder: (context, state) => Column(
-        children: <Widget>[
-          Expanded(
-            child: switch (state) {
-              MessagesInitial() || MessagesLoading() => const _LoadingView(),
-              MessagesLoaded(
-                items: final items,
-                prevCursor: final prevCursor,
-                isLoadingOlder: final isLoadingOlder,
-                pending: final pending,
-              ) =>
-                (items.isEmpty && pending.isEmpty)
-                    ? const _EmptyView()
-                    : _ThreadView(
-                        items: items,
-                        pending: pending,
-                        hasMore: prevCursor != null,
-                        isLoadingOlder: isLoadingOlder,
-                      ),
-              MessagesFailed(failure: final f) => _FailedView(failure: f),
-            },
-          ),
-          // El composer sólo con hilo cargado: enviar exige una conversación
-          // abierta (en Loading/Failed no hay a dónde escribir).
-          if (state is MessagesLoaded) const MessageComposer(),
-        ],
-      ),
+        builder: (context, state) => Column(
+          children: <Widget>[
+            Expanded(
+              child: switch (state) {
+                MessagesInitial() || MessagesLoading() => const _LoadingView(),
+                MessagesLoaded(
+                  items: final items,
+                  prevCursor: final prevCursor,
+                  isLoadingOlder: final isLoadingOlder,
+                  pending: final pending,
+                ) =>
+                  (items.isEmpty && pending.isEmpty)
+                      ? const _EmptyView()
+                      : _ThreadView(
+                          items: items,
+                          pending: pending,
+                          hasMore: prevCursor != null,
+                          isLoadingOlder: isLoadingOlder,
+                        ),
+                MessagesFailed(failure: final f) => _FailedView(failure: f),
+              },
+            ),
+            // El composer sólo con hilo cargado: enviar exige una conversación
+            // abierta (en Loading/Failed no hay a dónde escribir).
+            if (state is MessagesLoaded) const MessageComposer(),
+          ],
+        ),
       ),
     );
   }
@@ -793,7 +793,6 @@ class _QuotedPreview extends StatelessWidget {
     );
   }
 }
-
 
 /// Tick de entrega estilo mensajería: ✓ enviado, ✓✓ entregado (gris), ✓✓ leído
 /// (verde de la sección de chat), ⚠ falló (rojo). El receipt en vivo

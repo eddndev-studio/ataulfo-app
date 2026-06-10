@@ -944,9 +944,9 @@ void main() {
     testWidgets('paso LABEL muestra el NOMBRE de la etiqueta, no el UUID', (
       tester,
     ) async {
-      when(() => stepsBloc.state).thenReturn(
-        FlowStepsLoaded(<fdom.Step>[labelStep()]),
-      );
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(FlowStepsLoaded(<fdom.Step>[labelStep()]));
       when(() => labelsBloc.state).thenReturn(
         const LabelsLoaded(<Label>[
           Label(id: 'L1', name: 'VIP', color: '#FF8800', description: ''),
@@ -955,19 +955,14 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      expect(
-        find.textContaining('VIP', findRichText: true),
-        findsOneWidget,
-      );
+      expect(find.textContaining('VIP', findRichText: true), findsOneWidget);
       expect(find.textContaining('L1', findRichText: true), findsNothing);
     });
 
-    testWidgets('paso LABEL cae al id crudo sólo sin catálogo', (
-      tester,
-    ) async {
-      when(() => stepsBloc.state).thenReturn(
-        FlowStepsLoaded(<fdom.Step>[labelStep()]),
-      );
+    testWidgets('paso LABEL cae al id crudo sólo sin catálogo', (tester) async {
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(FlowStepsLoaded(<fdom.Step>[labelStep()]));
       when(() => labelsBloc.state).thenReturn(const LabelsLoading());
 
       await tester.pumpWidget(host());
@@ -985,10 +980,7 @@ void main() {
       whenListen(
         stepsBloc,
         Stream<FlowStepsState>.fromIterable(<FlowStepsState>[
-          FlowStepsMutationFailed(
-            seed.steps,
-            const FlowsNetworkFailure(),
-          ),
+          FlowStepsMutationFailed(seed.steps, const FlowsNetworkFailure()),
         ]),
         initialState: seed,
       );
@@ -998,7 +990,9 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text('No se pudo guardar el nuevo orden. Se revirtieron los cambios.'),
+        find.text(
+          'No se pudo guardar el nuevo orden. Se revirtieron los cambios.',
+        ),
         findsOneWidget,
       );
     });
@@ -1007,10 +1001,7 @@ void main() {
       tester,
     ) async {
       when(() => stepsBloc.state).thenReturn(
-        FlowStepsLoaded(<fdom.Step>[
-          textStep(),
-          labelStep(id: 's1', order: 1),
-        ]),
+        FlowStepsLoaded(<fdom.Step>[textStep(), labelStep(id: 's1', order: 1)]),
       );
 
       await tester.pumpWidget(host());

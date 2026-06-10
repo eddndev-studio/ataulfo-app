@@ -61,11 +61,7 @@ void main() {
 
     // El gesto despacha una recarga (la única vía de ver labels nuevos sin
     // salir y volver a entrar).
-    await tester.fling(
-      find.byType(ListView),
-      const Offset(0, 300),
-      1000,
-    );
+    await tester.fling(find.byType(ListView), const Offset(0, 300), 1000);
     // El indicador arma → dispara onRefresh tras asentar su animación.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));

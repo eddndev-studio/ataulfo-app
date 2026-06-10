@@ -35,19 +35,13 @@ void main() {
   });
 
   test('cruce de medianoche: 00:01 de hoy sigue siendo hoy', () {
-    expect(
-      smartTimestamp(ms(DateTime(2026, 6, 9, 0, 1)), now: now),
-      '00:01',
-    );
+    expect(smartTimestamp(ms(DateTime(2026, 6, 9, 0, 1)), now: now), '00:01');
   });
 
   test('ayer cruzando mes (1º del mes a las 00:30)', () {
     final firstOfMonth = DateTime(2026, 6, 1, 0, 30);
     expect(
-      smartTimestamp(
-        ms(DateTime(2026, 5, 31, 22, 0)),
-        now: firstOfMonth,
-      ),
+      smartTimestamp(ms(DateTime(2026, 5, 31, 22, 0)), now: firstOfMonth),
       'Ayer 22:00',
     );
   });

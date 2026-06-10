@@ -137,8 +137,7 @@ void main() {
           ),
           BlocProvider<LabelsBloc>(
             create: (_) =>
-                LabelsBloc(repo: labelsRepo)
-                  ..add(const LabelsLoadRequested()),
+                LabelsBloc(repo: labelsRepo)..add(const LabelsLoadRequested()),
           ),
         ],
         child: const Scaffold(body: FlowDetailPage()),
