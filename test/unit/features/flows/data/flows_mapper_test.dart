@@ -38,6 +38,50 @@ void main() {
     );
   });
 
+  group('FlowsMapper.flowRespToEntity aiInvocable', () {
+    test('propaga aiInvocable=true del DTO a la entity', () {
+      const resp = FlowResp(
+        id: 'f1',
+        templateId: 't1',
+        name: 'IA flow',
+        isActive: true,
+        aiInvocable: true,
+        version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
+      );
+
+      expect(FlowsMapper.flowRespToEntity(resp).aiInvocable, isTrue);
+    });
+
+    test('la entity equipara por aiInvocable (== y hashCode lo incluyen)', () {
+      const a = Flow(
+        id: 'f1',
+        templateId: 't1',
+        name: 'n',
+        isActive: true,
+        aiInvocable: true,
+        version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
+      );
+      const b = Flow(
+        id: 'f1',
+        templateId: 't1',
+        name: 'n',
+        isActive: true,
+        version: 1,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: <String>[],
+      );
+
+      expect(a == b, isFalse);
+    });
+  });
+
   group('FlowsMapper.listToFlows', () {
     test(
       'traduce el wrapper a List<Flow> preservando el orden del backend',
