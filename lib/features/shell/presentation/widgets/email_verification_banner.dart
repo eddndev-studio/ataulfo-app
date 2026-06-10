@@ -72,9 +72,18 @@ class _BannerBody extends StatelessWidget {
               style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
             ),
           ),
-          AppButton.text(
-            label: 'Reenviar',
-            onPressed: () => context.read<ResendVerificationCubit>().resend(),
+          // Sólo el botón observa el cubit: el loading inline del AppButton
+          // bloquea re-taps durante el envío sin reconstruir el banner entero.
+          BlocBuilder<ResendVerificationCubit, ResendVerificationState>(
+            builder: (context, state) {
+              final sending = state is ResendVerificationSending;
+              return AppButton.text(
+                label: 'Reenviar',
+                loading: sending,
+                onPressed: () =>
+                    context.read<ResendVerificationCubit>().resend(),
+              );
+            },
           ),
           AppButton.text(
             label: 'Verificar',

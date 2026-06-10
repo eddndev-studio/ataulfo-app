@@ -20,6 +20,36 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
+  /// Confirmación previa al logout: cerrar sesión descarta el estado local y
+  /// obliga a re-autenticarse, así que un tap accidental no debe bastar.
+  Future<void> _confirmLogout(BuildContext context) async {
+    // Capturado antes del await: el dialog desmonta/remonta contextos.
+    final authBloc = context.read<AuthBloc>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Cerrar sesión?'),
+        content: const Text(
+          'Tendrás que volver a iniciar sesión para acceder.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('settings.logout_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      authBloc.add(const AuthLoggedOut());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(
@@ -114,8 +144,7 @@ class SettingsPage extends StatelessWidget {
               AppButton.danger(
                 label: 'Cerrar sesión',
                 fullWidth: true,
-                onPressed: () =>
-                    context.read<AuthBloc>().add(const AuthLoggedOut()),
+                onPressed: () => _confirmLogout(context),
               ),
             ],
           ),

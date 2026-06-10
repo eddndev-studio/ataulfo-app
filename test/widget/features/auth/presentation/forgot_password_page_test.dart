@@ -50,6 +50,9 @@ void main() {
       find.byKey(const Key('forgot.email')),
       'op@example.com',
     );
+    // El gate de no-vacío rebuilda el botón al teclear (igual que Register):
+    // un pump antes del tap para que el onPressed habilitado esté montado.
+    await tester.pump();
     await tester.tap(find.byType(AppButton));
     await tester.pump();
 
