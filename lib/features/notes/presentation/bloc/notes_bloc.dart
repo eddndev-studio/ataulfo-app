@@ -137,6 +137,11 @@ sealed class NotesEvent {
 
 class NotesLoadRequested extends NotesEvent {
   const NotesLoadRequested();
+
+  @override
+  bool operator ==(Object other) => other is NotesLoadRequested;
+  @override
+  int get hashCode => (NotesLoadRequested).hashCode;
 }
 
 class NotesCreateRequested extends NotesEvent {
@@ -149,6 +154,15 @@ class NotesCreateRequested extends NotesEvent {
   final String content;
   final List<String> tags;
   final String color;
+
+  @override
+  bool operator ==(Object other) =>
+      other is NotesCreateRequested &&
+      other.content == content &&
+      other.color == color &&
+      _sameTags(other.tags, tags);
+  @override
+  int get hashCode => Object.hash(content, color, Object.hashAll(tags));
 }
 
 class NotesUpdateRequested extends NotesEvent {
@@ -165,6 +179,18 @@ class NotesUpdateRequested extends NotesEvent {
   final String content;
   final List<String> tags;
   final String color;
+
+  @override
+  bool operator ==(Object other) =>
+      other is NotesUpdateRequested &&
+      other.id == id &&
+      other.version == version &&
+      other.content == content &&
+      other.color == color &&
+      _sameTags(other.tags, tags);
+  @override
+  int get hashCode =>
+      Object.hash(id, version, content, color, Object.hashAll(tags));
 }
 
 class NotesDeleteRequested extends NotesEvent {
@@ -172,6 +198,22 @@ class NotesDeleteRequested extends NotesEvent {
 
   final String id;
   final int version;
+
+  @override
+  bool operator ==(Object other) =>
+      other is NotesDeleteRequested &&
+      other.id == id &&
+      other.version == version;
+  @override
+  int get hashCode => Object.hash(id, version);
+}
+
+bool _sameTags(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 // States --------------------------------------------------------------------

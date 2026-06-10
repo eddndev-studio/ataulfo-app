@@ -22,6 +22,10 @@ final _existing = Note(
 );
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(const NotesLoadRequested());
+  });
+
   late _MockNotesBloc bloc;
 
   setUp(() {
