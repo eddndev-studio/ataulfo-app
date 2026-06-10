@@ -256,4 +256,37 @@ void main() {
       expect(md.windows, hasLength(1));
     });
   });
+
+  group('aviso inline de ventana inválida (barrido UX)', () {
+    testWidgets('desde ≥ hasta muestra el motivo del bloqueo', (tester) async {
+      // Sin este aviso el guardado se bloquea (toWireOrNull = null) sin que
+      // el operador sepa por qué.
+      await pumpForm(
+        tester,
+        initial: const ConditionalTimeMetadata(
+          tz: 'America/Mexico_City',
+          windows: <TimeWindow>[
+            TimeWindow(days: <int>[1, 2], from: '18:00', to: '09:00'),
+          ],
+          onMatchOrder: 0,
+          onElseOrder: 1,
+        ),
+      );
+
+      expect(
+        find.text('La hora de inicio debe ser anterior al final'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('ventana válida no muestra ningún aviso', (tester) async {
+      await pumpForm(tester);
+
+      expect(
+        find.text('La hora de inicio debe ser anterior al final'),
+        findsNothing,
+      );
+      expect(find.text('Selecciona al menos un día'), findsNothing);
+    });
+  });
 }

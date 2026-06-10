@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
+import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
@@ -147,6 +149,58 @@ void main() {
       ),
     );
   }
+
+  group('UX del sheet (barrido)', () {
+    testWidgets('con teclado abierto el sheet aplica el inset inferior', (
+      tester,
+    ) async {
+      // Simula el teclado: el sheet DEBE reaccionar por sí mismo al
+      // viewInsets (el padre lo abría con un inset congelado al momento de
+      // abrir, que nunca se actualizaba al aparecer el teclado).
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TriggersBloc>.value(value: triggers),
+              BlocProvider<LabelsBloc>.value(value: labels),
+            ],
+            child: MediaQuery(
+              data: const MediaQueryData(
+                viewInsets: EdgeInsets.only(bottom: 300),
+              ),
+              child: Scaffold(
+                body: TriggerEditSheet(scopedFlow: _flow()),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final padding = find.byWidgetPredicate(
+        (w) =>
+            w is Padding &&
+            w.padding.resolve(TextDirection.ltr).bottom >= 300 &&
+            w.child is SingleChildScrollView,
+      );
+      expect(padding, findsOneWidget);
+    });
+
+    testWidgets('los pickers usan AppChoiceChip (Semantics + área táctil)', (
+      tester,
+    ) async {
+      await pumpHost(tester);
+
+      // Migrados del par AppPill+InkWell (sin Semantics de botón y con el
+      // seleccionado inerte) al chip controlado del design system.
+      expect(find.byType(AppChoiceChip), findsWidgets);
+      expect(find.byType(AppPill), findsNothing);
+    });
+  });
 
   group('TriggerEditSheet (Add mode)', () {
     testWidgets('renderiza título "Nuevo disparador" + controles base', (

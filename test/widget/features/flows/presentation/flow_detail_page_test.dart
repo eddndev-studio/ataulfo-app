@@ -13,6 +13,7 @@ import 'package:ataulfo/features/flows/presentation/bloc/media_names_cubit.dart'
 import 'package:ataulfo/features/flows/presentation/pages/flow_detail_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
+import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/triggers/presentation/widgets/flow_triggers_tab.dart';
@@ -34,6 +35,9 @@ class _MockLabelsRepo extends Mock implements LabelsRepository {}
 
 class _MockMediaNamesCubit extends MockCubit<MediaNamesState>
     implements MediaNamesCubit {}
+
+class _MockLabelsBloc extends MockBloc<LabelsEvent, LabelsState>
+    implements LabelsBloc {}
 
 const _flow = flows.Flow(
   id: 'f1',
@@ -57,6 +61,7 @@ void main() {
   late _MockTriggersRepo triggersRepo;
   late _MockLabelsRepo labelsRepo;
   late _MockMediaNamesCubit mediaNamesCubit;
+  late _MockLabelsBloc labelsBloc;
 
   setUp(() {
     detailBloc = _MockDetailBloc();
@@ -64,8 +69,12 @@ void main() {
     triggersRepo = _MockTriggersRepo();
     labelsRepo = _MockLabelsRepo();
     mediaNamesCubit = _MockMediaNamesCubit();
+    labelsBloc = _MockLabelsBloc();
     when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
     when(() => stepsBloc.state).thenReturn(const FlowStepsLoading());
+    // Catálogo de labels sin cargar por default: los pasos LABEL caen al
+    // respaldo (id crudo) salvo en los tests que pueblan el catálogo.
+    when(() => labelsBloc.state).thenReturn(const LabelsLoading());
     // Resolutor de nombres por default vacío (sin cargar): los pasos
     // multimedia caen a su respaldo (media_filename / cola corta del ref).
     when(() => mediaNamesCubit.state).thenReturn(const MediaNamesState());
@@ -91,6 +100,7 @@ void main() {
           BlocProvider<FlowDetailBloc>.value(value: detailBloc),
           BlocProvider<FlowStepsBloc>.value(value: stepsBloc),
           BlocProvider<MediaNamesCubit>.value(value: mediaNamesCubit),
+          BlocProvider<LabelsBloc>.value(value: labelsBloc),
         ],
         child: const Scaffold(body: FlowDetailPage()),
       ),
@@ -897,4 +907,133 @@ void main() {
       expect(find.byKey(const Key('step_edit.media_change')), findsOneWidget);
     },
   );
+
+  group('UX del listado de pasos (barrido)', () {
+    fdom.Step labelStep({String id = 's1', int order = 0}) => fdom.Step(
+      id: id,
+      flowId: 'f1',
+      type: fdom.StepType.label,
+      order: order,
+      content: '',
+      mediaRef: '',
+      metadataJson: '{"label_id":"L1","action":"ADD"}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+
+    fdom.Step textStep({String id = 's0', int order = 0}) => fdom.Step(
+      id: id,
+      flowId: 'f1',
+      type: fdom.StepType.text,
+      order: order,
+      content: 'Hola',
+      mediaRef: '',
+      metadataJson: '{}',
+      delayMs: 0,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+
+    setUp(() {
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
+    });
+
+    testWidgets('paso LABEL muestra el NOMBRE de la etiqueta, no el UUID', (
+      tester,
+    ) async {
+      when(() => stepsBloc.state).thenReturn(
+        FlowStepsLoaded(<fdom.Step>[labelStep()]),
+      );
+      when(() => labelsBloc.state).thenReturn(
+        const LabelsLoaded(<Label>[
+          Label(id: 'L1', name: 'VIP', color: '#FF8800', description: ''),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.textContaining('VIP', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.textContaining('L1', findRichText: true), findsNothing);
+    });
+
+    testWidgets('paso LABEL cae al id crudo sólo sin catálogo', (
+      tester,
+    ) async {
+      when(() => stepsBloc.state).thenReturn(
+        FlowStepsLoaded(<fdom.Step>[labelStep()]),
+      );
+      when(() => labelsBloc.state).thenReturn(const LabelsLoading());
+
+      await tester.pumpWidget(host());
+
+      expect(find.textContaining('L1', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('fallo al reordenar muestra SnackBar (no es silencioso)', (
+      tester,
+    ) async {
+      final seed = FlowStepsLoaded(<fdom.Step>[
+        textStep(),
+        labelStep(id: 's1', order: 1),
+      ]);
+      whenListen(
+        stepsBloc,
+        Stream<FlowStepsState>.fromIterable(<FlowStepsState>[
+          FlowStepsMutationFailed(
+            seed.steps,
+            const FlowsNetworkFailure(),
+          ),
+        ]),
+        initialState: seed,
+      );
+
+      await tester.pumpWidget(host());
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.text('No se pudo guardar el nuevo orden. Se revirtieron los cambios.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('el drag handle ofrece área táctil ≥48 y Semantics', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      addTearDown(semantics.dispose);
+      when(() => stepsBloc.state).thenReturn(
+        FlowStepsLoaded(<fdom.Step>[
+          textStep(),
+          labelStep(id: 's1', order: 1),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      final handle = find.byKey(
+        const Key('flow_detail.step_card.drag_handle.s1'),
+      );
+      expect(handle, findsOneWidget);
+      // El área de agarre real (el listener de drag) debe dar el mínimo
+      // táctil; el ícono de 24px a secas es demasiado fino para el pulgar.
+      final listener = find.ancestor(
+        of: handle,
+        matching: find.byType(ReorderableDragStartListener),
+      );
+      final size = tester.getSize(listener);
+      expect(size.width, greaterThanOrEqualTo(48));
+      expect(size.height, greaterThanOrEqualTo(48));
+      expect(
+        find.bySemanticsLabel('Mover paso'),
+        findsWidgets,
+      );
+    });
+  });
 }
