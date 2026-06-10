@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -37,7 +38,14 @@ class ForegroundPushPresenter {
       return;
     }
     // Fire-and-forget: la presentación no debe bloquear el procesamiento del
-    // stream de mensajes entrantes.
-    unawaited(_notifier.show(title: title, body: body));
+    // stream de mensajes entrantes. El data viaja como payload para que el
+    // tap sepa a dónde navegar.
+    unawaited(
+      _notifier.show(
+        title: title,
+        body: body,
+        payload: message.data.isEmpty ? null : jsonEncode(message.data),
+      ),
+    );
   }
 }

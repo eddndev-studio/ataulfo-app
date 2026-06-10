@@ -20,6 +20,7 @@ void main() {
       () => notifier.show(
         title: any(named: 'title'),
         body: any(named: 'body'),
+        payload: any(named: 'payload'),
       ),
     ).thenAnswer((_) async {});
     presenter = ForegroundPushPresenter(
@@ -44,7 +45,38 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
 
-      verify(() => notifier.show(title: 'T', body: 'B')).called(1);
+      verify(
+        () => notifier.show(
+          title: 'T',
+          body: 'B',
+          payload: any(named: 'payload'),
+        ),
+      ).called(1);
+    },
+  );
+
+  test(
+    'el data del push viaja como payload JSON (para rutear el tap)',
+    () async {
+      messages.add(
+        const RemoteMessage(
+          notification: RemoteNotification(title: 'T', body: 'B'),
+          data: {'eventType': 'message.inbound.new', 'botId': 'b1'},
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final captured =
+          verify(
+                () => notifier.show(
+                  title: 'T',
+                  body: 'B',
+                  payload: captureAny(named: 'payload'),
+                ),
+              ).captured.single
+              as String?;
+      expect(captured, contains('"botId":"b1"'));
+      expect(captured, contains('message.inbound.new'));
     },
   );
 
@@ -56,6 +88,7 @@ void main() {
       () => notifier.show(
         title: any(named: 'title'),
         body: any(named: 'body'),
+        payload: any(named: 'payload'),
       ),
     );
   });

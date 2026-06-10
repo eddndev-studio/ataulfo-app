@@ -25,11 +25,18 @@ class FlutterLocalNotifier implements LocalNotifier {
 
   int _nextId = 0;
 
-  Future<void> init() async {
+  /// [onTap] recibe el payload de la notificación tocada (con la app viva).
+  Future<void> init({void Function(String payload)? onTap}) async {
     await _plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (onTap != null && payload != null && payload.isNotEmpty) {
+          onTap(payload);
+        }
+      },
     );
     await _plugin
         .resolvePlatformSpecificImplementation<
@@ -46,12 +53,21 @@ class FlutterLocalNotifier implements LocalNotifier {
   }
 
   @override
-  Future<void> show({String? title, String? body}) {
+  Future<void> show({String? title, String? body, String? payload}) {
     return _plugin.show(
       id: _nextId++,
       title: title,
       body: body,
       notificationDetails: _details,
+      payload: payload,
     );
+  }
+
+  /// Payload de la notificación local que LANZÓ la app (tap con la app
+  /// muerta), o null si el arranque fue normal.
+  Future<String?> launchPayload() async {
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details == null || !details.didNotificationLaunchApp) return null;
+    return details.notificationResponse?.payload;
   }
 }
