@@ -84,6 +84,7 @@ abstract interface class FlowsRepository {
     required int version,
     required String name,
     required bool isActive,
+    required bool aiInvocable,
     required int cooldownMs,
     required int usageLimit,
     required List<String> excludesFlows,

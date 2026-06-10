@@ -59,6 +59,7 @@ void main() {
     registerFallbackValue(const FlowDetailLoadRequested());
     registerFallbackValue(
       const FlowDetailUpdateSettingsRequested(
+        aiInvocable: false,
         cooldownMs: 0,
         usageLimit: 0,
         excludesFlows: <String>[],
@@ -261,6 +262,7 @@ void main() {
         verify(
           () => bloc.add(
             const FlowDetailUpdateSettingsRequested(
+              aiInvocable: false,
               cooldownMs: 0,
               usageLimit: 0,
               excludesFlows: <String>['f2', 'f3'],
@@ -572,6 +574,7 @@ void main() {
         verify(
           () => bloc.add(
             const FlowDetailUpdateSettingsRequested(
+              aiInvocable: false,
               cooldownMs: 5 * 24 * 60 * 60 * 1000,
               usageLimit: 0,
               excludesFlows: <String>[],
@@ -607,6 +610,7 @@ void main() {
         verify(
           () => bloc.add(
             const FlowDetailUpdateSettingsRequested(
+              aiInvocable: false,
               cooldownMs: 5000,
               usageLimit: 5,
               excludesFlows: <String>[],
