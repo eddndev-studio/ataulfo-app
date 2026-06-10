@@ -26,7 +26,7 @@ Map<String, dynamic> msgJson({
   'conversation_id': 'c1',
   'role': role,
   'content': content,
-  if (toolResults != null) 'tool_results': toolResults,
+  'tool_results': ?toolResults,
   'created_at': '2026-06-10T10:00:01.000Z',
 };
 

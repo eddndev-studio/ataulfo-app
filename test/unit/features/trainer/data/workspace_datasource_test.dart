@@ -13,7 +13,7 @@ Map<String, dynamic> docJson({
   int version = 1,
 }) => <String, dynamic>{
   'name': name,
-  if (content != null) 'content': content,
+  'content': ?content,
   'sizeBytes': content?.length ?? 0,
   'updatedByKind': 'trainer',
   'version': version,
