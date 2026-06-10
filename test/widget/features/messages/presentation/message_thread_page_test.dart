@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
@@ -60,6 +61,9 @@ void main() {
   setUp(() {
     bloc = _MockMessagesBloc();
     when(() => bloc.state).thenReturn(const MessagesInitial());
+    when(
+      () => bloc.reactFailures,
+    ).thenAnswer((_) => const Stream<void>.empty());
   });
 
   Widget host() => MaterialApp(
@@ -78,6 +82,28 @@ void main() {
     when(() => bloc.state).thenReturn(const MessagesLoading());
     await tester.pumpWidget(host());
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('un fallo de reacción se anuncia con SnackBar', (tester) async {
+    // La reacción se materializa por eco SSE; el único feedback posible del
+    // fallo es el side-channel del bloc → SnackBar.
+    final failures = StreamController<void>.broadcast();
+    addTearDown(failures.close);
+    when(() => bloc.reactFailures).thenAnswer((_) => failures.stream);
+    when(() => bloc.state).thenReturn(
+      const MessagesLoaded(
+        items: <Message>[],
+        prevCursor: null,
+        isLoadingOlder: false,
+      ),
+    );
+
+    await tester.pumpWidget(host());
+    failures.add(null);
+    await tester.pump(); // entrega del stream
+    await tester.pump(); // frame del SnackBar
+
+    expect(find.text('No se pudo enviar la reacción'), findsOneWidget);
   });
 
   testWidgets('Loaded alinea INBOUND a la izquierda y OUTBOUND a la derecha', (
