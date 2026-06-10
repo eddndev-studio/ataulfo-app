@@ -1006,8 +1006,6 @@ void main() {
     testWidgets('el drag handle ofrece área táctil ≥48 y Semantics', (
       tester,
     ) async {
-      final semantics = tester.ensureSemantics();
-      addTearDown(semantics.dispose);
       when(() => stepsBloc.state).thenReturn(
         FlowStepsLoaded(<fdom.Step>[
           textStep(),
@@ -1031,7 +1029,9 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(48));
       expect(size.height, greaterThanOrEqualTo(48));
       expect(
-        find.bySemanticsLabel('Mover paso'),
+        find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.label == 'Mover paso',
+        ),
         findsWidgets,
       );
     });

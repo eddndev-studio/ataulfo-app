@@ -377,9 +377,38 @@ class _WindowBlock extends StatelessWidget {
               ),
             ],
           ),
+          // Una ventana inválida anula el guardado (toWireOrNull = null): el
+          // motivo se explica aquí mismo, junto a los controles que lo causan.
+          if (_invalidReason != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AppTokens.sp2),
+              child: Text(
+                _invalidReason!,
+                style: const TextStyle(
+                  color: AppTokens.danger,
+                  fontSize: AppTokens.captionSize,
+                  height: AppTokens.captionLineHeight / AppTokens.captionSize,
+                  fontWeight: AppTokens.captionWeight,
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  /// Motivo por el que la ventana no es guardable, o null si es válida.
+  /// Espeja las reglas de `_EditableWindow.toWireOrNull`.
+  String? get _invalidReason {
+    if (window.daysUi.isEmpty) {
+      return 'Selecciona al menos un día';
+    }
+    final fromMin = window.from.hour * 60 + window.from.minute;
+    final toMin = window.to.hour * 60 + window.to.minute;
+    if (fromMin >= toMin) {
+      return 'La hora de inicio debe ser anterior al final';
+    }
+    return null;
   }
 }
 

@@ -169,12 +169,15 @@ void main() {
               BlocProvider<TriggersBloc>.value(value: triggers),
               BlocProvider<LabelsBloc>.value(value: labels),
             ],
-            child: MediaQuery(
-              data: const MediaQueryData(
-                viewInsets: EdgeInsets.only(bottom: 300),
-              ),
-              child: Scaffold(
-                body: TriggerEditSheet(scopedFlow: _flow()),
+            // El MediaQuery vive DENTRO del Scaffold: el Scaffold consume el
+            // viewInsets de su body (resize), pero un bottom sheet real vive
+            // en el overlay y SÍ ve el inset del teclado.
+            child: Scaffold(
+              body: MediaQuery(
+                data: const MediaQueryData(
+                  viewInsets: EdgeInsets.only(bottom: 300),
+                ),
+                child: TriggerEditSheet(scopedFlow: _flow()),
               ),
             ),
           ),

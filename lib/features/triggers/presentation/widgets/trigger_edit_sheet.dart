@@ -10,9 +10,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
@@ -197,7 +198,12 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
           final failure = state is TriggersMutationFailed
               ? state.failure
               : null;
-          return SingleChildScrollView(
+          // El inset vive AQUÍ (no en quien abre el sheet): este context se
+          // reconstruye con el MediaQuery, así que sigue al teclado al
+          // abrirse/cerrarse y el botón Guardar queda siempre visible.
+          return Padding(
+            padding: EdgeInsets.only(bottom: context.sheetBottomInset),
+            child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppTokens.sp6),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -305,6 +311,7 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
                   fullWidth: true,
                 ),
               ],
+            ),
             ),
           );
         },
@@ -581,13 +588,13 @@ class _PickerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (selected) {
-      return AppPill.primary(label: label);
-    }
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-      child: AppPill.outline(label: label),
+    // Chip controlado del design system: Semantics de botón+selección, área
+    // táctil mínima y feedback en ambos estados (el par AppPill+InkWell
+    // dejaba el seleccionado inerte y sin nodo semántico).
+    return AppChoiceChip(
+      label: label,
+      selected: selected,
+      onSelected: enabled ? (_) => onTap() : null,
     );
   }
 }
