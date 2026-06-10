@@ -63,9 +63,9 @@ void main() {
       build: () {
         when(
           () => repo.listChatNotes(botId: 'b1', chatLid: '12@lid'),
-        ).thenAnswer((_) => Future<List<Note>>.error(
-              const NotesServerFailure(),
-            ));
+        ).thenAnswer(
+          (_) => Future<List<Note>>.error(const NotesServerFailure()),
+        );
         return build();
       },
       act: (bloc) => bloc.add(const NotesLoadRequested()),
@@ -93,7 +93,11 @@ void main() {
       },
       seed: () => const NotesLoaded(<Note>[]),
       act: (bloc) => bloc.add(
-        const NotesCreateRequested(content: 'nueva', tags: <String>[], color: ''),
+        const NotesCreateRequested(
+          content: 'nueva',
+          tags: <String>[],
+          color: '',
+        ),
       ),
       expect: () => <NotesState>[
         const NotesMutating(<Note>[]),

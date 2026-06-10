@@ -57,7 +57,10 @@ void main() {
         (_) async => Response<List<dynamic>>(
           requestOptions: RequestOptions(path: '/notes'),
           statusCode: 200,
-          data: <dynamic>[noteJson(), noteJson(id: 'n2', isAiCreated: true)],
+          data: <dynamic>[
+            noteJson(),
+            noteJson(id: 'n2', isAiCreated: true),
+          ],
         ),
       );
 
@@ -137,42 +140,45 @@ void main() {
       });
     });
 
-    test('color/tags vacíos se omiten del body (omitempty del contrato)', () async {
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          any(),
-          data: any(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer(
-        (_) async => Response<Map<String, dynamic>>(
-          requestOptions: RequestOptions(path: '/notes'),
-          statusCode: 201,
-          data: noteJson(),
-        ),
-      );
+    test(
+      'color/tags vacíos se omiten del body (omitempty del contrato)',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/notes'),
+            statusCode: 201,
+            data: noteJson(),
+          ),
+        );
 
-      await ds.createNote(
-        botId: 'b1',
-        chatLid: '12@lid',
-        content: 'x',
-        tags: const <String>[],
-        color: '',
-      );
+        await ds.createNote(
+          botId: 'b1',
+          chatLid: '12@lid',
+          content: 'x',
+          tags: const <String>[],
+          color: '',
+        );
 
-      final captured = verify(
-        () => dio.post<Map<String, dynamic>>(
-          any(),
-          data: captureAny(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).captured;
-      expect(captured[0], <String, dynamic>{
-        'bot_id': 'b1',
-        'session_chat_lid': '12@lid',
-        'content': 'x',
-      });
-    });
+        final captured = verify(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured[0], <String, dynamic>{
+          'bot_id': 'b1',
+          'session_chat_lid': '12@lid',
+          'content': 'x',
+        });
+      },
+    );
 
     test('422 → NotesValidationFailure', () async {
       when(

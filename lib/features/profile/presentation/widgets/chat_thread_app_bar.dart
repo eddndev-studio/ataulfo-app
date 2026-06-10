@@ -6,6 +6,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../conversations/domain/entities/conversation.dart';
 import '../../../flow_run/presentation/widgets/flow_run_sheet.dart';
+import '../../../notes/presentation/widgets/notes_sheet.dart';
 import '../../../wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import '../bloc/profile_bloc.dart';
 
@@ -63,6 +64,16 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
             chatLid: chatLid,
             kind: _kindFrom(context.read<ProfileBloc>().state),
           ),
+        ),
+        // Cuaderno de notas del chat (S14): el mismo que lee/escribe el
+        // agente IA (save_note/read_notes). El `NotesRepository` lo provee
+        // la ruta.
+        IconButton(
+          key: const Key('thread.notes'),
+          tooltip: 'Notas del chat',
+          icon: const Icon(Icons.sticky_note_2_outlined),
+          onPressed: () =>
+              NotesSheet.open(context, botId: botId, chatLid: chatLid),
         ),
       ],
       title: BlocBuilder<ProfileBloc, ProfileState>(

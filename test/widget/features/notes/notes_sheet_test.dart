@@ -84,9 +84,7 @@ void main() {
   testWidgets('Failed: copy de error + botón reintentar recarga', (
     tester,
   ) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const NotesFailed(NotesServerFailure()));
+    when(() => bloc.state).thenReturn(const NotesFailed(NotesServerFailure()));
 
     await tester.pumpWidget(host());
 

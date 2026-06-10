@@ -5,8 +5,7 @@ import '../datasources/notes_datasource.dart';
 /// Delegación directa al datasource: las notas no llevan cache local (el
 /// panel recarga al abrir; el CAS del backend resuelve la concurrencia).
 class NotesRepositoryImpl implements NotesRepository {
-  NotesRepositoryImpl({required NotesDatasource datasource})
-    : _ds = datasource;
+  NotesRepositoryImpl({required NotesDatasource datasource}) : _ds = datasource;
 
   final NotesDatasource _ds;
 

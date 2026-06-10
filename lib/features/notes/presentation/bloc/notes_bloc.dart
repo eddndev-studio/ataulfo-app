@@ -38,10 +38,7 @@ class NotesBloc extends Bloc<NotesEvent, NotesState> {
       emit(const NotesLoading());
     }
     try {
-      final notes = await _repo.listChatNotes(
-        botId: _botId,
-        chatLid: _chatLid,
-      );
+      final notes = await _repo.listChatNotes(botId: _botId, chatLid: _chatLid);
       emit(NotesLoaded(notes));
     } on NotesFailure catch (f) {
       emit(NotesFailed(f));
@@ -116,10 +113,7 @@ class NotesBloc extends Bloc<NotesEvent, NotesState> {
       return;
     }
     try {
-      final notes = await _repo.listChatNotes(
-        botId: _botId,
-        chatLid: _chatLid,
-      );
+      final notes = await _repo.listChatNotes(botId: _botId, chatLid: _chatLid);
       emit(NotesLoaded(notes));
     } on NotesFailure catch (f) {
       // La mutación persistió pero el refetch falló: sin verdad fresca,

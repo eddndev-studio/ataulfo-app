@@ -68,6 +68,7 @@ import 'package:ataulfo/features/templates/presentation/pages/template_edit_page
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
+import 'package:ataulfo/features/notes/domain/repositories/notes_repository.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/quick_replies/domain/repositories/quick_replies_repository.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
@@ -103,6 +104,8 @@ class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
 class _MockTriggersRepo extends Mock implements TriggersRepository {}
 
 class _MockLabelsRepo extends Mock implements LabelsRepository {}
+
+class _MockNotesRepo extends Mock implements NotesRepository {}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
@@ -312,6 +315,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
+      notesRepository: _MockNotesRepo(),
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
       invitationsRepository: invitationsRepo,
@@ -746,6 +750,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
+      notesRepository: _MockNotesRepo(),
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
       invitationsRepository: invitationsRepo,
@@ -825,6 +830,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
+      notesRepository: _MockNotesRepo(),
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
       invitationsRepository: invitationsRepo,
@@ -1138,6 +1144,7 @@ void main() {
         waLabelsRepository: _MockWaLabelsRepo(),
         quickRepliesRepository: _quickRepliesRepo(),
         labelsRepository: labelsRepo,
+        notesRepository: _MockNotesRepo(),
         membershipsRepository: membershipsRepo,
         membersRepository: membersRepo,
         invitationsRepository: invitationsRepo,
@@ -1177,6 +1184,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
+      notesRepository: _MockNotesRepo(),
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
       invitationsRepository: invitationsRepo,
@@ -1412,6 +1420,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
+      notesRepository: _MockNotesRepo(),
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
       invitationsRepository: invitationsRepo,

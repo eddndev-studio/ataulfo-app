@@ -26,7 +26,9 @@ import 'features/flow_run/data/repositories/flow_run_repository_impl.dart';
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/labels/data/datasources/labels_datasource.dart';
+import 'features/notes/data/datasources/notes_datasource.dart';
 import 'features/labels/data/repositories/labels_repository_impl.dart';
+import 'features/notes/data/repositories/notes_repository_impl.dart';
 import 'features/media/data/cache/caching_media_thumbnail_loader.dart';
 import 'features/media/data/cache/dio_thumbnail_downloader.dart';
 import 'features/media/data/cache/file_media_byte_store.dart';
@@ -195,6 +197,12 @@ Future<void> main() async {
     datasource: DioLabelsDatasource(mainDio),
   );
 
+  // Cuaderno de notas (S14): panel chat-scoped del hilo; mismo cuaderno que
+  // escribe el agente IA con save_note.
+  final notesRepository = NotesRepositoryImpl(
+    datasource: DioNotesDatasource(mainDio),
+  );
+
   final membershipsRepository = MembershipsRepositoryImpl(
     datasource: DioMembershipsDatasource(mainDio),
   );
@@ -268,6 +276,7 @@ Future<void> main() async {
     waLabelsRepository: waLabelsRepository,
     quickRepliesRepository: quickRepliesRepository,
     labelsRepository: labelsRepository,
+    notesRepository: notesRepository,
     membershipsRepository: membershipsRepository,
     membersRepository: membersRepository,
     invitationsRepository: invitationsRepository,

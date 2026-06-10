@@ -15,6 +15,7 @@ import 'package:ataulfo/features/profile/domain/repositories/profile_repository.
 import 'package:ataulfo/features/flow_run/domain/repositories/flow_run_repository.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
+import 'package:ataulfo/features/notes/domain/repositories/notes_repository.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/quick_replies/domain/repositories/quick_replies_repository.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
@@ -62,6 +63,8 @@ class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
 class _MockTriggersRepo extends Mock implements TriggersRepository {}
 
 class _MockLabelsRepo extends Mock implements LabelsRepository {}
+
+class _MockNotesRepo extends Mock implements NotesRepository {}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
@@ -129,6 +132,7 @@ void main() {
       waLabelsRepository: _MockWaLabelsRepo(),
       quickRepliesRepository: _MockQuickRepliesRepo(),
       labelsRepository: _MockLabelsRepo(),
+      notesRepository: _MockNotesRepo(),
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
       invitationsRepository: invitationsRepo,

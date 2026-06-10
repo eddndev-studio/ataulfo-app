@@ -33,8 +33,9 @@ class NotesSheet extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => BlocProvider<NotesBloc>(
-        create: (_) => NotesBloc(repo: repo, botId: botId, chatLid: chatLid)
-          ..add(const NotesLoadRequested()),
+        create: (_) =>
+            NotesBloc(repo: repo, botId: botId, chatLid: chatLid)
+              ..add(const NotesLoadRequested()),
         child: const NotesSheet(),
       ),
     );
@@ -244,9 +245,7 @@ class _NoteCard extends StatelessWidget {
                 ),
                 const SizedBox(width: AppTokens.sp2),
               ],
-              Expanded(
-                child: Text(note.content, style: textTheme.bodyMedium),
-              ),
+              Expanded(child: Text(note.content, style: textTheme.bodyMedium)),
               if (note.isAiCreated) ...<Widget>[
                 const SizedBox(width: AppTokens.sp2),
                 AppPill.primary(
