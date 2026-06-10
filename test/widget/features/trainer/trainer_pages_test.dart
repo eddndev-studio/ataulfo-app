@@ -1,0 +1,272 @@
+import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
+import 'package:ataulfo/features/trainer/domain/entities/trainer_conversation.dart';
+import 'package:ataulfo/features/trainer/domain/entities/trainer_message.dart';
+import 'package:ataulfo/features/trainer/domain/entities/workspace_doc.dart';
+import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
+import 'package:ataulfo/features/trainer/presentation/bloc/preview_bloc.dart';
+import 'package:ataulfo/features/trainer/presentation/bloc/trainer_chat_bloc.dart';
+import 'package:ataulfo/features/trainer/presentation/bloc/workspace_bloc.dart';
+import 'package:ataulfo/features/trainer/presentation/pages/preview_page.dart';
+import 'package:ataulfo/features/trainer/presentation/pages/trainer_chat_page.dart';
+import 'package:ataulfo/features/trainer/presentation/pages/workspace_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockTrainerRepo extends Mock implements TrainerRepository {}
+
+class _MockWorkspaceRepo extends Mock implements WorkspaceRepository {}
+
+class _MockPreviewRepo extends Mock implements PreviewRepository {}
+
+final _conv = TrainerConversation(
+  id: 'c1',
+  templateId: 't1',
+  title: 'Entrenamiento',
+  createdAt: DateTime.utc(2026, 6, 10),
+  updatedAt: DateTime.utc(2026, 6, 10),
+);
+
+TrainerMessage _msg(
+  String id,
+  String role,
+  String content, {
+  String? toolResultsRaw,
+}) => TrainerMessage(
+  id: id,
+  conversationId: 'c1',
+  role: role,
+  content: content,
+  toolResultsRaw: toolResultsRaw,
+  createdAt: DateTime.utc(2026, 6, 10, 10),
+);
+
+Widget _wrap(Widget child) => MaterialApp(home: child);
+
+void main() {
+  group('TrainerChatPage', () {
+    late _MockTrainerRepo repo;
+    setUp(() {
+      repo = _MockTrainerRepo();
+      when(
+        () => repo.listConversations(templateId: 't1'),
+      ).thenAnswer((_) async => <TrainerConversation>[_conv]);
+    });
+
+    Future<void> pump(WidgetTester tester, List<TrainerMessage> msgs) async {
+      when(
+        () => repo.listMessages(
+          templateId: 't1',
+          conversationId: 'c1',
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async => TrainerMessagesPage(
+          messages: msgs.reversed.toList(),
+          nextCursor: '',
+        ),
+      );
+      await tester.pumpWidget(
+        _wrap(
+          BlocProvider<TrainerChatBloc>(
+            create: (_) =>
+                TrainerChatBloc(repo: repo, templateId: 't1')
+                  ..add(const TrainerChatStarted()),
+            child: const TrainerChatPage(templateId: 't1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('renderiza burbujas y la tarjeta de cambio de edit_prompt', (
+      tester,
+    ) async {
+      await pump(tester, <TrainerMessage>[
+        _msg('m1', 'user', 'mejora el tono'),
+        _msg(
+          'm2',
+          'tool',
+          '',
+          toolResultsRaw:
+              '{"toolName":"edit_prompt","content":"{\\"status\\":\\"updated\\"}"}',
+        ),
+        _msg('m3', 'assistant', 'listo, tono cálido'),
+      ]);
+
+      expect(find.text('mejora el tono'), findsOneWidget);
+      expect(find.text('listo, tono cálido'), findsOneWidget);
+      expect(find.byKey(const Key('trainer.change_card.m2')), findsOneWidget);
+      expect(find.textContaining('Prompt actualizado'), findsOneWidget);
+    });
+
+    testWidgets('hilo nuevo muestra chips de arranque y mandan el mensaje', (
+      tester,
+    ) async {
+      await pump(tester, <TrainerMessage>[]);
+      expect(find.byKey(const Key('trainer.chip.0')), findsOneWidget);
+
+      when(
+        () => repo.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: any(named: 'content'),
+        ),
+      ).thenAnswer((_) async => _msg('mx', 'assistant', 'ok'));
+
+      await tester.tap(find.byKey(const Key('trainer.chip.0')));
+      await tester.pump();
+      verify(
+        () => repo.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: any(named: 'content'),
+        ),
+      ).called(1);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('composer manda el texto y bloquea mientras envía', (
+      tester,
+    ) async {
+      await pump(tester, <TrainerMessage>[_msg('m1', 'user', 'hola')]);
+      when(
+        () => repo.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: 'sube precios',
+        ),
+      ).thenAnswer((_) async => _msg('mx', 'assistant', 'ok'));
+
+      await tester.enterText(
+        find.byKey(const Key('trainer.composer.field')),
+        'sube precios',
+      );
+      await tester.tap(find.byKey(const Key('trainer.composer.send')));
+      await tester.pump();
+      verify(
+        () => repo.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: 'sube precios',
+        ),
+      ).called(1);
+      await tester.pumpAndSettle();
+    });
+  });
+
+  group('WorkspacePage', () {
+    testWidgets('lista docs con badge del entrenador y abre el editor', (
+      tester,
+    ) async {
+      final repo = _MockWorkspaceRepo();
+      when(() => repo.listDocs(templateId: 't1')).thenAnswer(
+        (_) async => <WorkspaceDoc>[
+          WorkspaceDoc(
+            name: 'menu-precios',
+            content: '',
+            sizeBytes: 120,
+            updatedByKind: 'trainer',
+            version: 2,
+            createdAt: DateTime.utc(2026, 6, 10),
+            updatedAt: DateTime.utc(2026, 6, 10),
+          ),
+        ],
+      );
+      when(
+        () => repo.getDoc(templateId: 't1', name: 'menu-precios'),
+      ).thenAnswer(
+        (_) async => WorkspaceDoc(
+          name: 'menu-precios',
+          content: 'Tacos \$25',
+          sizeBytes: 9,
+          updatedByKind: 'trainer',
+          version: 2,
+          createdAt: DateTime.utc(2026, 6, 10),
+          updatedAt: DateTime.utc(2026, 6, 10),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          RepositoryProvider<WorkspaceRepository>.value(
+            value: repo,
+            child: BlocProvider<WorkspaceBloc>(
+              create: (_) =>
+                  WorkspaceBloc(repo: repo, templateId: 't1')
+                    ..add(const WorkspaceLoadRequested()),
+              child: const WorkspacePage(templateId: 't1'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('workspace.doc.menu-precios')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('workspace.badge.menu-precios')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('workspace.doc.menu-precios')));
+      await tester.pumpAndSettle();
+      expect(find.text('Tacos \$25'), findsOneWidget);
+    });
+  });
+
+  group('PreviewPage', () {
+    testWidgets('banner demo + chips de acciones grabadas + composer', (
+      tester,
+    ) async {
+      final repo = _MockPreviewRepo();
+      when(() => repo.transcript(templateId: 't1')).thenAnswer(
+        (_) async => <PreviewItem>[
+          PreviewItem(kind: 'user', text: 'hola', at: DateTime.utc(2026)),
+          PreviewItem(kind: 'bot', text: '¡Hola!', at: DateTime.utc(2026)),
+          PreviewItem(
+            kind: 'action',
+            tool: 'apply_label',
+            summary: 'Etiquetaría el chat: VIP',
+            at: DateTime.utc(2026),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          BlocProvider<PreviewBloc>(
+            create: (_) =>
+                PreviewBloc(repo: repo, templateId: 't1')
+                  ..add(const PreviewStarted()),
+            child: const PreviewPage(templateId: 't1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('preview.banner')), findsOneWidget);
+      expect(find.text('¡Hola!'), findsOneWidget);
+      expect(find.textContaining('Etiquetaría el chat: VIP'), findsOneWidget);
+
+      when(
+        () => repo.sendMessage(templateId: 't1', content: '¿precio?'),
+      ).thenAnswer(
+        (_) async => const PreviewTurn(items: <PreviewItem>[], iterations: 1),
+      );
+      await tester.enterText(
+        find.byKey(const Key('preview.composer.field')),
+        '¿precio?',
+      );
+      await tester.tap(find.byKey(const Key('preview.composer.send')));
+      await tester.pump();
+      verify(
+        () => repo.sendMessage(templateId: 't1', content: '¿precio?'),
+      ).called(1);
+      await tester.pumpAndSettle();
+    });
+  });
+}
