@@ -51,6 +51,7 @@ import '../../features/flows/presentation/bloc/media_names_cubit.dart';
 import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
+import '../../features/notes/domain/repositories/notes_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/labels/presentation/bloc/labels_bloc.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
@@ -134,6 +135,7 @@ class AppRouter {
     required WaLabelsRepository waLabelsRepository,
     required QuickRepliesRepository quickRepliesRepository,
     required LabelsRepository labelsRepository,
+    required NotesRepository notesRepository,
     required MembershipsRepository membershipsRepository,
     required MembersRepository membersRepository,
     required InvitationsRepository invitationsRepository,
@@ -156,6 +158,7 @@ class AppRouter {
        _waLabelsRepo = waLabelsRepository,
        _quickRepliesRepo = quickRepliesRepository,
        _labelsRepo = labelsRepository,
+       _notesRepo = notesRepository,
        _membershipsRepo = membershipsRepository,
        _membersRepo = membersRepository,
        _invitationsRepo = invitationsRepository,
@@ -179,6 +182,7 @@ class AppRouter {
   final WaLabelsRepository _waLabelsRepo;
   final QuickRepliesRepository _quickRepliesRepo;
   final LabelsRepository _labelsRepo;
+  final NotesRepository _notesRepo;
   final MembershipsRepository _membershipsRepo;
   final MembersRepository _membersRepo;
   final InvitationsRepository _invitationsRepo;
@@ -601,6 +605,7 @@ class AppRouter {
                 value: _waLabelsRepo,
               ),
               RepositoryProvider<FlowRunRepository>.value(value: _flowRunRepo),
+              RepositoryProvider<NotesRepository>.value(value: _notesRepo),
             ],
             child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[
