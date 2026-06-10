@@ -1343,6 +1343,7 @@ void main() {
           version: 3,
           name: 'Bienvenida',
           isActive: true,
+          aiInvocable: false,
           cooldownMs: 5000,
           usageLimit: 3,
           excludesFlows: const <String>['f2', 'f3'],
@@ -1366,12 +1367,49 @@ void main() {
           'version': 3,
           'name': 'Bienvenida',
           'isActive': true,
+          'aiInvocable': false,
           'cooldownMs': 5000,
           'usageLimit': 3,
           'excludesFlows': <String>['f2', 'f3'],
         });
       },
     );
+
+    test('aiInvocable=true viaja explícito en el documento', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/flows/f1'),
+          statusCode: 200,
+          data: flowJson(version: 2),
+        ),
+      );
+
+      await ds.updateFlow(
+        flowId: 'f1',
+        version: 1,
+        name: 'Bienvenida',
+        isActive: true,
+        aiInvocable: true,
+        cooldownMs: 0,
+        usageLimit: 0,
+        excludesFlows: const <String>[],
+      );
+
+      final captured = verify(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      expect((captured[0] as Map<String, dynamic>)['aiInvocable'], true);
+    });
 
     test('isActive=false viaja explícito (no omitido)', () async {
       when(

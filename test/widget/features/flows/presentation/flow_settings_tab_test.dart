@@ -270,6 +270,54 @@ void main() {
       },
     );
 
+    testWidgets(
+      'toggle "Invocable por IA": refleja el flow, habilita Guardar y viaja en el evento',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          FlowDetailLoaded(
+            _flow(),
+            const <fdom.Flow>[],
+            siblingsFailed: false,
+          ),
+        );
+
+        await tester.pumpWidget(host());
+
+        // El flow llega con aiInvocable=false ⇒ el switch arranca apagado y
+        // sin cambios el botón Guardar sigue deshabilitado.
+        final switchFinder = find.byKey(
+          const Key('flow_settings.ai_invocable.switch'),
+        );
+        expect(switchFinder, findsOneWidget);
+        final saveBtnBefore = tester.widget<AppButton>(
+          find.byKey(const Key('flow_settings.save_button')),
+        );
+        expect(saveBtnBefore.onPressed, isNull);
+
+        await tester.tap(switchFinder);
+        await tester.pump();
+
+        final saveBtnAfter = tester.widget<AppButton>(
+          find.byKey(const Key('flow_settings.save_button')),
+        );
+        expect(saveBtnAfter.onPressed, isNotNull);
+
+        await tester.tap(find.byKey(const Key('flow_settings.save_button')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const FlowDetailUpdateSettingsRequested(
+              aiInvocable: true,
+              cooldownMs: 0,
+              usageLimit: 0,
+              excludesFlows: <String>[],
+            ),
+          ),
+        ).called(1);
+      },
+    );
+
     testWidgets('Saving: botón Guardar disabled + indicador inline visible', (
       tester,
     ) async {

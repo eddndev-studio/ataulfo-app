@@ -239,6 +239,52 @@ void main() {
     );
 
     blocTest<FlowDetailBloc, FlowDetailState>(
+      'el PUT lleva aiInvocable del evento (toggle del editor)',
+      build: () {
+        when(() => repo.flowById('f1')).thenAnswer((_) async => flowV4);
+        when(
+          () => repo.listFlows('t1'),
+        ).thenAnswer((_) async => const <Flow>[flowV4]);
+        when(
+          () => repo.updateFlow(
+            flowId: any(named: 'flowId'),
+            version: any(named: 'version'),
+            name: any(named: 'name'),
+            isActive: any(named: 'isActive'),
+            aiInvocable: any(named: 'aiInvocable'),
+            cooldownMs: any(named: 'cooldownMs'),
+            usageLimit: any(named: 'usageLimit'),
+            excludesFlows: any(named: 'excludesFlows'),
+          ),
+        ).thenAnswer((_) async => flowV4);
+        return FlowDetailBloc(repo: repo, id: 'f1');
+      },
+      seed: () => const FlowDetailLoaded(_flow, <Flow>[], siblingsFailed: false),
+      act: (bloc) => bloc.add(
+        const FlowDetailUpdateSettingsRequested(
+          aiInvocable: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: <String>[],
+        ),
+      ),
+      verify: (_) {
+        verify(
+          () => repo.updateFlow(
+            flowId: 'f1',
+            version: 3,
+            name: 'Bienvenida',
+            isActive: true,
+            aiInvocable: true,
+            cooldownMs: 0,
+            usageLimit: 0,
+            excludesFlows: const <String>[],
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<FlowDetailBloc, FlowDetailState>(
       '409 → SettingsSaveFailed(snapshot, Conflict) — preserva flow + siblings',
       build: () {
         when(
