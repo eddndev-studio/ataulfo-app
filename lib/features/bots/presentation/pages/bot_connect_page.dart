@@ -143,6 +143,8 @@ class _ReadyView extends StatelessWidget {
   }
 
   Future<void> _confirmWipe(BuildContext context) async {
+    // Capturado antes del await: el diálogo desmonta/remonta contextos.
+    final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -169,6 +171,16 @@ class _ReadyView extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
     context.read<BotConnectBloc>().add(const BotConnectWipeRequested());
+    // El bloc trata el wipe como siempre-éxito (idempotente, sin estado
+    // propio): este aviso es el único feedback de que la acción se registró.
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Credenciales borradas. Inicia el emparejamiento para volver a '
+          'vincular.',
+        ),
+      ),
+    );
   }
 
   Future<void> _copy(BuildContext context) async {
@@ -328,10 +340,31 @@ class _PairingSection extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppTokens.sp2),
-              Text(
-                'Pide que escaneen el QR ahora — válido ~2 minutos. Si expira, '
-                'vuelve a iniciarlo.',
-                style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+              // En esta fase el QR aún no llegó (con qrCode el bloque del QR
+              // escaneable toma precedencia): comunicar la espera real en vez
+              // de pedir escanear algo que no está en pantalla.
+              Row(
+                children: <Widget>[
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppTokens.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppTokens.sp2),
+                  Expanded(
+                    child: Text(
+                      'Generando el código QR…',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.text2,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: AppTokens.sp4),
               AppButton.tonal(
