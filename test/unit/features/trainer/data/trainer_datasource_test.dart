@@ -94,7 +94,10 @@ void main() {
       when(() => dio.get<List<dynamic>>(any())).thenAnswer(
         (_) async => Response(
           requestOptions: RequestOptions(path: '/x'),
-          data: <dynamic>[convJson(), convJson(id: 'c2')],
+          data: <dynamic>[
+            convJson(),
+            convJson(id: 'c2'),
+          ],
         ),
       );
       final list = await ds.listConversations(templateId: 't1');
@@ -167,7 +170,11 @@ void main() {
         ),
       );
       await expectLater(
-        () => ds.sendMessage(templateId: 't1', conversationId: 'c1', content: 'x'),
+        () => ds.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: 'x',
+        ),
         throwsA(isA<TrainerEngineFailure>()),
       );
     });

@@ -35,7 +35,12 @@ void main() {
     expect(bot.text, '¡Hola!');
 
     final action = PreviewItemDto.fromJson(
-      itemJson(kind: 'action', text: '', tool: 'apply_label', summary: 'Etiquetaría: VIP'),
+      itemJson(
+        kind: 'action',
+        text: '',
+        tool: 'apply_label',
+        summary: 'Etiquetaría: VIP',
+      ),
     );
     expect(action.tool, 'apply_label');
     expect(action.summary, 'Etiquetaría: VIP');
@@ -50,10 +55,7 @@ void main() {
         requestOptions: RequestOptions(path: '/x'),
         statusCode: 201,
         data: <String, dynamic>{
-          'items': <dynamic>[
-            itemJson(kind: 'user', text: 'hola'),
-            itemJson(),
-          ],
+          'items': <dynamic>[itemJson(kind: 'user', text: 'hola'), itemJson()],
           'iterations': 2,
         },
       ),

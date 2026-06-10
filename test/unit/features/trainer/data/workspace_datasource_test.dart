@@ -62,9 +62,7 @@ void main() {
 
   group('listDocs', () {
     test('GET /templates/{id}/workspace/docs y desempaca {docs}', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>(any()),
-      ).thenAnswer(
+      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
         (_) async => Response(
           requestOptions: RequestOptions(path: '/x'),
           data: <String, dynamic>{
@@ -173,8 +171,7 @@ void main() {
         (404, TrainerNotFoundFailure),
       ]) {
         when(
-          () =>
-              dio.put<Map<String, dynamic>>(any(), data: any(named: 'data')),
+          () => dio.put<Map<String, dynamic>>(any(), data: any(named: 'data')),
         ).thenThrow(bad(c.$1));
         await expectLater(
           () => ds.updateDoc(
@@ -183,7 +180,9 @@ void main() {
             content: 'x',
             version: 1,
           ),
-          throwsA(isA<TrainerFailure>().having((f) => f.runtimeType, 'tipo', c.$2)),
+          throwsA(
+            isA<TrainerFailure>().having((f) => f.runtimeType, 'tipo', c.$2),
+          ),
         );
       }
     });
