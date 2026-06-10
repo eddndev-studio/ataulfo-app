@@ -67,12 +67,15 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
       ],
       title: BlocBuilder<ProfileBloc, ProfileState>(
         builder: (context, state) {
+          // El chatLid es jerga de wire: NUNCA se pinta como nombre. Mientras
+          // no hay identidad se comunica la espera; los grupos son detectables
+          // por el sufijo del JID aun sin perfil.
           final (String name, String? photo) = switch (state) {
             ProfileLoaded(profile: final p) => (
-              p.displayName ?? (p.isGroup ? 'Grupo' : (p.phone ?? chatLid)),
+              p.displayName ?? (p.isGroup ? 'Grupo' : (p.phone ?? 'Chat')),
               p.photoUrl,
             ),
-            _ => (chatLid, null),
+            _ => (chatLid.contains('@g.us') ? 'Grupo' : 'Cargando…', null),
           };
           // El header completo es un botón: el lector de pantalla lo anuncia
           // como control ("Ver perfil") en vez de leer el nombre como texto

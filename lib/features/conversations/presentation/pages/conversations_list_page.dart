@@ -8,6 +8,7 @@ import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/util/smart_timestamp.dart';
 import '../../../wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import '../../domain/entities/conversation.dart';
 import '../../domain/failures/conversations_failure.dart';
@@ -170,9 +171,11 @@ class _ConversationTile extends StatelessWidget {
     final isGroup = c.kind == ConversationKind.group;
     final title = c.displayName ?? (isGroup ? 'Grupo' : (c.phone ?? c.chatLid));
     final hasLast = c.lastMessageTimestampMs != null;
+    // Sin actividad aún: copy humano para DM y grupo por igual — el chatLid
+    // es jerga de wire y nunca se le muestra al operador.
     final secondary = hasLast
         ? _previewLabel(c.lastMessageType, c.lastMessagePreview)
-        : (isGroup ? c.chatLid : null);
+        : 'Sin mensajes';
     final hasUnread = c.unreadCount > 0;
     final showSecondaryRow =
         (secondary != null && secondary.isNotEmpty) || hasUnread;
@@ -211,7 +214,7 @@ class _ConversationTile extends StatelessWidget {
                     if (hasLast) ...<Widget>[
                       const SizedBox(width: AppTokens.sp2),
                       Text(
-                        _hhmm(c.lastMessageTimestampMs!),
+                        smartTimestamp(c.lastMessageTimestampMs!),
                         style: textTheme.labelSmall?.copyWith(
                           // La hora se tiñe del verde de sección cuando hay
                           // no-leídos: el acento "ligero" que la bandeja comparte
@@ -324,11 +327,3 @@ String _previewLabel(String? type, String? preview) {
   };
 }
 
-/// Hora local HH:mm del epoch en ms para la línea de último-mensaje. Formateo
-/// manual para no arrastrar `intl` por una hora; la bandeja no muestra fecha.
-String _hhmm(int timestampMs) {
-  final dt = DateTime.fromMillisecondsSinceEpoch(timestampMs);
-  final hh = dt.hour.toString().padLeft(2, '0');
-  final mm = dt.minute.toString().padLeft(2, '0');
-  return '$hh:$mm';
-}

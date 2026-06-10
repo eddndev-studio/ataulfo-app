@@ -3,11 +3,14 @@
 // entrega y burbujas optimistas pendientes/fallidas—. Son piezas acopladas por
 // el mismo layout de lista invertida; partirlas dispersaría la presentación sin
 // ganar claridad. El composer sí vive aparte (`MessageComposer`).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/util/smart_timestamp.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/failures/messages_failure.dart';
 import '../../domain/reactions.dart';
@@ -29,7 +32,8 @@ class MessageThreadPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<MessagesBloc, MessagesState>(
+    return _ReactFailuresListener(
+      child: BlocBuilder<MessagesBloc, MessagesState>(
       builder: (context, state) => Column(
         children: <Widget>[
           Expanded(
@@ -57,8 +61,48 @@ class MessageThreadPage extends StatelessWidget {
           if (state is MessagesLoaded) const MessageComposer(),
         ],
       ),
+      ),
     );
   }
+}
+
+/// Anuncia los fallos de reacción con un SnackBar. La reacción se materializa
+/// por el eco SSE (el bloc no emite estados al reaccionar), así que el
+/// side-channel `reactFailures` es la única señal de que el POST falló; sin
+/// este aviso el operador vería que su reacción "no aparece" sin explicación.
+class _ReactFailuresListener extends StatefulWidget {
+  const _ReactFailuresListener({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ReactFailuresListener> createState() => _ReactFailuresListenerState();
+}
+
+class _ReactFailuresListenerState extends State<_ReactFailuresListener> {
+  StreamSubscription<void>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = context.read<MessagesBloc>().reactFailures.listen((_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo enviar la reacción')),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _LoadingView extends StatelessWidget {
@@ -494,7 +538,7 @@ class _MessageBubble extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          Text(_hhmm(m.timestampMs), style: caption),
+                          Text(smartTimestamp(m.timestampMs), style: caption),
                           if (isOutbound && m.status != null) ...<Widget>[
                             const SizedBox(width: AppTokens.sp2),
                             _statusTick(m.status!),
@@ -750,14 +794,6 @@ class _QuotedPreview extends StatelessWidget {
   }
 }
 
-/// Hora local HH:mm del epoch en ms. Formateo manual para no arrastrar `intl`
-/// por un caption; el hilo no necesita fecha completa en este slice.
-String _hhmm(int timestampMs) {
-  final dt = DateTime.fromMillisecondsSinceEpoch(timestampMs);
-  final hh = dt.hour.toString().padLeft(2, '0');
-  final mm = dt.minute.toString().padLeft(2, '0');
-  return '$hh:$mm';
-}
 
 /// Tick de entrega estilo mensajería: ✓ enviado, ✓✓ entregado (gris), ✓✓ leído
 /// (verde de la sección de chat), ⚠ falló (rojo). El receipt en vivo
