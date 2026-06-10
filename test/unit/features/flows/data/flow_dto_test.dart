@@ -44,6 +44,40 @@ void main() {
       expect(resp.excludesFlows, <String>['f2', 'f3']);
     });
 
+    test('parsea aiInvocable=true del wire', () {
+      final resp = FlowResp.fromJson(<String, dynamic>{
+        'id': 'f1',
+        'templateId': 't1',
+        'name': 'Bienvenida',
+        'isActive': true,
+        'aiInvocable': true,
+        'cooldownMs': 0,
+        'usageLimit': 0,
+        'excludesFlows': <dynamic>[],
+        'version': 1,
+      });
+
+      expect(resp.aiInvocable, isTrue);
+    });
+
+    test('aiInvocable ausente → false (tolerante en ventana de deploy)', () {
+      // A diferencia de los campos canónicos (fail-loud), aiInvocable degrada
+      // a false si el backend aún no lo sirve: la app nueva debe poder hablar
+      // con un backend viejo durante el despliegue.
+      final resp = FlowResp.fromJson(<String, dynamic>{
+        'id': 'f1',
+        'templateId': 't1',
+        'name': 'Bienvenida',
+        'isActive': true,
+        'cooldownMs': 0,
+        'usageLimit': 0,
+        'excludesFlows': <dynamic>[],
+        'version': 1,
+      });
+
+      expect(resp.aiInvocable, isFalse);
+    });
+
     test('cooldownMs ausente → FormatException (fail-loud)', () {
       expect(
         () => FlowResp.fromJson(<String, dynamic>{

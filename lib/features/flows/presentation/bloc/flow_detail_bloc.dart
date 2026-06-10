@@ -99,6 +99,7 @@ class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
         version: snapshot.version,
         name: snapshot.name,
         isActive: snapshot.isActive,
+        aiInvocable: event.aiInvocable,
         cooldownMs: event.cooldownMs,
         usageLimit: event.usageLimit,
         excludesFlows: event.excludesFlows,
@@ -144,17 +145,20 @@ class FlowDetailLoadRequested extends FlowDetailEvent {
   int get hashCode => (FlowDetailLoadRequested).hashCode;
 }
 
-/// Pide guardar los gates del flow (cooldown / usage limit / exclusiones).
+/// Pide guardar la configuración del flow (gates + allowlist de IA).
 /// `name` e `isActive` no viajan: el bloc los toma del snapshot Loaded
 /// y los reenvía intactos en el PUT replace-completo. La version del
-/// CAS también sale del snapshot.
+/// CAS también sale del snapshot. `aiInvocable` SÍ viaja: es parte del
+/// form de configuración (el toggle del editor).
 class FlowDetailUpdateSettingsRequested extends FlowDetailEvent {
   const FlowDetailUpdateSettingsRequested({
+    required this.aiInvocable,
     required this.cooldownMs,
     required this.usageLimit,
     required this.excludesFlows,
   });
 
+  final bool aiInvocable;
   final int cooldownMs;
   final int usageLimit;
   final List<String> excludesFlows;
@@ -163,7 +167,9 @@ class FlowDetailUpdateSettingsRequested extends FlowDetailEvent {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! FlowDetailUpdateSettingsRequested) return false;
-    if (other.cooldownMs != cooldownMs || other.usageLimit != usageLimit) {
+    if (other.aiInvocable != aiInvocable ||
+        other.cooldownMs != cooldownMs ||
+        other.usageLimit != usageLimit) {
       return false;
     }
     if (other.excludesFlows.length != excludesFlows.length) return false;
@@ -174,8 +180,12 @@ class FlowDetailUpdateSettingsRequested extends FlowDetailEvent {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(cooldownMs, usageLimit, Object.hashAll(excludesFlows));
+  int get hashCode => Object.hash(
+    aiInvocable,
+    cooldownMs,
+    usageLimit,
+    Object.hashAll(excludesFlows),
+  );
 }
 
 // States --------------------------------------------------------------------

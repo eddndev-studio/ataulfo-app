@@ -6,6 +6,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/flow.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
@@ -119,6 +120,7 @@ class _SettingsFormState extends State<_SettingsForm> {
 
   late final TextEditingController _usageLimitCtrl;
   late Set<String> _excludes;
+  late bool _aiInvocable;
 
   @override
   void initState() {
@@ -133,6 +135,7 @@ class _SettingsFormState extends State<_SettingsForm> {
     );
     _usageLimitCtrl.addListener(_onUsageLimitChanged);
     _excludes = <String>{...widget.flow.excludesFlows};
+    _aiInvocable = widget.flow.aiInvocable;
   }
 
   void _onUsageLimitChanged() {
@@ -167,6 +170,7 @@ class _SettingsFormState extends State<_SettingsForm> {
   }
 
   bool get _isDirty {
+    if (_aiInvocable != widget.flow.aiInvocable) return true;
     if (_cooldownHours.round() != _initialCooldownHours) return true;
     if (_usageLimit != widget.flow.usageLimit) return true;
     final snapshot = <String>[...widget.flow.excludesFlows]..sort();
@@ -181,6 +185,7 @@ class _SettingsFormState extends State<_SettingsForm> {
   void _submit() {
     context.read<FlowDetailBloc>().add(
       FlowDetailUpdateSettingsRequested(
+        aiInvocable: _aiInvocable,
         cooldownMs: _cooldownMs,
         usageLimit: _usageLimit,
         excludesFlows: _excludesSorted,
@@ -202,6 +207,12 @@ class _SettingsFormState extends State<_SettingsForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          _AIInvocableField(
+            value: _aiInvocable,
+            onChanged: (v) => setState(() => _aiInvocable = v),
+            textTheme: textTheme,
+          ),
+          const SizedBox(height: AppTokens.sp6),
           _CooldownField(
             hours: _cooldownHours,
             onChanged: (v) => setState(() => _cooldownHours = v),
@@ -240,6 +251,51 @@ class _SettingsFormState extends State<_SettingsForm> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Toggle "Invocable por IA" (allowlist S11 RF#17): autoriza al agente IA
+/// conversacional a listar y ejecutar este flujo. Apagado por defecto — que
+/// un LLM dispare una automatización es opt-in explícito del operador.
+class _AIInvocableField extends StatelessWidget {
+  const _AIInvocableField({
+    required this.value,
+    required this.onChanged,
+    required this.textTheme,
+  });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Invocable por IA',
+                style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+              ),
+              const SizedBox(height: AppTokens.sp1),
+              Text(
+                'El agente IA puede lanzar este flujo en una conversación.',
+                style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppTokens.sp3),
+        AppSwitch(
+          key: const Key('flow_settings.ai_invocable.switch'),
+          value: value,
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }

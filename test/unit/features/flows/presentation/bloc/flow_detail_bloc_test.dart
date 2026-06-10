@@ -198,6 +198,7 @@ void main() {
             version: any(named: 'version'),
             name: any(named: 'name'),
             isActive: any(named: 'isActive'),
+            aiInvocable: any(named: 'aiInvocable'),
             cooldownMs: any(named: 'cooldownMs'),
             usageLimit: any(named: 'usageLimit'),
             excludesFlows: any(named: 'excludesFlows'),
@@ -210,6 +211,7 @@ void main() {
       ], siblingsFailed: false),
       act: (bloc) => bloc.add(
         const FlowDetailUpdateSettingsRequested(
+          aiInvocable: false,
           cooldownMs: 5000,
           usageLimit: 3,
           excludesFlows: <String>['f2'],
@@ -230,9 +232,57 @@ void main() {
             version: 3,
             name: 'Bienvenida',
             isActive: true,
+            aiInvocable: false,
             cooldownMs: 5000,
             usageLimit: 3,
             excludesFlows: const <String>['f2'],
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<FlowDetailBloc, FlowDetailState>(
+      'el PUT lleva aiInvocable del evento (toggle del editor)',
+      build: () {
+        when(() => repo.flowById('f1')).thenAnswer((_) async => flowV4);
+        when(
+          () => repo.listFlows('t1'),
+        ).thenAnswer((_) async => const <Flow>[flowV4]);
+        when(
+          () => repo.updateFlow(
+            flowId: any(named: 'flowId'),
+            version: any(named: 'version'),
+            name: any(named: 'name'),
+            isActive: any(named: 'isActive'),
+            aiInvocable: any(named: 'aiInvocable'),
+            cooldownMs: any(named: 'cooldownMs'),
+            usageLimit: any(named: 'usageLimit'),
+            excludesFlows: any(named: 'excludesFlows'),
+          ),
+        ).thenAnswer((_) async => flowV4);
+        return FlowDetailBloc(repo: repo, id: 'f1');
+      },
+      seed: () =>
+          const FlowDetailLoaded(_flow, <Flow>[], siblingsFailed: false),
+      act: (bloc) => bloc.add(
+        const FlowDetailUpdateSettingsRequested(
+          aiInvocable: true,
+          cooldownMs: 0,
+          usageLimit: 0,
+          excludesFlows: <String>[],
+        ),
+      ),
+      verify: (_) {
+        verify(
+          () => repo.updateFlow(
+            flowId: 'f1',
+            version: 3,
+            name: 'Bienvenida',
+            isActive: true,
+            aiInvocable: true,
+            cooldownMs: 0,
+            usageLimit: 0,
+            excludesFlows: const <String>[],
           ),
         ).called(1);
       },
@@ -247,6 +297,7 @@ void main() {
             version: any(named: 'version'),
             name: any(named: 'name'),
             isActive: any(named: 'isActive'),
+            aiInvocable: any(named: 'aiInvocable'),
             cooldownMs: any(named: 'cooldownMs'),
             usageLimit: any(named: 'usageLimit'),
             excludesFlows: any(named: 'excludesFlows'),
@@ -260,6 +311,7 @@ void main() {
       ], siblingsFailed: false),
       act: (bloc) => bloc.add(
         const FlowDetailUpdateSettingsRequested(
+          aiInvocable: false,
           cooldownMs: 0,
           usageLimit: 0,
           excludesFlows: <String>[],
@@ -288,6 +340,7 @@ void main() {
             version: any(named: 'version'),
             name: any(named: 'name'),
             isActive: any(named: 'isActive'),
+            aiInvocable: any(named: 'aiInvocable'),
             cooldownMs: any(named: 'cooldownMs'),
             usageLimit: any(named: 'usageLimit'),
             excludesFlows: any(named: 'excludesFlows'),
@@ -299,6 +352,7 @@ void main() {
           const FlowDetailLoaded(_flow, <Flow>[], siblingsFailed: false),
       act: (bloc) => bloc.add(
         const FlowDetailUpdateSettingsRequested(
+          aiInvocable: false,
           cooldownMs: -1,
           usageLimit: 0,
           excludesFlows: <String>[],
@@ -320,6 +374,7 @@ void main() {
       build: () => FlowDetailBloc(repo: repo, id: 'f1'),
       act: (bloc) => bloc.add(
         const FlowDetailUpdateSettingsRequested(
+          aiInvocable: false,
           cooldownMs: 0,
           usageLimit: 0,
           excludesFlows: <String>[],
@@ -333,6 +388,7 @@ void main() {
             version: any(named: 'version'),
             name: any(named: 'name'),
             isActive: any(named: 'isActive'),
+            aiInvocable: any(named: 'aiInvocable'),
             cooldownMs: any(named: 'cooldownMs'),
             usageLimit: any(named: 'usageLimit'),
             excludesFlows: any(named: 'excludesFlows'),
@@ -354,6 +410,7 @@ void main() {
             version: any(named: 'version'),
             name: any(named: 'name'),
             isActive: any(named: 'isActive'),
+            aiInvocable: any(named: 'aiInvocable'),
             cooldownMs: any(named: 'cooldownMs'),
             usageLimit: any(named: 'usageLimit'),
             excludesFlows: any(named: 'excludesFlows'),
@@ -369,6 +426,7 @@ void main() {
       ),
       act: (bloc) => bloc.add(
         const FlowDetailUpdateSettingsRequested(
+          aiInvocable: false,
           cooldownMs: 5000,
           usageLimit: 3,
           excludesFlows: <String>['f2'],
