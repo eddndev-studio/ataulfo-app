@@ -224,7 +224,15 @@ void main() {
     expect(find.byKey(const Key('bot_variables.submit')), findsOneWidget);
 
     ctrl.add(const BotVariablesSaved());
+    await tester.pump();
+    // Confirmación visible ANTES de que el pop desmonte la página: sin el
+    // SnackBar el guardado sería silencioso y el operador no sabría si
+    // funcionó.
+    expect(find.text('Variables guardadas'), findsOneWidget);
+
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('bot_variables.submit')), findsNothing);
+    // El SnackBar sobrevive al pop (messenger del MaterialApp raíz).
+    expect(find.text('Variables guardadas'), findsOneWidget);
   });
 }
