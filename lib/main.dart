@@ -88,9 +88,6 @@ Future<void> main() async {
   final pushTokens = await PushTokenProviderResolver(
     isAndroid: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
   ).resolve();
-  // Visualización de push (foreground + background); no-op si el push real no
-  // está activo (desktop/web, o Android sin Firebase).
-  await startPushDisplay(pushTokens);
 
   const baseUrl = String.fromEnvironment(
     'AGENTIC_BASE_URL',
@@ -279,6 +276,15 @@ Future<void> main() async {
     mediaRepository: mediaRepository,
     mediaFilePicker: mediaFilePicker,
     mediaThumbnailLoader: mediaThumbnailLoader,
+  );
+
+  // Visualización + navegación de push; no-op si el push real no está activo
+  // (desktop/web, o Android sin Firebase). Va DESPUÉS del router porque el
+  // tap de una notificación navega con él.
+  await startPushDisplay(
+    pushTokens,
+    authBloc: authBloc,
+    navigate: (location) => router.router.go(location),
   );
 
   // Dispara el check inicial: lee storage, si hay tokens valida con
