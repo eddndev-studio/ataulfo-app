@@ -113,5 +113,39 @@ void main() {
         NotificationPreferencesFailed(NotificationsNetworkFailure()),
       ],
     );
+
+    blocTest<NotificationPreferencesBloc, NotificationPreferencesState>(
+      'fallo al guardar → SaveFailed con las prefs ORIGINALES (señaliza, no silencia)',
+      build: () {
+        final repo = _MockRepo();
+        when(
+          () => repo.savePreferences(any()),
+        ).thenThrow(const NotificationsNetworkFailure());
+        return NotificationPreferencesBloc(repo);
+      },
+      seed: () => const NotificationPreferencesLoaded(
+        preferences: <NotificationPreference>[_pref],
+      ),
+      act: (b) => b.add(
+        const NotificationPreferenceToggled(
+          NotificationEventType.messageInboundNew,
+          false,
+        ),
+      ),
+      expect: () => <Matcher>[
+        isA<NotificationPreferencesLoaded>().having(
+          (s) => s.saving,
+          'saving',
+          isTrue,
+        ),
+        // El switch se revierte Y el estado lo dice: la página puede avisar
+        // con un SnackBar en vez de revertir en silencio.
+        isA<NotificationPreferencesSaveFailed>().having(
+          (s) => s.preferences,
+          'prefs originales',
+          <NotificationPreference>[_pref],
+        ),
+      ],
+    );
   });
 }

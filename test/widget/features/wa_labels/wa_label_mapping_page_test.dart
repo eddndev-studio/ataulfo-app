@@ -52,6 +52,24 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
+  testWidgets('Loaded ofrece pull-to-refresh', (tester) async {
+    stub(WaMappingLoaded(data));
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(find.byType(RefreshIndicator), findsOneWidget);
+
+    // El gesto despacha una recarga (la única vía de ver labels nuevos sin
+    // salir y volver a entrar).
+    await tester.fling(
+      find.byType(ListView),
+      const Offset(0, 300),
+      1000,
+    );
+    await tester.pump();
+    verify(() => bloc.add(const WaMappingLoadRequested())).called(1);
+  });
+
   testWidgets(
     'Loaded: nota + mapeado muestra el label, sin mapear muestra aviso',
     (tester) async {

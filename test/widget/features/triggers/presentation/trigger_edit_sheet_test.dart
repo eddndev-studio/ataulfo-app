@@ -193,6 +193,22 @@ void main() {
       expect(padding, findsOneWidget);
     });
 
+    testWidgets('las opciones del LabelPicker dan área táctil ≥44px', (
+      tester,
+    ) async {
+      await pumpHost(tester, editing: _labelTrigger(labelId: 'vip'));
+
+      final option = find.byKey(
+        const Key('trigger_edit.label_picker.option.vip'),
+      );
+      expect(option, findsOneWidget);
+      expect(
+        tester.getSize(option).height,
+        greaterThanOrEqualTo(44.0),
+        reason: 'una fila de 36px es difícil de acertar con el pulgar',
+      );
+    });
+
     testWidgets('los pickers usan AppChoiceChip (Semantics + área táctil)', (
       tester,
     ) async {
@@ -577,12 +593,17 @@ void main() {
           labelsState: LabelsLoaded(<Label>[_lbl(id: 'vip', name: 'VIP')]),
         );
 
-        // El fallback visible muestra el id crudo: no se descarta en silencio.
+        // El fallback orienta a la acción correctiva; el UUID crudo es ruido
+        // para el operador (el id NO se descarta: el submit lo preserva).
         expect(
           find.byKey(const Key('trigger_edit.label_picker.unknown')),
           findsOneWidget,
         );
-        expect(find.textContaining('ghost'), findsOneWidget);
+        expect(find.textContaining('ghost'), findsNothing);
+        expect(
+          find.text('Fue eliminada del catálogo. Elige otra etiqueta.'),
+          findsOneWidget,
+        );
 
         // El operador puede guardar otros campos sin perder el id original.
         await tester.tap(find.byKey(const Key('trigger_edit.submit')));

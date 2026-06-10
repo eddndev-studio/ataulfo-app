@@ -57,6 +57,16 @@ void main() {
     );
   }
 
+  testWidgets('los swatches de color dan área táctil ≥44px', (tester) async {
+    await pumpCreate(tester);
+
+    final swatch = find.byKey(const Key('label_palette.0'));
+    expect(swatch, findsOneWidget);
+    final size = tester.getSize(swatch);
+    expect(size.width, greaterThanOrEqualTo(44.0));
+    expect(size.height, greaterThanOrEqualTo(44.0));
+  });
+
   testWidgets('crear: título, sin delete, submit deshabilitado sin nombre', (
     tester,
   ) async {

@@ -53,6 +53,26 @@ void main() {
     expect(submit.onPressed, isNull);
   });
 
+  testWidgets('correo sin forma de email deja Enviar deshabilitado', (
+    tester,
+  ) async {
+    final read = pumpHost(tester);
+    await read();
+
+    await tester.enterText(find.byKey(const Key('invite.email')), 'x');
+    await tester.pumpAndSettle();
+
+    final submit = tester.widget<AppButton>(
+      find.byKey(const Key('invite.submit')),
+    );
+    expect(
+      submit.onPressed,
+      isNull,
+      reason: 'sin @ con texto a ambos lados y punto en el dominio, '
+          'el backend lo rechazaría: mejor gatear local',
+    );
+  });
+
   testWidgets('con correo, enviar devuelve InviteSheetResult(email, rol)', (
     tester,
   ) async {
@@ -79,7 +99,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('invite.role')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ADMIN').last);
+    await tester.tap(find.text('Administrador').last);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('invite.submit')));
     await tester.pumpAndSettle();

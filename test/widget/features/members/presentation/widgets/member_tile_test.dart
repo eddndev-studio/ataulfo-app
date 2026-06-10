@@ -35,7 +35,7 @@ void main() {
 
     expect(find.byType(AppAvatar), findsOneWidget);
     expect(find.text('a@x.com'), findsOneWidget);
-    expect(find.widgetWithText(AppPill, 'OWNER'), findsOneWidget);
+    expect(find.widgetWithText(AppPill, 'Propietario'), findsOneWidget);
   });
 
   testWidgets('miembro confirmado muestra el badge "Verificado"', (

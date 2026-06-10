@@ -75,7 +75,8 @@ void main() {
       // sólo exponía el rol porque el UUID era ruido; ahora el operador
       // ve quién está logueado.
       expect(find.text('op@example.com'), findsOneWidget);
-      expect(find.widgetWithText(AppPill, 'OWNER'), findsOneWidget);
+      // Rol interpretado al humano (la jerga del wire no llega a la UI).
+      expect(find.widgetWithText(AppPill, 'Propietario'), findsOneWidget);
       expect(find.widgetWithText(AppButton, 'Cerrar sesión'), findsOneWidget);
       // UUIDs siguen sin mostrarse — el user_id/org_id NO entra a la UI.
       expect(find.text('u1'), findsNothing);

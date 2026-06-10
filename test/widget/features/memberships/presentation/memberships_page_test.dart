@@ -161,6 +161,33 @@ void main() {
     expect(find.byType(AppCard), findsNWidgets(2));
   });
 
+  testWidgets('switch en curso muestra el indicador de progreso', (
+    tester,
+  ) async {
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(
+        items: <Membership>[_activeMembership, _otherMembership],
+      ),
+    );
+    when(() => switchOrg.state).thenReturn(const SwitchOrgSwitching());
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('memberships.switching')), findsOneWidget);
+  });
+
+  testWidgets('sin switch en curso no hay indicador', (tester) async {
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(
+        items: <Membership>[_activeMembership, _otherMembership],
+      ),
+    );
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('memberships.switching')), findsNothing);
+  });
+
   testWidgets('Loaded vacío muestra empty state (sin tiles)', (tester) async {
     when(
       () => membershipsBloc.state,

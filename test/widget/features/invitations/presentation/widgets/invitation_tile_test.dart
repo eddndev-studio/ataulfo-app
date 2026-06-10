@@ -34,8 +34,8 @@ void main() {
     );
 
     expect(find.text('a@x.com'), findsOneWidget);
-    expect(find.widgetWithText(AppPill, 'WORKER'), findsOneWidget);
-    expect(find.widgetWithText(AppPill, 'PENDING'), findsWidgets);
+    expect(find.widgetWithText(AppPill, 'Agente'), findsOneWidget);
+    expect(find.widgetWithText(AppPill, 'Pendiente'), findsWidgets);
   });
 
   testWidgets('PENDING no caducada NO muestra badge de expirada', (
