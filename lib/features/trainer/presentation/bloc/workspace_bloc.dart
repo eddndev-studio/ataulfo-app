@@ -130,6 +130,10 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   final WorkspaceRepository _repo;
   final String _templateId;
 
+  /// El sheet de detalle necesita el scope para pedir el contenido
+  /// completo de un doc (el listado viaja sin content).
+  String get templateId => _templateId;
+
   Future<void> _onLoad(
     WorkspaceLoadRequested event,
     Emitter<WorkspaceState> emit,
@@ -154,7 +158,11 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       await effect();
     } on TrainerFailure catch (f) {
       emit(
-        WorkspaceLoaded(docs: current.docs, mutating: false, mutationFailure: f),
+        WorkspaceLoaded(
+          docs: current.docs,
+          mutating: false,
+          mutationFailure: f,
+        ),
       );
       return;
     }

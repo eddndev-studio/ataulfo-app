@@ -44,7 +44,12 @@ final _doc = WorkspaceDoc(
 );
 
 PreviewItem _item(String kind, {String text = '', String summary = ''}) =>
-    PreviewItem(kind: kind, text: text, summary: summary, at: DateTime.utc(2026, 6, 10));
+    PreviewItem(
+      kind: kind,
+      text: text,
+      summary: summary,
+      at: DateTime.utc(2026, 6, 10),
+    );
 
 void main() {
   group('TrainerChatBloc', () {
@@ -107,8 +112,10 @@ void main() {
             limit: any(named: 'limit'),
           ),
         ).thenAnswer(
-          (_) async =>
-              const TrainerMessagesPage(messages: <TrainerMessage>[], nextCursor: ''),
+          (_) async => const TrainerMessagesPage(
+            messages: <TrainerMessage>[],
+            nextCursor: '',
+          ),
         );
       },
       act: (b) => b.add(const TrainerChatStarted()),
@@ -159,7 +166,11 @@ void main() {
       expect: () => <dynamic>[
         isA<TrainerChatLoaded>()
             .having((s) => s.sending, 'typing visible', true)
-            .having((s) => s.messages.last.content, 'optimista', 'mejora el prompt'),
+            .having(
+              (s) => s.messages.last.content,
+              'optimista',
+              'mejora el prompt',
+            ),
         isA<TrainerChatLoaded>()
             .having((s) => s.sending, 'sending off', false)
             .having((s) => s.messages.length, 'recargado', 3),
@@ -189,7 +200,11 @@ void main() {
         isA<TrainerChatLoaded>()
             .having((s) => s.sending, 'off', false)
             .having((s) => s.messages.length, 'optimista revertido', 1)
-            .having((s) => s.sendFailure, 'fallo expuesto', isA<TrainerEngineFailure>()),
+            .having(
+              (s) => s.sendFailure,
+              'fallo expuesto',
+              isA<TrainerEngineFailure>(),
+            ),
       ],
     );
   });
@@ -221,11 +236,7 @@ void main() {
       seed: () => WorkspaceLoaded(docs: <WorkspaceDoc>[_doc], mutating: false),
       setUp: () {
         when(
-          () => repo.createDoc(
-            templateId: 't1',
-            name: 'menu',
-            content: 'x',
-          ),
+          () => repo.createDoc(templateId: 't1', name: 'menu', content: 'x'),
         ).thenThrow(const TrainerConflictFailure());
       },
       act: (b) => b.add(const WorkspaceDocCreated(name: 'menu', content: 'x')),
@@ -234,7 +245,11 @@ void main() {
         isA<WorkspaceLoaded>()
             .having((s) => s.mutating, 'off', false)
             .having((s) => s.docs.length, 'snapshot intacto', 1)
-            .having((s) => s.mutationFailure, 'fallo', isA<TrainerConflictFailure>()),
+            .having(
+              (s) => s.mutationFailure,
+              'fallo',
+              isA<TrainerConflictFailure>(),
+            ),
       ],
     );
 
@@ -277,9 +292,9 @@ void main() {
       'Started rehidrata el transcript vivo',
       build: build,
       setUp: () {
-        when(() => repo.transcript(templateId: 't1')).thenAnswer(
-          (_) async => <PreviewItem>[_item('user', text: 'hola')],
-        );
+        when(
+          () => repo.transcript(templateId: 't1'),
+        ).thenAnswer((_) async => <PreviewItem>[_item('user', text: 'hola')]);
       },
       act: (b) => b.add(const PreviewStarted()),
       expect: () => <dynamic>[
@@ -345,7 +360,11 @@ void main() {
         isA<PreviewLoaded>().having((s) => s.sending, 'typing', true),
         isA<PreviewLoaded>()
             .having((s) => s.sending, 'off', false)
-            .having((s) => s.failure, 'fallo', isA<TrainerUnavailableFailure>()),
+            .having(
+              (s) => s.failure,
+              'fallo',
+              isA<TrainerUnavailableFailure>(),
+            ),
       ],
     );
   });

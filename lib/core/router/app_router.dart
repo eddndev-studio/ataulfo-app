@@ -51,6 +51,13 @@ import '../../features/flows/presentation/bloc/media_names_cubit.dart';
 import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
+import '../../features/trainer/domain/repositories/trainer_repositories.dart';
+import '../../features/trainer/presentation/bloc/preview_bloc.dart';
+import '../../features/trainer/presentation/bloc/trainer_chat_bloc.dart';
+import '../../features/trainer/presentation/bloc/workspace_bloc.dart';
+import '../../features/trainer/presentation/pages/preview_page.dart';
+import '../../features/trainer/presentation/pages/trainer_chat_page.dart';
+import '../../features/trainer/presentation/pages/workspace_page.dart';
 import '../../features/notes/domain/repositories/notes_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/labels/presentation/bloc/labels_bloc.dart';
@@ -136,6 +143,9 @@ class AppRouter {
     required QuickRepliesRepository quickRepliesRepository,
     required LabelsRepository labelsRepository,
     required NotesRepository notesRepository,
+    required TrainerRepository trainerRepository,
+    required WorkspaceRepository workspaceRepository,
+    required PreviewRepository previewRepository,
     required MembershipsRepository membershipsRepository,
     required MembersRepository membersRepository,
     required InvitationsRepository invitationsRepository,
@@ -159,6 +169,9 @@ class AppRouter {
        _quickRepliesRepo = quickRepliesRepository,
        _labelsRepo = labelsRepository,
        _notesRepo = notesRepository,
+       _trainerRepo = trainerRepository,
+       _workspaceRepo = workspaceRepository,
+       _previewRepo = previewRepository,
        _membershipsRepo = membershipsRepository,
        _membersRepo = membersRepository,
        _invitationsRepo = invitationsRepository,
@@ -182,6 +195,9 @@ class AppRouter {
   final WaLabelsRepository _waLabelsRepo;
   final QuickRepliesRepository _quickRepliesRepo;
   final LabelsRepository _labelsRepo;
+  final TrainerRepository _trainerRepo;
+  final WorkspaceRepository _workspaceRepo;
+  final PreviewRepository _previewRepo;
   final NotesRepository _notesRepo;
   final MembershipsRepository _membershipsRepo;
   final MembersRepository _membersRepo;
@@ -690,7 +706,19 @@ class AppRouter {
                 ),
               ],
               child: Scaffold(
-                appBar: AppBar(title: const Text('Detalle de plantilla')),
+                appBar: AppBar(
+                  title: const Text('Detalle de plantilla'),
+                  actions: <Widget>[
+                    Builder(
+                      builder: (ctx) => IconButton(
+                        key: const Key('template_detail.trainer'),
+                        tooltip: 'Entrenador',
+                        icon: const Icon(Icons.school_outlined),
+                        onPressed: () => ctx.push('/templates/$id/trainer'),
+                      ),
+                    ),
+                  ],
+                ),
                 body: const TemplateDetailPage(),
               ),
             ),
@@ -729,6 +757,53 @@ class AppRouter {
               appBar: AppBar(title: const Text('Editar plantilla')),
               body: const TemplateEditPage(),
             ),
+          );
+        },
+      ),
+      GoRoute(
+        // Chat con el agente entrenador (S24). Page-scoped: el bloc carga
+        // (o crea) el hilo más reciente al montar. El WorkspaceRepository
+        // y PreviewRepository NO cuelgan aquí: las subrutas montan los
+        // suyos (cada pantalla es page-scoped completa).
+        path: '/templates/:id/trainer',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<TrainerChatBloc>(
+            create: (_) =>
+                TrainerChatBloc(repo: _trainerRepo, templateId: id)
+                  ..add(const TrainerChatStarted()),
+            child: TrainerChatPage(templateId: id),
+          );
+        },
+      ),
+      GoRoute(
+        // Workspace de negocio (S24): documentos que alimentan al bot. El
+        // repo cuelga del scope para que el sheet de detalle haga el GET
+        // del contenido completo.
+        path: '/templates/:id/trainer/workspace',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return RepositoryProvider<WorkspaceRepository>.value(
+            value: _workspaceRepo,
+            child: BlocProvider<WorkspaceBloc>(
+              create: (_) =>
+                  WorkspaceBloc(repo: _workspaceRepo, templateId: id)
+                    ..add(const WorkspaceLoadRequested()),
+              child: WorkspacePage(templateId: id),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Preview sandbox (S24): emulador del bot, efectos grabados.
+        path: '/templates/:id/trainer/preview',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<PreviewBloc>(
+            create: (_) =>
+                PreviewBloc(repo: _previewRepo, templateId: id)
+                  ..add(const PreviewStarted()),
+            child: PreviewPage(templateId: id),
           );
         },
       ),

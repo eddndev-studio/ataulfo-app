@@ -26,6 +26,10 @@ import 'features/flow_run/data/repositories/flow_run_repository_impl.dart';
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/labels/data/datasources/labels_datasource.dart';
+import 'features/trainer/data/datasources/preview_datasource.dart';
+import 'features/trainer/data/datasources/trainer_datasource.dart';
+import 'features/trainer/data/datasources/workspace_datasource.dart';
+import 'features/trainer/data/repositories/trainer_repositories_impl.dart';
 import 'features/notes/data/datasources/notes_datasource.dart';
 import 'features/labels/data/repositories/labels_repository_impl.dart';
 import 'features/notes/data/repositories/notes_repository_impl.dart';
@@ -203,6 +207,18 @@ Future<void> main() async {
     datasource: DioNotesDatasource(mainDio),
   );
 
+  // Agente entrenador + Workspace + Preview (S24): tres superficies del
+  // mismo arco, page-scoped en sus rutas.
+  final trainerRepository = TrainerRepositoryImpl(
+    datasource: DioTrainerDatasource(mainDio),
+  );
+  final workspaceRepository = WorkspaceRepositoryImpl(
+    datasource: DioWorkspaceDatasource(mainDio),
+  );
+  final previewRepository = PreviewRepositoryImpl(
+    datasource: DioPreviewDatasource(mainDio),
+  );
+
   final membershipsRepository = MembershipsRepositoryImpl(
     datasource: DioMembershipsDatasource(mainDio),
   );
@@ -277,6 +293,9 @@ Future<void> main() async {
     quickRepliesRepository: quickRepliesRepository,
     labelsRepository: labelsRepository,
     notesRepository: notesRepository,
+    trainerRepository: trainerRepository,
+    workspaceRepository: workspaceRepository,
+    previewRepository: previewRepository,
     membershipsRepository: membershipsRepository,
     membersRepository: membersRepository,
     invitationsRepository: invitationsRepository,
