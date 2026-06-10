@@ -60,6 +60,14 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   /// tests deterministas; por defecto un UUID v4.
   final String Function() _newToken;
 
+  /// Side-channel de fallos de reacción. Reaccionar no emite estados (la
+  /// reacción se materializa por el eco SSE), así que un POST fallido sería
+  /// invisible; este stream permite a la UI anunciarlo sin tocar el hilo.
+  final StreamController<void> _reactFailures =
+      StreamController<void>.broadcast();
+
+  Stream<void> get reactFailures => _reactFailures.stream;
+
   StreamSubscription<ThreadLiveEvent>? _liveSub;
 
   /// Evita refetchs solapados cuando llegan varias reconexiones seguidas
@@ -246,6 +254,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   @override
   Future<void> close() {
     _liveSub?.cancel();
+    _reactFailures.close();
     return super.close();
   }
 
@@ -343,10 +352,12 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     await _dispatchSend(retrying, emit);
   }
 
-  /// Reacciona a un mensaje. Best-effort: la reacción se materializa por el eco
-  /// SSE (el backend la persiste y publica como OUTBOUND `type=reaction`, que el
-  /// hilo ya sabe doblar sobre su target). Un fallo es silencioso —no corrompe
-  /// el hilo; el operador puede reintentar—. `emoji` vacío quita la reacción.
+  /// Reacciona a un mensaje. Best-effort sobre el ESTADO: la reacción se
+  /// materializa por el eco SSE (el backend la persiste y publica como
+  /// OUTBOUND `type=reaction`, que el hilo ya sabe doblar sobre su target),
+  /// así que un fallo no altera el hilo — pero SÍ se señaliza por
+  /// [reactFailures] para que la UI lo anuncie. `emoji` vacío quita la
+  /// reacción.
   Future<void> _onReact(
     MessagesReactRequested event,
     Emitter<MessagesState> emit,
@@ -359,7 +370,8 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         emoji: event.emoji,
       );
     } on MessagesFailure {
-      // Best-effort: una reacción fallida no altera el hilo.
+      // El hilo queda intacto; el side-channel avisa del fallo.
+      _reactFailures.add(null);
     }
   }
 

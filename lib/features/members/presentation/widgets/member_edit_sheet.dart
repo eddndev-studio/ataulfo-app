@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/i18n/role_labels.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/member.dart';
@@ -168,7 +169,10 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final items = MemberEditSheet.roleOptions
-        .map((r) => DropdownMenuItem<String>(value: r, child: Text(r)))
+        // value crudo del contrato; sólo el texto visible se humaniza.
+        .map(
+          (r) => DropdownMenuItem<String>(value: r, child: Text(roleLabel(r))),
+        )
         .toList(growable: false);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
@@ -187,7 +191,7 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
             children: <Widget>[
               const Text('Rol actual'),
               const SizedBox(width: AppTokens.sp3),
-              AppPill.neutral(label: widget.member.role),
+              AppPill.neutral(label: roleLabel(widget.member.role)),
             ],
           ),
           const SizedBox(height: AppTokens.sp5),

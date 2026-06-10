@@ -100,6 +100,23 @@ void main() {
     expect(find.byKey(const Key('bot_connect.active')), findsOneWidget);
   });
 
+  testWidgets('Ready(active) sin QR aún: indica que se está generando', (
+    tester,
+  ) async {
+    // En la fase active sin status.qrCode todavía no hay nada que escanear:
+    // pedir "escanea el QR ahora" confunde. Debe verse el indicador de
+    // generación en su lugar.
+    when(
+      () => bloc.state,
+    ).thenReturn(BotConnectReady(_link, phase: PairingPhase.active));
+
+    await tester.pumpWidget(host());
+
+    expect(find.text('Generando el código QR…'), findsOneWidget);
+    expect(find.byKey(const Key('bot_connect.qr')), findsNothing);
+    expect(find.textContaining('escaneen el QR ahora'), findsNothing);
+  });
+
   testWidgets('Failed muestra error y Reintentar dispara BotConnectStarted', (
     tester,
   ) async {
@@ -157,6 +174,23 @@ void main() {
         verify(() => bloc.add(const BotConnectWipeRequested())).called(1);
       },
     );
+
+    testWidgets('confirmar el wipe muestra el SnackBar de confirmación', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(BotConnectReady(_link));
+
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('bot_connect.wipe')));
+      await tester.tap(find.byKey(const Key('bot_connect.wipe')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bot_connect.wipe_confirm')));
+      await tester.pumpAndSettle();
+
+      // El borrado es asíncrono y sin estado propio en el bloc: el SnackBar
+      // es el único feedback de que la acción se registró.
+      expect(find.textContaining('Credenciales borradas'), findsOneWidget);
+    });
 
     testWidgets('WABA: la sección wipe está oculta', (tester) async {
       when(() => bloc.state).thenReturn(BotConnectReady(_link));

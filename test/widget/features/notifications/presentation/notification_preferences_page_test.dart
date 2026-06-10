@@ -48,6 +48,34 @@ void main() {
     ),
   );
 
+  testWidgets('SaveFailed avisa con SnackBar y conserva la lista', (
+    tester,
+  ) async {
+    const failed = NotificationPreferencesSaveFailed(
+      preferences: <NotificationPreference>[_pref],
+    );
+    whenListen(
+      bloc,
+      Stream<NotificationPreferencesState>.fromIterable(
+        const <NotificationPreferencesState>[failed],
+      ),
+      initialState: const NotificationPreferencesLoaded(
+        preferences: <NotificationPreference>[_pref],
+      ),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('No pudimos guardar tu preferencia. Intenta de nuevo.'),
+      findsOneWidget,
+    );
+    // La lista sigue renderizada con las prefs originales (switch revertido).
+    expect(find.byType(AppSwitch), findsOneWidget);
+  });
+
   testWidgets('loading muestra estado de carga', (tester) async {
     when(() => bloc.state).thenReturn(const NotificationPreferencesLoading());
 

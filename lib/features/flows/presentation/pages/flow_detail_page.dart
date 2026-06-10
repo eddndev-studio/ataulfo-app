@@ -220,7 +220,25 @@ class _StepsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return BlocBuilder<FlowStepsBloc, FlowStepsState>(
+    return BlocConsumer<FlowStepsBloc, FlowStepsState>(
+      // Sólo el reorder muta sin un sheet delante: add/edit/delete reportan
+      // su fallo inline dentro del sheet abierto. El gate `isCurrent` evita
+      // duplicar el aviso cuando el fallo ocurre con un modal encima.
+      listener: (context, state) {
+        if (state is FlowStepsMutationFailed &&
+            (ModalRoute.of(context)?.isCurrent ?? true)) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'No se pudo guardar el nuevo orden. Se revirtieron los '
+                  'cambios.',
+                ),
+              ),
+            );
+        }
+      },
       builder: (context, state) => switch (state) {
         FlowStepsLoading() => const Padding(
           padding: EdgeInsets.symmetric(vertical: AppTokens.sp4),
@@ -285,6 +303,12 @@ class _StepsListView extends StatelessWidget {
     // item se eleva al overlay del Navigator (fuera del scope del provider) y
     // el lookup lanzaría ProviderNotFound → RenderErrorBox gris estirado.
     final namesState = context.watch<MediaNamesCubit>().state;
+    // Mismo patrón para el catálogo de labels: mapa plano id→nombre para que
+    // el paso LABEL muestre el nombre y no el UUID.
+    final labelsState = context.watch<LabelsBloc>().state;
+    final labelNames = labelsState is LabelsLoaded
+        ? <String, String>{for (final l in labelsState.labels) l.id: l.name}
+        : const <String, String>{};
 
     if (steps.isEmpty) {
       return SingleChildScrollView(
@@ -322,6 +346,7 @@ class _StepsListView extends StatelessWidget {
             _StepCard(
               step: steps.first,
               resolvedMediaName: namesState.nameFor(steps.first.mediaRef),
+              labelNames: labelNames,
             ),
           ],
         ),
@@ -352,6 +377,7 @@ class _StepsListView extends StatelessWidget {
                   step: s,
                   dragIndex: i,
                   resolvedMediaName: namesState.nameFor(s.mediaRef),
+                  labelNames: labelNames,
                 ),
               );
             },
@@ -433,7 +459,12 @@ class _StepsFailedView extends StatelessWidget {
 /// captura el gesto antes del InkWell (se monta como sibling del área
 /// tappable), así que long-press/drag sobre el handle no abre el sheet.
 class _StepCard extends StatelessWidget {
-  const _StepCard({required this.step, this.dragIndex, this.resolvedMediaName});
+  const _StepCard({
+    required this.step,
+    this.dragIndex,
+    this.resolvedMediaName,
+    this.labelNames = const <String, String>{},
+  });
 
   final sdom.Step step;
   final int? dragIndex;
@@ -442,6 +473,10 @@ class _StepCard extends StatelessWidget {
   /// `MediaNamesCubit` por encima del listado). Plano a propósito: ver
   /// [_StepBody.resolvedMediaName].
   final String? resolvedMediaName;
+
+  /// Catálogo id→nombre de labels, resuelto por el caller por encima del
+  /// listado (mismo motivo de planitud que [resolvedMediaName]).
+  final Map<String, String> labelNames;
 
   @override
   Widget build(BuildContext context) {
@@ -464,6 +499,7 @@ class _StepCard extends StatelessWidget {
           step: step,
           textTheme: textTheme,
           resolvedMediaName: resolvedMediaName,
+          labelNames: labelNames,
         ),
         const SizedBox(height: AppTokens.sp3),
         Wrap(
@@ -493,12 +529,21 @@ class _StepCard extends StatelessWidget {
           if (dragIdx != null)
             ReorderableDragStartListener(
               index: dragIdx,
-              child: Padding(
-                padding: const EdgeInsets.only(left: AppTokens.sp2),
-                child: Icon(
-                  Icons.drag_handle,
-                  key: Key('flow_detail.step_card.drag_handle.${step.id}'),
-                  color: AppTokens.text2,
+              // 48x48: área de agarre táctil mínima (el ícono solo mide 24 y
+              // es demasiado fino para el pulgar). ExcludeSemantics colapsa el
+              // nodo del ícono en uno solo con la etiqueta de acción.
+              child: Semantics(
+                label: 'Mover paso',
+                child: ExcludeSemantics(
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Icon(
+                      Icons.drag_handle,
+                      key: Key('flow_detail.step_card.drag_handle.${step.id}'),
+                      color: AppTokens.text2,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -553,10 +598,15 @@ class _StepBody extends StatelessWidget {
     required this.step,
     required this.textTheme,
     this.resolvedMediaName,
+    this.labelNames = const <String, String>{},
   });
 
   final sdom.Step step;
   final TextTheme textTheme;
+
+  /// Catálogo id→nombre de labels, plano por el mismo motivo que
+  /// [resolvedMediaName].
+  final Map<String, String> labelNames;
 
   /// Nombre EN VIVO del recurso (alias/filename del catálogo) ya resuelto por
   /// el caller, que lee el `MediaNamesCubit` POR ENCIMA del `ReorderableListView`.
@@ -583,7 +633,11 @@ class _StepBody extends StatelessWidget {
       return _ConditionalTimeSummary(step: step, textTheme: textTheme);
     }
     if (t == sdom.StepType.label) {
-      return _LabelStepSummary(step: step, textTheme: textTheme);
+      return _LabelStepSummary(
+        step: step,
+        textTheme: textTheme,
+        labelNames: labelNames,
+      );
     }
     if (t == sdom.StepType.unsupported) {
       return Text(
@@ -638,14 +692,20 @@ class _StepBody extends StatelessWidget {
 }
 
 /// Resumen read-only de un paso LABEL en la StepCard: la acción
-/// (Etiquetar / Quitar etiqueta) + el id de la etiqueta. El nombre legible se
-/// resuelve al entrar al editor (el catálogo no está en scope acá); el id es
-/// honesto y distingue pasos. Metadata inválida ⇒ fallback "sin configurar".
+/// (Etiquetar / Quitar etiqueta) + el NOMBRE de la etiqueta resuelto del
+/// catálogo ([labelNames]); el id crudo queda sólo como respaldo honesto
+/// (catálogo cargando, fallo o label borrada) y distingue pasos. Metadata
+/// inválida ⇒ fallback "sin configurar".
 class _LabelStepSummary extends StatelessWidget {
-  const _LabelStepSummary({required this.step, required this.textTheme});
+  const _LabelStepSummary({
+    required this.step,
+    required this.textTheme,
+    this.labelNames = const <String, String>{},
+  });
 
   final sdom.Step step;
   final TextTheme textTheme;
+  final Map<String, String> labelNames;
 
   @override
   Widget build(BuildContext context) {
@@ -662,6 +722,7 @@ class _LabelStepSummary extends StatelessWidget {
       );
     }
     final isAdd = md.action == LabelStepAction.add;
+    final resolvedName = labelNames[md.labelId];
     return Row(
       children: <Widget>[
         Icon(
@@ -678,13 +739,16 @@ class _LabelStepSummary extends StatelessWidget {
                   text: isAdd ? 'Etiquetar · ' : 'Quitar etiqueta · ',
                   style: textTheme.bodyMedium,
                 ),
-                TextSpan(
-                  text: md.labelId,
-                  style: textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                    color: AppTokens.text2,
+                if (resolvedName != null)
+                  TextSpan(text: resolvedName, style: textTheme.bodyMedium)
+                else
+                  TextSpan(
+                    text: md.labelId,
+                    style: textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      color: AppTokens.text2,
+                    ),
                   ),
-                ),
               ],
             ),
             maxLines: 1,

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
+import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
@@ -147,6 +149,77 @@ void main() {
       ),
     );
   }
+
+  group('UX del sheet (barrido)', () {
+    testWidgets('con teclado abierto el sheet aplica el inset inferior', (
+      tester,
+    ) async {
+      // Simula el teclado: el sheet DEBE reaccionar por sí mismo al
+      // viewInsets (el padre lo abría con un inset congelado al momento de
+      // abrir, que nunca se actualizaba al aparecer el teclado).
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TriggersBloc>.value(value: triggers),
+              BlocProvider<LabelsBloc>.value(value: labels),
+            ],
+            // El MediaQuery vive DENTRO del Scaffold: el Scaffold consume el
+            // viewInsets de su body (resize), pero un bottom sheet real vive
+            // en el overlay y SÍ ve el inset del teclado.
+            child: Scaffold(
+              body: MediaQuery(
+                data: const MediaQueryData(
+                  viewInsets: EdgeInsets.only(bottom: 300),
+                ),
+                child: TriggerEditSheet(scopedFlow: _flow()),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final padding = find.byWidgetPredicate(
+        (w) =>
+            w is Padding &&
+            w.padding.resolve(TextDirection.ltr).bottom >= 300 &&
+            w.child is SingleChildScrollView,
+      );
+      expect(padding, findsOneWidget);
+    });
+
+    testWidgets('las opciones del LabelPicker dan área táctil ≥44px', (
+      tester,
+    ) async {
+      await pumpHost(tester, editing: _labelTrigger(labelId: 'vip'));
+
+      final option = find.byKey(
+        const Key('trigger_edit.label_picker.option.vip'),
+      );
+      expect(option, findsOneWidget);
+      expect(
+        tester.getSize(option).height,
+        greaterThanOrEqualTo(44.0),
+        reason: 'una fila de 36px es difícil de acertar con el pulgar',
+      );
+    });
+
+    testWidgets('los pickers usan AppChoiceChip (Semantics + área táctil)', (
+      tester,
+    ) async {
+      await pumpHost(tester);
+
+      // Migrados del par AppPill+InkWell (sin Semantics de botón y con el
+      // seleccionado inerte) al chip controlado del design system.
+      expect(find.byType(AppChoiceChip), findsWidgets);
+      expect(find.byType(AppPill), findsNothing);
+    });
+  });
 
   group('TriggerEditSheet (Add mode)', () {
     testWidgets('renderiza título "Nuevo disparador" + controles base', (
@@ -520,12 +593,17 @@ void main() {
           labelsState: LabelsLoaded(<Label>[_lbl(id: 'vip', name: 'VIP')]),
         );
 
-        // El fallback visible muestra el id crudo: no se descarta en silencio.
+        // El fallback orienta a la acción correctiva; el UUID crudo es ruido
+        // para el operador (el id NO se descarta: el submit lo preserva).
         expect(
           find.byKey(const Key('trigger_edit.label_picker.unknown')),
           findsOneWidget,
         );
-        expect(find.textContaining('ghost'), findsOneWidget);
+        expect(find.textContaining('ghost'), findsNothing);
+        expect(
+          find.text('Fue eliminada del catálogo. Elige otra etiqueta.'),
+          findsOneWidget,
+        );
 
         // El operador puede guardar otros campos sin perder el id original.
         await tester.tap(find.byKey(const Key('trigger_edit.submit')));

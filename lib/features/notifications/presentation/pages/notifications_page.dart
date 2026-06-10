@@ -49,31 +49,41 @@ class _NotificationsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(AppTokens.sp6),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Wrap(
-            alignment: WrapAlignment.end,
-            spacing: AppTokens.sp3,
-            runSpacing: AppTokens.sp3,
-            children: <Widget>[
-              const _PreferencesButton(),
-              AppButton.tonal(
-                label: 'Marcar todo leído',
-                icon: Icons.done_all_outlined,
-                onPressed: () => context.read<NotificationsBloc>().add(
-                  const NotificationsMarkAllReadRequested(),
-                ),
-              ),
-            ],
-          );
-        }
-        final item = items[index - 1];
-        return _NotificationItem(item: item);
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Reusa la carga; el Loading intermedio es el costo honesto de no
+        // tener un refresh incremental en el bloc.
+        context.read<NotificationsBloc>().add(
+          const NotificationsLoadRequested(),
+        );
       },
-      separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
-      itemCount: items.length + 1,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(AppTokens.sp6),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Wrap(
+              alignment: WrapAlignment.end,
+              spacing: AppTokens.sp3,
+              runSpacing: AppTokens.sp3,
+              children: <Widget>[
+                const _PreferencesButton(),
+                AppButton.tonal(
+                  label: 'Marcar todo leído',
+                  icon: Icons.done_all_outlined,
+                  onPressed: () => context.read<NotificationsBloc>().add(
+                    const NotificationsMarkAllReadRequested(),
+                  ),
+                ),
+              ],
+            );
+          }
+          final item = items[index - 1];
+          return _NotificationItem(item: item);
+        },
+        separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
+        itemCount: items.length + 1,
+      ),
     );
   }
 }
@@ -118,7 +128,9 @@ class _NotificationItem extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: AppTokens.text2),
+          // Ícono de "marcar leído": un chevron prometería navegación a un
+          // detalle que no existe.
+          const Icon(Icons.done_outlined, color: AppTokens.text2),
         ],
       ),
     );

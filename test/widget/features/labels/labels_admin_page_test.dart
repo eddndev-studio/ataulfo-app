@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/failures/labels_failure.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
@@ -53,6 +54,25 @@ void main() {
     expect(find.text('VIP'), findsOneWidget);
     expect(find.text('Soporte'), findsOneWidget);
     expect(find.text('Oro'), findsOneWidget);
+  });
+
+  testWidgets('el tile usa el onTap del AppCard (ripple del DS)', (
+    tester,
+  ) async {
+    seed(
+      const LabelsAdminLoaded(
+        labels: <Label>[
+          Label(id: '1', name: 'VIP', color: '#7c3aed', description: ''),
+        ],
+        isRefreshing: false,
+      ),
+    );
+    await tester.pumpWidget(host());
+
+    // El feedback táctil viene del InkWell interno del AppCard; un
+    // GestureDetector externo no da ripple y deja el tap "muerto" al ojo.
+    final card = tester.widget<AppCard>(find.byType(AppCard).first);
+    expect(card.onTap, isNotNull);
   });
 
   testWidgets('Loaded vacío → empty state', (tester) async {

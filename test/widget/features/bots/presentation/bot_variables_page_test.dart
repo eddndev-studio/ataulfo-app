@@ -224,7 +224,17 @@ void main() {
     expect(find.byKey(const Key('bot_variables.submit')), findsOneWidget);
 
     ctrl.add(const BotVariablesSaved());
+    await tester.pump(); // entrega del stream → listener (pop + showSnackBar)
+    await tester.pump(); // frame en que el messenger monta el SnackBar
+    // Confirmación visible ANTES de que el pop desmonte la página: sin el
+    // SnackBar el guardado sería silencioso y el operador no sabría si
+    // funcionó. (findsWidgets: durante la transición ambos Scaffolds están
+    // registrados en el messenger y el aviso se pinta en los dos.)
+    expect(find.text('Variables guardadas'), findsWidgets);
+
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('bot_variables.submit')), findsNothing);
+    // El SnackBar sobrevive al pop (messenger del MaterialApp raíz).
+    expect(find.text('Variables guardadas'), findsOneWidget);
   });
 }

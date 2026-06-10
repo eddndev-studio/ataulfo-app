@@ -88,7 +88,9 @@ class _RegisterPageState extends State<RegisterPage> {
           },
           builder: (context, state) {
             final submitting = state is RegisterSubmitting;
-            return Padding(
+            // Scrolleable: cuando el teclado encoge el body, el contenido se
+            // desplaza y el campo enfocado/botón quedan alcanzables.
+            return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

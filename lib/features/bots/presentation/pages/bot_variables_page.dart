@@ -27,6 +27,13 @@ class BotVariablesPage extends StatelessWidget {
     return BlocListener<BotVariablesBloc, BotVariablesState>(
       listener: (context, state) {
         if (state is BotVariablesSaved) {
+          // El messenger se resuelve antes del pop (ancestro del MaterialApp):
+          // la confirmación sobrevive al desmontaje de la página.
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(content: Text('Variables guardadas')),
+            );
           Navigator.of(context).maybePop();
         }
       },

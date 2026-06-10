@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
 import '../../domain/failures/flow_run_failure.dart';
 import '../../domain/repositories/flow_run_repository.dart';
 import '../bloc/flow_run_cubit.dart';
@@ -122,7 +123,25 @@ class _FlowRunSheetState extends State<FlowRunSheet> {
                 FlowRunFailed(failure: final f) => Padding(
                   key: const Key('flow_run.error'),
                   padding: const EdgeInsets.all(AppTokens.sp6),
-                  child: Text(_errorText(f), style: textTheme.bodyLarge),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(_errorText(f), style: textTheme.bodyLarge),
+                      // Reintentar sólo para fallos transitorios; un 403 /
+                      // not-found / bot pausado devolvería lo mismo.
+                      if (_isTransient(f)) ...<Widget>[
+                        const SizedBox(height: AppTokens.sp3),
+                        Builder(
+                          builder: (context) => AppButton.tonal(
+                            label: 'Reintentar',
+                            onPressed: () =>
+                                context.read<FlowRunCubit>().load(),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               },
             ),
@@ -145,6 +164,14 @@ String _reasonText(String reason) => switch (reason) {
   'EXCLUDED' => 'otro flujo excluyente está activo',
   _ => 'una regla del flujo lo bloqueó',
 };
+
+/// Fallos donde reintentar tiene sentido (red/timeout/server/desconocido);
+/// los terminales (paused/forbidden/not-found) devolverían lo mismo.
+bool _isTransient(FlowRunFailure f) =>
+    f is FlowRunNetworkFailure ||
+    f is FlowRunTimeoutFailure ||
+    f is FlowRunServerFailure ||
+    f is UnknownFlowRunFailure;
 
 String _errorText(FlowRunFailure f) => switch (f) {
   FlowRunPausedFailure() => 'El bot está pausado',

@@ -126,10 +126,10 @@ void _openSheet(BuildContext context, fdom.Flow flow, {Trigger? editing}) {
         BlocProvider<TriggersBloc>.value(value: triggersBloc),
         BlocProvider<LabelsBloc>.value(value: labelsBloc),
       ],
-      child: Padding(
-        padding: EdgeInsets.only(bottom: context.sheetBottomInset),
-        child: TriggerEditSheet(editing: editing, scopedFlow: flow),
-      ),
+      // El inset del teclado lo aplica el PROPIO sheet (su context sí se
+      // reconstruye con el MediaQuery); ponerlo aquí lo congelaba al valor
+      // del momento de abrir y el teclado tapaba el formulario.
+      child: TriggerEditSheet(editing: editing, scopedFlow: flow),
     ),
   );
 }

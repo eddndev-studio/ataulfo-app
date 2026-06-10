@@ -29,10 +29,24 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final TextEditingController _email = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _email.addListener(_onChanged);
+  }
+
+  @override
   void dispose() {
+    _email.removeListener(_onChanged);
     _email.dispose();
     super.dispose();
   }
+
+  // Rebuild para re-evaluar el gate del botón en cada tecla.
+  void _onChanged() => setState(() {});
+
+  // Igual que RegisterPage: el gate sólo exige texto; el formato fino del
+  // email lo juzga el backend (202 ciego), no el cliente.
+  bool get _canSubmit => _email.text.isNotEmpty;
 
   void _submit() {
     context.read<ForgotPasswordBloc>().add(
@@ -75,7 +89,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     label: 'Enviar instrucciones',
                     fullWidth: true,
                     loading: submitting,
-                    onPressed: submitting ? null : _submit,
+                    onPressed: (_canSubmit && !submitting) ? _submit : null,
                   ),
                   const SizedBox(height: 8),
                   TextButton(

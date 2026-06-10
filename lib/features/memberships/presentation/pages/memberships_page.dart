@@ -153,36 +153,52 @@ class _LoadedView extends StatelessWidget {
         ? null
         : activeMatches.first.orgName;
 
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp4,
-        AppTokens.sp4,
-        AppTokens.sp4,
-        AppTokens.sp4 + context.safeBottomInset,
-      ),
-      // +1 por el pie de acciones (crear / renombrar).
-      itemCount: items.length + 1,
-      separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
-      itemBuilder: (context, i) {
-        if (i == items.length) {
-          return _OrgActionsFooter(
-            // Renombrar es admin-gated (cosmético; el backend 403ea por debajo
-            // de ADMIN). Sin nombre activo (carrera) no se ofrece.
-            renameName: isAdminOrAbove(activeRole) ? activeName : null,
-          );
-        }
-        final m = items[i];
-        return OrgMembershipTile(
-          membership: m,
-          isActive: m.orgId == activeOrgId,
-          // La org activa nunca es tappable (el tile lo anula con isActive); un
-          // switch en curso mata el resto de taps.
-          onTap: switching
-              ? null
-              : () => context.read<SwitchOrgCubit>().switchTo(m.orgId),
-        );
-      },
+    return Column(
+      children: <Widget>[
+        // Cambio de organización en vuelo: barra fina arriba de la lista —
+        // los taps ya están deshabilitados, pero sin esta señal el tile
+        // tocado parece ignorado.
+        if (switching)
+          const LinearProgressIndicator(
+            key: Key('memberships.switching'),
+            color: AppTokens.primary,
+            backgroundColor: Colors.transparent,
+          ),
+        Expanded(
+          child: ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              AppTokens.sp4,
+              AppTokens.sp4,
+              AppTokens.sp4,
+              AppTokens.sp4 + context.safeBottomInset,
+            ),
+            // +1 por el pie de acciones (crear / renombrar).
+            itemCount: items.length + 1,
+            separatorBuilder: (_, _) =>
+                const SizedBox(height: AppTokens.cardGap),
+            itemBuilder: (context, i) {
+              if (i == items.length) {
+                return _OrgActionsFooter(
+                  // Renombrar es admin-gated (cosmético; el backend 403ea por debajo
+                  // de ADMIN). Sin nombre activo (carrera) no se ofrece.
+                  renameName: isAdminOrAbove(activeRole) ? activeName : null,
+                );
+              }
+              final m = items[i];
+              return OrgMembershipTile(
+                membership: m,
+                isActive: m.orgId == activeOrgId,
+                // La org activa nunca es tappable (el tile lo anula con isActive); un
+                // switch en curso mata el resto de taps.
+                onTap: switching
+                    ? null
+                    : () => context.read<SwitchOrgCubit>().switchTo(m.orgId),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

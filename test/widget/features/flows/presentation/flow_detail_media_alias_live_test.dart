@@ -7,7 +7,9 @@ import 'package:ataulfo/features/flows/presentation/bloc/flow_detail_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/media_names_cubit.dart';
 import 'package:ataulfo/features/flows/presentation/pages/flow_detail_page.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
+import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
@@ -112,6 +114,9 @@ void main() {
     when(
       () => triggersRepo.listTriggers(any()),
     ).thenAnswer((_) => Completer<List<Trigger>>().future);
+    // El LabelsBloc page-scoped (nombres de pasos LABEL) carga el catálogo
+    // al montar; vacío basta para estos tests (no hay pasos LABEL aquí).
+    when(() => labelsRepo.listLabels()).thenAnswer((_) async => <Label>[]);
   });
 
   // Espeja el cableado del router en `/flows/:id`: el MediaNamesCubit REAL se
@@ -129,6 +134,10 @@ void main() {
           BlocProvider<FlowStepsBloc>.value(value: stepsBloc),
           BlocProvider<MediaNamesCubit>(
             create: (_) => MediaNamesCubit(repo: mediaRepo)..load(),
+          ),
+          BlocProvider<LabelsBloc>(
+            create: (_) =>
+                LabelsBloc(repo: labelsRepo)..add(const LabelsLoadRequested()),
           ),
         ],
         child: const Scaffold(body: FlowDetailPage()),

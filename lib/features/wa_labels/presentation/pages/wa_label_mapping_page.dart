@@ -64,41 +64,52 @@ class _LoadedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final waLabels = data.waLabels;
-    return ListView(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp4,
-        AppTokens.sp4,
-        AppTokens.sp4,
-        AppTokens.sp4 + context.safeBottomInset,
-      ),
-      children: <Widget>[
-        Text(
-          'Vincular una etiqueta de WhatsApp a un Label interno no la cambia en '
-          'WhatsApp: solo decide qué automatización dispara cuando etiquetas un '
-          'chat.',
-          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+    return RefreshIndicator(
+      onRefresh: () async {
+        final bloc = context.read<WaLabelMappingBloc>();
+        bloc.add(const WaMappingLoadRequested());
+        await bloc.stream.firstWhere(
+          (s) => s is WaMappingLoaded || s is WaMappingFailed,
+          orElse: () => bloc.state,
+        );
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          AppTokens.sp4,
+          AppTokens.sp4,
+          AppTokens.sp4,
+          AppTokens.sp4 + context.safeBottomInset,
         ),
-        const SizedBox(height: AppTokens.sp4),
-        if (waLabels.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppTokens.sp6),
-            child: Text(
-              'No hay etiquetas de WhatsApp todavía. Créalas en la sección de '
-              'etiquetas para poder vincularlas.',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-            ),
-          )
-        else
-          for (final wa in waLabels) ...<Widget>[
-            _MappingRow(
-              waLabel: wa,
-              hasMapping: data.mappings.containsKey(wa.waLabelId),
-              mapped: data.mappedLabel(wa.waLabelId),
-            ),
-            const SizedBox(height: AppTokens.cardGap),
-          ],
-      ],
+        children: <Widget>[
+          Text(
+            'Vincular una etiqueta de WhatsApp a un Label interno no la cambia en '
+            'WhatsApp: solo decide qué automatización dispara cuando etiquetas un '
+            'chat.',
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          if (waLabels.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppTokens.sp6),
+              child: Text(
+                'No hay etiquetas de WhatsApp todavía. Créalas en la sección de '
+                'etiquetas para poder vincularlas.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+              ),
+            )
+          else
+            for (final wa in waLabels) ...<Widget>[
+              _MappingRow(
+                waLabel: wa,
+                hasMapping: data.mappings.containsKey(wa.waLabelId),
+                mapped: data.mappedLabel(wa.waLabelId),
+              ),
+              const SizedBox(height: AppTokens.cardGap),
+            ],
+        ],
+      ),
     );
   }
 }
@@ -124,64 +135,59 @@ class _MappingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final m = mapped;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    // onTap nativo del AppCard: ripple/highlight del InkWell interno
+    // (el GestureDetector externo dejaba el tap sin feedback visual).
+    return AppCard(
       onTap: () => WaMappingSelectorSheet.open(context, waLabel),
-      child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              WaLabelSwatch(colorIndex: waLabel.color, size: 20),
+              const SizedBox(width: AppTokens.sp3),
+              Expanded(
+                child: Text(
+                  waLabel.name,
+                  style: textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
+            ],
+          ),
+          const SizedBox(height: AppTokens.sp2),
+          if (m == null && !hasMapping)
+            Text(
+              'Sin vincular',
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            )
+          else if (m == null)
+            // Hay un mapeo pero el Label interno fue borrado de la org: roto.
+            // El operador puede tocar la fila y "Quitar vínculo" para limpiarlo.
+            Text(
+              'Vínculo roto',
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.warning),
+            )
+          else
             Row(
               children: <Widget>[
-                WaLabelSwatch(colorIndex: waLabel.color, size: 20),
-                const SizedBox(width: AppTokens.sp3),
-                Expanded(
+                const Icon(Icons.link, color: AppTokens.text2, size: 16),
+                const SizedBox(width: AppTokens.sp2),
+                LabelDot(hex: m.color, size: 14),
+                const SizedBox(width: AppTokens.sp2),
+                Flexible(
                   child: Text(
-                    waLabel.name,
-                    style: textTheme.titleMedium,
+                    m.name,
+                    style: textTheme.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppTokens.text2,
-                  size: 20,
-                ),
               ],
             ),
-            const SizedBox(height: AppTokens.sp2),
-            if (m == null && !hasMapping)
-              Text(
-                'Sin vincular',
-                style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-              )
-            else if (m == null)
-              // Hay un mapeo pero el Label interno fue borrado de la org: roto.
-              // El operador puede tocar la fila y "Quitar vínculo" para limpiarlo.
-              Text(
-                'Vínculo roto',
-                style: textTheme.bodyMedium?.copyWith(color: AppTokens.warning),
-              )
-            else
-              Row(
-                children: <Widget>[
-                  const Icon(Icons.link, color: AppTokens.text2, size: 16),
-                  const SizedBox(width: AppTokens.sp2),
-                  LabelDot(hex: m.color, size: 14),
-                  const SizedBox(width: AppTokens.sp2),
-                  Flexible(
-                    child: Text(
-                      m.name,
-                      style: textTheme.bodyMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }

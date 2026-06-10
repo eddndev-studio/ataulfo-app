@@ -10,9 +10,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
@@ -197,114 +198,120 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
           final failure = state is TriggersMutationFailed
               ? state.failure
               : null;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(AppTokens.sp6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        widget.editing == null
-                            ? 'Nuevo disparador'
-                            : 'Editar disparador',
-                        style: textTheme.titleLarge,
-                      ),
-                    ),
-                    if (widget.editing != null)
-                      IconButton(
-                        key: const Key('trigger_edit.delete'),
-                        tooltip: 'Eliminar disparador',
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: AppTokens.danger,
-                        ),
-                        onPressed: isMutating ? null : _confirmDelete,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                _TypePicker(
-                  selected: _triggerType,
-                  enabled: !isMutating && widget.editing == null,
-                  onSelected: (t) => setState(() => _triggerType = t),
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                if (_isText) ...<Widget>[
-                  AppTextField(
-                    key: const Key('trigger_edit.keyword'),
-                    label: 'Palabra clave',
-                    hint: 'Texto que dispara el flow',
-                    controller: _keywordCtrl,
-                    enabled: !isMutating,
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: AppTokens.sp4),
-                  _MatchPicker(
-                    selected: _matchType,
-                    enabled: !isMutating,
-                    onSelected: (m) => setState(() => _matchType = m),
-                  ),
-                  const SizedBox(height: AppTokens.sp4),
-                  _ScopePicker(
-                    selected: _scope,
-                    enabled: !isMutating,
-                    onSelected: (s) => setState(() => _scope = s),
-                  ),
-                ] else ...<Widget>[
-                  LabelPicker(
-                    selectedLabelId: _selectedLabelId,
-                    enabled: !isMutating,
-                    onSelected: (id) => setState(() => _selectedLabelId = id),
-                  ),
-                  const SizedBox(height: AppTokens.sp4),
-                  _LabelActionPicker(
-                    selected: _labelAction,
-                    enabled: !isMutating,
-                    onSelected: (a) => setState(() => _labelAction = a),
-                  ),
-                ],
-                const SizedBox(height: AppTokens.sp4),
-                _FixedFlowLine(flow: widget.scopedFlow),
-                const SizedBox(height: AppTokens.sp4),
-                Row(
-                  key: const Key('trigger_edit.active_switch'),
-                  children: <Widget>[
-                    AppSwitch(
-                      value: _isActive,
-                      onChanged: isMutating
-                          ? null
-                          : (v) => setState(() => _isActive = v),
-                    ),
-                    const SizedBox(width: AppTokens.sp2),
-                    Expanded(
-                      child: Text(
-                        'Activo — el disparador evalúa mensajes nuevos.',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppTokens.text2,
+          // El inset vive AQUÍ (no en quien abre el sheet): este context se
+          // reconstruye con el MediaQuery, así que sigue al teclado al
+          // abrirse/cerrarse y el botón Guardar queda siempre visible.
+          return Padding(
+            padding: EdgeInsets.only(bottom: context.sheetBottomInset),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppTokens.sp6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          widget.editing == null
+                              ? 'Nuevo disparador'
+                              : 'Editar disparador',
+                          style: textTheme.titleLarge,
                         ),
                       ),
+                      if (widget.editing != null)
+                        IconButton(
+                          key: const Key('trigger_edit.delete'),
+                          tooltip: 'Eliminar disparador',
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppTokens.danger,
+                          ),
+                          onPressed: isMutating ? null : _confirmDelete,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  _TypePicker(
+                    selected: _triggerType,
+                    enabled: !isMutating && widget.editing == null,
+                    onSelected: (t) => setState(() => _triggerType = t),
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  if (_isText) ...<Widget>[
+                    AppTextField(
+                      key: const Key('trigger_edit.keyword'),
+                      label: 'Palabra clave',
+                      hint: 'Texto que dispara el flow',
+                      controller: _keywordCtrl,
+                      enabled: !isMutating,
+                      autofocus: true,
+                    ),
+                    const SizedBox(height: AppTokens.sp4),
+                    _MatchPicker(
+                      selected: _matchType,
+                      enabled: !isMutating,
+                      onSelected: (m) => setState(() => _matchType = m),
+                    ),
+                    const SizedBox(height: AppTokens.sp4),
+                    _ScopePicker(
+                      selected: _scope,
+                      enabled: !isMutating,
+                      onSelected: (s) => setState(() => _scope = s),
+                    ),
+                  ] else ...<Widget>[
+                    LabelPicker(
+                      selectedLabelId: _selectedLabelId,
+                      enabled: !isMutating,
+                      onSelected: (id) => setState(() => _selectedLabelId = id),
+                    ),
+                    const SizedBox(height: AppTokens.sp4),
+                    _LabelActionPicker(
+                      selected: _labelAction,
+                      enabled: !isMutating,
+                      onSelected: (a) => setState(() => _labelAction = a),
                     ),
                   ],
-                ),
-                if (failure != null) ...<Widget>[
                   const SizedBox(height: AppTokens.sp4),
-                  _FailureCopy(
-                    failure: failure,
-                    isEdit: widget.editing != null,
+                  _FixedFlowLine(flow: widget.scopedFlow),
+                  const SizedBox(height: AppTokens.sp4),
+                  Row(
+                    key: const Key('trigger_edit.active_switch'),
+                    children: <Widget>[
+                      AppSwitch(
+                        value: _isActive,
+                        onChanged: isMutating
+                            ? null
+                            : (v) => setState(() => _isActive = v),
+                      ),
+                      const SizedBox(width: AppTokens.sp2),
+                      Expanded(
+                        child: Text(
+                          'Activo — el disparador evalúa mensajes nuevos.',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppTokens.text2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (failure != null) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    _FailureCopy(
+                      failure: failure,
+                      isEdit: widget.editing != null,
+                    ),
+                  ],
+                  const SizedBox(height: AppTokens.sp6),
+                  AppButton.filled(
+                    key: const Key('trigger_edit.submit'),
+                    label: 'Guardar',
+                    onPressed: _isSubmittable ? _submit : null,
+                    loading: isMutating,
+                    fullWidth: true,
                   ),
                 ],
-                const SizedBox(height: AppTokens.sp6),
-                AppButton.filled(
-                  key: const Key('trigger_edit.submit'),
-                  label: 'Guardar',
-                  onPressed: _isSubmittable ? _submit : null,
-                  loading: isMutating,
-                  fullWidth: true,
-                ),
-              ],
+              ),
             ),
           );
         },
@@ -581,13 +588,13 @@ class _PickerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (selected) {
-      return AppPill.primary(label: label);
-    }
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-      child: AppPill.outline(label: label),
+    // Chip controlado del design system: Semantics de botón+selección, área
+    // táctil mínima y feedback en ambos estados (el par AppPill+InkWell
+    // dejaba el seleccionado inerte y sin nodo semántico).
+    return AppChoiceChip(
+      label: label,
+      selected: selected,
+      onSelected: enabled ? (_) => onTap() : null,
     );
   }
 }

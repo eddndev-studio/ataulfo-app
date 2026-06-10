@@ -63,12 +63,35 @@ void main() {
     expect(find.byType(AppAvatar), findsOneWidget);
   });
 
-  testWidgets('mientras carga cae al chatLid (no bloquea el header)', (
+  testWidgets('mientras carga muestra un nombre neutro, nunca el JID crudo', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(const ProfileLoading());
     await tester.pumpWidget(host());
-    expect(find.text('lid-dm'), findsOneWidget);
+    // El chatLid es jerga de wire (p.ej. `34612@lid`): jamás se pinta en la
+    // cabecera; mientras no hay identidad se comunica la espera.
+    expect(find.text('lid-dm'), findsNothing);
+    expect(find.text('Cargando…'), findsOneWidget);
+  });
+
+  testWidgets('grupo en carga: nombre neutro "Grupo" derivado del chatLid', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(const ProfileLoading());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: BlocProvider<ProfileBloc>.value(
+          value: bloc,
+          child: const Scaffold(
+            appBar: ChatThreadAppBar(botId: 'b1', chatLid: '123-456@g.us'),
+            body: SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('123-456@g.us'), findsNothing);
+    expect(find.text('Grupo'), findsOneWidget);
   });
 
   testWidgets('el header es tappable (InkWell para abrir el perfil)', (

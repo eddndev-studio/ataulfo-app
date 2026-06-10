@@ -954,6 +954,30 @@ void main() {
       expect: () => const <MessagesState>[],
     );
 
+    test(
+      'un fallo de react señaliza por reactFailures (sin emitir estados)',
+      () async {
+        // El hilo pinta reacciones por eco SSE, así que el fallo no toca el
+        // estado; el side-channel permite a la UI avisar al operador en vez de
+        // tragárselo en silencio.
+        when(
+          () => repo.react(
+            'b1',
+            'lid-1',
+            messageId: any(named: 'messageId'),
+            emoji: any(named: 'emoji'),
+          ),
+        ).thenThrow(const MessagesWireFailure());
+        final b = build();
+        final signaled = expectLater(b.reactFailures, emits(anything));
+
+        b.add(const MessagesReactRequested(messageId: 'm1', emoji: '👍'));
+
+        await signaled;
+        await b.close();
+      },
+    );
+
     test('eco SSE después del 200 → deduplicado por externalId', () async {
       when(
         () => repo.thread(

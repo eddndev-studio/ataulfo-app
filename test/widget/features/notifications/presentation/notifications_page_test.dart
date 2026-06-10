@@ -69,6 +69,31 @@ void main() {
     expect(find.widgetWithText(AppButton, 'Marcar todo leído'), findsOneWidget);
   });
 
+  testWidgets('el ítem NO finge navegación: sin chevron, ícono de hecho', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(NotificationsLoaded(items: <NotificationInboxItem>[_item]));
+
+    await tester.pumpWidget(host());
+
+    // El tap marca como leída (no navega): un chevron prometería un detalle
+    // que no existe.
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
+    expect(find.byIcon(Icons.done_outlined), findsWidgets);
+  });
+
+  testWidgets('la lista ofrece pull-to-refresh', (tester) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(NotificationsLoaded(items: <NotificationInboxItem>[_item]));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(RefreshIndicator), findsOneWidget);
+  });
+
   testWidgets('tap item marca leído', (tester) async {
     when(
       () => bloc.state,

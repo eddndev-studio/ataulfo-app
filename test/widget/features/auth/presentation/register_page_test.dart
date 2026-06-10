@@ -39,6 +39,24 @@ void main() {
     ),
   );
 
+  testWidgets('pantalla baja: el formulario scrollea en vez de desbordar', (
+    tester,
+  ) async {
+    // Tres campos + botón superan una superficie chica (teclado abierto):
+    // el contenido debe poder desplazarse para alcanzar el submit.
+    tester.view.physicalSize = const Size(720, 960);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.widgetWithText(AppButton, 'Crear cuenta'));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renderiza email + password + confirm + AppButton Crear cuenta', (
     tester,
   ) async {

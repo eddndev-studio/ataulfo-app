@@ -47,7 +47,9 @@ class NotificationPreferencesBloc
       final saved = await repo.savePreferences(updated);
       emit(NotificationPreferencesLoaded(preferences: saved));
     } on NotificationsFailure {
-      emit(current);
+      // Revertir al snapshot Y señalizarlo: la página avisa con un SnackBar
+      // en vez de dejar que el switch "se devuelva solo" sin explicación.
+      emit(NotificationPreferencesSaveFailed(preferences: current.preferences));
     }
   }
 }
@@ -127,6 +129,29 @@ class NotificationPreferencesLoaded extends NotificationPreferencesState {
 
   @override
   int get hashCode => Object.hash(Object.hashAll(preferences), saving);
+}
+
+/// El guardado de un toggle falló: conserva las preferencias ORIGINALES para
+/// que la lista siga renderizada (switch revertido) mientras la página
+/// anuncia el fallo. Distinto de [NotificationPreferencesFailed], que es el
+/// fallo terminal de la CARGA (sin lista que preservar).
+class NotificationPreferencesSaveFailed extends NotificationPreferencesState {
+  const NotificationPreferencesSaveFailed({required this.preferences});
+
+  final List<NotificationPreference> preferences;
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! NotificationPreferencesSaveFailed) return false;
+    if (other.preferences.length != preferences.length) return false;
+    for (var i = 0; i < preferences.length; i++) {
+      if (other.preferences[i] != preferences[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll(preferences);
 }
 
 class NotificationPreferencesFailed extends NotificationPreferencesState {

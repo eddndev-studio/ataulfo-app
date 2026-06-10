@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/i18n/role_labels.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
@@ -38,7 +39,7 @@ class MemberTile extends StatelessWidget {
                 const SizedBox(height: AppTokens.sp2),
                 Row(
                   children: <Widget>[
-                    AppPill.neutral(label: member.role),
+                    AppPill.neutral(label: roleLabel(member.role)),
                     const SizedBox(width: AppTokens.sp2),
                     if (member.emailVerified)
                       const AppPill.outline(

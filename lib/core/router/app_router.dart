@@ -52,6 +52,7 @@ import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
+import '../../features/labels/presentation/bloc/labels_bloc.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
 import '../../features/media/domain/repositories/media_repository.dart';
 import '../../features/invitations/domain/repositories/invitations_repository.dart';
@@ -785,6 +786,15 @@ class AppRouter {
                 // legible en vez del id. Carga al abrir el flujo.
                 BlocProvider<MediaNamesCubit>(
                   create: (_) => MediaNamesCubit(repo: _mediaRepo)..load(),
+                ),
+                // Catálogo de labels para que la lista de pasos muestre el
+                // NOMBRE de la etiqueta del paso LABEL (no el UUID). Scope de
+                // página: no interfiere con los LabelsBloc efímeros que crean
+                // los sheets (subtrees propios).
+                BlocProvider<LabelsBloc>(
+                  create: (_) =>
+                      LabelsBloc(repo: _labelsRepo)
+                        ..add(const LabelsLoadRequested()),
                 ),
               ],
               child: Scaffold(

@@ -7,6 +7,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/i18n/role_labels.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Pantalla de Settings mínima del shell: muestra el perfil real del
@@ -19,6 +20,36 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 /// sobre el nombre legible).
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
+
+  /// Confirmación previa al logout: cerrar sesión descarta el estado local y
+  /// obliga a re-autenticarse, así que un tap accidental no debe bastar.
+  Future<void> _confirmLogout(BuildContext context) async {
+    // Capturado antes del await: el dialog desmonta/remonta contextos.
+    final authBloc = context.read<AuthBloc>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Cerrar sesión?'),
+        content: const Text(
+          'Tendrás que volver a iniciar sesión para acceder.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('settings.logout_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      authBloc.add(const AuthLoggedOut());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +72,7 @@ class SettingsPage extends StatelessWidget {
                 children: <Widget>[
                   const Text('Rol'),
                   const SizedBox(width: AppTokens.sp3),
-                  AppPill.primary(label: identity.role),
+                  AppPill.primary(label: roleLabel(identity.role)),
                 ],
               ),
               const SizedBox(height: AppTokens.sp6),
@@ -114,8 +145,7 @@ class SettingsPage extends StatelessWidget {
               AppButton.danger(
                 label: 'Cerrar sesión',
                 fullWidth: true,
-                onPressed: () =>
-                    context.read<AuthBloc>().add(const AuthLoggedOut()),
+                onPressed: () => _confirmLogout(context),
               ),
             ],
           ),

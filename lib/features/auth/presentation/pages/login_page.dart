@@ -71,7 +71,9 @@ class _LoginPageState extends State<LoginPage> {
           },
           builder: (context, state) {
             final submitting = state is LoginSubmitting;
-            return Padding(
+            // Scrolleable: cuando el teclado encoge el body, el contenido se
+            // desplaza y el campo enfocado/botón quedan alcanzables.
+            return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -112,10 +114,13 @@ class _LoginPageState extends State<LoginPage> {
                     obscureText: true,
                   ),
                   const SizedBox(height: 24),
+                  // El feedback de envío vive en el propio botón (loading
+                  // bloquea el tap internamente, sin nullificar onPressed).
                   AppButton.filled(
                     label: 'Entrar',
                     fullWidth: true,
-                    onPressed: submitting ? null : _submit,
+                    loading: submitting,
+                    onPressed: _submit,
                   ),
                   const SizedBox(height: 8),
                   TextButton(
@@ -127,19 +132,6 @@ class _LoginPageState extends State<LoginPage> {
                     child: const Text('¿Olvidaste tu contraseña?'),
                   ),
                   const SizedBox(height: 16),
-                  if (submitting)
-                    const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppTokens.primary,
-                          ),
-                        ),
-                      ),
-                    ),
                   if (state is LoginFailed)
                     Text(
                       _messageFor(state.kind),

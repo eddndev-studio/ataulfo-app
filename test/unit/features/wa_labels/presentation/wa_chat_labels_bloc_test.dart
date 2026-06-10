@@ -156,6 +156,85 @@ void main() {
         ),
       ],
     );
+
+    blocTest<WaChatLabelsBloc, WaChatLabelsState>(
+      'el toggle es OPTIMISTA: Mutating ya lleva el cambio aplicado',
+      build: () {
+        stubLoad();
+        when(
+          () => repo.labelChat(
+            botId: any(named: 'botId'),
+            waLabelId: any(named: 'waLabelId'),
+            chatLid: any(named: 'chatLid'),
+            kind: any(named: 'kind'),
+            labeled: any(named: 'labeled'),
+          ),
+        ).thenAnswer((_) async {});
+        return build();
+      },
+      act: (b) async {
+        b.add(const WaChatLabelsLoadRequested());
+        await b.stream.firstWhere((s) => s is WaChatLabelsLoaded);
+        b.add(
+          const WaChatLabelsToggleRequested(waLabelId: '1001', associate: true),
+        );
+      },
+      skip: 1,
+      expect: () => <Matcher>[
+        // El checkbox cambia YA (sin esperar 1-3s al push a WhatsApp); el
+        // spinner del título confirma la sincronización en curso.
+        isA<WaChatLabelsMutating>().having(
+          (s) => s.associated.contains('1001'),
+          'optimista',
+          isTrue,
+        ),
+        isA<WaChatLabelsLoaded>().having(
+          (s) => s.associated.contains('1001'),
+          'confirmado',
+          isTrue,
+        ),
+      ],
+    );
+
+    blocTest<WaChatLabelsBloc, WaChatLabelsState>(
+      'fallo del push → rollback al set PRE-toggle',
+      build: () {
+        stubLoad();
+        when(
+          () => repo.labelChat(
+            botId: any(named: 'botId'),
+            waLabelId: any(named: 'waLabelId'),
+            chatLid: any(named: 'chatLid'),
+            kind: any(named: 'kind'),
+            labeled: any(named: 'labeled'),
+          ),
+        ).thenThrow(const WaLabelsNotConnectedFailure());
+        return build();
+      },
+      act: (b) async {
+        b.add(const WaChatLabelsLoadRequested());
+        await b.stream.firstWhere((s) => s is WaChatLabelsLoaded);
+        b.add(
+          const WaChatLabelsToggleRequested(
+            waLabelId: '1000',
+            associate: false,
+          ),
+        );
+      },
+      skip: 1,
+      expect: () => <Matcher>[
+        isA<WaChatLabelsMutating>().having(
+          (s) => s.associated.contains('1000'),
+          'optimista quitado',
+          isFalse,
+        ),
+        isA<WaChatLabelsMutationFailed>().having(
+          (s) => s.associated.contains('1000'),
+          'rollback',
+          isTrue,
+        ),
+      ],
+    );
   });
 
   group('realtime CHAT', () {

@@ -109,6 +109,50 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
+  testWidgets('Submitting: el spinner vive DENTRO del botón Entrar', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      Stream<LoginState>.fromIterable(const <LoginState>[LoginSubmitting()]),
+      initialState: const LoginSubmitting(),
+    );
+
+    await tester.pumpWidget(host());
+
+    // El feedback de envío es el estado loading del propio AppButton; no
+    // queda ningún spinner suelto duplicado debajo del formulario.
+    final button = tester.widget<AppButton>(find.byType(AppButton));
+    expect(button.loading, isTrue);
+    expect(
+      find.descendant(
+        of: find.byType(AppButton),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('pantalla baja: el formulario scrollea en vez de desbordar', (
+    tester,
+  ) async {
+    // Superficie chica (≈360x480 lógicos): simula un teléfono con el teclado
+    // abierto, donde el body encogido debe poder desplazarse para alcanzar
+    // el botón y los enlaces inferiores.
+    tester.view.physicalSize = const Size(720, 960);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.widgetWithText(AppButton, 'Entrar'));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('estado Failed(invalidCredentials) muestra mensaje específico', (
     tester,
   ) async {

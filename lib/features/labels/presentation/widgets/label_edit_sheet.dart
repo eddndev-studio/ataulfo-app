@@ -325,19 +325,28 @@ class _Swatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 44x44 de área de toque (el círculo visible sigue siendo 38): opaque
+    // hace tappable todo el cuadro, no sólo los píxeles pintados.
     return GestureDetector(
       key: swatchKey,
+      behavior: HitTestBehavior.opaque,
       onTap: enabled ? onTap : null,
-      child: Container(
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: selected ? AppTokens.primary : Colors.transparent,
-            width: 2,
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? AppTokens.primary : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: LabelDot(hex: hex, size: 28),
           ),
         ),
-        child: LabelDot(hex: hex, size: 28),
       ),
     );
   }

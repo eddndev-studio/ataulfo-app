@@ -189,12 +189,39 @@ void main() {
       expect(find.text('5215550001'), findsNothing);
     });
 
+    testWidgets('grupo sin mensajes: nunca muestra el chatLid crudo', (
+      tester,
+    ) async {
+      await pumpOne(
+        tester,
+        const Conversation(
+          chatLid: '123456789-1234@g.us',
+          kind: ConversationKind.group,
+          phone: null,
+          isArchived: false,
+          isPinned: false,
+          isMarkedUnread: false,
+          mutedUntil: null,
+        ),
+      );
+      // El JID no significa nada para el operador; el hueco se comunica
+      // con copy humano.
+      expect(find.text('123456789-1234@g.us'), findsNothing);
+      expect(find.text('Sin mensajes'), findsOneWidget);
+    });
+
     testWidgets('último-mensaje de texto: preview + hora', (tester) async {
-      // Instante fijo; la hora esperada se calcula con la misma fórmula local
-      // del widget para no depender de la zona horaria del runner.
+      // Instante fijo de un año pasado; lo esperado se calcula con la misma
+      // fórmula local del widget para no depender de la zona del runner. Al
+      // ser de otro año, el timestamp inteligente antepone la fecha completa
+      // (DD/MM/YY) — sin ella "14:32" no dice nada de cuándo fue.
       const ts = 1700000000000;
       final dt = DateTime.fromMillisecondsSinceEpoch(ts);
+      final dd = dt.day.toString().padLeft(2, '0');
+      final mo = dt.month.toString().padLeft(2, '0');
+      final yy = (dt.year % 100).toString().padLeft(2, '0');
       final hhmm =
+          '$dd/$mo/$yy '
           '${dt.hour.toString().padLeft(2, '0')}:'
           '${dt.minute.toString().padLeft(2, '0')}';
       await pumpOne(

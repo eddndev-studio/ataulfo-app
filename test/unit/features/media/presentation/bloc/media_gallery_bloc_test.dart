@@ -737,11 +737,14 @@ void main() {
         ),
         act: (b) => b.add(const MediaGalleryDeleteSelectedRequested()),
         expect: () => <Matcher>[
-          isA<MediaGalleryLoaded>().having(
-            (s) => s.isDeleting,
-            'isDeleting',
-            isTrue,
-          ),
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.isDeleting, 'isDeleting', isTrue)
+              .having((s) => s.deleteTotal, 'deleteTotal', 1)
+              .having((s) => s.deleteDone, 'deleteDone', 0),
+          // Progreso por ítem: el overlay muestra "Borrando X de Y…".
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.isDeleting, 'isDeleting', isTrue)
+              .having((s) => s.deleteDone, 'deleteDone', 1),
           isA<MediaGalleryLoaded>()
               .having((s) => s.items.length, 'items', 1)
               .having((s) => s.selectedRefs, 'selectedRefs', isEmpty)
@@ -751,6 +754,103 @@ void main() {
           verify(() => _lastRepo.delete('media/a')).called(1);
           verify(() => _lastRepo.invalidate()).called(1);
         },
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'borrado en lote avanza deleteDone por cada ref',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(() => _lastRepo.delete(any())).thenAnswer((_) async {});
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async =>
+                const MediaPage(assets: <MediaAsset>[], nextCursor: ''),
+          );
+          return MediaGalleryBloc(repo: _lastRepo, picker: _MockPicker());
+        },
+        seed: () => MediaGalleryLoaded(
+          items: <MediaAsset>[_a, _b],
+          nextCursor: '',
+          selectedRefs: const <String>{'media/a', 'media/b'},
+        ),
+        act: (b) => b.add(const MediaGalleryDeleteSelectedRequested()),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.deleteTotal, 'deleteTotal', 2)
+              .having((s) => s.deleteDone, 'deleteDone', 0),
+          isA<MediaGalleryLoaded>().having((s) => s.deleteDone, 'done', 1),
+          isA<MediaGalleryLoaded>().having((s) => s.deleteDone, 'done', 2),
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.isDeleting, 'isDeleting', isFalse)
+              .having((s) => s.items, 'items', isEmpty),
+        ],
+      );
+    });
+
+    group('fallo de paginación con feedback (barrido UX)', () {
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'fallo de load-more expone loadMoreError y conserva la lista',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(
+            () => _lastRepo.listAssets(
+              cursor: 'cur-1',
+              limit: any(named: 'limit'),
+            ),
+          ).thenThrow(const MediaNetworkFailure());
+          return build(_lastRepo, _MockPicker());
+        },
+        seed: () =>
+            MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: 'cur-1'),
+        act: (b) => b.add(const MediaGalleryLoadMoreRequested()),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoaded>().having(
+            (s) => s.isLoadingMore,
+            'isLoadingMore',
+            isTrue,
+          ),
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.isLoadingMore, 'isLoadingMore', isFalse)
+              .having((s) => s.loadMoreError, 'loadMoreError', isNotNull)
+              .having((s) => s.items, 'items', <MediaAsset>[_a])
+              .having((s) => s.nextCursor, 'cursor intacto', 'cur-1'),
+        ],
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'reintentar el load-more limpia el error previo al arrancar',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(
+            () => _lastRepo.listAssets(
+              cursor: 'cur-1',
+              limit: any(named: 'limit'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_b], nextCursor: ''),
+          );
+          return build(_lastRepo, _MockPicker());
+        },
+        seed: () => MediaGalleryLoaded(
+          items: <MediaAsset>[_a],
+          nextCursor: 'cur-1',
+          loadMoreError: const MediaNetworkFailure(),
+        ),
+        act: (b) => b.add(const MediaGalleryLoadMoreRequested()),
+        expect: () => <Matcher>[
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.isLoadingMore, 'isLoadingMore', isTrue)
+              .having((s) => s.loadMoreError, 'error limpiado', isNull),
+          isA<MediaGalleryLoaded>()
+              .having((s) => s.items.length, 'items', 2)
+              .having((s) => s.loadMoreError, 'sin error', isNull),
+        ],
       );
     });
   });
