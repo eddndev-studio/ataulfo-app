@@ -262,7 +262,8 @@ void main() {
         ).thenAnswer((_) async => flowV4);
         return FlowDetailBloc(repo: repo, id: 'f1');
       },
-      seed: () => const FlowDetailLoaded(_flow, <Flow>[], siblingsFailed: false),
+      seed: () =>
+          const FlowDetailLoaded(_flow, <Flow>[], siblingsFailed: false),
       act: (bloc) => bloc.add(
         const FlowDetailUpdateSettingsRequested(
           aiInvocable: true,

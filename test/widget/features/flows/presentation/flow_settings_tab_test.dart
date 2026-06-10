@@ -276,11 +276,7 @@ void main() {
       'toggle "Invocable por IA": refleja el flow, habilita Guardar y viaja en el evento',
       (tester) async {
         when(() => bloc.state).thenReturn(
-          FlowDetailLoaded(
-            _flow(),
-            const <fdom.Flow>[],
-            siblingsFailed: false,
-          ),
+          FlowDetailLoaded(_flow(), const <fdom.Flow>[], siblingsFailed: false),
         );
 
         await tester.pumpWidget(host());
