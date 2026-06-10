@@ -73,7 +73,7 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
         current.isLoadingMore) {
       return;
     }
-    emit(current.copyWith(isLoadingMore: true));
+    emit(current.copyWith(isLoadingMore: true, clearLoadMoreError: true));
     try {
       final page = await _repo.listAssets(
         cursor: current.nextCursor,
@@ -86,12 +86,16 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
           items: <MediaAsset>[...current.items, ...page.assets],
           nextCursor: page.nextCursor,
           isLoadingMore: false,
+          // `current` es el snapshot pre-emisión: limpia un error previo que
+          // copyWith arrastraría desde un intento fallido anterior.
+          clearLoadMoreError: true,
         ),
       );
-    } on MediaFailure {
-      // Un fallo de paginación no tumba la lista visible: revertimos el flag y
-      // dejamos items/cursor intactos para que el usuario pueda reintentar.
-      emit(current.copyWith(isLoadingMore: false));
+    } on MediaFailure catch (f) {
+      // Un fallo de paginación no tumba la lista visible: revertimos el flag,
+      // dejamos items/cursor intactos y exponemos el error para que la UI
+      // ofrezca reintentar al pie del grid.
+      emit(current.copyWith(isLoadingMore: false, loadMoreError: f));
     }
   }
 
@@ -188,7 +192,14 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
   Future<void> _fetchFirstPage(Emitter<MediaGalleryState> emit) async {
     try {
       final page = await _repo.listAssets(type: _type, q: _queryParam);
-      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+      emit(
+        MediaGalleryLoaded(
+          items: page.assets,
+          nextCursor: page.nextCursor,
+          query: _query,
+          type: _type,
+        ),
+      );
     } on MediaFailure catch (f) {
       emit(MediaGalleryFailed(f));
     }
@@ -210,7 +221,14 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     try {
       final page = await _repo.listAssets(type: _type, q: _queryParam);
       if (_query != q) return; // un search más nuevo ganó
-      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+      emit(
+        MediaGalleryLoaded(
+          items: page.assets,
+          nextCursor: page.nextCursor,
+          query: _query,
+          type: _type,
+        ),
+      );
     } on MediaFailure catch (f) {
       if (_query != q) return;
       emit(MediaGalleryFailed(f));
@@ -230,7 +248,14 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     try {
       final page = await _repo.listAssets(type: event.type, q: _queryParam);
       if (_type != event.type) return; // un cambio de tipo más nuevo ganó
-      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+      emit(
+        MediaGalleryLoaded(
+          items: page.assets,
+          nextCursor: page.nextCursor,
+          query: _query,
+          type: _type,
+        ),
+      );
     } on MediaFailure catch (f) {
       if (_type != event.type) return;
       emit(MediaGalleryFailed(f));
@@ -275,18 +300,35 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
         current.isDeleting) {
       return;
     }
-    emit(current.copyWith(isDeleting: true));
+    final total = current.selectedRefs.length;
+    var done = 0;
+    emit(current.copyWith(isDeleting: true, deleteTotal: total, deleteDone: 0));
     for (final ref in current.selectedRefs) {
       try {
         await _repo.delete(ref);
       } on MediaFailure {
         // Tolerante: el re-list reflejará qué sobrevivió.
       }
+      done += 1;
+      emit(
+        current.copyWith(
+          isDeleting: true,
+          deleteTotal: total,
+          deleteDone: done,
+        ),
+      );
     }
     _repo.invalidate();
     try {
       final page = await _repo.listAssets(type: _type, q: _queryParam);
-      emit(MediaGalleryLoaded(items: page.assets, nextCursor: page.nextCursor));
+      emit(
+        MediaGalleryLoaded(
+          items: page.assets,
+          nextCursor: page.nextCursor,
+          query: _query,
+          type: _type,
+        ),
+      );
     } on MediaFailure {
       emit(current.copyWith(isDeleting: false, selectedRefs: const <String>{}));
     }
@@ -439,6 +481,11 @@ class MediaGalleryLoaded extends MediaGalleryState {
     this.isDeleting = false,
     this.uploadTotal = 0,
     this.uploadDone = 0,
+    this.deleteTotal = 0,
+    this.deleteDone = 0,
+    this.loadMoreError,
+    this.query = '',
+    this.type,
   });
 
   final List<MediaAsset> items;
@@ -461,6 +508,23 @@ class MediaGalleryLoaded extends MediaGalleryState {
   /// Un borrado en lote en curso (bloquea acciones y muestra progreso).
   final bool isDeleting;
 
+  /// Progreso del borrado en lote: [deleteDone] de [deleteTotal]. 0 ⇒ sin
+  /// borrado en curso; la UI muestra "Borrando done de total…".
+  final int deleteTotal;
+  final int deleteDone;
+
+  /// Error TRANSITORIO de paginación: la lista visible queda intacta y la UI
+  /// ofrece reintentar al pie del grid. Se limpia al arrancar el retry.
+  final MediaFailure? loadMoreError;
+
+  /// Filtros activos de esta vista (espejo de los internos del bloc): le
+  /// permiten a la UI distinguir "galería vacía" de "búsqueda sin resultados".
+  final String query;
+  final String? type;
+
+  /// Hay filtros activos (búsqueda o tipo).
+  bool get isFiltered => query.isNotEmpty || type != null;
+
   /// Hay más páginas sii el cursor no está vacío. Derivado, nunca un flag.
   bool get hasMore => nextCursor.isNotEmpty;
 
@@ -480,6 +544,13 @@ class MediaGalleryLoaded extends MediaGalleryState {
     bool? isDeleting,
     int? uploadTotal,
     int? uploadDone,
+    int? deleteTotal,
+    int? deleteDone,
+    MediaFailure? loadMoreError,
+    bool clearLoadMoreError = false,
+    String? query,
+    String? type,
+    bool clearType = false,
   }) => MediaGalleryLoaded(
     items: items ?? this.items,
     nextCursor: nextCursor ?? this.nextCursor,
@@ -491,6 +562,13 @@ class MediaGalleryLoaded extends MediaGalleryState {
     isDeleting: isDeleting ?? this.isDeleting,
     uploadTotal: uploadTotal ?? this.uploadTotal,
     uploadDone: uploadDone ?? this.uploadDone,
+    deleteTotal: deleteTotal ?? this.deleteTotal,
+    deleteDone: deleteDone ?? this.deleteDone,
+    loadMoreError: clearLoadMoreError
+        ? null
+        : (loadMoreError ?? this.loadMoreError),
+    query: query ?? this.query,
+    type: clearType ? null : (type ?? this.type),
   );
 
   @override
@@ -504,7 +582,12 @@ class MediaGalleryLoaded extends MediaGalleryState {
         other.uploadError != uploadError ||
         other.isDeleting != isDeleting ||
         other.uploadTotal != uploadTotal ||
-        other.uploadDone != uploadDone) {
+        other.uploadDone != uploadDone ||
+        other.deleteTotal != deleteTotal ||
+        other.deleteDone != deleteDone ||
+        other.loadMoreError != loadMoreError ||
+        other.query != query ||
+        other.type != type) {
       return false;
     }
     if (other.selectedRefs.length != selectedRefs.length ||
@@ -530,6 +613,11 @@ class MediaGalleryLoaded extends MediaGalleryState {
     isDeleting,
     uploadTotal,
     uploadDone,
+    deleteTotal,
+    deleteDone,
+    loadMoreError,
+    query,
+    type,
   );
 }
 

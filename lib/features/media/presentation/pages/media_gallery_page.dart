@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../../domain/entities/media_asset.dart';
 import '../bloc/media_gallery_bloc.dart';
@@ -230,6 +231,13 @@ class _TypeTabsState extends State<_TypeTabs> {
 
   @override
   Widget build(BuildContext context) {
+    // Sincroniza con el bloc cuando el tipo cambió fuera de las tabs (p.ej.
+    // "Limpiar filtros" del vacío filtrado): el estado Loaded ahora expone el
+    // filtro activo y esta vista lo espeja en vez de divergir.
+    final blocState = context.watch<MediaGalleryBloc>().state;
+    if (blocState is MediaGalleryLoaded && blocState.type != _selected) {
+      _selected = blocState.type;
+    }
     return SizedBox(
       height: 52,
       child: ListView(
@@ -242,9 +250,9 @@ class _TypeTabsState extends State<_TypeTabs> {
           for (final (String? family, String label) in _families)
             Padding(
               padding: const EdgeInsets.only(right: AppTokens.sp2),
-              child: ChoiceChip(
+              child: AppChoiceChip(
                 key: Key('media_gallery.type_chip.${family ?? 'all'}'),
-                label: Text(label),
+                label: label,
                 selected: _selected == family,
                 onSelected: (_) => _select(family),
               ),
@@ -334,7 +342,7 @@ class _LoadedViewState extends State<_LoadedView> {
                   );
                 },
                 child: state.items.isEmpty
-                    ? const _EmptyView()
+                    ? _EmptyView(isFiltered: state.isFiltered)
                     : _Grid(
                         controller: _controller,
                         state: state,
@@ -350,14 +358,27 @@ class _LoadedViewState extends State<_LoadedView> {
                   child: _UploadFab(isUploading: state.isUploading),
                 ),
               if (state.isDeleting)
-                const Positioned.fill(
+                Positioned.fill(
                   child: ColoredBox(
-                    color: Color(0x66000000),
+                    color: const Color(0x66000000),
                     child: Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppTokens.primary,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppTokens.primary,
+                            ),
+                          ),
+                          const SizedBox(height: AppTokens.sp3),
+                          Text(
+                            state.deleteTotal == 1
+                                ? 'Borrando archivo…'
+                                : 'Borrando ${state.deleteDone} de '
+                                      '${state.deleteTotal}…',
+                            style: const TextStyle(color: AppTokens.text1),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -365,6 +386,8 @@ class _LoadedViewState extends State<_LoadedView> {
             ],
           ),
         ),
+        if (state.loadMoreError != null && !state.isLoadingMore)
+          const _LoadMoreErrorBar(),
       ],
     );
   }
@@ -468,13 +491,13 @@ class _SelectionBar extends StatelessWidget {
           'acción no se puede deshacer.',
         ),
         actions: <Widget>[
-          TextButton(
+          AppButton.text(
+            label: 'Cancelar',
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
+          AppButton.danger(
+            label: 'Borrar',
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Borrar'),
           ),
         ],
       ),
@@ -582,7 +605,11 @@ class _Grid extends StatelessWidget {
 }
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+  const _EmptyView({this.isFiltered = false});
+
+  /// Hay búsqueda o filtro de tipo activos: el vacío significa "sin
+  /// resultados", no "galería virgen", y ofrece limpiar los filtros.
+  final bool isFiltered;
 
   @override
   Widget build(BuildContext context) {
@@ -597,11 +624,34 @@ class _EmptyView extends StatelessWidget {
               key: const Key('media_gallery.empty'),
               child: Padding(
                 padding: const EdgeInsets.all(AppTokens.sp6),
-                child: Text(
-                  'Todavía no hay archivos en la galería',
-                  textAlign: TextAlign.center,
-                  style: textTheme.bodyLarge,
-                ),
+                child: isFiltered
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            'Sin resultados para esta búsqueda',
+                            textAlign: TextAlign.center,
+                            style: textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: AppTokens.sp3),
+                          Builder(
+                            builder: (context) => AppButton.text(
+                              label: 'Limpiar filtros',
+                              onPressed: () =>
+                                  context.read<MediaGalleryBloc>()
+                                    ..add(
+                                      const MediaGallerySearchChanged(''),
+                                    )
+                                    ..add(const MediaGalleryTypeChanged(null)),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        'Todavía no hay archivos en la galería',
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodyLarge,
+                      ),
               ),
             ),
           ),
@@ -639,6 +689,37 @@ class _UploadFab extends StatelessWidget {
               ),
             )
           : const Icon(Icons.upload_outlined),
+    );
+  }
+}
+
+/// Barra de error de paginación al pie del grid: el fallo de load-more no
+/// tumba la lista visible, pero tampoco puede ser silencioso — el operador
+/// ve el motivo y reintenta en el lugar donde ocurrió.
+class _LoadMoreErrorBar extends StatelessWidget {
+  const _LoadMoreErrorBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppTokens.surface2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp4,
+          vertical: AppTokens.sp1,
+        ),
+        child: Row(
+          children: <Widget>[
+            const Expanded(child: Text('No se pudo cargar más')),
+            AppButton.text(
+              label: 'Reintentar',
+              onPressed: () => context.read<MediaGalleryBloc>().add(
+                const MediaGalleryLoadMoreRequested(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

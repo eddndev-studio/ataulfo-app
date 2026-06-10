@@ -8,6 +8,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../ai_catalog/domain/catalog_drift.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
 import '../../../ai_catalog/domain/failures/catalog_failure.dart';
@@ -569,7 +570,8 @@ class _ProviderField extends StatelessWidget {
               .map(
                 (p) => DropdownMenuItem<AIProvider>(
                   value: p,
-                  child: Text(p.toWire()),
+                  // Label humano del DS; el value sigue siendo la enum wire.
+                  child: Text(ProviderBadge.labelOf(p)),
                 ),
               )
               .toList(growable: false),

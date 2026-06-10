@@ -110,7 +110,12 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
         : null;
     final newDesc = _descCtrl.text != ed.description ? _descCtrl.text : null;
     final isNoOp = newName == null && newDefault == null && newDesc == null;
-    if (isNoOp) return;
+    if (isNoOp) {
+      // Nada cambió: "Guardar" igual cierra el sheet (consistente con el
+      // auto-pop de éxito); sin request al bloc.
+      Navigator.of(context).maybePop();
+      return;
+    }
 
     _didSubmit = true;
     context.read<VarDefsBloc>().add(

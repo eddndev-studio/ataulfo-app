@@ -493,7 +493,21 @@ void main() {
       when(() => bloc.state).thenReturn(
         const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
       );
-      await tester.pumpWidget(host());
+      // Las tabs sólo se muestran en modo browse (showTypeTabs).
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: BlocProvider<MediaGalleryBloc>.value(
+            value: bloc,
+            child: const Scaffold(
+              body: MediaGalleryPage(
+                loader: FakeThumbnailLoader(),
+                showTypeTabs: true,
+              ),
+            ),
+          ),
+        ),
+      );
 
       expect(find.byType(AppChoiceChip), findsNWidgets(5));
       expect(find.byType(ChoiceChip), findsNothing);

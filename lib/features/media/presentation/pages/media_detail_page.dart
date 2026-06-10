@@ -171,13 +171,13 @@ class MediaDetailPage extends StatelessWidget {
           'acción no se puede deshacer.',
         ),
         actions: <Widget>[
-          TextButton(
+          AppButton.text(
+            label: 'Cancelar',
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
           ),
-          TextButton(
+          AppButton.danger(
+            label: 'Borrar',
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Borrar'),
           ),
         ],
       ),
