@@ -31,6 +31,7 @@ import '../../features/bots/domain/repositories/bots_repository.dart';
 import '../../features/bots/presentation/bloc/bot_connect_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_maintenance_bloc.dart';
+import '../../features/bots/presentation/bloc/bot_session_status_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_variables_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/bot_create_draft.dart';
@@ -457,10 +458,22 @@ class AppRouter {
           // así un WORKER (ruta WORKER+) nunca cruza ese endpoint ADMIN+.
           return RepositoryProvider<TemplatesRepository>.value(
             value: _templatesRepo,
-            child: BlocProvider<BotDetailBloc>(
-              create: (_) =>
-                  BotDetailBloc(repo: _botsRepo, id: id)
-                    ..add(const BotDetailLoadRequested()),
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<BotDetailBloc>(
+                  create: (_) =>
+                      BotDetailBloc(repo: _botsRepo, id: id)
+                        ..add(const BotDetailLoadRequested()),
+                ),
+                // Estado vivo de la sesión para el hero de conexión: carga
+                // al montar y sondea mientras el detalle está abierto (al
+                // volver de /connect el hub se refresca solo).
+                BlocProvider<BotSessionStatusBloc>(
+                  create: (_) =>
+                      BotSessionStatusBloc(repo: _botSessionRepo, botId: id)
+                        ..add(const BotSessionStatusStarted()),
+                ),
+              ],
               // Sin AppBar: el header full-bleed con gradiente ES el encabezado
               // (la página aporta su propio retorno en los tres estados).
               child: const Scaffold(body: BotDetailPage()),

@@ -8,9 +8,13 @@ import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_section_link.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_detail_bloc.dart';
+import 'package:ataulfo/features/bots/presentation/bloc/bot_session_status_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
@@ -27,6 +31,10 @@ class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
 
 class _MockTemplatesRepo extends Mock implements TemplatesRepository {}
+
+class _MockStatusBloc
+    extends MockBloc<BotSessionStatusEvent, BotSessionStatusState>
+    implements BotSessionStatusBloc {}
 
 Identity _identity(String role) =>
     Identity(userId: 'u1', orgId: 'o1', role: role, email: 'op@org.test');
@@ -67,6 +75,7 @@ void main() {
   late _MockBotDetailBloc bloc;
   late _MockAuthBloc authBloc;
   late _MockTemplatesRepo templatesRepo;
+  late _MockStatusBloc statusBloc;
 
   setUp(() {
     bloc = _MockBotDetailBloc();
@@ -80,6 +89,13 @@ void main() {
     when(
       () => templatesRepo.byId(any()),
     ).thenAnswer((_) async => _tmpl(aiEnabled: true));
+    // El hero de conexión consume el bloc de estado de sesión del scope.
+    statusBloc = _MockStatusBloc();
+    when(() => statusBloc.state).thenReturn(
+      const BotSessionStatusLoaded(
+        SessionStatus(state: SessionState.connected),
+      ),
+    );
   });
 
   // El gateo ADMIN+ lee el rol del AuthBloc del scope; por defecto ADMIN
@@ -96,6 +112,7 @@ void main() {
           providers: <BlocProvider<dynamic>>[
             BlocProvider<BotDetailBloc>.value(value: bloc),
             BlocProvider<AuthBloc>.value(value: authBloc),
+            BlocProvider<BotSessionStatusBloc>.value(value: statusBloc),
           ],
           // BotDetailPage es content-only; el host envuelve en Scaffold para
           // dar Material upstream a los widgets internos.
@@ -326,6 +343,7 @@ void main() {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(find.byKey(const Key('bot_detail.paused')));
       await tester.tap(find.byKey(const Key('bot_detail.paused')));
       await tester.pump();
 
@@ -422,6 +440,7 @@ void main() {
 
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('bot_detail.ai')));
       await tester.tap(find.byKey(const Key('bot_detail.ai')));
       await tester.pump();
 
@@ -467,38 +486,134 @@ void main() {
     });
   });
 
-  group('navegación a sub-páginas ADMIN+ (S6)', () {
-    testWidgets('ADMIN ve el botón Variables', (tester) async {
+  group('hero de conexión', () {
+    testWidgets('Loaded monta la card de conexión (estado vivo + CTA)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('bot_detail.connection')), findsOneWidget);
+      expect(find.text('En línea'), findsOneWidget);
+    });
+
+    testWidgets('WORKER también ve la card de conexión', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host(role: 'WORKER'));
+
+      expect(find.byKey(const Key('bot_detail.connection')), findsOneWidget);
+    });
+
+    testWidgets('muere el botón suelto "Conectar WhatsApp" del muro viejo', (
+      tester,
+    ) async {
+      // El acceso a /connect vive en el CTA del hero (key
+      // bot_detail.connection.cta), no como botón gigante en el cuerpo.
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('bot_detail.connection.cta')),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('launcher de secciones (hub)', () {
+    testWidgets(
+      'todos los roles ven Conversaciones y Etiquetas de WhatsApp como filas',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+        await tester.pumpWidget(host(role: 'WORKER'));
+
+        expect(
+          find.byKey(const Key('bot_detail.link.sessions')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('bot_detail.link.wa_labels')),
+          findsOneWidget,
+        );
+        // El muro de AppButton tonales idénticos murió: las áreas son filas
+        // launcher con glifo + caption, como en el hub de plantillas.
+        expect(find.widgetWithText(AppButton, 'Conversaciones'), findsNothing);
+        expect(
+          find.widgetWithText(AppButton, 'Etiquetas de WhatsApp'),
+          findsNothing,
+        );
+        expect(find.byType(AppSectionLink), findsNWidgets(2));
+      },
+    );
+
+    testWidgets('ADMIN ve además Variables y Mantenimiento', (tester) async {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('bot_detail.variables')), findsOneWidget);
+      expect(
+        find.byKey(const Key('bot_detail.link.variables')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('bot_detail.link.maintenance')),
+        findsOneWidget,
+      );
+      expect(find.byType(AppSectionLink), findsNWidgets(4));
     });
 
-    testWidgets('WORKER no ve el botón Variables', (tester) async {
+    testWidgets('WORKER no ve Variables ni Mantenimiento', (tester) async {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
       await tester.pumpWidget(host(role: 'WORKER'));
 
-      expect(find.byKey(const Key('bot_detail.variables')), findsNothing);
+      expect(find.byKey(const Key('bot_detail.link.variables')), findsNothing);
+      expect(
+        find.byKey(const Key('bot_detail.link.maintenance')),
+        findsNothing,
+      );
     });
+  });
 
-    testWidgets('ADMIN ve el botón Mantenimiento', (tester) async {
+  group('card de controles (ADMIN+)', () {
+    testWidgets('los toggles pausar/IA viven agrupados en una card', (
+      tester,
+    ) async {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('bot_detail.maintenance')), findsOneWidget);
+
+      final card = find.byKey(const Key('bot_detail.card.controls'));
+      expect(card, findsOneWidget);
+      expect(tester.widget(card), isA<AppCard>());
+      // Ambos switches viven DENTRO de la card.
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.byKey(const Key('bot_detail.paused')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.byKey(const Key('bot_detail.ai')),
+        ),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('WORKER no ve el botón Mantenimiento', (tester) async {
+    testWidgets('WORKER no ve la card de controles', (tester) async {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
       await tester.pumpWidget(host(role: 'WORKER'));
 
-      expect(find.byKey(const Key('bot_detail.maintenance')), findsNothing);
+      expect(find.byKey(const Key('bot_detail.card.controls')), findsNothing);
     });
   });
 
@@ -597,6 +712,9 @@ void main() {
                             providers: <BlocProvider<dynamic>>[
                               BlocProvider<BotDetailBloc>.value(value: bloc),
                               BlocProvider<AuthBloc>.value(value: authBloc),
+                              BlocProvider<BotSessionStatusBloc>.value(
+                                value: statusBloc,
+                              ),
                             ],
                             child: const Scaffold(body: BotDetailPage()),
                           ),

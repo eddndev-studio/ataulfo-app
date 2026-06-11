@@ -8,8 +8,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
-import '../../../../core/design/widgets/app_entity_icon.dart';
-import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../bots/presentation/widgets/bot_create_sheet.dart';
 import '../../../flows/presentation/bloc/flows_bloc.dart';
@@ -160,7 +159,7 @@ class _SectionLauncher extends StatelessWidget {
       child: Column(
         children: <Widget>[
           BlocBuilder<FlowsBloc, FlowsState>(
-            builder: (context, state) => _SectionLinkRow(
+            builder: (context, state) => AppSectionLink(
               rowKey: const Key('template_detail.link.flows'),
               icon: Icons.account_tree_outlined,
               title: 'Flujos',
@@ -171,7 +170,7 @@ class _SectionLauncher extends StatelessWidget {
           ),
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
           BlocBuilder<VarDefsBloc, VarDefsState>(
-            builder: (context, state) => _SectionLinkRow(
+            builder: (context, state) => AppSectionLink(
               rowKey: const Key('template_detail.link.variables'),
               icon: Icons.data_object,
               title: 'Variables',
@@ -181,7 +180,7 @@ class _SectionLauncher extends StatelessWidget {
             ),
           ),
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-          _SectionLinkRow(
+          AppSectionLink(
             rowKey: const Key('template_detail.link.ai'),
             icon: Icons.psychology_outlined,
             title: 'Motor IA',
@@ -238,79 +237,6 @@ class _SectionLauncher extends StatelessWidget {
     if (defs.isEmpty) return 'Sin variables aún';
     final names = defs.take(3).map((d) => '{{${d.name}}}').join(', ');
     return defs.length > 3 ? '$names…' : names;
-  }
-}
-
-/// Fila del launcher: glifo de entidad + título con count + caption de
-/// resumen + chevron. Toda la fila es tap-target hacia su página.
-class _SectionLinkRow extends StatelessWidget {
-  const _SectionLinkRow({
-    required this.rowKey,
-    required this.icon,
-    required this.title,
-    required this.onTap,
-    this.count,
-    this.caption,
-  });
-
-  final Key rowKey;
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  /// Items del área. Con valor > 0 acompaña al título como pill; null (sin
-  /// snapshot) o 0 (vacío) van sin pill — un "0" solo repetiría el caption.
-  final int? count;
-  final String? caption;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final c = count;
-    return InkWell(
-      key: rowKey,
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
-        child: Row(
-          children: <Widget>[
-            AppEntityIcon(icon: icon, size: 44),
-            const SizedBox(width: AppTokens.sp4),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Text(title, style: textTheme.titleMedium),
-                      if (c != null && c > 0) ...<Widget>[
-                        const SizedBox(width: AppTokens.sp2),
-                        AppPill.neutral(label: '$c'),
-                      ],
-                    ],
-                  ),
-                  if (caption != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        caption!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppTokens.text2,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppTokens.sp2),
-            const Icon(Icons.chevron_right, color: AppTokens.text2),
-          ],
-        ),
-      ),
-    );
   }
 }
 

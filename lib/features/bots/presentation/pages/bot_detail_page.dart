@@ -6,20 +6,27 @@ import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_detail_bloc.dart';
 import '../widgets/bot_ai_toggle.dart';
 import '../widgets/bot_clone_sheet.dart';
+import '../widgets/bot_connection_card.dart';
 import '../widgets/bot_detail_header.dart';
 import '../widgets/bot_edit_sheet.dart';
 import '../widgets/bot_toggle_row.dart';
 
-/// Detalle de un Bot (S04). Consume el `BotDetailBloc` del scope; el
-/// cableado del provider y del ID lo hace el router en `/bots/:id`. Es
-/// content-only: el Scaffold y el AppBar los aporta la ruta, igual que
-/// en el listado para mantener consistencia con el shell.
+/// Detalle de un Bot (S04): el HUB del bot. Identidad en el header de
+/// gradiente, la conexión del canal como card hero (estado vivo — lo
+/// primero que el operador necesita saber), las áreas (conversaciones,
+/// etiquetas WA, variables, mantenimiento) como filas launcher hacia sus
+/// páginas, y los controles de mutación agrupados en una card. Consume el
+/// `BotDetailBloc` y el `BotSessionStatusBloc` del scope; el cableado lo
+/// hace el router en `/bots/:id`. Content-only: el Scaffold lo aporta la
+/// ruta (sin AppBar — el header aporta retorno y editar).
 ///
 /// Centro de mando: WORKER ve el detalle (la ruta es WORKER+), pero todos
 /// los controles de mutación están gateados ADMIN+ leyendo `Identity.role`
@@ -164,24 +171,38 @@ class _LoadedView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                // Versión, estado, IA e identificador viven ahora EN el header
-                // (cápsulas glass sobre el gradiente). Aquí abajo: controles.
+                // Versión, estado, IA e identificador viven EN el header
+                // (cápsulas glass). Aquí abajo: conexión → áreas → controles.
+                BotConnectionCard(bot: bot),
+                const SizedBox(height: AppTokens.sp6),
+                _SectionLauncher(bot: bot, isAdmin: isAdmin),
                 if (isAdmin) ...<Widget>[
-                  BotToggleRow(
-                    switchKey: const Key('bot_detail.paused'),
-                    label: 'Pausar bot',
-                    caption:
-                        'Pausado, el bot deja de procesar mensajes hasta que lo '
-                        'reanudes; no se reanuda solo.',
-                    value: bot.paused,
-                    onChanged: isMutating
-                        ? null
-                        : (v) => context.read<BotDetailBloc>().add(
-                            BotDetailUpdateRequested(paused: v),
-                          ),
+                  const SizedBox(height: AppTokens.sp6),
+                  AppCard(
+                    key: const Key('bot_detail.card.controls'),
+                    child: Column(
+                      children: <Widget>[
+                        BotToggleRow(
+                          switchKey: const Key('bot_detail.paused'),
+                          label: 'Pausar bot',
+                          caption:
+                              'Pausado, el bot deja de procesar mensajes '
+                              'hasta que lo reanudes; no se reanuda solo.',
+                          value: bot.paused,
+                          onChanged: isMutating
+                              ? null
+                              : (v) => context.read<BotDetailBloc>().add(
+                                  BotDetailUpdateRequested(paused: v),
+                                ),
+                        ),
+                        const Divider(
+                          height: AppTokens.sp6,
+                          color: AppTokens.divider,
+                        ),
+                        BotAiToggle(bot: bot, isMutating: isMutating),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: AppTokens.sp5),
-                  BotAiToggle(bot: bot, isMutating: isMutating),
                 ],
                 if (f != null) ...<Widget>[
                   const SizedBox(height: AppTokens.sp4),
@@ -193,62 +214,36 @@ class _LoadedView extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: AppTokens.sp7),
-                AppButton.tonal(
-                  label: 'Conversaciones',
-                  fullWidth: true,
-                  onPressed: () => context.push('/bots/${bot.id}/sessions'),
-                ),
-                const SizedBox(height: AppTokens.sp3),
-                AppButton.tonal(
-                  label: 'Etiquetas de WhatsApp',
-                  fullWidth: true,
-                  onPressed: () => context.push('/bots/${bot.id}/wa-labels'),
-                ),
-                const SizedBox(height: AppTokens.sp3),
-                AppButton.filled(
-                  label: 'Conectar WhatsApp',
-                  fullWidth: true,
-                  onPressed: () => context.push(
-                    '/bots/${bot.id}/connect?channel=${bot.channel.toWire()}',
-                  ),
-                ),
                 if (isAdmin) ...<Widget>[
-                  const SizedBox(height: AppTokens.sp3),
-                  AppButton.tonal(
-                    key: const Key('bot_detail.variables'),
-                    label: 'Variables',
-                    fullWidth: true,
-                    onPressed: () => context.push('/bots/${bot.id}/variables'),
-                  ),
-                  const SizedBox(height: AppTokens.sp3),
-                  AppButton.tonal(
-                    key: const Key('bot_detail.maintenance'),
-                    label: 'Mantenimiento',
-                    fullWidth: true,
-                    onPressed: () =>
-                        context.push('/bots/${bot.id}/maintenance'),
-                  ),
                   const SizedBox(height: AppTokens.sp7),
-                  AppButton.tonal(
-                    key: const Key('bot_detail.clone'),
-                    label: 'Clonar bot',
-                    fullWidth: true,
-                    onPressed: isMutating
-                        ? null
-                        : () => BotCloneSheet.open(
-                            context,
-                            onCloned: (newId) => context.push('/bots/$newId'),
-                          ),
-                  ),
-                  const SizedBox(height: AppTokens.sp3),
-                  AppButton.danger(
-                    key: const Key('bot_detail.delete'),
-                    label: 'Eliminar bot',
-                    fullWidth: true,
-                    onPressed: isMutating
-                        ? null
-                        : () => _confirmDelete(context, bot),
+                  // Gestión del ciclo de vida: compacta en una fila — son
+                  // acciones raras; no compiten con la operación diaria.
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: AppButton.tonal(
+                          key: const Key('bot_detail.clone'),
+                          label: 'Clonar bot',
+                          onPressed: isMutating
+                              ? null
+                              : () => BotCloneSheet.open(
+                                  context,
+                                  onCloned: (newId) =>
+                                      context.push('/bots/$newId'),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: AppTokens.sp3),
+                      Expanded(
+                        child: AppButton.danger(
+                          key: const Key('bot_detail.delete'),
+                          label: 'Eliminar bot',
+                          onPressed: isMutating
+                              ? null
+                              : () => _confirmDelete(context, bot),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
@@ -317,6 +312,61 @@ class _LoadedView extends StatelessWidget {
     BotsServerFailure() ||
     UnknownBotsFailure() => 'No pudimos guardar el cambio. Inténtalo de nuevo.',
   };
+}
+
+/// Launcher de las áreas del bot: una card con filas hacia las páginas
+/// dedicadas, como en el hub de plantillas. Conversaciones y etiquetas WA
+/// son operación diaria (todos los roles); variables y mantenimiento son
+/// configuración ADMIN+ — el gateo espeja el `_redirect` del router.
+class _SectionLauncher extends StatelessWidget {
+  const _SectionLauncher({required this.bot, required this.isAdmin});
+
+  final Bot bot;
+  final bool isAdmin;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      key: const Key('bot_detail.card.sections'),
+      child: Column(
+        children: <Widget>[
+          AppSectionLink(
+            rowKey: const Key('bot_detail.link.sessions'),
+            icon: Icons.chat_outlined,
+            title: 'Conversaciones',
+            caption: 'La bandeja de chats del bot',
+            onTap: () => context.push('/bots/${bot.id}/sessions'),
+          ),
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          AppSectionLink(
+            rowKey: const Key('bot_detail.link.wa_labels'),
+            icon: Icons.label_outline,
+            title: 'Etiquetas de WhatsApp',
+            caption: 'Catálogo del número y mapeo a flujos',
+            onTap: () => context.push('/bots/${bot.id}/wa-labels'),
+          ),
+          if (isAdmin) ...<Widget>[
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('bot_detail.link.variables'),
+              icon: Icons.data_object,
+              title: 'Variables',
+              caption: 'Valores propios de este bot',
+              onTap: () => context.push('/bots/${bot.id}/variables'),
+            ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('bot_detail.link.maintenance'),
+              icon: Icons.build_outlined,
+              title: 'Mantenimiento',
+              caption: 'Limpieza y reinicio de sesiones',
+              onTap: () => context.push('/bots/${bot.id}/maintenance'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _FailedView extends StatelessWidget {

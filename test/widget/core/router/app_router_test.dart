@@ -18,6 +18,7 @@ import 'package:ataulfo/features/auth/presentation/pages/reset_password_page.dar
 import 'package:ataulfo/features/auth/presentation/pages/verify_email_page.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dart';
+import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
@@ -275,6 +276,11 @@ void main() {
           contextMessages: 10,
         ),
       ),
+    );
+    // El hero de conexión del detalle del bot carga el estado de sesión al
+    // montar la ruta; un estado terminal deja terminar el pumpAndSettle.
+    when(() => botSessionRepo.getSessionState(any())).thenAnswer(
+      (_) async => const SessionStatus(state: SessionState.connected),
     );
     when(
       () => flowsRepo.listFlows(any()),
