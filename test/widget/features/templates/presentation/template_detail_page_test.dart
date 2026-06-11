@@ -4,11 +4,9 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
-import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
-import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flows_bloc.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
@@ -16,7 +14,7 @@ import 'package:ataulfo/features/templates/domain/failures/templates_failure.dar
 import 'package:ataulfo/features/templates/presentation/bloc/template_detail_bloc.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/var_defs_bloc.dart';
 import 'package:ataulfo/features/templates/presentation/pages/template_detail_page.dart';
-import 'package:ataulfo/features/templates/presentation/widgets/var_def_form_sheet.dart';
+import 'package:ataulfo/features/templates/presentation/widgets/template_rename_sheet.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/triggers/presentation/bloc/triggers_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -40,20 +38,37 @@ class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
 
 class _MockBotsRepository extends Mock implements BotsRepository {}
 
+const _ai = AIConfig(
+  enabled: true,
+  provider: AIProvider.gemini,
+  model: 'gemini-3.1-pro-preview',
+  temperature: 0.7,
+  thinkingLevel: ThinkingLevel.medium,
+  systemPrompt: 'Eres un asistente de soporte amable.',
+  contextMessages: 20,
+);
+
 const _tpl = Template(
   id: 't1',
   orgId: 'o1',
   name: 'Soporte',
   version: 3,
-  ai: AIConfig(
-    enabled: true,
-    provider: AIProvider.gemini,
-    model: 'gemini-3.1-pro-preview',
-    temperature: 0.7,
-    thinkingLevel: ThinkingLevel.medium,
-    systemPrompt: 'Eres un asistente de soporte amable.',
-    contextMessages: 20,
-  ),
+  ai: _ai,
+);
+
+flows.Flow _flow({
+  required String id,
+  required String name,
+  bool isActive = true,
+}) => flows.Flow(
+  id: id,
+  templateId: 't1',
+  name: name,
+  isActive: isActive,
+  version: 1,
+  cooldownMs: 0,
+  usageLimit: 0,
+  excludesFlows: const <String>[],
 );
 
 void main() {
@@ -75,15 +90,12 @@ void main() {
     flowsBloc = _MockFlowsBloc();
     triggersBloc = _MockTriggersBloc();
     when(() => bloc.state).thenReturn(const TemplateDetailLoading());
-    // Default: var-defs Loaded vacío (estado terminal sin animaciones).
-    // Tests específicos de la sección Variables sobreescriben este stub.
+    // Defaults en Loaded vacío (estado terminal sin animaciones); los tests
+    // del launcher sobreescriben estos stubs.
     when(
       () => varDefsBloc.state,
     ).thenReturn(const VarDefsLoaded(<VariableDef>[], 1));
-    // Default: flows Loaded vacío para que la sección Flujos no flashee
-    // Loading en los tests que no la ejercen.
     when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
-    // Default: triggers Loaded vacío. Mismo motivo que flows.
     when(
       () => triggersBloc.state,
     ).thenReturn(const TriggersLoaded(<Trigger>[]));
@@ -104,6 +116,58 @@ void main() {
     ),
   );
 
+  /// Monta el detalle bajo un GoRouter con [destinationPath] registrado,
+  /// tapea [tapKey] y devuelve la URI alcanzada + canPop en el destino.
+  Future<({String? uri, List<bool> canPop})> pushFrom(
+    WidgetTester tester, {
+    required Key tapKey,
+    required String destinationPath,
+  }) async {
+    final canPopAtDestination = <bool>[];
+    String? destinationUri;
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TemplateDetailBloc>.value(value: bloc),
+              BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
+              BlocProvider<FlowsBloc>.value(value: flowsBloc),
+              BlocProvider<TriggersBloc>.value(value: triggersBloc),
+            ],
+            child: const Scaffold(body: TemplateDetailPage()),
+          ),
+        ),
+        GoRoute(
+          path: destinationPath,
+          builder: (_, state) {
+            destinationUri = state.uri.toString();
+            return Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  canPopAtDestination.add(Navigator.of(ctx).canPop());
+                  return const SizedBox.shrink();
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(tapKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(tapKey));
+    await tester.pumpAndSettle();
+    return (uri: destinationUri, canPop: canPopAtDestination);
+  }
+
   testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
     when(() => bloc.state).thenReturn(const TemplateDetailLoading());
 
@@ -116,67 +180,91 @@ void main() {
   });
 
   testWidgets(
-    'Loaded muestra header con AppAvatar(size: 64), nombre y provider',
+    'Loaded muestra el header de gradiente: nombre, provider · modelo y '
+    'pills glass — sin avatar ni card vieja',
     (tester) async {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
 
       await tester.pumpWidget(host());
 
-      expect(find.text('Soporte'), findsOneWidget);
-      expect(find.text('Gemini'), findsOneWidget);
-      final avatar = tester.widget<AppAvatar>(find.byType(AppAvatar));
-      expect(avatar.size, 64);
-      expect(avatar.name, 'Soporte');
-      expect(find.byType(CircleAvatar), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'Loaded agrupa header + acciones en AppCard con key contractual',
-    (tester) async {
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-
-      await tester.pumpWidget(host());
-
-      final cardFinder = find.byKey(const Key('template_detail.card.header'));
-      expect(cardFinder, findsOneWidget);
-      // Avatar + name viven dentro de la header card.
+      final header = find.byKey(const Key('template_detail.header'));
+      expect(header, findsOneWidget);
       expect(
-        find.descendant(of: cardFinder, matching: find.text('Soporte')),
+        find.descendant(of: header, matching: find.text('Soporte')),
         findsOneWidget,
       );
+      // El subtítulo combina proveedor humanizado y modelo en una línea.
       expect(
-        find.descendant(of: cardFinder, matching: find.byType(AppAvatar)),
+        find.descendant(of: header, matching: find.textContaining('Gemini')),
         findsOneWidget,
       );
-      // La pill de versión y la pill de estado IA están en el header.
       expect(
         find.descendant(
-          of: cardFinder,
+          of: header,
+          matching: find.textContaining('gemini-3.1-pro-preview'),
+        ),
+        findsOneWidget,
+      );
+      // Versión + estado IA en cápsulas dentro del header.
+      expect(
+        find.descendant(
+          of: header,
           matching: find.widgetWithText(AppPill, 'v3'),
         ),
         findsOneWidget,
       );
-      // Las acciones (Editar plantilla / Crear bot) viven en el header,
-      // no en el bottom-stack del scroll.
       expect(
         find.descendant(
-          of: cardFinder,
-          matching: find.byKey(const Key('template_detail.edit_button')),
+          of: header,
+          matching: find.widgetWithText(AppPill, 'IA habilitada'),
         ),
         findsOneWidget,
       );
+      // El patrón viejo muere: ni avatar ni header card plana.
+      expect(find.byType(AppAvatar), findsNothing);
       expect(
-        find.descendant(
-          of: cardFinder,
-          matching: find.byKey(const Key('template_detail.create_bot_button')),
-        ),
-        findsOneWidget,
+        find.byKey(const Key('template_detail.card.header')),
+        findsNothing,
       );
     },
   );
 
-  testWidgets('Loaded muestra versión como AppPill.outline', (tester) async {
+  testWidgets('el header expone retorno y lápiz de editar; Crear bot vive '
+      'FUERA del header como CTA propio', (tester) async {
+    when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+
+    await tester.pumpWidget(host());
+
+    final header = find.byKey(const Key('template_detail.header'));
+    expect(
+      find.descendant(
+        of: header,
+        matching: find.byKey(const Key('template_detail.back')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: header,
+        matching: find.byKey(const Key('template_detail.edit_button')),
+      ),
+      findsOneWidget,
+    );
+    // El CTA de crear bot NO está dentro del header (es botón del cuerpo).
+    expect(
+      find.descendant(
+        of: header,
+        matching: find.byKey(const Key('template_detail.create_bot_button')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('template_detail.create_bot_button')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Loaded muestra versión como AppPill', (tester) async {
     when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
 
     await tester.pumpWidget(host());
@@ -219,90 +307,9 @@ void main() {
 
       // IA off es estado de configuración, no error → neutral (no danger).
       expect(find.widgetWithText(AppPill, 'IA deshabilitada'), findsOneWidget);
-      expect(find.text('OpenAI'), findsOneWidget);
-      expect(find.text('Bajo'), findsOneWidget);
-    },
-  );
-
-  testWidgets('Loaded muestra los 4 stats AIConfig en AppCard individuales '
-      '(modelo/temp/razonamiento/contexto)', (tester) async {
-    when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-
-    await tester.pumpWidget(host());
-
-    // Cuatro stat tiles, uno por campo. Cada uno es un AppCard con
-    // label caption + valor titleM — reemplaza al _FieldRow del shape
-    // pre-DS (label 180px fijo). El page tiene además cards de sección
-    // (Flujos / Disparadores / Variables / etc.), así que verificamos
-    // las tarjetas de stats por contenido y no por conteo global.
-    expect(find.widgetWithText(AppCard, 'Modelo'), findsOneWidget);
-    expect(
-      find.widgetWithText(AppCard, 'gemini-3.1-pro-preview'),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(AppCard, 'Temperatura'), findsOneWidget);
-    expect(find.widgetWithText(AppCard, '0.7'), findsOneWidget);
-    expect(find.widgetWithText(AppCard, 'Razonamiento'), findsOneWidget);
-    expect(find.widgetWithText(AppCard, 'Medio'), findsOneWidget);
-    expect(
-      find.widgetWithText(AppCard, 'Mensajes de contexto'),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(AppCard, '20'), findsOneWidget);
-  });
-
-  testWidgets('Loaded con systemPrompt no vacío lo muestra (SelectableText)', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-
-    await tester.pumpWidget(host());
-
-    // El system prompt es contenido del usuario; debe ser seleccionable
-    // para que se pueda copiar.
-    expect(find.text('Eres un asistente de soporte amable.'), findsOneWidget);
-  });
-
-  testWidgets(
-    'Loaded agrupa stats + prompt en card Configuración IA con key contractual',
-    (tester) async {
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-
-      await tester.pumpWidget(host());
-
-      final cardFinder = find.byKey(
-        const Key('template_detail.card.ai_config'),
-      );
-      expect(cardFinder, findsOneWidget);
-
-      // La card combina el grid de stats + el system prompt: ambos deben
-      // estar dentro del mismo ancestro AppCard.
-      expect(
-        find.descendant(of: cardFinder, matching: find.text('Modelo')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: cardFinder, matching: find.text('Temperatura')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: cardFinder, matching: find.text('Razonamiento')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: cardFinder,
-          matching: find.text('Mensajes de contexto'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: cardFinder,
-          matching: find.text('Eres un asistente de soporte amable.'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.textContaining('OpenAI'), findsOneWidget);
+      // El nivel de razonamiento vive en el caption de la fila Motor IA.
+      expect(find.textContaining('razonamiento bajo'), findsOneWidget);
     },
   );
 
@@ -373,8 +380,8 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.text('MiniMax'), findsOneWidget);
-    expect(find.text('Alto'), findsOneWidget);
+    expect(find.textContaining('MiniMax'), findsOneWidget);
+    expect(find.textContaining('razonamiento alto'), findsOneWidget);
   });
 
   testWidgets('proveedor DeepSeek se humaniza correctamente', (tester) async {
@@ -397,538 +404,237 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.text('DeepSeek'), findsOneWidget);
+    expect(find.textContaining('DeepSeek'), findsOneWidget);
   });
 
-  // ── Sección Variables ──────────────────────────────────────────────────────
-  group('sección Variables', () {
+  // ── Hero del Entrenador ─────────────────────────────────────────────────────
+  group('hero del Entrenador', () {
     setUp(() {
-      // Sin Template no se renderiza el resto de la página; las pruebas de
-      // var-defs necesitan el detalle ya en Loaded para que la sección sea
-      // visible debajo del prompt.
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
-    testWidgets('vive dentro de AppCard con key contractual', (tester) async {
+    testWidgets(
+      'Loaded muestra la card del Entrenador con accesos a Workspace y '
+      'Probar bot',
+      (tester) async {
+        await tester.pumpWidget(host());
+
+        final card = find.byKey(const Key('template_detail.card.trainer'));
+        expect(card, findsOneWidget);
+        expect(
+          find.descendant(of: card, matching: find.text('Entrenador')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byKey(const Key('template_detail.trainer')),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byKey(
+              const Key('template_detail.trainer.workspace'),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byKey(const Key('template_detail.trainer.preview')),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Workspace'), findsOneWidget);
+        expect(find.text('Probar bot'), findsOneWidget);
+      },
+    );
+
+    testWidgets('tap en la card apila /templates/:id/trainer', (tester) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.trainer'),
+        destinationPath: '/templates/:id/trainer',
+      );
+      expect(r.uri, '/templates/t1/trainer');
+      expect(r.canPop, <bool>[true]);
+    });
+
+    testWidgets('tap Workspace apila /templates/:id/trainer/workspace', (
+      tester,
+    ) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.trainer.workspace'),
+        destinationPath: '/templates/:id/trainer/workspace',
+      );
+      expect(r.uri, '/templates/t1/trainer/workspace');
+      expect(r.canPop, <bool>[true]);
+    });
+
+    testWidgets('tap Probar bot apila /templates/:id/trainer/preview', (
+      tester,
+    ) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.trainer.preview'),
+        destinationPath: '/templates/:id/trainer/preview',
+      );
+      expect(r.uri, '/templates/t1/trainer/preview');
+      expect(r.canPop, <bool>[true]);
+    });
+  });
+
+  // ── Launcher de secciones (hub) ─────────────────────────────────────────────
+  group('launcher de secciones', () {
+    setUp(() {
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
+    });
+
+    testWidgets('muestra las filas Flujos / Variables / Motor IA', (
+      tester,
+    ) async {
       await tester.pumpWidget(host());
 
-      final cardFinder = find.byKey(
-        const Key('template_detail.card.variables'),
-      );
-      expect(cardFinder, findsOneWidget);
       expect(
-        find.descendant(of: cardFinder, matching: find.text('Variables')),
+        find.byKey(const Key('template_detail.link.flows')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('template_detail.link.variables')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('template_detail.link.ai')), findsOneWidget);
+      expect(find.text('Flujos'), findsOneWidget);
+      expect(find.text('Variables'), findsOneWidget);
+      expect(find.text('Motor IA'), findsOneWidget);
+      // Las listas ya NO viven inline en el detalle.
+      expect(find.byKey(const Key('flows.add_button')), findsNothing);
+      expect(find.byKey(const Key('var_defs.add_button')), findsNothing);
+    });
+
+    testWidgets('fila Flujos: count pill + caption activos/pausados', (
+      tester,
+    ) async {
+      when(() => flowsBloc.state).thenReturn(
+        FlowsLoaded(<flows.Flow>[
+          _flow(id: 'f1', name: 'Bienvenida'),
+          _flow(id: 'f2', name: 'Despedida', isActive: false),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      final row = find.byKey(const Key('template_detail.link.flows'));
+      expect(
+        find.descendant(of: row, matching: find.widgetWithText(AppPill, '2')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.text('1 activo · 1 pausado')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('fila Flujos vacía: caption "Sin flujos aún", sin pill', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      final row = find.byKey(const Key('template_detail.link.flows'));
+      expect(
+        find.descendant(of: row, matching: find.text('Sin flujos aún')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.widgetWithText(AppPill, '0')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('fila Variables: count pill + caption con placeholders', (
+      tester,
+    ) async {
+      when(() => varDefsBloc.state).thenReturn(
+        const VarDefsLoaded(<VariableDef>[
+          VariableDef(
+            id: 'v1',
+            name: 'nombre',
+            defaultValue: '',
+            description: '',
+          ),
+          VariableDef(
+            id: 'v2',
+            name: 'edad',
+            defaultValue: '',
+            description: '',
+          ),
+        ], 2),
+      );
+
+      await tester.pumpWidget(host());
+
+      final row = find.byKey(const Key('template_detail.link.variables'));
+      expect(
+        find.descendant(of: row, matching: find.widgetWithText(AppPill, '2')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.textContaining('{{nombre}}')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('fila Motor IA: caption con temperatura y razonamiento', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      final row = find.byKey(const Key('template_detail.link.ai'));
+      expect(
+        find.descendant(of: row, matching: find.textContaining('0.7')),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: cardFinder,
-          matching: find.byKey(const Key('var_defs.add_button')),
+          of: row,
+          matching: find.textContaining('razonamiento medio'),
         ),
         findsOneWidget,
       );
     });
 
-    testWidgets('siempre muestra el título "Variables"', (tester) async {
-      await tester.pumpWidget(host());
-      expect(find.text('Variables'), findsOneWidget);
-    });
-
-    testWidgets('VarDefsLoading muestra spinner inline', (tester) async {
-      when(() => varDefsBloc.state).thenReturn(const VarDefsLoading());
-
-      await tester.pumpWidget(host());
-
-      expect(find.byKey(const Key('var_defs.loading')), findsOneWidget);
-    });
-
-    testWidgets('VarDefsLoaded([]) muestra empty state italic', (tester) async {
-      when(
-        () => varDefsBloc.state,
-      ).thenReturn(const VarDefsLoaded(<VariableDef>[], 1));
-
-      await tester.pumpWidget(host());
-
-      expect(find.byKey(const Key('var_defs.empty')), findsOneWidget);
-    });
-
-    testWidgets(
-      'VarDefsLoaded con defs muestra una fila por variable (name + default)',
-      (tester) async {
-        when(() => varDefsBloc.state).thenReturn(
-          const VarDefsLoaded(<VariableDef>[
-            VariableDef(
-              id: 'v1',
-              name: 'nombre',
-              defaultValue: 'cliente',
-              description: 'Saludo personalizado',
-            ),
-            VariableDef(
-              id: 'v2',
-              name: 'edad',
-              defaultValue: '',
-              description: '',
-            ),
-          ], 2),
-        );
-
-        await tester.pumpWidget(host());
-
-        expect(find.text('{{nombre}}'), findsOneWidget);
-        expect(find.text('cliente'), findsOneWidget);
-        expect(find.text('Saludo personalizado'), findsOneWidget);
-        expect(find.text('{{edad}}'), findsOneWidget);
-      },
-    );
-
-    testWidgets('VarDefsFailed muestra mensaje + AppButton "Reintentar"', (
-      tester,
-    ) async {
-      when(
-        () => varDefsBloc.state,
-      ).thenReturn(const VarDefsFailed(TemplatesServerFailure()));
-
-      await tester.pumpWidget(host());
-
-      expect(find.byKey(const Key('var_defs.failed')), findsOneWidget);
-      // El retry inline usa AppButton.text (consistente con DS); el
-      // TextButton de Material desaparece de la página.
-      expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
-      expect(find.byType(TextButton), findsNothing);
-    });
-
-    testWidgets('tap Reintentar dispara VarDefsLoadRequested', (tester) async {
-      when(
-        () => varDefsBloc.state,
-      ).thenReturn(const VarDefsFailed(TemplatesNetworkFailure()));
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('var_defs.failed')));
-      await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
-      await tester.pump();
-
-      verify(() => varDefsBloc.add(const VarDefsLoadRequested())).called(1);
-    });
-
-    testWidgets(
-      'VarDefsMutating conserva la lista visible (no flash a Loading)',
-      (tester) async {
-        when(() => varDefsBloc.state).thenReturn(
-          const VarDefsMutating(<VariableDef>[
-            VariableDef(
-              id: 'v1',
-              name: 'nombre',
-              defaultValue: 'cliente',
-              description: '',
-            ),
-          ], 2),
-        );
-
-        await tester.pumpWidget(host());
-
-        expect(find.text('{{nombre}}'), findsOneWidget);
-        // El spinner inline NO debe aparecer durante la mutación — el
-        // contexto del operador se conserva; el overlay/disable del
-        // botón lo gestiona el form que disparó la mutación.
-        expect(find.byKey(const Key('var_defs.loading')), findsNothing);
-      },
-    );
-
-    testWidgets(
-      'VarDefsMutationFailed mantiene lista visible (feedback va por listener)',
-      (tester) async {
-        when(() => varDefsBloc.state).thenReturn(
-          const VarDefsMutationFailed(
-            <VariableDef>[
-              VariableDef(
-                id: 'v1',
-                name: 'nombre',
-                defaultValue: 'cliente',
-                description: '',
-              ),
-            ],
-            2,
-            TemplatesConflictFailure(),
-          ),
-        );
-
-        await tester.pumpWidget(host());
-
-        expect(find.text('{{nombre}}'), findsOneWidget);
-        // No es el terminal de Failed (que apaga la lista) — el snapshot
-        // sigue intacto y el operador puede reintentar sin perder
-        // contexto.
-        expect(find.byKey(const Key('var_defs.failed')), findsNothing);
-      },
-    );
-
-    testWidgets('VarDefsMutating con lista vacía muestra empty state', (
-      tester,
-    ) async {
-      when(
-        () => varDefsBloc.state,
-      ).thenReturn(const VarDefsMutating(<VariableDef>[], 1));
-
-      await tester.pumpWidget(host());
-
-      expect(find.byKey(const Key('var_defs.empty')), findsOneWidget);
-    });
-
-    testWidgets('Loaded muestra botón "Agregar variable" con key contractual', (
-      tester,
-    ) async {
-      when(
-        () => varDefsBloc.state,
-      ).thenReturn(const VarDefsLoaded(<VariableDef>[], 1));
-
-      await tester.pumpWidget(host());
-
-      expect(find.byKey(const Key('var_defs.add_button')), findsOneWidget);
-      expect(find.text('Agregar variable'), findsOneWidget);
-    });
-
-    testWidgets('MutationFailed mantiene visible el botón "Agregar variable"', (
-      tester,
-    ) async {
-      // Tras un 409, el operador puede corregir el form y reintentar
-      // desde el mismo sheet; el botón debe seguir visible.
-      when(() => varDefsBloc.state).thenReturn(
-        const VarDefsMutationFailed(
-          <VariableDef>[],
-          1,
-          TemplatesConflictFailure(),
-        ),
+    testWidgets('tap Flujos apila /templates/:id/flows', (tester) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.link.flows'),
+        destinationPath: '/templates/:id/flows',
       );
-
-      await tester.pumpWidget(host());
-
-      expect(find.byKey(const Key('var_defs.add_button')), findsOneWidget);
+      expect(r.uri, '/templates/t1/flows');
+      expect(r.canPop, <bool>[true]);
     });
 
-    testWidgets(
-      'Mutating oculta el botón "Agregar variable" (no doble dispatch)',
-      (tester) async {
-        when(
-          () => varDefsBloc.state,
-        ).thenReturn(const VarDefsMutating(<VariableDef>[], 1));
-
-        await tester.pumpWidget(host());
-
-        // El sheet está abierto y mostrando su propio spinner; el botón
-        // del detail page no debe coexistir o el operador puede
-        // dispararlo dos veces.
-        expect(find.byKey(const Key('var_defs.add_button')), findsNothing);
-      },
-    );
-
-    testWidgets(
-      'tap "Agregar variable" abre el VarDefFormSheet (modal bottom sheet)',
-      (tester) async {
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-        when(() => varDefsBloc.state).thenReturn(
-          const VarDefsLoaded(<VariableDef>[
-            VariableDef(
-              id: 'v1',
-              name: 'nombre',
-              defaultValue: 'cliente',
-              description: '',
-            ),
-          ], 2),
-        );
-
-        await tester.pumpWidget(host());
-        // ensureVisible: con var-defs en la lista + trash icon el botón
-        // puede caer fuera del viewport en el tester.
-        await tester.ensureVisible(
-          find.byKey(const Key('var_defs.add_button')),
-        );
-        await tester.tap(find.byKey(const Key('var_defs.add_button')));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(VarDefFormSheet), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      'tap row de variable abre el sheet en modo edit (editing pre-fillado)',
-      (tester) async {
-        const defs = <VariableDef>[
-          VariableDef(
-            id: 'v1',
-            name: 'nombre',
-            defaultValue: 'cliente',
-            description: 'Saludo personalizado',
-          ),
-        ];
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
-
-        await tester.pumpWidget(host());
-        // El row del var-def es tappeable. Cualquier descendant
-        // tappable que arranque el flujo está bien — clave: end-to-end
-        // el sheet se monta con el editing pre-fillado.
-        await tester.ensureVisible(find.text('{{nombre}}'));
-        await tester.tap(find.text('{{nombre}}'));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(VarDefFormSheet), findsOneWidget);
-        // El sheet refleja modo edit (title + valores pre-fillados).
-        expect(find.text('Editar variable'), findsOneWidget);
-        // El name está en el field name del sheet (descendiente del sheet).
-        expect(
-          find.descendant(
-            of: find.byType(VarDefFormSheet),
-            matching: find.text('Saludo personalizado'),
-          ),
-          findsOneWidget,
-        );
-      },
-    );
-
-    testWidgets('cada row expone un trash icon con key contractual', (
-      tester,
-    ) async {
-      const defs = <VariableDef>[
-        VariableDef(
-          id: 'v1',
-          name: 'nombre',
-          defaultValue: '',
-          description: '',
-        ),
-        VariableDef(id: 'v2', name: 'edad', defaultValue: '', description: ''),
-      ];
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-      when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
-
-      await tester.pumpWidget(host());
-
-      expect(find.byKey(const Key('var_defs.row.v1.delete')), findsOneWidget);
-      expect(find.byKey(const Key('var_defs.row.v2.delete')), findsOneWidget);
-    });
-
-    testWidgets('tap trash icon abre confirm dialog (no dispatch inmediato)', (
-      tester,
-    ) async {
-      const defs = <VariableDef>[
-        VariableDef(
-          id: 'v1',
-          name: 'nombre',
-          defaultValue: '',
-          description: '',
-        ),
-      ];
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-      when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(
-        find.byKey(const Key('var_defs.row.v1.delete')),
+    testWidgets('tap Variables apila /templates/:id/variables', (tester) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.link.variables'),
+        destinationPath: '/templates/:id/variables',
       );
-      await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
-      await tester.pumpAndSettle();
-
-      // Confirm dialog visible — operador debe confirmar la acción
-      // destructiva. Key contractual del dialog.
-      expect(find.byKey(const Key('var_defs.delete_confirm')), findsOneWidget);
-      // Las acciones del dialog son AppButton: Cancelar (text) y Eliminar
-      // (danger) — no TextButton de Material.
-      expect(find.widgetWithText(AppButton, 'Cancelar'), findsOneWidget);
-      expect(find.widgetWithText(AppButton, 'Eliminar'), findsOneWidget);
-      // No se dispatchó nada todavía.
-      verifyNever(() => varDefsBloc.add(any()));
+      expect(r.uri, '/templates/t1/variables');
+      expect(r.canPop, <bool>[true]);
     });
 
-    testWidgets(
-      'tap Cancelar en confirm dialog: no dispatcha, cierra el dialog',
-      (tester) async {
-        const defs = <VariableDef>[
-          VariableDef(
-            id: 'v1',
-            name: 'nombre',
-            defaultValue: '',
-            description: '',
-          ),
-        ];
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
-
-        await tester.pumpWidget(host());
-        await tester.ensureVisible(
-          find.byKey(const Key('var_defs.row.v1.delete')),
-        );
-        await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Cancelar'));
-        await tester.pumpAndSettle();
-
-        expect(find.byKey(const Key('var_defs.delete_confirm')), findsNothing);
-        verifyNever(() => varDefsBloc.add(any()));
-      },
-    );
-
-    testWidgets(
-      'tap Eliminar en confirm dialog: dispatcha VarDefsDeleteRequested + cierra',
-      (tester) async {
-        const defs = <VariableDef>[
-          VariableDef(
-            id: 'v1',
-            name: 'nombre',
-            defaultValue: '',
-            description: '',
-          ),
-        ];
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-        when(() => varDefsBloc.state).thenReturn(const VarDefsLoaded(defs, 2));
-
-        await tester.pumpWidget(host());
-        await tester.ensureVisible(
-          find.byKey(const Key('var_defs.row.v1.delete')),
-        );
-        await tester.tap(find.byKey(const Key('var_defs.row.v1.delete')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Eliminar'));
-        await tester.pumpAndSettle();
-
-        verify(
-          () => varDefsBloc.add(const VarDefsDeleteRequested(varDefId: 'v1')),
-        ).called(1);
-        expect(find.byKey(const Key('var_defs.delete_confirm')), findsNothing);
-      },
-    );
-
-    testWidgets(
-      'MutationFailed muestra SnackBar con copy de "intenta recargar"',
-      (tester) async {
-        // El parent del sheet es quien muestra feedback de error — el
-        // sheet sigue montado para permitir reintento, pero el operador
-        // necesita verbalización del fallo. Genérico cubre los 3 buckets
-        // del 409 (duplicate / stale CAS / in-use) sin precisión que no
-        // tenemos.
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-        final controller = StreamController<VarDefsState>.broadcast();
-        addTearDown(controller.close);
-        whenListen<VarDefsState>(
-          varDefsBloc,
-          controller.stream,
-          initialState: const VarDefsLoaded(<VariableDef>[], 1),
-        );
-
-        await tester.pumpWidget(host());
-        controller.add(
-          const VarDefsMutationFailed(
-            <VariableDef>[],
-            1,
-            TemplatesConflictFailure(),
-          ),
-        );
-        await tester.pump();
-
-        expect(find.byType(SnackBar), findsOneWidget);
-        // Copy genérico: no se distingue duplicado/stale/in-use porque
-        // el backend conflación 409.
-        expect(
-          find.textContaining('plantilla cambió', findRichText: true),
-          findsOneWidget,
-        );
-      },
-    );
-  });
-
-  // ── Sección Flujos · borrado de flujo (#5) ─────────────────────────────────
-  group('Sección Flujos · borrado de flujo', () {
-    const seeded = <flows.Flow>[
-      flows.Flow(
-        id: 'f1',
-        templateId: 't-1',
-        name: 'Bienvenida',
-        isActive: true,
-        version: 1,
-        cooldownMs: 0,
-        usageLimit: 0,
-        excludesFlows: <String>[],
-      ),
-    ];
-
-    testWidgets('Loaded con flujos: cada row expone botón borrar', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(seeded));
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('flows.row.f1.delete')));
-
-      expect(find.byKey(const Key('flows.row.f1.delete')), findsOneWidget);
-    });
-
-    testWidgets('tap borrar abre confirm dialog (no dispatch inmediato)', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(seeded));
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('flows.row.f1.delete')));
-      await tester.tap(find.byKey(const Key('flows.row.f1.delete')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('flows.delete_confirm')), findsOneWidget);
-      expect(find.widgetWithText(AppButton, 'Cancelar'), findsOneWidget);
-      expect(find.widgetWithText(AppButton, 'Eliminar'), findsOneWidget);
-      verifyNever(() => flowsBloc.add(any()));
-    });
-
-    testWidgets('tap Cancelar: cierra el dialog, no dispatcha', (tester) async {
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(seeded));
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('flows.row.f1.delete')));
-      await tester.tap(find.byKey(const Key('flows.row.f1.delete')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Cancelar'));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('flows.delete_confirm')), findsNothing);
-      verifyNever(() => flowsBloc.add(any()));
-    });
-
-    testWidgets('tap Eliminar: dispatcha FlowsDeleteRequested + cierra', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(seeded));
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('flows.row.f1.delete')));
-      await tester.tap(find.byKey(const Key('flows.row.f1.delete')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Eliminar'));
-      await tester.pumpAndSettle();
-
-      verify(() => flowsBloc.add(const FlowsDeleteRequested('f1'))).called(1);
-      expect(find.byKey(const Key('flows.delete_confirm')), findsNothing);
-    });
-
-    testWidgets('FlowsMutationFailed muestra SnackBar de feedback', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-      final controller = StreamController<FlowsState>.broadcast();
-      addTearDown(controller.close);
-      whenListen<FlowsState>(
-        flowsBloc,
-        controller.stream,
-        initialState: const FlowsLoaded(seeded),
+    testWidgets('tap Motor IA apila /templates/:id/ai', (tester) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.link.ai'),
+        destinationPath: '/templates/:id/ai',
       );
-
-      await tester.pumpWidget(host());
-      controller.add(
-        const FlowsMutationFailed(seeded, FlowsForbiddenFailure()),
-      );
-      await tester.pump();
-
-      expect(find.byType(SnackBar), findsOneWidget);
+      expect(r.uri, '/templates/t1/ai');
+      expect(r.canPop, <bool>[true]);
     });
   });
 
@@ -1011,7 +717,7 @@ void main() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
-    testWidgets('Loaded expone botón con key contractual y AppButton', (
+    testWidgets('Loaded expone el lápiz de editar con key contractual', (
       tester,
     ) async {
       await tester.pumpWidget(host());
@@ -1020,372 +726,111 @@ void main() {
         find.byKey(const Key('template_detail.edit_button')),
         findsOneWidget,
       );
-      expect(
-        find.widgetWithText(AppButton, 'Editar plantilla'),
-        findsOneWidget,
-      );
+      // Ya no hay botón ancho "Editar plantilla": la edición vive como
+      // lápiz en el header de gradiente.
+      expect(find.text('Editar plantilla'), findsNothing);
     });
 
-    testWidgets(
-      'tap apila /templates/:id/edit preservando el detalle (canPop=true)',
-      (tester) async {
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-
-        final canPopAtDestination = <bool>[];
-        String? destinationUri;
-        final router = GoRouter(
-          initialLocation: '/',
-          routes: <RouteBase>[
-            GoRoute(
-              path: '/',
-              builder: (_, _) => MultiBlocProvider(
-                providers: <BlocProvider<dynamic>>[
-                  BlocProvider<TemplateDetailBloc>.value(value: bloc),
-                  BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
-                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
-                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
-                ],
-                child: const Scaffold(body: TemplateDetailPage()),
-              ),
-            ),
-            GoRoute(
-              path: '/templates/:id/edit',
-              builder: (_, state) {
-                destinationUri = state.uri.toString();
-                return Scaffold(
-                  body: Builder(
-                    builder: (ctx) {
-                      canPopAtDestination.add(Navigator.of(ctx).canPop());
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-
-        await tester.pumpWidget(
-          MaterialApp.router(
-            theme: AppDesignTheme.dark(),
-            routerConfig: router,
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(
-          find.byKey(const Key('template_detail.edit_button')),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('template_detail.edit_button')));
-        await tester.pumpAndSettle();
-
-        expect(destinationUri, '/templates/t1/edit');
-        expect(
-          canPopAtDestination,
-          <bool>[true],
-          reason:
-              'el botón debe usar push (no go) para que el back físico '
-              'vuelva al detalle de plantilla, no salga de la app',
-        );
-      },
-    );
-  });
-
-  // ── Sección Flujos (F1) ────────────────────────────────────────────────────
-  group('sección Flujos', () {
-    setUp(() {
-      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-    });
-
-    testWidgets('vive dentro de AppCard con key contractual', (tester) async {
+    testWidgets('tap lápiz abre el sheet de renombrar con el nombre precargado '
+        '(NO navega a una pantalla dedicada)', (tester) async {
       await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('template_detail.edit_button')));
+      await tester.pumpAndSettle();
 
-      final cardFinder = find.byKey(const Key('template_detail.card.flows'));
-      expect(cardFinder, findsOneWidget);
-      expect(
-        find.descendant(of: cardFinder, matching: find.text('Flujos')),
-        findsOneWidget,
-      );
-      // El AppCard debe contener la sección Flujos completa, incluyendo
-      // el botón de "Nuevo flujo" que es el affordance de creación.
-      expect(
+      expect(find.byType(TemplateRenameSheet), findsOneWidget);
+      final field = tester.widget<TextField>(
         find.descendant(
-          of: cardFinder,
-          matching: find.byKey(const Key('flows.add_button')),
+          of: find.byType(TemplateRenameSheet),
+          matching: find.byType(TextField),
         ),
+      );
+      expect(field.controller?.text, 'Soporte');
+    });
+
+    testWidgets('Guardar dispatcha RenameRequested con el nombre nuevo', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('template_detail.edit_button')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('template_rename.name')),
+        'Ventas',
+      );
+      await tester.tap(find.byKey(const Key('template_rename.submit')));
+      await tester.pump();
+
+      verify(
+        () => bloc.add(const TemplateDetailRenameRequested('Ventas')),
+      ).called(1);
+    });
+
+    testWidgets('al volver Loaded tras el submit, el sheet se cierra', (
+      tester,
+    ) async {
+      final controller = StreamController<TemplateDetailState>.broadcast();
+      addTearDown(controller.close);
+      whenListen<TemplateDetailState>(
+        bloc,
+        controller.stream,
+        initialState: const TemplateDetailLoaded(_tpl),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('template_detail.edit_button')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('template_rename.name')),
+        'Ventas',
+      );
+      await tester.tap(find.byKey(const Key('template_rename.submit')));
+      await tester.pump();
+
+      controller.add(
+        const TemplateDetailLoaded(
+          Template(id: 't1', orgId: 'o1', name: 'Ventas', version: 4, ai: _ai),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TemplateRenameSheet), findsNothing);
+    });
+
+    testWidgets('MutationFailed muestra copy de error dentro del sheet', (
+      tester,
+    ) async {
+      final controller = StreamController<TemplateDetailState>.broadcast();
+      addTearDown(controller.close);
+      whenListen<TemplateDetailState>(
+        bloc,
+        controller.stream,
+        initialState: const TemplateDetailLoaded(_tpl),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('template_detail.edit_button')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('template_rename.name')),
+        'Ventas',
+      );
+      await tester.tap(find.byKey(const Key('template_rename.submit')));
+      await tester.pump();
+
+      controller.add(
+        const TemplateDetailMutationFailed(_tpl, TemplatesConflictFailure()),
+      );
+      await tester.pumpAndSettle();
+
+      // El sheet sigue abierto con el copy del fallo (el operador corrige
+      // y reintenta sin perder contexto).
+      expect(find.byType(TemplateRenameSheet), findsOneWidget);
+      expect(
+        find.textContaining('desactualizada', findRichText: true),
         findsOneWidget,
       );
     });
-
-    testWidgets('siempre muestra el título "Flujos"', (tester) async {
-      await tester.pumpWidget(host());
-      expect(find.text('Flujos'), findsOneWidget);
-    });
-
-    testWidgets('FlowsLoading muestra spinner inline', (tester) async {
-      when(() => flowsBloc.state).thenReturn(const FlowsLoading());
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('flows.loading')));
-
-      expect(find.byKey(const Key('flows.loading')), findsOneWidget);
-    });
-
-    testWidgets('FlowsLoaded([]) muestra empty state italic', (tester) async {
-      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('flows.empty')));
-
-      expect(find.byKey(const Key('flows.empty')), findsOneWidget);
-    });
-
-    testWidgets(
-      'FlowsLoaded con flows muestra una fila por flow (name visible)',
-      (tester) async {
-        when(() => flowsBloc.state).thenReturn(
-          const FlowsLoaded(<flows.Flow>[
-            flows.Flow(
-              id: 'f1',
-              templateId: 't1',
-              name: 'Bienvenida',
-              isActive: true,
-              version: 1,
-              cooldownMs: 0,
-              usageLimit: 0,
-              excludesFlows: <String>[],
-            ),
-            flows.Flow(
-              id: 'f2',
-              templateId: 't1',
-              name: 'Despedida',
-              isActive: false,
-              version: 2,
-              cooldownMs: 0,
-              usageLimit: 0,
-              excludesFlows: <String>[],
-            ),
-          ]),
-        );
-
-        await tester.pumpWidget(host());
-        await tester.ensureVisible(find.byKey(const Key('flows.row.f1')));
-
-        expect(find.byKey(const Key('flows.row.f1')), findsOneWidget);
-        expect(find.byKey(const Key('flows.row.f2')), findsOneWidget);
-        expect(find.text('Bienvenida'), findsOneWidget);
-        expect(find.text('Despedida'), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      'row de flow activo muestra pill primary; pausado muestra pill neutral',
-      (tester) async {
-        when(() => flowsBloc.state).thenReturn(
-          const FlowsLoaded(<flows.Flow>[
-            flows.Flow(
-              id: 'f1',
-              templateId: 't1',
-              name: 'Bienvenida',
-              isActive: true,
-              version: 1,
-              cooldownMs: 0,
-              usageLimit: 0,
-              excludesFlows: <String>[],
-            ),
-            flows.Flow(
-              id: 'f2',
-              templateId: 't1',
-              name: 'Despedida',
-              isActive: false,
-              version: 2,
-              cooldownMs: 0,
-              usageLimit: 0,
-              excludesFlows: <String>[],
-            ),
-          ]),
-        );
-
-        await tester.pumpWidget(host());
-        await tester.ensureVisible(find.byKey(const Key('flows.row.f1')));
-
-        expect(
-          find.byKey(const Key('flows.row.f1.status_pill')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const Key('flows.row.f2.status_pill')),
-          findsOneWidget,
-        );
-        expect(find.text('Activo'), findsOneWidget);
-        expect(find.text('Pausado'), findsOneWidget);
-      },
-    );
-
-    testWidgets('FlowsFailed muestra fila de error con botón Reintentar', (
-      tester,
-    ) async {
-      when(
-        () => flowsBloc.state,
-      ).thenReturn(const FlowsFailed(FlowsServerFailure()));
-
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('flows.failed')));
-
-      expect(find.byKey(const Key('flows.failed')), findsOneWidget);
-      // Tap del Reintentar dispatcha LoadRequested al bloc.
-      await tester.tap(find.widgetWithText(AppButton, 'Reintentar').last);
-      await tester.pump();
-      verify(() => flowsBloc.add(const FlowsLoadRequested())).called(1);
-    });
-
-    testWidgets(
-      'tap del row apila /flows/:id preservando el detalle (canPop=true)',
-      (tester) async {
-        when(() => flowsBloc.state).thenReturn(
-          const FlowsLoaded(<flows.Flow>[
-            flows.Flow(
-              id: 'f1',
-              templateId: 't1',
-              name: 'Bienvenida',
-              isActive: true,
-              version: 1,
-              cooldownMs: 0,
-              usageLimit: 0,
-              excludesFlows: <String>[],
-            ),
-          ]),
-        );
-
-        final canPopAtDestination = <bool>[];
-        String? destinationUri;
-        final router = GoRouter(
-          initialLocation: '/',
-          routes: <RouteBase>[
-            GoRoute(
-              path: '/',
-              builder: (_, _) => MultiBlocProvider(
-                providers: <BlocProvider<dynamic>>[
-                  BlocProvider<TemplateDetailBloc>.value(value: bloc),
-                  BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
-                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
-                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
-                ],
-                child: const Scaffold(body: TemplateDetailPage()),
-              ),
-            ),
-            GoRoute(
-              path: '/flows/:id',
-              builder: (_, state) {
-                destinationUri = state.uri.toString();
-                return Scaffold(
-                  body: Builder(
-                    builder: (ctx) {
-                      canPopAtDestination.add(Navigator.of(ctx).canPop());
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-
-        await tester.pumpWidget(
-          MaterialApp.router(
-            theme: AppDesignTheme.dark(),
-            routerConfig: router,
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.byKey(const Key('flows.row.f1')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('flows.row.f1')));
-        await tester.pumpAndSettle();
-
-        expect(destinationUri, '/flows/f1');
-        expect(
-          canPopAtDestination,
-          <bool>[true],
-          reason:
-              'el row debe usar push (no go) para que el back físico '
-              'vuelva al detalle de plantilla, no salga de la app',
-        );
-      },
-    );
-
-    testWidgets('expone botón "Nuevo flujo" con key contractual en Loaded', (
-      tester,
-    ) async {
-      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
-      await tester.pumpWidget(host());
-      await tester.ensureVisible(find.byKey(const Key('flows.add_button')));
-      expect(find.byKey(const Key('flows.add_button')), findsOneWidget);
-      expect(find.widgetWithText(AppButton, 'Nuevo flujo'), findsOneWidget);
-    });
-
-    testWidgets(
-      'tap "Nuevo flujo" apila /templates/:id/flows/new (canPop=true en destino)',
-      (tester) async {
-        when(
-          () => flowsBloc.state,
-        ).thenReturn(const FlowsLoaded(<flows.Flow>[]));
-        final canPopAtDestination = <bool>[];
-        String? destinationUri;
-        final router = GoRouter(
-          initialLocation: '/',
-          routes: <RouteBase>[
-            GoRoute(
-              path: '/',
-              builder: (_, _) => MultiBlocProvider(
-                providers: <BlocProvider<dynamic>>[
-                  BlocProvider<TemplateDetailBloc>.value(value: bloc),
-                  BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
-                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
-                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
-                ],
-                child: const Scaffold(body: TemplateDetailPage()),
-              ),
-            ),
-            GoRoute(
-              path: '/templates/:templateId/flows/new',
-              builder: (_, st) {
-                destinationUri = st.uri.toString();
-                return Scaffold(
-                  body: Builder(
-                    builder: (ctx) {
-                      canPopAtDestination.add(Navigator.of(ctx).canPop());
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-
-        await tester.pumpWidget(
-          MaterialApp.router(
-            theme: AppDesignTheme.dark(),
-            routerConfig: router,
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.byKey(const Key('flows.add_button')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('flows.add_button')));
-        await tester.pumpAndSettle();
-
-        expect(destinationUri, '/templates/t1/flows/new');
-        expect(
-          canPopAtDestination,
-          <bool>[true],
-          reason:
-              'el botón debe usar push (no go) para que el back físico '
-              'vuelva al detalle de plantilla',
-        );
-      },
-    );
   });
 
   // Los disparadores no son sección del TemplateDetailPage — viven en

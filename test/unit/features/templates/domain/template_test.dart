@@ -157,4 +157,32 @@ void main() {
       );
     });
   });
+
+  group('AIConfig.copyWith', () {
+    const base = AIConfig(
+      enabled: true,
+      provider: AIProvider.gemini,
+      model: 'gemini-3.1-pro-preview',
+      temperature: 0.7,
+      thinkingLevel: ThinkingLevel.medium,
+      systemPrompt: 'hola',
+      contextMessages: 20,
+    );
+
+    test('sin args devuelve un value-equal', () {
+      expect(base.copyWith(), base);
+    });
+
+    test('reemplaza solo el campo pedido y conserva el resto', () {
+      final out = base.copyWith(temperature: 1.2);
+      expect(out.temperature, 1.2);
+      expect(out.model, base.model);
+      expect(out.systemPrompt, base.systemPrompt);
+      expect(out.enabled, base.enabled);
+
+      final off = base.copyWith(enabled: false);
+      expect(off.enabled, isFalse);
+      expect(off.temperature, base.temperature);
+    });
+  });
 }

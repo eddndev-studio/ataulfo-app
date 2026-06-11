@@ -1,0 +1,396 @@
+import 'dart:async';
+
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
+import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
+import 'package:ataulfo/features/flows/presentation/bloc/flows_bloc.dart';
+import 'package:ataulfo/features/templates/presentation/pages/template_flows_page.dart';
+import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
+import 'package:ataulfo/features/triggers/presentation/bloc/triggers_bloc.dart';
+import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockFlowsBloc extends MockBloc<FlowsEvent, FlowsState>
+    implements FlowsBloc {}
+
+class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
+    implements TriggersBloc {}
+
+flows.Flow _flow({
+  required String id,
+  required String name,
+  bool isActive = true,
+  int cooldownMs = 0,
+  int usageLimit = 0,
+}) => flows.Flow(
+  id: id,
+  templateId: 't1',
+  name: name,
+  isActive: isActive,
+  version: 1,
+  cooldownMs: cooldownMs,
+  usageLimit: usageLimit,
+  excludesFlows: const <String>[],
+);
+
+Trigger _trigger({required String id, required String flowId}) => Trigger(
+  id: id,
+  templateId: 't1',
+  flowId: flowId,
+  triggerType: TriggerType.text,
+  matchType: MatchType.contains,
+  keyword: 'hola',
+  labelId: '',
+  labelAction: null,
+  scope: TriggerScope.incoming,
+  isActive: true,
+  createdAt: DateTime.utc(2026, 6, 10),
+  updatedAt: DateTime.utc(2026, 6, 10),
+);
+
+void main() {
+  setUpAll(() {
+    registerFallbackValue(const FlowsLoadRequested());
+    registerFallbackValue(const TriggersLoadRequested());
+  });
+
+  late _MockFlowsBloc flowsBloc;
+  late _MockTriggersBloc triggersBloc;
+
+  setUp(() {
+    flowsBloc = _MockFlowsBloc();
+    triggersBloc = _MockTriggersBloc();
+    when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+    when(
+      () => triggersBloc.state,
+    ).thenReturn(const TriggersLoaded(<Trigger>[]));
+  });
+
+  // La página posee su Scaffold (AppBar + FAB), como las páginas del
+  // entrenador: el host solo provee blocs.
+  Widget host() => MaterialApp(
+    theme: AppDesignTheme.dark(),
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<FlowsBloc>.value(value: flowsBloc),
+        BlocProvider<TriggersBloc>.value(value: triggersBloc),
+      ],
+      child: const TemplateFlowsPage(templateId: 't1'),
+    ),
+  );
+
+  testWidgets('Loading muestra spinner', (tester) async {
+    when(() => flowsBloc.state).thenReturn(const FlowsLoading());
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('flows.loading')), findsOneWidget);
+  });
+
+  testWidgets('Loaded([]) muestra empty state y oculta el buscador', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('flows.empty')), findsOneWidget);
+    // Sin flujos no hay nada que buscar; el campo solo agregaría ruido.
+    expect(find.byKey(const Key('template_flows.search')), findsNothing);
+  });
+
+  testWidgets('Loaded con flujos muestra una tarjeta por flow + status pills', (
+    tester,
+  ) async {
+    when(() => flowsBloc.state).thenReturn(
+      FlowsLoaded(<flows.Flow>[
+        _flow(id: 'f1', name: 'Bienvenida'),
+        _flow(id: 'f2', name: 'Despedida', isActive: false),
+      ]),
+    );
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('flows.row.f1')), findsOneWidget);
+    expect(find.byKey(const Key('flows.row.f2')), findsOneWidget);
+    expect(find.text('Bienvenida'), findsOneWidget);
+    expect(find.text('Despedida'), findsOneWidget);
+    expect(find.text('Activo'), findsOneWidget);
+    expect(find.text('Pausado'), findsOneWidget);
+  });
+
+  group('tarjetas ricas', () {
+    testWidgets(
+      'la tarjeta resume disparadores, enfriamiento y límite de uso',
+      (tester) async {
+        when(() => flowsBloc.state).thenReturn(
+          FlowsLoaded(<flows.Flow>[
+            _flow(
+              id: 'f1',
+              name: 'Bienvenida',
+              cooldownMs: 5 * 60 * 60 * 1000, // 5 h
+              usageLimit: 10,
+            ),
+          ]),
+        );
+        when(() => triggersBloc.state).thenReturn(
+          TriggersLoaded(<Trigger>[
+            _trigger(id: 'g1', flowId: 'f1'),
+            _trigger(id: 'g2', flowId: 'f1'),
+            _trigger(id: 'g3', flowId: 'f1'),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+
+        final card = find.byKey(const Key('flows.row.f1'));
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.textContaining('3 disparadores'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: card, matching: find.textContaining('5 h')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: card, matching: find.textContaining('límite 10')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('flujo sin gates ni triggers: caption "Sin disparadores"', (
+      tester,
+    ) async {
+      when(() => flowsBloc.state).thenReturn(
+        FlowsLoaded(<flows.Flow>[_flow(id: 'f1', name: 'Bienvenida')]),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('flows.row.f1')),
+          matching: find.textContaining('Sin disparadores'),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('buscador', () {
+    setUp(() {
+      when(() => flowsBloc.state).thenReturn(
+        FlowsLoaded(<flows.Flow>[
+          _flow(id: 'f1', name: 'Bienvenida'),
+          _flow(id: 'f2', name: 'Despedida', isActive: false),
+          _flow(id: 'f3', name: 'Bienvenida VIP'),
+        ]),
+      );
+    });
+
+    testWidgets('filtra por nombre (case-insensitive)', (tester) async {
+      await tester.pumpWidget(host());
+
+      await tester.enterText(
+        find.byKey(const Key('template_flows.search')),
+        'bien',
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('flows.row.f1')), findsOneWidget);
+      expect(find.byKey(const Key('flows.row.f3')), findsOneWidget);
+      expect(find.byKey(const Key('flows.row.f2')), findsNothing);
+    });
+
+    testWidgets('sin coincidencias muestra mensaje de no-resultados', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      await tester.enterText(
+        find.byKey(const Key('template_flows.search')),
+        'zzz',
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('template_flows.no_results')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('flows.row.f1')), findsNothing);
+    });
+
+    testWidgets('limpiar el query restaura la lista completa', (tester) async {
+      await tester.pumpWidget(host());
+
+      await tester.enterText(
+        find.byKey(const Key('template_flows.search')),
+        'bien',
+      );
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('template_flows.search')),
+        '',
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('flows.row.f1')), findsOneWidget);
+      expect(find.byKey(const Key('flows.row.f2')), findsOneWidget);
+      expect(find.byKey(const Key('flows.row.f3')), findsOneWidget);
+    });
+  });
+
+  testWidgets('FlowsFailed muestra error con Reintentar que dispatcha load', (
+    tester,
+  ) async {
+    when(
+      () => flowsBloc.state,
+    ).thenReturn(const FlowsFailed(FlowsServerFailure()));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('flows.failed')), findsOneWidget);
+    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
+    await tester.pump();
+    verify(() => flowsBloc.add(const FlowsLoadRequested())).called(1);
+  });
+
+  testWidgets('tap borrar abre confirm; Eliminar dispatcha DeleteRequested', (
+    tester,
+  ) async {
+    when(() => flowsBloc.state).thenReturn(
+      FlowsLoaded(<flows.Flow>[_flow(id: 'f1', name: 'Bienvenida')]),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.byKey(const Key('flows.row.f1.delete')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('flows.delete_confirm')), findsOneWidget);
+    verifyNever(() => flowsBloc.add(any()));
+
+    await tester.tap(find.text('Eliminar'));
+    await tester.pumpAndSettle();
+
+    verify(() => flowsBloc.add(const FlowsDeleteRequested('f1'))).called(1);
+  });
+
+  testWidgets('FlowsMutationFailed muestra SnackBar de feedback', (
+    tester,
+  ) async {
+    final controller = StreamController<FlowsState>.broadcast();
+    addTearDown(controller.close);
+    final seeded = <flows.Flow>[_flow(id: 'f1', name: 'Bienvenida')];
+    whenListen<FlowsState>(
+      flowsBloc,
+      controller.stream,
+      initialState: FlowsLoaded(seeded),
+    );
+
+    await tester.pumpWidget(host());
+    controller.add(FlowsMutationFailed(seeded, const FlowsForbiddenFailure()));
+    await tester.pump();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  testWidgets('la página posee AppBar "Flujos" y FAB [+]; muere el botón '
+      'inline de texto', (tester) async {
+    await tester.pumpWidget(host());
+
+    expect(find.widgetWithText(AppBar, 'Flujos'), findsOneWidget);
+    expect(find.byKey(const Key('template_flows.fab')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('template_flows.fab')),
+        matching: find.byIcon(Icons.add),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('flows.add_button')), findsNothing);
+    expect(find.text('Nuevo flujo'), findsNothing);
+  });
+
+  group('navegación', () {
+    testWidgets('tap del FAB apila /templates/:id/flows/new', (tester) async {
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+      String? destinationUri;
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                BlocProvider<TriggersBloc>.value(value: triggersBloc),
+              ],
+              child: const TemplateFlowsPage(templateId: 't1'),
+            ),
+          ),
+          GoRoute(
+            path: '/templates/:templateId/flows/new',
+            builder: (_, st) {
+              destinationUri = st.uri.toString();
+              return const Scaffold(body: SizedBox.shrink());
+            },
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_flows.fab')));
+      await tester.pumpAndSettle();
+
+      expect(destinationUri, '/templates/t1/flows/new');
+    });
+
+    testWidgets('tap del row apila /flows/:id', (tester) async {
+      when(() => flowsBloc.state).thenReturn(
+        FlowsLoaded(<flows.Flow>[_flow(id: 'f1', name: 'Bienvenida')]),
+      );
+      String? destinationUri;
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                BlocProvider<TriggersBloc>.value(value: triggersBloc),
+              ],
+              child: const TemplateFlowsPage(templateId: 't1'),
+            ),
+          ),
+          GoRoute(
+            path: '/flows/:id',
+            builder: (_, st) {
+              destinationUri = st.uri.toString();
+              return const Scaffold(body: SizedBox.shrink());
+            },
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('flows.row.f1')));
+      await tester.pumpAndSettle();
+
+      expect(destinationUri, '/flows/f1');
+    });
+  });
+}

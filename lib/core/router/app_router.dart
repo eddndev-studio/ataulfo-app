@@ -102,12 +102,14 @@ import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
 import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
-import '../../features/templates/presentation/bloc/template_edit_bloc.dart';
 import '../../features/templates/presentation/bloc/templates_bloc.dart';
 import '../../features/templates/presentation/bloc/var_defs_bloc.dart';
+import '../../features/templates/presentation/pages/template_ai_page.dart';
 import '../../features/templates/presentation/pages/template_detail_page.dart';
-import '../../features/templates/presentation/pages/template_edit_page.dart';
+import '../../features/templates/presentation/pages/template_flows_page.dart';
+import '../../features/templates/presentation/pages/template_variables_page.dart';
 import '../../features/triggers/domain/repositories/triggers_repository.dart';
+import '../../features/triggers/presentation/bloc/triggers_bloc.dart';
 import '../../features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import '../../features/wa_labels/presentation/bloc/wa_label_mapping_bloc.dart';
 import '../../features/wa_labels/presentation/bloc/wa_labels_bloc.dart';
@@ -705,47 +707,69 @@ class AppRouter {
                         ..add(const FlowsLoadRequested()),
                 ),
               ],
-              child: Scaffold(
-                appBar: AppBar(
-                  title: const Text('Detalle de plantilla'),
-                  actions: <Widget>[
-                    Builder(
-                      builder: (ctx) => IconButton(
-                        key: const Key('template_detail.trainer'),
-                        tooltip: 'Entrenador',
-                        icon: const Icon(Icons.school_outlined),
-                        onPressed: () => ctx.push('/templates/$id/trainer'),
-                      ),
-                    ),
-                  ],
-                ),
-                body: const TemplateDetailPage(),
-              ),
+              // Sin AppBar: el header de gradiente full-bleed de la página
+              // aporta retorno + editar, y el Entrenador entra por su card
+              // hero en el cuerpo (ya no es un icono escondido de AppBar).
+              child: const Scaffold(body: TemplateDetailPage()),
             ),
           );
         },
       ),
       GoRoute(
-        // Editor completo: name + systemPrompt + AIConfig (provider,
-        // model, temperature, thinking, contextMessages, enabled).
-        // Page-scoped: dos blocs montados en paralelo — TemplateEditBloc
-        // carga el template y CatalogBloc carga la tabla de modelos del
-        // backend. Ambos disparan load al construirse; el form espera
-        // a que ambos terminen antes de renderizar (Loading combinado).
-        // Tras Succeeded, la página hace pushReplacement a
-        // /templates/:id, así el back físico vuelve al listado sin
-        // pasar por el form que ya cumplió. Subruta del id (path
-        // /templates/:id/edit), no compite con /templates/new ni con
-        // /templates/:id por orden de match.
-        path: '/templates/:id/edit',
+        // Lista de flujos de la plantilla con buscador local. Página
+        // dedicada (el hub solo muestra count + caption): inline en el
+        // detalle, decenas de flujos lo volvían inusable.
+        path: '/templates/:id/flows',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
+          // La página posee su Scaffold (AppBar + FAB); la ruta solo provee
+          // blocs. TriggersBloc alimenta el count de disparadores por
+          // tarjeta (un GET por template, no por flujo).
           return MultiBlocProvider(
             providers: <BlocProvider<dynamic>>[
-              BlocProvider<TemplateEditBloc>(
+              BlocProvider<FlowsBloc>(
                 create: (_) =>
-                    TemplateEditBloc(repo: _templatesRepo, id: id)
-                      ..add(const TemplateEditLoadRequested()),
+                    FlowsBloc(repo: _flowsRepo, templateId: id)
+                      ..add(const FlowsLoadRequested()),
+              ),
+              BlocProvider<TriggersBloc>(
+                create: (_) =>
+                    TriggersBloc(repo: _triggersRepo, templateId: id)
+                      ..add(const TriggersLoadRequested()),
+              ),
+            ],
+            child: TemplateFlowsPage(templateId: id),
+          );
+        },
+      ),
+      GoRoute(
+        // Variables (var-defs) de la plantilla con buscador local. Misma
+        // motivación que /flows: las listas largas viven en su página.
+        path: '/templates/:id/variables',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<VarDefsBloc>(
+            create: (_) =>
+                VarDefsBloc(repo: _templatesRepo, templateId: id)
+                  ..add(const VarDefsLoadRequested()),
+            child: const TemplateVariablesPage(),
+          );
+        },
+      ),
+      GoRoute(
+        // Motor IA de la plantilla: stats + prompt completo + CTA al
+        // entrenador. Saca la config del fondo del detalle a su escenario.
+        path: '/templates/:id/ai',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          // CatalogBloc alimenta el picker de modelo y las capacidades
+          // (temperatura/razonamiento) que gobiernan qué tiles editan.
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TemplateDetailBloc>(
+                create: (_) =>
+                    TemplateDetailBloc(repo: _templatesRepo, id: id)
+                      ..add(const TemplateDetailLoadRequested()),
               ),
               BlocProvider<CatalogBloc>(
                 create: (_) =>
@@ -753,13 +777,12 @@ class AppRouter {
                       ..add(const CatalogLoadRequested()),
               ),
             ],
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Editar plantilla')),
-              body: const TemplateEditPage(),
-            ),
+            child: const TemplateAiPage(),
           );
         },
       ),
+      // La pantalla "Editar plantilla" murió: renombrar vive en el sheet
+      // del hub y el motor IA se edita en su propia página (/ai).
       GoRoute(
         // Chat con el agente entrenador (S24). Page-scoped: el bloc carga
         // (o crea) el hilo más reciente al montar. El WorkspaceRepository

@@ -19,10 +19,80 @@ class TemplateDetailBloc
       _id = id,
       super(const TemplateDetailLoading()) {
     on<TemplateDetailLoadRequested>(_onLoad);
+    on<TemplateDetailRenameRequested>(_onRename);
+    on<TemplateDetailAiUpdateRequested>(_onAiUpdate);
   }
 
   final TemplatesRepository _repo;
   final String _id;
+
+  /// Snapshot mutable de base: solo Loaded/MutationFailed traen una
+  /// Template con versión CAS sobre la cual editar.
+  Template? get _snapshot => switch (state) {
+    TemplateDetailLoaded(template: final t) => t,
+    TemplateDetailMutationFailed(template: final t) => t,
+    _ => null,
+  };
+
+  Future<void> _onRename(
+    TemplateDetailRenameRequested event,
+    Emitter<TemplateDetailState> emit,
+  ) async {
+    final t = _snapshot;
+    if (t == null) return;
+    emit(TemplateDetailMutating(t));
+    try {
+      // ai:null deja la config IA intacta — renombrar NO toca el motor
+      // (separación de responsabilidades: el motor se edita en su página).
+      final updated = await _repo.update(
+        id: _id,
+        name: event.name,
+        version: t.version,
+        ai: null,
+      );
+      emit(TemplateDetailLoaded(updated));
+    } on TemplatesConflictFailure catch (f) {
+      // CAS stale: refresca para que el siguiente intento parta de la
+      // versión nueva. Si el re-GET también falla, conserva el snapshot.
+      try {
+        final refreshed = await _repo.byId(_id);
+        emit(TemplateDetailMutationFailed(refreshed, f));
+      } on TemplatesFailure {
+        emit(TemplateDetailMutationFailed(t, f));
+      }
+    } on TemplatesFailure catch (f) {
+      emit(TemplateDetailMutationFailed(t, f));
+    }
+  }
+
+  Future<void> _onAiUpdate(
+    TemplateDetailAiUpdateRequested event,
+    Emitter<TemplateDetailState> emit,
+  ) async {
+    final t = _snapshot;
+    if (t == null) return;
+    emit(TemplateDetailMutating(t));
+    try {
+      // El name viaja INTACTO: editar el motor no renombra (el rename
+      // tiene su propio evento y su propio sheet).
+      final updated = await _repo.update(
+        id: _id,
+        name: t.name,
+        version: t.version,
+        ai: event.ai,
+      );
+      emit(TemplateDetailLoaded(updated));
+    } on TemplatesConflictFailure catch (f) {
+      try {
+        final refreshed = await _repo.byId(_id);
+        emit(TemplateDetailMutationFailed(refreshed, f));
+      } on TemplatesFailure {
+        emit(TemplateDetailMutationFailed(t, f));
+      }
+    } on TemplatesFailure catch (f) {
+      emit(TemplateDetailMutationFailed(t, f));
+    }
+  }
 
   Future<void> _onLoad(
     TemplateDetailLoadRequested event,
@@ -56,6 +126,32 @@ class TemplateDetailLoadRequested extends TemplateDetailEvent {
   bool operator ==(Object other) => other is TemplateDetailLoadRequested;
   @override
   int get hashCode => (TemplateDetailLoadRequested).hashCode;
+}
+
+/// Renombra la plantilla (PUT con CAS, `ai:null` ⇒ motor intacto).
+class TemplateDetailRenameRequested extends TemplateDetailEvent {
+  const TemplateDetailRenameRequested(this.name);
+
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TemplateDetailRenameRequested && other.name == name;
+  @override
+  int get hashCode => name.hashCode;
+}
+
+/// Actualiza la config del Motor IA (PUT con CAS; el `name` viaja intacto).
+class TemplateDetailAiUpdateRequested extends TemplateDetailEvent {
+  const TemplateDetailAiUpdateRequested(this.ai);
+
+  final AIConfig ai;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TemplateDetailAiUpdateRequested && other.ai == ai;
+  @override
+  int get hashCode => ai.hashCode;
 }
 
 // States --------------------------------------------------------------------
@@ -94,4 +190,35 @@ class TemplateDetailFailed extends TemplateDetailState {
       other is TemplateDetailFailed && other.failure == failure;
   @override
   int get hashCode => failure.hashCode;
+}
+
+/// PUT en vuelo. Conserva el snapshot para que la UI siga pintando el
+/// detalle (sin flash a Loading) mientras la mutación corre.
+class TemplateDetailMutating extends TemplateDetailState {
+  const TemplateDetailMutating(this.template);
+
+  final Template template;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TemplateDetailMutating && other.template == template;
+  @override
+  int get hashCode => template.hashCode;
+}
+
+/// La mutación falló. `template` es la base del siguiente intento — tras un
+/// 409 viene REFRESCADA del re-GET (versión CAS nueva).
+class TemplateDetailMutationFailed extends TemplateDetailState {
+  const TemplateDetailMutationFailed(this.template, this.failure);
+
+  final Template template;
+  final TemplatesFailure failure;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TemplateDetailMutationFailed &&
+      other.template == template &&
+      other.failure == failure;
+  @override
+  int get hashCode => Object.hash(template, failure);
 }

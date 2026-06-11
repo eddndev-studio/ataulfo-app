@@ -64,7 +64,6 @@ import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:ataulfo/features/templates/presentation/pages/template_detail_page.dart';
-import 'package:ataulfo/features/templates/presentation/pages/template_edit_page.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
@@ -1107,83 +1106,8 @@ void main() {
     },
   );
 
-  testWidgets(
-    'AuthAuthenticated → /templates/:id/edit monta TemplateEditPage y carga',
-    (tester) async {
-      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-      when(() => templatesRepo.byId('t1')).thenAnswer(
-        (_) async => const Template(
-          id: 't1',
-          orgId: 'o1',
-          name: 'Soporte',
-          version: 1,
-          ai: AIConfig(
-            enabled: false,
-            provider: AIProvider.gemini,
-            model: 'gemini-3.1-pro-preview',
-            temperature: 0.7,
-            thinkingLevel: ThinkingLevel.low,
-            systemPrompt: '',
-            contextMessages: 20,
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      // /templates/:id/edit DEBE declararse antes que /templates/:id en
-      // el router para que `:id` no capture "new" o "edit" como id
-      // literal (mismo orden contractual que /templates/new).
-      router.router.go('/templates/t1/edit');
-      await tester.pumpAndSettle();
-
-      expect(find.byType(TemplateEditPage), findsOneWidget);
-      verify(() => templatesRepo.byId('t1')).called(1);
-    },
-  );
-
-  testWidgets(
-    'AuthUnauthenticated + deep-link a /templates/:id/edit → /login',
-    (tester) async {
-      when(() => authBloc.state).thenReturn(const AuthUnauthenticated());
-      router = AppRouter(
-        authBloc: authBloc,
-        authRepository: _MockAuthRepo(),
-        botsRepository: botsRepo,
-        botSessionRepository: botSessionRepo,
-        conversationsRepository: conversationsRepo,
-        messagesRepository: messagesRepo,
-        templatesRepository: templatesRepo,
-        flowsRepository: flowsRepo,
-        flowRunRepository: flowRunRepo,
-        triggersRepository: triggersRepo,
-        waLabelsRepository: _MockWaLabelsRepo(),
-        quickRepliesRepository: _quickRepliesRepo(),
-        labelsRepository: labelsRepo,
-        notesRepository: _MockNotesRepo(),
-        trainerRepository: _MockTrainerRepo(),
-        workspaceRepository: _MockWorkspaceRepo(),
-        previewRepository: _MockPreviewRepo(),
-        membershipsRepository: membershipsRepo,
-        membersRepository: membersRepo,
-        invitationsRepository: invitationsRepo,
-        catalogRepository: catalogRepo,
-        notificationsRepository: notificationsRepo,
-        mediaRepository: _MockMediaRepo(),
-        mediaFilePicker: _FakeMediaFilePicker(),
-        mediaThumbnailLoader: const FakeThumbnailLoader(),
-        profileRepository: profileRepo,
-      );
-
-      await tester.pumpWidget(_host(router, authBloc));
-      await tester.pumpAndSettle();
-      router.router.go('/templates/t1/edit');
-      await tester.pumpAndSettle();
-
-      expect(find.byType(LoginPage), findsOneWidget);
-      expect(find.byType(TemplateEditPage), findsNothing);
-    },
-  );
+  // La ruta /templates/:id/edit murió: renombrar vive en el sheet del hub
+  // y el motor IA se edita en /templates/:id/ai.
 
   testWidgets('AuthUnauthenticated + deep-link a /memberships → /login', (
     tester,

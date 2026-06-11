@@ -1,0 +1,344 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/design/safe_bottom.dart';
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../flows/domain/entities/flow.dart' as fdom;
+import '../../../flows/presentation/bloc/flows_bloc.dart';
+import '../../../triggers/presentation/bloc/triggers_bloc.dart';
+
+/// Lista de flujos de una plantilla (`/templates/:id/flows`), con buscador
+/// local y tarjetas ricas: cada flujo resume sus disparadores y gates
+/// (enfriamiento, límite de uso) sin entrar al editor. Posee su Scaffold —
+/// AppBar y FAB [+] de crear — como las páginas del entrenador; la ruta
+/// solo provee blocs (FlowsBloc + TriggersBloc del template).
+class TemplateFlowsPage extends StatefulWidget {
+  const TemplateFlowsPage({super.key, required this.templateId});
+
+  final String templateId;
+
+  @override
+  State<TemplateFlowsPage> createState() => _TemplateFlowsPageState();
+}
+
+class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // El filtro es derivado del controller: un listener + setState basta,
+    // la lista completa ya vive en memoria (no hay query al backend).
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  String get _query => _search.text.trim().toLowerCase();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Flujos')),
+      floatingActionButton: FloatingActionButton(
+        key: const Key('template_flows.fab'),
+        tooltip: 'Nuevo flujo',
+        // push apila el form sobre esta lista; back físico vuelve aquí
+        // (Succeeded usa pushReplacement a /flows/:id).
+        onPressed: () =>
+            context.push('/templates/${widget.templateId}/flows/new'),
+        child: const Icon(Icons.add),
+      ),
+      body: BlocListener<FlowsBloc, FlowsState>(
+        // Feedback del borrado fallido: la lista sigue visible, sólo la
+        // mutación falló (403 sin rol, red, etc.). Operador reintenta.
+        listener: (context, state) {
+          if (state is FlowsMutationFailed) {
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'No pudimos eliminar el flujo. Intenta de nuevo.',
+                  ),
+                ),
+              );
+          }
+        },
+        child: BlocBuilder<FlowsBloc, FlowsState>(
+          builder: (context, state) => switch (state) {
+            FlowsLoading() => const Center(
+              key: Key('flows.loading'),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+              ),
+            ),
+            FlowsLoaded(flows: final fs) => _content(context, fs),
+            FlowsMutating(flows: final fs) => _content(context, fs),
+            FlowsMutationFailed(flows: final fs) => _content(context, fs),
+            FlowsFailed() => const _FailedView(),
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, List<fdom.Flow> all) {
+    final q = _query;
+    final filtered = q.isEmpty
+        ? all
+        : all
+              .where((f) => f.name.toLowerCase().contains(q))
+              .toList(growable: false);
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp6,
+        AppTokens.sp4,
+        AppTokens.sp6,
+        // Espacio extra al fondo para que el FAB no tape la última tarjeta.
+        AppTokens.sp9 + context.safeBottomInset,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          // Sin flujos no hay nada que filtrar: el buscador solo aparece
+          // cuando existe una lista que recortar.
+          if (all.isNotEmpty) ...<Widget>[
+            AppTextField(
+              key: const Key('template_flows.search'),
+              label: 'Buscar',
+              hint: 'Nombre del flujo',
+              controller: _search,
+            ),
+            const SizedBox(height: AppTokens.sp4),
+          ],
+          if (all.isEmpty)
+            Text(
+              'Esta plantilla aún no tiene flujos.',
+              key: const Key('flows.empty'),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: AppTokens.text2,
+              ),
+            )
+          else if (filtered.isEmpty)
+            Text(
+              'Sin resultados para "${_search.text.trim()}".',
+              key: const Key('template_flows.no_results'),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: AppTokens.text2,
+              ),
+            )
+          else
+            // El count de disparadores por flujo sale del TriggersBloc del
+            // template (un solo GET); cada tarjeta lo consume del mapa.
+            BlocBuilder<TriggersBloc, TriggersState>(
+              builder: (context, tState) {
+                final counts = _triggerCounts(tState);
+                return Column(
+                  children: <Widget>[
+                    for (final f in filtered)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: AppTokens.cardGap,
+                        ),
+                        child: _FlowCard(
+                          flow: f,
+                          triggerCount: counts == null
+                              ? null
+                              : (counts[f.id] ?? 0),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Counts por flowId; null mientras el bloc de triggers no tiene snapshot
+  /// (la tarjeta omite esa parte del resumen en vez de mentir un 0).
+  static Map<String, int>? _triggerCounts(TriggersState state) {
+    if (state is! TriggersLoaded) return null;
+    final counts = <String, int>{};
+    for (final t in state.triggers) {
+      counts[t.flowId] = (counts[t.flowId] ?? 0) + 1;
+    }
+    return counts;
+  }
+}
+
+/// Tarjeta rica de un flujo: glifo + nombre + resumen (disparadores ·
+/// enfriamiento · límite) + pill de estado + borrar. Tap → editor del flujo.
+class _FlowCard extends StatelessWidget {
+  const _FlowCard({required this.flow, required this.triggerCount});
+
+  final fdom.Flow flow;
+
+  /// Disparadores del flujo; null = aún sin snapshot (se omite del resumen).
+  final int? triggerCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final meta = _meta();
+    return AppCard(
+      key: Key('flows.row.${flow.id}'),
+      // push apila el editor del flow; el back físico vuelve a la lista.
+      onTap: () => context.push('/flows/${flow.id}'),
+      child: Row(
+        children: <Widget>[
+          const AppEntityIcon(icon: Icons.account_tree_outlined),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        flow.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleMedium,
+                      ),
+                    ),
+                    const SizedBox(width: AppTokens.sp2),
+                    if (flow.isActive)
+                      AppPill.neutral(
+                        key: Key('flows.row.${flow.id}.status_pill'),
+                        label: 'Activo',
+                        dot: AppPillDot.active,
+                      )
+                    else
+                      AppPill.outline(
+                        key: Key('flows.row.${flow.id}.status_pill'),
+                        label: 'Pausado',
+                        dot: AppPillDot.paused,
+                      ),
+                  ],
+                ),
+                if (meta.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      meta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppTokens.text2,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Trash icon como acción destructiva. Su propio gesture detector
+          // absorbe el tap y no compite con el onTap de la tarjeta.
+          IconButton(
+            key: Key('flows.row.${flow.id}.delete'),
+            icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
+            tooltip: 'Eliminar flujo',
+            onPressed: () => _confirmDeleteFlow(context, flow),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Resumen "3 disparadores · enfría 5 h · límite 10". Cada parte se omite
+  /// cuando no aplica; sin disparadores se dice explícito (señal útil: un
+  /// flujo sin disparadores nunca corre solo).
+  String _meta() {
+    final c = triggerCount;
+    final parts = <String>[
+      if (c != null)
+        c == 0
+            ? 'Sin disparadores'
+            : (c == 1 ? '1 disparador' : '$c disparadores'),
+      if (flow.cooldownMs > 0) 'enfría ${_cooldownLabel(flow.cooldownMs)}',
+      if (flow.usageLimit > 0) 'límite ${flow.usageLimit}',
+    ];
+    return parts.join(' · ');
+  }
+
+  static String _cooldownLabel(int ms) {
+    final s = ms ~/ 1000;
+    if (s < 60) return '$s s';
+    final m = s ~/ 60;
+    if (m < 60) return '$m min';
+    final h = m ~/ 60;
+    if (h < 24) return '$h h';
+    return '${h ~/ 24} d';
+  }
+
+  Future<void> _confirmDeleteFlow(BuildContext context, fdom.Flow flow) async {
+    final bloc = context.read<FlowsBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('flows.delete_confirm'),
+        title: const Text('Eliminar flujo'),
+        content: Text(
+          '¿Eliminar el flujo "${flow.name}"? Se borrarán también sus pasos '
+          'y disparadores. Esta acción no se puede deshacer.',
+        ),
+        actions: <Widget>[
+          AppButton.text(
+            label: 'Cancelar',
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+          ),
+          AppButton.danger(
+            label: 'Eliminar',
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      bloc.add(FlowsDeleteRequested(flow.id));
+    }
+  }
+}
+
+class _FailedView extends StatelessWidget {
+  const _FailedView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(AppTokens.sp6),
+      child: Row(
+        key: const Key('flows.failed'),
+        children: <Widget>[
+          const Expanded(
+            child: Text(
+              'No pudimos cargar los flujos.',
+              style: TextStyle(color: AppTokens.danger),
+            ),
+          ),
+          AppButton.text(
+            label: 'Reintentar',
+            onPressed: () =>
+                context.read<FlowsBloc>().add(const FlowsLoadRequested()),
+          ),
+        ],
+      ),
+    );
+  }
+}

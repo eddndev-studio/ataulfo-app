@@ -6,76 +6,48 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../bots/presentation/widgets/bot_create_sheet.dart';
-import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../domain/entities/template.dart';
-import '../../domain/entities/variable_def.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../bloc/template_detail_bloc.dart';
 import '../bloc/var_defs_bloc.dart';
-import '../widgets/var_def_form_sheet.dart';
+import '../widgets/template_detail_header.dart';
+import '../widgets/template_rename_sheet.dart';
+import '../widgets/thinking_label.dart';
+import '../widgets/trainer_hero_card.dart';
 
-/// Detalle de una Template (S03). Consume el `TemplateDetailBloc` del scope;
-/// el cableado del provider y del ID lo hace el router en `/templates/:id`.
-/// Es content-only: el Scaffold y el AppBar los aporta la ruta.
+/// Detalle de una Template (S03): el HUB de la plantilla. Identidad en el
+/// header de gradiente, el Entrenador como card hero, y las áreas que crecen
+/// sin tope (flujos, variables, motor IA) como filas launcher hacia páginas
+/// dedicadas — inline se volvían inusables con decenas de items. Consume el
+/// `TemplateDetailBloc` del scope; FlowsBloc/VarDefsBloc alimentan counts y
+/// captions de las filas. Content-only: el Scaffold lo aporta la ruta (sin
+/// AppBar — el header aporta retorno y editar).
 class TemplateDetailPage extends StatelessWidget {
   const TemplateDetailPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocListener(
-      listeners: <BlocListener<dynamic, dynamic>>[
-        // Feedback global de mutaciones de var-defs. El sheet sigue
-        // montado tras una MutationFailed (operador corrige y reintenta);
-        // el snackbar verbalízale el fallo sin tirar contexto.
-        BlocListener<VarDefsBloc, VarDefsState>(
-          listener: (context, state) {
-            if (state is VarDefsMutationFailed) {
-              ScaffoldMessenger.of(context)
-                ..clearSnackBars()
-                ..showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'La plantilla cambió. Recarga para ver los últimos datos.',
-                    ),
-                  ),
-                );
-            }
-          },
+    return BlocBuilder<TemplateDetailBloc, TemplateDetailState>(
+      builder: (context, state) => switch (state) {
+        TemplateDetailLoading() => const _LoadingView(),
+        TemplateDetailLoaded(template: final tpl) => _LoadedView(template: tpl),
+        // Mutación en vuelo / fallida: el detalle sigue pintado con el
+        // snapshot (sin flash); el feedback fino lo da el sheet que mutó.
+        TemplateDetailMutating(template: final tpl) => _LoadedView(
+          template: tpl,
         ),
-        // Feedback del borrado de flujo: la lista sigue visible, sólo la
-        // mutación falló (403 sin rol, red, etc.). Operador reintenta.
-        BlocListener<FlowsBloc, FlowsState>(
-          listener: (context, state) {
-            if (state is FlowsMutationFailed) {
-              ScaffoldMessenger.of(context)
-                ..clearSnackBars()
-                ..showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'No pudimos eliminar el flujo. Intenta de nuevo.',
-                    ),
-                  ),
-                );
-            }
-          },
+        TemplateDetailMutationFailed(template: final tpl) => _LoadedView(
+          template: tpl,
         ),
-      ],
-      child: BlocBuilder<TemplateDetailBloc, TemplateDetailState>(
-        builder: (context, state) => switch (state) {
-          TemplateDetailLoading() => const _LoadingView(),
-          TemplateDetailLoaded(template: final tpl) => _LoadedView(
-            template: tpl,
-          ),
-          TemplateDetailFailed(failure: final f) => _FailedView(failure: f),
-        },
-      ),
+        TemplateDetailFailed(failure: final f) => _FailedView(failure: f),
+      },
     );
   }
 }
@@ -84,11 +56,41 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+  Widget build(BuildContext context) => const _BackOverlay(
+    child: Center(
+      child: CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+      ),
     ),
   );
+}
+
+/// Superpone un retorno claro arriba a la izquierda en los estados sin header
+/// (carga/error). La ruta ya no aporta AppBar; sin esto el operador quedaría
+/// atrapado si la carga cuelga o la plantilla falla.
+class _BackOverlay extends StatelessWidget {
+  const _BackOverlay({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Positioned.fill(child: child),
+        SafeArea(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: IconButton(
+              tooltip: 'Volver',
+              icon: const Icon(Icons.arrow_back, color: AppTokens.text1),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _LoadedView extends StatelessWidget {
@@ -99,483 +101,215 @@ class _LoadedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ai = template.ai;
-    final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6 + context.safeBottomInset,
-      ),
+      // Sin padding aquí: el header es full-bleed y va pegado arriba. El
+      // resto del contenido lleva su propio padding más abajo.
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          AppCard(
-            key: const Key('template_detail.card.header'),
+          TemplateDetailHeader(
+            key: const Key('template_detail.header'),
+            name: template.name,
+            providerModelLabel:
+                '${ProviderBadge.labelOf(ai.provider)} · ${ai.model}',
+            version: template.version,
+            aiEnabled: ai.enabled,
+            onBack: () => Navigator.of(context).maybePop(),
+            // Renombrar es una micro-tarea: sheet inferior, no pantalla.
+            // El motor IA se edita en su propia página (launcher abajo).
+            onEdit: () => TemplateRenameSheet.open(context, template),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppTokens.sp6,
+              AppTokens.sp6,
+              AppTokens.sp6,
+              AppTokens.sp6 + context.safeBottomInset,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    AppAvatar(name: template.name, size: 64),
-                    const SizedBox(width: AppTokens.sp4),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(template.name, style: textTheme.titleLarge),
-                          const SizedBox(height: 2),
-                          ProviderBadge(provider: ai.provider),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                Wrap(
-                  spacing: AppTokens.sp2,
-                  runSpacing: AppTokens.sp2,
-                  children: <Widget>[
-                    AppPill.outline(label: 'v${template.version}'),
-                    // IA on/off es estado de configuración, no error: primary
-                    // cuando está habilitada, neutral cuando no — danger queda
-                    // reservado para fallos reales (load errors, destructive).
-                    if (ai.enabled)
-                      const AppPill.primary(
-                        label: 'IA habilitada',
-                        dot: AppPillDot.active,
-                      )
-                    else
-                      const AppPill.neutral(
-                        label: 'IA deshabilitada',
-                        dot: AppPillDot.paused,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppTokens.sp5),
-                _EditButton(template: template),
-                const SizedBox(height: AppTokens.sp3),
+                TrainerHeroCard(templateId: template.id),
+                const SizedBox(height: AppTokens.sp6),
+                _SectionLauncher(template: template),
+                const SizedBox(height: AppTokens.sp6),
                 _CreateBotButton(template: template),
               ],
             ),
           ),
-          const SizedBox(height: AppTokens.sp6),
-          AppCard(
-            key: const Key('template_detail.card.flows'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                const _SectionTitle('Flujos'),
-                const SizedBox(height: AppTokens.sp3),
-                _FlowsSection(templateId: template.id),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppTokens.sp6),
-          const AppCard(
-            key: Key('template_detail.card.variables'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                _SectionTitle('Variables'),
-                SizedBox(height: AppTokens.sp3),
-                _VarDefsSection(),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppTokens.sp6),
-          AppCard(
-            key: const Key('template_detail.card.ai_config'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                const _SectionTitle('Configuración IA'),
-                const SizedBox(height: AppTokens.sp3),
-                _StatGrid(ai: ai),
-                const SizedBox(height: AppTokens.sp5),
-                const _SectionTitle('Prompt del sistema'),
-                const SizedBox(height: AppTokens.sp2),
-                if (ai.systemPrompt.isEmpty)
-                  Text(
-                    'Sin prompt definido',
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: AppTokens.text2,
-                    ),
-                  )
-                else
-                  SelectableText(ai.systemPrompt, style: textTheme.bodyMedium),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
+/// Launcher de las áreas de la plantilla: una card con filas hacia las
+/// páginas dedicadas. Cada fila resume su área (count + caption) para que
+/// el hub informe de un vistazo sin cargar las listas completas en pantalla.
+class _SectionLauncher extends StatelessWidget {
+  const _SectionLauncher({required this.template});
 
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: Theme.of(
-        context,
-      ).textTheme.titleMedium?.copyWith(color: AppTokens.text2),
-    );
-  }
-}
-
-class _StatGrid extends StatelessWidget {
-  const _StatGrid({required this.ai});
-
-  final AIConfig ai;
+  final Template template;
 
   @override
   Widget build(BuildContext context) {
-    // 2×2 stats — la sección Motor IA cabe en una grilla compacta en
-    // mobile sin scroll horizontal y deja respirar el system prompt
-    // debajo. IntrinsicHeight iguala la altura de las dos cards de cada
-    // fila cuando un modelo largo (p.ej. 'gemini-3.1-pro-preview')
-    // estira una columna pero no la otra.
-    return Column(
-      children: <Widget>[
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Expanded(
-                child: _StatTile(label: 'Modelo', value: ai.model),
-              ),
-              const SizedBox(width: AppTokens.cardGap),
-              Expanded(
-                child: _StatTile(
-                  label: 'Temperatura',
-                  value: ai.temperature.toStringAsFixed(1),
-                ),
-              ),
-            ],
+    final ai = template.ai;
+    return AppCard(
+      key: const Key('template_detail.card.sections'),
+      child: Column(
+        children: <Widget>[
+          BlocBuilder<FlowsBloc, FlowsState>(
+            builder: (context, state) => _SectionLinkRow(
+              rowKey: const Key('template_detail.link.flows'),
+              icon: Icons.account_tree_outlined,
+              title: 'Flujos',
+              count: _flowsCount(state),
+              caption: _flowsCaption(state),
+              onTap: () => context.push('/templates/${template.id}/flows'),
+            ),
           ),
-        ),
-        const SizedBox(height: AppTokens.cardGap),
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Expanded(
-                child: _StatTile(
-                  label: 'Razonamiento',
-                  value: _thinkingLabel(ai.thinkingLevel),
-                ),
-              ),
-              const SizedBox(width: AppTokens.cardGap),
-              Expanded(
-                child: _StatTile(
-                  label: 'Mensajes de contexto',
-                  value: ai.contextMessages.toString(),
-                ),
-              ),
-            ],
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          BlocBuilder<VarDefsBloc, VarDefsState>(
+            builder: (context, state) => _SectionLinkRow(
+              rowKey: const Key('template_detail.link.variables'),
+              icon: Icons.data_object,
+              title: 'Variables',
+              count: _varDefsCount(state),
+              caption: _varDefsCaption(state),
+              onTap: () => context.push('/templates/${template.id}/variables'),
+            ),
           ),
-        ),
-      ],
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          _SectionLinkRow(
+            rowKey: const Key('template_detail.link.ai'),
+            icon: Icons.psychology_outlined,
+            title: 'Motor IA',
+            caption:
+                'Temperatura ${ai.temperature.toStringAsFixed(1)} · '
+                'razonamiento ${thinkingLabel(ai.thinkingLevel).toLowerCase()}',
+            onTap: () => context.push('/templates/${template.id}/ai'),
+          ),
+        ],
+      ),
     );
   }
 
-  static String _thinkingLabel(ThinkingLevel t) => switch (t) {
-    ThinkingLevel.low => 'Bajo',
-    ThinkingLevel.medium => 'Medio',
-    ThinkingLevel.high => 'Alto',
+  /// Count visible para la fila; null mientras la sección no tiene snapshot
+  /// (Loading/Failed) — la fila va sin pill.
+  static int? _flowsCount(FlowsState state) => switch (state) {
+    FlowsLoaded(flows: final f) => f.length,
+    FlowsMutating(flows: final f) => f.length,
+    FlowsMutationFailed(flows: final f) => f.length,
+    _ => null,
   };
+
+  static String? _flowsCaption(FlowsState state) {
+    final flows = switch (state) {
+      FlowsLoaded(flows: final f) => f,
+      FlowsMutating(flows: final f) => f,
+      FlowsMutationFailed(flows: final f) => f,
+      _ => null,
+    };
+    if (flows == null) return null;
+    if (flows.isEmpty) return 'Sin flujos aún';
+    final active = flows.where((f) => f.isActive).length;
+    final paused = flows.length - active;
+    final a = active == 1 ? '1 activo' : '$active activos';
+    final p = paused == 1 ? '1 pausado' : '$paused pausados';
+    return '$a · $p';
+  }
+
+  static int? _varDefsCount(VarDefsState state) => switch (state) {
+    VarDefsLoaded(defs: final d) => d.length,
+    VarDefsMutating(defs: final d) => d.length,
+    VarDefsMutationFailed(defs: final d) => d.length,
+    _ => null,
+  };
+
+  static String? _varDefsCaption(VarDefsState state) {
+    final defs = switch (state) {
+      VarDefsLoaded(defs: final d) => d,
+      VarDefsMutating(defs: final d) => d,
+      VarDefsMutationFailed(defs: final d) => d,
+      _ => null,
+    };
+    if (defs == null) return null;
+    if (defs.isEmpty) return 'Sin variables aún';
+    final names = defs.take(3).map((d) => '{{${d.name}}}').join(', ');
+    return defs.length > 3 ? '$names…' : names;
+  }
 }
 
-class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value});
+/// Fila del launcher: glifo de entidad + título con count + caption de
+/// resumen + chevron. Toda la fila es tap-target hacia su página.
+class _SectionLinkRow extends StatelessWidget {
+  const _SectionLinkRow({
+    required this.rowKey,
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.count,
+    this.caption,
+  });
 
-  final String label;
-  final String value;
+  final Key rowKey;
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  /// Items del área. Con valor > 0 acompaña al título como pill; null (sin
+  /// snapshot) o 0 (vacío) van sin pill — un "0" solo repetiría el caption.
+  final int? count;
+  final String? caption;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    // Tile plano (no AppCard) — vive dentro de la AppCard outer de
-    // Configuración IA, así que se diferencia visualmente con surface3
-    // sobre el surface2 de la card padre, sin doble shell.
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      decoration: BoxDecoration(
-        color: AppTokens.surface3,
-        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text(label, style: textTheme.labelSmall),
-          const SizedBox(height: AppTokens.sp1),
-          Text(value, style: textTheme.titleMedium),
-        ],
-      ),
-    );
-  }
-}
-
-class _VarDefsSection extends StatelessWidget {
-  const _VarDefsSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<VarDefsBloc, VarDefsState>(
-      builder: (context, state) => switch (state) {
-        VarDefsLoading() => const Padding(
-          key: Key('var_defs.loading'),
-          padding: EdgeInsets.symmetric(vertical: AppTokens.sp2),
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-        VarDefsLoaded(defs: final defs) => _VarDefsList(
-          defs: defs,
-          showAddButton: true,
-        ),
-        // Durante una mutación seguimos mostrando el snapshot previo;
-        // el botón de Agregar se oculta para no permitir doble dispatch
-        // mientras el sheet ya está abierto con su propio submit.
-        VarDefsMutating(defs: final defs) => _VarDefsList(
-          defs: defs,
-          showAddButton: false,
-        ),
-        // MutationFailed: lista intacta y botón visible para reintentar.
-        VarDefsMutationFailed(defs: final defs) => _VarDefsList(
-          defs: defs,
-          showAddButton: true,
-        ),
-        VarDefsFailed() => const _VarDefsFailedView(),
-      },
-    );
-  }
-}
-
-class _VarDefsList extends StatelessWidget {
-  const _VarDefsList({required this.defs, required this.showAddButton});
-
-  final List<VariableDef> defs;
-  final bool showAddButton;
-
-  @override
-  Widget build(BuildContext context) {
-    final empty = defs.isEmpty;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        if (empty)
-          Text(
-            'Esta plantilla aún no tiene variables.',
-            key: const Key('var_defs.empty'),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontStyle: FontStyle.italic,
-              color: AppTokens.text2,
-            ),
-          )
-        else
-          for (final d in defs)
-            _VarDefRow(
-              def: d,
-              onTap: () => _openSheet(context, defs, editing: d),
-            ),
-        if (showAddButton) ...<Widget>[
-          const SizedBox(height: AppTokens.sp3),
-          AppButton.text(
-            key: const Key('var_defs.add_button'),
-            label: 'Agregar variable',
-            icon: Icons.add,
-            onPressed: () => _openSheet(context, defs),
-          ),
-        ],
-      ],
-    );
-  }
-
-  /// Monta el sheet de creación o edición. El sheet vive sobre el bloc
-  /// del detail page; usamos `.value` para pasarle la misma instancia
-  /// (el modal crea un nuevo context que no hereda de los
-  /// BlocProviders del padre por default).
-  void _openSheet(
-    BuildContext context,
-    List<VariableDef> defs, {
-    VariableDef? editing,
-  }) {
-    final bloc = context.read<VarDefsBloc>();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => BlocProvider<VarDefsBloc>.value(
-        value: bloc,
-        child: VarDefFormSheet(
-          existingNames: defs.map((d) => d.name).toSet(),
-          editing: editing,
-        ),
-      ),
-    );
-  }
-}
-
-class _VarDefRow extends StatelessWidget {
-  const _VarDefRow({required this.def, required this.onTap});
-
-  final VariableDef def;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
+    final c = count;
     return InkWell(
-      key: Key('var_defs.row.${def.id}'),
+      key: rowKey,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTokens.radiusField),
+      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            AppEntityIcon(icon: icon, size: 44),
+            const SizedBox(width: AppTokens.sp4),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Row(
                     children: <Widget>[
-                      SizedBox(
-                        width: 180,
-                        // El placeholder de interpolación `{{name}}` es la
-                        // forma en que el operador referencia la variable
-                        // desde el prompt; mostrarla así es más útil que el
-                        // name pelado. No usamos SelectableText: el row es
-                        // tap-target del edit sheet y el gesture detector
-                        // interno del Selectable ganaría el tap. La copia
-                        // puede agregarse via long-press menu en un slice
-                        // futuro si se pide.
-                        child: Text(
-                          '{{${def.name}}}',
-                          style: t.bodyMedium?.copyWith(
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          def.defaultValue.isEmpty ? '—' : def.defaultValue,
-                          style: t.bodyMedium?.copyWith(
-                            color: def.defaultValue.isEmpty
-                                ? AppTokens.text2
-                                : null,
-                          ),
-                        ),
-                      ),
+                      Text(title, style: textTheme.titleMedium),
+                      if (c != null && c > 0) ...<Widget>[
+                        const SizedBox(width: AppTokens.sp2),
+                        AppPill.neutral(label: '$c'),
+                      ],
                     ],
                   ),
-                  if (def.description.isNotEmpty)
+                  if (caption != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
-                        def.description,
-                        style: t.bodySmall?.copyWith(color: AppTokens.text2),
+                        caption!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppTokens.text2,
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
-            // Trash icon como acción destructiva. Tap apunta y abre
-            // confirm dialog — no compite con el tap del row (InkWell
-            // padre) porque el IconButton tiene su propio gesture detector
-            // y "absorbe" su área (Flutter usa hit-testing por proximidad).
-            IconButton(
-              key: Key('var_defs.row.${def.id}.delete'),
-              icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
-              tooltip: 'Eliminar variable',
-              onPressed: () => _confirmDelete(context, def),
-            ),
+            const SizedBox(width: AppTokens.sp2),
+            const Icon(Icons.chevron_right, color: AppTokens.text2),
           ],
         ),
       ),
-    );
-  }
-
-  Future<void> _confirmDelete(BuildContext context, VariableDef def) async {
-    final bloc = context.read<VarDefsBloc>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        key: const Key('var_defs.delete_confirm'),
-        title: const Text('Eliminar variable'),
-        content: Text(
-          '¿Eliminar la variable {{${def.name}}}? '
-          'Los bots que ya tengan un valor asignado bloquearán esta acción.',
-        ),
-        actions: <Widget>[
-          AppButton.text(
-            label: 'Cancelar',
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-          ),
-          AppButton.danger(
-            label: 'Eliminar',
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      bloc.add(VarDefsDeleteRequested(varDefId: def.id));
-    }
-  }
-}
-
-class _VarDefsFailedView extends StatelessWidget {
-  const _VarDefsFailedView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      key: const Key('var_defs.failed'),
-      children: <Widget>[
-        const Expanded(
-          child: Text(
-            'No pudimos cargar las variables.',
-            style: TextStyle(color: AppTokens.danger),
-          ),
-        ),
-        AppButton.text(
-          label: 'Reintentar',
-          onPressed: () =>
-              context.read<VarDefsBloc>().add(const VarDefsLoadRequested()),
-        ),
-      ],
-    );
-  }
-}
-
-class _EditButton extends StatelessWidget {
-  const _EditButton({required this.template});
-
-  final Template template;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppButton.tonal(
-      key: const Key('template_detail.edit_button'),
-      label: 'Editar plantilla',
-      icon: Icons.edit_outlined,
-      onPressed: () {
-        // push apila el editor sobre el detalle; el back físico vuelve al
-        // detalle (no sale de la app, no aplasta pila).
-        context.push('/templates/${template.id}/edit');
-      },
     );
   }
 }
@@ -591,6 +325,7 @@ class _CreateBotButton extends StatelessWidget {
       key: const Key('template_detail.create_bot_button'),
       label: 'Crear bot',
       icon: Icons.smart_toy_outlined,
+      fullWidth: true,
       onPressed: () async {
         // Abre la hoja de creación con esta plantilla ya elegida (salta el
         // paso de selección). Al crear, la hoja devuelve el bot y aquí se
@@ -614,211 +349,34 @@ class _FailedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final isNotFound = failure is TemplatesNotFoundFailure;
     final textTheme = Theme.of(context).textTheme;
-    return Center(
-      key: isNotFound
-          ? const Key('template_detail.error.not_found')
-          : const Key('template_detail.error.generic'),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              isNotFound
-                  ? 'Esta plantilla ya no existe en tu organización'
-                  : 'No pudimos cargar el detalle de la plantilla',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyLarge,
-            ),
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.tonal(
-              label: 'Reintentar',
-              onPressed: () => context.read<TemplateDetailBloc>().add(
-                const TemplateDetailLoadRequested(),
+    return _BackOverlay(
+      child: Center(
+        key: isNotFound
+            ? const Key('template_detail.error.not_found')
+            : const Key('template_detail.error.generic'),
+        child: Padding(
+          padding: const EdgeInsets.all(AppTokens.sp6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                isNotFound
+                    ? 'Esta plantilla ya no existe en tu organización'
+                    : 'No pudimos cargar el detalle de la plantilla',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyLarge,
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Sección Flujos (S11 F1, read-only) ───────────────────────────────────────
-
-class _FlowsSection extends StatelessWidget {
-  const _FlowsSection({required this.templateId});
-
-  final String templateId;
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<FlowsBloc, FlowsState>(
-      builder: (context, state) => switch (state) {
-        FlowsLoading() => const Padding(
-          key: Key('flows.loading'),
-          padding: EdgeInsets.symmetric(vertical: AppTokens.sp2),
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-        FlowsLoaded(flows: final fs) => _FlowsList(
-          items: fs,
-          templateId: templateId,
-        ),
-        // Durante/tras una mutación fallida la lista sigue visible (no se
-        // flashea Loading); el feedback del fallo lo da el SnackBar global.
-        FlowsMutating(flows: final fs) => _FlowsList(
-          items: fs,
-          templateId: templateId,
-        ),
-        FlowsMutationFailed(flows: final fs) => _FlowsList(
-          items: fs,
-          templateId: templateId,
-        ),
-        FlowsFailed() => const _FlowsFailedView(),
-      },
-    );
-  }
-}
-
-class _FlowsList extends StatelessWidget {
-  const _FlowsList({required this.items, required this.templateId});
-
-  final List<fdom.Flow> items;
-  final String templateId;
-
-  @override
-  Widget build(BuildContext context) {
-    final empty = items.isEmpty;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        if (empty)
-          Text(
-            'Esta plantilla aún no tiene flujos.',
-            key: const Key('flows.empty'),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontStyle: FontStyle.italic,
-              color: AppTokens.text2,
-            ),
-          )
-        else
-          for (final f in items) _FlowRow(flow: f),
-        const SizedBox(height: AppTokens.sp3),
-        AppButton.text(
-          key: const Key('flows.add_button'),
-          label: 'Nuevo flujo',
-          icon: Icons.add,
-          // push apila el form sobre el detalle; back físico vuelve aquí
-          // sin pasar por el form que ya cumplió (Succeeded usa
-          // pushReplacement a /flows/:id).
-          onPressed: () => context.push('/templates/$templateId/flows/new'),
-        ),
-      ],
-    );
-  }
-}
-
-class _FlowRow extends StatelessWidget {
-  const _FlowRow({required this.flow});
-
-  final fdom.Flow flow;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    return InkWell(
-      key: Key('flows.row.${flow.id}'),
-      // push apila el editor del flow sobre el detalle de plantilla; el
-      // back físico vuelve al detalle. La ruta /flows/:id la monta el
-      // slice del editor de flujos.
-      onTap: () => context.push('/flows/${flow.id}'),
-      borderRadius: BorderRadius.circular(AppTokens.radiusField),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            Expanded(child: Text(flow.name, style: t.bodyMedium)),
-            if (flow.isActive)
-              AppPill.primary(
-                key: Key('flows.row.${flow.id}.status_pill'),
-                label: 'Activo',
-                dot: AppPillDot.active,
-              )
-            else
-              AppPill.neutral(
-                key: Key('flows.row.${flow.id}.status_pill'),
-                label: 'Pausado',
-                dot: AppPillDot.paused,
+              const SizedBox(height: AppTokens.sp3),
+              AppButton.tonal(
+                label: 'Reintentar',
+                onPressed: () => context.read<TemplateDetailBloc>().add(
+                  const TemplateDetailLoadRequested(),
+                ),
               ),
-            // Trash icon como acción destructiva. Su propio gesture detector
-            // absorbe el tap y no compite con el onTap del row (navegar al
-            // editor) — Flutter resuelve por proximidad del hit-test.
-            IconButton(
-              key: Key('flows.row.${flow.id}.delete'),
-              icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
-              tooltip: 'Eliminar flujo',
-              onPressed: () => _confirmDeleteFlow(context, flow),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    );
-  }
-
-  Future<void> _confirmDeleteFlow(BuildContext context, fdom.Flow flow) async {
-    final bloc = context.read<FlowsBloc>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        key: const Key('flows.delete_confirm'),
-        title: const Text('Eliminar flujo'),
-        content: Text(
-          '¿Eliminar el flujo "${flow.name}"? Se borrarán también sus pasos '
-          'y disparadores. Esta acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          AppButton.text(
-            label: 'Cancelar',
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-          ),
-          AppButton.danger(
-            label: 'Eliminar',
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      bloc.add(FlowsDeleteRequested(flow.id));
-    }
-  }
-}
-
-class _FlowsFailedView extends StatelessWidget {
-  const _FlowsFailedView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      key: const Key('flows.failed'),
-      children: <Widget>[
-        const Expanded(
-          child: Text(
-            'No pudimos cargar los flujos.',
-            style: TextStyle(color: AppTokens.danger),
-          ),
-        ),
-        AppButton.text(
-          label: 'Reintentar',
-          onPressed: () =>
-              context.read<FlowsBloc>().add(const FlowsLoadRequested()),
-        ),
-      ],
     );
   }
 }

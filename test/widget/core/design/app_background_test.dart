@@ -6,7 +6,7 @@ import 'package:ataulfo/core/design/widgets/app_background.dart';
 
 void main() {
   group('AppBackground', () {
-    testWidgets('pinta el lienzo base + las capas del glow amanecer', (
+    testWidgets('pinta SOLO el lienzo oscuro sólido — sin capas de glow', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -27,7 +27,9 @@ void main() {
       );
       expect(base.color, AppTokens.bgBase);
 
-      // Una capa (DecoratedBox con gradiente) por cada capa del token, en orden.
+      // Cero capas de gradiente: el fondo es oscuro sólido (el glow
+      // "amanecer" se retiró; los gradientes viven solo como FILL de
+      // componentes — headers, botones — nunca como fondo).
       final gradients = tester
           .widgetList<DecoratedBox>(
             find.descendant(
@@ -38,7 +40,7 @@ void main() {
           .map((b) => (b.decoration as BoxDecoration).gradient)
           .whereType<Gradient>()
           .toList();
-      expect(gradients, AppTokens.backgroundGlowLayers);
+      expect(gradients, isEmpty);
     });
 
     testWidgets('renderiza su child', (tester) async {

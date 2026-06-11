@@ -98,55 +98,6 @@ class AppTokens {
   /// Tinte del glow de foco (campos) y de la sombra del FAB. `primary` al ~35%.
   static const Color primaryGlow = _Yellow.s700a35;
 
-  /// Núcleo cálido del glow (un punto más claro que [primary], el "sol").
-  static const Color _glowCore = Color(0xFFFFD86B);
-
-  /// Ambiente profundo del glow (naranja quemado) para el halo más externo.
-  static const Color _glowDeep = Color(0xFF8A3A0A);
-
-  /// Fondo absoluto de la app: glow "amanecer" premium en CAPAS, anclado en el
-  /// borde SUPERIOR. Se pintan en orden sobre [bgBase] —ambiente profundo →
-  /// halo naranja → núcleo cálido— y cada capa es un radial que se desvanece a
-  /// alpha 0 para fundirse con el oscuro del cuerpo. Las pantallas se montan
-  /// encima con app bars transparentes; el contenido scrollea sobre el glow.
-  ///
-  /// El layering (3 radiales superpuestos) da la profundidad de un sol real:
-  /// un núcleo brillante con un halo amplio que cae suave, en vez del corte
-  /// plano de un solo gradiente. Centros con `y` negativo ⇒ nacen arriba.
-  static final List<RadialGradient> backgroundGlowLayers = <RadialGradient>[
-    // Ambiente profundo: halo amplio y tenue que tiñe la cabecera.
-    RadialGradient(
-      center: const Alignment(0.0, -1.45),
-      radius: 1.3,
-      colors: <Color>[
-        _glowDeep.withValues(alpha: 0.5),
-        _glowDeep.withValues(alpha: 0.0),
-      ],
-      stops: const <double>[0.0, 1.0],
-    ),
-    // Halo naranja: el cuerpo cálido del sol.
-    RadialGradient(
-      center: const Alignment(0.0, -1.37),
-      radius: 0.95,
-      colors: <Color>[
-        accent.withValues(alpha: 0.6),
-        accent.withValues(alpha: 0.0),
-      ],
-      stops: const <double>[0.0, 1.0],
-    ),
-    // Núcleo cálido: el centro brillante.
-    RadialGradient(
-      center: const Alignment(0.0, -1.33),
-      radius: 0.55,
-      colors: <Color>[
-        _glowCore.withValues(alpha: 0.98),
-        primary.withValues(alpha: 0.8),
-        primary.withValues(alpha: 0.0),
-      ],
-      stops: const <double>[0.0, 0.45, 1.0],
-    ),
-  ];
-
   // ── Section accents ───────────────────────────────────────────────────────
   /// Verde brillante que marca la superficie de **conversaciones/chat**: la
   /// distingue del amarillo de marca sin reemplazarlo. Uso *ligero* y por

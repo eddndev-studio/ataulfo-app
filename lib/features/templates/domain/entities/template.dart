@@ -95,6 +95,26 @@ class AIConfig {
     systemPrompt,
     contextMessages,
   );
+
+  /// Copia con campos reemplazados — base de las ediciones por-campo del
+  /// Motor IA (cada control muta UN campo y conserva el resto).
+  AIConfig copyWith({
+    bool? enabled,
+    AIProvider? provider,
+    String? model,
+    double? temperature,
+    ThinkingLevel? thinkingLevel,
+    String? systemPrompt,
+    int? contextMessages,
+  }) => AIConfig(
+    enabled: enabled ?? this.enabled,
+    provider: provider ?? this.provider,
+    model: model ?? this.model,
+    temperature: temperature ?? this.temperature,
+    thinkingLevel: thinkingLevel ?? this.thinkingLevel,
+    systemPrompt: systemPrompt ?? this.systemPrompt,
+    contextMessages: contextMessages ?? this.contextMessages,
+  );
 }
 
 /// Conteo de agregados hijos de una Template, para las tarjetas del listado

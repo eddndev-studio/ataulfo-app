@@ -62,22 +62,6 @@ void main() {
       // ~35% de alpha sobre primary (#EDB900).
       expect(AppTokens.primaryGlow, const Color(0x59EDB900));
     });
-
-    test('backgroundGlowLayers: amanecer premium en 3 capas anclado arriba', () {
-      // Glow en capas (ambiente profundo → halo → núcleo) que nace del borde
-      // SUPERIOR. Cada capa es un radial cálido que se desvanece a alpha 0 para
-      // fundirse con el oscuro del cuerpo.
-      final layers = AppTokens.backgroundGlowLayers;
-      expect(layers.length, 3);
-      for (final g in layers) {
-        // Anclado arriba: el centro está sobre el borde superior (y negativo).
-        expect((g.center as Alignment).y, lessThan(0.0));
-        // Premium: cada capa se funde (última parada a alpha 0).
-        expect(g.colors.last.a, 0.0);
-      }
-      // La capa núcleo (última) arranca casi opaca: el sol brillante.
-      expect(layers.last.colors.first.a, greaterThan(0.9));
-    });
   });
 
   group('AppTokens — text', () {
