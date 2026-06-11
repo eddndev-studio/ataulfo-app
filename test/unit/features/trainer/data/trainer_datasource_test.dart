@@ -139,7 +139,11 @@ void main() {
 
     test('POST devuelve el turno final del asistente', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => Response(
           requestOptions: RequestOptions(path: '/x'),
@@ -156,9 +160,52 @@ void main() {
       expect(m.content, 'te ayudo');
     });
 
+    test(
+      'POST del turno sobreescribe receiveTimeout (turno > global)',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: '/x'),
+            statusCode: 201,
+            data: msgJson(),
+          ),
+        );
+        await ds.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: 'x',
+        );
+        final captured = verify(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: captureAny(named: 'options'),
+          ),
+        ).captured;
+        final opts = captured.single as Options?;
+        expect(
+          opts?.receiveTimeout,
+          const Duration(seconds: 180),
+          reason:
+              'el turno síncrono debe esperar más que el presupuesto '
+              'del motor en el server; el global de Dio (30s) lo cortaría antes',
+        );
+      },
+    );
+
     test('502 del motor ⇒ TrainerEngineFailure', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/x'),

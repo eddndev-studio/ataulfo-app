@@ -4,6 +4,7 @@ import '../../domain/entities/preview_item.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../dto/preview_dtos.dart';
 import 'failure_mapper.dart';
+import 'turn_timeout.dart';
 
 /// Puerto de datos del preview sandbox. POST síncrono (el turno completo
 /// del bot); GET rehidrata el transcript vivo; DELETE resetea la sesión.
@@ -33,6 +34,7 @@ class DioPreviewDatasource implements PreviewDatasource {
       final res = await _dio.post<Map<String, dynamic>>(
         '/templates/$templateId/preview/messages',
         data: <String, dynamic>{'content': content},
+        options: Options(receiveTimeout: turnReceiveTimeout),
       );
       final body = res.data;
       final items = body?['items'];

@@ -49,7 +49,11 @@ void main() {
 
   test('POST corre el turno y devuelve items+iterations', () async {
     when(
-      () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      () => dio.post<Map<String, dynamic>>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
     ).thenAnswer(
       (_) async => Response(
         requestOptions: RequestOptions(path: '/x'),
@@ -67,8 +71,41 @@ void main() {
       () => dio.post<Map<String, dynamic>>(
         '/templates/t1/preview/messages',
         data: <String, dynamic>{'content': 'hola'},
+        options: any(named: 'options'),
       ),
     ).called(1);
+  });
+
+  test('POST del turno sobreescribe receiveTimeout (turno > global)', () async {
+    when(
+      () => dio.post<Map<String, dynamic>>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/x'),
+        statusCode: 201,
+        data: <String, dynamic>{'items': <dynamic>[], 'iterations': 1},
+      ),
+    );
+    await ds.sendMessage(templateId: 't1', content: 'hola');
+    final captured = verify(
+      () => dio.post<Map<String, dynamic>>(
+        any(),
+        data: any(named: 'data'),
+        options: captureAny(named: 'options'),
+      ),
+    ).captured;
+    final opts = captured.single as Options?;
+    expect(
+      opts?.receiveTimeout,
+      const Duration(seconds: 180),
+      reason:
+          'el turno síncrono debe esperar más que el presupuesto '
+          'del motor en el server; el global de Dio (30s) lo cortaría antes',
+    );
   });
 
   test('GET rehidrata el transcript', () async {
@@ -94,7 +131,11 @@ void main() {
 
   test('503 sin sandbox ⇒ TrainerUnavailableFailure', () async {
     when(
-      () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      () => dio.post<Map<String, dynamic>>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
     ).thenThrow(
       DioException(
         requestOptions: RequestOptions(path: '/x'),

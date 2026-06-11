@@ -5,6 +5,7 @@ import '../../domain/entities/trainer_message.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../dto/trainer_dtos.dart';
 import 'failure_mapper.dart';
+import 'turn_timeout.dart';
 
 /// Puerto de datos del hilo del entrenador (template-scoped). El POST de
 /// mensaje es SÍNCRONO: corre el turno completo del motor y devuelve el
@@ -145,6 +146,7 @@ class DioTrainerDatasource implements TrainerDatasource {
       final res = await _dio.post<Map<String, dynamic>>(
         '${_base(templateId)}/$conversationId/messages',
         data: <String, dynamic>{'content': content},
+        options: Options(receiveTimeout: turnReceiveTimeout),
       );
       final body = res.data;
       if (body == null) throw const TrainerUnknownFailure();
