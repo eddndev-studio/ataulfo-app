@@ -63,11 +63,6 @@ class _ShellPageState extends State<ShellPage> {
 
   void _select(int i) => setState(() => _index = i);
 
-  /// Las tabs con header rico propio (Bots/Plantillas/Etiquetas) NO usan el
-  /// AppBar del shell: la tarjeta-header full-bleed ES su encabezado. El resto
-  /// conserva el AppBar con el título del tab.
-  bool get _hasOwnHeader => _index <= 2;
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -86,10 +81,9 @@ class _ShellPageState extends State<ShellPage> {
             ),
           ],
         );
+        // Sin AppBar del shell: TODAS las tabs traen header rico propio
+        // (la tarjeta-header full-bleed ES su encabezado).
         return Scaffold(
-          appBar: _hasOwnHeader
-              ? null
-              : AppBar(title: Text(_tabs[_index].label)),
           body: useRail
               ? Row(
                   children: <Widget>[

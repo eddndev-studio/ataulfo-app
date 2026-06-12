@@ -1,6 +1,9 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/core/design/widgets/app_section_link.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/settings/presentation/pages/settings_page.dart';
@@ -10,6 +13,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
@@ -381,6 +385,86 @@ void main() {
 
     expect(find.byType(AlertDialog), findsNothing);
     verifyNever(() => authBloc.add(const AuthLoggedOut()));
+  });
+
+  group('header de perfil (rediseño)', () {
+    testWidgets('monta el header gradiente con avatar, email y rol', (
+      tester,
+    ) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('settings.header')), findsOneWidget);
+      expect(find.text('Ajustes'), findsOneWidget);
+      // La identidad vive EN el header: avatar con inicial + email + rol.
+      expect(find.byType(AppAvatar), findsOneWidget);
+      final header = find.byKey(const Key('settings.header'));
+      expect(
+        find.descendant(of: header, matching: find.text('op@example.com')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: header,
+          matching: find.widgetWithText(AppPill, 'Propietario'),
+        ),
+        findsOneWidget,
+      );
+      // El label suelto "Rol" muere: la pill se explica sola junto al email.
+      expect(find.text('Rol'), findsNothing);
+    });
+  });
+
+  group('secciones agrupadas (rediseño)', () {
+    testWidgets('los tiles viven como filas launcher en UNA card con caption', (
+      tester,
+    ) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(host());
+
+      final card = find.byKey(const Key('settings.card.sections'));
+      expect(card, findsOneWidget);
+      expect(tester.widget(card), isA<AppCard>());
+      // OWNER: las 4 áreas como filas (organizaciones, miembros, galería,
+      // notificaciones) — muere la pila de cards sueltas sin jerarquía.
+      expect(
+        find.descendant(of: card, matching: find.byType(AppSectionLink)),
+        findsNWidgets(4),
+      );
+      // Captions: cada fila dice qué hay detrás, no solo el título.
+      expect(find.text('Bandeja y preferencias de avisos'), findsOneWidget);
+    });
+
+    testWidgets('la página scrollea (no overflow en pantallas bajas)', (
+      tester,
+    ) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(host());
+
+      expect(find.byType(SingleChildScrollView), findsOneWidget);
+    });
+  });
+
+  group('versión instalada (rediseño)', () {
+    testWidgets('pinta la versión de la app al pie', (tester) async {
+      PackageInfo.setMockInitialValues(
+        appName: 'Ataulfo',
+        packageName: 'studio.eddndev.ataulfo',
+        version: '0.7.0',
+        buildNumber: '18',
+        buildSignature: '',
+      );
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('settings.version')), findsOneWidget);
+      expect(find.text('Ataulfo v0.7.0 (18)'), findsOneWidget);
+    });
   });
 
   testWidgets('non-Authenticated renderiza vacío (trust router redirect)', (

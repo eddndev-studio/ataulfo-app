@@ -52,6 +52,31 @@ void main() {
     expect(find.widgetWithText(AppPill, '7'), findsOneWidget);
   });
 
+  testWidgets('título largo en ancho angosto ellipsa sin overflow', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        SizedBox(
+          width: 280,
+          child: AppSectionLink(
+            rowKey: const Key('x.link'),
+            icon: Icons.link,
+            title: 'Vínculos con etiquetas internas de la organización',
+            count: 12,
+            caption: 'Una caption igualmente larga que debe ellipsar bien',
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    // Un Row sin Flexible revienta con RenderFlex overflow; el título debe
+    // ceder espacio (ellipsis) y dejar la pill de count visible.
+    expect(tester.takeException(), isNull);
+    expect(find.widgetWithText(AppPill, '12'), findsOneWidget);
+  });
+
   testWidgets('count 0 o null van sin pill (no repetir el vacío)', (
     tester,
   ) async {

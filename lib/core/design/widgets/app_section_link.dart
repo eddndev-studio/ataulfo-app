@@ -51,7 +51,17 @@ class AppSectionLink extends StatelessWidget {
                 children: <Widget>[
                   Row(
                     children: <Widget>[
-                      Text(title, style: textTheme.titleMedium),
+                      // Flexible (no Expanded): el título cede ante la pill
+                      // de count y ellipsa en anchos angostos, sin empujarla
+                      // fuera ni reventar el Row.
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleMedium,
+                        ),
+                      ),
                       if (c != null && c > 0) ...<Widget>[
                         const SizedBox(width: AppTokens.sp2),
                         AppPill.neutral(label: '$c'),

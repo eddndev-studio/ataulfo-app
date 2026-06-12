@@ -522,6 +522,23 @@ void main() {
       expect(find.byType(AppBar), findsNothing);
     });
 
+    testWidgets('la tab Ajustes NO monta AppBar del shell (header propio)', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Ajustes'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppBar), findsNothing);
+    });
+
     testWidgets('el avatar del header de Etiquetas navega a Ajustes', (
       tester,
     ) async {

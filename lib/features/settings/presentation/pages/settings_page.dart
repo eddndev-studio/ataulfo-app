@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../../core/auth/role_privilege.dart';
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../../core/i18n/role_labels.dart';
+import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/domain/entities/identity.dart';
 
-/// Pantalla de Settings mínima del shell: muestra el perfil real del
-/// operador (email + rol vía pill primary) y dos acciones (tile a
-/// /memberships, logout). Otras opciones (tema, idioma, perfil editable)
-/// aterrizan en su propio slice.
+/// Pantalla de Ajustes del shell. Header gradiente propio con el PERFIL del
+/// operador (avatar + email + rol) — la identidad es el contenido principal
+/// de esta tab, no un texto suelto — y las áreas como filas launcher
+/// agrupadas en una card con caption (paridad con los hubs). Al pie: cerrar
+/// sesión (confirmado) y la versión instalada (soporte: "¿qué versión
+/// traes?").
 ///
 /// Sin UUIDs visibles: el operador no acciona sobre `userId`/`orgId`;
 /// `orgId` se interpreta al humano en `/memberships` (badge "Activa"
@@ -61,93 +69,204 @@ class SettingsPage extends StatelessWidget {
           return const SizedBox.shrink();
         }
         final identity = state.identity;
-        return Padding(
-          padding: const EdgeInsets.all(AppTokens.sp6),
+        return SingleChildScrollView(
+          // Sin padding aquí: el header es full-bleed y va pegado arriba. El
+          // resto del contenido lleva su propio padding más abajo.
+          padding: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(identity.email),
-              const SizedBox(height: AppTokens.sp4),
-              Row(
-                children: <Widget>[
-                  const Text('Rol'),
-                  const SizedBox(width: AppTokens.sp3),
-                  AppPill.primary(label: roleLabel(identity.role)),
-                ],
-              ),
-              const SizedBox(height: AppTokens.sp6),
-              AppCard(
-                key: const Key('settings.memberships_tile'),
-                // push (no go): apila /memberships sobre Settings para
-                // que el back físico de Android vuelva al shell sin sacar
-                // al operador de la app. Mismo guard que tiles y FABs
-                // del resto del repo.
-                onTap: () => context.push('/memberships'),
-                child: const Row(
+              _ProfileHeader(identity: identity),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppTokens.sp5,
+                  AppTokens.sp5,
+                  AppTokens.sp5,
+                  AppTokens.sp5 + context.safeBottomInset,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Icon(Icons.business_outlined, color: AppTokens.text2),
-                    SizedBox(width: AppTokens.sp4),
-                    Expanded(child: Text('Tus organizaciones')),
-                    Icon(Icons.chevron_right, color: AppTokens.text2),
+                    _SectionsCard(identity: identity),
+                    const SizedBox(height: AppTokens.sp7),
+                    AppButton.danger(
+                      label: 'Cerrar sesión',
+                      fullWidth: true,
+                      onPressed: () => _confirmLogout(context),
+                    ),
+                    const SizedBox(height: AppTokens.sp5),
+                    const _VersionFooter(),
                   ],
                 ),
-              ),
-              // Gestión de miembros: gateada a ADMIN+ porque el backend 403ea
-              // a roles por debajo (RequireRole). El gate es cosmético —
-              // oculta un control que de todos modos fallaría—; la autoridad
-              // real sigue siendo el 403 del servidor.
-              if (isAdminOrAbove(identity.role)) ...<Widget>[
-                const SizedBox(height: AppTokens.cardGap),
-                AppCard(
-                  key: const Key('settings.members_tile'),
-                  // push (no go): apila /members sobre Settings para que el
-                  // back físico vuelva al shell, igual que el resto de tiles.
-                  onTap: () => context.push('/members'),
-                  child: const Row(
-                    children: <Widget>[
-                      Icon(Icons.people_outline, color: AppTokens.text2),
-                      SizedBox(width: AppTokens.sp4),
-                      Expanded(child: Text('Miembros')),
-                      Icon(Icons.chevron_right, color: AppTokens.text2),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: AppTokens.cardGap),
-              AppCard(
-                key: const Key('settings.media_tile'),
-                // push (no go): apila /media sobre Settings para que el back
-                // físico vuelva al shell, igual que el tile de organizaciones.
-                onTap: () => context.push('/media'),
-                child: const Row(
-                  children: <Widget>[
-                    Icon(Icons.perm_media_outlined, color: AppTokens.text2),
-                    SizedBox(width: AppTokens.sp4),
-                    Expanded(child: Text('Galería de multimedia')),
-                    Icon(Icons.chevron_right, color: AppTokens.text2),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppTokens.cardGap),
-              AppCard(
-                key: const Key('settings.notifications_tile'),
-                onTap: () => context.push('/notifications'),
-                child: const Row(
-                  children: <Widget>[
-                    Icon(Icons.notifications_outlined, color: AppTokens.text2),
-                    SizedBox(width: AppTokens.sp4),
-                    Expanded(child: Text('Notificaciones')),
-                    Icon(Icons.chevron_right, color: AppTokens.text2),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppTokens.sp7),
-              AppButton.danger(
-                label: 'Cerrar sesión',
-                fullWidth: true,
-                onPressed: () => _confirmLogout(context),
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Header full-bleed con el gradiente de marca: la identidad del operador es
+/// el contenido principal de Ajustes (quién soy, con qué rol), no un texto
+/// suelto al inicio de una lista.
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.identity});
+
+  final Identity identity;
+
+  /// Gradiente de marca VERTICAL, idéntico al de los headers de sección.
+  static const LinearGradient _gradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: <Color>[AppTokens.primary, AppTokens.accent],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    final user = userGreeting(identity.email);
+    return ClipRRect(
+      key: const Key('settings.header'),
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(28),
+        bottomRight: Radius.circular(28),
+      ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(gradient: _gradient),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTokens.sp5,
+            topInset + AppTokens.sp5,
+            AppTokens.sp5,
+            AppTokens.sp6,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Text(
+                'Ajustes',
+                style: TextStyle(
+                  fontFamily: AppTokens.fontSans,
+                  fontSize: 34,
+                  height: 1.15,
+                  fontWeight: FontWeight.w700,
+                  color: AppTokens.onPrimary,
+                ),
+              ),
+              const SizedBox(height: AppTokens.sp5),
+              Row(
+                children: <Widget>[
+                  AppAvatar(name: user.initial, size: 56),
+                  const SizedBox(width: AppTokens.sp4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          identity.email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: AppTokens.fontSans,
+                            fontSize: AppTokens.bodyLSize,
+                            fontWeight: FontWeight.w600,
+                            color: AppTokens.onPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: AppTokens.sp2),
+                        AppPill.glass(label: roleLabel(identity.role)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Las áreas de Ajustes como filas launcher en UNA card (paridad con los
+/// hubs): título + caption de qué hay detrás + chevron. Miembros queda
+/// gateado ADMIN+ porque el backend 403ea a roles por debajo (RequireRole);
+/// el gate es cosmético — la autoridad real es el 403 del servidor.
+class _SectionsCard extends StatelessWidget {
+  const _SectionsCard({required this.identity});
+
+  final Identity identity;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      key: const Key('settings.card.sections'),
+      child: Column(
+        children: <Widget>[
+          AppSectionLink(
+            rowKey: const Key('settings.memberships_tile'),
+            icon: Icons.business_outlined,
+            title: 'Tus organizaciones',
+            caption: 'Cambia o renombra la organización activa',
+            // push (no go): apila sobre Settings para que el back físico
+            // vuelva al shell sin sacar al operador de la app. Igual en
+            // todas las filas.
+            onTap: () => context.push('/memberships'),
+          ),
+          if (isAdminOrAbove(identity.role)) ...<Widget>[
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.members_tile'),
+              icon: Icons.people_outline,
+              title: 'Miembros',
+              caption: 'Roles, invitaciones y acceso a bots',
+              onTap: () => context.push('/members'),
+            ),
+          ],
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          AppSectionLink(
+            rowKey: const Key('settings.media_tile'),
+            icon: Icons.perm_media_outlined,
+            title: 'Galería de multimedia',
+            caption: 'Imágenes, videos y audios para tus flujos',
+            onTap: () => context.push('/media'),
+          ),
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          AppSectionLink(
+            rowKey: const Key('settings.notifications_tile'),
+            icon: Icons.notifications_outlined,
+            title: 'Notificaciones',
+            caption: 'Bandeja y preferencias de avisos',
+            onTap: () => context.push('/notifications'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Versión instalada al pie ("¿qué versión traes?" en soporte). La trae el
+/// plugin de plataforma de forma asíncrona; mientras llega (o si falla en un
+/// host sin plugin) no se pinta nada — es información auxiliar, no bloqueante.
+class _VersionFooter extends StatelessWidget {
+  const _VersionFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snap) {
+        final info = snap.data;
+        if (info == null) return const SizedBox.shrink();
+        return Center(
+          child: Text(
+            '${info.appName} v${info.version} (${info.buildNumber})',
+            key: const Key('settings.version'),
+            style: textTheme.bodySmall?.copyWith(color: AppTokens.textDisabled),
           ),
         );
       },
