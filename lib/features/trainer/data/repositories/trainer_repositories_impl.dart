@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/preview_item.dart';
+import '../../domain/entities/preview_attachment.dart';
 import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
@@ -128,7 +129,12 @@ class PreviewRepositoryImpl implements PreviewRepository {
   Future<PreviewTurn> sendMessage({
     required String templateId,
     required String content,
-  }) => _ds.sendMessage(templateId: templateId, content: content);
+    List<PreviewAttachment> attachments = const <PreviewAttachment>[],
+  }) => _ds.sendMessage(
+    templateId: templateId,
+    content: content,
+    attachments: attachments,
+  );
 
   @override
   Future<PreviewTranscript> transcript({required String templateId}) =>

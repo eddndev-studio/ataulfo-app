@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/entities/preview_attachment.dart';
 import '../../domain/entities/preview_item.dart';
 import '../../domain/failures/trainer_failure.dart';
+import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../domain/repositories/trainer_repositories.dart';
 
 sealed class PreviewEvent {
@@ -19,6 +21,19 @@ final class PreviewMessageSent extends PreviewEvent {
   const PreviewMessageSent(this.content);
 
   final String content;
+}
+
+/// El operador adjunta un archivo al próximo turno del demo (bytes en
+/// memoria del cliente; viajan base64 con el send).
+final class PreviewAttachRequested extends PreviewEvent {
+  const PreviewAttachRequested();
+}
+
+/// Quita un adjunto pendiente por nombre.
+final class PreviewAttachmentRemoved extends PreviewEvent {
+  const PreviewAttachmentRemoved(this.name);
+
+  final String name;
 }
 
 final class PreviewResetRequested extends PreviewEvent {
@@ -63,10 +78,14 @@ final class PreviewLoaded extends PreviewState {
     required this.sending,
     this.failure,
     this.accumulatingUntil,
+    this.pendingAttachments = const <PreviewAttachment>[],
   });
 
   final List<PreviewItem> items;
   final bool sending;
+
+  /// Adjuntos en memoria esperando el próximo send (chips del composer).
+  final List<PreviewAttachment> pendingAttachments;
 
   /// Fallo del último turno (503 sandbox sin cablear, 502 motor...); el
   /// transcript previo sigue visible.
@@ -82,11 +101,17 @@ final class PreviewLoaded extends PreviewState {
       listEquals(other.items, items) &&
       other.sending == sending &&
       other.failure == failure &&
-      other.accumulatingUntil == accumulatingUntil;
+      other.accumulatingUntil == accumulatingUntil &&
+      listEquals(other.pendingAttachments, pendingAttachments);
 
   @override
-  int get hashCode =>
-      Object.hash(Object.hashAll(items), sending, failure, accumulatingUntil);
+  int get hashCode => Object.hash(
+    Object.hashAll(items),
+    sending,
+    failure,
+    accumulatingUntil,
+    Object.hashAll(pendingAttachments),
+  );
 }
 
 /// Emulador del bot. El turno síncrono se REVELA item por item con la
@@ -100,13 +125,17 @@ class PreviewBloc extends Bloc<PreviewEvent, PreviewState> {
   PreviewBloc({
     required PreviewRepository repo,
     required String templateId,
+    MediaFilePicker? picker,
     Future<void> Function(Duration)? pace,
   }) : _repo = repo,
        _templateId = templateId,
+       _picker = picker,
        _pace = pace ?? ((d) => Future<void>.delayed(d)),
        super(const PreviewLoading()) {
     on<PreviewStarted>(_onStarted);
     on<PreviewMessageSent>(_onMessageSent);
+    on<PreviewAttachRequested>(_onAttachRequested);
+    on<PreviewAttachmentRemoved>(_onAttachmentRemoved);
     on<PreviewResetRequested>(_onReset);
     on<_PreviewFlushArrived>(_onFlushArrived);
     on<_PreviewPollFailed>(_onPollFailed);
@@ -114,6 +143,9 @@ class PreviewBloc extends Bloc<PreviewEvent, PreviewState> {
 
   final PreviewRepository _repo;
   final String _templateId;
+
+  /// Picker de archivos (nil ⇒ el composer oculta el clip — DX/tests).
+  final MediaFilePicker? _picker;
 
   /// Espera entre revelados y entre polls. Inyectable: los tests verifican
   /// cadencia sin dormir relojes reales.
@@ -200,15 +232,17 @@ class PreviewBloc extends Bloc<PreviewEvent, PreviewState> {
         accumulatingUntil: current.accumulatingUntil,
       ),
     );
+    final atts = current.pendingAttachments;
     try {
       final turn = await _repo.sendMessage(
         templateId: _templateId,
         content: event.content,
+        attachments: atts,
       );
       if (turn.pending) {
         // Ventana de acumulación: el server grabó el user (reemplaza al
         // optimista) y atenderá el batch al cerrarla. Sin typing — el bot
-        // aún no responde; el poll trae el flush.
+        // aún no responde; el poll trae el flush. Los adjuntos YA viajaron.
         final until = turn.windowEndsAt ?? _now();
         emit(
           PreviewLoaded(
@@ -342,6 +376,50 @@ class PreviewBloc extends Bloc<PreviewEvent, PreviewState> {
         items: current.items,
         sending: false,
         failure: event.failure,
+      ),
+    );
+  }
+
+  Future<void> _onAttachRequested(
+    PreviewAttachRequested event,
+    Emitter<PreviewState> emit,
+  ) async {
+    final current = state;
+    final picker = _picker;
+    if (current is! PreviewLoaded || picker == null) return;
+    final picked = await picker.pick();
+    if (picked == null) return;
+    final cur = state;
+    if (cur is! PreviewLoaded) return;
+    emit(
+      PreviewLoaded(
+        items: cur.items,
+        sending: cur.sending,
+        failure: cur.failure,
+        accumulatingUntil: cur.accumulatingUntil,
+        pendingAttachments: <PreviewAttachment>[
+          ...cur.pendingAttachments,
+          PreviewAttachment(name: picked.filename, bytes: picked.bytes),
+        ],
+      ),
+    );
+  }
+
+  void _onAttachmentRemoved(
+    PreviewAttachmentRemoved event,
+    Emitter<PreviewState> emit,
+  ) {
+    final current = state;
+    if (current is! PreviewLoaded) return;
+    emit(
+      PreviewLoaded(
+        items: current.items,
+        sending: current.sending,
+        failure: current.failure,
+        accumulatingUntil: current.accumulatingUntil,
+        pendingAttachments: current.pendingAttachments
+            .where((a) => a.name != event.name)
+            .toList(growable: false),
       ),
     );
   }

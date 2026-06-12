@@ -1,13 +1,17 @@
+import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
 import 'package:ataulfo/features/trainer/presentation/bloc/preview_bloc.dart';
 import 'package:ataulfo/features/trainer/presentation/pages/preview_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockPreviewRepo extends Mock implements PreviewRepository {}
+
+class _MockPicker extends Mock implements MediaFilePicker {}
 
 Future<void> _pump(WidgetTester tester, List<PreviewItem> items) async {
   final repo = _MockPreviewRepo();
@@ -80,5 +84,38 @@ void main() {
       PreviewItem(kind: 'bot', text: '¡Hola!', at: DateTime.utc(2026)),
     ]);
     expect(find.byKey(const Key('preview.tools_toggle')), findsNothing);
+  });
+
+  testWidgets('el clip del demo guarda el adjunto y pinta el chip con ✕', (
+    tester,
+  ) async {
+    final repo = _MockPreviewRepo();
+    final picker = _MockPicker();
+    when(
+      () => repo.transcript(templateId: 't1'),
+    ).thenAnswer((_) async => const PreviewTranscript(items: <PreviewItem>[]));
+    when(() => picker.pick()).thenAnswer(
+      (_) async =>
+          PickedMedia(bytes: Uint8List.fromList(<int>[1]), filename: 'f.png'),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider<PreviewBloc>(
+          create: (_) =>
+              PreviewBloc(repo: repo, templateId: 't1', picker: picker)
+                ..add(const PreviewStarted()),
+          child: const PreviewPage(templateId: 't1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('preview.attach')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('preview.pending_att.f.png')), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close).first);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('preview.pending_att.f.png')), findsNothing);
   });
 }

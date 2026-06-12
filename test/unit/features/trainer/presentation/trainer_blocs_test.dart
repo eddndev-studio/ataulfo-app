@@ -516,7 +516,11 @@ void main() {
       seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
       setUp: () {
         when(
-          () => repo.sendMessage(templateId: 't1', content: 'hola'),
+          () => repo.sendMessage(
+            templateId: 't1',
+            content: 'hola',
+            attachments: any(named: 'attachments'),
+          ),
         ).thenAnswer(
           (_) async => PreviewTurn(
             items: <PreviewItem>[_item('user', text: 'hola')],
@@ -577,7 +581,11 @@ void main() {
       ),
       setUp: () {
         when(
-          () => repo.sendMessage(templateId: 't1', content: '¿hay envío?'),
+          () => repo.sendMessage(
+            templateId: 't1',
+            content: '¿hay envío?',
+            attachments: any(named: 'attachments'),
+          ),
         ).thenAnswer(
           (_) async => PreviewTurn(
             items: <PreviewItem>[_item('user', text: '¿hay envío?')],
@@ -629,7 +637,11 @@ void main() {
       seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
       setUp: () {
         when(
-          () => repo.sendMessage(templateId: 't1', content: 'hola'),
+          () => repo.sendMessage(
+            templateId: 't1',
+            content: 'hola',
+            attachments: any(named: 'attachments'),
+          ),
         ).thenAnswer(
           (_) async => PreviewTurn(
             items: <PreviewItem>[_item('user', text: 'hola')],
@@ -669,7 +681,11 @@ void main() {
       seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
       setUp: () {
         when(
-          () => repo.sendMessage(templateId: 't1', content: 'hola'),
+          () => repo.sendMessage(
+            templateId: 't1',
+            content: 'hola',
+            attachments: any(named: 'attachments'),
+          ),
         ).thenAnswer(
           (_) async => PreviewTurn(
             items: <PreviewItem>[
@@ -718,7 +734,11 @@ void main() {
       seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
       setUp: () {
         when(
-          () => repo.sendMessage(templateId: 't1', content: 'promo'),
+          () => repo.sendMessage(
+            templateId: 't1',
+            content: 'promo',
+            attachments: any(named: 'attachments'),
+          ),
         ).thenAnswer(
           (_) async => PreviewTurn(
             items: <PreviewItem>[
@@ -763,7 +783,11 @@ void main() {
       seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
       setUp: () {
         when(
-          () => repo.sendMessage(templateId: 't1', content: 'x'),
+          () => repo.sendMessage(
+            templateId: 't1',
+            content: 'x',
+            attachments: any(named: 'attachments'),
+          ),
         ).thenThrow(const TrainerUnavailableFailure());
       },
       act: (b) => b.add(const PreviewMessageSent('x')),

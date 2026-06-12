@@ -175,12 +175,47 @@ class _PreviewThreadState extends State<_PreviewThread> {
             ),
           ),
         if (s.accumulatingUntil != null) const _AccumulatingBanner(),
+        if (s.pendingAttachments.isNotEmpty)
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              key: const Key('preview.pending_attachments'),
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
+              itemCount: s.pendingAttachments.length,
+              separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
+              itemBuilder: (context, i) {
+                final att = s.pendingAttachments[i];
+                return InputChip(
+                  key: Key('preview.pending_att.${att.name}'),
+                  avatar: const Icon(Icons.attach_file, size: 16),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  label: Text(att.name, overflow: TextOverflow.ellipsis),
+                  onDeleted: () => context.read<PreviewBloc>().add(
+                    PreviewAttachmentRemoved(att.name),
+                  ),
+                );
+              },
+            ),
+          ),
         AppChatComposer(
           fieldKey: const Key('preview.composer.field'),
           sendKey: const Key('preview.composer.send'),
           hint: 'Escribe como cliente…',
           enabled: !s.sending,
           onSend: _send,
+          leading: <Widget>[
+            IconButton(
+              key: const Key('preview.attach'),
+              tooltip: 'Adjuntar imagen, PDF o audio',
+              icon: const Icon(Icons.attach_file, color: AppTokens.text2),
+              onPressed: s.sending
+                  ? null
+                  : () => context.read<PreviewBloc>().add(
+                      const PreviewAttachRequested(),
+                    ),
+            ),
+          ],
         ),
       ],
     );

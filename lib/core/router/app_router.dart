@@ -859,9 +859,11 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return BlocProvider<PreviewBloc>(
-            create: (_) =>
-                PreviewBloc(repo: _previewRepo, templateId: id)
-                  ..add(const PreviewStarted()),
+            create: (_) => PreviewBloc(
+              repo: _previewRepo,
+              templateId: id,
+              picker: FilePickerMediaFilePicker(),
+            )..add(const PreviewStarted()),
             child: PreviewPage(templateId: id),
           );
         },

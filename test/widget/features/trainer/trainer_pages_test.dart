@@ -356,7 +356,11 @@ void main() {
       expect(find.byIcon(Icons.image_outlined), findsOneWidget);
 
       when(
-        () => repo.sendMessage(templateId: 't1', content: '¿precio?'),
+        () => repo.sendMessage(
+          templateId: 't1',
+          content: '¿precio?',
+          attachments: any(named: 'attachments'),
+        ),
       ).thenAnswer(
         (_) async => const PreviewTurn(items: <PreviewItem>[], iterations: 1),
       );
@@ -368,7 +372,11 @@ void main() {
       await tester.tap(find.byKey(const Key('preview.composer.send')));
       await tester.pump();
       verify(
-        () => repo.sendMessage(templateId: 't1', content: '¿precio?'),
+        () => repo.sendMessage(
+          templateId: 't1',
+          content: '¿precio?',
+          attachments: any(named: 'attachments'),
+        ),
       ).called(1);
       await tester.pumpAndSettle();
 

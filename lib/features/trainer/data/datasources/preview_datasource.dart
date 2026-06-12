@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
+import '../../domain/entities/preview_attachment.dart';
 import '../../domain/entities/preview_item.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../dto/preview_dtos.dart';
@@ -14,6 +17,7 @@ abstract interface class PreviewDatasource {
   Future<PreviewTurn> sendMessage({
     required String templateId,
     required String content,
+    List<PreviewAttachment> attachments,
   });
 
   Future<PreviewTranscript> transcript({required String templateId});
@@ -30,11 +34,23 @@ class DioPreviewDatasource implements PreviewDatasource {
   Future<PreviewTurn> sendMessage({
     required String templateId,
     required String content,
+    List<PreviewAttachment> attachments = const <PreviewAttachment>[],
   }) async {
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '/templates/$templateId/preview/messages',
-        data: <String, dynamic>{'content': content},
+        data: <String, dynamic>{
+          'content': content,
+          if (attachments.isNotEmpty)
+            'attachments': attachments
+                .map(
+                  (a) => <String, String>{
+                    'name': a.name,
+                    'data': base64Encode(a.bytes),
+                  },
+                )
+                .toList(growable: false),
+        },
         options: Options(receiveTimeout: turnReceiveTimeout),
       );
       final body = res.data;

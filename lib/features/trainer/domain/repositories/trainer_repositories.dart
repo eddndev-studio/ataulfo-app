@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../entities/preview_item.dart';
+import '../entities/preview_attachment.dart';
 import '../entities/trainer_attachment.dart';
 import '../entities/trainer_conversation.dart';
 import '../entities/trainer_message.dart';
@@ -71,6 +72,7 @@ abstract interface class PreviewRepository {
   Future<PreviewTurn> sendMessage({
     required String templateId,
     required String content,
+    List<PreviewAttachment> attachments,
   });
   Future<PreviewTranscript> transcript({required String templateId});
   Future<void> reset({required String templateId});
