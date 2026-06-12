@@ -5,11 +5,13 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_swatch_icon.dart';
 import '../../../labels/domain/entities/label.dart';
 import '../../../labels/presentation/widgets/label_dot.dart';
 import '../../domain/entities/wa_label.dart';
 import '../bloc/wa_label_mapping_bloc.dart';
-import '../widgets/wa_label_swatch.dart';
+import '../widgets/wa_label_palette.dart';
 import '../widgets/wa_mapping_selector_sheet.dart';
 
 /// Pantalla de mapeo etiqueta-WhatsApp ↔ Label interno (S21, Dirección 2).
@@ -60,10 +62,16 @@ class _LoadedView extends StatelessWidget {
 
   final WaMappingData data;
 
+  /// Etiquetas con vínculo RESUELTO (un mapeo roto no automatiza nada: no
+  /// cuenta como vinculada).
+  int get _linkedCount =>
+      data.waLabels.where((w) => data.mappedLabel(w.waLabelId) != null).length;
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final waLabels = data.waLabels;
+    final linked = _linkedCount;
     return RefreshIndicator(
       onRefresh: () async {
         final bloc = context.read<WaLabelMappingBloc>();
@@ -88,6 +96,19 @@ class _LoadedView extends StatelessWidget {
             'chat.',
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
           ),
+          if (waLabels.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppTokens.sp4),
+            // Resumen del progreso del mapeo de un vistazo.
+            Align(
+              alignment: Alignment.centerLeft,
+              child: AppPill.neutral(
+                key: const Key('wa_mapping.summary'),
+                label:
+                    '$linked de ${waLabels.length} '
+                    '${linked == 1 ? 'vinculada' : 'vinculadas'}',
+              ),
+            ),
+          ],
           const SizedBox(height: AppTokens.sp4),
           if (waLabels.isEmpty)
             Padding(
@@ -139,54 +160,55 @@ class _MappingRow extends StatelessWidget {
     // (el GestureDetector externo dejaba el tap sin feedback visual).
     return AppCard(
       onTap: () => WaMappingSelectorSheet.open(context, waLabel),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              WaLabelSwatch(colorIndex: waLabel.color, size: 20),
-              const SizedBox(width: AppTokens.sp3),
-              Expanded(
-                child: Text(
+          // Identidad cromática de la etiqueta WA con presencia (paridad con
+          // el catálogo).
+          AppSwatchIcon(
+            color: WaLabelPalette.resolve(waLabel.color),
+            icon: Icons.sell_outlined,
+          ),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
                   waLabel.name,
                   style: textTheme.titleMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp2),
-          if (m == null && !hasMapping)
-            Text(
-              'Sin vincular',
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-            )
-          else if (m == null)
-            // Hay un mapeo pero el Label interno fue borrado de la org: roto.
-            // El operador puede tocar la fila y "Quitar vínculo" para limpiarlo.
-            Text(
-              'Vínculo roto',
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.warning),
-            )
-          else
-            Row(
-              children: <Widget>[
-                const Icon(Icons.link, color: AppTokens.text2, size: 16),
-                const SizedBox(width: AppTokens.sp2),
-                LabelDot(hex: m.color, size: 14),
-                const SizedBox(width: AppTokens.sp2),
-                Flexible(
-                  child: Text(
-                    m.name,
-                    style: textTheme.bodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(height: AppTokens.sp1),
+                if (m == null && !hasMapping)
+                  const AppPill.outline(label: 'Sin vincular')
+                else if (m == null)
+                  // Hay un mapeo pero el Label interno fue borrado de la org:
+                  // roto. El operador toca la fila y "Quitar vínculo" limpia.
+                  const AppPill.danger(label: 'Vínculo roto')
+                else
+                  Row(
+                    children: <Widget>[
+                      const Icon(Icons.link, color: AppTokens.text2, size: 16),
+                      const SizedBox(width: AppTokens.sp2),
+                      LabelDot(hex: m.color, size: 14),
+                      const SizedBox(width: AppTokens.sp2),
+                      Flexible(
+                        child: Text(
+                          m.name,
+                          style: textTheme.bodyMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
               ],
             ),
+          ),
+          const SizedBox(width: AppTokens.sp2),
+          const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
         ],
       ),
     );

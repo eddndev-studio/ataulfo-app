@@ -502,4 +502,46 @@ void main() {
       expect(templatesList.routeObserver, same(observer));
     });
   });
+
+  group('header propio por tab', () {
+    testWidgets('la tab Etiquetas NO monta AppBar del shell (header rico)', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Etiquetas'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Como Bots/Plantillas: la tarjeta-header full-bleed ES el encabezado.
+      expect(find.byType(AppBar), findsNothing);
+    });
+
+    testWidgets('el avatar del header de Etiquetas navega a Ajustes', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Etiquetas'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final page = tester.widget<LabelsAdminPage>(find.byType(LabelsAdminPage));
+      expect(
+        page.onOpenSettings,
+        isNotNull,
+        reason: 'El shell debe cablear el avatar → tab Ajustes.',
+      );
+    });
+  });
 }

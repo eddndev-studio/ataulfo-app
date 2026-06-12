@@ -1,5 +1,9 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_header_card.dart';
+import 'package:ataulfo/core/design/widgets/app_swatch_icon.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/failures/labels_failure.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
@@ -13,9 +17,25 @@ import 'package:mocktail/mocktail.dart';
 class _MockBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
     implements LabelsAdminBloc {}
 
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
+
+const _identity = Identity(
+  userId: 'u1',
+  orgId: 'o1',
+  role: 'OWNER',
+  email: 'op@example.com',
+);
+
 void main() {
   late _MockBloc bloc;
-  setUp(() => bloc = _MockBloc());
+  late _MockAuthBloc authBloc;
+
+  setUp(() {
+    bloc = _MockBloc();
+    authBloc = _MockAuthBloc();
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+  });
 
   void seed(LabelsAdminState state) {
     when(() => bloc.state).thenReturn(state);
@@ -28,10 +48,21 @@ void main() {
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: BlocProvider<LabelsAdminBloc>.value(
-      value: bloc,
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<LabelsAdminBloc>.value(value: bloc),
+        BlocProvider<AuthBloc>.value(value: authBloc),
+      ],
       child: const Scaffold(body: LabelsAdminPage()),
     ),
+  );
+
+  const twoLabels = LabelsAdminLoaded(
+    labels: <Label>[
+      Label(id: '1', name: 'VIP', color: '#7c3aed', description: 'Oro'),
+      Label(id: '2', name: 'Soporte', color: '#22c55e', description: ''),
+    ],
+    isRefreshing: false,
   );
 
   testWidgets('Loading → spinner', (tester) async {
@@ -40,20 +71,49 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  testWidgets('Loaded con etiquetas → pinta nombres', (tester) async {
-    seed(
-      const LabelsAdminLoaded(
-        labels: <Label>[
-          Label(id: '1', name: 'VIP', color: '#7c3aed', description: 'Oro'),
-          Label(id: '2', name: 'Soporte', color: '#22c55e', description: ''),
-        ],
-        isRefreshing: false,
-      ),
-    );
+  testWidgets('Loaded monta el header rico de sección (paridad con tabs)', (
+    tester,
+  ) async {
+    seed(twoLabels);
+    await tester.pumpWidget(host());
+
+    expect(find.byType(AppHeaderCard), findsOneWidget);
+    expect(find.text('Etiquetas'), findsOneWidget);
+    // El saludo viene de la sesión (parte local del email capitalizada).
+    expect(find.textContaining('Op'), findsWidgets);
+  });
+
+  testWidgets('Loaded con etiquetas → nombres + glifo tintado por etiqueta', (
+    tester,
+  ) async {
+    seed(twoLabels);
     await tester.pumpWidget(host());
     expect(find.text('VIP'), findsOneWidget);
     expect(find.text('Soporte'), findsOneWidget);
     expect(find.text('Oro'), findsOneWidget);
+    // La identidad cromática deja de ser un dot de 16px: glifo tintado 44px.
+    expect(find.byType(AppSwatchIcon), findsNWidgets(2));
+  });
+
+  testWidgets('buscador filtra por nombre (client-side)', (tester) async {
+    seed(twoLabels);
+    await tester.pumpWidget(host());
+
+    await tester.enterText(find.byKey(const Key('labels_admin.search')), 'vip');
+    await tester.pump();
+
+    expect(find.text('VIP'), findsOneWidget);
+    expect(find.text('Soporte'), findsNothing);
+  });
+
+  testWidgets('búsqueda sin coincidencias → aviso no_results', (tester) async {
+    seed(twoLabels);
+    await tester.pumpWidget(host());
+
+    await tester.enterText(find.byKey(const Key('labels_admin.search')), 'zzz');
+    await tester.pump();
+
+    expect(find.byKey(const Key('labels_admin.no_results')), findsOneWidget);
   });
 
   testWidgets('el tile usa el onTap del AppCard (ripple del DS)', (
@@ -75,10 +135,16 @@ void main() {
     expect(card.onTap, isNotNull);
   });
 
-  testWidgets('Loaded vacío → empty state', (tester) async {
+  testWidgets('Loaded vacío → empty state SIN perder el header ni el refresh', (
+    tester,
+  ) async {
     seed(const LabelsAdminLoaded(labels: <Label>[], isRefreshing: false));
     await tester.pumpWidget(host());
     expect(find.byKey(const Key('labels_admin.empty')), findsOneWidget);
+    expect(find.byType(AppHeaderCard), findsOneWidget);
+    expect(find.byType(RefreshIndicator), findsOneWidget);
+    // Sin etiquetas no hay qué buscar: el campo no se monta.
+    expect(find.byKey(const Key('labels_admin.search')), findsNothing);
   });
 
   testWidgets('Failed → error + reintentar despacha LoadRequested', (

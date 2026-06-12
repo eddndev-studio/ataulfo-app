@@ -1,4 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/core/design/widgets/app_swatch_icon.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
 import 'package:ataulfo/features/wa_labels/presentation/bloc/wa_label_mapping_bloc.dart';
@@ -81,11 +83,43 @@ void main() {
       // La etiqueta WA mapeada muestra el nombre del label interno.
       expect(find.text('VIP'), findsOneWidget);
       expect(find.text('Clientes top'), findsOneWidget);
-      // La no mapeada muestra "Sin vincular".
+      // La no mapeada muestra "Sin vincular" como pill (estado, no texto suelto).
       expect(find.text('Soporte'), findsOneWidget);
-      expect(find.text('Sin vincular'), findsOneWidget);
+      expect(find.widgetWithText(AppPill, 'Sin vincular'), findsOneWidget);
+      // Cada etiqueta WA lleva su glifo tintado (identidad cromática).
+      expect(find.byType(AppSwatchIcon), findsNWidgets(2));
     },
   );
+
+  testWidgets('Loaded resume cuántas etiquetas están vinculadas', (
+    tester,
+  ) async {
+    stub(WaMappingLoaded(data));
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    // 1 mapeo resuelto sobre 2 etiquetas activas.
+    expect(find.byKey(const Key('wa_mapping.summary')), findsOneWidget);
+    expect(find.text('1 de 2 vinculada'), findsOneWidget);
+  });
+
+  testWidgets('el resumen NO cuenta vínculos rotos como vinculados', (
+    tester,
+  ) async {
+    stub(
+      WaMappingLoaded(
+        WaMappingData(
+          waLabels: <WaLabel>[_wa(name: 'Soporte')],
+          mappings: const <String, String>{'1000': 'ghost'},
+          internalLabels: <Label>[_il()],
+        ),
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(find.text('0 de 1 vinculadas'), findsOneWidget);
+  });
 
   testWidgets(
     'mapeo colgante (label borrado) → "Vínculo roto", no "Sin vincular"',
@@ -102,7 +136,9 @@ void main() {
       );
       await tester.pumpWidget(host());
       await tester.pump();
-      expect(find.text('Vínculo roto'), findsOneWidget);
+      // Estado anómalo en pill danger — distinguible de "Sin vincular" de un
+      // vistazo (el operador toca la fila y quita el vínculo para limpiarlo).
+      expect(find.widgetWithText(AppPill, 'Vínculo roto'), findsOneWidget);
       expect(find.text('Sin vincular'), findsNothing);
     },
   );

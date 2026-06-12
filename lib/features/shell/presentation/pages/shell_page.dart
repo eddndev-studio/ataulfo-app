@@ -57,16 +57,16 @@ class _ShellPageState extends State<ShellPage> {
       routeObserver: widget.routeObserver,
       onOpenSettings: () => _select(3),
     ),
-    const LabelsAdminPage(),
+    LabelsAdminPage(onOpenSettings: () => _select(3)),
     const SettingsPage(),
   ];
 
   void _select(int i) => setState(() => _index = i);
 
-  /// Las tabs con header rico propio (Bots/Plantillas) NO usan el AppBar del
-  /// shell: la tarjeta-header full-bleed ES su encabezado. El resto conserva el
-  /// AppBar con el título del tab.
-  bool get _hasOwnHeader => _index == 0 || _index == 1;
+  /// Las tabs con header rico propio (Bots/Plantillas/Etiquetas) NO usan el
+  /// AppBar del shell: la tarjeta-header full-bleed ES su encabezado. El resto
+  /// conserva el AppBar con el título del tab.
+  bool get _hasOwnHeader => _index <= 2;
 
   @override
   Widget build(BuildContext context) {

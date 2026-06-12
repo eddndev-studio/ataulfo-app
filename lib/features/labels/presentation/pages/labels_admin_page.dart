@@ -5,18 +5,89 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_header_card.dart';
+import '../../../../core/design/widgets/app_swatch_icon.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/util/user_greeting.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/label.dart';
 import '../../domain/failures/labels_failure.dart';
 import '../bloc/labels_admin_bloc.dart';
 import '../widgets/label_dot.dart';
 import '../widgets/label_edit_sheet.dart';
 
-/// Cuerpo de la sección "Etiquetas" (S10), org-scoped. Es una tab del shell, así
-/// que NO trae Scaffold/AppBar propios (el shell aporta la barra y el FAB de
-/// crear). Consume el `LabelsAdminBloc` del scope: pinta el catálogo, abre la
-/// hoja de edición al tocar una etiqueta y deja recargar con pull-to-refresh.
-class LabelsAdminPage extends StatelessWidget {
-  const LabelsAdminPage({super.key});
+/// Cuerpo de la sección "Etiquetas" (S10), org-scoped. Es una tab del shell con
+/// header rico propio (la tarjeta-header full-bleed ES su encabezado, como en
+/// Bots/Plantillas — el shell no monta AppBar para esta tab; el FAB de crear sí
+/// lo aporta el shell). Consume el `LabelsAdminBloc` del scope: pinta el
+/// catálogo con buscador client-side, abre la hoja de edición al tocar una
+/// etiqueta y deja recargar con pull-to-refresh.
+class LabelsAdminPage extends StatefulWidget {
+  const LabelsAdminPage({super.key, this.onOpenSettings});
+
+  /// Acción del avatar del header → abrir Ajustes. La aporta el shell (que
+  /// controla los tabs). Sin ella, el avatar es no-op.
+  final VoidCallback? onOpenSettings;
+
+  @override
+  State<LabelsAdminPage> createState() => _LabelsAdminPageState();
+}
+
+class _LabelsAdminPageState extends State<LabelsAdminPage> {
+  late final TextEditingController _searchCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl = TextEditingController();
+    // Cada keystroke re-filtra la lista visible (client-side); un setState basta.
+    _searchCtrl.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl
+      ..removeListener(_onSearchChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  String _emailFromSession(BuildContext context) {
+    final state = context.read<AuthBloc>().state;
+    return switch (state) {
+      AuthAuthenticated(:final identity) => identity.email,
+      AuthAuthenticatedNoOrg(:final identity) => identity.email,
+      _ => '',
+    };
+  }
+
+  List<Label> _applyFilter(List<Label> items) {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return items;
+    return items
+        .where(
+          (l) =>
+              l.name.toLowerCase().contains(q) ||
+              l.description.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+
+  Future<void> _refresh(BuildContext context) async {
+    final bloc = context.read<LabelsAdminBloc>();
+    bloc.add(const LabelsAdminRefreshRequested());
+    // `orElse` evita un StateError si el bloc se cierra (el operador cambia
+    // de tab) mientras el refresh sigue en vuelo.
+    await bloc.stream.firstWhere(
+      (s) =>
+          (s is LabelsAdminLoaded && !s.isRefreshing) || s is LabelsAdminFailed,
+      orElse: () => bloc.state,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,59 +98,66 @@ class LabelsAdminPage extends StatelessWidget {
         LabelsAdminMutating(labels: final labels) ||
         LabelsAdminMutationFailed(
           labels: final labels,
-        ) => _LoadedView(labels: labels),
+        ) => _buildLoaded(context, labels),
         LabelsAdminFailed(failure: final f) => _FailedView(failure: f),
       },
     );
   }
-}
 
-class _LoadingView extends StatelessWidget {
-  const _LoadingView();
-
-  @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
-}
-
-class _LoadedView extends StatelessWidget {
-  const _LoadedView({required this.labels});
-
-  final List<Label> labels;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildLoaded(BuildContext context, List<Label> labels) {
+    final filtered = _applyFilter(labels);
+    final user = userGreeting(_emailFromSession(context));
     return RefreshIndicator(
-      onRefresh: () async {
-        final bloc = context.read<LabelsAdminBloc>();
-        bloc.add(const LabelsAdminRefreshRequested());
-        // `orElse` evita un StateError si el bloc se cierra (el operador cambia
-        // de tab) mientras el refresh sigue en vuelo.
-        await bloc.stream.firstWhere(
-          (s) =>
-              (s is LabelsAdminLoaded && !s.isRefreshing) ||
-              s is LabelsAdminFailed,
-          orElse: () => bloc.state,
-        );
-      },
-      child: labels.isEmpty
-          ? const _EmptyView()
-          : ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                AppTokens.sp4,
-                AppTokens.sp4,
-                AppTokens.sp4,
-                AppTokens.sp4 + context.safeBottomInset,
-              ),
-              itemCount: labels.length,
-              separatorBuilder: (_, _) =>
-                  const SizedBox(height: AppTokens.cardGap),
-              itemBuilder: (_, i) => _LabelTile(label: labels[i]),
+      onRefresh: () => _refresh(context),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        // Sin padding aquí: el header es full-bleed y va pegado arriba. El
+        // resto del contenido lleva su propio padding más abajo.
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            AppHeaderCard(
+              greeting: user.greeting,
+              title: 'Etiquetas',
+              avatarInitial: user.initial,
+              onAvatarTap: widget.onOpenSettings ?? () {},
+              watermark: Icons.label,
             ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.sp5 + context.safeBottomInset,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (labels.isEmpty)
+                    const _EmptyCopy()
+                  else ...<Widget>[
+                    AppTextField(
+                      key: const Key('labels_admin.search'),
+                      label: 'Buscar etiqueta',
+                      hint: 'Nombre o descripción',
+                      controller: _searchCtrl,
+                    ),
+                    const SizedBox(height: AppTokens.sp5),
+                    if (filtered.isEmpty)
+                      const _NoResults()
+                    else
+                      for (final label in filtered) ...<Widget>[
+                        _LabelTile(label: label),
+                        const SizedBox(height: AppTokens.cardGap),
+                      ],
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -99,7 +177,9 @@ class _LabelTile extends StatelessWidget {
       onTap: () => LabelEditSheet.openEdit(context, label),
       child: Row(
         children: <Widget>[
-          LabelDot(hex: label.color),
+          // El color ES la identidad de la etiqueta: glifo tintado con
+          // presencia (no un dot de 16px perdido en la card).
+          AppSwatchIcon(color: parseLabelHex(label.color)),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(
@@ -133,37 +213,65 @@ class _LabelTile extends StatelessWidget {
   }
 }
 
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+class _LoadingView extends StatelessWidget {
+  const _LoadingView();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: CircularProgressIndicator(
+      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+    ),
+  );
+}
+
+/// La búsqueda no dejó etiquetas visibles (pero sí las hay en la org).
+class _NoResults extends StatelessWidget {
+  const _NoResults();
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return ListView(
-      key: const Key('labels_admin.empty'),
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: <Widget>[
-        SizedBox(height: MediaQuery.sizeOf(context).height * 0.3),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp6),
-          child: Column(
-            children: <Widget>[
-              Text(
-                'Sin etiquetas todavía',
-                textAlign: TextAlign.center,
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: AppTokens.sp2),
-              Text(
-                'Crea etiquetas para clasificar conversaciones y dispararlas '
-                'desde tus flujos.',
-                textAlign: TextAlign.center,
-                style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-              ),
-            ],
-          ),
+    return Padding(
+      key: const Key('labels_admin.no_results'),
+      padding: const EdgeInsets.symmetric(vertical: AppTokens.sp6),
+      child: Center(
+        child: Text(
+          'Ninguna etiqueta coincide con tu búsqueda.',
+          textAlign: TextAlign.center,
+          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+/// Catálogo vacío. Vive BAJO el header (la sección no pierde identidad ni el
+/// avatar) y deja el pull-to-refresh activo.
+class _EmptyCopy extends StatelessWidget {
+  const _EmptyCopy();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      key: const Key('labels_admin.empty'),
+      padding: const EdgeInsets.symmetric(vertical: AppTokens.sp7),
+      child: Column(
+        children: <Widget>[
+          Text(
+            'Sin etiquetas todavía',
+            textAlign: TextAlign.center,
+            style: textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppTokens.sp2),
+          Text(
+            'Crea etiquetas para clasificar conversaciones y dispararlas '
+            'desde tus flujos.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,9 +1,9 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_swatch_icon.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
 import 'package:ataulfo/features/wa_labels/domain/failures/wa_labels_failure.dart';
 import 'package:ataulfo/features/wa_labels/presentation/bloc/wa_labels_bloc.dart';
 import 'package:ataulfo/features/wa_labels/presentation/pages/wa_labels_page.dart';
-import 'package:ataulfo/features/wa_labels/presentation/widgets/wa_label_swatch.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -68,8 +68,8 @@ void main() {
     expect(find.text('Spam'), findsOneWidget);
     // El tombstone no se pinta.
     expect(find.text('Borrada'), findsNothing);
-    // Un swatch por etiqueta activa (2), no por el tombstone.
-    expect(find.byType(WaLabelSwatch), findsNWidgets(2));
+    // Un glifo tintado por etiqueta activa (2), no por el tombstone.
+    expect(find.byType(AppSwatchIcon), findsNWidgets(2));
   });
 
   testWidgets('Loaded sin activas (solo tombstones) → vista vacía', (
@@ -83,8 +83,10 @@ void main() {
     );
     await tester.pumpWidget(host());
     await tester.pump();
-    expect(find.byType(WaLabelSwatch), findsNothing);
+    expect(find.byType(AppSwatchIcon), findsNothing);
     expect(find.byKey(const Key('wa_labels.empty')), findsOneWidget);
+    // Sin etiquetas no hay nada que vincular: el launcher tampoco se monta.
+    expect(find.byKey(const Key('wa_labels.mappings')), findsNothing);
   });
 
   testWidgets('Failed → error + Reintentar despacha load', (tester) async {
@@ -97,13 +99,22 @@ void main() {
     verify(() => bloc.add(const WaLabelsLoadRequested())).called(1);
   });
 
-  testWidgets('AppBar expone la acción de Vínculos con etiquetas internas', (
-    tester,
-  ) async {
+  testWidgets('el launcher de Vínculos vive en el cuerpo como card visible, '
+      'no escondido en el AppBar', (tester) async {
     stub(WaLabelsLoaded(labels: <WaLabel>[_label()], isRefreshing: false));
     await tester.pumpWidget(host());
     await tester.pump();
-    expect(find.byKey(const Key('wa_labels.mappings')), findsOneWidget);
+
+    final launcher = find.byKey(const Key('wa_labels.mappings'));
+    expect(launcher, findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: launcher),
+      findsNothing,
+      reason:
+          'Un icono de AppBar es una affordance invisible para LA feature '
+          'que convierte etiquetas en automatizaciones.',
+    );
+    expect(find.text('Vínculos con etiquetas internas'), findsOneWidget);
   });
 
   testWidgets('FAB de crear ausente en Loading', (tester) async {

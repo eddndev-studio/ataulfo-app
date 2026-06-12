@@ -6,11 +6,13 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_section_link.dart';
+import '../../../../core/design/widgets/app_swatch_icon.dart';
 import '../../domain/entities/wa_label.dart';
 import '../../domain/failures/wa_labels_failure.dart';
 import '../bloc/wa_labels_bloc.dart';
 import '../widgets/wa_label_edit_sheet.dart';
-import '../widgets/wa_label_swatch.dart';
+import '../widgets/wa_label_palette.dart';
 
 /// Catálogo de etiquetas WhatsApp del bot (S21). Consume el `WaLabelsBloc` del
 /// scope (la ruta `/bots/:id/wa-labels` lo cabla con el botId). Posee su propio
@@ -27,20 +29,10 @@ class WaLabelsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Etiquetas de WhatsApp'),
-        actions: <Widget>[
-          IconButton(
-            key: const Key('wa_labels.mappings'),
-            tooltip: 'Vínculos con etiquetas internas',
-            icon: const Icon(Icons.link),
-            onPressed: () {
-              final botId = context.read<WaLabelsBloc>().botId;
-              context.push('/bots/$botId/wa-label-mappings');
-            },
-          ),
-        ],
-      ),
+      // El acceso a los vínculos vive en el CUERPO como card launcher (un
+      // icono de AppBar era una affordance invisible para la feature que
+      // convierte etiquetas en automatizaciones).
+      appBar: AppBar(title: const Text('Etiquetas de WhatsApp')),
       body: BlocBuilder<WaLabelsBloc, WaLabelsState>(
         builder: (context, state) => switch (state) {
           WaLabelsLoading() => const _LoadingView(),
@@ -108,7 +100,7 @@ class _LoadedView extends StatelessWidget {
       },
       child: active.isEmpty
           ? const _EmptyView()
-          : ListView.separated(
+          : ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(
                 AppTokens.sp4,
@@ -116,11 +108,38 @@ class _LoadedView extends StatelessWidget {
                 AppTokens.sp4,
                 AppTokens.sp4 + context.safeBottomInset,
               ),
-              itemCount: active.length,
-              separatorBuilder: (_, _) =>
+              children: <Widget>[
+                const _MappingsLauncher(),
+                const SizedBox(height: AppTokens.sp5),
+                for (final label in active) ...<Widget>[
+                  _WaLabelTile(label: label),
                   const SizedBox(height: AppTokens.cardGap),
-              itemBuilder: (_, i) => _WaLabelTile(label: active[i]),
+                ],
+              ],
             ),
+    );
+  }
+}
+
+/// Card launcher hacia el mapeo WA ↔ Label interno: LA acción que convierte
+/// "etiqueté un chat en WhatsApp" en una automatización merece una affordance
+/// visible, no un icono de AppBar.
+class _MappingsLauncher extends StatelessWidget {
+  const _MappingsLauncher();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: AppSectionLink(
+        rowKey: const Key('wa_labels.mappings'),
+        icon: Icons.link,
+        title: 'Vínculos con etiquetas internas',
+        caption: 'Qué automatización dispara cada etiqueta',
+        onTap: () {
+          final botId = context.read<WaLabelsBloc>().botId;
+          context.push('/bots/$botId/wa-label-mappings');
+        },
+      ),
     );
   }
 }
@@ -139,7 +158,12 @@ class _WaLabelTile extends StatelessWidget {
       onTap: () => WaLabelEditSheet.openEdit(context, label),
       child: Row(
         children: <Widget>[
-          WaLabelSwatch(colorIndex: label.color),
+          // El color ES la identidad de la etiqueta: glifo tintado con el
+          // color resuelto de la paleta WhatsApp (no un dot pequeño).
+          AppSwatchIcon(
+            color: WaLabelPalette.resolve(label.color),
+            icon: Icons.sell_outlined,
+          ),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Text(
