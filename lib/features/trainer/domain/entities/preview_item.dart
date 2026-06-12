@@ -15,7 +15,7 @@ class PreviewItem {
     this.delayMs = 0,
   });
 
-  final String kind; // user | bot | action | media
+  final String kind; // user | bot | action | tool | media
   final String text;
   final String tool;
   final String summary;
@@ -35,6 +35,7 @@ class PreviewItem {
   bool get isUser => kind == 'user';
   bool get isBot => kind == 'bot';
   bool get isAction => kind == 'action';
+  bool get isTool => kind == 'tool';
   bool get isMedia => kind == 'media';
 
   @override

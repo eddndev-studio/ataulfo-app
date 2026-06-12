@@ -11,11 +11,21 @@ import 'trainer_chat_page.dart' show trainerFailureCopy;
 
 /// Emulador del bot: corre el MISMO motor que producción contra una sesión
 /// sandbox. Nada llega a WhatsApp; los efectos (etiquetas, notas, flujos)
-/// aparecen como chips grabados. Consume tokens reales del proveedor.
-class PreviewPage extends StatelessWidget {
+/// aparecen como chips grabados. Consume tokens reales del proveedor. Las
+/// LECTURAS del bot (kind tool) viven tras un toggle: por defecto el hilo
+/// muestra solo la conversación + efectos; el operador que diagnostica
+/// enciende las herramientas.
+class PreviewPage extends StatefulWidget {
   const PreviewPage({required this.templateId, super.key});
 
   final String templateId;
+
+  @override
+  State<PreviewPage> createState() => _PreviewPageState();
+}
+
+class _PreviewPageState extends State<PreviewPage> {
+  bool _showTools = false;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +33,25 @@ class PreviewPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Probar bot'),
         actions: <Widget>[
+          BlocBuilder<PreviewBloc, PreviewState>(
+            builder: (context, state) {
+              final hasTools =
+                  state is PreviewLoaded &&
+                  state.items.any((PreviewItem it) => it.isTool);
+              if (!hasTools) return const SizedBox.shrink();
+              return IconButton(
+                key: const Key('preview.tools_toggle'),
+                tooltip: _showTools
+                    ? 'Ocultar herramientas'
+                    : 'Mostrar herramientas',
+                icon: Icon(
+                  _showTools ? Icons.visibility : Icons.visibility_outlined,
+                  color: _showTools ? AppTokens.primary : null,
+                ),
+                onPressed: () => setState(() => _showTools = !_showTools),
+              );
+            },
+          ),
           IconButton(
             key: const Key('preview.reset'),
             tooltip: 'Reiniciar demo',
@@ -45,7 +74,10 @@ class PreviewPage extends StatelessWidget {
                     ),
                   ),
                 ),
-                PreviewLoaded() => _PreviewThread(state: state),
+                PreviewLoaded() => _PreviewThread(
+                  state: state,
+                  showTools: _showTools,
+                ),
               },
             ),
           ),
@@ -92,9 +124,10 @@ class _DemoBanner extends StatelessWidget {
 }
 
 class _PreviewThread extends StatefulWidget {
-  const _PreviewThread({required this.state});
+  const _PreviewThread({required this.state, this.showTools = false});
 
   final PreviewLoaded state;
+  final bool showTools;
 
   @override
   State<_PreviewThread> createState() => _PreviewThreadState();
@@ -109,21 +142,26 @@ class _PreviewThreadState extends State<_PreviewThread> {
   @override
   Widget build(BuildContext context) {
     final s = widget.state;
+    // Las lecturas (kind tool) se filtran ANTES de indexar: el reverse
+    // ListView cuenta sobre la lista visible, no sobre el transcript crudo.
+    final items = widget.showTools
+        ? s.items
+        : s.items.where((PreviewItem it) => !it.isTool).toList();
     return Column(
       children: <Widget>[
         Expanded(
-          child: s.items.isEmpty && !s.sending
+          child: items.isEmpty && !s.sending
               ? const _EmptyView()
               : ListView.builder(
                   reverse: true,
                   padding: const EdgeInsets.all(AppTokens.sp3),
-                  itemCount: s.items.length + (s.sending ? 1 : 0),
+                  itemCount: items.length + (s.sending ? 1 : 0),
                   itemBuilder: (context, i) {
                     if (s.sending && i == 0) {
                       return const TypingBubble(key: Key('preview.typing'));
                     }
-                    final idx = s.items.length - 1 - (i - (s.sending ? 1 : 0));
-                    return _ItemTile(item: s.items[idx]);
+                    final idx = items.length - 1 - (i - (s.sending ? 1 : 0));
+                    return _ItemTile(item: items[idx]);
                   },
                 ),
         ),
@@ -239,6 +277,17 @@ class _ItemTile extends StatelessWidget {
 
   final PreviewItem item;
 
+  IconData get _toolIcon => switch (item.tool) {
+    'read_document' => Icons.description_outlined,
+    'list_documents' => Icons.folder_open_outlined,
+    'read_labels' => Icons.label_outline,
+    'read_notes' => Icons.sticky_note_2_outlined,
+    'list_flows' => Icons.account_tree_outlined,
+    'list_sendable_files' => Icons.attach_file,
+    'get_current_time' => Icons.schedule,
+    _ => Icons.manage_search,
+  };
+
   IconData get _actionIcon => switch (item.tool) {
     'apply_label' => Icons.label_outline,
     'save_note' => Icons.sticky_note_2_outlined,
@@ -252,6 +301,38 @@ class _ItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    if (item.isTool) {
+      // Lectura del bot: chip discreto (sin acento) — diagnóstico, no
+      // evento del negocio. El summary declara fallos ("falló…").
+      return Align(
+        alignment: Alignment.center,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp3,
+            vertical: AppTokens.sp1,
+          ),
+          decoration: BoxDecoration(
+            color: AppTokens.surface1,
+            borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+            border: Border.all(color: AppTokens.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(_toolIcon, size: 14, color: AppTokens.text2),
+              const SizedBox(width: AppTokens.sp2),
+              Flexible(
+                child: Text(
+                  item.summary,
+                  style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (item.isAction) {
       // Efecto grabado del turno (etiquetaría/guardaría/ejecutaría): evento
       // centrado del hilo, con el idioma de cápsula del kit.
