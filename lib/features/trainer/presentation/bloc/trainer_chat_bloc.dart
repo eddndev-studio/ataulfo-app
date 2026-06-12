@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
+import '../../domain/entities/trainer_models.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../../domain/repositories/trainer_repositories.dart';
 
@@ -34,6 +35,21 @@ final class TrainerChatMessageSent extends TrainerChatEvent {
 
 final class TrainerChatNewConversationRequested extends TrainerChatEvent {
   const TrainerChatNewConversationRequested();
+}
+
+/// El operador elige el modelo del entrenador para los próximos turnos.
+/// id vacío ⇒ volver al default de la plataforma (el turno viaja sin model).
+final class TrainerChatModelSelected extends TrainerChatEvent {
+  const TrainerChatModelSelected(this.modelId);
+
+  final String modelId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TrainerChatModelSelected && other.modelId == modelId;
+
+  @override
+  int get hashCode => modelId.hashCode;
 }
 
 sealed class TrainerChatState {
@@ -69,6 +85,9 @@ final class TrainerChatLoaded extends TrainerChatState {
     required this.messages,
     required this.sending,
     this.sendFailure,
+    this.models = const <TrainerModelOption>[],
+    this.defaultModelId = '',
+    this.selectedModelId = '',
   });
 
   final TrainerConversation conversation;
@@ -82,16 +101,30 @@ final class TrainerChatLoaded extends TrainerChatState {
   /// Fallo del ÚLTIMO turno (el hilo sigue usable); null si no hubo.
   final TrainerFailure? sendFailure;
 
+  /// Allowlist de modelos del entrenador (best-effort: vacía oculta el
+  /// selector — backend sin la ruta o fallo de carga).
+  final List<TrainerModelOption> models;
+
+  /// Modelo default de la plataforma (informativo, para marcarlo en el menú).
+  final String defaultModelId;
+
+  /// Elección vigente del operador; '' = default (el turno viaja sin model).
+  final String selectedModelId;
+
   TrainerChatLoaded copyWith({
     List<TrainerMessage>? messages,
     bool? sending,
     TrainerFailure? sendFailure,
     bool clearSendFailure = false,
+    String? selectedModelId,
   }) => TrainerChatLoaded(
     conversation: conversation,
     messages: messages ?? this.messages,
     sending: sending ?? this.sending,
     sendFailure: clearSendFailure ? null : (sendFailure ?? this.sendFailure),
+    models: models,
+    defaultModelId: defaultModelId,
+    selectedModelId: selectedModelId ?? this.selectedModelId,
   );
 
   @override
@@ -100,11 +133,21 @@ final class TrainerChatLoaded extends TrainerChatState {
       other.conversation == conversation &&
       listEquals(other.messages, messages) &&
       other.sending == sending &&
-      other.sendFailure == sendFailure;
+      other.sendFailure == sendFailure &&
+      listEquals(other.models, models) &&
+      other.defaultModelId == defaultModelId &&
+      other.selectedModelId == selectedModelId;
 
   @override
-  int get hashCode =>
-      Object.hash(conversation, Object.hashAll(messages), sending, sendFailure);
+  int get hashCode => Object.hash(
+    conversation,
+    Object.hashAll(messages),
+    sending,
+    sendFailure,
+    Object.hashAll(models),
+    defaultModelId,
+    selectedModelId,
+  );
 }
 
 class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
@@ -115,10 +158,25 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     on<TrainerChatStarted>(_onStarted);
     on<TrainerChatMessageSent>(_onMessageSent);
     on<TrainerChatNewConversationRequested>(_onNewConversation);
+    on<TrainerChatModelSelected>(_onModelSelected);
   }
 
   final TrainerRepository _repo;
   final String _templateId;
+
+  /// Allowlist de modelos, best-effort: el selector es accesorio — CUALQUIER
+  /// fallo (backend sin la ruta, red, wire inesperado) lo oculta sin tocar
+  /// la carga del hilo.
+  Future<TrainerModels> _loadModels() async {
+    try {
+      return await _repo.listModels(templateId: _templateId);
+    } on Object {
+      return const TrainerModels(
+        options: <TrainerModelOption>[],
+        defaultId: '',
+      );
+    }
+  }
 
   Future<List<TrainerMessage>> _loadMessages(String conversationId) async {
     final page = await _repo.listMessages(
@@ -143,11 +201,14 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
               templateId: _templateId,
               title: 'Entrenamiento',
             );
+      final models = await _loadModels();
       emit(
         TrainerChatLoaded(
           conversation: conv,
           messages: await _loadMessages(conv.id),
           sending: false,
+          models: models.options,
+          defaultModelId: models.defaultId,
         ),
       );
     } on TrainerFailure catch (f) {
@@ -180,6 +241,7 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         templateId: _templateId,
         conversationId: current.conversation.id,
         content: event.content,
+        model: current.selectedModelId.isEmpty ? null : current.selectedModelId,
       );
       emit(
         current.copyWith(
@@ -193,6 +255,15 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       // motor deja el user message fuera del hilo — reintentable).
       emit(current.copyWith(sending: false, sendFailure: f));
     }
+  }
+
+  void _onModelSelected(
+    TrainerChatModelSelected event,
+    Emitter<TrainerChatState> emit,
+  ) {
+    final current = state;
+    if (current is! TrainerChatLoaded) return;
+    emit(current.copyWith(selectedModelId: event.modelId));
   }
 
   Future<void> _onNewConversation(

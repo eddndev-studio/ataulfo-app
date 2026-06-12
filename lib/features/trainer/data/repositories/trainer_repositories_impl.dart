@@ -1,6 +1,7 @@
 import '../../domain/entities/preview_item.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
+import '../../domain/entities/trainer_models.dart';
 import '../../domain/entities/workspace_doc.dart';
 import '../../domain/repositories/trainer_repositories.dart';
 import '../datasources/preview_datasource.dart';
@@ -88,11 +89,17 @@ class TrainerRepositoryImpl implements TrainerRepository {
     required String templateId,
     required String conversationId,
     required String content,
+    String? model,
   }) => _ds.sendMessage(
     templateId: templateId,
     conversationId: conversationId,
     content: content,
+    model: model,
   );
+
+  @override
+  Future<TrainerModels> listModels({required String templateId}) =>
+      _ds.listModels(templateId: templateId);
 }
 
 class PreviewRepositoryImpl implements PreviewRepository {

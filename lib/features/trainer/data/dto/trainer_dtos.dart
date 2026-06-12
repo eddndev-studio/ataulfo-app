@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
+import '../../domain/entities/trainer_models.dart';
 
 /// DTOs del hilo del entrenador (wire snake_case, espejo del platform
 /// agent). Los canónicos fallan loud; content es tolerante (assistant puro
@@ -108,4 +109,37 @@ class TrainerMessageDto {
     thinking: thinking,
     createdAt: createdAt,
   );
+}
+
+/// DTO de GET `/templates/{id}/trainer/models`. TOLERANTE de punta a punta
+/// (claves ausentes ⇒ vacío): la feature del selector es opcional y un wire
+/// inesperado no debe tumbar el chat del entrenador.
+class TrainerModelsDto {
+  const TrainerModelsDto({required this.options, required this.defaultId});
+
+  factory TrainerModelsDto.fromJson(Map<String, dynamic> json) {
+    final raw = json['items'];
+    final options = <TrainerModelOption>[];
+    if (raw is List<dynamic>) {
+      for (final e in raw) {
+        if (e is! Map<String, dynamic>) continue;
+        final id = e['id'];
+        final label = e['label'];
+        if (id is String && id.isNotEmpty && label is String) {
+          options.add(TrainerModelOption(id: id, label: label));
+        }
+      }
+    }
+    final def = json['default'];
+    return TrainerModelsDto(
+      options: options,
+      defaultId: def is String ? def : '',
+    );
+  }
+
+  final List<TrainerModelOption> options;
+  final String defaultId;
+
+  TrainerModels toEntity() =>
+      TrainerModels(options: options, defaultId: defaultId);
 }

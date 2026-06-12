@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
+import '../../domain/entities/trainer_models.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../dto/trainer_dtos.dart';
 import 'failure_mapper.dart';
@@ -30,11 +31,19 @@ abstract interface class TrainerDatasource {
 
   /// Corre un turno: persiste el user message y devuelve el assistant
   /// final. 502 ⇒ TrainerEngineFailure (el motor no produjo turno).
+  /// `model` es la elección del operador (allowlist del entrenador); null
+  /// se omite del body y el server corre con su default. 422 si el id
+  /// quedó fuera de la allowlist (app vieja vs server nuevo).
   Future<TrainerMessage> sendMessage({
     required String templateId,
     required String conversationId,
     required String content,
+    String? model,
   });
+
+  /// Allowlist de modelos del entrenador + default de la plataforma. El
+  /// caller la trata como best-effort: cualquier fallo oculta el selector.
+  Future<TrainerModels> listModels({required String templateId});
 }
 
 class DioTrainerDatasource implements TrainerDatasource {
@@ -141,16 +150,37 @@ class DioTrainerDatasource implements TrainerDatasource {
     required String templateId,
     required String conversationId,
     required String content,
+    String? model,
   }) async {
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '${_base(templateId)}/$conversationId/messages',
-        data: <String, dynamic>{'content': content},
+        data: <String, dynamic>{'content': content, 'model': ?model},
         options: Options(receiveTimeout: turnReceiveTimeout),
       );
       final body = res.data;
       if (body == null) throw const TrainerUnknownFailure();
       return TrainerMessageDto.fromJson(body).toEntity();
+    } on TrainerFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw mapTrainerDioException(e);
+    } on FormatException {
+      throw const TrainerUnknownFailure();
+    } on TypeError {
+      throw const TrainerUnknownFailure();
+    }
+  }
+
+  @override
+  Future<TrainerModels> listModels({required String templateId}) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/templates/$templateId/trainer/models',
+      );
+      final body = res.data;
+      if (body == null) throw const TrainerUnknownFailure();
+      return TrainerModelsDto.fromJson(body).toEntity();
     } on TrainerFailure {
       rethrow;
     } on DioException catch (e) {

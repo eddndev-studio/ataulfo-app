@@ -1,6 +1,7 @@
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_conversation.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_message.dart';
+import 'package:ataulfo/features/trainer/domain/entities/trainer_models.dart';
 import 'package:ataulfo/features/trainer/domain/entities/workspace_doc.dart';
 import 'package:ataulfo/features/trainer/domain/failures/trainer_failure.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
@@ -180,6 +181,144 @@ void main() {
             .having((s) => s.sending, 'sending off', false)
             .having((s) => s.messages.length, 'recargado', 3),
       ],
+    );
+
+    blocTest<TrainerChatBloc, TrainerChatState>(
+      'Started carga la allowlist de modelos (best-effort) con el default',
+      build: build,
+      setUp: () {
+        when(
+          () => repo.listConversations(templateId: 't1'),
+        ).thenAnswer((_) async => <TrainerConversation>[_conv]);
+        when(
+          () => repo.listMessages(
+            templateId: 't1',
+            conversationId: 'c1',
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => const TrainerMessagesPage(
+            messages: <TrainerMessage>[],
+            nextCursor: '',
+          ),
+        );
+        when(() => repo.listModels(templateId: 't1')).thenAnswer(
+          (_) async => const TrainerModels(
+            options: <TrainerModelOption>[
+              TrainerModelOption(
+                id: 'gemini-3.1-pro-preview',
+                label: 'Gemini 3.1 Pro',
+              ),
+              TrainerModelOption(id: 'gpt-5.5', label: 'ChatGPT 5.5'),
+              TrainerModelOption(id: 'MiniMax-M3', label: 'MiniMax M3'),
+            ],
+            defaultId: 'gpt-5.5',
+          ),
+        );
+      },
+      act: (b) => b.add(const TrainerChatStarted()),
+      expect: () => <dynamic>[
+        const TrainerChatLoading(),
+        isA<TrainerChatLoaded>()
+            .having((s) => s.models.length, 'allowlist', 3)
+            .having((s) => s.defaultModelId, 'default', 'gpt-5.5')
+            .having((s) => s.selectedModelId, 'arranca en default', ''),
+      ],
+    );
+
+    blocTest<TrainerChatBloc, TrainerChatState>(
+      'ModelSelected fija el modelo y MessageSent lo manda al repo',
+      build: build,
+      seed: () => TrainerChatLoaded(
+        conversation: _conv,
+        messages: <TrainerMessage>[_msg('m1', 'user', 'hola')],
+        sending: false,
+        models: const <TrainerModelOption>[
+          TrainerModelOption(id: 'MiniMax-M3', label: 'MiniMax M3'),
+        ],
+      ),
+      setUp: () {
+        when(
+          () => repo.sendMessage(
+            templateId: 't1',
+            conversationId: 'c1',
+            content: 'hola M3',
+            model: 'MiniMax-M3',
+          ),
+        ).thenAnswer((_) async => _msg('m3', 'assistant', 'hecho'));
+        when(
+          () => repo.listMessages(
+            templateId: 't1',
+            conversationId: 'c1',
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => const TrainerMessagesPage(
+            messages: <TrainerMessage>[],
+            nextCursor: '',
+          ),
+        );
+      },
+      act: (b) => b
+        ..add(const TrainerChatModelSelected('MiniMax-M3'))
+        ..add(const TrainerChatMessageSent('hola M3')),
+      verify: (_) {
+        verify(
+          () => repo.sendMessage(
+            templateId: 't1',
+            conversationId: 'c1',
+            content: 'hola M3',
+            model: 'MiniMax-M3',
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<TrainerChatBloc, TrainerChatState>(
+      'ModelSelected("") vuelve al default de la plataforma (sin model)',
+      build: build,
+      seed: () => TrainerChatLoaded(
+        conversation: _conv,
+        messages: const <TrainerMessage>[],
+        sending: false,
+        models: const <TrainerModelOption>[
+          TrainerModelOption(id: 'gpt-5.5', label: 'ChatGPT 5.5'),
+        ],
+        selectedModelId: 'gpt-5.5',
+      ),
+      setUp: () {
+        when(
+          () => repo.sendMessage(
+            templateId: 't1',
+            conversationId: 'c1',
+            content: 'x',
+          ),
+        ).thenAnswer((_) async => _msg('m3', 'assistant', 'ok'));
+        when(
+          () => repo.listMessages(
+            templateId: 't1',
+            conversationId: 'c1',
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => const TrainerMessagesPage(
+            messages: <TrainerMessage>[],
+            nextCursor: '',
+          ),
+        );
+      },
+      act: (b) => b
+        ..add(const TrainerChatModelSelected(''))
+        ..add(const TrainerChatMessageSent('x')),
+      verify: (_) {
+        verify(
+          () => repo.sendMessage(
+            templateId: 't1',
+            conversationId: 'c1',
+            content: 'x',
+          ),
+        ).called(1);
+      },
     );
 
     blocTest<TrainerChatBloc, TrainerChatState>(

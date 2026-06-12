@@ -2,6 +2,7 @@ import 'package:ataulfo/core/design/widgets/app_chat_composer.dart';
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_conversation.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_message.dart';
+import 'package:ataulfo/features/trainer/domain/entities/trainer_models.dart';
 import 'package:ataulfo/features/trainer/domain/entities/workspace_doc.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
 import 'package:ataulfo/features/trainer/presentation/bloc/preview_bloc.dart';
@@ -160,6 +161,66 @@ void main() {
     testWidgets('el composer es el del design system', (tester) async {
       await pump(tester, <TrainerMessage>[]);
       expect(find.byType(AppChatComposer), findsOneWidget);
+    });
+
+    testWidgets('sin allowlist de modelos el selector se oculta', (
+      tester,
+    ) async {
+      await pump(tester, <TrainerMessage>[]);
+      expect(find.byKey(const Key('trainer.model.button')), findsNothing);
+    });
+
+    testWidgets('elegir un modelo del selector lo manda en el turno', (
+      tester,
+    ) async {
+      when(() => repo.listModels(templateId: 't1')).thenAnswer(
+        (_) async => const TrainerModels(
+          options: <TrainerModelOption>[
+            TrainerModelOption(
+              id: 'gemini-3.1-pro-preview',
+              label: 'Gemini 3.1 Pro',
+            ),
+            TrainerModelOption(id: 'gpt-5.5', label: 'ChatGPT 5.5'),
+            TrainerModelOption(id: 'MiniMax-M3', label: 'MiniMax M3'),
+          ],
+          defaultId: 'gpt-5.5',
+        ),
+      );
+      await pump(tester, <TrainerMessage>[_msg('m1', 'user', 'hola')]);
+
+      await tester.tap(find.byKey(const Key('trainer.model.button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('trainer.model.option.MiniMax-M3')),
+      );
+      await tester.pumpAndSettle();
+
+      when(
+        () => repo.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: 'hola M3',
+          model: 'MiniMax-M3',
+        ),
+      ).thenAnswer((_) async => _msg('mx', 'assistant', 'ok'));
+
+      await tester.enterText(
+        find.byKey(const Key('trainer.composer.field')),
+        'hola M3',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('trainer.composer.send')));
+      await tester.pump();
+
+      verify(
+        () => repo.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: 'hola M3',
+          model: 'MiniMax-M3',
+        ),
+      ).called(1);
+      await tester.pumpAndSettle();
     });
   });
 

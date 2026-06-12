@@ -199,6 +199,57 @@ void main() {
       },
     );
 
+    test(
+      'POST con modelo elegido manda `model`; sin elección lo omite',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: '/x'),
+            statusCode: 201,
+            data: msgJson(),
+          ),
+        );
+
+        await ds.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: 'hola',
+          model: 'gpt-5.5',
+        );
+        var captured = verify(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured.single, <String, dynamic>{
+          'content': 'hola',
+          'model': 'gpt-5.5',
+        });
+
+        await ds.sendMessage(
+          templateId: 't1',
+          conversationId: 'c1',
+          content: 'x',
+        );
+        captured = verify(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: captureAny(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).captured;
+        expect(captured.single, <String, dynamic>{'content': 'x'});
+      },
+    );
+
     test('502 del motor ⇒ TrainerEngineFailure', () async {
       when(
         () => dio.post<Map<String, dynamic>>(
@@ -224,6 +275,47 @@ void main() {
         ),
         throwsA(isA<TrainerEngineFailure>()),
       );
+    });
+  });
+
+  group('modelos del entrenador', () {
+    test('GET models desempaca {items, default}', () async {
+      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/x'),
+          data: <String, dynamic>{
+            'items': <dynamic>[
+              <String, dynamic>{
+                'id': 'gemini-3.1-pro-preview',
+                'label': 'Gemini 3.1 Pro',
+              },
+              <String, dynamic>{'id': 'gpt-5.5', 'label': 'ChatGPT 5.5'},
+              <String, dynamic>{'id': 'MiniMax-M3', 'label': 'MiniMax M3'},
+            ],
+            'default': 'gpt-5.5',
+          },
+        ),
+      );
+      final models = await ds.listModels(templateId: 't1');
+      expect(models.options, hasLength(3));
+      expect(models.options[1].id, 'gpt-5.5');
+      expect(models.options[1].label, 'ChatGPT 5.5');
+      expect(models.defaultId, 'gpt-5.5');
+      verify(
+        () => dio.get<Map<String, dynamic>>('/templates/t1/trainer/models'),
+      ).called(1);
+    });
+
+    test('default ausente (backend sin config) degrada a vacío', () async {
+      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/x'),
+          data: <String, dynamic>{'items': <dynamic>[]},
+        ),
+      );
+      final models = await ds.listModels(templateId: 't1');
+      expect(models.options, isEmpty);
+      expect(models.defaultId, '');
     });
   });
 }

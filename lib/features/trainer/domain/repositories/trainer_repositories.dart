@@ -1,6 +1,7 @@
 import '../entities/preview_item.dart';
 import '../entities/trainer_conversation.dart';
 import '../entities/trainer_message.dart';
+import '../entities/trainer_models.dart';
 import '../entities/workspace_doc.dart';
 
 /// Puertos de dominio de la superficie del entrenador. Tres repositorios
@@ -48,7 +49,11 @@ abstract interface class TrainerRepository {
     required String templateId,
     required String conversationId,
     required String content,
+    String? model,
   });
+
+  /// Allowlist de modelos del entrenador (best-effort en el caller).
+  Future<TrainerModels> listModels({required String templateId});
 }
 
 abstract interface class PreviewRepository {
