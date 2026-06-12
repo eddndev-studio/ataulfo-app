@@ -327,13 +327,33 @@ class _MessageTile extends StatelessWidget {
   }
 }
 
+/// Diff embebido en el envelope de una tool de escritura (puede faltar:
+/// historial previo al server que lo computa — la tarjeta degrada).
+class _ChangeDiff {
+  const _ChangeDiff({required this.oldStr, required this.newStr});
+
+  final String oldStr;
+  final String newStr;
+}
+
 /// Datos de una tarjeta de cambio: proyección de un tool result de
 /// escritura. Las lecturas (overview/read_*/list_*/done) no rinden tarjeta.
+/// `name`/`diff` salen del envelope ANIDADO (content es un string JSON) y
+/// alimentan la vista expandida; sin detalle, la tarjeta es plana.
 class _ChangeCardData {
-  const _ChangeCardData({required this.icon, required this.title});
+  const _ChangeCardData({
+    required this.icon,
+    required this.title,
+    this.name,
+    this.diff,
+  });
 
   final IconData icon;
   final String title;
+  final String? name;
+  final _ChangeDiff? diff;
+
+  bool get expandable => name != null || diff != null;
 
   static _ChangeCardData? fromMessage(TrainerMessage m) {
     final raw = m.toolResultsRaw;
@@ -349,22 +369,66 @@ class _ChangeCardData {
     final content = decoded['content'];
     final failed = content is String && content.contains('"error_kind"');
     if (failed) return null; // los envelopes de error no son cambios
+
+    // El envelope de la tool viaja como STRING JSON dentro de content.
+    String? name;
+    _ChangeDiff? diff;
+    if (content is String) {
+      try {
+        final env = jsonDecode(content);
+        if (env is Map<String, dynamic>) {
+          if (env['name'] is String) name = env['name'] as String;
+          final d = env['diff'];
+          if (d is Map<String, dynamic> &&
+              (d['old'] is String || d['new'] is String)) {
+            diff = _ChangeDiff(
+              oldStr: d['old'] is String ? d['old'] as String : '',
+              newStr: d['new'] is String ? d['new'] as String : '',
+            );
+          }
+        }
+      } on FormatException {
+        // Content no-JSON: la tarjeta queda plana.
+      }
+    }
     return switch (tool) {
-      'edit_prompt' => const _ChangeCardData(
+      'edit_prompt' => _ChangeCardData(
         icon: Icons.edit_note,
         title: 'Prompt actualizado',
+        name: name,
+        diff: diff,
       ),
-      'write_doc' => const _ChangeCardData(
+      'write_doc' => _ChangeCardData(
         icon: Icons.note_add_outlined,
         title: 'Documento creado',
+        name: name,
+        diff: diff,
       ),
-      'edit_doc' => const _ChangeCardData(
+      'edit_doc' => _ChangeCardData(
         icon: Icons.edit_document,
         title: 'Documento actualizado',
+        name: name,
+        diff: diff,
       ),
-      'delete_doc' => const _ChangeCardData(
+      'delete_doc' => _ChangeCardData(
         icon: Icons.delete_outline,
         title: 'Documento borrado',
+        name: name,
+      ),
+      'save_file' => _ChangeCardData(
+        icon: Icons.attach_file,
+        title: 'Archivo guardado',
+        name: name,
+      ),
+      'update_file_meta' => _ChangeCardData(
+        icon: Icons.edit_attributes_outlined,
+        title: 'Archivo actualizado',
+        name: name,
+      ),
+      'delete_file' => _ChangeCardData(
+        icon: Icons.delete_outline,
+        title: 'Archivo borrado',
+        name: name,
       ),
       _ => null,
     };
@@ -373,45 +437,137 @@ class _ChangeCardData {
 
 /// Tarjeta de cambio: registro de que el entrenador escribió en el workspace.
 /// Centrada como los chips de acción del preview — es un evento del hilo, no
-/// una burbuja de nadie.
-class _ChangeCard extends StatelessWidget {
+/// una burbuja de nadie. Con detalle (nombre/diff) se expande al tocarla; el
+/// estado vive en el widget (efímero, como el resto del transcript).
+class _ChangeCard extends StatefulWidget {
   const _ChangeCard({required this.messageId, required this.data});
 
   final String messageId;
   final _ChangeCardData data;
 
   @override
+  State<_ChangeCard> createState() => _ChangeCardState();
+}
+
+class _ChangeCardState extends State<_ChangeCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final data = widget.data;
+    final header = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(data.icon, size: 16, color: AppTokens.primary),
+        const SizedBox(width: AppTokens.sp2),
+        Flexible(
+          child: Text(
+            data.title,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: AppTokens.text1),
+          ),
+        ),
+        if (data.expandable) ...<Widget>[
+          const SizedBox(width: AppTokens.sp1),
+          Icon(
+            _expanded ? Icons.expand_less : Icons.expand_more,
+            key: Key('trainer.change_card.${widget.messageId}.expand'),
+            size: 16,
+            color: AppTokens.text2,
+          ),
+        ],
+      ],
+    );
     return Align(
       alignment: Alignment.center,
-      child: Container(
-        key: Key('trainer.change_card.$messageId'),
-        margin: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.sp3,
-          vertical: AppTokens.sp2,
-        ),
-        decoration: BoxDecoration(
-          color: AppTokens.surface2,
-          borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-          border: Border.all(color: AppTokens.divider),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(data.icon, size: 16, color: AppTokens.primary),
-            const SizedBox(width: AppTokens.sp2),
-            Flexible(
-              child: Text(
-                data.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(color: AppTokens.text1),
-              ),
+      child: GestureDetector(
+        onTap: data.expandable
+            ? () => setState(() => _expanded = !_expanded)
+            : null,
+        child: Container(
+          key: Key('trainer.change_card.${widget.messageId}'),
+          margin: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp3,
+            vertical: AppTokens.sp2,
+          ),
+          decoration: BoxDecoration(
+            color: AppTokens.surface2,
+            borderRadius: BorderRadius.circular(
+              _expanded ? AppTokens.radiusCard : AppTokens.radiusPill,
             ),
-          ],
+            border: Border.all(color: AppTokens.divider),
+          ),
+          child: _expanded
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    header,
+                    const SizedBox(height: AppTokens.sp2),
+                    _ChangeDetail(data: data),
+                  ],
+                )
+              : header,
         ),
       ),
+    );
+  }
+}
+
+/// Cuerpo expandido: nombre del recurso + bloques del diff (lo reemplazado
+/// y lo nuevo). Monospace para que el operador lea el texto literal.
+class _ChangeDetail extends StatelessWidget {
+  const _ChangeDetail({required this.data});
+
+  final _ChangeCardData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final mono = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: AppTokens.text1,
+      fontFamily: 'monospace',
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (data.name != null)
+          Text(
+            data.name!,
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+          ),
+        if (data.diff != null) ...<Widget>[
+          if (data.diff!.oldStr.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppTokens.sp2),
+            _diffBlock(
+              data.diff!.oldStr,
+              AppTokens.danger,
+              mono?.copyWith(decoration: TextDecoration.lineThrough),
+            ),
+          ],
+          if (data.diff!.newStr.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppTokens.sp1),
+            _diffBlock(data.diff!.newStr, AppTokens.success, mono),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _diffBlock(String text, Color accent, TextStyle? style) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppTokens.sp2),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+        border: Border(left: BorderSide(color: accent, width: 2)),
+      ),
+      child: Text(text, style: style),
     );
   }
 }
