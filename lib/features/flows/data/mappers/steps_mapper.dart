@@ -19,6 +19,7 @@ class StepsMapper {
     delayMs: resp.delayMs,
     jitterPct: resp.jitterPct,
     aiOnly: resp.aiOnly,
+    manualOnly: resp.manualOnly,
   );
 
   /// Despliega el wrapper `{items:[...]}` a `List<Step>` preservando el

@@ -250,6 +250,52 @@ void main() {
     );
 
     blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested propaga manualOnly al repo',
+      build: () {
+        when(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 2,
+            content: 'Solo disparadores',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+            manualOnly: true,
+          ),
+        ).thenAnswer((_) async => newStep);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => afterAdd);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          content: 'Solo disparadores',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+          manualOnly: true,
+        ),
+      ),
+      verify: (_) {
+        verify(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 2,
+            content: 'Solo disparadores',
+            mediaRef: '',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+            manualOnly: true,
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
       'AddRequested falla 422 → Mutating + MutationFailed(steps intactos)',
       build: () {
         when(
@@ -602,6 +648,24 @@ void main() {
             aiOnly: true,
           ),
         ).called(1);
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'UpdateRequested propaga manualOnly al repo',
+      build: () {
+        when(
+          () => repo.patchStep(stepId: 's1', manualOnly: true),
+        ).thenAnswer((_) async => patched);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => afterPatch);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsUpdateRequested(stepId: 's1', manualOnly: true),
+      ),
+      verify: (_) {
+        verify(() => repo.patchStep(stepId: 's1', manualOnly: true)).called(1);
       },
     );
 

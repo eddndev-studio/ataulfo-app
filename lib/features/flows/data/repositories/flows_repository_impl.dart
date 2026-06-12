@@ -34,6 +34,7 @@ class FlowsRepositoryImpl implements FlowsRepository {
     required int delayMs,
     required int jitterPct,
     required bool aiOnly,
+    bool manualOnly = false,
     String? metadataJson,
   }) => _ds.createStep(
     flowId: flowId,
@@ -44,6 +45,7 @@ class FlowsRepositoryImpl implements FlowsRepository {
     delayMs: delayMs,
     jitterPct: jitterPct,
     aiOnly: aiOnly,
+    manualOnly: manualOnly,
     metadataJson: metadataJson,
   );
 
@@ -55,6 +57,7 @@ class FlowsRepositoryImpl implements FlowsRepository {
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    bool? manualOnly,
     int? order,
     String? metadataJson,
   }) => _ds.patchStep(
@@ -64,6 +67,7 @@ class FlowsRepositoryImpl implements FlowsRepository {
     delayMs: delayMs,
     jitterPct: jitterPct,
     aiOnly: aiOnly,
+    manualOnly: manualOnly,
     order: order,
     metadataJson: metadataJson,
   );

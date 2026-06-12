@@ -84,6 +84,7 @@ class Step {
     required this.delayMs,
     required this.jitterPct,
     required this.aiOnly,
+    this.manualOnly = false,
   });
 
   final String id;
@@ -97,6 +98,12 @@ class Step {
   final int jitterPct;
   final bool aiOnly;
 
+  /// Inverso de [aiOnly]: el paso solo corre cuando el flujo arranca por
+  /// disparador o manualmente — la IA lo salta al conducir vía run_flow.
+  /// Ambos flags a la vez son inválidos (422 del backend); el editor lo
+  /// previene con un selector excluyente.
+  final bool manualOnly;
+
   Step copyWith({
     String? id,
     String? flowId,
@@ -108,6 +115,7 @@ class Step {
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    bool? manualOnly,
   }) => Step(
     id: id ?? this.id,
     flowId: flowId ?? this.flowId,
@@ -119,6 +127,7 @@ class Step {
     delayMs: delayMs ?? this.delayMs,
     jitterPct: jitterPct ?? this.jitterPct,
     aiOnly: aiOnly ?? this.aiOnly,
+    manualOnly: manualOnly ?? this.manualOnly,
   );
 
   @override
@@ -134,7 +143,8 @@ class Step {
         other.metadataJson == metadataJson &&
         other.delayMs == delayMs &&
         other.jitterPct == jitterPct &&
-        other.aiOnly == aiOnly;
+        other.aiOnly == aiOnly &&
+        other.manualOnly == manualOnly;
   }
 
   @override
@@ -149,5 +159,6 @@ class Step {
     delayMs,
     jitterPct,
     aiOnly,
+    manualOnly,
   );
 }

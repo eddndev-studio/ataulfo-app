@@ -133,7 +133,11 @@ void main() {
       expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
       expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
       expect(find.byKey(const Key('step_edit.jitter_slider')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.ai_only_switch')), findsOneWidget);
+      // Selector tri-estado del modo de ejecución (reemplaza al viejo switch
+      // binario de "Solo IA").
+      expect(find.byKey(const Key('step_edit.mode.always')), findsOneWidget);
+      expect(find.byKey(const Key('step_edit.mode.ai')), findsOneWidget);
+      expect(find.byKey(const Key('step_edit.mode.manual')), findsOneWidget);
       expect(find.byKey(const Key('step_edit.submit')), findsOneWidget);
     });
 
@@ -172,6 +176,57 @@ void main() {
             ),
           ),
         ).called(1);
+      },
+    );
+
+    testWidgets(
+      'elegir "Solo disparadores" manda manualOnly:true (y aiOnly:false)',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Promo',
+        );
+        await tester.pump();
+        await tester.ensureVisible(
+          find.byKey(const Key('step_edit.mode.manual')),
+        );
+        await tester.tap(find.byKey(const Key('step_edit.mode.manual')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.manualOnly, isTrue);
+        expect(ev.aiOnly, isFalse);
+      },
+    );
+
+    testWidgets(
+      'los modos son excluyentes: pasar de "Solo IA" a "Solo disparadores" '
+      'apaga aiOnly',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Promo',
+        );
+        await tester.pump();
+        await tester.ensureVisible(find.byKey(const Key('step_edit.mode.ai')));
+        await tester.tap(find.byKey(const Key('step_edit.mode.ai')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.mode.manual')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.aiOnly, isFalse);
+        expect(ev.manualOnly, isTrue);
       },
     );
 
@@ -528,6 +583,54 @@ void main() {
 
       verifyNever(() => bloc.add(any()));
     });
+
+    testWidgets(
+      'cambiar un paso "Solo IA" a "Solo disparadores" patchea ambos flags',
+      (tester) async {
+        // editingStep tiene aiOnly:true ⇒ el selector arranca en "Solo IA".
+        await pumpHost(tester, editing: editingStep);
+
+        await tester.ensureVisible(
+          find.byKey(const Key('step_edit.mode.manual')),
+        );
+        await tester.tap(find.byKey(const Key('step_edit.mode.manual')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const FlowStepsUpdateRequested(
+              stepId: 's1',
+              aiOnly: false,
+              manualOnly: true,
+            ),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'volver el paso a "Siempre" apaga el flag activo sin tocar el otro',
+      (tester) async {
+        await pumpHost(tester, editing: editingStep);
+
+        await tester.ensureVisible(
+          find.byKey(const Key('step_edit.mode.always')),
+        );
+        await tester.tap(find.byKey(const Key('step_edit.mode.always')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        // manualOnly ya era false ⇒ se omite del PATCH (only-changed).
+        verify(
+          () => bloc.add(
+            const FlowStepsUpdateRequested(stepId: 's1', aiOnly: false),
+          ),
+        ).called(1);
+      },
+    );
 
     testWidgets('edit con content vacío es no-op (gate del trim().isEmpty)', (
       tester,

@@ -452,7 +452,7 @@ class _StepsFailedView extends StatelessWidget {
 /// Card read-only por step. Muestra index (order+1), label humanizado del
 /// type, contenido (`content` para TEXT, `mediaRef` para multimedia,
 /// resumen de metadata para CONDITIONAL_TIME), y pills laterales (delay,
-/// aiOnly si aplica).
+/// modo de ejecución si está acotado: "Solo IA" / "Solo disparadores").
 ///
 /// `dragIndex != null` ⇒ se renderiza con drag handle a la derecha,
 /// listo para reordenar dentro del `ReorderableListView` padre. El handle
@@ -508,6 +508,8 @@ class _StepCard extends StatelessWidget {
           children: <Widget>[
             AppPill.neutral(label: _delayLabel(step)),
             if (step.aiOnly) const AppPill.primary(label: 'Solo IA'),
+            if (step.manualOnly)
+              const AppPill.outline(label: 'Solo disparadores'),
           ],
         ),
       ],

@@ -67,6 +67,7 @@ abstract interface class FlowsDatasource {
     required int delayMs,
     required int jitterPct,
     required bool aiOnly,
+    bool manualOnly = false,
     String? metadataJson,
   });
 
@@ -96,6 +97,7 @@ abstract interface class FlowsDatasource {
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    bool? manualOnly,
     int? order,
     String? metadataJson,
   });
@@ -247,6 +249,7 @@ class DioFlowsDatasource implements FlowsDatasource {
     required int delayMs,
     required int jitterPct,
     required bool aiOnly,
+    bool manualOnly = false,
     String? metadataJson,
   }) async {
     final body = <String, dynamic>{
@@ -257,6 +260,7 @@ class DioFlowsDatasource implements FlowsDatasource {
       'delayMs': delayMs,
       'jitterPct': jitterPct,
       'aiOnly': aiOnly,
+      'manualOnly': manualOnly,
     };
     if (metadataJson != null) {
       // Wire del backend espera `metadata` como objeto JSON literal
@@ -412,6 +416,7 @@ class DioFlowsDatasource implements FlowsDatasource {
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    bool? manualOnly,
     int? order,
     String? metadataJson,
   }) async {
@@ -421,6 +426,7 @@ class DioFlowsDatasource implements FlowsDatasource {
     if (delayMs != null) body['delayMs'] = delayMs;
     if (jitterPct != null) body['jitterPct'] = jitterPct;
     if (aiOnly != null) body['aiOnly'] = aiOnly;
+    if (manualOnly != null) body['manualOnly'] = manualOnly;
     if (order != null) body['order'] = order;
     if (metadataJson != null) {
       body['metadata'] = jsonDecode(metadataJson);

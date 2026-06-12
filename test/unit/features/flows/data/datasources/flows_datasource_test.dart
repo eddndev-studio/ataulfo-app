@@ -483,6 +483,7 @@ void main() {
     int delayMs = 0,
     int jitterPct = 0,
     bool aiOnly = false,
+    bool manualOnly = false,
   }) => <String, dynamic>{
     'id': id,
     'flowId': flowId,
@@ -494,6 +495,7 @@ void main() {
     'delayMs': delayMs,
     'jitterPct': jitterPct,
     'aiOnly': aiOnly,
+    'manualOnly': manualOnly,
     'createdAt': '2026-05-27T10:00:00Z',
     'updatedAt': '2026-05-27T10:00:00Z',
   };
@@ -559,9 +561,49 @@ void main() {
           'delayMs': 1500,
           'jitterPct': 10,
           'aiOnly': true,
+          'manualOnly': false,
         });
       },
     );
+
+    test('manualOnly viaja en el body del create', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/flows/f1/steps'),
+          statusCode: 201,
+          data: stepJson(id: 's-new', manualOnly: true),
+        ),
+      );
+
+      final out = await ds.createStep(
+        flowId: 'f1',
+        type: fdom.StepType.text,
+        order: 0,
+        content: 'Hola',
+        mediaRef: '',
+        delayMs: 1000,
+        jitterPct: 0,
+        aiOnly: false,
+        manualOnly: true,
+      );
+      expect(out.manualOnly, isTrue);
+
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).captured;
+      final body = captured[1] as Map<String, dynamic>;
+      expect(body['manualOnly'], isTrue);
+    });
 
     test('metadataJson viaja como objeto JSON bajo `metadata`', () async {
       when(
@@ -867,6 +909,7 @@ void main() {
         delayMs: 2000,
         jitterPct: 20,
         aiOnly: true,
+        manualOnly: false,
       );
 
       final captured = verify(
@@ -881,6 +924,7 @@ void main() {
         'delayMs': 2000,
         'jitterPct': 20,
         'aiOnly': true,
+        'manualOnly': false,
       });
     });
 

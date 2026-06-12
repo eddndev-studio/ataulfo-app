@@ -16,7 +16,6 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
-import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../media/domain/entities/media_asset.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
@@ -40,7 +39,8 @@ typedef MediaRefPicker =
 
 /// Modal sheet de creación/edición de un step TEXT (S11 F5a). Cuenta
 /// con tres controles: `content` (TextField multiline), `delayMs` y
-/// `jitterPct` (sliders), y `aiOnly` (switch).
+/// `jitterPct` (sliders), y el modo de ejecución (chips excluyentes
+/// Siempre / Solo IA / Solo disparadores que mapean a `aiOnly`/`manualOnly`).
 ///
 /// `editing == null` ⇒ modo creación (POST). `editing != null` ⇒ modo
 /// edición: fields pre-fillados con los valores actuales, submit
@@ -102,7 +102,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
   late fdom.StepType _type;
   late int _delayMs;
   late int _jitterPct;
-  late bool _aiOnly;
+  late _StepMode _mode;
   bool _didSubmit = false;
 
   /// Último `metadataJson` emitido por el form CONDITIONAL_TIME.
@@ -148,7 +148,10 @@ class _StepEditSheetState extends State<StepEditSheet> {
       _delayMs = _minDelayMs;
     }
     _jitterPct = ed?.jitterPct ?? 0;
-    _aiOnly = ed?.aiOnly ?? false;
+    _mode = _StepMode.of(
+      aiOnly: ed?.aiOnly ?? false,
+      manualOnly: ed?.manualOnly ?? false,
+    );
     _contentCtrl.addListener(_onContentChanged);
     _mediaCtrl.addListener(_onContentChanged);
 
@@ -285,7 +288,8 @@ class _StepEditSheetState extends State<StepEditSheet> {
           // LABEL no envía al wire: el piso de 1s no aplica, su delay queda en 0.
           delayMs: _isLabel ? 0 : _delayMs,
           jitterPct: _jitterPct,
-          aiOnly: _aiOnly,
+          aiOnly: _mode == _StepMode.aiOnly,
+          manualOnly: _mode == _StepMode.manualOnly,
           metadataJson: _isConditionalTime
               ? _ctMetadataJson
               : _isLabel
@@ -311,7 +315,12 @@ class _StepEditSheetState extends State<StepEditSheet> {
         : null;
     final newDelay = _delayMs != ed.delayMs ? _delayMs : null;
     final newJitter = _jitterPct != ed.jitterPct ? _jitterPct : null;
-    final newAiOnly = _aiOnly != ed.aiOnly ? _aiOnly : null;
+    final modeAiOnly = _mode == _StepMode.aiOnly;
+    final modeManualOnly = _mode == _StepMode.manualOnly;
+    final newAiOnly = modeAiOnly != ed.aiOnly ? modeAiOnly : null;
+    final newManualOnly = modeManualOnly != ed.manualOnly
+        ? modeManualOnly
+        : null;
 
     String? newMetadata;
     if (_isConditionalTime && _ctMetadataJson != null) {
@@ -355,6 +364,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
         newDelay == null &&
         newJitter == null &&
         newAiOnly == null &&
+        newManualOnly == null &&
         newMetadata == null;
     if (isNoOp) return;
 
@@ -367,6 +377,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
         delayMs: newDelay,
         jitterPct: newJitter,
         aiOnly: newAiOnly,
+        manualOnly: newManualOnly,
         metadataJson: newMetadata,
       ),
     );
@@ -518,25 +529,27 @@ class _StepEditSheetState extends State<StepEditSheet> {
                     ),
                   ],
                   const SizedBox(height: AppTokens.sp4),
-                  Row(
-                    key: const Key('step_edit.ai_only_switch'),
+                  Wrap(
+                    spacing: AppTokens.sp2,
+                    runSpacing: AppTokens.sp2,
                     children: <Widget>[
-                      AppSwitch(
-                        value: _aiOnly,
-                        onChanged: isMutating
-                            ? null
-                            : (v) => setState(() => _aiOnly = v),
-                      ),
-                      const SizedBox(width: AppTokens.sp2),
-                      Expanded(
-                        child: Text(
-                          'Solo IA — el paso lo aplica el agente, no el flujo manual.',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: AppTokens.text2,
-                          ),
+                      for (final mode in _StepMode.values)
+                        AppChoiceChip(
+                          key: Key(mode.chipKey),
+                          label: mode.label,
+                          selected: _mode == mode,
+                          onSelected: isMutating
+                              ? null
+                              : (_) => setState(() => _mode = mode),
                         ),
-                      ),
                     ],
+                  ),
+                  const SizedBox(height: AppTokens.sp2),
+                  Text(
+                    _mode.helper,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppTokens.text2,
+                    ),
                   ),
                   if (failure != null) ...<Widget>[
                     const SizedBox(height: AppTokens.sp4),
@@ -560,6 +573,45 @@ class _StepEditSheetState extends State<StepEditSheet> {
         },
       ),
     );
+  }
+}
+
+/// Modo de ejecución del paso. Mapea 1:1 a los flags excluyentes del wire
+/// (`aiOnly`/`manualOnly`); el selector garantiza a-lo-más-uno-true, así el
+/// 422 de exclusión del backend es inalcanzable desde este editor.
+enum _StepMode {
+  always(
+    chipKey: 'step_edit.mode.always',
+    label: 'Siempre',
+    helper:
+        'El paso corre tanto por disparador como cuando la IA conduce el flujo.',
+  ),
+  aiOnly(
+    chipKey: 'step_edit.mode.ai',
+    label: 'Solo IA',
+    helper: 'El paso lo ejecuta solo el agente de IA cuando conduce el flujo.',
+  ),
+  manualOnly(
+    chipKey: 'step_edit.mode.manual',
+    label: 'Solo disparadores',
+    helper:
+        'El paso corre solo cuando el flujo arranca por disparador o manualmente; la IA lo salta.',
+  );
+
+  const _StepMode({
+    required this.chipKey,
+    required this.label,
+    required this.helper,
+  });
+
+  final String chipKey;
+  final String label;
+  final String helper;
+
+  static _StepMode of({required bool aiOnly, required bool manualOnly}) {
+    if (aiOnly) return _StepMode.aiOnly;
+    if (manualOnly) return _StepMode.manualOnly;
+    return _StepMode.always;
   }
 }
 

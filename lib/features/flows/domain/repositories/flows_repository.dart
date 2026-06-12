@@ -36,6 +36,7 @@ abstract interface class FlowsRepository {
     required int delayMs,
     required int jitterPct,
     required bool aiOnly,
+    bool manualOnly = false,
     String? metadataJson,
   });
 
@@ -62,6 +63,7 @@ abstract interface class FlowsRepository {
     int? delayMs,
     int? jitterPct,
     bool? aiOnly,
+    bool? manualOnly,
     int? order,
     String? metadataJson,
   });

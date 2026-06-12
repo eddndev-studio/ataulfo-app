@@ -19,6 +19,7 @@ void main() {
           delayMs: 1500,
           jitterPct: 15,
           aiOnly: true,
+          manualOnly: false,
         );
 
         final entity = StepsMapper.stepRespToEntity(resp);
@@ -40,6 +41,23 @@ void main() {
         );
       },
     );
+
+    test('manualOnly del DTO aterriza en la entity', () {
+      const resp = StepResp(
+        id: 's1',
+        flowId: 'f1',
+        type: 'TEXT',
+        order: 0,
+        content: 'x',
+        mediaRef: '',
+        metadataJson: '{}',
+        delayMs: 0,
+        jitterPct: 0,
+        aiOnly: false,
+        manualOnly: true,
+      );
+      expect(StepsMapper.stepRespToEntity(resp).manualOnly, isTrue);
+    });
 
     test('type desconocido degrada a StepType.unsupported (no crashea)', () {
       // Un tipo que el cliente no conoce ya no rompe el mapeo del listado:

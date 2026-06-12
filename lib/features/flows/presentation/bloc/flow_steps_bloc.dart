@@ -67,6 +67,7 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
         delayMs: event.delayMs,
         jitterPct: event.jitterPct,
         aiOnly: event.aiOnly,
+        manualOnly: event.manualOnly,
         metadataJson: event.metadataJson,
       );
     });
@@ -84,6 +85,7 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
         delayMs: event.delayMs,
         jitterPct: event.jitterPct,
         aiOnly: event.aiOnly,
+        manualOnly: event.manualOnly,
         metadataJson: event.metadataJson,
       );
     });
@@ -208,6 +210,7 @@ class FlowStepsAddRequested extends FlowStepsEvent {
     required this.delayMs,
     required this.jitterPct,
     required this.aiOnly,
+    this.manualOnly = false,
     this.type = fdom.StepType.text,
     this.mediaRef = '',
     this.metadataJson,
@@ -219,6 +222,10 @@ class FlowStepsAddRequested extends FlowStepsEvent {
   final int delayMs;
   final int jitterPct;
   final bool aiOnly;
+
+  /// Inverso de [aiOnly]: el paso solo corre por disparador/arranque manual.
+  /// El selector del sheet garantiza que nunca viajen ambos en true.
+  final bool manualOnly;
 
   /// Shape literal de `Step.metadata` para el step nuevo. Hoy lo necesita
   /// solo CONDITIONAL_TIME (ventanas); null para los otros tipos —el
@@ -234,6 +241,7 @@ class FlowStepsAddRequested extends FlowStepsEvent {
       other.delayMs == delayMs &&
       other.jitterPct == jitterPct &&
       other.aiOnly == aiOnly &&
+      other.manualOnly == manualOnly &&
       other.metadataJson == metadataJson;
 
   @override
@@ -244,6 +252,7 @@ class FlowStepsAddRequested extends FlowStepsEvent {
     delayMs,
     jitterPct,
     aiOnly,
+    manualOnly,
     metadataJson,
   );
 }
@@ -260,6 +269,7 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
     this.delayMs,
     this.jitterPct,
     this.aiOnly,
+    this.manualOnly,
     this.metadataJson,
   });
 
@@ -274,6 +284,9 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
   final int? jitterPct;
   final bool? aiOnly;
 
+  /// Cambio del modo "solo disparadores". Null = preservar (omitido).
+  final bool? manualOnly;
+
   /// Nuevo shape de `Step.metadata` para el step. Null = preservar el
   /// metadata actual del backend (omitido del PATCH).
   final String? metadataJson;
@@ -287,6 +300,7 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
       other.delayMs == delayMs &&
       other.jitterPct == jitterPct &&
       other.aiOnly == aiOnly &&
+      other.manualOnly == manualOnly &&
       other.metadataJson == metadataJson;
 
   @override
@@ -297,6 +311,7 @@ class FlowStepsUpdateRequested extends FlowStepsEvent {
     delayMs,
     jitterPct,
     aiOnly,
+    manualOnly,
     metadataJson,
   );
 }

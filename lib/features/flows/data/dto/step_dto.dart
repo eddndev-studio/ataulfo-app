@@ -24,6 +24,7 @@ class StepResp {
     required this.delayMs,
     required this.jitterPct,
     required this.aiOnly,
+    this.manualOnly = false,
   });
 
   factory StepResp.fromJson(Map<String, dynamic> json) {
@@ -36,6 +37,10 @@ class StepResp {
     final delayMs = json['delayMs'];
     final jitterPct = json['jitterPct'];
     final aiOnly = json['aiOnly'];
+    // Clave aditiva del wire: un backend anterior no la manda. Tolerante
+    // (ausente ⇒ false), a diferencia de las fundacionales que fail-loud.
+    final rawManualOnly = json['manualOnly'];
+    final manualOnly = rawManualOnly is bool ? rawManualOnly : false;
     if (id is! String ||
         flowId is! String ||
         type is! String ||
@@ -75,6 +80,7 @@ class StepResp {
       delayMs: delayMs,
       jitterPct: jitterPct,
       aiOnly: aiOnly,
+      manualOnly: manualOnly,
     );
   }
 
@@ -88,6 +94,7 @@ class StepResp {
   final int delayMs;
   final int jitterPct;
   final bool aiOnly;
+  final bool manualOnly;
 }
 
 /// Wrapper de la lista `GET /flows/{flowId}/steps` → `{items:[...]}`.

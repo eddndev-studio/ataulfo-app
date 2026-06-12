@@ -226,6 +226,37 @@ void main() {
   );
 
   testWidgets(
+    'StepCard de un paso manualOnly muestra pill "Solo disparadores"',
+    (tester) async {
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
+      when(() => stepsBloc.state).thenReturn(
+        const FlowStepsLoaded(<fdom.Step>[
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'Solo por disparador',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+            manualOnly: true,
+          ),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.widgetWithText(AppPill, 'Solo disparadores'), findsOneWidget);
+      expect(find.widgetWithText(AppPill, 'Solo IA'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'StepCard multimedia muestra el nombre del archivo (media_filename) cuando '
     'está guardado; sin él, la cola corta del ref — nunca el ref completo',
     (tester) async {

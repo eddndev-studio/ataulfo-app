@@ -32,6 +32,31 @@ void main() {
       expect(resp.aiOnly, isFalse);
     });
 
+    test('manualOnly presente se parsea; ausente degrada a false', () {
+      // TOLERANTE a propósito (a diferencia del estricto aiOnly): la clave es
+      // aditiva en el wire y un backend anterior no la manda — la app no debe
+      // crashear contra él.
+      final base = <String, dynamic>{
+        'id': 's1',
+        'flowId': 'f1',
+        'type': 'TEXT',
+        'order': 0,
+        'content': 'x',
+        'mediaRef': '',
+        'delayMs': 0,
+        'jitterPct': 0,
+        'aiOnly': false,
+      };
+      final con = StepResp.fromJson(<String, dynamic>{
+        ...base,
+        'manualOnly': true,
+      });
+      expect(con.manualOnly, isTrue);
+
+      final sin = StepResp.fromJson(base);
+      expect(sin.manualOnly, isFalse);
+    });
+
     test('metadata ausente → "{}" (default jsonb del backend)', () {
       final resp = StepResp.fromJson(<String, dynamic>{
         'id': 's1',
