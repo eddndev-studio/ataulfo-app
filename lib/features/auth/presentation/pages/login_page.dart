@@ -112,6 +112,7 @@ class _LoginPageState extends State<LoginPage> {
                     controller: _password,
                     enabled: !submitting,
                     obscureText: true,
+                    obscureToggle: true,
                   ),
                   const SizedBox(height: 24),
                   // El feedback de envío vive en el propio botón (loading

@@ -59,6 +59,18 @@ void main() {
     expect(find.byType(FilledButton), findsNothing);
   });
 
+  testWidgets('el campo de contraseña lleva obscureToggle (botón de ojo)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    final pw = tester.widget<AppTextField>(
+      find.byKey(const Key('login.password')),
+    );
+    expect(pw.obscureText, isTrue);
+    expect(pw.obscureToggle, isTrue);
+  });
+
   testWidgets('wordmark "Ataúlfo" usa displayLarge del textTheme', (
     tester,
   ) async {
