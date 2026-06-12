@@ -701,6 +701,7 @@ void main() {
             'thinking_level': 'LOW',
             'system_prompt': 'Eres un asistente útil.',
             'context_messages': 20,
+            'response_delay_seconds': 0,
           },
         });
       },

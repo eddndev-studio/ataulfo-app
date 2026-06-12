@@ -56,6 +56,6 @@ abstract interface class PreviewRepository {
     required String templateId,
     required String content,
   });
-  Future<List<PreviewItem>> transcript({required String templateId});
+  Future<PreviewTranscript> transcript({required String templateId});
   Future<void> reset({required String templateId});
 }

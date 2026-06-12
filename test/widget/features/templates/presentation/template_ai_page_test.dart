@@ -314,6 +314,58 @@ void main() {
     });
   });
 
+  group('tile Retraso de respuesta', () {
+    testWidgets('0 se lee como Inmediato', (tester) async {
+      await tester.pumpWidget(host());
+      expect(find.text('Retraso de respuesta'), findsOneWidget);
+      expect(find.text('Inmediato'), findsOneWidget);
+    });
+
+    testWidgets('segundos nuevos + Guardar dispatcha responseDelaySeconds', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('template_ai.tile.delay')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('template_ai.sheet.delay.field')),
+        '30',
+      );
+      await tester.tap(find.byKey(const Key('template_ai.sheet.delay.save')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          TemplateDetailAiUpdateRequested(
+            _ai.copyWith(responseDelaySeconds: 30),
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('más de 120 deshabilita Guardar (tope del backend)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('template_ai.tile.delay')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('template_ai.sheet.delay.field')),
+        '121',
+      );
+      await tester.pump();
+
+      final save = tester.widget<AppButton>(
+        find.byKey(const Key('template_ai.sheet.delay.save')),
+      );
+      expect(save.onPressed, isNull);
+    });
+  });
+
   testWidgets('MutationFailed muestra SnackBar con el copy del fallo', (
     tester,
   ) async {

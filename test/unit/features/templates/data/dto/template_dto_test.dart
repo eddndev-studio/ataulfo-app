@@ -46,6 +46,18 @@ void main() {
         throwsA(isA<FormatException>()),
       );
     });
+
+    test('parsea response_delay_seconds cuando viaja', () {
+      final c = AiConfigDto.fromJson(aiJson()..['response_delay_seconds'] = 30);
+      expect(c.responseDelaySeconds, 30);
+    });
+
+    test('response_delay_seconds ausente ⇒ 0 (clave aditiva, server viejo)', () {
+      // A diferencia de las claves fundacionales (fail-loud), esta es aditiva:
+      // un backend previo al campo no la manda y el cliente degrada a 0
+      // (responder de inmediato) — mismo trato tolerante que `counts`.
+      expect(AiConfigDto.fromJson(aiJson()).responseDelaySeconds, 0);
+    });
   });
 
   group('TemplateResp.fromJson', () {

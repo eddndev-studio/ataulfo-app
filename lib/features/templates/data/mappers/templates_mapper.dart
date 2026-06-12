@@ -17,6 +17,7 @@ class TemplatesMapper {
     thinkingLevel: ThinkingLevel.fromWire(dto.thinkingLevel),
     systemPrompt: dto.systemPrompt,
     contextMessages: dto.contextMessages,
+    responseDelaySeconds: dto.responseDelaySeconds,
   );
 
   static Template templateRespToEntity(TemplateResp resp) => Template(

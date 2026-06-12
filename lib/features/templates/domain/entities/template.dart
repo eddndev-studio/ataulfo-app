@@ -62,6 +62,7 @@ class AIConfig {
     required this.thinkingLevel,
     required this.systemPrompt,
     required this.contextMessages,
+    this.responseDelaySeconds = 0,
   });
 
   final bool enabled;
@@ -71,6 +72,12 @@ class AIConfig {
   final ThinkingLevel thinkingLevel;
   final String systemPrompt;
   final int contextMessages;
+
+  /// Ventana de acumulación del motor: segundos que espera desde el PRIMER
+  /// mensaje del cliente antes de atender todo lo acumulado en una corrida.
+  /// 0 = responder de inmediato. La ventana es fija (no se reinicia con
+  /// mensajes posteriores); el backend la acota a 0..120.
+  final int responseDelaySeconds;
 
   @override
   bool operator ==(Object other) {
@@ -82,7 +89,8 @@ class AIConfig {
         other.temperature == temperature &&
         other.thinkingLevel == thinkingLevel &&
         other.systemPrompt == systemPrompt &&
-        other.contextMessages == contextMessages;
+        other.contextMessages == contextMessages &&
+        other.responseDelaySeconds == responseDelaySeconds;
   }
 
   @override
@@ -94,6 +102,7 @@ class AIConfig {
     thinkingLevel,
     systemPrompt,
     contextMessages,
+    responseDelaySeconds,
   );
 
   /// Copia con campos reemplazados — base de las ediciones por-campo del
@@ -106,6 +115,7 @@ class AIConfig {
     ThinkingLevel? thinkingLevel,
     String? systemPrompt,
     int? contextMessages,
+    int? responseDelaySeconds,
   }) => AIConfig(
     enabled: enabled ?? this.enabled,
     provider: provider ?? this.provider,
@@ -114,6 +124,7 @@ class AIConfig {
     thinkingLevel: thinkingLevel ?? this.thinkingLevel,
     systemPrompt: systemPrompt ?? this.systemPrompt,
     contextMessages: contextMessages ?? this.contextMessages,
+    responseDelaySeconds: responseDelaySeconds ?? this.responseDelaySeconds,
   );
 }
 

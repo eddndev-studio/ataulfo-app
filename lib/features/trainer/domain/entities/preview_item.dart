@@ -55,10 +55,35 @@ class PreviewItem {
 }
 
 /// Desenlace de un turno del preview: los items nuevos + iteraciones del
-/// loop (visibilidad de costo).
+/// loop (visibilidad de costo). Con la ventana de acumulación abierta el
+/// turno regresa de inmediato: `pending` true, items trae SOLO el user y
+/// `windowEndsAt` anuncia el cierre de la ventana — el resto del turno
+/// aterriza en el transcript (el cliente pollea).
 class PreviewTurn {
-  const PreviewTurn({required this.items, required this.iterations});
+  const PreviewTurn({
+    required this.items,
+    required this.iterations,
+    this.pending = false,
+    this.windowEndsAt,
+  });
 
   final List<PreviewItem> items;
   final int iterations;
+  final bool pending;
+  final DateTime? windowEndsAt;
+}
+
+/// Transcript vivo de la sesión del preview + el estado de su ventana de
+/// acumulación: `pending` mientras haya ventana abierta o turno en vuelo —
+/// la señal de poll del cliente.
+class PreviewTranscript {
+  const PreviewTranscript({
+    required this.items,
+    this.pending = false,
+    this.windowEndsAt,
+  });
+
+  final List<PreviewItem> items;
+  final bool pending;
+  final DateTime? windowEndsAt;
 }

@@ -231,23 +231,25 @@ void main() {
     ) async {
       final repo = _MockPreviewRepo();
       when(() => repo.transcript(templateId: 't1')).thenAnswer(
-        (_) async => <PreviewItem>[
-          PreviewItem(kind: 'user', text: 'hola', at: DateTime.utc(2026)),
-          PreviewItem(kind: 'bot', text: '¡Hola!', at: DateTime.utc(2026)),
-          PreviewItem(
-            kind: 'action',
-            tool: 'apply_label',
-            summary: 'Etiquetaría el chat: VIP',
-            at: DateTime.utc(2026),
-          ),
-          PreviewItem(
-            kind: 'media',
-            text: 'mira el catálogo',
-            mediaRef: 'ref-7',
-            stepType: 'IMAGE',
-            at: DateTime.utc(2026),
-          ),
-        ],
+        (_) async => PreviewTranscript(
+          items: <PreviewItem>[
+            PreviewItem(kind: 'user', text: 'hola', at: DateTime.utc(2026)),
+            PreviewItem(kind: 'bot', text: '¡Hola!', at: DateTime.utc(2026)),
+            PreviewItem(
+              kind: 'action',
+              tool: 'apply_label',
+              summary: 'Etiquetaría el chat: VIP',
+              at: DateTime.utc(2026),
+            ),
+            PreviewItem(
+              kind: 'media',
+              text: 'mira el catálogo',
+              mediaRef: 'ref-7',
+              stepType: 'IMAGE',
+              at: DateTime.utc(2026),
+            ),
+          ],
+        ),
       );
 
       await tester.pumpWidget(
@@ -291,6 +293,103 @@ void main() {
 
       // El composer es el del design system, como en el resto de la app.
       expect(find.byType(AppChatComposer), findsOneWidget);
+    });
+
+    testWidgets(
+      'ventana de acumulación: banner visible, composer habilitado, y al '
+      'aterrizar el flush el banner se apaga',
+      (tester) async {
+        final repo = _MockPreviewRepo();
+        var polls = 0;
+        // 1ª lectura (rehidratar): ventana viva ⇒ banner + poll en marcha.
+        // Lecturas siguientes (el poll): flush aterrizado ⇒ banner fuera.
+        // El stub DEBE terminar en pending=false o el poll quedaría vivo
+        // (timers pendientes rompen el test y comen memoria).
+        when(() => repo.transcript(templateId: 't1')).thenAnswer((_) async {
+          polls++;
+          final user = PreviewItem(
+            kind: 'user',
+            text: 'hola',
+            at: DateTime.utc(2026),
+          );
+          if (polls == 1) {
+            return PreviewTranscript(
+              items: <PreviewItem>[user],
+              pending: true,
+              windowEndsAt: DateTime.utc(2026),
+            );
+          }
+          return PreviewTranscript(
+            items: <PreviewItem>[
+              user,
+              PreviewItem(kind: 'bot', text: 'listo', at: DateTime.utc(2026)),
+            ],
+          );
+        });
+
+        await tester.pumpWidget(
+          _wrap(
+            BlocProvider<PreviewBloc>(
+              create: (_) =>
+                  PreviewBloc(repo: repo, templateId: 't1')
+                    ..add(const PreviewStarted()),
+              child: const PreviewPage(templateId: 't1'),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        // Ventana viva: el banner anuncia la acumulación, SIN typing (el bot
+        // aún no responde) y el composer sigue habilitado (se puede seguir
+        // mandando — se suma al batch).
+        expect(find.byKey(const Key('preview.accumulating')), findsOneWidget);
+        expect(find.byKey(const Key('preview.typing')), findsNothing);
+        final field = tester.widget<AppChatComposer>(
+          find.byType(AppChatComposer),
+        );
+        expect(field.enabled, isTrue);
+
+        // El poll (cadencia ~1.5s) encuentra el flush: banner fuera, la
+        // respuesta del bot en el hilo.
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('preview.accumulating')), findsNothing);
+        expect(find.text('listo'), findsOneWidget);
+      },
+    );
+
+    testWidgets('una acción de error del flush se pinta como chip de fallo', (
+      tester,
+    ) async {
+      final repo = _MockPreviewRepo();
+      when(() => repo.transcript(templateId: 't1')).thenAnswer(
+        (_) async => PreviewTranscript(
+          items: <PreviewItem>[
+            PreviewItem(
+              kind: 'action',
+              tool: 'error',
+              summary: 'La corrida del motor falló: timeout',
+              at: DateTime.utc(2026),
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          BlocProvider<PreviewBloc>(
+            create: (_) =>
+                PreviewBloc(repo: repo, templateId: 't1')
+                  ..add(const PreviewStarted()),
+            child: const PreviewPage(templateId: 't1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('La corrida del motor falló'), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
   });
 }

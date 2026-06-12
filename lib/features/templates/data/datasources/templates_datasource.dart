@@ -198,6 +198,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
               'thinking_level': ai.thinkingLevel.toWire(),
               'system_prompt': ai.systemPrompt,
               'context_messages': ai.contextMessages,
+              'response_delay_seconds': ai.responseDelaySeconds,
             },
         },
       );

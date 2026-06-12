@@ -61,6 +61,20 @@ void main() {
       expect(c.contextMessages, 10);
     });
 
+    test('traduce responseDelaySeconds (ventana de acumulación)', () {
+      const dto = AiConfigDto(
+        enabled: true,
+        provider: 'GEMINI',
+        model: 'gemini-3.1-pro-preview',
+        temperature: 0.7,
+        thinkingLevel: 'LOW',
+        systemPrompt: '',
+        contextMessages: 20,
+        responseDelaySeconds: 45,
+      );
+      expect(TemplatesMapper.aiConfigDtoToEntity(dto).responseDelaySeconds, 45);
+    });
+
     test('proveedor desconocido propaga ArgumentError (fail-loud)', () {
       expect(
         () => TemplatesMapper.aiConfigDtoToEntity(aiDto(provider: 'ANTHROPIC')),

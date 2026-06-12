@@ -132,7 +132,7 @@ void main() {
     );
   });
 
-  test('GET rehidrata el transcript', () async {
+  test('GET rehidrata el transcript (sin ventana ⇒ no pending)', () async {
     when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
       (_) async => Response(
         requestOptions: RequestOptions(path: '/x'),
@@ -141,8 +141,51 @@ void main() {
         },
       ),
     );
-    final items = await ds.transcript(templateId: 't1');
-    expect(items, hasLength(1));
+    final t = await ds.transcript(templateId: 't1');
+    expect(t.items, hasLength(1));
+    expect(t.pending, isFalse);
+    expect(t.windowEndsAt, isNull);
+  });
+
+  test('POST con ventana abierta parsea pending + windowEndsAt', () async {
+    when(
+      () => dio.post<Map<String, dynamic>>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/x'),
+        statusCode: 201,
+        data: <String, dynamic>{
+          'items': <dynamic>[itemJson(kind: 'user', text: 'hola')],
+          'iterations': 0,
+          'pending': true,
+          'windowEndsAt': '2026-06-12T12:00:30.000Z',
+        },
+      ),
+    );
+    final turn = await ds.sendMessage(templateId: 't1', content: 'hola');
+    expect(turn.pending, isTrue);
+    expect(turn.windowEndsAt, DateTime.utc(2026, 6, 12, 12, 0, 30));
+    expect(turn.items, hasLength(1));
+  });
+
+  test('GET con ventana viva parsea pending + windowEndsAt', () async {
+    when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/x'),
+        data: <String, dynamic>{
+          'items': <dynamic>[itemJson(kind: 'user', text: 'hola')],
+          'pending': true,
+          'windowEndsAt': '2026-06-12T12:00:30.000Z',
+        },
+      ),
+    );
+    final t = await ds.transcript(templateId: 't1');
+    expect(t.pending, isTrue);
+    expect(t.windowEndsAt, DateTime.utc(2026, 6, 12, 12, 0, 30));
   });
 
   test('DELETE resetea la sesión', () async {

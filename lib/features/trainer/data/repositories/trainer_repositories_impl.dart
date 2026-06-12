@@ -108,7 +108,7 @@ class PreviewRepositoryImpl implements PreviewRepository {
   }) => _ds.sendMessage(templateId: templateId, content: content);
 
   @override
-  Future<List<PreviewItem>> transcript({required String templateId}) =>
+  Future<PreviewTranscript> transcript({required String templateId}) =>
       _ds.transcript(templateId: templateId);
 
   @override

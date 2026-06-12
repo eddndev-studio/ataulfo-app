@@ -89,6 +89,7 @@ class AiConfigDto {
     required this.thinkingLevel,
     required this.systemPrompt,
     required this.contextMessages,
+    this.responseDelaySeconds = 0,
   });
 
   factory AiConfigDto.fromJson(Map<String, dynamic> json) {
@@ -108,6 +109,10 @@ class AiConfigDto {
         contextMessages is! int) {
       throw const FormatException('aiConfigDTO: clave obligatoria ausente');
     }
+    // Clave aditiva (ventana de acumulación): un backend previo al campo no
+    // la manda y el cliente degrada a 0 — responder de inmediato. Mismo
+    // trato tolerante que `counts`, a diferencia de las claves fundacionales.
+    final delayRaw = json['response_delay_seconds'];
     return AiConfigDto(
       enabled: enabled,
       provider: provider,
@@ -118,6 +123,7 @@ class AiConfigDto {
       thinkingLevel: thinkingLevel,
       systemPrompt: systemPrompt,
       contextMessages: contextMessages,
+      responseDelaySeconds: delayRaw is int ? delayRaw : 0,
     );
   }
 
@@ -128,4 +134,5 @@ class AiConfigDto {
   final String thinkingLevel;
   final String systemPrompt;
   final int contextMessages;
+  final int responseDelaySeconds;
 }

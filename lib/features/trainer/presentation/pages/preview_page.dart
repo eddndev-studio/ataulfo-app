@@ -136,6 +136,7 @@ class _PreviewThreadState extends State<_PreviewThread> {
               style: const TextStyle(color: AppTokens.danger),
             ),
           ),
+        if (s.accumulatingUntil != null) const _AccumulatingBanner(),
         AppChatComposer(
           fieldKey: const Key('preview.composer.field'),
           sendKey: const Key('preview.composer.send'),
@@ -144,6 +145,61 @@ class _PreviewThreadState extends State<_PreviewThread> {
           onSend: _send,
         ),
       ],
+    );
+  }
+}
+
+/// Pill sobre el composer mientras la ventana de acumulación está viva: el
+/// bot junta los mensajes y responderá todo al cerrarla. Sin typing — el
+/// typing es "está respondiendo", esto es "está escuchando". El composer
+/// queda habilitado: cada envío se suma al batch.
+class _AccumulatingBanner extends StatelessWidget {
+  const _AccumulatingBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      key: const Key('preview.accumulating'),
+      padding: const EdgeInsets.fromLTRB(
+        AppTokens.sp3,
+        0,
+        AppTokens.sp3,
+        AppTokens.sp2,
+      ),
+      child: Align(
+        alignment: Alignment.center,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp3,
+            vertical: AppTokens.sp2,
+          ),
+          decoration: BoxDecoration(
+            color: AppTokens.surface2,
+            borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+            border: Border.all(color: AppTokens.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(
+                Icons.hourglass_top,
+                size: 16,
+                color: AppTokens.primary,
+              ),
+              const SizedBox(width: AppTokens.sp2),
+              Flexible(
+                child: Text(
+                  'Acumulando mensajes — el bot responderá al cerrar la ventana',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: AppTokens.text2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -189,6 +245,7 @@ class _ItemTile extends StatelessWidget {
     'run_flow' => Icons.account_tree_outlined,
     'react' => Icons.add_reaction_outlined,
     'mark_read' => Icons.done_all,
+    'error' => Icons.error_outline,
     _ => Icons.bolt,
   };
 
@@ -214,7 +271,15 @@ class _ItemTile extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(_actionIcon, size: 16, color: AppTokens.primary),
+              Icon(
+                _actionIcon,
+                size: 16,
+                // El chip de error es el único con tinte de peligro: anuncia
+                // un flush fallido, no un efecto grabado del bot.
+                color: item.tool == 'error'
+                    ? AppTokens.danger
+                    : AppTokens.primary,
+              ),
               const SizedBox(width: AppTokens.sp2),
               Flexible(
                 child: Text(

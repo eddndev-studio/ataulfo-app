@@ -307,14 +307,169 @@ void main() {
       'Started rehidrata el transcript vivo',
       build: build,
       setUp: () {
-        when(
-          () => repo.transcript(templateId: 't1'),
-        ).thenAnswer((_) async => <PreviewItem>[_item('user', text: 'hola')]);
+        when(() => repo.transcript(templateId: 't1')).thenAnswer(
+          (_) async => PreviewTranscript(
+            items: <PreviewItem>[_item('user', text: 'hola')],
+          ),
+        );
       },
       act: (b) => b.add(const PreviewStarted()),
       expect: () => <dynamic>[
         const PreviewLoading(),
         isA<PreviewLoaded>().having((s) => s.items.length, 'items', 1),
+      ],
+    );
+
+    blocTest<PreviewBloc, PreviewState>(
+      'turno pendiente: pinta el user, anuncia la acumulación sin typing, '
+      'pollea al cerrar la ventana y revela el flush con cadencia',
+      build: build,
+      seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
+      setUp: () {
+        when(
+          () => repo.sendMessage(templateId: 't1', content: 'hola'),
+        ).thenAnswer(
+          (_) async => PreviewTurn(
+            items: <PreviewItem>[_item('user', text: 'hola')],
+            iterations: 0,
+            pending: true,
+            // Vencida ya: el poll arranca de inmediato (sin esperar reloj).
+            windowEndsAt: DateTime.utc(2026, 6, 12, 12),
+          ),
+        );
+        when(() => repo.transcript(templateId: 't1')).thenAnswer(
+          (_) async => PreviewTranscript(
+            items: <PreviewItem>[
+              _item('user', text: 'hola'),
+              _item('bot', text: 'les respondo todo'),
+            ],
+          ),
+        );
+      },
+      act: (b) async {
+        b.add(const PreviewMessageSent('hola'));
+        // El poll corre fuera del handler y cede un timer por iteración:
+        // ceder turnos de event loop hasta que el flush aterrice.
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      },
+      expect: () => <dynamic>[
+        // Optimista mientras el POST viaja.
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'typing', true)
+            .having((s) => s.items.length, 'optimista', 1),
+        // Acumulando: el user del server reemplaza al optimista, SIN typing
+        // (el bot aún no responde) y con la ventana anunciada.
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'sin typing', false)
+            .having((s) => s.items.length, 'user del server', 1)
+            .having((s) => s.accumulatingUntil, 'ventana', isNotNull),
+        // El flush llegó: typing durante el revelado.
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'typing del revelado', true)
+            .having((s) => s.accumulatingUntil, 'ventana cerrada', isNull),
+        // Revelado completo.
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'off', false)
+            .having((s) => s.items.length, 'flush revelado', 2)
+            .having((s) => s.items.last.isBot, 'bot', true),
+      ],
+    );
+
+    blocTest<PreviewBloc, PreviewState>(
+      'enviar DURANTE la acumulación se permite (se suma al batch) y el '
+      'flush combinado se revela al cerrar la ventana',
+      build: build,
+      seed: () => PreviewLoaded(
+        items: <PreviewItem>[_item('user', text: 'hola')],
+        sending: false,
+        accumulatingUntil: DateTime.utc(2026, 6, 12, 12, 5),
+      ),
+      setUp: () {
+        when(
+          () => repo.sendMessage(templateId: 't1', content: '¿hay envío?'),
+        ).thenAnswer(
+          (_) async => PreviewTurn(
+            items: <PreviewItem>[_item('user', text: '¿hay envío?')],
+            iterations: 0,
+            pending: true,
+            windowEndsAt: DateTime.utc(2026, 6, 12, 12, 5),
+          ),
+        );
+        // El stub del poll DEBE terminar (pending=false): un transcript
+        // eternamente pendiente + pacer instantáneo = loop infinito que
+        // come memoria hasta el OOM del runner.
+        when(() => repo.transcript(templateId: 't1')).thenAnswer(
+          (_) async => PreviewTranscript(
+            items: <PreviewItem>[
+              _item('user', text: 'hola'),
+              _item('user', text: '¿hay envío?'),
+              _item('bot', text: 'sí hay'),
+            ],
+          ),
+        );
+      },
+      act: (b) async {
+        b.add(const PreviewMessageSent('¿hay envío?'));
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      },
+      expect: () => <dynamic>[
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'typing del POST', true)
+            .having((s) => s.items.length, 'optimista sumado', 2),
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'sin typing', false)
+            .having((s) => s.items.length, 'dos users', 2)
+            .having((s) => s.accumulatingUntil, 'ventana viva', isNotNull),
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'typing del revelado', true)
+            .having((s) => s.accumulatingUntil, 'ventana cerrada', isNull),
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'off', false)
+            .having((s) => s.items.length, 'flush revelado', 3)
+            .having((s) => s.items.last.isBot, 'bot al final', true),
+      ],
+    );
+
+    blocTest<PreviewBloc, PreviewState>(
+      'poll que falla persistentemente expone el fallo y apaga la ventana',
+      build: build,
+      seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
+      setUp: () {
+        when(
+          () => repo.sendMessage(templateId: 't1', content: 'hola'),
+        ).thenAnswer(
+          (_) async => PreviewTurn(
+            items: <PreviewItem>[_item('user', text: 'hola')],
+            iterations: 0,
+            pending: true,
+            windowEndsAt: DateTime.utc(2026, 6, 12, 12),
+          ),
+        );
+        when(
+          () => repo.transcript(templateId: 't1'),
+        ).thenThrow(const TrainerNetworkFailure());
+      },
+      act: (b) async {
+        b.add(const PreviewMessageSent('hola'));
+        for (var i = 0; i < 24; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      },
+      expect: () => <dynamic>[
+        isA<PreviewLoaded>().having((s) => s.sending, 'typing', true),
+        isA<PreviewLoaded>().having(
+          (s) => s.accumulatingUntil,
+          'ventana',
+          isNotNull,
+        ),
+        isA<PreviewLoaded>()
+            .having((s) => s.failure, 'fallo', isA<TrainerNetworkFailure>())
+            .having((s) => s.accumulatingUntil, 'ventana apagada', isNull)
+            .having((s) => s.items.length, 'user conservado', 1),
       ],
     );
 

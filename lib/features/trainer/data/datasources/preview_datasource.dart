@@ -6,8 +6,9 @@ import '../dto/preview_dtos.dart';
 import 'failure_mapper.dart';
 import 'turn_timeout.dart';
 
-/// Puerto de datos del preview sandbox. POST síncrono (el turno completo
-/// del bot); GET rehidrata el transcript vivo; DELETE resetea la sesión.
+/// Puerto de datos del preview sandbox. POST corre el turno (síncrono, o
+/// inmediato con `pending` cuando la plantilla acumula); GET rehidrata el
+/// transcript vivo con el estado de la ventana; DELETE resetea la sesión.
 /// 503 ⇒ sandbox sin cablear en el server (TrainerUnavailableFailure).
 abstract interface class PreviewDatasource {
   Future<PreviewTurn> sendMessage({
@@ -15,7 +16,7 @@ abstract interface class PreviewDatasource {
     required String content,
   });
 
-  Future<List<PreviewItem>> transcript({required String templateId});
+  Future<PreviewTranscript> transcript({required String templateId});
 
   Future<void> reset({required String templateId});
 }
@@ -42,6 +43,8 @@ class DioPreviewDatasource implements PreviewDatasource {
       return PreviewTurn(
         items: PreviewItemDto.listFromJson(items),
         iterations: body?['iterations'] is int ? body!['iterations'] as int : 0,
+        pending: body?['pending'] == true,
+        windowEndsAt: _windowEndsAt(body),
       );
     } on TrainerFailure {
       rethrow;
@@ -55,14 +58,19 @@ class DioPreviewDatasource implements PreviewDatasource {
   }
 
   @override
-  Future<List<PreviewItem>> transcript({required String templateId}) async {
+  Future<PreviewTranscript> transcript({required String templateId}) async {
     try {
       final res = await _dio.get<Map<String, dynamic>>(
         '/templates/$templateId/preview/messages',
       );
-      final items = res.data?['items'];
+      final body = res.data;
+      final items = body?['items'];
       if (items is! List<dynamic>) throw const TrainerUnknownFailure();
-      return PreviewItemDto.listFromJson(items);
+      return PreviewTranscript(
+        items: PreviewItemDto.listFromJson(items),
+        pending: body?['pending'] == true,
+        windowEndsAt: _windowEndsAt(body),
+      );
     } on TrainerFailure {
       rethrow;
     } on DioException catch (e) {
@@ -72,6 +80,14 @@ class DioPreviewDatasource implements PreviewDatasource {
     } on TypeError {
       throw const TrainerUnknownFailure();
     }
+  }
+
+  /// windowEndsAt es aditivo y solo viaja con una ventana viva; ausente o
+  /// ilegible ⇒ null (el cliente degrada a poll inmediato).
+  static DateTime? _windowEndsAt(Map<String, dynamic>? body) {
+    final raw = body?['windowEndsAt'];
+    if (raw is! String) return null;
+    return DateTime.tryParse(raw)?.toUtc();
   }
 
   @override

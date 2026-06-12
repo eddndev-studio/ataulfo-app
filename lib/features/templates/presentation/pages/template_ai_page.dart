@@ -278,6 +278,15 @@ class _StatGrid extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: AppTokens.cardGap),
+        _StatTile(
+          tileKey: const Key('template_ai.tile.delay'),
+          label: 'Retraso de respuesta',
+          value: ai.responseDelaySeconds == 0
+              ? 'Inmediato'
+              : '${ai.responseDelaySeconds}s',
+          onTap: isMutating ? null : () => _pickDelay(context),
+        ),
       ],
     );
   }
@@ -336,6 +345,17 @@ class _StatGrid extends StatelessWidget {
     );
     if (picked == null || !context.mounted) return;
     _dispatch(context, ai.copyWith(contextMessages: picked));
+  }
+
+  Future<void> _pickDelay(BuildContext context) async {
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => _DelaySheet(initial: ai.responseDelaySeconds),
+    );
+    if (picked == null || !context.mounted) return;
+    _dispatch(context, ai.copyWith(responseDelaySeconds: picked));
   }
 }
 
@@ -683,6 +703,94 @@ class _ContextSheetState extends State<_ContextSheet> {
             const SizedBox(height: AppTokens.sp4),
             AppButton.filled(
               key: const Key('template_ai.sheet.context.save'),
+              label: 'Guardar',
+              fullWidth: true,
+              // _parsed se evalúa AL TAP (no al build): el closure no debe
+              // congelar el valor de un frame anterior.
+              onPressed: parsed == null
+                  ? null
+                  : () => Navigator.of(context).pop(_parsed),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Campo numérico de la ventana de acumulación (0..120 s) con Guardar
+/// explícito. 0 = responder de inmediato (comportamiento histórico).
+class _DelaySheet extends StatefulWidget {
+  const _DelaySheet({required this.initial});
+
+  final int initial;
+
+  @override
+  State<_DelaySheet> createState() => _DelaySheetState();
+}
+
+class _DelaySheetState extends State<_DelaySheet> {
+  static const int _max = 120;
+
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.initial.toString(),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  int? get _parsed {
+    final n = int.tryParse(_ctrl.text.trim());
+    return (n == null || n < 0 || n > _max) ? null : n;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final parsed = _parsed;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppTokens.sp6,
+          AppTokens.sp6,
+          AppTokens.sp6,
+          AppTokens.sp6 + context.sheetBottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Retraso de respuesta', style: textTheme.titleLarge),
+            const SizedBox(height: 2),
+            Text(
+              'Segundos que el bot acumula mensajes del cliente antes de '
+              'responder todo junto. 0 = inmediato; máximo $_max.',
+              style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+            ),
+            const SizedBox(height: AppTokens.sp4),
+            AppTextField(
+              key: const Key('template_ai.sheet.delay.field'),
+              label: 'Segundos',
+              hint: 'p. ej. 30',
+              controller: _ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: <TextInputFormatter>[
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+            ),
+            const SizedBox(height: AppTokens.sp4),
+            AppButton.filled(
+              key: const Key('template_ai.sheet.delay.save'),
               label: 'Guardar',
               fullWidth: true,
               // _parsed se evalúa AL TAP (no al build): el closure no debe
