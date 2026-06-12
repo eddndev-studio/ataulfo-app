@@ -495,8 +495,44 @@ class _ModelSheet extends StatelessWidget {
             child: Row(
               children: <Widget>[
                 Expanded(child: Text(m.id, style: textTheme.bodyLarge)),
+                // Badges de modalidad de ENTRADA: qué adjuntos del cliente
+                // puede VER este modelo. Sin flags = solo texto, sin ruido.
+                if (m.supportsImageInput)
+                  const Padding(
+                    padding: EdgeInsets.only(left: AppTokens.sp1),
+                    child: Icon(
+                      Icons.image_outlined,
+                      size: 16,
+                      color: AppTokens.text2,
+                    ),
+                  ),
+                if (m.supportsAudioInput)
+                  const Padding(
+                    padding: EdgeInsets.only(left: AppTokens.sp1),
+                    child: Icon(
+                      Icons.mic_none,
+                      size: 16,
+                      color: AppTokens.text2,
+                    ),
+                  ),
+                if (m.supportsDocumentInput)
+                  const Padding(
+                    padding: EdgeInsets.only(left: AppTokens.sp1),
+                    child: Icon(
+                      Icons.description_outlined,
+                      size: 16,
+                      color: AppTokens.text2,
+                    ),
+                  ),
                 if (m.id == current)
-                  const Icon(Icons.check, color: AppTokens.primary, size: 20),
+                  const Padding(
+                    padding: EdgeInsets.only(left: AppTokens.sp2),
+                    child: Icon(
+                      Icons.check,
+                      color: AppTokens.primary,
+                      size: 20,
+                    ),
+                  ),
               ],
             ),
           ),

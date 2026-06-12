@@ -64,6 +64,9 @@ class ModelDto {
     required this.id,
     required this.supportsTemperature,
     required this.supportsThinking,
+    this.supportsImageInput = false,
+    this.supportsAudioInput = false,
+    this.supportsDocumentInput = false,
   });
 
   factory ModelDto.fromJson(Map<String, dynamic> json) {
@@ -77,14 +80,22 @@ class ModelDto {
         'model: clave obligatoria ausente o tipo inválido',
       );
     }
+    // Modalidades de entrada: TOLERANTES (ausentes ⇒ false) — el wire las
+    // ganó después y un backend viejo no debe romper el catálogo.
     return ModelDto(
       id: id,
       supportsTemperature: supportsTemperature,
       supportsThinking: supportsThinking,
+      supportsImageInput: json['supportsImageInput'] == true,
+      supportsAudioInput: json['supportsAudioInput'] == true,
+      supportsDocumentInput: json['supportsDocumentInput'] == true,
     );
   }
 
   final String id;
   final bool supportsTemperature;
   final bool supportsThinking;
+  final bool supportsImageInput;
+  final bool supportsAudioInput;
+  final bool supportsDocumentInput;
 }

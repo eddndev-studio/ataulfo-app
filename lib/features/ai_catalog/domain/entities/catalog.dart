@@ -69,16 +69,25 @@ class ProviderEntry {
 ///   - `supportsThinking`: el modelo expone una perilla de razonamiento
 ///     mapeable a `thinkingLevel`. MiniMax/DeepSeek razonan nativos sin
 ///     perilla; el editor oculta el dropdown cuando es `false`.
+/// Las flags `supports*Input` declaran las modalidades de ENTRADA del
+/// modelo (qué adjuntos del cliente puede VER); alimentan los badges del
+/// picker. Ausentes en el wire ⇒ false (wire viejo degrada sin crash).
 class AIModel {
   const AIModel({
     required this.id,
     required this.supportsTemperature,
     required this.supportsThinking,
+    this.supportsImageInput = false,
+    this.supportsAudioInput = false,
+    this.supportsDocumentInput = false,
   });
 
   final String id;
   final bool supportsTemperature;
   final bool supportsThinking;
+  final bool supportsImageInput;
+  final bool supportsAudioInput;
+  final bool supportsDocumentInput;
 
   @override
   bool operator ==(Object other) {
@@ -86,9 +95,19 @@ class AIModel {
     return other is AIModel &&
         other.id == id &&
         other.supportsTemperature == supportsTemperature &&
-        other.supportsThinking == supportsThinking;
+        other.supportsThinking == supportsThinking &&
+        other.supportsImageInput == supportsImageInput &&
+        other.supportsAudioInput == supportsAudioInput &&
+        other.supportsDocumentInput == supportsDocumentInput;
   }
 
   @override
-  int get hashCode => Object.hash(id, supportsTemperature, supportsThinking);
+  int get hashCode => Object.hash(
+    id,
+    supportsTemperature,
+    supportsThinking,
+    supportsImageInput,
+    supportsAudioInput,
+    supportsDocumentInput,
+  );
 }

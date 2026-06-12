@@ -50,6 +50,9 @@ const _catalog = Catalog(
           id: 'gemini-3.1-pro-preview',
           supportsTemperature: true,
           supportsThinking: true,
+          supportsImageInput: true,
+          supportsAudioInput: true,
+          supportsDocumentInput: true,
         ),
         AIModel(
           id: 'gemini-3-flash',
@@ -180,6 +183,46 @@ void main() {
         ),
       ).called(1);
       expect(find.byKey(const Key('template_ai.sheet.model')), findsNothing);
+    });
+
+    testWidgets('el picker muestra badges de modalidad por modelo', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('template_ai.tile.model')));
+      await tester.pumpAndSettle();
+
+      // gemini-3.1: imagen+audio+documento.
+      final richRow = find.byKey(
+        const Key('template_ai.model.gemini-3.1-pro-preview'),
+      );
+      expect(
+        find.descendant(
+          of: richRow,
+          matching: find.byIcon(Icons.image_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: richRow, matching: find.byIcon(Icons.mic_none)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: richRow,
+          matching: find.byIcon(Icons.description_outlined),
+        ),
+        findsOneWidget,
+      );
+      // gpt-5-pro: solo texto — sin badges.
+      final plainRow = find.byKey(const Key('template_ai.model.gpt-5-pro'));
+      expect(
+        find.descendant(
+          of: plainRow,
+          matching: find.byIcon(Icons.image_outlined),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('elegir un modelo de OTRO proveedor cambia también provider', (

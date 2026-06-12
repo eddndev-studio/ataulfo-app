@@ -25,5 +25,8 @@ class CatalogMapper {
     id: dto.id,
     supportsTemperature: dto.supportsTemperature,
     supportsThinking: dto.supportsThinking,
+    supportsImageInput: dto.supportsImageInput,
+    supportsAudioInput: dto.supportsAudioInput,
+    supportsDocumentInput: dto.supportsDocumentInput,
   );
 }
