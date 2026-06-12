@@ -149,6 +149,7 @@ void main() {
             templateId: 't1',
             conversationId: 'c1',
             content: 'mejora el prompt',
+            attachments: any(named: 'attachments'),
           ),
         ).thenAnswer((_) async => _msg('m3', 'assistant', 'hecho'));
         when(
@@ -244,6 +245,7 @@ void main() {
             conversationId: 'c1',
             content: 'hola M3',
             model: 'MiniMax-M3',
+            attachments: any(named: 'attachments'),
           ),
         ).thenAnswer((_) async => _msg('m3', 'assistant', 'hecho'));
         when(
@@ -269,6 +271,7 @@ void main() {
             conversationId: 'c1',
             content: 'hola M3',
             model: 'MiniMax-M3',
+            attachments: any(named: 'attachments'),
           ),
         ).called(1);
       },
@@ -292,6 +295,7 @@ void main() {
             templateId: 't1',
             conversationId: 'c1',
             content: 'x',
+            attachments: any(named: 'attachments'),
           ),
         ).thenAnswer((_) async => _msg('m3', 'assistant', 'ok'));
         when(
@@ -316,6 +320,7 @@ void main() {
             templateId: 't1',
             conversationId: 'c1',
             content: 'x',
+            attachments: any(named: 'attachments'),
           ),
         ).called(1);
       },
@@ -379,6 +384,7 @@ void main() {
             templateId: 't1',
             conversationId: 'c1',
             content: 'x',
+            attachments: any(named: 'attachments'),
           ),
         ).thenThrow(const TrainerEngineFailure());
       },

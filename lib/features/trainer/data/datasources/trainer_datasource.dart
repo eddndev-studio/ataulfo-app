@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
+import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
 import '../../domain/entities/trainer_models.dart';
@@ -39,6 +41,15 @@ abstract interface class TrainerDatasource {
     required String conversationId,
     required String content,
     String? model,
+    List<String> attachments = const <String>[],
+  });
+
+  /// Sube un adjunto del hilo (multipart). La ref devuelta es la moneda
+  /// que el POST de mensaje manda; el server valida pertenencia.
+  Future<TrainerAttachment> uploadAttachment({
+    required String templateId,
+    required Uint8List bytes,
+    required String filename,
   });
 
   /// Allowlist de modelos del entrenador + default de la plataforma. El
@@ -151,16 +162,48 @@ class DioTrainerDatasource implements TrainerDatasource {
     required String conversationId,
     required String content,
     String? model,
+    List<String> attachments = const <String>[],
   }) async {
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '${_base(templateId)}/$conversationId/messages',
-        data: <String, dynamic>{'content': content, 'model': ?model},
+        data: <String, dynamic>{
+          'content': content,
+          'model': ?model,
+          if (attachments.isNotEmpty) 'attachments': attachments,
+        },
         options: Options(receiveTimeout: turnReceiveTimeout),
       );
       final body = res.data;
       if (body == null) throw const TrainerUnknownFailure();
       return TrainerMessageDto.fromJson(body).toEntity();
+    } on TrainerFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw mapTrainerDioException(e);
+    } on FormatException {
+      throw const TrainerUnknownFailure();
+    } on TypeError {
+      throw const TrainerUnknownFailure();
+    }
+  }
+
+  @override
+  Future<TrainerAttachment> uploadAttachment({
+    required String templateId,
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/templates/$templateId/trainer/attachments',
+        data: FormData.fromMap(<String, dynamic>{
+          'file': MultipartFile.fromBytes(bytes, filename: filename),
+        }),
+      );
+      final body = res.data;
+      if (body == null) throw const TrainerUnknownFailure();
+      return TrainerAttachmentDto.fromJson(body).toEntity();
     } on TrainerFailure {
       rethrow;
     } on DioException catch (e) {

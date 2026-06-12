@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
 import '../../domain/entities/trainer_models.dart';
@@ -61,6 +62,7 @@ class TrainerMessageDto {
     this.toolCallsRaw,
     this.toolResultsRaw,
     this.thinking = '',
+    this.attachments = const <TrainerAttachmentDto>[],
   });
 
   factory TrainerMessageDto.fromJson(Map<String, dynamic> json) {
@@ -78,6 +80,16 @@ class TrainerMessageDto {
     // a String para que la presentación los parsee sin que la capa de datos
     // fije su shape.
     String? raw(Object? v) => v == null ? null : jsonEncode(v);
+    // attachments es aditivo y TOLERANTE: entradas malformadas se omiten
+    // (el hilo no se cae por un adjunto raro del wire).
+    final atts = <TrainerAttachmentDto>[];
+    if (json['attachments'] is List<dynamic>) {
+      for (final e in json['attachments'] as List<dynamic>) {
+        if (e is! Map<String, dynamic>) continue;
+        final att = TrainerAttachmentDto.tryParse(e);
+        if (att != null) atts.add(att);
+      }
+    }
     return TrainerMessageDto(
       id: id,
       conversationId: conversationId,
@@ -86,6 +98,7 @@ class TrainerMessageDto {
       toolCallsRaw: raw(json['tool_calls']),
       toolResultsRaw: raw(json['tool_results']),
       thinking: json['thinking'] is String ? json['thinking'] as String : '',
+      attachments: atts,
       createdAt: DateTime.parse(createdAt).toUtc(),
     );
   }
@@ -97,6 +110,7 @@ class TrainerMessageDto {
   final String? toolCallsRaw;
   final String? toolResultsRaw;
   final String thinking;
+  final List<TrainerAttachmentDto> attachments;
   final DateTime createdAt;
 
   TrainerMessage toEntity() => TrainerMessage(
@@ -107,8 +121,53 @@ class TrainerMessageDto {
     toolCallsRaw: toolCallsRaw,
     toolResultsRaw: toolResultsRaw,
     thinking: thinking,
+    attachments: attachments.map((a) => a.toEntity()).toList(growable: false),
     createdAt: createdAt,
   );
+}
+
+/// DTO de un adjunto del hilo (mismo shape en la subida y en el mensaje).
+class TrainerAttachmentDto {
+  const TrainerAttachmentDto({
+    required this.ref,
+    required this.mime,
+    required this.name,
+    required this.sizeBytes,
+  });
+
+  /// Canónico para la respuesta de la SUBIDA (shape garantizado).
+  factory TrainerAttachmentDto.fromJson(Map<String, dynamic> json) {
+    final att = tryParse(json);
+    if (att == null) {
+      throw const FormatException('trainer attachment: shape inválido');
+    }
+    return att;
+  }
+
+  /// Tolerante para las listas del hilo (malformado ⇒ null, se omite).
+  static TrainerAttachmentDto? tryParse(Map<String, dynamic> json) {
+    final ref = json['ref'];
+    final mime = json['mime'];
+    final name = json['name'];
+    final size = json['sizeBytes'];
+    if (ref is! String || mime is! String || name is! String || size is! num) {
+      return null;
+    }
+    return TrainerAttachmentDto(
+      ref: ref,
+      mime: mime,
+      name: name,
+      sizeBytes: size.toInt(),
+    );
+  }
+
+  final String ref;
+  final String mime;
+  final String name;
+  final int sizeBytes;
+
+  TrainerAttachment toEntity() =>
+      TrainerAttachment(ref: ref, mime: mime, name: name, sizeBytes: sizeBytes);
 }
 
 /// DTO de GET `/templates/{id}/trainer/models`. TOLERANTE de punta a punta

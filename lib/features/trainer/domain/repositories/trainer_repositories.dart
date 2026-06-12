@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
+
 import '../entities/preview_item.dart';
+import '../entities/trainer_attachment.dart';
 import '../entities/trainer_conversation.dart';
 import '../entities/trainer_message.dart';
 import '../entities/trainer_models.dart';
@@ -50,6 +53,14 @@ abstract interface class TrainerRepository {
     required String conversationId,
     required String content,
     String? model,
+    List<String> attachments,
+  });
+
+  /// Sube un adjunto del hilo; la ref devuelta viaja en sendMessage.
+  Future<TrainerAttachment> uploadAttachment({
+    required String templateId,
+    required Uint8List bytes,
+    required String filename,
   });
 
   /// Allowlist de modelos del entrenador (best-effort en el caller).

@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
+
 import '../../domain/entities/preview_item.dart';
+import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
 import '../../domain/entities/trainer_models.dart';
@@ -90,11 +93,24 @@ class TrainerRepositoryImpl implements TrainerRepository {
     required String conversationId,
     required String content,
     String? model,
+    List<String> attachments = const <String>[],
   }) => _ds.sendMessage(
     templateId: templateId,
     conversationId: conversationId,
     content: content,
     model: model,
+    attachments: attachments,
+  );
+
+  @override
+  Future<TrainerAttachment> uploadAttachment({
+    required String templateId,
+    required Uint8List bytes,
+    required String filename,
+  }) => _ds.uploadAttachment(
+    templateId: templateId,
+    bytes: bytes,
+    filename: filename,
   );
 
   @override

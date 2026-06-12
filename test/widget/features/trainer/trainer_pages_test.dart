@@ -114,6 +114,7 @@ void main() {
           templateId: 't1',
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) async => _msg('mx', 'assistant', 'ok'));
 
@@ -124,6 +125,7 @@ void main() {
           templateId: 't1',
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).called(1);
       await tester.pumpAndSettle();
@@ -152,6 +154,7 @@ void main() {
           templateId: 't1',
           conversationId: 'c1',
           content: 'sube precios',
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) async => _msg('mx', 'assistant', 'ok'));
 
@@ -167,6 +170,7 @@ void main() {
           templateId: 't1',
           conversationId: 'c1',
           content: 'sube precios',
+          attachments: any(named: 'attachments'),
         ),
       ).called(1);
       await tester.pumpAndSettle();
@@ -215,6 +219,7 @@ void main() {
           conversationId: 'c1',
           content: 'hola M3',
           model: 'MiniMax-M3',
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) async => _msg('mx', 'assistant', 'ok'));
 
@@ -232,6 +237,7 @@ void main() {
           conversationId: 'c1',
           content: 'hola M3',
           model: 'MiniMax-M3',
+          attachments: any(named: 'attachments'),
         ),
       ).called(1);
       await tester.pumpAndSettle();

@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart';
+
+import 'trainer_attachment.dart';
+
 /// Turno persistido del hilo del entrenador. `toolCallsRaw`/`toolResultsRaw`
 /// conservan el jsonb CRUDO del wire: la capa de presentación los parsea
 /// para las tarjetas de cambio (edit_prompt/write_doc/...), sin que la capa
@@ -12,6 +16,7 @@ class TrainerMessage {
     this.toolCallsRaw,
     this.toolResultsRaw,
     this.thinking = '',
+    this.attachments = const <TrainerAttachment>[],
   });
 
   final String id;
@@ -21,6 +26,7 @@ class TrainerMessage {
   final String? toolCallsRaw;
   final String? toolResultsRaw;
   final String thinking;
+  final List<TrainerAttachment> attachments;
   final DateTime createdAt;
 
   bool get isUser => role == 'user';
@@ -37,6 +43,7 @@ class TrainerMessage {
       other.toolCallsRaw == toolCallsRaw &&
       other.toolResultsRaw == toolResultsRaw &&
       other.thinking == thinking &&
+      listEquals(other.attachments, attachments) &&
       other.createdAt == createdAt;
 
   @override
@@ -48,6 +55,7 @@ class TrainerMessage {
     toolCallsRaw,
     toolResultsRaw,
     thinking,
+    Object.hashAll(attachments),
     createdAt,
   );
 }

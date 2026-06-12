@@ -63,6 +63,7 @@ import '../../features/notes/domain/repositories/notes_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/labels/presentation/bloc/labels_bloc.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
+import '../../features/media/data/repositories/file_picker_media_file_picker.dart';
 import '../../features/media/domain/repositories/media_repository.dart';
 import '../../features/invitations/domain/repositories/invitations_repository.dart';
 import '../../features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
@@ -825,9 +826,11 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return BlocProvider<TrainerChatBloc>(
-            create: (_) =>
-                TrainerChatBloc(repo: _trainerRepo, templateId: id)
-                  ..add(const TrainerChatStarted()),
+            create: (_) => TrainerChatBloc(
+              repo: _trainerRepo,
+              templateId: id,
+              picker: FilePickerMediaFilePicker(),
+            )..add(const TrainerChatStarted()),
             child: TrainerChatPage(templateId: id),
           );
         },

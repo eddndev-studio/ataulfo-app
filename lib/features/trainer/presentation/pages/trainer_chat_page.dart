@@ -186,12 +186,53 @@ class _ChatViewState extends State<_ChatView> {
               ),
             ),
           ),
+        if (s.pendingAttachments.isNotEmpty)
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              key: const Key('trainer.pending_attachments'),
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
+              itemCount: s.pendingAttachments.length,
+              separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
+              itemBuilder: (context, i) {
+                final att = s.pendingAttachments[i];
+                return InputChip(
+                  key: Key('trainer.pending_att.${att.ref}'),
+                  avatar: Icon(attachmentIcon(att.mime), size: 16),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  label: Text(att.name, overflow: TextOverflow.ellipsis),
+                  onDeleted: () => context.read<TrainerChatBloc>().add(
+                    TrainerChatAttachmentRemoved(att.ref),
+                  ),
+                );
+              },
+            ),
+          ),
         AppChatComposer(
           fieldKey: const Key('trainer.composer.field'),
           sendKey: const Key('trainer.composer.send'),
           hint: 'Cuéntale de tu negocio…',
           enabled: !s.sending,
           onSend: _send,
+          leading: <Widget>[
+            IconButton(
+              key: const Key('trainer.attach'),
+              tooltip: 'Adjuntar imagen o PDF',
+              icon: s.attaching
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.attach_file, color: AppTokens.text2),
+              onPressed: s.attaching || s.sending
+                  ? null
+                  : () => context.read<TrainerChatBloc>().add(
+                      const TrainerChatAttachRequested(),
+                    ),
+            ),
+          ],
         ),
       ],
     );
@@ -317,14 +358,54 @@ class _MessageTile extends StatelessWidget {
     }
     return ChatBubble(
       mine: message.isUser,
-      child: Text(
-        message.content,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (message.attachments.isNotEmpty) ...<Widget>[
+            for (final att in message.attachments)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppTokens.sp1),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(
+                      attachmentIcon(att.mime),
+                      size: 16,
+                      color: AppTokens.text2,
+                    ),
+                    const SizedBox(width: AppTokens.sp1),
+                    Flexible(
+                      child: Text(
+                        att.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: AppTokens.text2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          if (message.content.isNotEmpty)
+            Text(
+              message.content,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+            ),
+        ],
       ),
     );
   }
+}
+
+/// Ícono por MIME del adjunto (imagen/PDF; resto genérico).
+IconData attachmentIcon(String mime) {
+  if (mime.startsWith('image/')) return Icons.image_outlined;
+  if (mime == 'application/pdf') return Icons.description_outlined;
+  return Icons.attach_file;
 }
 
 /// Diff embebido en el envelope de una tool de escritura (puede faltar:

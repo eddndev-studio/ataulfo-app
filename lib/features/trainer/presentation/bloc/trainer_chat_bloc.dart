@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
 import '../../domain/entities/trainer_models.dart';
 import '../../domain/failures/trainer_failure.dart';
+import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../domain/repositories/trainer_repositories.dart';
 
 /// Página de historial que el chat carga por turno. El POST síncrono ya
@@ -39,6 +41,19 @@ final class TrainerChatNewConversationRequested extends TrainerChatEvent {
 
 /// El operador elige el modelo del entrenador para los próximos turnos.
 /// id vacío ⇒ volver al default de la plataforma (el turno viaja sin model).
+/// El operador quiere adjuntar un archivo al turno: abre el picker y, si
+/// elige, lo sube al hilo (la ref queda PENDIENTE hasta el send).
+final class TrainerChatAttachRequested extends TrainerChatEvent {
+  const TrainerChatAttachRequested();
+}
+
+/// Quita un adjunto pendiente (por ref) antes de enviar.
+final class TrainerChatAttachmentRemoved extends TrainerChatEvent {
+  const TrainerChatAttachmentRemoved(this.ref);
+
+  final String ref;
+}
+
 final class TrainerChatModelSelected extends TrainerChatEvent {
   const TrainerChatModelSelected(this.modelId);
 
@@ -88,6 +103,8 @@ final class TrainerChatLoaded extends TrainerChatState {
     this.models = const <TrainerModelOption>[],
     this.defaultModelId = '',
     this.selectedModelId = '',
+    this.pendingAttachments = const <TrainerAttachment>[],
+    this.attaching = false,
   });
 
   final TrainerConversation conversation;
@@ -111,12 +128,20 @@ final class TrainerChatLoaded extends TrainerChatState {
   /// Elección vigente del operador; '' = default (el turno viaja sin model).
   final String selectedModelId;
 
+  /// Adjuntos YA subidos esperando el próximo send (chips en el composer).
+  final List<TrainerAttachment> pendingAttachments;
+
+  /// true mientras un adjunto sube (el clip muestra spinner).
+  final bool attaching;
+
   TrainerChatLoaded copyWith({
     List<TrainerMessage>? messages,
     bool? sending,
     TrainerFailure? sendFailure,
     bool clearSendFailure = false,
     String? selectedModelId,
+    List<TrainerAttachment>? pendingAttachments,
+    bool? attaching,
   }) => TrainerChatLoaded(
     conversation: conversation,
     messages: messages ?? this.messages,
@@ -125,6 +150,8 @@ final class TrainerChatLoaded extends TrainerChatState {
     models: models,
     defaultModelId: defaultModelId,
     selectedModelId: selectedModelId ?? this.selectedModelId,
+    pendingAttachments: pendingAttachments ?? this.pendingAttachments,
+    attaching: attaching ?? this.attaching,
   );
 
   @override
@@ -136,7 +163,9 @@ final class TrainerChatLoaded extends TrainerChatState {
       other.sendFailure == sendFailure &&
       listEquals(other.models, models) &&
       other.defaultModelId == defaultModelId &&
-      other.selectedModelId == selectedModelId;
+      other.selectedModelId == selectedModelId &&
+      listEquals(other.pendingAttachments, pendingAttachments) &&
+      other.attaching == attaching;
 
   @override
   int get hashCode => Object.hash(
@@ -147,22 +176,33 @@ final class TrainerChatLoaded extends TrainerChatState {
     Object.hashAll(models),
     defaultModelId,
     selectedModelId,
+    Object.hashAll(pendingAttachments),
+    attaching,
   );
 }
 
 class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
-  TrainerChatBloc({required TrainerRepository repo, required String templateId})
-    : _repo = repo,
-      _templateId = templateId,
-      super(const TrainerChatLoading()) {
+  TrainerChatBloc({
+    required TrainerRepository repo,
+    required String templateId,
+    MediaFilePicker? picker,
+  }) : _repo = repo,
+       _templateId = templateId,
+       _picker = picker,
+       super(const TrainerChatLoading()) {
     on<TrainerChatStarted>(_onStarted);
     on<TrainerChatMessageSent>(_onMessageSent);
+    on<TrainerChatAttachRequested>(_onAttachRequested);
+    on<TrainerChatAttachmentRemoved>(_onAttachmentRemoved);
     on<TrainerChatNewConversationRequested>(_onNewConversation);
     on<TrainerChatModelSelected>(_onModelSelected);
   }
 
   final TrainerRepository _repo;
   final String _templateId;
+
+  /// Picker de archivos (nil ⇒ el composer oculta el clip — DX/tests).
+  final MediaFilePicker? _picker;
 
   /// Allowlist de modelos, best-effort: el selector es accesorio — CUALQUIER
   /// fallo (backend sin la ruta, red, wire inesperado) lo oculta sin tocar
@@ -227,6 +267,7 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       conversationId: current.conversation.id,
       role: 'user',
       content: event.content,
+      attachments: current.pendingAttachments,
       createdAt: DateTime.now().toUtc(),
     );
     emit(
@@ -242,12 +283,16 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         conversationId: current.conversation.id,
         content: event.content,
         model: current.selectedModelId.isEmpty ? null : current.selectedModelId,
+        attachments: current.pendingAttachments
+            .map((a) => a.ref)
+            .toList(growable: false),
       );
       emit(
         current.copyWith(
           messages: await _loadMessages(current.conversation.id),
           sending: false,
           clearSendFailure: true,
+          pendingAttachments: const <TrainerAttachment>[],
         ),
       );
     } on TrainerFailure catch (f) {
@@ -255,6 +300,59 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       // motor deja el user message fuera del hilo — reintentable).
       emit(current.copyWith(sending: false, sendFailure: f));
     }
+  }
+
+  Future<void> _onAttachRequested(
+    TrainerChatAttachRequested event,
+    Emitter<TrainerChatState> emit,
+  ) async {
+    final current = state;
+    final picker = _picker;
+    if (current is! TrainerChatLoaded || picker == null || current.attaching) {
+      return;
+    }
+    final picked = await picker.pick();
+    if (picked == null) return; // canceló: ni estado ni red.
+    final afterPick = state;
+    if (afterPick is! TrainerChatLoaded) return;
+    emit(afterPick.copyWith(attaching: true));
+    try {
+      final att = await _repo.uploadAttachment(
+        templateId: _templateId,
+        bytes: picked.bytes,
+        filename: picked.filename,
+      );
+      final cur = state;
+      if (cur is! TrainerChatLoaded) return;
+      emit(
+        cur.copyWith(
+          attaching: false,
+          pendingAttachments: <TrainerAttachment>[
+            ...cur.pendingAttachments,
+            att,
+          ],
+        ),
+      );
+    } on TrainerFailure catch (f) {
+      final cur = state;
+      if (cur is! TrainerChatLoaded) return;
+      emit(cur.copyWith(attaching: false, sendFailure: f));
+    }
+  }
+
+  void _onAttachmentRemoved(
+    TrainerChatAttachmentRemoved event,
+    Emitter<TrainerChatState> emit,
+  ) {
+    final current = state;
+    if (current is! TrainerChatLoaded) return;
+    emit(
+      current.copyWith(
+        pendingAttachments: current.pendingAttachments
+            .where((a) => a.ref != event.ref)
+            .toList(growable: false),
+      ),
+    );
   }
 
   void _onModelSelected(
