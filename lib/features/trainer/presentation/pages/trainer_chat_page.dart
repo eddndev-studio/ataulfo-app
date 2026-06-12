@@ -143,18 +143,24 @@ class _ChatViewState extends State<_ChatView> {
     return Column(
       children: <Widget>[
         Expanded(
-          child: ListView.builder(
-            reverse: true,
-            padding: const EdgeInsets.all(AppTokens.sp3),
-            itemCount: s.messages.length + (s.sending ? 1 : 0),
-            itemBuilder: (context, i) {
-              if (s.sending && i == 0) {
-                return const TypingBubble(key: Key('trainer.typing'));
-              }
-              final idx = s.messages.length - 1 - (i - (s.sending ? 1 : 0));
-              return _MessageTile(message: s.messages[idx]);
-            },
-          ),
+          // Hilo vacío en reposo: el área del chat quedaría en blanco, así que
+          // la ocupa un tip que orienta al operador sobre qué hacer (convive
+          // con los chips de arranque de abajo).
+          child: (s.messages.isEmpty && !s.sending)
+              ? const _EmptyHint()
+              : ListView.builder(
+                  reverse: true,
+                  padding: const EdgeInsets.all(AppTokens.sp3),
+                  itemCount: s.messages.length + (s.sending ? 1 : 0),
+                  itemBuilder: (context, i) {
+                    if (s.sending && i == 0) {
+                      return const TypingBubble(key: Key('trainer.typing'));
+                    }
+                    final idx =
+                        s.messages.length - 1 - (i - (s.sending ? 1 : 0));
+                    return _MessageTile(message: s.messages[idx]);
+                  },
+                ),
         ),
         if (s.sendFailure != null)
           Padding(
@@ -188,6 +194,50 @@ class _ChatViewState extends State<_ChatView> {
           onSend: _send,
         ),
       ],
+    );
+  }
+}
+
+/// Estado vacío del hilo: un tip de fondo que orienta al operador sobre qué
+/// hacer con el entrenador. Ocupa el área del chat —que de otro modo quedaría
+/// en blanco— y complementa los chips de arranque, que viven abajo.
+class _EmptyHint extends StatelessWidget {
+  const _EmptyHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    // Scrolleable: si el teclado encoge el área del hilo, el tip se desplaza
+    // en vez de desbordar (y se centra mientras haya espacio de sobra).
+    return Center(
+      key: const Key('trainer.empty_hint'),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.school_outlined,
+              size: 48,
+              color: AppTokens.primary,
+            ),
+            const SizedBox(height: AppTokens.sp3),
+            Text(
+              'Entrena a tu bot',
+              textAlign: TextAlign.center,
+              style: textTheme.titleMedium?.copyWith(color: AppTokens.text1),
+            ),
+            const SizedBox(height: AppTokens.sp2),
+            Text(
+              'Cuéntale al entrenador sobre tu negocio —menú, horarios, tono— y '
+              'él irá afinando el prompt y el workspace por ti. Empieza con una '
+              'sugerencia de abajo o escribe tu primer mensaje.',
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

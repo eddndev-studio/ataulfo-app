@@ -322,6 +322,50 @@ void main() {
     );
 
     blocTest<TrainerChatBloc, TrainerChatState>(
+      'NewConversation conserva el selector de modelo (allowlist + elección)',
+      build: build,
+      seed: () => TrainerChatLoaded(
+        conversation: _conv,
+        messages: <TrainerMessage>[_msg('m1', 'user', 'hola')],
+        sending: false,
+        models: const <TrainerModelOption>[
+          TrainerModelOption(id: 'MiniMax-M3', label: 'MiniMax M3'),
+          TrainerModelOption(id: 'gpt-5.5', label: 'ChatGPT 5.5'),
+        ],
+        defaultModelId: 'gpt-5.5',
+        selectedModelId: 'MiniMax-M3',
+      ),
+      setUp: () {
+        when(
+          () => repo.createConversation(
+            templateId: 't1',
+            title: any(named: 'title'),
+          ),
+        ).thenAnswer((_) async => _conv);
+      },
+      act: (b) => b.add(const TrainerChatNewConversationRequested()),
+      expect: () => <dynamic>[
+        isA<TrainerChatLoading>(),
+        isA<TrainerChatLoaded>()
+            .having((s) => s.messages, 'hilo vacío', isEmpty)
+            .having((s) => s.models.length, 'allowlist preservada', 2)
+            .having((s) => s.defaultModelId, 'default preservado', 'gpt-5.5')
+            .having(
+              (s) => s.selectedModelId,
+              'elección preservada',
+              'MiniMax-M3',
+            ),
+      ],
+      verify: (_) {
+        // El selector NO se recarga del server: la allowlist se hereda del
+        // estado vivo (los modelos son del template, no de la conversación).
+        verifyNever(
+          () => repo.listModels(templateId: any(named: 'templateId')),
+        );
+      },
+    );
+
+    blocTest<TrainerChatBloc, TrainerChatState>(
       'MessageSent con motor caído: revierte el optimista y expone el fallo',
       build: build,
       seed: () => TrainerChatLoaded(

@@ -270,17 +270,34 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     TrainerChatNewConversationRequested event,
     Emitter<TrainerChatState> emit,
   ) async {
+    // La allowlist de modelos y la elección del operador son de la pantalla
+    // (template/servidor), no de la conversación: deben sobrevivir al iniciar
+    // un hilo nuevo, o el selector de modelo desaparecería. Se heredan del
+    // estado cargado vivo; si no lo había (nueva conversación lanzada desde
+    // Loading/Failed), se recargan best-effort.
+    final preserved = state is TrainerChatLoaded
+        ? state as TrainerChatLoaded
+        : null;
     emit(const TrainerChatLoading());
     try {
       final conv = await _repo.createConversation(
         templateId: _templateId,
         title: 'Entrenamiento',
       );
+      final models = preserved != null
+          ? TrainerModels(
+              options: preserved.models,
+              defaultId: preserved.defaultModelId,
+            )
+          : await _loadModels();
       emit(
         TrainerChatLoaded(
           conversation: conv,
           messages: const <TrainerMessage>[],
           sending: false,
+          models: models.options,
+          defaultModelId: models.defaultId,
+          selectedModelId: preserved?.selectedModelId ?? '',
         ),
       );
     } on TrainerFailure catch (f) {

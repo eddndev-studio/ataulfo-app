@@ -129,6 +129,20 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('hilo vacío muestra un tip de fondo que orienta al usuario', (
+      tester,
+    ) async {
+      await pump(tester, <TrainerMessage>[]);
+      expect(find.byKey(const Key('trainer.empty_hint')), findsOneWidget);
+    });
+
+    testWidgets('con mensajes en el hilo NO se muestra el tip de fondo', (
+      tester,
+    ) async {
+      await pump(tester, <TrainerMessage>[_msg('m1', 'user', 'hola')]);
+      expect(find.byKey(const Key('trainer.empty_hint')), findsNothing);
+    });
+
     testWidgets('composer manda el texto y bloquea mientras envía', (
       tester,
     ) async {
