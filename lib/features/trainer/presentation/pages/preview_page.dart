@@ -201,6 +201,44 @@ class _ItemTile extends StatelessWidget {
         ),
       );
     }
+    if (item.isMedia) {
+      // Archivo que el flujo simulado enviaría: tipo legible + caption.
+      // Misma burbuja del bot (lado izquierdo) — ES un envío del bot.
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          key: const Key('preview.media_bubble'),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          constraints: const BoxConstraints(maxWidth: 320),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(_mediaIcon(item.stepType), size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    _mediaLabel(item.stepType),
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ],
+              ),
+              if (item.text.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 6),
+                Text(item.text),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
     final mine = item.isUser;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -218,4 +256,24 @@ class _ItemTile extends StatelessWidget {
       ),
     );
   }
+
+  static IconData _mediaIcon(String stepType) => switch (stepType) {
+    'IMAGE' => Icons.image_outlined,
+    'VIDEO' => Icons.videocam_outlined,
+    'DOCUMENT' => Icons.description_outlined,
+    'AUDIO' => Icons.audiotrack_outlined,
+    'PTT' => Icons.mic_none,
+    'STICKER' => Icons.emoji_emotions_outlined,
+    _ => Icons.attach_file,
+  };
+
+  static String _mediaLabel(String stepType) => switch (stepType) {
+    'IMAGE' => 'Imagen',
+    'VIDEO' => 'Video',
+    'DOCUMENT' => 'Documento',
+    'AUDIO' => 'Audio',
+    'PTT' => 'Nota de voz',
+    'STICKER' => 'Sticker',
+    _ => 'Archivo',
+  };
 }

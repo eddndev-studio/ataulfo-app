@@ -9,6 +9,8 @@ class PreviewItemDto {
     this.text = '',
     this.tool = '',
     this.summary = '',
+    this.mediaRef = '',
+    this.stepType = '',
   });
 
   factory PreviewItemDto.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,8 @@ class PreviewItemDto {
       text: json['text'] is String ? json['text'] as String : '',
       tool: json['tool'] is String ? json['tool'] as String : '',
       summary: json['summary'] is String ? json['summary'] as String : '',
+      mediaRef: json['mediaRef'] is String ? json['mediaRef'] as String : '',
+      stepType: json['stepType'] is String ? json['stepType'] as String : '',
       at: DateTime.parse(at).toUtc(),
     );
   }
@@ -30,10 +34,19 @@ class PreviewItemDto {
   final String text;
   final String tool;
   final String summary;
+  final String mediaRef;
+  final String stepType;
   final DateTime at;
 
-  PreviewItem toEntity() =>
-      PreviewItem(kind: kind, text: text, tool: tool, summary: summary, at: at);
+  PreviewItem toEntity() => PreviewItem(
+    kind: kind,
+    text: text,
+    tool: tool,
+    summary: summary,
+    mediaRef: mediaRef,
+    stepType: stepType,
+    at: at,
+  );
 
   static List<PreviewItem> listFromJson(List<dynamic> items) => items
       .map((e) => PreviewItemDto.fromJson(e as Map<String, dynamic>).toEntity())

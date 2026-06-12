@@ -47,6 +47,20 @@ void main() {
     expect(action.text, '');
   });
 
+  test('PreviewItemDto parsea media (ref + tipo de paso + caption)', () {
+    final media = PreviewItemDto.fromJson(
+      itemJson(kind: 'media', text: 'Catálogo 2026')
+        ..['mediaRef'] = 'ref-7'
+        ..['stepType'] = 'IMAGE',
+    );
+    expect(media.kind, 'media');
+    final entity = media.toEntity();
+    expect(entity.isMedia, isTrue);
+    expect(entity.mediaRef, 'ref-7');
+    expect(entity.stepType, 'IMAGE');
+    expect(entity.text, 'Catálogo 2026');
+  });
+
   test('POST corre el turno y devuelve items+iterations', () async {
     when(
       () => dio.post<Map<String, dynamic>>(

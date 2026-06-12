@@ -233,6 +233,13 @@ void main() {
             summary: 'Etiquetaría el chat: VIP',
             at: DateTime.utc(2026),
           ),
+          PreviewItem(
+            kind: 'media',
+            text: 'mira el catálogo',
+            mediaRef: 'ref-7',
+            stepType: 'IMAGE',
+            at: DateTime.utc(2026),
+          ),
         ],
       );
 
@@ -251,6 +258,12 @@ void main() {
       expect(find.byKey(const Key('preview.banner')), findsOneWidget);
       expect(find.text('¡Hola!'), findsOneWidget);
       expect(find.textContaining('Etiquetaría el chat: VIP'), findsOneWidget);
+      // El paso media del flujo simulado se ve como burbuja de archivo:
+      // tipo legible + caption (no un texto plano ni un item invisible).
+      expect(find.byKey(const Key('preview.media_bubble')), findsOneWidget);
+      expect(find.text('Imagen'), findsOneWidget);
+      expect(find.text('mira el catálogo'), findsOneWidget);
+      expect(find.byIcon(Icons.image_outlined), findsOneWidget);
 
       when(
         () => repo.sendMessage(templateId: 't1', content: '¿precio?'),
