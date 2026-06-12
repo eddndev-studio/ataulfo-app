@@ -49,6 +49,8 @@ import 'features/memberships/data/datasources/memberships_datasource.dart';
 import 'features/memberships/data/repositories/memberships_repository_impl.dart';
 import 'features/messages/data/datasources/messages_datasource.dart';
 import 'features/messages/data/datasources/messages_events_datasource.dart';
+import 'features/messages/data/media/dio_media_opener.dart';
+import 'features/messages/data/media/just_audio_engine.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
 import 'features/notifications/application/push_display_bootstrap.dart';
 import 'features/notifications/application/push_registration_coordinator.dart';
@@ -304,6 +306,10 @@ Future<void> main() async {
     mediaRepository: mediaRepository,
     mediaFilePicker: mediaFilePicker,
     mediaThumbnailLoader: mediaThumbnailLoader,
+    // Media del hilo: descarga-y-abre con app externa (URL firmada pública,
+    // Dio propio sin Authorization) y player de audio nuevo por visita.
+    mediaOpener: DioMediaOpener(),
+    audioEngineFactory: JustAudioEngine.new,
   );
 
   // Visualización + navegación de push; no-op si el push real no está activo

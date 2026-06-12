@@ -4,12 +4,15 @@ import 'dart:typed_data';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_chat_composer.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
+import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
+import 'package:ataulfo/features/messages/presentation/bloc/thread_audio_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +26,11 @@ class _MockMessagesBloc extends MockBloc<MessagesEvent, MessagesState>
 class _MockFilePicker extends Mock implements MediaFilePicker {}
 
 class _MockMediaRepo extends Mock implements MediaRepository {}
+
+class _MockThreadAudioCubit extends MockCubit<ThreadAudioState>
+    implements ThreadAudioCubit {}
+
+class _MockMediaOpener extends Mock implements MediaOpener {}
 
 Message msg({
   String externalId = 'e1',
@@ -57,20 +65,31 @@ void main() {
   });
 
   late _MockMessagesBloc bloc;
+  late _MockThreadAudioCubit audio;
+  late _MockMediaOpener opener;
 
   setUp(() {
     bloc = _MockMessagesBloc();
+    audio = _MockThreadAudioCubit();
+    opener = _MockMediaOpener();
     when(() => bloc.state).thenReturn(const MessagesInitial());
     when(
       () => bloc.reactFailures,
     ).thenAnswer((_) => const Stream<void>.empty());
+    when(() => audio.state).thenReturn(const ThreadAudioState());
   });
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: BlocProvider<MessagesBloc>.value(
-      value: bloc,
-      child: const Scaffold(body: MessageThreadPage()),
+    home: RepositoryProvider<MediaOpener>.value(
+      value: opener,
+      child: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<MessagesBloc>.value(value: bloc),
+          BlocProvider<ThreadAudioCubit>.value(value: audio),
+        ],
+        child: const Scaffold(body: MessageThreadPage()),
+      ),
     ),
   );
 
@@ -545,6 +564,8 @@ void main() {
       await tester.pumpWidget(host());
       expect(find.byKey(const Key('composer.input')), findsOneWidget);
       expect(find.byKey(const Key('composer.send')), findsOneWidget);
+      // La caja de redacción es la canónica del design system.
+      expect(find.byType(AppChatComposer), findsOneWidget);
     });
 
     testWidgets('Loading y Failed ocultan el composer', (tester) async {
@@ -699,9 +720,13 @@ void main() {
         providers: <RepositoryProvider<dynamic>>[
           RepositoryProvider<MediaFilePicker>.value(value: picker),
           RepositoryProvider<MediaRepository>.value(value: mediaRepo),
+          RepositoryProvider<MediaOpener>.value(value: opener),
         ],
-        child: BlocProvider<MessagesBloc>.value(
-          value: bloc,
+        child: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<MessagesBloc>.value(value: bloc),
+            BlocProvider<ThreadAudioCubit>.value(value: audio),
+          ],
           child: const Scaffold(body: MessageThreadPage()),
         ),
       ),
@@ -755,6 +780,230 @@ void main() {
         ),
       );
       verifyNever(() => bloc.add(any(that: isA<MessagesSendRequested>())));
+    });
+  });
+
+  group('multimedia interaccionable', () {
+    void seed(Message m) {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[m],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+    }
+
+    testWidgets('audio con mediaUrl: burbuja reproducible, tap → toggle', (
+      tester,
+    ) async {
+      seed(msg(externalId: 'a1', type: 'ptt', mediaUrl: 'https://m/a.ogg'));
+      when(() => audio.toggle(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('message.audio.a1.toggle')));
+      verify(() => audio.toggle('https://m/a.ogg')).called(1);
+    });
+
+    testWidgets('audio activo: ícono de pausa y barra de progreso', (
+      tester,
+    ) async {
+      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      when(() => audio.state).thenReturn(
+        const ThreadAudioState(
+          url: 'https://m/a.ogg',
+          playing: true,
+          position: Duration(seconds: 5),
+          duration: Duration(seconds: 20),
+        ),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byKey(const Key('message.audio.a1.progress')),
+      );
+      expect(bar.value, closeTo(0.25, 0.001));
+      expect(find.textContaining('0:05'), findsOneWidget); // posición en curso
+    });
+
+    testWidgets('audio sin mediaUrl cae a la tarjeta de tipo', (tester) async {
+      seed(msg(externalId: 'a1', type: 'audio'));
+      await tester.pumpWidget(host());
+      expect(find.text('Audio'), findsOneWidget);
+      expect(find.byKey(const Key('message.audio.a1.toggle')), findsNothing);
+    });
+
+    testWidgets('audio que falla al cargar anuncia SnackBar', (tester) async {
+      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      whenListen(
+        audio,
+        Stream<ThreadAudioState>.fromIterable(<ThreadAudioState>[
+          const ThreadAudioState(failedUrl: 'https://m/a.ogg'),
+        ]),
+        initialState: const ThreadAudioState(),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('No se pudo reproducir el audio'), findsOneWidget);
+    });
+
+    testWidgets('documento con mediaUrl: tap lo abre con la app externa', (
+      tester,
+    ) async {
+      seed(
+        msg(externalId: 'd1', type: 'document', mediaUrl: 'https://m/f.pdf'),
+      );
+      when(() => opener.open(url: any(named: 'url'))).thenAnswer((_) async {});
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('message.open.d1')));
+      await tester.pumpAndSettle();
+
+      verify(() => opener.open(url: 'https://m/f.pdf')).called(1);
+    });
+
+    testWidgets('video con mediaUrl: tap lo abre con la app externa', (
+      tester,
+    ) async {
+      seed(msg(externalId: 'v1', type: 'video', mediaUrl: 'https://m/v.mp4'));
+      when(() => opener.open(url: any(named: 'url'))).thenAnswer((_) async {});
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('message.open.v1')));
+      await tester.pumpAndSettle();
+
+      verify(() => opener.open(url: 'https://m/v.mp4')).called(1);
+    });
+
+    testWidgets('documento sin mediaUrl no es tocable (sin URL firmada)', (
+      tester,
+    ) async {
+      seed(msg(externalId: 'd1', type: 'document'));
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('message.open.d1')), findsNothing);
+      expect(find.text('Documento'), findsOneWidget);
+    });
+
+    testWidgets('fallo al abrir anuncia SnackBar', (tester) async {
+      seed(
+        msg(externalId: 'd1', type: 'document', mediaUrl: 'https://m/f.pdf'),
+      );
+      when(
+        () => opener.open(url: any(named: 'url')),
+      ).thenThrow(const MediaOpenException('sin app'));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('message.open.d1')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No se pudo abrir el archivo'), findsOneWidget);
+    });
+
+    testWidgets('imagen con mediaUrl: tap abre el visor y un tap lo cierra', (
+      tester,
+    ) async {
+      seed(msg(externalId: 'i1', type: 'image', mediaUrl: 'https://m/i.jpg'));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('message.image.i1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('media_viewer')), findsOneWidget);
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('media_viewer.dismiss')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('media_viewer')), findsNothing);
+    });
+  });
+
+  group('separadores de día', () {
+    void seedItems(List<Message> items) {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(items: items, prevCursor: null, isLoadingOlder: false),
+      );
+    }
+
+    int ms(DateTime dt) => dt.millisecondsSinceEpoch;
+
+    testWidgets('mensajes de días distintos llevan separador por día', (
+      tester,
+    ) async {
+      final today = DateTime.now();
+      final yesterday = DateTime(today.year, today.month, today.day - 1, 22);
+      seedItems(<Message>[
+        msg(externalId: 'm1', content: 'de ayer', ts: ms(yesterday)),
+        msg(externalId: 'm2', content: 'de hoy', ts: ms(today)),
+      ]);
+      await tester.pumpWidget(host());
+
+      expect(find.text('Ayer'), findsOneWidget);
+      expect(find.text('Hoy'), findsOneWidget);
+    });
+
+    testWidgets('mensajes del mismo día comparten UN separador', (
+      tester,
+    ) async {
+      final today = DateTime.now();
+      seedItems(<Message>[
+        msg(externalId: 'm1', content: 'uno', ts: ms(today) - 60000),
+        msg(externalId: 'm2', content: 'dos', ts: ms(today)),
+      ]);
+      await tester.pumpWidget(host());
+
+      expect(find.text('Hoy'), findsOneWidget);
+    });
+  });
+
+  group('cola de burbuja (radios asimétricos)', () {
+    BorderRadius radiusOf(WidgetTester tester, String ext) {
+      final box = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.byKey(Key('message.$ext')),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      return (box.decoration! as BoxDecoration).borderRadius! as BorderRadius;
+    }
+
+    testWidgets('OUTBOUND lleva la cola abajo a la derecha', (tester) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(externalId: 'e1', direction: MessageDirection.outbound),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      final r = radiusOf(tester, 'e1');
+      expect(r.bottomRight.x, lessThan(r.bottomLeft.x));
+    });
+
+    testWidgets('INBOUND lleva la cola abajo a la izquierda', (tester) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(externalId: 'e1', direction: MessageDirection.inbound),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      final r = radiusOf(tester, 'e1');
+      expect(r.bottomLeft.x, lessThan(r.bottomRight.x));
     });
   });
 }

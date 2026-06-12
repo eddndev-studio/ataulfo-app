@@ -38,6 +38,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../support/fake_chat_media.dart';
 import '../support/fake_thumbnail_loader.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
@@ -152,6 +153,8 @@ void main() {
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
+      mediaOpener: const FakeMediaOpener(),
+      audioEngineFactory: FakeAudioEngine.new,
     );
   });
 

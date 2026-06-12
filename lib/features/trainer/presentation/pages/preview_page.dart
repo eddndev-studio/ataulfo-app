@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_chat_composer.dart';
+import '../../../../core/design/widgets/chat_bubble.dart';
+import '../../../../core/design/widgets/typing_bubble.dart';
 import '../../domain/entities/preview_item.dart';
 import '../bloc/preview_bloc.dart';
 import 'trainer_chat_page.dart' show trainerFailureCopy;
@@ -30,24 +34,55 @@ class PreviewPage extends StatelessWidget {
       ),
       body: Column(
         children: <Widget>[
-          Container(
-            key: const Key('preview.banner'),
-            width: double.infinity,
-            color: Theme.of(context).colorScheme.tertiaryContainer,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Text(
-              'Demo: nada se envía a WhatsApp. Las acciones aparecen como chips. Consume tokens reales.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
+          const _DemoBanner(),
           Expanded(
             child: BlocBuilder<PreviewBloc, PreviewState>(
               builder: (context, state) => switch (state) {
                 PreviewLoading() => const Center(
-                  child: CircularProgressIndicator(),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppTokens.primary,
+                    ),
+                  ),
                 ),
                 PreviewLoaded() => _PreviewThread(state: state),
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Aviso permanente del sandbox: nada sale a WhatsApp, los efectos son chips
+/// y el turno consume tokens reales. Franja sobria en surface1, no un toast.
+class _DemoBanner extends StatelessWidget {
+  const _DemoBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('preview.banner'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.sp4,
+        vertical: AppTokens.sp2,
+      ),
+      decoration: const BoxDecoration(
+        color: AppTokens.surface1,
+        border: Border(bottom: BorderSide(color: AppTokens.divider)),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.science_outlined, size: 16, color: AppTokens.text2),
+          const SizedBox(width: AppTokens.sp2),
+          Expanded(
+            child: Text(
+              'Demo: nada se envía a WhatsApp. Las acciones aparecen como chips. Consume tokens reales.',
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppTokens.text2),
             ),
           ),
         ],
@@ -66,19 +101,9 @@ class _PreviewThread extends StatefulWidget {
 }
 
 class _PreviewThreadState extends State<_PreviewThread> {
-  final TextEditingController _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _send() {
-    final text = _controller.text.trim();
-    if (text.isEmpty || widget.state.sending) return;
+  void _send(String text) {
+    if (widget.state.sending) return;
     context.read<PreviewBloc>().add(PreviewMessageSent(text));
-    _controller.clear();
   }
 
   @override
@@ -88,28 +113,14 @@ class _PreviewThreadState extends State<_PreviewThread> {
       children: <Widget>[
         Expanded(
           child: s.items.isEmpty && !s.sending
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'Escríbele al bot como si fueras un cliente y observa cómo responde con el entrenamiento actual.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
+              ? const _EmptyView()
               : ListView.builder(
                   reverse: true,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppTokens.sp3),
                   itemCount: s.items.length + (s.sending ? 1 : 0),
                   itemBuilder: (context, i) {
                     if (s.sending && i == 0) {
-                      return const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: EdgeInsets.all(8),
-                          child: Text('Escribiendo…'),
-                        ),
-                      );
+                      return const TypingBubble(key: Key('preview.typing'));
                     }
                     final idx = s.items.length - 1 - (i - (s.sending ? 1 : 0));
                     return _ItemTile(item: s.items[idx]);
@@ -118,42 +129,51 @@ class _PreviewThreadState extends State<_PreviewThread> {
         ),
         if (s.failure != null)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
             child: Text(
               trainerFailureCopy(s.failure!),
               key: const Key('preview.failure'),
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              style: const TextStyle(color: AppTokens.danger),
             ),
           ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    key: const Key('preview.composer.field'),
-                    controller: _controller,
-                    enabled: !s.sending,
-                    decoration: const InputDecoration(
-                      hintText: 'Escribe como cliente…',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (_) => _send(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  key: const Key('preview.composer.send'),
-                  onPressed: s.sending ? null : _send,
-                  icon: const Icon(Icons.send),
-                ),
-              ],
-            ),
-          ),
+        AppChatComposer(
+          fieldKey: const Key('preview.composer.field'),
+          sendKey: const Key('preview.composer.send'),
+          hint: 'Escribe como cliente…',
+          enabled: !s.sending,
+          onSend: _send,
         ),
       ],
+    );
+  }
+}
+
+class _EmptyView extends StatelessWidget {
+  const _EmptyView();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.sp6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.smart_toy_outlined,
+              size: 40,
+              color: AppTokens.text2,
+            ),
+            const SizedBox(height: AppTokens.sp3),
+            Text(
+              'Escríbele al bot como si fueras un cliente y observa cómo responde con el entrenamiento actual.',
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -174,26 +194,34 @@ class _ItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     if (item.isAction) {
+      // Efecto grabado del turno (etiquetaría/guardaría/ejecutaría): evento
+      // centrado del hilo, con el idioma de cápsula del kit.
       return Align(
         alignment: Alignment.center,
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          margin: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp3,
+            vertical: AppTokens.sp2,
+          ),
           decoration: BoxDecoration(
-            color: scheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(20),
+            color: AppTokens.surface2,
+            borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+            border: Border.all(color: AppTokens.divider),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(_actionIcon, size: 16),
-              const SizedBox(width: 6),
+              Icon(_actionIcon, size: 16, color: AppTokens.primary),
+              const SizedBox(width: AppTokens.sp2),
               Flexible(
                 child: Text(
                   item.summary,
-                  style: Theme.of(context).textTheme.labelMedium,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: AppTokens.text1,
+                  ),
                 ),
               ),
             ],
@@ -203,56 +231,47 @@ class _ItemTile extends StatelessWidget {
     }
     if (item.isMedia) {
       // Archivo que el flujo simulado enviaría: tipo legible + caption.
-      // Misma burbuja del bot (lado izquierdo) — ES un envío del bot.
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          key: const Key('preview.media_bubble'),
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          constraints: const BoxConstraints(maxWidth: 320),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(_mediaIcon(item.stepType), size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    _mediaLabel(item.stepType),
-                    style: Theme.of(context).textTheme.labelMedium,
+      // Burbuja del lado del bot — ES un envío del bot.
+      return ChatBubble(
+        key: const Key('preview.media_bubble'),
+        mine: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(
+                  _mediaIcon(item.stepType),
+                  size: 18,
+                  color: AppTokens.chatAccent,
+                ),
+                const SizedBox(width: AppTokens.sp2),
+                Text(
+                  _mediaLabel(item.stepType),
+                  style: textTheme.labelMedium?.copyWith(
+                    color: AppTokens.text1,
                   ),
-                ],
-              ),
-              if (item.text.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 6),
-                Text(item.text),
+                ),
               ],
+            ),
+            if (item.text.isNotEmpty) ...<Widget>[
+              const SizedBox(height: AppTokens.sp2),
+              Text(
+                item.text,
+                style: textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+              ),
             ],
-          ),
+          ],
         ),
       );
     }
-    final mine = item.isUser;
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: const BoxConstraints(maxWidth: 320),
-        decoration: BoxDecoration(
-          color: mine
-              ? scheme.primaryContainer
-              : scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(item.text),
+    return ChatBubble(
+      mine: item.isUser,
+      child: Text(
+        item.text,
+        style: textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
       ),
     );
   }

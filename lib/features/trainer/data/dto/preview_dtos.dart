@@ -11,6 +11,7 @@ class PreviewItemDto {
     this.summary = '',
     this.mediaRef = '',
     this.stepType = '',
+    this.delayMs = 0,
   });
 
   factory PreviewItemDto.fromJson(Map<String, dynamic> json) {
@@ -26,6 +27,7 @@ class PreviewItemDto {
       summary: json['summary'] is String ? json['summary'] as String : '',
       mediaRef: json['mediaRef'] is String ? json['mediaRef'] as String : '',
       stepType: json['stepType'] is String ? json['stepType'] as String : '',
+      delayMs: json['delayMs'] is num ? (json['delayMs'] as num).toInt() : 0,
       at: DateTime.parse(at).toUtc(),
     );
   }
@@ -36,6 +38,7 @@ class PreviewItemDto {
   final String summary;
   final String mediaRef;
   final String stepType;
+  final int delayMs;
   final DateTime at;
 
   PreviewItem toEntity() => PreviewItem(
@@ -45,6 +48,7 @@ class PreviewItemDto {
     summary: summary,
     mediaRef: mediaRef,
     stepType: stepType,
+    delayMs: delayMs,
     at: at,
   );
 

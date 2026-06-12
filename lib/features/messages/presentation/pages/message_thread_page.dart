@@ -15,7 +15,9 @@ import '../../domain/entities/message.dart';
 import '../../domain/failures/messages_failure.dart';
 import '../../domain/reactions.dart';
 import '../bloc/messages_bloc.dart';
+import '../bloc/thread_audio_cubit.dart';
 import '../widgets/message_composer.dart';
+import '../widgets/message_media.dart';
 
 /// Hilo de mensajes de una conversación (S09 `GET
 /// /sessions/:botId/:chatLid/messages`). Consume el `MessagesBloc` del scope
@@ -32,36 +34,60 @@ class MessageThreadPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ReactFailuresListener(
-      child: BlocBuilder<MessagesBloc, MessagesState>(
-        builder: (context, state) => Column(
-          children: <Widget>[
-            Expanded(
-              child: switch (state) {
-                MessagesInitial() || MessagesLoading() => const _LoadingView(),
-                MessagesLoaded(
-                  items: final items,
-                  prevCursor: final prevCursor,
-                  isLoadingOlder: final isLoadingOlder,
-                  pending: final pending,
-                ) =>
-                  (items.isEmpty && pending.isEmpty)
-                      ? const _EmptyView()
-                      : _ThreadView(
-                          items: items,
-                          pending: pending,
-                          hasMore: prevCursor != null,
-                          isLoadingOlder: isLoadingOlder,
-                        ),
-                MessagesFailed(failure: final f) => _FailedView(failure: f),
-              },
-            ),
-            // El composer sólo con hilo cargado: enviar exige una conversación
-            // abierta (en Loading/Failed no hay a dónde escribir).
-            if (state is MessagesLoaded) const MessageComposer(),
-          ],
+    return _AudioFailuresListener(
+      child: _ReactFailuresListener(
+        child: BlocBuilder<MessagesBloc, MessagesState>(
+          builder: (context, state) => Column(
+            children: <Widget>[
+              Expanded(
+                child: switch (state) {
+                  MessagesInitial() ||
+                  MessagesLoading() => const _LoadingView(),
+                  MessagesLoaded(
+                    items: final items,
+                    prevCursor: final prevCursor,
+                    isLoadingOlder: final isLoadingOlder,
+                    pending: final pending,
+                  ) =>
+                    (items.isEmpty && pending.isEmpty)
+                        ? const _EmptyView()
+                        : _ThreadView(
+                            items: items,
+                            pending: pending,
+                            hasMore: prevCursor != null,
+                            isLoadingOlder: isLoadingOlder,
+                          ),
+                  MessagesFailed(failure: final f) => _FailedView(failure: f),
+                },
+              ),
+              // El composer sólo con hilo cargado: enviar exige una conversación
+              // abierta (en Loading/Failed no hay a dónde escribir).
+              if (state is MessagesLoaded) const MessageComposer(),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// Anuncia con SnackBar cuando una nota de voz/audio no se pudo cargar o
+/// reproducir (firma vencida, plataforma sin player). El cubit señala la URL
+/// fallida en `failedUrl`; sólo el CAMBIO de ese campo dispara el aviso.
+class _AudioFailuresListener extends StatelessWidget {
+  const _AudioFailuresListener({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<ThreadAudioCubit, ThreadAudioState>(
+      listenWhen: (prev, next) =>
+          next.failedUrl != null && prev.failedUrl != next.failedUrl,
+      listener: (context, _) => ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo reproducir el audio')),
+      ),
+      child: child,
     );
   }
 }
@@ -211,18 +237,36 @@ class _ThreadView extends StatelessWidget {
     // pintarse como burbuja; `renderable` son los mensajes que sí se pintan.
     final folded = foldReactions(items);
     final renderable = folded.renderable;
-    // items viene ASC (más viejo→más nuevo); invertimos para que el índice 0
-    // (más nuevo) quede al fondo con reverse:true.
-    final newestFirst = renderable.reversed.toList(growable: false);
     // Índice por externalId para resolver las citas (reply→mensaje citado)
     // contra la ventana cargada. Un citado fuera de la ventana queda sin
     // resolver (la burbuja muestra el fallback).
     final byId = <String, Message>{for (final m in renderable) m.externalId: m};
+    // Filas en ASC: separador al cambiar el día calendario + burbuja por
+    // mensaje. Se construyen ASC (donde "cambio de día" es natural) y se
+    // invierten para la lista reverse:true (índice 0 = fondo, lo más nuevo).
+    final rowsAsc = <Widget>[];
+    DateTime? day;
+    for (final m in renderable) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(m.timestampMs);
+      final mDay = DateTime(dt.year, dt.month, dt.day);
+      if (day != mDay) {
+        rowsAsc.add(_DaySeparator(timestampMs: m.timestampMs));
+        day = mDay;
+      }
+      rowsAsc.add(
+        _MessageBubble(
+          message: m,
+          quoted: m.quotedId == null ? null : byId[m.quotedId],
+          reactions: folded.byTarget[m.externalId],
+        ),
+      );
+    }
+    final rows = rowsAsc.reversed.toList(growable: false);
     // Las pendientes son lo más nuevo: en la lista invertida (índice 0 = fondo)
     // ocupan el tramo inicial, en orden nueva→vieja, BAJO el último mensaje real.
     final pendingNewestFirst = pending.reversed.toList(growable: false);
     final pendingCount = pendingNewestFirst.length;
-    final realCount = newestFirst.length;
+    final rowCount = rows.length;
     return NotificationListener<ScrollNotification>(
       onNotification: (n) => _onScroll(context, n),
       child: ListView.builder(
@@ -231,7 +275,7 @@ class _ThreadView extends StatelessWidget {
         // El padding inferior NO suma el safe-area: el composer (abajo) lo
         // absorbe; sumarlo aquí dejaría un hueco doble sobre el composer.
         padding: const EdgeInsets.all(AppTokens.sp4),
-        itemCount: pendingCount + realCount + (isLoadingOlder ? 1 : 0),
+        itemCount: pendingCount + rowCount + (isLoadingOlder ? 1 : 0),
         itemBuilder: (context, i) {
           // Tramo inferior (índices [0, pendingCount)): burbujas optimistas.
           if (i < pendingCount) {
@@ -240,7 +284,7 @@ class _ThreadView extends StatelessWidget {
           final j = i - pendingCount;
           // El item extra cae al final de la lista invertida ⇒ se pinta arriba:
           // el spinner de "cargando más viejos".
-          if (j == realCount) {
+          if (j == rowCount) {
             return const Padding(
               key: Key('messages.older_loading'),
               padding: EdgeInsets.all(AppTokens.sp4),
@@ -258,13 +302,41 @@ class _ThreadView extends StatelessWidget {
               ),
             );
           }
-          final m = newestFirst[j];
-          return _MessageBubble(
-            message: m,
-            quoted: m.quotedId == null ? null : byId[m.quotedId],
-            reactions: folded.byTarget[m.externalId],
-          );
+          return rows[j];
         },
+      ),
+    );
+  }
+}
+
+/// Separador de día estilo mensajería: cápsula centrada con la etiqueta del
+/// día calendario ("Hoy"/"Ayer"/fecha). Una por día, sobre el primer mensaje
+/// de ese día en la ventana cargada (paginar hacia atrás la reubica sola).
+class _DaySeparator extends StatelessWidget {
+  const _DaySeparator({required this.timestampMs});
+
+  final int timestampMs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: AppTokens.sp2),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp3,
+          vertical: AppTokens.sp1,
+        ),
+        decoration: BoxDecoration(
+          color: AppTokens.surface1,
+          borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+          border: Border.all(color: AppTokens.divider),
+        ),
+        child: Text(
+          dayLabel(timestampMs),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+        ),
       ),
     );
   }
@@ -305,8 +377,8 @@ class _PendingBubble extends StatelessWidget {
               vertical: AppTokens.sp3,
             ),
             decoration: BoxDecoration(
-              color: AppTokens.surface3,
-              borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+              color: _outboundFill,
+              borderRadius: _bubbleRadius(mine: true),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,6 +478,27 @@ String _pendingErrorText(MessagesFailure f) => switch (f) {
   MessagesNetworkFailure() || MessagesTimeoutFailure() => 'Sin conexión',
   _ => 'No se pudo enviar',
 };
+
+/// Fill de la burbuja OUTBOUND: surface3 con un matiz tenue del verde de
+/// sección — diferencia los lados como en mensajería sin volver fill un
+/// color de acento.
+final Color _outboundFill = Color.alphaBlend(
+  AppTokens.chatAccent.withValues(alpha: 0.07),
+  AppTokens.surface3,
+);
+
+/// Radios de burbuja con "cola": el radio inferior del lado del emisor se
+/// achica (mismo idioma que `ChatBubble` del kit).
+BorderRadius _bubbleRadius({required bool mine}) {
+  const tail = Radius.circular(AppTokens.radiusSm);
+  const full = Radius.circular(AppTokens.radiusCard);
+  return BorderRadius.only(
+    topLeft: full,
+    topRight: full,
+    bottomLeft: mine ? full : tail,
+    bottomRight: mine ? tail : full,
+  );
+}
 
 /// Emojis de reacción rápida del hilo (estilo mensajería).
 const List<String> _quickReactions = <String>[
@@ -508,8 +601,11 @@ class _MessageBubble extends StatelessWidget {
                     vertical: AppTokens.sp3,
                   ),
                   decoration: BoxDecoration(
-                    color: isOutbound ? AppTokens.surface3 : AppTokens.surface2,
-                    borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+                    // El OUTBOUND lleva un matiz sutil del verde de sección
+                    // sobre surface3: distingue los lados sin gritar (el
+                    // verde pleno es de acentos, no de fills).
+                    color: isOutbound ? _outboundFill : AppTokens.surface2,
+                    borderRadius: _bubbleRadius(mine: isOutbound),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,7 +629,7 @@ class _MessageBubble extends StatelessWidget {
                       if (isText)
                         Text(m.content, style: textTheme.bodyLarge)
                       else
-                        _MediaContent(message: m),
+                        MessageMediaContent(message: m),
                       const SizedBox(height: AppTokens.sp1),
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -559,125 +655,6 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Contenido de un mensaje no-texto. Imagen/sticker se cargan con la URL
-/// firmada (`mediaUrl`); el resto (video/audio/documento) se muestra como una
-/// tarjeta de tipo (ícono + etiqueta). v1: no se reproduce video ni audio inline
-/// (sin dependencia de player); la tarjeta deja claro el tipo. Si la media trae
-/// caption (`content`), se pinta debajo.
-class _MediaContent extends StatelessWidget {
-  const _MediaContent({required this.message});
-
-  final Message message;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final m = message;
-    final media = switch (m.type) {
-      'image' => _mediaImage(context, m.mediaUrl, sticker: false),
-      'sticker' => _mediaImage(context, m.mediaUrl, sticker: true),
-      'video' => _mediaTypedCard(context, Icons.videocam_outlined, 'Video'),
-      'audio' ||
-      'ptt' => _mediaTypedCard(context, Icons.mic_none_outlined, 'Audio'),
-      'document' => _mediaTypedCard(
-        context,
-        Icons.description_outlined,
-        'Documento',
-      ),
-      _ => Text(
-        '[${m.type}]',
-        style: textTheme.bodyLarge?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.text2,
-        ),
-      ),
-    };
-    if (m.content.isEmpty) {
-      return media;
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        media,
-        const SizedBox(height: AppTokens.sp1),
-        Text(m.content, style: textTheme.bodyLarge),
-      ],
-    );
-  }
-}
-
-/// Miniatura de imagen/sticker desde la URL firmada, con estados de carga y
-/// error (R2 caído ⇒ el error es lo que se ve). Sin URL ⇒ tarjeta de tipo.
-Widget _mediaImage(BuildContext context, String? url, {required bool sticker}) {
-  if (url == null) {
-    return _mediaTypedCard(
-      context,
-      sticker ? Icons.emoji_emotions_outlined : Icons.image_outlined,
-      sticker ? 'Sticker' : 'Imagen',
-    );
-  }
-  final side = sticker ? 120.0 : 220.0;
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-    child: Image.network(
-      url,
-      width: side,
-      height: side,
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return SizedBox(
-          width: side,
-          height: side,
-          child: const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-              ),
-            ),
-          ),
-        );
-      },
-      errorBuilder: (context, error, stack) => _mediaTypedCard(
-        context,
-        Icons.broken_image_outlined,
-        sticker ? 'Sticker no disponible' : 'Imagen no disponible',
-      ),
-    ),
-  );
-}
-
-/// Tarjeta de tipo para media no-imagen (o imagen sin URL/caída): ícono en el
-/// verde de sección + etiqueta legible del tipo.
-Widget _mediaTypedCard(BuildContext context, IconData icon, String label) {
-  final textTheme = Theme.of(context).textTheme;
-  return Container(
-    padding: const EdgeInsets.symmetric(
-      horizontal: AppTokens.sp3,
-      vertical: AppTokens.sp2,
-    ),
-    decoration: BoxDecoration(
-      color: AppTokens.bgBase.withValues(alpha: 0.25),
-      borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Icon(icon, size: 20, color: AppTokens.chatAccent),
-        const SizedBox(width: AppTokens.sp2),
-        Text(
-          label,
-          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
-        ),
-      ],
-    ),
-  );
 }
 
 /// Fila de pills de reacción bajo la burbuja: un chip por emoji con su conteo

@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_chat_composer.dart';
+import '../../../../core/design/widgets/chat_bubble.dart';
+import '../../../../core/design/widgets/typing_bubble.dart';
 import '../../domain/entities/trainer_message.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../bloc/trainer_chat_bloc.dart';
@@ -50,7 +55,9 @@ class TrainerChatPage extends StatelessWidget {
       body: BlocBuilder<TrainerChatBloc, TrainerChatState>(
         builder: (context, state) => switch (state) {
           TrainerChatLoading() => const Center(
-            child: CircularProgressIndicator(),
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+            ),
           ),
           TrainerChatFailed(:final failure) => _FailedView(failure: failure),
           TrainerChatLoaded() => _ChatView(state: state),
@@ -68,17 +75,21 @@ class _FailedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text(trainerFailureCopy(failure), textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: () =>
-                context.read<TrainerChatBloc>().add(const TrainerChatStarted()),
-            child: const Text('Reintentar'),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.sp6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(trainerFailureCopy(failure), textAlign: TextAlign.center),
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              label: 'Reintentar',
+              onPressed: () => context.read<TrainerChatBloc>().add(
+                const TrainerChatStarted(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -120,19 +131,9 @@ class _ChatView extends StatefulWidget {
 }
 
 class _ChatViewState extends State<_ChatView> {
-  final TextEditingController _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _send([String? preset]) {
-    final text = (preset ?? _controller.text).trim();
-    if (text.isEmpty || widget.state.sending) return;
+  void _send(String text) {
+    if (widget.state.sending) return;
     context.read<TrainerChatBloc>().add(TrainerChatMessageSent(text));
-    if (preset == null) _controller.clear();
   }
 
   @override
@@ -143,10 +144,12 @@ class _ChatViewState extends State<_ChatView> {
         Expanded(
           child: ListView.builder(
             reverse: true,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppTokens.sp3),
             itemCount: s.messages.length + (s.sending ? 1 : 0),
             itemBuilder: (context, i) {
-              if (s.sending && i == 0) return const _TypingBubble();
+              if (s.sending && i == 0) {
+                return const TypingBubble(key: Key('trainer.typing'));
+              }
               final idx = s.messages.length - 1 - (i - (s.sending ? 1 : 0));
               return _MessageTile(message: s.messages[idx]);
             },
@@ -154,11 +157,11 @@ class _ChatViewState extends State<_ChatView> {
         ),
         if (s.sendFailure != null)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
             child: Text(
               trainerFailureCopy(s.sendFailure!),
               key: const Key('trainer.send_failure'),
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              style: const TextStyle(color: AppTokens.danger),
             ),
           ),
         if (s.messages.isEmpty && !s.sending)
@@ -166,67 +169,79 @@ class _ChatViewState extends State<_ChatView> {
             height: 48,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
               itemCount: _starterChips.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, i) => ActionChip(
-                key: Key('trainer.chip.$i'),
-                label: Text(_starterChips[i]),
-                onPressed: () => _send(_starterChips[i]),
+              separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
+              itemBuilder: (context, i) => _StarterChip(
+                chipKey: Key('trainer.chip.$i'),
+                label: _starterChips[i],
+                onTap: () => _send(_starterChips[i]),
               ),
             ),
           ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    key: const Key('trainer.composer.field'),
-                    controller: _controller,
-                    enabled: !s.sending,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'Cuéntale de tu negocio…',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (_) => _send(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  key: const Key('trainer.composer.send'),
-                  onPressed: s.sending ? null : _send,
-                  icon: const Icon(Icons.send),
-                ),
-              ],
-            ),
-          ),
+        AppChatComposer(
+          fieldKey: const Key('trainer.composer.field'),
+          sendKey: const Key('trainer.composer.send'),
+          hint: 'Cuéntale de tu negocio…',
+          enabled: !s.sending,
+          onSend: _send,
         ),
       ],
     );
   }
 }
 
-class _TypingBubble extends StatelessWidget {
-  const _TypingBubble();
+/// Chip de arranque para un hilo vacío: cápsula con borde hairline (idioma de
+/// los chips del kit) que manda el preset como mensaje.
+class _StarterChip extends StatelessWidget {
+  const _StarterChip({
+    required this.chipKey,
+    required this.label,
+    required this.onTap,
+  });
+
+  final Key chipKey;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        key: const Key('trainer.typing'),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
+    final radius = BorderRadius.circular(AppTokens.radiusPill);
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: chipKey,
+          borderRadius: radius,
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp3,
+              vertical: AppTokens.sp2,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(color: AppTokens.divider),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(
+                  Icons.auto_awesome,
+                  size: 14,
+                  color: AppTokens.primary,
+                ),
+                const SizedBox(width: AppTokens.sp1),
+                Text(
+                  label,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+                ),
+              ],
+            ),
+          ),
         ),
-        child: const Text('Entrenando…'),
       ),
     );
   }
@@ -249,21 +264,13 @@ class _MessageTile extends StatelessWidget {
       // result; una burbuja vacía solo mete ruido.
       return const SizedBox.shrink();
     }
-    final scheme = Theme.of(context).colorScheme;
-    final mine = message.isUser;
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: const BoxConstraints(maxWidth: 320),
-        decoration: BoxDecoration(
-          color: mine
-              ? scheme.primaryContainer
-              : scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(message.content),
+    return ChatBubble(
+      mine: message.isUser,
+      child: Text(
+        message.content,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
       ),
     );
   }
@@ -313,6 +320,9 @@ class _ChangeCardData {
   }
 }
 
+/// Tarjeta de cambio: registro de que el entrenador escribió en el workspace.
+/// Centrada como los chips de acción del preview — es un evento del hilo, no
+/// una burbuja de nadie.
 class _ChangeCard extends StatelessWidget {
   const _ChangeCard({required this.messageId, required this.data});
 
@@ -321,23 +331,33 @@ class _ChangeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment: Alignment.center,
       child: Container(
         key: Key('trainer.change_card.$messageId'),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp3,
+          vertical: AppTokens.sp2,
+        ),
         decoration: BoxDecoration(
-          border: Border.all(color: scheme.outlineVariant),
-          borderRadius: BorderRadius.circular(12),
+          color: AppTokens.surface2,
+          borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+          border: Border.all(color: AppTokens.divider),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(data.icon, size: 18, color: scheme.primary),
-            const SizedBox(width: 8),
-            Text(data.title, style: Theme.of(context).textTheme.labelLarge),
+            Icon(data.icon, size: 16, color: AppTokens.primary),
+            const SizedBox(width: AppTokens.sp2),
+            Flexible(
+              child: Text(
+                data.title,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: AppTokens.text1),
+              ),
+            ),
           ],
         ),
       ),

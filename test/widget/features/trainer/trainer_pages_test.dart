@@ -1,3 +1,4 @@
+import 'package:ataulfo/core/design/widgets/app_chat_composer.dart';
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_conversation.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_message.dart';
@@ -143,6 +144,7 @@ void main() {
         find.byKey(const Key('trainer.composer.field')),
         'sube precios',
       );
+      await tester.pump(); // el botón de enviar se habilita al haber texto
       await tester.tap(find.byKey(const Key('trainer.composer.send')));
       await tester.pump();
       verify(
@@ -153,6 +155,11 @@ void main() {
         ),
       ).called(1);
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('el composer es el del design system', (tester) async {
+      await pump(tester, <TrainerMessage>[]);
+      expect(find.byType(AppChatComposer), findsOneWidget);
     });
   });
 
@@ -274,12 +281,16 @@ void main() {
         find.byKey(const Key('preview.composer.field')),
         '¿precio?',
       );
+      await tester.pump(); // el botón de enviar se habilita al haber texto
       await tester.tap(find.byKey(const Key('preview.composer.send')));
       await tester.pump();
       verify(
         () => repo.sendMessage(templateId: 't1', content: '¿precio?'),
       ).called(1);
       await tester.pumpAndSettle();
+
+      // El composer es el del design system, como en el resto de la app.
+      expect(find.byType(AppChatComposer), findsOneWidget);
     });
   });
 }

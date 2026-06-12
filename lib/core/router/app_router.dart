@@ -85,8 +85,11 @@ import '../../features/memberships/domain/repositories/memberships_repository.da
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
 import '../../features/memberships/presentation/pages/select_org_page.dart';
+import '../../features/messages/domain/repositories/audio_engine.dart';
+import '../../features/messages/domain/repositories/media_opener.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
 import '../../features/messages/presentation/bloc/messages_bloc.dart';
+import '../../features/messages/presentation/bloc/thread_audio_cubit.dart';
 import '../../features/messages/presentation/pages/message_thread_page.dart';
 import '../../features/notifications/domain/repositories/notifications_repository.dart';
 import '../../features/notifications/presentation/bloc/notification_preferences_bloc.dart';
@@ -157,6 +160,8 @@ class AppRouter {
     required MediaRepository mediaRepository,
     required MediaFilePicker mediaFilePicker,
     required MediaThumbnailLoader mediaThumbnailLoader,
+    required MediaOpener mediaOpener,
+    required AudioEngine Function() audioEngineFactory,
   }) : _authBloc = authBloc,
        _authRepo = authRepository,
        _botsRepo = botsRepository,
@@ -182,7 +187,9 @@ class AppRouter {
        _notificationsRepo = notificationsRepository,
        _mediaRepo = mediaRepository,
        _mediaFilePicker = mediaFilePicker,
-       _mediaThumbnailLoader = mediaThumbnailLoader;
+       _mediaThumbnailLoader = mediaThumbnailLoader,
+       _mediaOpener = mediaOpener,
+       _audioEngineFactory = audioEngineFactory;
 
   final AuthBloc _authBloc;
   final AuthRepository _authRepo;
@@ -210,6 +217,11 @@ class AppRouter {
   final MediaRepository _mediaRepo;
   final MediaFilePicker _mediaFilePicker;
   final MediaThumbnailLoader _mediaThumbnailLoader;
+  final MediaOpener _mediaOpener;
+
+  /// Fabrica el motor de audio del hilo: un engine NUEVO por visita (el
+  /// cubit lo dispone al cerrar la ruta; un singleton quedaría dispuesto).
+  final AudioEngine Function() _audioEngineFactory;
 
   /// Observer compartido entre el Navigator del GoRouter y los list pages
   /// del shell. El GoRouter notifica push/pop sobre este observer; las
@@ -637,6 +649,8 @@ class AppRouter {
               ),
               RepositoryProvider<FlowRunRepository>.value(value: _flowRunRepo),
               RepositoryProvider<NotesRepository>.value(value: _notesRepo),
+              // Abre documentos/videos del hilo con una app externa.
+              RepositoryProvider<MediaOpener>.value(value: _mediaOpener),
             ],
             child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[
@@ -646,6 +660,12 @@ class AppRouter {
                     botId: id,
                     chatLid: chatLid,
                   )..add(const MessagesLoadRequested()),
+                ),
+                // Player de audio del hilo (uno por visita; el provider lo
+                // cierra al salir y el cubit dispone el engine).
+                BlocProvider<ThreadAudioCubit>(
+                  create: (_) =>
+                      ThreadAudioCubit(engine: _audioEngineFactory()),
                 ),
                 // Catálogo de respuestas rápidas WhatsApp del bot: carga al abrir
                 // el hilo para que el selector ⚡ del composer las ofrezca.

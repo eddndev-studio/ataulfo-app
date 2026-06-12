@@ -12,6 +12,7 @@ class PreviewItem {
     this.summary = '',
     this.mediaRef = '',
     this.stepType = '',
+    this.delayMs = 0,
   });
 
   final String kind; // user | bot | action | media
@@ -24,6 +25,10 @@ class PreviewItem {
 
   /// media: tipo del paso del flujo (IMAGE/VIDEO/DOCUMENT/AUDIO/PTT/STICKER).
   final String stepType;
+
+  /// Retraso configurado del paso simulado (0 = sin retraso). El bloc lo usa
+  /// para reproducir la cadencia real del flujo al revelar el turno.
+  final int delayMs;
 
   final DateTime at;
 
@@ -41,11 +46,12 @@ class PreviewItem {
       other.summary == summary &&
       other.mediaRef == mediaRef &&
       other.stepType == stepType &&
+      other.delayMs == delayMs &&
       other.at == at;
 
   @override
   int get hashCode =>
-      Object.hash(kind, text, tool, summary, mediaRef, stepType, at);
+      Object.hash(kind, text, tool, summary, mediaRef, stepType, delayMs, at);
 }
 
 /// Desenlace de un turno del preview: los items nuevos + iteraciones del

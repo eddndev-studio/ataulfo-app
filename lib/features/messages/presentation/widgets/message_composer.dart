@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../media/domain/failures/media_failure.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../../media/domain/repositories/media_repository.dart';
@@ -10,15 +10,14 @@ import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../../quick_replies/presentation/widgets/quick_replies_sheet.dart';
 import '../bloc/messages_bloc.dart';
 
-/// Caja de redacción del hilo: campo de texto multilínea + botón enviar. Vive al
-/// fondo de la pantalla del hilo (fuera del scroll). Despacha
-/// `MessagesSendRequested` con el texto recortado; el bloc pinta la burbuja
-/// optimista. El botón se deshabilita cuando no hay texto. El adjuntar
-/// multimedia es una rebanada posterior.
+/// Caja de redacción del hilo: el [AppChatComposer] del kit con las acciones
+/// propias de esta superficie (adjuntar imagen y respuestas rápidas ⚡) como
+/// leading. Despacha `MessagesSendRequested` con el texto recortado; el bloc
+/// pinta la burbuja optimista.
 ///
-/// Stateful por el `TextEditingController`: escucha sus cambios para alternar el
-/// estado del botón y se limpia tras un envío exitoso de intent (el resultado
-/// del POST lo refleja la burbuja, no este campo).
+/// Stateful por el `TextEditingController` (compartido con el composer para
+/// insertar respuestas rápidas y leer el caption del adjunto) y por el estado
+/// de subida en vuelo.
 class MessageComposer extends StatefulWidget {
   const MessageComposer({super.key});
 
@@ -33,29 +32,15 @@ class _MessageComposerState extends State<MessageComposer> {
   bool _uploading = false;
 
   @override
-  void initState() {
-    super.initState();
-    _ctrl.addListener(_onChanged);
-  }
-
-  void _onChanged() => setState(() {});
-
-  @override
   void dispose() {
-    _ctrl.removeListener(_onChanged);
     _ctrl.dispose();
     super.dispose();
   }
 
-  void _send() {
-    final text = _ctrl.text.trim();
-    if (text.isEmpty) {
-      return;
-    }
+  void _send(String text) {
     context.read<MessagesBloc>().add(
       MessagesSendRequested(type: 'text', content: text),
     );
-    _ctrl.clear();
   }
 
   /// Adjunta una imagen: elige un archivo, lo sube (`/upload` → ref BARE) y
@@ -162,75 +147,33 @@ class _MessageComposerState extends State<MessageComposer> {
 
   @override
   Widget build(BuildContext context) {
-    final canSend = _ctrl.text.trim().isNotEmpty;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp3,
-        AppTokens.sp2,
-        AppTokens.sp3,
-        AppTokens.sp2 + context.safeBottomInset,
-      ),
-      decoration: const BoxDecoration(
-        color: AppTokens.surface1,
-        border: Border(top: BorderSide(color: AppTokens.divider)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: <Widget>[
-          IconButton(
-            key: const Key('composer.attach'),
-            tooltip: 'Adjuntar imagen',
-            color: AppTokens.text2,
-            onPressed: _uploading ? null : _attach,
-            icon: _uploading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.image_outlined),
-          ),
-          IconButton(
-            key: const Key('composer.quickreply'),
-            tooltip: 'Respuestas rápidas',
-            color: AppTokens.text2,
-            onPressed: _quickReply,
-            icon: const Icon(Icons.bolt),
-          ),
-          Expanded(
-            child: TextField(
-              key: const Key('composer.input'),
-              controller: _ctrl,
-              minLines: 1,
-              maxLines: 5,
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.newline,
-              style: Theme.of(context).textTheme.bodyLarge,
-              decoration: InputDecoration(
-                hintText: 'Mensaje',
-                filled: true,
-                fillColor: AppTokens.surface2,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppTokens.sp4,
-                  vertical: AppTokens.sp3,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppTokens.sp2),
-          IconButton(
-            key: const Key('composer.send'),
-            tooltip: 'Enviar',
-            icon: const Icon(Icons.send),
-            color: AppTokens.primary,
-            onPressed: canSend ? _send : null,
-          ),
-        ],
-      ),
+    return AppChatComposer(
+      controller: _ctrl,
+      fieldKey: const Key('composer.input'),
+      sendKey: const Key('composer.send'),
+      onSend: _send,
+      leading: <Widget>[
+        IconButton(
+          key: const Key('composer.attach'),
+          tooltip: 'Adjuntar imagen',
+          color: AppTokens.text2,
+          onPressed: _uploading ? null : _attach,
+          icon: _uploading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.image_outlined),
+        ),
+        IconButton(
+          key: const Key('composer.quickreply'),
+          tooltip: 'Respuestas rápidas',
+          color: AppTokens.text2,
+          onPressed: _quickReply,
+          icon: const Icon(Icons.bolt),
+        ),
+      ],
     );
   }
 }

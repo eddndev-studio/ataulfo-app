@@ -316,4 +316,159 @@ void main() {
       expect(find.byKey(const Key('conversation.unread.lid-dm')), findsNothing);
     });
   });
+
+  group('bandeja: búsqueda, filtros y jerarquía', () {
+    Conversation conv({
+      required String chatLid,
+      String? displayName,
+      String? phone,
+      bool archived = false,
+      bool pinned = false,
+      int unread = 0,
+      String lastType = 'text',
+      String lastPreview = 'hola',
+    }) => Conversation(
+      chatLid: chatLid,
+      kind: ConversationKind.dm,
+      phone: phone ?? '5215550001',
+      displayName: displayName,
+      isArchived: archived,
+      isPinned: pinned,
+      isMarkedUnread: false,
+      mutedUntil: null,
+      unreadCount: unread,
+      lastMessagePreview: lastPreview,
+      lastMessageType: lastType,
+      lastMessageDirection: 'INBOUND',
+      lastMessageTimestampMs: 1700000000000,
+    );
+
+    void seed(List<Conversation> items) {
+      when(
+        () => bloc.state,
+      ).thenReturn(ConversationsLoaded(items: items, isRefreshing: false));
+    }
+
+    testWidgets('la búsqueda filtra por nombre (case-insensitive)', (
+      tester,
+    ) async {
+      seed(<Conversation>[
+        conv(chatLid: 'l1', displayName: 'Carlos Pérez'),
+        conv(chatLid: 'l2', displayName: 'María López'),
+      ]);
+      await tester.pumpWidget(host());
+
+      await tester.enterText(
+        find.byKey(const Key('conversations.search')),
+        'marí',
+      );
+      await tester.pump();
+
+      expect(find.text('María López'), findsOneWidget);
+      expect(find.text('Carlos Pérez'), findsNothing);
+    });
+
+    testWidgets('la búsqueda también encuentra por teléfono', (tester) async {
+      seed(<Conversation>[
+        conv(chatLid: 'l1', phone: '5215550001'),
+        conv(chatLid: 'l2', phone: '5219998888'),
+      ]);
+      await tester.pumpWidget(host());
+
+      await tester.enterText(
+        find.byKey(const Key('conversations.search')),
+        '9998',
+      );
+      await tester.pump();
+
+      expect(find.text('5219998888'), findsOneWidget);
+      expect(find.text('5215550001'), findsNothing);
+    });
+
+    testWidgets('el preview de media lleva ícono de tipo', (tester) async {
+      seed(<Conversation>[
+        conv(chatLid: 'l1', lastType: 'image', lastPreview: ''),
+      ]);
+      await tester.pumpWidget(host());
+
+      expect(find.byIcon(Icons.image_outlined), findsOneWidget);
+      expect(find.text('Imagen'), findsOneWidget);
+    });
+
+    testWidgets('con no-leídos el preview se enfatiza (text1 + w600)', (
+      tester,
+    ) async {
+      seed(<Conversation>[conv(chatLid: 'l1', unread: 3)]);
+      await tester.pumpWidget(host());
+
+      final preview = tester.widget<Text>(
+        find.byKey(const Key('conversation.preview.l1')),
+      );
+      expect(preview.style?.color, AppTokens.text1);
+      expect(preview.style?.fontWeight, FontWeight.w600);
+    });
+
+    testWidgets('filtro "No leídas" muestra solo las pendientes', (
+      tester,
+    ) async {
+      seed(<Conversation>[
+        conv(chatLid: 'l1', displayName: 'Leída'),
+        conv(chatLid: 'l2', displayName: 'Pendiente', unread: 2),
+      ]);
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('conversations.filter.unread')));
+      await tester.pump();
+
+      expect(find.text('Pendiente'), findsOneWidget);
+      expect(find.text('Leída'), findsNothing);
+    });
+
+    testWidgets('las archivadas viven bajo su filtro y "Todas" las oculta', (
+      tester,
+    ) async {
+      seed(<Conversation>[
+        conv(chatLid: 'l1', displayName: 'Activa'),
+        conv(chatLid: 'l2', displayName: 'Guardada', archived: true),
+      ]);
+      await tester.pumpWidget(host());
+
+      // Vista default (Todas): la archivada no aparece.
+      expect(find.text('Activa'), findsOneWidget);
+      expect(find.text('Guardada'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('conversations.filter.archived')));
+      await tester.pump();
+
+      expect(find.text('Guardada'), findsOneWidget);
+      expect(find.text('Activa'), findsNothing);
+    });
+
+    testWidgets('las fijadas se ordenan primero', (tester) async {
+      seed(<Conversation>[
+        conv(chatLid: 'l1', displayName: 'Normal'),
+        conv(chatLid: 'l2', displayName: 'Fijada', pinned: true),
+      ]);
+      await tester.pumpWidget(host());
+
+      final normal = tester.getTopLeft(find.text('Normal'));
+      final pinned = tester.getTopLeft(find.text('Fijada'));
+      expect(pinned.dy, lessThan(normal.dy));
+    });
+
+    testWidgets('búsqueda sin coincidencias muestra "sin resultados"', (
+      tester,
+    ) async {
+      seed(<Conversation>[conv(chatLid: 'l1', displayName: 'Carlos')]);
+      await tester.pumpWidget(host());
+
+      await tester.enterText(
+        find.byKey(const Key('conversations.search')),
+        'zzz',
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('conversations.no_results')), findsOneWidget);
+    });
+  });
 }

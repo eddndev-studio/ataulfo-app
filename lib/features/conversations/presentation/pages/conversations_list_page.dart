@@ -7,7 +7,9 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/smart_timestamp.dart';
 import '../../../wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import '../../domain/entities/conversation.dart';
@@ -48,13 +50,64 @@ class _LoadingView extends StatelessWidget {
   );
 }
 
-class _LoadedView extends StatelessWidget {
+/// Vista del filtro de la bandeja. `all` esconde las archivadas (viven bajo
+/// su propio filtro, como en mensajería); `unread` = pendientes de atender.
+enum _TrayFilter { all, unread, archived }
+
+class _LoadedView extends StatefulWidget {
   const _LoadedView({required this.items});
 
   final List<Conversation> items;
 
   @override
+  State<_LoadedView> createState() => _LoadedViewState();
+}
+
+class _LoadedViewState extends State<_LoadedView> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  _TrayFilter _filter = _TrayFilter.all;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Bandeja visible: filtro de vista + búsqueda por nombre/teléfono, con
+  /// las fijadas primero (orden estable dentro de cada grupo).
+  List<Conversation> get _visible {
+    final query = _searchCtrl.text.trim().toLowerCase();
+    final byFilter = widget.items.where(
+      (c) => switch (_filter) {
+        _TrayFilter.all => !c.isArchived,
+        _TrayFilter.unread =>
+          !c.isArchived && (c.unreadCount > 0 || c.isMarkedUnread),
+        _TrayFilter.archived => c.isArchived,
+      },
+    );
+    final byQuery = query.isEmpty
+        ? byFilter
+        : byFilter.where(
+            (c) =>
+                _titleOf(c).toLowerCase().contains(query) ||
+                (c.phone?.contains(query) ?? false),
+          );
+    final matched = byQuery.toList(growable: false);
+    return <Conversation>[
+      ...matched.where((c) => c.isPinned),
+      ...matched.where((c) => !c.isPinned),
+    ];
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final visible = _visible;
     return RefreshIndicator(
       onRefresh: () async {
         final bloc = context.read<ConversationsBloc>();
@@ -65,9 +118,9 @@ class _LoadedView extends StatelessWidget {
               s is ConversationsFailed,
         );
       },
-      child: items.isEmpty
+      child: widget.items.isEmpty
           ? const _EmptyView()
-          : ListView.separated(
+          : ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(
                 AppTokens.sp4,
@@ -75,13 +128,69 @@ class _LoadedView extends StatelessWidget {
                 AppTokens.sp4,
                 AppTokens.sp4 + context.safeBottomInset,
               ),
-              itemCount: items.length,
-              separatorBuilder: (_, _) =>
-                  const SizedBox(height: AppTokens.cardGap),
-              itemBuilder: (_, i) => _ConversationTile(conversation: items[i]),
+              children: <Widget>[
+                AppTextField(
+                  key: const Key('conversations.search'),
+                  label: 'Buscar conversación',
+                  hint: 'Nombre o teléfono',
+                  controller: _searchCtrl,
+                ),
+                const SizedBox(height: AppTokens.sp3),
+                Wrap(
+                  spacing: AppTokens.sp2,
+                  children: <Widget>[
+                    AppChoiceChip(
+                      key: const Key('conversations.filter.all'),
+                      label: 'Todas',
+                      selected: _filter == _TrayFilter.all,
+                      onSelected: (_) =>
+                          setState(() => _filter = _TrayFilter.all),
+                    ),
+                    AppChoiceChip(
+                      key: const Key('conversations.filter.unread'),
+                      label: 'No leídas',
+                      selected: _filter == _TrayFilter.unread,
+                      onSelected: (_) =>
+                          setState(() => _filter = _TrayFilter.unread),
+                    ),
+                    AppChoiceChip(
+                      key: const Key('conversations.filter.archived'),
+                      label: 'Archivadas',
+                      selected: _filter == _TrayFilter.archived,
+                      onSelected: (_) =>
+                          setState(() => _filter = _TrayFilter.archived),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppTokens.sp4),
+                if (visible.isEmpty)
+                  Padding(
+                    key: const Key('conversations.no_results'),
+                    padding: const EdgeInsets.all(AppTokens.sp6),
+                    child: Text(
+                      'Sin resultados con este filtro',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+                    ),
+                  )
+                else
+                  for (final c in visible) ...<Widget>[
+                    _ConversationTile(conversation: c),
+                    const SizedBox(height: AppTokens.cardGap),
+                  ],
+              ],
             ),
     );
   }
+}
+
+/// Nombre visible de la fila: `displayName`, o el teléfono en DM, o "Grupo".
+/// El chatLid es jerga de wire — sólo de último recurso.
+String _titleOf(Conversation c) {
+  final isGroup = c.kind == ConversationKind.group;
+  return c.displayName ?? (isGroup ? 'Grupo' : (c.phone ?? c.chatLid));
 }
 
 class _EmptyView extends StatelessWidget {
@@ -168,15 +277,21 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final c = conversation;
-    final isGroup = c.kind == ConversationKind.group;
-    final title = c.displayName ?? (isGroup ? 'Grupo' : (c.phone ?? c.chatLid));
+    final title = _titleOf(c);
     final hasLast = c.lastMessageTimestampMs != null;
     // Sin actividad aún: copy humano para DM y grupo por igual — el chatLid
     // es jerga de wire y nunca se le muestra al operador.
     final secondary = hasLast
         ? _previewLabel(c.lastMessageType, c.lastMessagePreview)
         : 'Sin mensajes';
-    final hasUnread = c.unreadCount > 0;
+    final previewIcon = hasLast ? _previewIcon(c.lastMessageType) : null;
+    final hasUnread = c.unreadCount > 0 || c.isMarkedUnread;
+    // Con pendientes, la línea de preview se enfatiza (texto pleno + w600):
+    // la jerarquía visual de una bandeja de mensajería.
+    final previewStyle = textTheme.bodyMedium?.copyWith(
+      color: hasUnread ? AppTokens.text1 : AppTokens.text2,
+      fontWeight: hasUnread ? FontWeight.w600 : null,
+    );
     final showSecondaryRow = secondary.isNotEmpty || hasUnread;
 
     final pills = <Widget>[
@@ -230,17 +345,24 @@ class _ConversationTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: <Widget>[
+                      if (previewIcon != null) ...<Widget>[
+                        Icon(
+                          previewIcon,
+                          size: 14,
+                          color: hasUnread ? AppTokens.text1 : AppTokens.text2,
+                        ),
+                        const SizedBox(width: AppTokens.sp1),
+                      ],
                       Expanded(
                         child: Text(
                           secondary,
+                          key: Key('conversation.preview.${c.chatLid}'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: AppTokens.text2,
-                          ),
+                          style: previewStyle,
                         ),
                       ),
-                      if (hasUnread) ...<Widget>[
+                      if (c.unreadCount > 0) ...<Widget>[
                         const SizedBox(width: AppTokens.sp2),
                         _UnreadBadge(count: c.unreadCount, chatLid: c.chatLid),
                       ],
@@ -325,3 +447,16 @@ String _previewLabel(String? type, String? preview) {
     _ => '[$type]',
   };
 }
+
+/// Glifo del tipo de último-mensaje para la línea de preview (sólo media:
+/// el texto no necesita ícono). Espeja los glifos del hilo.
+IconData? _previewIcon(String? type) => switch (type) {
+  'image' => Icons.image_outlined,
+  'video' => Icons.videocam_outlined,
+  'audio' || 'ptt' => Icons.mic_none_outlined,
+  'document' => Icons.description_outlined,
+  'sticker' => Icons.emoji_emotions_outlined,
+  'location' => Icons.location_on_outlined,
+  'contact' || 'vcard' => Icons.person_outline,
+  _ => null,
+};

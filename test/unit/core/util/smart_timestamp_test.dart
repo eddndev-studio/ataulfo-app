@@ -45,4 +45,22 @@ void main() {
       'Ayer 22:00',
     );
   });
+
+  group('dayLabel (separadores de día del hilo)', () {
+    test('hoy → "Hoy"', () {
+      expect(dayLabel(ms(DateTime(2026, 6, 9, 0, 5)), now: now), 'Hoy');
+    });
+
+    test('ayer → "Ayer"', () {
+      expect(dayLabel(ms(DateTime(2026, 6, 8, 23, 59)), now: now), 'Ayer');
+    });
+
+    test('mismo año → DD/MM', () {
+      expect(dayLabel(ms(DateTime(2026, 3, 2, 10, 0)), now: now), '02/03');
+    });
+
+    test('año distinto → DD/MM/YY', () {
+      expect(dayLabel(ms(DateTime(2025, 12, 31, 10, 0)), now: now), '31/12/25');
+    });
+  });
 }

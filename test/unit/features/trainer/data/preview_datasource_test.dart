@@ -61,6 +61,16 @@ void main() {
     expect(entity.text, 'Catálogo 2026');
   });
 
+  test('PreviewItemDto parsea delayMs (cadencia del paso simulado)', () {
+    final paced = PreviewItemDto.fromJson(
+      itemJson(kind: 'bot', text: 'uno')..['delayMs'] = 1500,
+    );
+    expect(paced.toEntity().delayMs, 1500);
+    // Ausente (turnos sin flujo / server viejo) ⇒ 0, sin romper.
+    final plain = PreviewItemDto.fromJson(itemJson(kind: 'bot', text: 'ya'));
+    expect(plain.toEntity().delayMs, 0);
+  });
+
   test('POST corre el turno y devuelve items+iterations', () async {
     when(
       () => dio.post<Map<String, dynamic>>(

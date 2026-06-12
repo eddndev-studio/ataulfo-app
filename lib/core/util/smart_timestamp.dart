@@ -33,3 +33,26 @@ String smartTimestamp(int timestampMs, {DateTime? now}) {
   }
   return '$dm/${two(dt.year % 100)} $hm';
 }
+
+/// Etiqueta de DÍA para los separadores del hilo (sin hora): mismas reglas
+/// calendario-local que [smartTimestamp].
+/// - hoy          → `Hoy`
+/// - ayer         → `Ayer`
+/// - mismo año    → `DD/MM`
+/// - año distinto → `DD/MM/YY`
+String dayLabel(int timestampMs, {DateTime? now}) {
+  final dt = DateTime.fromMillisecondsSinceEpoch(timestampMs);
+  final ref = now ?? DateTime.now();
+
+  String two(int v) => v.toString().padLeft(2, '0');
+
+  final day = DateTime(dt.year, dt.month, dt.day);
+  if (day == DateTime(ref.year, ref.month, ref.day)) {
+    return 'Hoy';
+  }
+  if (day == DateTime(ref.year, ref.month, ref.day - 1)) {
+    return 'Ayer';
+  }
+  final dm = '${two(dt.day)}/${two(dt.month)}';
+  return dt.year == ref.year ? dm : '$dm/${two(dt.year % 100)}';
+}

@@ -43,13 +43,18 @@ final _doc = WorkspaceDoc(
   updatedAt: DateTime.utc(2026, 6, 10),
 );
 
-PreviewItem _item(String kind, {String text = '', String summary = ''}) =>
-    PreviewItem(
-      kind: kind,
-      text: text,
-      summary: summary,
-      at: DateTime.utc(2026, 6, 10),
-    );
+PreviewItem _item(
+  String kind, {
+  String text = '',
+  String summary = '',
+  int delayMs = 0,
+}) => PreviewItem(
+  kind: kind,
+  text: text,
+  summary: summary,
+  delayMs: delayMs,
+  at: DateTime.utc(2026, 6, 10),
+);
 
 void main() {
   group('TrainerChatBloc', () {
@@ -284,9 +289,19 @@ void main() {
 
   group('PreviewBloc', () {
     late _MockPreviewRepo repo;
-    setUp(() => repo = _MockPreviewRepo());
+    late List<Duration> paces;
+    setUp(() {
+      repo = _MockPreviewRepo();
+      paces = <Duration>[];
+    });
 
-    PreviewBloc build() => PreviewBloc(repo: repo, templateId: 't1');
+    // El pacer registra las esperas sin dormir: los tests verifican la
+    // CADENCIA pedida, no relojes reales.
+    PreviewBloc build() => PreviewBloc(
+      repo: repo,
+      templateId: 't1',
+      pace: (d) async => paces.add(d),
+    );
 
     blocTest<PreviewBloc, PreviewState>(
       'Started rehidrata el transcript vivo',
@@ -304,7 +319,8 @@ void main() {
     );
 
     blocTest<PreviewBloc, PreviewState>(
-      'MessageSent agrega los items del turno (burbujas + chips)',
+      'MessageSent pinta la burbuja del usuario de inmediato y el turno '
+      'del server la reemplaza sin duplicarla',
       build: build,
       seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
       setUp: () {
@@ -323,11 +339,62 @@ void main() {
       },
       act: (b) => b.add(const PreviewMessageSent('hola')),
       expect: () => <dynamic>[
-        isA<PreviewLoaded>().having((s) => s.sending, 'typing', true),
+        // Optimista: la burbuja del usuario aparece al ENVIAR, no al
+        // resolver el turno.
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'typing', true)
+            .having((s) => s.items.length, 'optimista pintado', 1)
+            .having((s) => s.items.single.isUser, 'es user', true)
+            .having((s) => s.items.single.text, 'texto', 'hola'),
+        // El turno se REVELA item por item (cadencia de envío real), no de
+        // golpe. El user del server reemplaza al optimista (3 items, no 4) y
+        // el typing sigue encendido entre revelados.
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'typing sigue', true)
+            .having((s) => s.items.length, 'user del server', 1)
+            .having((s) => s.items.first.isUser, 'es user', true),
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'typing sigue', true)
+            .having((s) => s.items.length, 'bot revelado', 2),
         isA<PreviewLoaded>()
             .having((s) => s.sending, 'off', false)
-            .having((s) => s.items.length, 'turno agregado', 3),
+            .having((s) => s.items.length, 'turno completo', 3),
       ],
+      verify: (_) {
+        // user: inmediato (sin pace); bot y action: stagger default.
+        expect(paces, hasLength(2));
+        expect(paces.every((d) => d.inMilliseconds > 0), isTrue);
+      },
+    );
+
+    blocTest<PreviewBloc, PreviewState>(
+      'los items con delayMs pacean el revelado con el retraso del paso '
+      '(clamp a 6s)',
+      build: build,
+      seed: () => const PreviewLoaded(items: <PreviewItem>[], sending: false),
+      setUp: () {
+        when(
+          () => repo.sendMessage(templateId: 't1', content: 'promo'),
+        ).thenAnswer(
+          (_) async => PreviewTurn(
+            items: <PreviewItem>[
+              _item('user', text: 'promo'),
+              _item('bot', text: 'uno', delayMs: 1500),
+              _item('bot', text: 'dos', delayMs: 9000),
+            ],
+            iterations: 2,
+          ),
+        );
+      },
+      act: (b) => b.add(const PreviewMessageSent('promo')),
+      skip: 4,
+      expect: () => <dynamic>[],
+      verify: (_) {
+        expect(paces, <Duration>[
+          const Duration(milliseconds: 1500),
+          const Duration(milliseconds: 6000), // 9s clampeado: demo usable
+        ]);
+      },
     );
 
     blocTest<PreviewBloc, PreviewState>(
@@ -357,9 +424,14 @@ void main() {
       },
       act: (b) => b.add(const PreviewMessageSent('x')),
       expect: () => <dynamic>[
-        isA<PreviewLoaded>().having((s) => s.sending, 'typing', true),
+        isA<PreviewLoaded>()
+            .having((s) => s.sending, 'typing', true)
+            .having((s) => s.items.length, 'optimista pintado', 1),
+        // El sandbox descarta el item user cuando el turno falla: la
+        // burbuja optimista se revierte para espejar la verdad del server.
         isA<PreviewLoaded>()
             .having((s) => s.sending, 'off', false)
+            .having((s) => s.items, 'optimista revertido', isEmpty)
             .having(
               (s) => s.failure,
               'fallo',
