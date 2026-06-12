@@ -28,6 +28,20 @@ final _item = NotificationInboxItem(
   updatedAt: DateTime.utc(2026, 6, 3, 12),
 );
 
+final _alertItem = NotificationInboxItem(
+  id: 'ni-2',
+  eventType: NotificationEventType.agentAlert,
+  botId: 'b1',
+  chatLid: '5215550000001',
+  title: 'El bot pide ayuda',
+  body: 'El cliente reporta un pago',
+  priority: NotificationPriority.high,
+  count: 1,
+  status: NotificationInboxStatus.unread,
+  createdAt: DateTime.utc(2026, 6, 12, 12),
+  updatedAt: DateTime.utc(2026, 6, 12, 12),
+);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(const NotificationsLoadRequested());
@@ -158,5 +172,44 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Preferencias route'), findsOneWidget);
+  });
+
+  testWidgets('un agent.alert se pinta con su ícono y deep-link al chat', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      NotificationsLoaded(items: <NotificationInboxItem>[_alertItem]),
+    );
+    String? pushed;
+    final router = GoRouter(
+      initialLocation: '/inbox',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/inbox',
+          builder: (_, _) => BlocProvider<NotificationsBloc>.value(
+            value: bloc,
+            child: const Scaffold(body: NotificationsPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/bots/:id/sessions/:chatLid',
+          builder: (_, state) {
+            pushed = state.uri.toString();
+            return const Scaffold();
+          },
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('El bot pide ayuda'), findsOneWidget);
+    expect(find.byIcon(Icons.support_agent_outlined), findsOneWidget);
+
+    await tester.tap(find.text('El bot pide ayuda'));
+    await tester.pumpAndSettle();
+    expect(pushed, '/bots/b1/sessions/5215550000001');
   });
 }

@@ -133,6 +133,7 @@ class _PreferencesList extends StatelessWidget {
       NotificationEventType.messageInboundNew => Icons.chat_bubble_outline,
       NotificationEventType.botDisconnected => Icons.link_off_outlined,
       NotificationEventType.flowFailed => Icons.error_outline,
+      NotificationEventType.agentAlert => Icons.support_agent_outlined,
     };
   }
 
@@ -141,6 +142,7 @@ class _PreferencesList extends StatelessWidget {
       NotificationEventType.messageInboundNew => 'Mensajes nuevos',
       NotificationEventType.botDisconnected => 'Bot desconectado',
       NotificationEventType.flowFailed => 'Flujos fallidos',
+      NotificationEventType.agentAlert => 'Alertas del bot (IA)',
     };
   }
 

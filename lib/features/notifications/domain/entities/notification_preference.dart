@@ -1,7 +1,8 @@
 enum NotificationEventType {
   messageInboundNew('message.inbound.new'),
   botDisconnected('bot.disconnected'),
-  flowFailed('flow.failed');
+  flowFailed('flow.failed'),
+  agentAlert('agent.alert');
 
   const NotificationEventType(this.wire);
   final String wire;

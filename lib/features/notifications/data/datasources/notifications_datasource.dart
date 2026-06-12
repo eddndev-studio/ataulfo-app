@@ -90,11 +90,10 @@ class DioNotificationsDatasource implements NotificationsDatasource {
       final body = res.data;
       if (body == null) throw const UnknownNotificationsFailure();
       final items = body['items'] as List<dynamic>;
-      return items
-          .cast<Map<String, dynamic>>()
-          .map(NotificationInboxResp.fromJson)
-          .map(NotificationsMapper.inboxRespToEntity)
-          .toList(growable: false);
+      return _skipUnknown(
+        items.cast<Map<String, dynamic>>().map(NotificationInboxResp.fromJson),
+        NotificationsMapper.inboxRespToEntity,
+      );
     } on NotificationsFailure {
       rethrow;
     } on DioException catch (e) {
@@ -161,11 +160,26 @@ class DioNotificationsDatasource implements NotificationsDatasource {
   ) {
     if (body == null) throw const UnknownNotificationsFailure();
     final items = body['items'] as List<dynamic>;
-    return items
-        .cast<Map<String, dynamic>>()
-        .map(NotificationPreferenceResp.fromJson)
-        .map(NotificationsMapper.preferenceRespToEntity)
-        .toList(growable: false);
+    return _skipUnknown(
+      items.cast<Map<String, dynamic>>().map(
+        NotificationPreferenceResp.fromJson,
+      ),
+      NotificationsMapper.preferenceRespToEntity,
+    );
+  }
+
+  /// Mapea saltando las entradas con enums desconocidos: un backend más
+  /// nuevo (eventType futuro) degrada esa fila, no la pantalla entera.
+  static List<E> _skipUnknown<D, E>(Iterable<D> dtos, E Function(D) map) {
+    final out = <E>[];
+    for (final d in dtos) {
+      try {
+        out.add(map(d));
+      } on FormatException {
+        // Entrada de un release futuro: se omite.
+      }
+    }
+    return out;
   }
 
   NotificationsFailure _mapDioException(DioException e) {

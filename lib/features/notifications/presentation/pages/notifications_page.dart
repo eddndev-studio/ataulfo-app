@@ -93,13 +93,27 @@ class _NotificationItem extends StatelessWidget {
 
   final NotificationInboxItem item;
 
+  /// Un agent.alert con chat conocido navega a la conversación (el bot
+  /// pidió ayuda AHÍ) y de paso se marca leído; el resto conserva el tap
+  /// de marcar-leído de siempre.
+  void _onTap(BuildContext context) {
+    context.read<NotificationsBloc>().add(
+      NotificationMarkReadRequested(item.id),
+    );
+    final botId = item.botId;
+    final chatLid = item.chatLid;
+    if (item.eventType == NotificationEventType.agentAlert &&
+        botId != null &&
+        chatLid != null) {
+      context.push('/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppCard(
       key: Key('notifications.item.${item.id}'),
-      onTap: () => context.read<NotificationsBloc>().add(
-        NotificationMarkReadRequested(item.id),
-      ),
+      onTap: () => _onTap(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -141,6 +155,7 @@ class _NotificationItem extends StatelessWidget {
       NotificationEventType.messageInboundNew => Icons.chat_bubble_outline,
       NotificationEventType.botDisconnected => Icons.link_off_outlined,
       NotificationEventType.flowFailed => Icons.error_outline,
+      NotificationEventType.agentAlert => Icons.support_agent_outlined,
     };
   }
 
