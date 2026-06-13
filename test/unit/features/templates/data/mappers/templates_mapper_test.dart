@@ -75,6 +75,23 @@ void main() {
       expect(TemplatesMapper.aiConfigDtoToEntity(dto).responseDelaySeconds, 45);
     });
 
+    test('traduce silenceLabelIds (etiquetas de silencio)', () {
+      const dto = AiConfigDto(
+        enabled: true,
+        provider: 'GEMINI',
+        model: 'gemini-3.1-pro-preview',
+        temperature: 0.7,
+        thinkingLevel: 'LOW',
+        systemPrompt: '',
+        contextMessages: 20,
+        silenceLabelIds: <String>['l1', 'l2'],
+      );
+      expect(TemplatesMapper.aiConfigDtoToEntity(dto).silenceLabelIds, <String>[
+        'l1',
+        'l2',
+      ]);
+    });
+
     test('proveedor desconocido propaga ArgumentError (fail-loud)', () {
       expect(
         () => TemplatesMapper.aiConfigDtoToEntity(aiDto(provider: 'ANTHROPIC')),

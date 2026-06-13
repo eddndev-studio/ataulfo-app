@@ -5,6 +5,9 @@ import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/bloc/catalog_bloc.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/failures/labels_failure.dart';
+import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/template_detail_bloc.dart';
@@ -21,6 +24,14 @@ class _MockBloc extends MockBloc<TemplateDetailEvent, TemplateDetailState>
 
 class _MockCatalogBloc extends MockBloc<CatalogEvent, CatalogState>
     implements CatalogBloc {}
+
+class _MockLabelsBloc extends MockBloc<LabelsEvent, LabelsState>
+    implements LabelsBloc {}
+
+const _labels = <Label>[
+  Label(id: 'l1', name: 'VIP', color: '#FF0000', description: ''),
+  Label(id: 'l2', name: 'Moroso', color: '#00C853', description: ''),
+];
 
 const _ai = AIConfig(
   enabled: true,
@@ -79,18 +90,22 @@ void main() {
   setUpAll(() {
     registerFallbackValue(const TemplateDetailLoadRequested());
     registerFallbackValue(const CatalogLoadRequested());
+    registerFallbackValue(const LabelsLoadRequested());
   });
 
   late _MockBloc bloc;
   late _MockCatalogBloc catalogBloc;
+  late _MockLabelsBloc labelsBloc;
 
   setUp(() {
     bloc = _MockBloc();
     catalogBloc = _MockCatalogBloc();
+    labelsBloc = _MockLabelsBloc();
     when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     when(
       () => catalogBloc.state,
     ).thenReturn(const CatalogLoaded(catalog: _catalog));
+    when(() => labelsBloc.state).thenReturn(const LabelsLoaded(_labels));
   });
 
   // La página posee su Scaffold; el host solo provee blocs.
@@ -100,6 +115,7 @@ void main() {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<TemplateDetailBloc>.value(value: bloc),
         BlocProvider<CatalogBloc>.value(value: catalogBloc),
+        BlocProvider<LabelsBloc>.value(value: labelsBloc),
       ],
       child: const TemplateAiPage(),
     ),
@@ -406,6 +422,228 @@ void main() {
         find.byKey(const Key('template_ai.sheet.delay.save')),
       );
       expect(save.onPressed, isNull);
+    });
+  });
+
+  group('tile Etiquetas de silencio', () {
+    const tplSilenced = Template(
+      id: 't1',
+      orgId: 'o1',
+      name: 'Soporte',
+      version: 3,
+      ai: AIConfig(
+        enabled: true,
+        provider: AIProvider.gemini,
+        model: 'gemini-3.1-pro-preview',
+        temperature: 0.7,
+        thinkingLevel: ThinkingLevel.medium,
+        systemPrompt: 'Eres un asistente de soporte amable.',
+        contextMessages: 20,
+        silenceLabelIds: <String>['l1'],
+      ),
+    );
+
+    testWidgets('vacío se lee como "Ninguna"', (tester) async {
+      await tester.pumpWidget(host());
+      expect(find.text('Etiquetas de silencio'), findsOneWidget);
+      expect(find.text('Ninguna'), findsOneWidget);
+    });
+
+    testWidgets('con etiquetas muestra el conteo', (tester) async {
+      const tpl2 = Template(
+        id: 't1',
+        orgId: 'o1',
+        name: 'Soporte',
+        version: 3,
+        ai: AIConfig(
+          enabled: true,
+          provider: AIProvider.gemini,
+          model: 'gemini-3.1-pro-preview',
+          temperature: 0.7,
+          thinkingLevel: ThinkingLevel.medium,
+          systemPrompt: '',
+          contextMessages: 20,
+          silenceLabelIds: <String>['l1', 'l2'],
+        ),
+      );
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(tpl2));
+
+      await tester.pumpWidget(host());
+
+      expect(find.text('2 etiquetas'), findsOneWidget);
+    });
+
+    testWidgets('abre el sheet; marcar etiqueta + Guardar dispatcha', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      await tester.tap(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
+      await tester.pumpAndSettle();
+
+      // El catálogo org-scoped se renderiza en el sheet.
+      expect(
+        find.byKey(const Key('template_ai.sheet.silence.option.l1')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('template_ai.sheet.silence.option.l1')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('template_ai.sheet.silence.save')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          TemplateDetailAiUpdateRequested(
+            _ai.copyWith(silenceLabelIds: const <String>['l1']),
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('una etiqueta ya elegida aparece marcada; desmarcar la quita', (
+      tester,
+    ) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const TemplateDetailLoaded(tplSilenced));
+
+      await tester.pumpWidget(host());
+
+      await tester.tap(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
+      await tester.pumpAndSettle();
+
+      final l1Row = find.byKey(
+        const Key('template_ai.sheet.silence.option.l1'),
+      );
+      expect(
+        find.descendant(of: l1Row, matching: find.byIcon(Icons.check_box)),
+        findsOneWidget,
+      );
+
+      await tester.tap(l1Row);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('template_ai.sheet.silence.save')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          TemplateDetailAiUpdateRequested(
+            tplSilenced.ai.copyWith(silenceLabelIds: const <String>[]),
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('Mutating: el tile queda inerte', (tester) async {
+      when(() => bloc.state).thenReturn(const TemplateDetailMutating(_tpl));
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_ai.sheet.silence.save')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('una etiqueta seleccionada que ya no existe se conserva', (
+      tester,
+    ) async {
+      // 'gone' no está en el catálogo [l1, l2]: el sheet la muestra como
+      // huérfana y, si no se quita, sobrevive al guardar (no se descarta).
+      const tplOrphan = Template(
+        id: 't1',
+        orgId: 'o1',
+        name: 'Soporte',
+        version: 3,
+        ai: AIConfig(
+          enabled: true,
+          provider: AIProvider.gemini,
+          model: 'gemini-3.1-pro-preview',
+          temperature: 0.7,
+          thinkingLevel: ThinkingLevel.medium,
+          systemPrompt: '',
+          contextMessages: 20,
+          silenceLabelIds: <String>['l1', 'gone'],
+        ),
+      );
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(tplOrphan));
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_ai.sheet.silence.orphan.gone')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('template_ai.sheet.silence.save')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          TemplateDetailAiUpdateRequested(
+            tplOrphan.ai.copyWith(
+              silenceLabelIds: const <String>['l1', 'gone'],
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('catálogo vacío muestra el empty state', (tester) async {
+      when(() => labelsBloc.state).thenReturn(const LabelsLoaded(<Label>[]));
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_ai.sheet.silence.empty')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('error del catálogo: muestra reintento y Guardar inerte', (
+      tester,
+    ) async {
+      when(
+        () => labelsBloc.state,
+      ).thenReturn(const LabelsFailed(LabelsServerFailure()));
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_ai.sheet.silence.error')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<AppButton>(
+              find.byKey(const Key('template_ai.sheet.silence.save')),
+            )
+            .onPressed,
+        isNull,
+      );
     });
   });
 

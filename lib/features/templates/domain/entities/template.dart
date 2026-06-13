@@ -63,6 +63,7 @@ class AIConfig {
     required this.systemPrompt,
     required this.contextMessages,
     this.responseDelaySeconds = 0,
+    this.silenceLabelIds = const <String>[],
   });
 
   final bool enabled;
@@ -79,6 +80,12 @@ class AIConfig {
   /// mensajes posteriores); el backend la acota a 0..120.
   final int responseDelaySeconds;
 
+  /// Ids de etiquetas de la organización ante cuya presencia en el chat el
+  /// motor NO atiende el turno (gate de silencio: el humano toma el control).
+  /// Vacío = ningún silenciamiento. El orden no es significativo, pero el
+  /// backend lo conserva tal cual; la igualdad lo compara por posición.
+  final List<String> silenceLabelIds;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -90,7 +97,8 @@ class AIConfig {
         other.thinkingLevel == thinkingLevel &&
         other.systemPrompt == systemPrompt &&
         other.contextMessages == contextMessages &&
-        other.responseDelaySeconds == responseDelaySeconds;
+        other.responseDelaySeconds == responseDelaySeconds &&
+        _stringListEquals(other.silenceLabelIds, silenceLabelIds);
   }
 
   @override
@@ -103,6 +111,7 @@ class AIConfig {
     systemPrompt,
     contextMessages,
     responseDelaySeconds,
+    Object.hashAll(silenceLabelIds),
   );
 
   /// Copia con campos reemplazados — base de las ediciones por-campo del
@@ -116,6 +125,7 @@ class AIConfig {
     String? systemPrompt,
     int? contextMessages,
     int? responseDelaySeconds,
+    List<String>? silenceLabelIds,
   }) => AIConfig(
     enabled: enabled ?? this.enabled,
     provider: provider ?? this.provider,
@@ -125,7 +135,20 @@ class AIConfig {
     systemPrompt: systemPrompt ?? this.systemPrompt,
     contextMessages: contextMessages ?? this.contextMessages,
     responseDelaySeconds: responseDelaySeconds ?? this.responseDelaySeconds,
+    silenceLabelIds: silenceLabelIds ?? this.silenceLabelIds,
   );
+}
+
+/// Igualdad posicional de dos listas de strings (las etiquetas de silencio):
+/// el dominio se mantiene puro (sin `package:flutter/foundation`), igual que
+/// las comparaciones manuales de listas del resto de la capa.
+bool _stringListEquals(List<String> a, List<String> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// Conteo de agregados hijos de una Template, para las tarjetas del listado

@@ -90,6 +90,7 @@ class AiConfigDto {
     required this.systemPrompt,
     required this.contextMessages,
     this.responseDelaySeconds = 0,
+    this.silenceLabelIds = const <String>[],
   });
 
   factory AiConfigDto.fromJson(Map<String, dynamic> json) {
@@ -113,6 +114,13 @@ class AiConfigDto {
     // la manda y el cliente degrada a 0 — responder de inmediato. Mismo
     // trato tolerante que `counts`, a diferencia de las claves fundacionales.
     final delayRaw = json['response_delay_seconds'];
+    // Clave aditiva (etiquetas de silencio): el backend la omite (omitempty)
+    // cuando no hay ninguna; ausente ⇒ lista vacía. Se filtra a strings por
+    // defensa de contrato (un elemento no-string no es un id de etiqueta).
+    final silenceRaw = json['silence_label_ids'];
+    final silenceLabelIds = silenceRaw is List
+        ? silenceRaw.whereType<String>().toList(growable: false)
+        : const <String>[];
     return AiConfigDto(
       enabled: enabled,
       provider: provider,
@@ -124,6 +132,7 @@ class AiConfigDto {
       systemPrompt: systemPrompt,
       contextMessages: contextMessages,
       responseDelaySeconds: delayRaw is int ? delayRaw : 0,
+      silenceLabelIds: silenceLabelIds,
     );
   }
 
@@ -135,4 +144,5 @@ class AiConfigDto {
   final String systemPrompt;
   final int contextMessages;
   final int responseDelaySeconds;
+  final List<String> silenceLabelIds;
 }

@@ -58,6 +58,29 @@ void main() {
       // (responder de inmediato) — mismo trato tolerante que `counts`.
       expect(AiConfigDto.fromJson(aiJson()).responseDelaySeconds, 0);
     });
+
+    test('parsea silence_label_ids cuando viaja', () {
+      final c = AiConfigDto.fromJson(
+        aiJson()..['silence_label_ids'] = <dynamic>['l1', 'l2'],
+      );
+      expect(c.silenceLabelIds, <String>['l1', 'l2']);
+    });
+
+    test('silence_label_ids ausente ⇒ vacío (clave aditiva, omitempty)', () {
+      // El backend la omite (omitempty) cuando no hay etiquetas de silencio;
+      // el cliente degrada a lista vacía, igual que response_delay_seconds.
+      expect(AiConfigDto.fromJson(aiJson()).silenceLabelIds, isEmpty);
+    });
+
+    test(
+      'silence_label_ids filtra elementos no-string (defensa de contrato)',
+      () {
+        final c = AiConfigDto.fromJson(
+          aiJson()..['silence_label_ids'] = <dynamic>['l1', 7, null, 'l2'],
+        );
+        expect(c.silenceLabelIds, <String>['l1', 'l2']);
+      },
+    );
   });
 
   group('TemplateResp.fromJson', () {

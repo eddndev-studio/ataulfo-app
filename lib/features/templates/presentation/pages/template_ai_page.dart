@@ -10,9 +10,11 @@ import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
 import '../../../ai_catalog/presentation/bloc/catalog_bloc.dart';
+import '../../../labels/presentation/bloc/labels_bloc.dart';
 import '../../domain/entities/template.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../bloc/template_detail_bloc.dart';
+import '../widgets/silence_labels_sheet.dart';
 import '../widgets/thinking_label.dart';
 
 /// Motor IA de una plantilla (`/templates/:id/ai`): información Y edición en
@@ -287,9 +289,22 @@ class _StatGrid extends StatelessWidget {
               : '${ai.responseDelaySeconds}s',
           onTap: isMutating ? null : () => _pickDelay(context),
         ),
+        const SizedBox(height: AppTokens.cardGap),
+        _StatTile(
+          tileKey: const Key('template_ai.tile.silence_labels'),
+          label: 'Etiquetas de silencio',
+          value: _silenceLabelsValue(ai.silenceLabelIds.length),
+          onTap: isMutating ? null : () => _pickSilenceLabels(context),
+        ),
       ],
     );
   }
+
+  static String _silenceLabelsValue(int n) => switch (n) {
+    0 => 'Ninguna',
+    1 => '1 etiqueta',
+    _ => '$n etiquetas',
+  };
 
   void _dispatch(BuildContext context, AIConfig next) {
     context.read<TemplateDetailBloc>().add(
@@ -356,6 +371,23 @@ class _StatGrid extends StatelessWidget {
     );
     if (picked == null || !context.mounted) return;
     _dispatch(context, ai.copyWith(responseDelaySeconds: picked));
+  }
+
+  Future<void> _pickSilenceLabels(BuildContext context) async {
+    // El catálogo (LabelsBloc) vive a nivel de ruta; el sheet abre en otra
+    // rama del árbol (navigator), así que se le pasa por value.
+    final labelsBloc = context.read<LabelsBloc>();
+    final picked = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => BlocProvider<LabelsBloc>.value(
+        value: labelsBloc,
+        child: SilenceLabelsSheet(initialSelectedIds: ai.silenceLabelIds),
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    _dispatch(context, ai.copyWith(silenceLabelIds: picked));
   }
 }
 

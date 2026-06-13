@@ -18,6 +18,7 @@ class TemplatesMapper {
     systemPrompt: dto.systemPrompt,
     contextMessages: dto.contextMessages,
     responseDelaySeconds: dto.responseDelaySeconds,
+    silenceLabelIds: dto.silenceLabelIds,
   );
 
   static Template templateRespToEntity(TemplateResp resp) => Template(

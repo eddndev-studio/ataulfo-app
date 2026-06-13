@@ -702,8 +702,37 @@ void main() {
             'system_prompt': 'Eres un asistente útil.',
             'context_messages': 20,
             'response_delay_seconds': 0,
+            'silence_label_ids': <String>[],
           },
         });
+      },
+    );
+
+    test(
+      'serializa silence_label_ids (snake_case) en el body del PUT',
+      () async {
+        final captured = <Map<String, dynamic>>[];
+        when(
+          () => dio.put<Map<String, dynamic>>(
+            '/templates/t1',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((invocation) async {
+          captured.add(
+            invocation.namedArguments[#data] as Map<String, dynamic>,
+          );
+          return respMap(200, body: tplJson(version: 2));
+        });
+
+        await ds.update(
+          id: 't1',
+          name: 'Soporte',
+          version: 1,
+          ai: ai.copyWith(silenceLabelIds: const <String>['l-vip', 'l-humano']),
+        );
+
+        final aiBody = captured.single['ai'] as Map<String, dynamic>;
+        expect(aiBody['silence_label_ids'], <String>['l-vip', 'l-humano']);
       },
     );
 

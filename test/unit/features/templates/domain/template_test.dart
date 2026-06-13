@@ -56,6 +56,7 @@ void main() {
       ThinkingLevel thinkingLevel = ThinkingLevel.low,
       String systemPrompt = '',
       int contextMessages = 20,
+      List<String> silenceLabelIds = const <String>[],
     }) => AIConfig(
       enabled: enabled,
       provider: provider,
@@ -64,6 +65,7 @@ void main() {
       thinkingLevel: thinkingLevel,
       systemPrompt: systemPrompt,
       contextMessages: contextMessages,
+      silenceLabelIds: silenceLabelIds,
     );
 
     test('expone los 7 campos del wire S03/S12', () {
@@ -92,6 +94,25 @@ void main() {
       expect(base, isNot(make(systemPrompt: 'eres un agente')));
       expect(base, isNot(make(contextMessages: 10)));
     });
+
+    test('silenceLabelIds arranca vacío', () {
+      expect(make().silenceLabelIds, isEmpty);
+    });
+
+    test(
+      'difiere si cambian las etiquetas de silencio (igualdad por lista)',
+      () {
+        expect(make(), isNot(make(silenceLabelIds: const <String>['l1'])));
+        expect(
+          make(silenceLabelIds: const <String>['l1']),
+          make(silenceLabelIds: const <String>['l1']),
+        );
+        expect(
+          make(silenceLabelIds: const <String>['l1']).hashCode,
+          make(silenceLabelIds: const <String>['l1']).hashCode,
+        );
+      },
+    );
   });
 
   group('Template', () {
@@ -183,6 +204,13 @@ void main() {
       final off = base.copyWith(enabled: false);
       expect(off.enabled, isFalse);
       expect(off.temperature, base.temperature);
+    });
+
+    test('reemplaza las etiquetas de silencio y conserva el resto', () {
+      final out = base.copyWith(silenceLabelIds: const <String>['l1', 'l2']);
+      expect(out.silenceLabelIds, const <String>['l1', 'l2']);
+      expect(out.model, base.model);
+      expect(out.enabled, base.enabled);
     });
   });
 }

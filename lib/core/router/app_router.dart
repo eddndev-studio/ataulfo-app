@@ -837,6 +837,13 @@ class AppRouter {
                     CatalogBloc(_catalogRepo)
                       ..add(const CatalogLoadRequested()),
               ),
+              // Catálogo org-scoped para el multi-select de etiquetas de
+              // silencio; carga única, compartida con el sheet por value.
+              BlocProvider<LabelsBloc>(
+                create: (_) =>
+                    LabelsBloc(repo: _labelsRepo)
+                      ..add(const LabelsLoadRequested()),
+              ),
             ],
             child: const TemplateAiPage(),
           );
