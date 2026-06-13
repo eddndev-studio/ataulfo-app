@@ -30,6 +30,16 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Small-icon y tinte por defecto de las notificaciones FCM (status
+             bar). Android enmascara el small-icon a una silueta y lo tiñe, así
+             que debe ser blanco sobre transparente; el launcher a color saldría
+             como un borrón. ic_stat_ataulfo es la silueta del mango. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_ataulfo" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/ic_notification_color" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -3,4 +3,6 @@
     <!-- Fondo del adaptive icon: el surface oscuro del design system de la
          app (AppTokens.s900). El glifo dorado del foreground vive encima. -->
     <color name="ic_launcher_background">#0A1014</color>
+    <!-- Tinte del small-icon y acento de las notificaciones (verde de marca). -->
+    <color name="ic_notification_color">#06CF9C</color>
 </resources>

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../domain/repositories/local_notifier.dart';
@@ -13,6 +14,11 @@ class FlutterLocalNotifier implements LocalNotifier {
   static const _channelName = 'Notificaciones';
   static const _channelDescription = 'Notificaciones push de Ataúlfo';
 
+  // Small-icon monocromo (silueta del mango): Android lo tiñe, debe ser blanco
+  // sobre transparente. El launcher a color saldría como un borrón en la barra.
+  static const _smallIcon = 'ic_stat_ataulfo';
+  static const _accent = Color(0xFF06CF9C);
+
   static const _details = NotificationDetails(
     android: AndroidNotificationDetails(
       _channelId,
@@ -20,6 +26,8 @@ class FlutterLocalNotifier implements LocalNotifier {
       channelDescription: _channelDescription,
       importance: Importance.high,
       priority: Priority.high,
+      icon: _smallIcon,
+      color: _accent,
     ),
   );
 
@@ -29,7 +37,7 @@ class FlutterLocalNotifier implements LocalNotifier {
   Future<void> init({void Function(String payload)? onTap}) async {
     await _plugin.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        android: AndroidInitializationSettings('@drawable/$_smallIcon'),
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
