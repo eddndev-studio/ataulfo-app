@@ -95,3 +95,18 @@ final class FlowsInvalidSettingsFailure extends FlowsFailure {
 final class FlowsConflictFailure extends FlowsFailure {
   const FlowsConflictFailure();
 }
+
+/// 422 contra `PUT /flows/:id/steps/order`: el array no es permutación
+/// exacta de los steps del flow, o el arreglo final dejaría un
+/// CONDITIONAL_TIME después de alguno de sus destinos (forward-only).
+/// El backend es atómico: nada cambió; la UI restaura la lista y explica.
+final class FlowsInvalidReorderFailure extends FlowsFailure {
+  const FlowsInvalidReorderFailure();
+}
+
+/// 409 contra `DELETE /steps/:id`: el step es destino de un
+/// CONDITIONAL_TIME del flow. El operador debe redirigir (o borrar) el
+/// condicional antes de poder borrar el destino.
+final class FlowsStepReferencedFailure extends FlowsFailure {
+  const FlowsStepReferencedFailure();
+}

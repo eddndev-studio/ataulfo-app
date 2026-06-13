@@ -90,6 +90,7 @@ const List<fdom.StepType> _pickableTypes = <fdom.StepType>[
   fdom.StepType.sticker,
   fdom.StepType.conditionalTime,
   fdom.StepType.label,
+  fdom.StepType.end,
 ];
 
 class _StepEditSheetState extends State<StepEditSheet> {
@@ -111,10 +112,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
   String? _ctMetadataJson;
 
   /// Metadata hidratada del step original al editar un CONDITIONAL_TIME;
-  /// se pasa al form como `initial`. Si el parse falla (legacy/corrupto),
-  /// el form arranca con su seed default — el operador verá un warning
-  /// implícito al notar que el form no refleja la config guardada.
+  /// se pasa al form como `initial`. Metadata legacy posicional se SANA
+  /// resolviendo orders→ids contra los steps vigentes del bloc.
   ConditionalTimeMetadata? _ctInitial;
+
+  /// True cuando la metadata original no se pudo leer o sus destinos no
+  /// resolvieron: el form pinta un aviso EXPLÍCITO de que guardar
+  /// reemplaza la configuración anterior (antes el reemplazo era mudo).
+  bool _ctRecovered = false;
 
   /// Último `metadataJson` emitido por el form LABEL. `null` = sin etiqueta
   /// seleccionada (gatea el submit). Solo aplica cuando `_type == label`.
@@ -157,11 +162,34 @@ class _StepEditSheetState extends State<StepEditSheet> {
 
     if (ed != null && ed.type == fdom.StepType.conditionalTime) {
       try {
-        _ctInitial = ConditionalTimeMetadata.fromJsonString(ed.metadataJson);
+        var md = ConditionalTimeMetadata.fromJsonString(ed.metadataJson);
+        if (!md.hasStepIdRefs) {
+          // Fila legacy posicional (no migrada): sanar resolviendo los
+          // orders contra los steps vigentes. Si algún destino no
+          // resuelve, el horario se conserva y los destinos quedan sin
+          // selección con el aviso de reemplazo.
+          final steps = _stepsFromState(context.read<FlowStepsBloc>().state);
+          final byOrder = <int, String>{for (final s in steps) s.order: s.id};
+          final m = byOrder[md.onMatchOrder];
+          final e = byOrder[md.onElseOrder];
+          if (m != null && e != null) {
+            md = ConditionalTimeMetadata(
+              tz: md.tz,
+              windows: md.windows,
+              onMatchStepId: m,
+              onElseStepId: e,
+            );
+          } else {
+            _ctRecovered = true;
+            md = ConditionalTimeMetadata(tz: md.tz, windows: md.windows);
+          }
+        }
+        _ctInitial = md;
       } on FormatException {
-        // metadata corrupto: el form arranca con seed default. El
-        // operador puede notar el desajuste y reconfigurar.
+        // Metadata corrupta: el form arranca con seed default y el aviso
+        // explícito de que guardar reemplaza lo anterior.
         _ctInitial = null;
+        _ctRecovered = true;
       }
     }
     if (ed != null && ed.type == fdom.StepType.label) {
@@ -191,6 +219,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
     fdom.StepType.text ||
     fdom.StepType.conditionalTime ||
     fdom.StepType.label ||
+    fdom.StepType.end ||
     fdom.StepType.unsupported => null,
   };
 
@@ -221,25 +250,37 @@ class _StepEditSheetState extends State<StepEditSheet> {
       _type != fdom.StepType.text &&
       _type != fdom.StepType.conditionalTime &&
       _type != fdom.StepType.label &&
+      _type != fdom.StepType.end &&
       _type != fdom.StepType.unsupported;
 
   bool get _isConditionalTime => _type == fdom.StepType.conditionalTime;
 
   bool get _isLabel => _type == fdom.StepType.label;
 
-  List<int> _availableOrdersFromState(FlowStepsState s) =>
-      _availableOrdersFromStateImpl(s, widget.editing?.id);
+  bool get _isEnd => _type == fdom.StepType.end;
+
+  List<CtTargetOption> _ctTargetsFromState(FlowStepsState s) =>
+      _ctTargetsFromStateImpl(s, widget.editing);
 
   Future<void> _confirmDelete() async {
     final ed = widget.editing;
     if (ed == null) return;
+    // Aviso anticipado: si el paso es destino de un condicional, el
+    // backend rechazará el borrado (409). Mejor decirlo ANTES del intento.
+    final referenced = _referencedByConditional(
+      ed.id,
+      _stepsFromState(context.read<FlowStepsBloc>().state),
+    );
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         key: const Key('step_edit.delete_confirm'),
         title: const Text('Eliminar paso'),
-        content: const Text(
-          '¿Eliminar este paso? La acción no se puede deshacer.',
+        content: Text(
+          referenced
+              ? 'Este paso es destino de un condicional del flujo. Para '
+                    'eliminarlo, primero cambia ese destino en el condicional.'
+              : '¿Eliminar este paso? La acción no se puede deshacer.',
         ),
         actions: <Widget>[
           AppButton.text(
@@ -265,12 +306,39 @@ class _StepEditSheetState extends State<StepEditSheet> {
   /// para TEXT, `content`; para multimedia, `mediaRef`. El campo
   /// secundario (caption en multimedia) puede quedar vacío.
   /// CONDITIONAL_TIME válida cuando el form local emitió un
-  /// `metadataJson` no-null (sin días vacíos, from<to, etc.).
+  /// `metadataJson` no-null (destinos elegidos, días, from<to). END no
+  /// lleva campos: siempre submittable.
   bool get _isSubmittable {
     if (_isConditionalTime) return _ctMetadataJson != null;
     if (_isLabel) return _labelMetadataJson != null;
+    if (_isEnd) return true;
     if (_isMultimedia) return _mediaCtrl.text.trim().isNotEmpty;
     return _contentCtrl.text.trim().isNotEmpty;
+  }
+
+  /// Posición de inserción para un CT nuevo: justo antes de su destino
+  /// más temprano (el backend desplaza los steps en/tras esa posición,
+  /// así que ambos destinos quedan DESPUÉS del condicional — la regla
+  /// forward-only se cumple por construcción). Sin destinos resolubles
+  /// cae a append (el backend rechazará con 422 explicativo — fail-loud,
+  /// no silencio).
+  int? _ctInsertOrder(FlowStepsState s) {
+    final json = _ctMetadataJson;
+    if (json == null) return null;
+    final ConditionalTimeMetadata md;
+    try {
+      md = ConditionalTimeMetadata.fromJsonString(json);
+    } on FormatException {
+      return null;
+    }
+    if (!md.hasStepIdRefs) return null;
+    final steps = _stepsFromState(s);
+    int? min;
+    for (final st in steps) {
+      if (st.id != md.onMatchStepId && st.id != md.onElseStepId) continue;
+      if (min == null || st.order < min) min = st.order;
+    }
+    return min;
   }
 
   void _submit() {
@@ -279,15 +347,16 @@ class _StepEditSheetState extends State<StepEditSheet> {
     final mediaRef = _mediaCtrl.text.trim();
     final ed = widget.editing;
     if (ed == null) {
+      final bloc = context.read<FlowStepsBloc>();
       _didSubmit = true;
-      context.read<FlowStepsBloc>().add(
+      bloc.add(
         FlowStepsAddRequested(
           type: _type,
           mediaRef: _isMultimedia ? mediaRef : '',
-          content: (_isConditionalTime || _isLabel) ? '' : content,
-          // LABEL no envía al wire: el piso de 1s no aplica, su delay queda en 0.
-          delayMs: _isLabel ? 0 : _delayMs,
-          jitterPct: _jitterPct,
+          content: (_isConditionalTime || _isLabel || _isEnd) ? '' : content,
+          // LABEL y END no envían al wire: el piso de 1s no aplica.
+          delayMs: (_isLabel || _isEnd) ? 0 : _delayMs,
+          jitterPct: _isEnd ? 0 : _jitterPct,
           aiOnly: _mode == _StepMode.aiOnly,
           manualOnly: _mode == _StepMode.manualOnly,
           metadataJson: _isConditionalTime
@@ -295,6 +364,9 @@ class _StepEditSheetState extends State<StepEditSheet> {
               : _isLabel
               ? _labelMetadataJson
               : _mediaMetadataJson(),
+          // El condicional se INSERTA antes de su destino más temprano;
+          // los demás tipos conservan el append clásico.
+          order: _isConditionalTime ? _ctInsertOrder(bloc.state) : null,
         ),
       );
       return;
@@ -324,13 +396,17 @@ class _StepEditSheetState extends State<StepEditSheet> {
 
     String? newMetadata;
     if (_isConditionalTime && _ctMetadataJson != null) {
-      // Comparación semántica: parseo el JSON original y el actual para
-      // evitar falsos positivos por orden de keys distinto del backend.
+      // Comparación semántica por shape CANÓNICO (tz + ventanas + ids):
+      // el listado del backend sintetiza on_*_order junto a los ids y el
+      // form re-emite id-form puro — comparar con el == del entity (que
+      // incluye los orders) marcaría cambio en CADA edición sin cambios
+      // y dispararía un PATCH espurio.
       try {
         final current = ConditionalTimeMetadata.fromJsonString(
           _ctMetadataJson!,
         );
-        if (_ctInitial == null || current != _ctInitial) {
+        final initial = _ctInitial;
+        if (initial == null || !_ctCanonicallyEqual(current, initial)) {
           newMetadata = _ctMetadataJson;
         }
       } on FormatException {
@@ -447,10 +523,22 @@ class _StepEditSheetState extends State<StepEditSheet> {
                     ConditionalTimeForm(
                       key: const Key('step_edit.ct_form'),
                       initial: _ctInitial,
-                      availableStepOrders: _availableOrdersFromState(state),
+                      targets: _ctTargetsFromState(state),
                       enabled: !isMutating,
+                      showRecoveredWarning: _ctRecovered,
                       onChanged: (json) =>
                           setState(() => _ctMetadataJson = json),
+                    ),
+                  ] else if (_isEnd) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp4),
+                    Text(
+                      'El flujo termina al llegar a este paso. Úsalo para '
+                      'cerrar la rama de un condicional: sin él, la rama '
+                      'continúa con los pasos siguientes.',
+                      key: const Key('step_edit.end_helper'),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.text2,
+                      ),
                     ),
                   ] else if (_isLabel) ...<Widget>[
                     const SizedBox(height: AppTokens.sp4),
@@ -494,10 +582,10 @@ class _StepEditSheetState extends State<StepEditSheet> {
                       maxLines: 4,
                     ),
                   ],
-                  // delay/jitter son pacing del envío al wire: un paso LABEL no
-                  // envía nada (side-effect invisible), así que sus sliders no
-                  // aplican y se ocultan.
-                  if (!_isLabel) ...<Widget>[
+                  // delay/jitter son pacing del envío al wire: LABEL no envía
+                  // nada (side-effect invisible) y END termina la ejecución,
+                  // así que sus sliders no aplican y se ocultan.
+                  if (!_isLabel && !_isEnd) ...<Widget>[
                     const SizedBox(height: AppTokens.sp4),
                     _SliderField(
                       sliderKey: const Key('step_edit.delay_slider'),
@@ -715,11 +803,17 @@ class _FailureCopy extends StatelessWidget {
       'step_edit.error.step_not_found',
       'Este paso ya no existe. Cierra y refresca la lista.',
     ),
+    FlowsStepReferencedFailure() => (
+      'step_edit.error.step_referenced',
+      'Este paso es destino de un condicional. Cambia ese destino antes '
+          'de eliminarlo.',
+    ),
     FlowsNotFoundFailure() ||
     FlowsServerFailure() ||
     FlowsInvalidCreateFailure() ||
     FlowsInvalidSettingsFailure() ||
     FlowsConflictFailure() ||
+    FlowsInvalidReorderFailure() ||
     UnknownFlowsFailure() => (
       'step_edit.error.generic',
       'No pudimos guardar el paso. Inténtalo de nuevo.',
@@ -903,23 +997,71 @@ class _MediaField extends StatelessWidget {
   }
 }
 
-/// Extrae los `order` de los steps vigentes del bloc state para los
-/// dropdowns `onMatch`/`onElse` del form CT. Excluye el step propio
-/// cuando se está editando (auto-referencia es un loop trivial).
-/// Loading/Failed iniciales ⇒ lista vacía (los dropdowns muestran
-/// "Sin pasos destino disponibles" hasta que aterricen los datos).
-List<int> _availableOrdersFromStateImpl(FlowStepsState s, String? editingId) {
-  final List<fdom.Step> steps;
-  if (s is FlowStepsLoaded) {
-    steps = s.steps;
-  } else if (s is FlowStepsMutating) {
-    steps = s.steps;
-  } else if (s is FlowStepsMutationFailed) {
-    steps = s.steps;
-  } else {
-    return const <int>[];
+/// Steps vigentes del bloc state (Loading/Failed iniciales ⇒ vacío).
+List<fdom.Step> _stepsFromState(FlowStepsState s) {
+  if (s is FlowStepsLoaded) return s.steps;
+  if (s is FlowStepsMutating) return s.steps;
+  if (s is FlowStepsMutationFailed) return s.steps;
+  return const <fdom.Step>[];
+}
+
+/// Candidatos a destino para los dropdowns del form CT, con etiqueta
+/// legible. Al CREAR, todos los steps son candidatos (el condicional se
+/// inserta antes de su destino más temprano, así que el forward-only se
+/// cumple por construcción). Al EDITAR no hay re-inserción: solo los
+/// steps estrictamente posteriores al propio CT son válidos (el backend
+/// rechaza lo demás con 422).
+List<CtTargetOption> _ctTargetsFromStateImpl(
+  FlowStepsState s,
+  fdom.Step? editing,
+) {
+  final steps = _stepsFromState(s);
+  return <CtTargetOption>[
+    for (final st in steps)
+      if (st.id != editing?.id && (editing == null || st.order > editing.order))
+        CtTargetOption(id: st.id, order: st.order, label: _ctTargetLabel(st)),
+  ];
+}
+
+/// Etiqueta corta de un step candidato a destino: el contenido para TEXT,
+/// el tipo humanizado para el resto (el operador reconoce el paso sin
+/// salir del sheet).
+String _ctTargetLabel(fdom.Step st) {
+  if (st.type == fdom.StepType.text && st.content.isNotEmpty) {
+    return st.content;
   }
-  return steps.where((st) => st.id != editingId).map((st) => st.order).toList();
+  return stepTypeLabel(st.type);
+}
+
+/// Igualdad por shape CANÓNICO de un CT: tz + ventanas + destinos por id.
+/// Ignora los orders legacy/sintetizados a propósito — son display, no
+/// configuración (el == del entity los incluye y daría falsos cambios).
+bool _ctCanonicallyEqual(ConditionalTimeMetadata a, ConditionalTimeMetadata b) {
+  if (a.tz != b.tz ||
+      a.onMatchStepId != b.onMatchStepId ||
+      a.onElseStepId != b.onElseStepId ||
+      a.windows.length != b.windows.length) {
+    return false;
+  }
+  for (var i = 0; i < a.windows.length; i++) {
+    if (a.windows[i] != b.windows[i]) return false;
+  }
+  return true;
+}
+
+/// Reporta si `id` es destino de algún condicional del flow (refs por id).
+/// Metadata ilegible o legacy se omite — el backend es la red final (409).
+bool _referencedByConditional(String id, List<fdom.Step> steps) {
+  for (final st in steps) {
+    if (st.type != fdom.StepType.conditionalTime) continue;
+    try {
+      final md = ConditionalTimeMetadata.fromJsonString(st.metadataJson);
+      if (md.onMatchStepId == id || md.onElseStepId == id) return true;
+    } on FormatException {
+      continue;
+    }
+  }
+  return false;
 }
 
 /// Convierte ms a un label legible. <60s muestra "Xs"; 60s+ muestra

@@ -1,12 +1,10 @@
 // Archivo > 400 LOC justificado: el form CT es un solo widget cohesivo
 // con tres bloques (tz selector, lista de ventanas día/hora, dropdowns
-// onMatch/onElse) que comparten estado mutable (`_EditableWindow`) y
+// de destino por id) que comparten estado mutable (`_EditableWindow`) y
 // callback canónico (`_emit` → `onChanged(metadataJson?)`). Separar los
-// sub-widgets (`_WindowBlock`, `_TimeButton`, `_OrderDropdown`) a otros
+// sub-widgets (`_WindowBlock`, `_TimeButton`, `_TargetDropdown`) a otros
 // archivos los desacoplaría del estado del padre — duplicaría callbacks
-// y constructors sin mejorar cohesión. Cuando aterrice una segunda
-// representación (ej. preview gráfico de la ventana semanal) el split
-// será natural; hoy no aporta.
+// y constructors sin mejorar cohesión.
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
@@ -15,32 +13,56 @@ import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import 'conditional_time_day_mapping.dart';
 
+/// Candidato a destino de una rama del condicional: el step con su
+/// posición vigente y una etiqueta legible ("3. Hola, ¿en qué te ayudo?").
+/// El caller (sheet) decide qué steps son candidatos válidos — al editar,
+/// solo los posteriores al propio CT; al crear, todos (el CT se inserta
+/// antes de sus destinos).
+class CtTargetOption {
+  const CtTargetOption({
+    required this.id,
+    required this.order,
+    required this.label,
+  });
+
+  final String id;
+  final int order;
+  final String label;
+}
+
 /// Form del step CONDITIONAL_TIME. Edita timezone + ventanas día/hora +
-/// los dos `order` destino (match/else). Devuelve el `metadataJson`
-/// resultante vía `onChanged`: `String` JSON-encoded cuando la
-/// configuración es válida, `null` cuando algún campo falla la
-/// validación local (días vacíos, from>=to, etc.).
+/// los dos destinos de rama POR ID de step (la identidad sobrevive
+/// reorders/borrados; el shape posicional murió con el rediseño).
+/// Devuelve el `metadataJson` resultante vía `onChanged`: `String`
+/// JSON-encoded id-form cuando la configuración es válida, `null` cuando
+/// algún campo falla la validación local (días vacíos, from>=to,
+/// destinos sin elegir).
 ///
-/// El form NO conoce al sheet ni al bloc — recibe `availableStepOrders`
-/// (los `order` válidos para los dropdowns destino) como input. El
-/// caller decide si excluye o no el step actual de esa lista.
+/// `initial == null` ⇒ create con seed por default de horario (L-V
+/// 09:00-18:00, `America/Mexico_City`) y SIN destinos preseleccionados —
+/// elegir las ramas es decisión explícita del operador, no un default
+/// que truena en runtime. `initial != null` ⇒ edit: los campos se
+/// hidratan con los valores existentes; destinos que ya no estén entre
+/// los candidatos quedan sin selección (el operador re-elige).
 ///
-/// `initial == null` ⇒ create con seed por default (L-V 09:00-18:00,
-/// `America/Mexico_City`, onMatch=0, onElse=1). `initial != null` ⇒
-/// edit, los campos se hidratan con los valores existentes.
+/// `showRecoveredWarning` pinta un aviso de que la configuración
+/// original no se pudo leer (metadata corrupta o destinos irresueltos):
+/// guardar REEMPLAZA la configuración anterior.
 class ConditionalTimeForm extends StatefulWidget {
   const ConditionalTimeForm({
     super.key,
     required this.onChanged,
-    required this.availableStepOrders,
+    required this.targets,
     this.initial,
     this.enabled = true,
+    this.showRecoveredWarning = false,
   });
 
   final ValueChanged<String?> onChanged;
-  final List<int> availableStepOrders;
+  final List<CtTargetOption> targets;
   final ConditionalTimeMetadata? initial;
   final bool enabled;
+  final bool showRecoveredWarning;
 
   @override
   State<ConditionalTimeForm> createState() => _ConditionalTimeFormState();
@@ -49,8 +71,8 @@ class ConditionalTimeForm extends StatefulWidget {
 /// Set v1 de timezones que el operador puede elegir. Curada y corta:
 /// cubre LATAM principales + US este/oeste + España + UTC. Ampliar la
 /// lista (o sustituirla por una autocomplete contra IANA) es trabajo
-/// fuera del arco del editor base — el backend acepta cualquier zona
-/// que `time.LoadLocation` resuelva.
+/// fuera de este arco — el backend acepta cualquier zona que
+/// `time.LoadLocation` resuelva.
 const List<String> _availableTimezones = <String>[
   'America/Mexico_City',
   'America/New_York',
@@ -60,17 +82,6 @@ const List<String> _availableTimezones = <String>[
   'Europe/Madrid',
   'UTC',
 ];
-
-/// Seed default L-V 09:00-18:00 (business hours estándar). El operador
-/// ajusta o submitea como está.
-const ConditionalTimeMetadata _defaultSeed = ConditionalTimeMetadata(
-  tz: 'America/Mexico_City',
-  windows: <TimeWindow>[
-    TimeWindow(days: <int>[1, 2, 3, 4, 5], from: '09:00', to: '18:00'),
-  ],
-  onMatchOrder: 0,
-  onElseOrder: 1,
-);
 
 /// Modelo mutable de una ventana mientras el operador la edita —
 /// `Set<int>` de días UI (0..6, L→D), TimeOfDay para from/to. Al
@@ -82,6 +93,12 @@ class _EditableWindow {
     daysUi: w.days.map(wireDayToUi).toSet(),
     from: _parseTimeOfDay(w.from),
     to: _parseTimeOfDay(w.to),
+  );
+
+  factory _EditableWindow.businessHours() => _EditableWindow(
+    daysUi: <int>{0, 1, 2, 3, 4},
+    from: const TimeOfDay(hour: 9, minute: 0),
+    to: const TimeOfDay(hour: 18, minute: 0),
   );
 
   Set<int> daysUi;
@@ -107,17 +124,25 @@ class _EditableWindow {
 class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
   late String _tz;
   late List<_EditableWindow> _windows;
-  late int _onMatch;
-  late int _onElse;
+  String? _onMatchId;
+  String? _onElseId;
 
   @override
   void initState() {
     super.initState();
-    final seed = widget.initial ?? _defaultSeed;
-    _tz = seed.tz;
-    _windows = seed.windows.map(_EditableWindow.fromWire).toList();
-    _onMatch = seed.onMatchOrder;
-    _onElse = seed.onElseOrder;
+    final seed = widget.initial;
+    _tz = seed?.tz ?? 'America/Mexico_City';
+    _windows = seed == null
+        ? <_EditableWindow>[_EditableWindow.businessHours()]
+        : seed.windows.map(_EditableWindow.fromWire).toList();
+    // Destinos: solo se hidratan si siguen entre los candidatos vigentes
+    // (un destino que dejó de ser válido aparece sin selección y el gate
+    // de submit obliga a re-elegir).
+    final ids = widget.targets.map((t) => t.id).toSet();
+    final m = seed?.onMatchStepId;
+    final e = seed?.onElseStepId;
+    _onMatchId = (m != null && ids.contains(m)) ? m : null;
+    _onElseId = (e != null && ids.contains(e)) ? e : null;
     // Emisión post-frame para no llamar setState durante build del
     // padre — el listener captura el estado inicial.
     WidgetsBinding.instance.addPostFrameCallback((_) => _emit());
@@ -137,15 +162,17 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
       widget.onChanged(null);
       return;
     }
-    if (_onMatch < 0 || _onElse < 0) {
+    final m = _onMatchId;
+    final e = _onElseId;
+    if (m == null || e == null) {
       widget.onChanged(null);
       return;
     }
     final md = ConditionalTimeMetadata(
       tz: _tz,
       windows: wireWindows,
-      onMatchOrder: _onMatch,
-      onElseOrder: _onElse,
+      onMatchStepId: m,
+      onElseStepId: e,
     );
     widget.onChanged(md.toJsonString());
   }
@@ -182,13 +209,7 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
   void _addWindow() {
     setState(() {
       _windows = List<_EditableWindow>.from(_windows)
-        ..add(
-          _EditableWindow(
-            daysUi: <int>{0, 1, 2, 3, 4},
-            from: const TimeOfDay(hour: 9, minute: 0),
-            to: const TimeOfDay(hour: 18, minute: 0),
-          ),
-        );
+        ..add(_EditableWindow.businessHours());
     });
     _emit();
   }
@@ -207,6 +228,22 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        if (widget.showRecoveredWarning) ...<Widget>[
+          Container(
+            key: const Key('ct_form.recovered_warning'),
+            padding: const EdgeInsets.all(AppTokens.sp3),
+            decoration: BoxDecoration(
+              color: AppTokens.danger.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+            ),
+            child: Text(
+              'La configuración guardada de este condicional no se pudo '
+              'leer. Al guardar se reemplaza por la que definas aquí.',
+              style: textTheme.bodySmall?.copyWith(color: AppTokens.danger),
+            ),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+        ],
         Text(
           'Zona horaria',
           style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
@@ -214,7 +251,7 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
         const SizedBox(height: AppTokens.sp1),
         DropdownButtonFormField<String>(
           key: const Key('ct_form.tz_dropdown'),
-          initialValue: _tz,
+          initialValue: _availableTimezones.contains(_tz) ? _tz : null,
           isExpanded: true,
           items: _availableTimezones
               .map((z) => DropdownMenuItem<String>(value: z, child: Text(z)))
@@ -257,29 +294,34 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
           'Destinos',
           style: textTheme.labelMedium?.copyWith(color: AppTokens.text2),
         ),
+        const SizedBox(height: AppTokens.sp1),
+        Text(
+          'El condicional salta al paso elegido según el horario. Una rama '
+          'se cierra con un paso "Fin" — sin él, continúa con los pasos '
+          'siguientes.',
+          style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+        ),
         const SizedBox(height: AppTokens.sp2),
-        _OrderDropdown(
+        _TargetDropdown(
           dropdownKey: const Key('ct_form.on_match_dropdown'),
           label: 'Si cumple → paso',
-          orders: widget.availableStepOrders,
-          value: _onMatch,
-          enabled: widget.enabled && widget.availableStepOrders.isNotEmpty,
+          targets: widget.targets,
+          value: _onMatchId,
+          enabled: widget.enabled,
           onChanged: (v) {
-            if (v == null) return;
-            setState(() => _onMatch = v);
+            setState(() => _onMatchId = v);
             _emit();
           },
         ),
         const SizedBox(height: AppTokens.sp3),
-        _OrderDropdown(
+        _TargetDropdown(
           dropdownKey: const Key('ct_form.on_else_dropdown'),
           label: 'Si NO cumple → paso',
-          orders: widget.availableStepOrders,
-          value: _onElse,
-          enabled: widget.enabled && widget.availableStepOrders.isNotEmpty,
+          targets: widget.targets,
+          value: _onElseId,
+          enabled: widget.enabled,
           onChanged: (v) {
-            if (v == null) return;
-            setState(() => _onElse = v);
+            setState(() => _onElseId = v);
             _emit();
           },
         ),
@@ -438,11 +480,11 @@ class _TimeButton extends StatelessWidget {
   }
 }
 
-class _OrderDropdown extends StatelessWidget {
-  const _OrderDropdown({
+class _TargetDropdown extends StatelessWidget {
+  const _TargetDropdown({
     required this.dropdownKey,
     required this.label,
-    required this.orders,
+    required this.targets,
     required this.value,
     required this.enabled,
     required this.onChanged,
@@ -450,35 +492,41 @@ class _OrderDropdown extends StatelessWidget {
 
   final Key dropdownKey;
   final String label;
-  final List<int> orders;
-  final int value;
+  final List<CtTargetOption> targets;
+  final String? value;
   final bool enabled;
-  final ValueChanged<int?> onChanged;
+  final ValueChanged<String?> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    // Sin opciones (flow con sólo el CT): mantener el valor como display
-    // text deshabilitado. El operador agregará destinos después.
-    if (orders.isEmpty) {
+    // Sin candidatos (flow sin pasos que puedan ser destino): explicar el
+    // bloqueo en lugar de un dropdown vacío que confunde.
+    if (targets.isEmpty) {
       return InputDecorator(
         decoration: InputDecoration(labelText: label, enabled: false),
-        child: const Text('Sin pasos destino disponibles'),
+        child: const Text(
+          'Agrega primero los pasos de cada rama; después configura el '
+          'condicional.',
+        ),
       );
     }
-    final items = orders
+    final items = targets
         .map(
-          (o) => DropdownMenuItem<int>(value: o, child: Text('Paso #${o + 1}')),
+          (t) => DropdownMenuItem<String>(
+            value: t.id,
+            child: Text(
+              '${t.order + 1}. ${t.label}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         )
         .toList();
-    // Si `value` no aparece en la lista (ej. seed default 0/1 con flow
-    // de un solo step), agregamos un item virtual para no crashear al
-    // construir el dropdown. El operador puede elegir un valor real al
-    // tocar el dropdown.
-    final hasValue = orders.contains(value);
-    return DropdownButtonFormField<int>(
+    return DropdownButtonFormField<String>(
       key: dropdownKey,
       isExpanded: true,
-      initialValue: hasValue ? value : orders.first,
+      initialValue: value,
+      hint: const Text('Elige un paso'),
       decoration: InputDecoration(labelText: label),
       items: items,
       onChanged: enabled ? onChanged : null,

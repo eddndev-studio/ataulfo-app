@@ -1,4 +1,3 @@
-import 'package:ataulfo/features/flows/domain/entities/conditional_time_metadata.dart';
 import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
@@ -775,8 +774,8 @@ void main() {
   });
 
   group('FlowStepsBloc.ReorderRequested', () {
-    // Tres steps para que el reorder pueda generar ≥2 patches y deje
-    // visible el caso de skip cuando algún id ya está en su lugar.
+    // Tres steps; el reorder viaja como UNA llamada atómica con el array
+    // completo de ids — el backend renumera 0..n-1 transaccionalmente.
     const s1 = fdom.Step(
       id: 's1',
       flowId: 'f1',
@@ -814,8 +813,6 @@ void main() {
       aiOnly: false,
     );
     const seedSteps = <fdom.Step>[s1, s2, s3];
-    // Tras reorder [s1, s3, s2] el backend devolverá la lista refrescada
-    // ordenada por `order` ASC. s1 mantiene su posición (skip de patch).
     const afterReorder = <fdom.Step>[
       s1,
       fdom.Step(
@@ -845,16 +842,14 @@ void main() {
     ];
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'ReorderRequested ok → N×patchStep(order) con skip + Loading + Loaded',
+      'ReorderRequested ok → UNA llamada atómica + Loading + Loaded',
       build: () {
-        // Patches solo para los ids que cambiaron de order. s1 (i=0
-        // tras reorder, original=0) NO debe ser pateado.
         when(
-          () => repo.patchStep(stepId: 's3', order: 1),
-        ).thenAnswer((_) async => afterReorder[1]);
-        when(
-          () => repo.patchStep(stepId: 's2', order: 2),
-        ).thenAnswer((_) async => afterReorder[2]);
+          () => repo.reorderSteps(
+            flowId: 'f1',
+            ids: const <String>['s1', 's3', 's2'],
+          ),
+        ).thenAnswer((_) async {});
         when(() => repo.listSteps('f1')).thenAnswer((_) async => afterReorder);
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
@@ -867,22 +862,30 @@ void main() {
         FlowStepsLoaded(afterReorder),
       ],
       verify: (_) {
-        // s1 mantiene order=0 — el bloc skipea para no gastar request.
-        verifyNever(() => repo.patchStep(stepId: 's1', order: 0));
-        verify(() => repo.patchStep(stepId: 's3', order: 1)).called(1);
-        verify(() => repo.patchStep(stepId: 's2', order: 2)).called(1);
+        verify(
+          () => repo.reorderSteps(
+            flowId: 'f1',
+            ids: const <String>['s1', 's3', 's2'],
+          ),
+        ).called(1);
+        // Nada de N×PATCH: el remap posicional murió con las refs por id.
+        verifyNever(
+          () => repo.patchStep(
+            stepId: any(named: 'stepId'),
+            order: any(named: 'order'),
+          ),
+        );
         verify(() => repo.listSteps('f1')).called(1);
       },
     );
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'ReorderRequested sin cambios reales → no patches, igual refetch',
+      'ReorderRequested sin cambios reales → sin llamada, igual refetch',
       build: () {
         when(() => repo.listSteps('f1')).thenAnswer((_) async => seedSteps);
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       seed: () => const FlowStepsLoaded(seedSteps),
-      // Mismos ids en el mismo orden que el snapshot vigente.
       act: (bloc) =>
           bloc.add(const FlowStepsReorderRequested(<String>['s1', 's2', 's3'])),
       expect: () => const <FlowStepsState>[
@@ -892,25 +895,25 @@ void main() {
       ],
       verify: (_) {
         verifyNever(
-          () => repo.patchStep(
-            stepId: any(named: 'stepId'),
-            order: any(named: 'order'),
+          () => repo.reorderSteps(
+            flowId: any(named: 'flowId'),
+            ids: any(named: 'ids'),
           ),
         );
       },
     );
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'ReorderRequested falla a mitad → MutationFailed(snapshot original)',
+      'ReorderRequested falla → MutationFailed(snapshot intacto), sin refetch',
       build: () {
-        // Primera patch ok, segunda revienta con StepNotFound (otro
-        // operador borró el step entre el listado y el drag).
+        // Atómico: el fallo deja el backend EXACTAMENTE como estaba; el
+        // snapshot en pantalla sigue siendo verdad y no hay refetch.
         when(
-          () => repo.patchStep(stepId: 's3', order: 0),
-        ).thenAnswer((_) async => afterReorder[0]);
-        when(
-          () => repo.patchStep(stepId: 's1', order: 1),
-        ).thenThrow(const FlowsStepNotFoundFailure());
+          () => repo.reorderSteps(
+            flowId: 'f1',
+            ids: const <String>['s3', 's1', 's2'],
+          ),
+        ).thenThrow(const FlowsInvalidReorderFailure());
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
       seed: () => const FlowStepsLoaded(seedSteps),
@@ -918,11 +921,9 @@ void main() {
           bloc.add(const FlowStepsReorderRequested(<String>['s3', 's1', 's2'])),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(seedSteps),
-        FlowStepsMutationFailed(seedSteps, FlowsStepNotFoundFailure()),
+        FlowStepsMutationFailed(seedSteps, FlowsInvalidReorderFailure()),
       ],
       verify: (_) {
-        // No refetch tras el fallo — el backend quedó parcial; el bloc
-        // deja que el operador reintente o haga reload manual.
         verifyNever(() => repo.listSteps('f1'));
       },
     );
@@ -936,9 +937,9 @@ void main() {
       expect: () => const <FlowStepsState>[],
       verify: (_) {
         verifyNever(
-          () => repo.patchStep(
-            stepId: any(named: 'stepId'),
-            order: any(named: 'order'),
+          () => repo.reorderSteps(
+            flowId: any(named: 'flowId'),
+            ids: any(named: 'ids'),
           ),
         );
       },
@@ -954,173 +955,102 @@ void main() {
     });
   });
 
-  group('FlowStepsBloc.ReorderRequested — remap de CONDITIONAL_TIME', () {
-    // metadataJson canónico con destinos parametrizables. Las ventanas son
-    // irrelevantes para el remap; solo importan los `order` destino.
-    String ctJson({required int onMatch, required int onElse}) =>
-        ConditionalTimeMetadata(
-          tz: 'America/Mexico_City',
-          windows: const <TimeWindow>[
-            TimeWindow(days: <int>[1, 2, 3, 4, 5], from: '09:00', to: '18:00'),
-          ],
-          onMatchOrder: onMatch,
-          onElseOrder: onElse,
-        ).toJsonString();
-
-    fdom.Step text(String id, int order) => fdom.Step(
-      id: id,
-      flowId: 'f1',
-      type: fdom.StepType.text,
-      order: order,
-      content: id.toUpperCase(),
-      mediaRef: '',
-      metadataJson: '{}',
-      delayMs: 0,
-      jitterPct: 0,
-      aiOnly: false,
-    );
-
-    fdom.Step ct(String id, int order, {required String metadataJson}) =>
-        fdom.Step(
-          id: id,
-          flowId: 'f1',
+  group('FlowStepsBloc.AddRequested — posición de inserción', () {
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested con order explícito → createStep en esa posición',
+      build: () {
+        when(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.conditionalTime,
+            order: 0,
+            content: '',
+            mediaRef: '',
+            delayMs: 1000,
+            jitterPct: 0,
+            aiOnly: false,
+            manualOnly: false,
+            metadataJson: any(named: 'metadataJson'),
+          ),
+        ).thenAnswer((_) async => _steps[0]);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => _steps);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
           type: fdom.StepType.conditionalTime,
-          order: order,
           content: '',
-          mediaRef: '',
-          metadataJson: metadataJson,
-          delayMs: 0,
+          delayMs: 1000,
           jitterPct: 0,
           aiOnly: false,
-        );
-
-    blocTest<FlowStepsBloc, FlowStepsState>(
-      'el CT se mueve y sus destinos cambian → patchStep con order + '
-      'metadataJson remapeado',
-      build: () {
-        // a(0) ct(1) c(2). El CT bifurca a c (onMatch=2) y a a (onElse=0).
-        // Reorder [c, a, ct]: c→0, a→1, ct→2. El CT debe remapear
-        // onMatch→0 (c) y onElse→1 (a).
-        final expectedCt = ctJson(onMatch: 0, onElse: 1);
-        when(
-          () => repo.patchStep(stepId: 'a', order: 1),
-        ).thenAnswer((_) async => text('a', 1));
-        when(
-          () => repo.patchStep(stepId: 'c', order: 0),
-        ).thenAnswer((_) async => text('c', 0));
-        when(
-          () =>
-              repo.patchStep(stepId: 'ct', order: 2, metadataJson: expectedCt),
-        ).thenAnswer((_) async => ct('ct', 2, metadataJson: expectedCt));
-        when(() => repo.listSteps('f1')).thenAnswer(
-          (_) async => <fdom.Step>[
-            text('c', 0),
-            text('a', 1),
-            ct('ct', 2, metadataJson: expectedCt),
-          ],
-        );
-        return FlowStepsBloc(repo: repo, flowId: 'f1');
-      },
-      seed: () => FlowStepsLoaded(<fdom.Step>[
-        text('a', 0),
-        ct('ct', 1, metadataJson: ctJson(onMatch: 2, onElse: 0)),
-        text('c', 2),
-      ]),
-      act: (bloc) =>
-          bloc.add(const FlowStepsReorderRequested(<String>['c', 'a', 'ct'])),
+          metadataJson: '{"x":1}',
+          order: 0,
+        ),
+      ),
       verify: (_) {
         verify(
-          () => repo.patchStep(
-            stepId: 'ct',
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.conditionalTime,
+            order: 0,
+            content: '',
+            mediaRef: '',
+            delayMs: 1000,
+            jitterPct: 0,
+            aiOnly: false,
+            manualOnly: false,
+            metadataJson: '{"x":1}',
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested sin order → append (longitud del snapshot)',
+      build: () {
+        when(
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
             order: 2,
-            metadataJson: ctJson(onMatch: 0, onElse: 1),
+            content: 'x',
+            mediaRef: '',
+            delayMs: 1000,
+            jitterPct: 0,
+            aiOnly: false,
+            manualOnly: false,
+            metadataJson: any(named: 'metadataJson'),
           ),
-        ).called(1);
-        verify(() => repo.patchStep(stepId: 'a', order: 1)).called(1);
-        verify(() => repo.patchStep(stepId: 'c', order: 0)).called(1);
-      },
-    );
-
-    blocTest<FlowStepsBloc, FlowStepsState>(
-      'el CT no se mueve pero sus destinos sí → patchStep con metadataJson '
-      'y sin order',
-      build: () {
-        // ct(0) b(1) c(2). El CT bifurca a b (onMatch=1) y a c (onElse=2).
-        // Reorder [ct, c, b]: ct se queda en 0, c→1, b→2. El CT no cambia
-        // de posición pero debe remapear onMatch→2 (b) y onElse→1 (c).
-        final expectedCt = ctJson(onMatch: 2, onElse: 1);
-        when(
-          () => repo.patchStep(stepId: 'ct', metadataJson: expectedCt),
-        ).thenAnswer((_) async => ct('ct', 0, metadataJson: expectedCt));
-        when(
-          () => repo.patchStep(stepId: 'b', order: 2),
-        ).thenAnswer((_) async => text('b', 2));
-        when(
-          () => repo.patchStep(stepId: 'c', order: 1),
-        ).thenAnswer((_) async => text('c', 1));
-        when(() => repo.listSteps('f1')).thenAnswer(
-          (_) async => <fdom.Step>[
-            ct('ct', 0, metadataJson: expectedCt),
-            text('c', 1),
-            text('b', 2),
-          ],
-        );
+        ).thenAnswer((_) async => _steps[0]);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => _steps);
         return FlowStepsBloc(repo: repo, flowId: 'f1');
       },
-      seed: () => FlowStepsLoaded(<fdom.Step>[
-        ct('ct', 0, metadataJson: ctJson(onMatch: 1, onElse: 2)),
-        text('b', 1),
-        text('c', 2),
-      ]),
-      act: (bloc) =>
-          bloc.add(const FlowStepsReorderRequested(<String>['ct', 'c', 'b'])),
+      seed: () => const FlowStepsLoaded(_steps),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          type: fdom.StepType.text,
+          content: 'x',
+          delayMs: 1000,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
       verify: (_) {
-        // order omitido (== null): el CT no cambió de posición, solo su
-        // metadata.
         verify(
-          () => repo.patchStep(
-            stepId: 'ct',
-            metadataJson: ctJson(onMatch: 2, onElse: 1),
+          () => repo.createStep(
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 2,
+            content: 'x',
+            mediaRef: '',
+            delayMs: 1000,
+            jitterPct: 0,
+            aiOnly: false,
+            manualOnly: false,
+            metadataJson: null,
           ),
         ).called(1);
-      },
-    );
-
-    blocTest<FlowStepsBloc, FlowStepsState>(
-      'CT con metadata ilegible que se mueve → patchStep solo de order, sin '
-      'metadataJson',
-      build: () {
-        // El CT corrupto se mueve (1→2) pero su metadata no se puede
-        // remapear: se PATCHea solo el order, la metadata queda intacta.
-        when(
-          () => repo.patchStep(stepId: 'a', order: 1),
-        ).thenAnswer((_) async => text('a', 1));
-        when(
-          () => repo.patchStep(stepId: 'c', order: 0),
-        ).thenAnswer((_) async => text('c', 0));
-        when(
-          () => repo.patchStep(stepId: 'ct', order: 2),
-        ).thenAnswer((_) async => ct('ct', 2, metadataJson: '{ no es json'));
-        when(() => repo.listSteps('f1')).thenAnswer(
-          (_) async => <fdom.Step>[
-            text('c', 0),
-            text('a', 1),
-            ct('ct', 2, metadataJson: '{ no es json'),
-          ],
-        );
-        return FlowStepsBloc(repo: repo, flowId: 'f1');
-      },
-      seed: () => FlowStepsLoaded(<fdom.Step>[
-        text('a', 0),
-        ct('ct', 1, metadataJson: '{ no es json'),
-        text('c', 2),
-      ]),
-      act: (bloc) =>
-          bloc.add(const FlowStepsReorderRequested(<String>['c', 'a', 'ct'])),
-      verify: (_) {
-        // order:2 con metadataJson omitido (null) — sin remap de la
-        // metadata corrupta.
-        verify(() => repo.patchStep(stepId: 'ct', order: 2)).called(1);
       },
     );
   });

@@ -4,7 +4,6 @@
 // corte es extraer eventos/estados a `flow_steps_event.dart`/`_state.dart`.
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../domain/conditional_time_reorder.dart';
 import '../../domain/entities/step.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
 import '../../domain/repositories/flows_repository.dart';
@@ -61,7 +60,11 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
       await _repo.createStep(
         flowId: _flowId,
         type: event.type,
-        order: snapshot.length,
+        // `order` explícito = POSICIÓN DE INSERCIÓN (el backend desplaza
+        // los steps siguientes). Sin él, append clásico al final. Lo usa
+        // el condicional: debe insertarse ANTES de sus destinos o el
+        // backend rechaza el create con 422 (forward-only).
+        order: event.order ?? snapshot.length,
         content: event.content,
         mediaRef: event.mediaRef,
         delayMs: event.delayMs,
@@ -100,45 +103,33 @@ class FlowStepsBloc extends Bloc<FlowStepsEvent, FlowStepsState> {
     });
   }
 
-  /// Reorder = N×PATCH /steps/:id cambiando `order`. Sin UNIQUE en
-  /// `(flow_id, order)` no se requiere two-pass: cada patch viaja
-  /// independiente. Se hace skip cuando el step ya estaba en su
-  /// posición destino y no necesita remap, para no gastar requests en
-  /// no-ops (ej. cuando la UX dispara reorder con el array entero aunque
-  /// el operador haya soltado el item en su lugar original).
+  /// Reorder ATÓMICO: una sola llamada con el array completo de ids; el
+  /// backend renumera 0..n-1 en una transacción y valida que ningún
+  /// condicional quede después de sus destinos. Los destinos de los CT
+  /// son refs por id, así que reordenar no exige remap alguno — el viejo
+  /// remapper posicional del cliente murió con ese shape.
   ///
-  /// Los pasos CONDITIONAL_TIME guardan sus destinos (`onMatchOrder`/
-  /// `onElseOrder`) por posición; al reordenar hay que recomponerlos para
-  /// que sigan apuntando al paso lógico (su id), o las flechas quedarían
-  /// apuntando al paso equivocado en silencio. El remap puede tocar un CT
-  /// que ni siquiera se movió (si sus destinos sí lo hicieron) y viaja en
-  /// el mismo PATCH que el cambio de `order` cuando ambos aplican.
-  ///
-  /// Si una patch a mitad falla, el bloc deja el backend en estado
-  /// parcial y emite MutationFailed(snapshot original, failure) — la
-  /// UI puede ofrecer reload manual. No se refetch automático porque
-  /// enmascarar el orden parcial con un Loaded "como si nada" engaña
-  /// al operador.
+  /// Si todos los ids ya están en su posición, no se gasta el request
+  /// (la UX dispara reorder con el array entero aunque el operador haya
+  /// soltado el item en su lugar original). Un fallo deja el backend
+  /// EXACTAMENTE como estaba (atómico): MutationFailed conserva el
+  /// snapshot, que sigue siendo verdad — sin refetch.
   Future<void> _onReorder(
     FlowStepsReorderRequested event,
     Emitter<FlowStepsState> emit,
   ) async {
     await _runMutation(emit, (snapshot) async {
-      final byId = <String, fdom.Step>{for (final s in snapshot) s.id: s};
-      final ctRemap = remapConditionalTargetsOnReorder(snapshot, event.ids);
-      for (var i = 0; i < event.ids.length; i++) {
-        final id = event.ids[i];
-        final original = byId[id];
-        if (original == null) continue;
-        final orderChanged = original.order != i;
-        final newMetadataJson = ctRemap[id];
-        if (!orderChanged && newMetadataJson == null) continue;
-        await _repo.patchStep(
-          stepId: id,
-          order: orderChanged ? i : null,
-          metadataJson: newMetadataJson,
-        );
+      var changed = snapshot.length != event.ids.length;
+      if (!changed) {
+        for (var i = 0; i < snapshot.length; i++) {
+          if (snapshot[i].id != event.ids[i]) {
+            changed = true;
+            break;
+          }
+        }
       }
+      if (!changed) return;
+      await _repo.reorderSteps(flowId: _flowId, ids: event.ids);
     });
   }
 
@@ -214,6 +205,7 @@ class FlowStepsAddRequested extends FlowStepsEvent {
     this.type = fdom.StepType.text,
     this.mediaRef = '',
     this.metadataJson,
+    this.order,
   });
 
   final fdom.StepType type;
@@ -222,6 +214,11 @@ class FlowStepsAddRequested extends FlowStepsEvent {
   final int delayMs;
   final int jitterPct;
   final bool aiOnly;
+
+  /// Posición de INSERCIÓN explícita (el backend desplaza los steps en y
+  /// después de esa posición). Null ⇒ append al final. La usa el
+  /// condicional, que debe quedar antes de sus destinos.
+  final int? order;
 
   /// Inverso de [aiOnly]: el paso solo corre por disparador/arranque manual.
   /// El selector del sheet garantiza que nunca viajen ambos en true.
@@ -242,7 +239,8 @@ class FlowStepsAddRequested extends FlowStepsEvent {
       other.jitterPct == jitterPct &&
       other.aiOnly == aiOnly &&
       other.manualOnly == manualOnly &&
-      other.metadataJson == metadataJson;
+      other.metadataJson == metadataJson &&
+      other.order == order;
 
   @override
   int get hashCode => Object.hash(
@@ -254,6 +252,7 @@ class FlowStepsAddRequested extends FlowStepsEvent {
     aiOnly,
     manualOnly,
     metadataJson,
+    order,
   );
 }
 

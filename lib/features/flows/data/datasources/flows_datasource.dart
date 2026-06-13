@@ -104,8 +104,20 @@ abstract interface class FlowsDatasource {
 
   /// `DELETE /steps/:stepId` idempotente. 204 sin body en ambos casos
   /// (existía o no). 404 se trata como éxito (defensa por si llegara —
-  /// el backend canónico siempre responde 204). 403 → Forbidden.
+  /// el backend canónico siempre responde 204). 409 ⇒ el step es destino
+  /// de un CONDITIONAL_TIME → `FlowsStepReferencedFailure`. 403 → Forbidden.
   Future<void> deleteStep(String stepId);
+
+  /// `PUT /flows/:flowId/steps/order` body `{ids:[...]}` — reorder
+  /// ATÓMICO: el array completo de ids en el orden destino; el backend
+  /// renumera 0..n-1 en una transacción (sustituye al N×PATCH que dejaba
+  /// estado parcial al fallar a la mitad). 204 sin body. 422 ⇒
+  /// `FlowsInvalidReorderFailure` (permutación inexacta o un condicional
+  /// quedaría tras sus destinos). 404 ⇒ flow ajeno/inexistente.
+  Future<void> reorderSteps({
+    required String flowId,
+    required List<String> ids,
+  });
 
   /// `PUT /flows/:flowId` con replace-completo (semántica PUT, no PATCH).
   /// El body lleva el documento entero — omitir un campo reaplica su
@@ -383,12 +395,37 @@ class DioFlowsDatasource implements FlowsDatasource {
     } on FlowsFailure {
       rethrow;
     } on DioException catch (e) {
-      // 404 = idempotente (el step ya no estaba). No es failure.
-      if (e.type == DioExceptionType.badResponse &&
-          e.response?.statusCode == 404) {
-        return;
+      if (e.type == DioExceptionType.badResponse) {
+        // 404 = idempotente (el step ya no estaba). No es failure.
+        if (e.response?.statusCode == 404) return;
+        // 409 = el step es destino de un condicional: el backend protege
+        // la flecha; la UI explica cómo destrabarlo.
+        if (e.response?.statusCode == 409) {
+          throw const FlowsStepReferencedFailure();
+        }
       }
       throw _mapStepRouteDioException(e);
+    }
+  }
+
+  @override
+  Future<void> reorderSteps({
+    required String flowId,
+    required List<String> ids,
+  }) async {
+    try {
+      await _dio.put<void>(
+        '/flows/$flowId/steps/order',
+        data: <String, dynamic>{'ids': ids},
+      );
+    } on FlowsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.badResponse &&
+          e.response?.statusCode == 422) {
+        throw const FlowsInvalidReorderFailure();
+      }
+      throw _mapDioException(e);
     }
   }
 

@@ -227,16 +227,14 @@ class _StepsList extends StatelessWidget {
       listener: (context, state) {
         if (state is FlowStepsMutationFailed &&
             (ModalRoute.of(context)?.isCurrent ?? true)) {
+          final copy = state.failure is FlowsInvalidReorderFailure
+              ? 'Ese orden dejaría un condicional apuntando hacia atrás. '
+                    'Sus destinos deben quedar después del condicional.'
+              : 'No se pudo guardar el nuevo orden. Se revirtieron los '
+                    'cambios.';
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
-            ..showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'No se pudo guardar el nuevo orden. Se revirtieron los '
-                  'cambios.',
-                ),
-              ),
-            );
+            ..showSnackBar(SnackBar(content: Text(copy)));
         }
       },
       builder: (context, state) => switch (state) {
@@ -309,6 +307,13 @@ class _StepsListView extends StatelessWidget {
     final labelNames = labelsState is LabelsLoaded
         ? <String, String>{for (final l in labelsState.labels) l.id: l.name}
         : const <String, String>{};
+    // Índice id → (posición, etiqueta) de los steps vigentes, para que la
+    // tarjeta del condicional resuelva sus destinos por NOMBRE y marque
+    // colgantes/hacia-atrás. Plano y calculado aquí arriba por el mismo
+    // motivo overlay-safe que labelNames/mediaNames.
+    final stepRefs = <String, ({int order, String label})>{
+      for (final s in steps) s.id: (order: s.order, label: _stepRefLabel(s)),
+    };
 
     if (steps.isEmpty) {
       return SingleChildScrollView(
@@ -347,6 +352,7 @@ class _StepsListView extends StatelessWidget {
               step: steps.first,
               resolvedMediaName: namesState.nameFor(steps.first.mediaRef),
               labelNames: labelNames,
+              stepRefs: stepRefs,
             ),
           ],
         ),
@@ -378,6 +384,7 @@ class _StepsListView extends StatelessWidget {
                   dragIndex: i,
                   resolvedMediaName: namesState.nameFor(s.mediaRef),
                   labelNames: labelNames,
+                  stepRefs: stepRefs,
                 ),
               );
             },
@@ -464,6 +471,7 @@ class _StepCard extends StatelessWidget {
     this.dragIndex,
     this.resolvedMediaName,
     this.labelNames = const <String, String>{},
+    this.stepRefs = const <String, ({int order, String label})>{},
   });
 
   final sdom.Step step;
@@ -477,6 +485,11 @@ class _StepCard extends StatelessWidget {
   /// Catálogo id→nombre de labels, resuelto por el caller por encima del
   /// listado (mismo motivo de planitud que [resolvedMediaName]).
   final Map<String, String> labelNames;
+
+  /// Índice id → (posición, etiqueta) de los steps del flow, para que el
+  /// resumen del condicional resuelva sus destinos por nombre (mismo
+  /// motivo de planitud que los otros catálogos).
+  final Map<String, ({int order, String label})> stepRefs;
 
   @override
   Widget build(BuildContext context) {
@@ -500,6 +513,7 @@ class _StepCard extends StatelessWidget {
           textTheme: textTheme,
           resolvedMediaName: resolvedMediaName,
           labelNames: labelNames,
+          stepRefs: stepRefs,
         ),
         const SizedBox(height: AppTokens.sp3),
         Wrap(
@@ -601,6 +615,7 @@ class _StepBody extends StatelessWidget {
     required this.textTheme,
     this.resolvedMediaName,
     this.labelNames = const <String, String>{},
+    this.stepRefs = const <String, ({int order, String label})>{},
   });
 
   final sdom.Step step;
@@ -609,6 +624,10 @@ class _StepBody extends StatelessWidget {
   /// Catálogo id→nombre de labels, plano por el mismo motivo que
   /// [resolvedMediaName].
   final Map<String, String> labelNames;
+
+  /// Índice id → (posición, etiqueta) de los steps del flow, para el
+  /// resumen del condicional.
+  final Map<String, ({int order, String label})> stepRefs;
 
   /// Nombre EN VIVO del recurso (alias/filename del catálogo) ya resuelto por
   /// el caller, que lee el `MediaNamesCubit` POR ENCIMA del `ReorderableListView`.
@@ -632,7 +651,21 @@ class _StepBody extends StatelessWidget {
       );
     }
     if (t == sdom.StepType.conditionalTime) {
-      return _ConditionalTimeSummary(step: step, textTheme: textTheme);
+      return _ConditionalTimeSummary(
+        step: step,
+        textTheme: textTheme,
+        stepRefs: stepRefs,
+      );
+    }
+    if (t == sdom.StepType.end) {
+      return Text(
+        'Termina el flujo aquí.',
+        key: const Key('flow_detail.step.end'),
+        style: textTheme.bodyMedium?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: AppTokens.text2,
+        ),
+      );
     }
     if (t == sdom.StepType.label) {
       return _LabelStepSummary(
@@ -764,20 +797,22 @@ class _LabelStepSummary extends StatelessWidget {
 
 /// Resumen read-only del shape CONDITIONAL_TIME en la StepCard. Parsea
 /// el metadataJson y formatea: TZ + cada ventana ("L M X J V · 09:00–18:00")
-/// + flechas a los pasos destino (`Paso #{order+1}`). Fallback honesto si
-/// el metadata es inválido — el operador puede entrar al editor a
-/// reconfigurar.
-///
-/// Nota: `onMatchOrder`/`onElseOrder` son enteros que apuntan a la
-/// posición de otro step, no a su id. Al reordenar desde el cliente, el
-/// bloc recompone estos destinos para que sigan al paso lógico; pero el
-/// wire sigue siendo posicional, así que un reorder fuera de banda (otro
-/// cliente, API directa, seed) puede dejarlos apuntando a un paso distinto.
+/// + las dos ramas con su paso destino RESUELTO POR ID contra [stepRefs]
+/// ("Si cumple → 3. Hola…"). Un destino colgante (paso borrado fuera de
+/// banda) o hacia atrás se marca en rojo — antes la tarjeta pintaba
+/// "Paso #4" impasible aunque el 4 no existiera. Metadata ilegible ⇒
+/// fallback honesto; filas legacy posicionales (no migradas) caen al
+/// "Paso #N" clásico.
 class _ConditionalTimeSummary extends StatelessWidget {
-  const _ConditionalTimeSummary({required this.step, required this.textTheme});
+  const _ConditionalTimeSummary({
+    required this.step,
+    required this.textTheme,
+    this.stepRefs = const <String, ({int order, String label})>{},
+  });
 
   final sdom.Step step;
   final TextTheme textTheme;
+  final Map<String, ({int order, String label})> stepRefs;
 
   @override
   Widget build(BuildContext context) {
@@ -811,12 +846,43 @@ class _ConditionalTimeSummary extends StatelessWidget {
             ),
           ),
         const SizedBox(height: AppTokens.sp1),
-        Text(
-          'Si cumple → Paso #${md.onMatchOrder + 1}   ·   '
-          'Si no → Paso #${md.onElseOrder + 1}',
-          style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-        ),
+        _branchLine('Si cumple', md.onMatchStepId, md.onMatchOrder),
+        _branchLine('Si no', md.onElseStepId, md.onElseOrder),
       ],
+    );
+  }
+
+  Widget _branchLine(String prefix, String? targetId, int? legacyOrder) {
+    final normal = textTheme.bodySmall?.copyWith(color: AppTokens.text2);
+    final danger = textTheme.bodySmall?.copyWith(color: AppTokens.danger);
+    if (targetId == null) {
+      // Fila legacy posicional: sin id que resolver, posición cruda.
+      final n = legacyOrder == null ? '?' : '${legacyOrder + 1}';
+      return Text('$prefix → Paso #$n', style: normal);
+    }
+    final ref = stepRefs[targetId];
+    if (ref == null) {
+      return Text(
+        '$prefix → (paso eliminado)',
+        key: Key('flow_detail.step.ct_dangling.${step.id}'),
+        style: danger,
+      );
+    }
+    if (ref.order <= step.order) {
+      return Text(
+        '$prefix → ${ref.order + 1}. ${ref.label} (hacia atrás — '
+        'mueve el condicional antes de su destino)',
+        key: Key('flow_detail.step.ct_backward.${step.id}'),
+        style: danger,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    return Text(
+      '$prefix → ${ref.order + 1}. ${ref.label}',
+      style: normal,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 
@@ -824,6 +890,15 @@ class _ConditionalTimeSummary extends StatelessWidget {
     final uiSorted = wireDays.map(wireDayToUi).toList()..sort();
     return uiSorted.map(uiDayLabel).join(' ');
   }
+}
+
+/// Etiqueta corta de un step para el índice [stepRefs]: el contenido para
+/// TEXT, el tipo humanizado para el resto.
+String _stepRefLabel(sdom.Step st) {
+  if (st.type == sdom.StepType.text && st.content.isNotEmpty) {
+    return st.content;
+  }
+  return stepTypeLabel(st.type);
 }
 
 class _FailedView extends StatelessWidget {

@@ -18,5 +18,6 @@ String stepTypeLabel(StepType t) => switch (t) {
   StepType.sticker => 'Sticker',
   StepType.conditionalTime => 'Condicional',
   StepType.label => 'Etiqueta',
+  StepType.end => 'Fin',
   StepType.unsupported => 'No soportado',
 };

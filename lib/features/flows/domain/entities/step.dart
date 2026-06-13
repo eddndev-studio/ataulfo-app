@@ -24,6 +24,11 @@ enum StepType {
   conditionalTime,
   label,
 
+  /// Terminador: la ejecución completa al alcanzarlo — la rama que cierra
+  /// con END no cae en los pasos siguientes. Es lo que hace expresable un
+  /// if/else real con CONDITIONAL_TIME en el motor lineal del backend.
+  end,
+
   /// Centinela para un token de wire desconocido. No se crea desde la UI
   /// (no está en el picker) ni se serializa (toWire lanza): solo aparece al
   /// LEER un flujo con un tipo que esta versión no soporta.
@@ -39,6 +44,7 @@ enum StepType {
     'STICKER' => StepType.sticker,
     'CONDITIONAL_TIME' => StepType.conditionalTime,
     'LABEL' => StepType.label,
+    'END' => StepType.end,
     _ => StepType.unsupported,
   };
 
@@ -52,6 +58,7 @@ enum StepType {
     StepType.sticker => 'STICKER',
     StepType.conditionalTime => 'CONDITIONAL_TIME',
     StepType.label => 'LABEL',
+    StepType.end => 'END',
     StepType.unsupported => throw ArgumentError.value(
       this,
       'StepType.toWire',

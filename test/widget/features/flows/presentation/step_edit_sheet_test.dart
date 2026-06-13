@@ -18,6 +18,57 @@ import 'package:mocktail/mocktail.dart';
 class _MockBloc extends MockBloc<FlowStepsEvent, FlowStepsState>
     implements FlowStepsBloc {}
 
+/// Steps TEXT fixture para los flujos del condicional: candidatos a
+/// destino en distintos arreglos (Add: orders 0/1; Edit: 1/2 tras el CT).
+const _tHola = fdom.Step(
+  id: 't-hola',
+  flowId: 'f1',
+  type: fdom.StepType.text,
+  order: 0,
+  content: 'Hola',
+  mediaRef: '',
+  metadataJson: '{}',
+  delayMs: 1000,
+  jitterPct: 0,
+  aiOnly: false,
+);
+const _tCerrados = fdom.Step(
+  id: 't-cerrados',
+  flowId: 'f1',
+  type: fdom.StepType.text,
+  order: 1,
+  content: 'Cerrados',
+  mediaRef: '',
+  metadataJson: '{}',
+  delayMs: 1000,
+  jitterPct: 0,
+  aiOnly: false,
+);
+const _tHolaAt1 = fdom.Step(
+  id: 't-hola',
+  flowId: 'f1',
+  type: fdom.StepType.text,
+  order: 1,
+  content: 'Hola',
+  mediaRef: '',
+  metadataJson: '{}',
+  delayMs: 1000,
+  jitterPct: 0,
+  aiOnly: false,
+);
+const _tCerradosAt2 = fdom.Step(
+  id: 't-cerrados',
+  flowId: 'f1',
+  type: fdom.StepType.text,
+  order: 2,
+  content: 'Cerrados',
+  mediaRef: '',
+  metadataJson: '{}',
+  delayMs: 1000,
+  jitterPct: 0,
+  aiOnly: false,
+);
+
 class _MockLabelsBloc extends MockBloc<LabelsEvent, LabelsState>
     implements LabelsBloc {}
 
@@ -335,8 +386,8 @@ void main() {
 
   group('StepEditSheet (Add mode · multimedia)', () {
     testWidgets(
-      'renderiza picker con 9 chips (text + 6 multimedia + conditionalTime + '
-      'label); default TEXT',
+      'renderiza picker con 10 chips (text + 6 multimedia + conditionalTime + '
+      'label + end); default TEXT',
       (tester) async {
         await pumpHost(tester);
 
@@ -350,6 +401,7 @@ void main() {
           'sticker',
           'conditionalTime',
           'label',
+          'end',
         ]) {
           expect(
             find.byKey(Key('step_edit.type.$id')),
@@ -904,32 +956,57 @@ void main() {
       },
     );
 
-    testWidgets(
-      'submit con seed default dispatcha AddRequested(conditionalTime, '
-      'metadataJson)',
-      (tester) async {
-        await pumpHost(tester);
+    testWidgets('sin elegir destinos el submit es no-op: el seed default ya no '
+        'inventa ramas que truenan en runtime', (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[_tHola, _tCerrados]));
+      await pumpHost(tester);
+      await tester.tap(find.byKey(const Key('step_edit.type.conditionalTime')));
+      await tester.pumpAndSettle();
 
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+      verifyNever(() => bloc.add(any()));
+    });
+
+    testWidgets(
+      'elegir ambos destinos → AddRequested(conditionalTime, id-form, '
+      'insertado ANTES de su destino más temprano)',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[_tHola, _tCerrados]));
+        await pumpHost(tester);
         await tester.tap(
           find.byKey(const Key('step_edit.type.conditionalTime')),
         );
         await tester.pumpAndSettle();
 
+        // match → "1. Hola" (order 0), else → "2. Cerrados" (order 1).
+        await tester.tap(find.byKey(const Key('ct_form.on_match_dropdown')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('1. Hola').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('ct_form.on_else_dropdown')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('2. Cerrados').last);
+        await tester.pumpAndSettle();
+
         await tester.tap(find.byKey(const Key('step_edit.submit')));
         await tester.pump();
 
-        // Captura el evento despachado y verifica el shape.
         final captured = verify(() => bloc.add(captureAny())).captured;
         expect(captured, hasLength(1));
         final ev = captured.single as FlowStepsAddRequested;
         expect(ev.type, fdom.StepType.conditionalTime);
-        expect(ev.content, '');
-        expect(ev.mediaRef, '');
         expect(ev.metadataJson, isNotNull);
-        // Seed default: L-V 09-18 + tz México + onMatch 0/onElse 1.
-        expect(ev.metadataJson, contains('America/Mexico_City'));
-        expect(ev.metadataJson, contains('09:00'));
-        expect(ev.metadataJson, contains('18:00'));
+        expect(ev.metadataJson, contains('"on_match_step_id":"t-hola"'));
+        expect(ev.metadataJson, contains('"on_else_step_id":"t-cerrados"'));
+        expect(ev.metadataJson, isNot(contains('on_match_order')));
+        // Inserción ante el destino más temprano (t-hola, order 0): el
+        // backend desplaza y ambos destinos quedan después del CT.
+        expect(ev.order, 0);
       },
     );
 
@@ -953,42 +1030,86 @@ void main() {
     });
   });
 
+  group('StepEditSheet (END)', () {
+    testWidgets('elegir tipo Fin muestra el helper y oculta content/sliders', (
+      tester,
+    ) async {
+      await pumpHost(tester);
+      await tester.tap(find.byKey(const Key('step_edit.type.end')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('step_edit.end_helper')), findsOneWidget);
+      expect(find.byKey(const Key('step_edit.content')), findsNothing);
+      expect(find.byKey(const Key('step_edit.delay_slider')), findsNothing);
+      expect(find.byKey(const Key('step_edit.jitter_slider')), findsNothing);
+    });
+
+    testWidgets(
+      'submit END dispatcha AddRequested(end) sin campos y delayMs 0',
+      (tester) async {
+        await pumpHost(tester);
+        await tester.tap(find.byKey(const Key('step_edit.type.end')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        expect(captured, hasLength(1));
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.type, fdom.StepType.end);
+        expect(ev.content, '');
+        expect(ev.delayMs, 0);
+        expect(ev.metadataJson, isNull);
+      },
+    );
+  });
+
   group('StepEditSheet (Edit mode · conditionalTime)', () {
+    // Shape de PRODUCCIÓN: el listado del backend sintetiza los orders
+    // legacy JUNTO a los ids. El no-op del submit debe sobrevivirlos (el
+    // form re-emite id-form puro; comparar orders daría PATCH espurio).
     const ctStep = fdom.Step(
       id: 's-ct',
       flowId: 'f1',
       type: fdom.StepType.conditionalTime,
-      order: 2,
+      order: 0,
       content: '',
       mediaRef: '',
       metadataJson:
           '{"tz":"UTC","windows":[{"days":[1,2],"from":"08:00",'
-          '"to":"12:00"}],"on_match_order":0,"on_else_order":1}',
+          '"to":"12:00"}],"on_match_step_id":"t-hola",'
+          '"on_else_step_id":"t-cerrados",'
+          '"on_match_order":1,"on_else_order":2}',
       // ≥1s: CONDITIONAL_TIME es no-LABEL, sujeto al piso de delay.
       delayMs: 1000,
       jitterPct: 0,
       aiOnly: false,
     );
+    // El CT en order 0 con sus destinos después (1 y 2): los candidatos
+    // del form al editar son SOLO los posteriores.
+    const ctFlowSteps = <fdom.Step>[ctStep, _tHolaAt1, _tCerradosAt2];
 
     testWidgets(
       'edit CT hidrata el form con metadataJson del step (tz UTC visible)',
       (tester) async {
-        when(
-          () => bloc.state,
-        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
+        when(() => bloc.state).thenReturn(const FlowStepsLoaded(ctFlowSteps));
         await pumpHost(tester, editing: ctStep);
 
         // El form CT está montado (no el content/media_url).
         expect(find.byKey(const Key('ct_form.tz_dropdown')), findsOneWidget);
         // tz dropdown muestra "UTC" como selección actual.
         expect(find.text('UTC'), findsWidgets);
+        // Sin aviso de configuración recuperada: la metadata era legible.
+        expect(
+          find.byKey(const Key('ct_form.recovered_warning')),
+          findsNothing,
+        );
       },
     );
 
     testWidgets('edit CT sin cambios → submit es no-op', (tester) async {
-      when(
-        () => bloc.state,
-      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
+      when(() => bloc.state).thenReturn(const FlowStepsLoaded(ctFlowSteps));
       await pumpHost(tester, editing: ctStep);
       await tester.pumpAndSettle();
 
@@ -1000,9 +1121,7 @@ void main() {
 
     testWidgets('edit CT con cambio (deselect día) → submit dispatcha '
         'UpdateRequested(metadataJson)', (tester) async {
-      when(
-        () => bloc.state,
-      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[ctStep]));
+      when(() => bloc.state).thenReturn(const FlowStepsLoaded(ctFlowSteps));
       await pumpHost(tester, editing: ctStep);
       await tester.pumpAndSettle();
 

@@ -13,13 +13,21 @@ class CaptureSink {
   int calls = 0;
 }
 
+const _defaultTargets = <CtTargetOption>[
+  CtTargetOption(id: 'sA', order: 0, label: 'Hola, ¿en qué te ayudo?'),
+  CtTargetOption(id: 'sB', order: 1, label: 'Imagen'),
+  CtTargetOption(id: 'sC', order: 2, label: 'Estamos cerrados'),
+  CtTargetOption(id: 'sD', order: 3, label: 'Fin'),
+];
+
 Future<CaptureSink> pumpForm(
   WidgetTester tester, {
   ConditionalTimeMetadata? initial,
-  List<int> availableOrders = const <int>[0, 1, 2],
+  List<CtTargetOption> targets = _defaultTargets,
   bool enabled = true,
+  bool showRecoveredWarning = false,
 }) async {
-  tester.view.physicalSize = const Size(1000, 1600);
+  tester.view.physicalSize = const Size(1000, 1800);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -30,8 +38,9 @@ Future<CaptureSink> pumpForm(
         body: SingleChildScrollView(
           child: ConditionalTimeForm(
             initial: initial,
-            availableStepOrders: availableOrders,
+            targets: targets,
             enabled: enabled,
+            showRecoveredWarning: showRecoveredWarning,
             onChanged: (json) {
               capture.last = json;
               capture.calls += 1;
@@ -45,24 +54,49 @@ Future<CaptureSink> pumpForm(
   return capture;
 }
 
+/// Selecciona destinos en ambos dropdowns (match → sC, else → sA).
+Future<void> selectTargets(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('ct_form.on_match_dropdown')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('3. Estamos cerrados').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('ct_form.on_else_dropdown')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('1. Hola, ¿en qué te ayudo?').last);
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  group('ConditionalTimeForm (create con seed)', () {
+  group('ConditionalTimeForm (create)', () {
     testWidgets(
-      'mount inicial → onChanged emite metadataJson válido con defaults '
-      '(L-V 09:00-18:00, tz America/Mexico_City)',
+      'mount inicial SIN destinos → onChanged(null): elegir las ramas es '
+      'decisión explícita, no un default que truena en runtime',
       (tester) async {
         final cap = await pumpForm(tester);
+        expect(cap.calls, greaterThan(0));
+        expect(cap.last, isNull);
+      },
+    );
+
+    testWidgets(
+      'elegir ambos destinos → onChanged emite id-form con defaults de '
+      'horario (L-V 09:00-18:00, tz America/Mexico_City)',
+      (tester) async {
+        final cap = await pumpForm(tester);
+        await selectTargets(tester);
 
         expect(cap.last, isNotNull);
         final md = ConditionalTimeMetadata.fromJsonString(cap.last!);
         expect(md.tz, 'America/Mexico_City');
         expect(md.windows, hasLength(1));
-        // Wire days L-V = [1,2,3,4,5] (Lun=1..Vie=5 en time.Weekday).
         expect(md.windows.first.days, <int>[1, 2, 3, 4, 5]);
         expect(md.windows.first.from, '09:00');
         expect(md.windows.first.to, '18:00');
-        expect(md.onMatchOrder, 0);
-        expect(md.onElseOrder, 1);
+        expect(md.onMatchStepId, 'sC');
+        expect(md.onElseStepId, 'sA');
+        // El wire nuevo es id-form puro: sin claves posicionales.
+        final raw = jsonDecode(cap.last!) as Map<String, dynamic>;
+        expect(raw.containsKey('on_match_order'), isFalse);
       },
     );
 
@@ -72,12 +106,10 @@ void main() {
       (tester) async {
         await pumpForm(tester);
 
-        // Los chips de día son AppChoiceChip controlados.
         expect(
           tester.widget(find.byKey(const Key('ct_form.window.0.day.0'))),
           isA<AppChoiceChip>(),
         );
-        // Los botones de hora desde/hasta son AppButton tonales.
         expect(
           tester.widget(find.byKey(const Key('ct_form.window.0.from'))),
           isA<AppButton>(),
@@ -86,7 +118,6 @@ void main() {
           tester.widget(find.byKey(const Key('ct_form.window.0.to'))),
           isA<AppButton>(),
         );
-        // Agregar ventana es un AppButton de texto.
         expect(
           tester.widget(find.byKey(const Key('ct_form.add_window'))),
           isA<AppButton>(),
@@ -98,10 +129,9 @@ void main() {
       'destildar TODOS los días de la única ventana → onChanged(null)',
       (tester) async {
         final cap = await pumpForm(tester);
-        // Estado inicial es válido.
+        await selectTargets(tester);
         expect(cap.last, isNotNull);
 
-        // Destildo los 5 chips L-V (uiIndex 0..4).
         for (final uiIdx in <int>[0, 1, 2, 3, 4]) {
           await tester.tap(find.byKey(Key('ct_form.window.0.day.$uiIdx')));
           await tester.pump();
@@ -110,30 +140,29 @@ void main() {
       },
     );
 
-    testWidgets(
-      'agregar Sábado (uiIndex 5) → onChanged emite metadataJson con wireDay 6',
-      (tester) async {
-        final cap = await pumpForm(tester);
-        await tester.tap(find.byKey(const Key('ct_form.window.0.day.5')));
-        await tester.pump();
+    testWidgets('agregar Sábado (uiIndex 5) → metadataJson con wireDay 6', (
+      tester,
+    ) async {
+      final cap = await pumpForm(tester);
+      await selectTargets(tester);
+      await tester.tap(find.byKey(const Key('ct_form.window.0.day.5')));
+      await tester.pump();
 
-        expect(cap.last, isNotNull);
-        final md = ConditionalTimeMetadata.fromJsonString(cap.last!);
-        // L-V + S = days [1,2,3,4,5,6] (Sáb=6 en wire).
-        expect(md.windows.first.days, <int>[1, 2, 3, 4, 5, 6]);
-      },
-    );
+      expect(cap.last, isNotNull);
+      final md = ConditionalTimeMetadata.fromJsonString(cap.last!);
+      expect(md.windows.first.days, <int>[1, 2, 3, 4, 5, 6]);
+    });
 
     testWidgets(
       'agregar Domingo (uiIndex 6) → wireDay 0 al inicio de la lista ordenada',
       (tester) async {
         final cap = await pumpForm(tester);
+        await selectTargets(tester);
         await tester.tap(find.byKey(const Key('ct_form.window.0.day.6')));
         await tester.pump();
 
         expect(cap.last, isNotNull);
         final md = ConditionalTimeMetadata.fromJsonString(cap.last!);
-        // L-V + D = days incluyen 0 (Dom). El form ordena ascendente.
         expect(md.windows.first.days, <int>[0, 1, 2, 3, 4, 5]);
       },
     );
@@ -141,30 +170,43 @@ void main() {
 
   group('ConditionalTimeForm (initial pre-cargado)', () {
     testWidgets(
-      'monta con initial → onChanged emite metadataJson igual al initial',
+      'monta con initial id-form → onChanged emite metadataJson equivalente',
       (tester) async {
         const initial = ConditionalTimeMetadata(
           tz: 'UTC',
           windows: <TimeWindow>[
             TimeWindow(days: <int>[0, 6], from: '10:00', to: '12:00'),
           ],
-          onMatchOrder: 2,
-          onElseOrder: 0,
+          onMatchStepId: 'sC',
+          onElseStepId: 'sA',
         );
-        final cap = await pumpForm(
-          tester,
-          initial: initial,
-          availableOrders: <int>[0, 1, 2, 3],
-        );
+        final cap = await pumpForm(tester, initial: initial);
 
         expect(cap.last, isNotNull);
         final md = ConditionalTimeMetadata.fromJsonString(cap.last!);
         expect(md.tz, 'UTC');
-        expect(md.onMatchOrder, 2);
-        expect(md.onElseOrder, 0);
+        expect(md.onMatchStepId, 'sC');
+        expect(md.onElseStepId, 'sA');
         expect(md.windows.first.days, <int>[0, 6]);
         expect(md.windows.first.from, '10:00');
         expect(md.windows.first.to, '12:00');
+      },
+    );
+
+    testWidgets(
+      'destino del initial que ya no es candidato → queda sin selección y '
+      'el form emite null hasta re-elegir',
+      (tester) async {
+        const initial = ConditionalTimeMetadata(
+          tz: 'UTC',
+          windows: <TimeWindow>[
+            TimeWindow(days: <int>[1], from: '10:00', to: '12:00'),
+          ],
+          onMatchStepId: 'ghost',
+          onElseStepId: 'sA',
+        );
+        final cap = await pumpForm(tester, initial: initial);
+        expect(cap.last, isNull);
       },
     );
 
@@ -172,10 +214,10 @@ void main() {
       tester,
     ) async {
       final cap = await pumpForm(tester);
+      await selectTargets(tester);
       final before = jsonDecode(cap.last!) as Map<String, dynamic>;
       expect(before['tz'], 'America/Mexico_City');
 
-      // Abrir dropdown TZ y elegir UTC.
       await tester.tap(find.byKey(const Key('ct_form.tz_dropdown')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('UTC').last);
@@ -187,31 +229,34 @@ void main() {
     });
   });
 
-  group('ConditionalTimeForm (dropdowns onMatch/onElse)', () {
-    testWidgets(
-      'cambio del dropdown onMatch → onChanged emite con nuevo on_match_order',
-      (tester) async {
-        final cap = await pumpForm(tester, availableOrders: <int>[0, 1, 2, 3]);
-        await tester.tap(find.byKey(const Key('ct_form.on_match_dropdown')));
-        await tester.pumpAndSettle();
-        // "Paso #3" en la UI = order=2 (display es order+1).
-        await tester.tap(find.text('Paso #3').last);
-        await tester.pumpAndSettle();
+  group('ConditionalTimeForm (destinos)', () {
+    testWidgets('las opciones muestran posición + contenido del paso destino', (
+      tester,
+    ) async {
+      await pumpForm(tester);
+      await tester.tap(find.byKey(const Key('ct_form.on_match_dropdown')));
+      await tester.pumpAndSettle();
+      expect(find.text('1. Hola, ¿en qué te ayudo?'), findsWidgets);
+      expect(find.text('3. Estamos cerrados'), findsWidgets);
+    });
 
-        final md = ConditionalTimeMetadata.fromJsonString(cap.last!);
-        expect(md.onMatchOrder, 2);
-      },
-    );
+    testWidgets('sin candidatos → guía al operador y el form emite null', (
+      tester,
+    ) async {
+      final cap = await pumpForm(tester, targets: const <CtTargetOption>[]);
+      expect(cap.last, isNull);
+      expect(find.textContaining('Agrega primero los pasos'), findsWidgets);
+    });
 
-    testWidgets(
-      'lista de orders vacía → dropdowns deshabilitados pero form no crashea',
-      (tester) async {
-        final cap = await pumpForm(tester, availableOrders: const <int>[]);
-        // Form sigue válido (defaults onMatch=0/onElse=1 — el operador
-        // puede crear el CT primero y agregar steps destino después).
-        expect(cap.last, isNotNull);
-      },
-    );
+    testWidgets('aviso de configuración recuperada visible cuando aplica', (
+      tester,
+    ) async {
+      await pumpForm(tester, showRecoveredWarning: true);
+      expect(
+        find.byKey(const Key('ct_form.recovered_warning')),
+        findsOneWidget,
+      );
+    });
   });
 
   group('ConditionalTimeForm (multi-ventana)', () {
@@ -219,6 +264,7 @@ void main() {
       'botón "Agregar ventana" añade ventana extra y onChanged la incluye',
       (tester) async {
         final cap = await pumpForm(tester);
+        await selectTargets(tester);
         final initialCalls = cap.calls;
 
         await tester.tap(find.byKey(const Key('ct_form.add_window')));
@@ -231,7 +277,6 @@ void main() {
           hasLength(2),
           reason: 'la 2da ventana debe estar agregada',
         );
-        // Las dos ventanas chequean días vía keys ct_form.window.0.* y .1.*
         expect(find.byKey(const Key('ct_form.window.1.day.0')), findsOneWidget);
       },
     );
@@ -239,17 +284,14 @@ void main() {
     testWidgets('botón "Eliminar ventana" desaparece cuando queda una sola; '
         'con dos, elimina la segunda', (tester) async {
       final cap = await pumpForm(tester);
-      // Una sola → el botón remove de la 0 no aparece (no se puede dejar 0).
+      await selectTargets(tester);
       expect(find.byKey(const Key('ct_form.window.0.remove')), findsNothing);
 
-      // Agrego una ventana.
       await tester.tap(find.byKey(const Key('ct_form.add_window')));
       await tester.pump();
-      // Ahora aparecen ambos remove.
       expect(find.byKey(const Key('ct_form.window.0.remove')), findsOneWidget);
       expect(find.byKey(const Key('ct_form.window.1.remove')), findsOneWidget);
 
-      // Elimino la 1.
       await tester.tap(find.byKey(const Key('ct_form.window.1.remove')));
       await tester.pump();
       final md = ConditionalTimeMetadata.fromJsonString(cap.last!);
@@ -259,8 +301,6 @@ void main() {
 
   group('aviso inline de ventana inválida (barrido UX)', () {
     testWidgets('desde ≥ hasta muestra el motivo del bloqueo', (tester) async {
-      // Sin este aviso el guardado se bloquea (toWireOrNull = null) sin que
-      // el operador sepa por qué.
       await pumpForm(
         tester,
         initial: const ConditionalTimeMetadata(
@@ -268,8 +308,8 @@ void main() {
           windows: <TimeWindow>[
             TimeWindow(days: <int>[1, 2], from: '18:00', to: '09:00'),
           ],
-          onMatchOrder: 0,
-          onElseOrder: 1,
+          onMatchStepId: 'sC',
+          onElseStepId: 'sA',
         ),
       );
 

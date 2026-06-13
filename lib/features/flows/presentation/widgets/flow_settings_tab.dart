@@ -568,6 +568,8 @@ class _FailureCopy extends StatelessWidget {
         FlowsInvalidCreateFailure() ||
         FlowsInvalidStepFailure() ||
         FlowsStepNotFoundFailure() ||
+        FlowsInvalidReorderFailure() ||
+        FlowsStepReferencedFailure() ||
         UnknownFlowsFailure() => (
           'flow_settings.error.unknown',
           'No pudimos guardar la configuración. Inténtalo de nuevo.',

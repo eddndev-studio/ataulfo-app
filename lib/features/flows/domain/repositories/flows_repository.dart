@@ -45,10 +45,8 @@ abstract interface class FlowsRepository {
   /// 404 → `FlowsStepNotFoundFailure` (el step ya no existe — el
   /// listado en pantalla está obsoleto).
   ///
-  /// `order` se envía cuando el cliente reordena steps (drag&drop): el
-  /// reorder es N×PATCH cambiando solo `order`. Sin UNIQUE en
-  /// `(flow_id, order)`, no hace falta two-pass; cada patch viaja
-  /// independiente y el listado posterior se ordena por `order` ASC.
+  /// `order` queda para patches puntuales de posición; el reorder
+  /// completo por drag&drop usa [reorderSteps] (atómico), no N×PATCH.
   ///
   /// `metadataJson` viaja con el shape literal de `Step.metadata`. Hoy
   /// solo CONDITIONAL_TIME lo necesita (ventanas horarias); otros tipos
@@ -70,8 +68,19 @@ abstract interface class FlowsRepository {
 
   /// Elimina un Step. Operación idempotente: si el step no existe, no
   /// falla — el bloc puede asumir que tras éxito el step ya no está en
-  /// el servidor.
+  /// el servidor. 409 ⇒ `FlowsStepReferencedFailure` (el step es destino
+  /// de un condicional; el operador debe redirigirlo antes).
   Future<void> deleteStep(String stepId);
+
+  /// Reordena TODOS los steps del flow en una sola operación atómica:
+  /// `ids` es el array completo en el orden destino y el backend renumera
+  /// 0..n-1 transaccionalmente. 422 ⇒ `FlowsInvalidReorderFailure`
+  /// (permutación inexacta o un condicional quedaría tras sus destinos);
+  /// como es atómico, un fallo deja el servidor EXACTAMENTE como estaba.
+  Future<void> reorderSteps({
+    required String flowId,
+    required List<String> ids,
+  });
 
   /// Reemplaza un Flow por id (PUT replace-completo). El editor del
   /// Settings tab debe propagar `name` e `isActive` desde la cabecera

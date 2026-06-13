@@ -16,6 +16,8 @@ void main() {
         FlowsStepNotFoundFailure(),
         FlowsInvalidSettingsFailure(),
         FlowsConflictFailure(),
+        FlowsInvalidReorderFailure(),
+        FlowsStepReferencedFailure(),
       ];
       for (final f in all) {
         expect(f, isA<FlowsFailure>());
@@ -36,6 +38,8 @@ void main() {
         FlowsStepNotFoundFailure() => 'step_notfound',
         FlowsInvalidSettingsFailure() => 'invalid_settings',
         FlowsConflictFailure() => 'conflict',
+        FlowsInvalidReorderFailure() => 'invalid_reorder',
+        FlowsStepReferencedFailure() => 'step_referenced',
       };
       expect(label(const FlowsInvalidSettingsFailure()), 'invalid_settings');
       expect(label(const FlowsConflictFailure()), 'conflict');

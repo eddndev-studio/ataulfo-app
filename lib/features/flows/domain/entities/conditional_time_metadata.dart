@@ -1,18 +1,22 @@
 import 'dart:convert';
 
-/// Shape de `Step.metadata` para CONDITIONAL_TIME (S11). El runner del
-/// backend evalúa "now ∈ alguna ventana" y bifurca al `order` indicado.
-/// El cliente edita el shape literal — esta entity es la representación
-/// tipada del JSON opaco que viaja en el wire.
+/// Shape de `Step.metadata` para CONDITIONAL_TIME. El runner del backend
+/// evalúa "now ∈ alguna ventana" y bifurca al destino indicado.
 ///
-/// Wire keys son **snake_case** (`tz`, `windows`, `on_match_order`,
-/// `on_else_order`, `days`, `from`, `to`) — inconsistente con el resto de
-/// camelCase de Flows (mediaRef/delayMs/...). Se espeja el wire actual del
-/// backend; cualquier cambio en `step_metadata.go` debe replicarse acá.
+/// Destinos — dos shapes en el wire:
+/// - **Canónico por id** (`on_match_step_id`/`on_else_step_id`): la
+///   identidad del step destino sobrevive reorders/borrados/inserciones.
+///   Es lo ÚNICO que este cliente emite al guardar.
+/// - **Posicional legacy** (`on_match_order`/`on_else_order`): filas no
+///   migradas, y claves que el backend SINTETIZA en el listado junto a los
+///   ids para clientes viejos. Se parsean si están (display/back-compat)
+///   pero jamás se re-emiten cuando hay ids.
+///
+/// Wire keys son **snake_case** — espeja `step_metadata.go`; cualquier
+/// cambio allá debe replicarse acá.
 ///
 /// Convención de días: `time.Weekday` (0=Domingo .. 6=Sábado). La UI hace
-/// el mapeo a chips L-M-X-J-V-S-D en presentation; el dominio se mantiene
-/// agnóstico de cómo se etiquetan en pantalla.
+/// el mapeo a chips L-M-X-J-V-S-D en presentation.
 ///
 /// `from`/`to` son `"HH:MM"` 24h en la TZ del metadata. `to` es exclusivo
 /// y `from < to` estricto (sin overnight v1 — una ventana 22:00-04:00
@@ -21,19 +25,32 @@ class ConditionalTimeMetadata {
   const ConditionalTimeMetadata({
     required this.tz,
     required this.windows,
-    required this.onMatchOrder,
-    required this.onElseOrder,
+    this.onMatchStepId,
+    this.onElseStepId,
+    this.onMatchOrder,
+    this.onElseOrder,
   });
 
   final String tz;
   final List<TimeWindow> windows;
-  final int onMatchOrder;
-  final int onElseOrder;
 
-  /// Decodifica + valida el shape. Cualquier desviación (json malformado,
-  /// tz vacía, windows lista vacía, order negativo, día fuera de [0..6],
-  /// HH:MM mal formado o fuera de rango, from >= to) ⇒ `FormatException`
-  /// con mensaje específico. El caller traduce a copy de UI o failure.
+  /// Id del step destino cuando la ventana matchea. Par con
+  /// [onElseStepId]: ambos-o-ninguno (lo garantiza el parse).
+  final String? onMatchStepId;
+  final String? onElseStepId;
+
+  /// Destinos posicionales legacy: presentes en filas no migradas y como
+  /// claves sintetizadas por el backend junto a los ids. Solo display.
+  final int? onMatchOrder;
+  final int? onElseOrder;
+
+  /// Reporta si el metadata trae destinos por id (shape canónico).
+  bool get hasStepIdRefs => onMatchStepId != null;
+
+  /// Decodifica + valida el shape. Reglas de destino: par de ids completo
+  /// (canónico), o par de orders completo (legacy). Un solo id, o un solo
+  /// order sin ids, es shape a medias ⇒ `FormatException`. tz/ventanas/
+  /// HH:MM se validan igual en ambos shapes.
   static ConditionalTimeMetadata fromJsonString(String raw) {
     final Object? decoded;
     try {
@@ -56,44 +73,86 @@ class ConditionalTimeMetadata {
     for (var i = 0; i < windowsRaw.length; i++) {
       windows.add(_parseWindow(windowsRaw[i], i));
     }
-    final onMatch = decoded['on_match_order'];
-    if (onMatch is! int || onMatch < 0) {
+
+    final matchId = _optionalId(decoded, 'on_match_step_id');
+    final elseId = _optionalId(decoded, 'on_else_step_id');
+    if ((matchId == null) != (elseId == null)) {
       throw const FormatException(
-        'conditional_time metadata: on_match_order negativo o ausente',
+        'conditional_time metadata: destino por id incompleto',
       );
     }
-    final onElse = decoded['on_else_order'];
-    if (onElse is! int || onElse < 0) {
-      throw const FormatException(
-        'conditional_time metadata: on_else_order negativo o ausente',
-      );
+    final matchOrder = _optionalOrder(decoded, 'on_match_order');
+    final elseOrder = _optionalOrder(decoded, 'on_else_order');
+    if (matchId == null) {
+      // Shape legacy: el par posicional es obligatorio.
+      if (matchOrder == null || elseOrder == null) {
+        throw const FormatException(
+          'conditional_time metadata: sin destinos (ni ids ni orders)',
+        );
+      }
     }
     return ConditionalTimeMetadata(
       tz: tz,
       windows: windows,
-      onMatchOrder: onMatch,
-      onElseOrder: onElse,
+      onMatchStepId: matchId,
+      onElseStepId: elseId,
+      onMatchOrder: matchOrder,
+      onElseOrder: elseOrder,
     );
   }
 
-  /// Serializa al shape canónico del wire (snake_case). El caller pasa el
-  /// resultado a `patchStep(metadataJson:)` / `createStep`.
-  String toJsonString() => jsonEncode(<String, dynamic>{
-    'tz': tz,
-    'windows': windows
-        .map(
-          (w) => <String, dynamic>{'days': w.days, 'from': w.from, 'to': w.to},
-        )
-        .toList(),
-    'on_match_order': onMatchOrder,
-    'on_else_order': onElseOrder,
-  });
+  static String? _optionalId(Map<String, dynamic> m, String key) {
+    final v = m[key];
+    if (v == null) return null;
+    if (v is! String || v.trim().isEmpty) {
+      throw FormatException('conditional_time metadata: $key inválido');
+    }
+    return v;
+  }
+
+  static int? _optionalOrder(Map<String, dynamic> m, String key) {
+    final v = m[key];
+    if (v == null) return null;
+    if (v is! int || v < 0) {
+      throw FormatException('conditional_time metadata: $key inválido: $v');
+    }
+    return v;
+  }
+
+  /// Serializa al shape canónico del wire. Con ids presentes emite
+  /// id-form PURO (los orders son carga muerta para el backend nuevo y
+  /// re-emitirlos arrastraría posiciones stale); sin ids conserva el
+  /// shape posicional (no inventa destinos).
+  String toJsonString() {
+    final m = <String, dynamic>{
+      'tz': tz,
+      'windows': windows
+          .map(
+            (w) => <String, dynamic>{
+              'days': w.days,
+              'from': w.from,
+              'to': w.to,
+            },
+          )
+          .toList(),
+    };
+    if (hasStepIdRefs) {
+      m['on_match_step_id'] = onMatchStepId;
+      m['on_else_step_id'] = onElseStepId;
+    } else {
+      m['on_match_order'] = onMatchOrder;
+      m['on_else_order'] = onElseOrder;
+    }
+    return jsonEncode(m);
+  }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! ConditionalTimeMetadata) return false;
     if (other.tz != tz) return false;
+    if (other.onMatchStepId != onMatchStepId) return false;
+    if (other.onElseStepId != onElseStepId) return false;
     if (other.onMatchOrder != onMatchOrder) return false;
     if (other.onElseOrder != onElseOrder) return false;
     if (other.windows.length != windows.length) return false;
@@ -104,8 +163,14 @@ class ConditionalTimeMetadata {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(tz, onMatchOrder, onElseOrder, Object.hashAll(windows));
+  int get hashCode => Object.hash(
+    tz,
+    onMatchStepId,
+    onElseStepId,
+    onMatchOrder,
+    onElseOrder,
+    Object.hashAll(windows),
+  );
 }
 
 /// Franja recurrente día+hora dentro de un `ConditionalTimeMetadata`.
