@@ -37,7 +37,9 @@ class FlutterLocalNotifier implements LocalNotifier {
   Future<void> init({void Function(String payload)? onTap}) async {
     await _plugin.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@drawable/$_smallIcon'),
+        // El nombre del drawable va PELADO (sin prefijo @drawable/): es la
+        // forma que resuelve el plugin (getIdentifier sobre el nombre).
+        android: AndroidInitializationSettings(_smallIcon),
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
