@@ -59,6 +59,9 @@ import '../../features/trainer/presentation/bloc/workspace_bloc.dart';
 import '../../features/trainer/presentation/pages/preview_page.dart';
 import '../../features/trainer/presentation/pages/trainer_chat_page.dart';
 import '../../features/trainer/presentation/pages/workspace_page.dart';
+import '../../features/ai_log/domain/ai_log_repository.dart';
+import '../../features/ai_log/presentation/bloc/ai_log_bloc.dart';
+import '../../features/ai_log/presentation/pages/ai_log_page.dart';
 import '../../features/notes/domain/repositories/notes_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/labels/presentation/bloc/labels_bloc.dart';
@@ -150,6 +153,7 @@ class AppRouter {
     required QuickRepliesRepository quickRepliesRepository,
     required LabelsRepository labelsRepository,
     required NotesRepository notesRepository,
+    required AiLogRepository aiLogRepository,
     required TrainerRepository trainerRepository,
     required WorkspaceRepository workspaceRepository,
     required PreviewRepository previewRepository,
@@ -178,6 +182,7 @@ class AppRouter {
        _quickRepliesRepo = quickRepliesRepository,
        _labelsRepo = labelsRepository,
        _notesRepo = notesRepository,
+       _aiLogRepo = aiLogRepository,
        _trainerRepo = trainerRepository,
        _workspaceRepo = workspaceRepository,
        _previewRepo = previewRepository,
@@ -210,6 +215,7 @@ class AppRouter {
   final WorkspaceRepository _workspaceRepo;
   final PreviewRepository _previewRepo;
   final NotesRepository _notesRepo;
+  final AiLogRepository _aiLogRepo;
   final MembershipsRepository _membershipsRepo;
   final MembersRepository _membersRepo;
   final InvitationsRepository _invitationsRepo;
@@ -710,6 +716,27 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Perfil')),
               body: const ProfilePage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Observabilidad del bot (S12): el ai-log del chat dividido por
+        // corrida del motor. Sub-ruta del hilo (segmento `/ai-log` extra).
+        // El backend la protege con ADMIN+ (la entrada del app bar también
+        // se oculta para roles menores); page-scoped: `AiLogBloc` carga la
+        // primera página al montarse.
+        path: '/bots/:id/sessions/:chatLid/ai-log',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final chatLid = state.pathParameters['chatLid']!;
+          return BlocProvider<AiLogBloc>(
+            create: (_) =>
+                AiLogBloc(repo: _aiLogRepo, botId: id, chatLid: chatLid)
+                  ..add(const AiLogLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Razonamiento del bot')),
+              body: const AiLogPage(),
             ),
           );
         },

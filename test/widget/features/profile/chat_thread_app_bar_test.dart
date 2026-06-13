@@ -1,5 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
 import 'package:ataulfo/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:ataulfo/features/flow_run/domain/entities/runnable_flow.dart';
@@ -20,21 +22,36 @@ import 'package:mocktail/mocktail.dart';
 class _MockProfileBloc extends MockBloc<ProfileEvent, ProfileState>
     implements ProfileBloc {}
 
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
+
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
 class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
 
 void main() {
   late _MockProfileBloc bloc;
+  late _MockAuthBloc auth;
   setUp(() {
     bloc = _MockProfileBloc();
     when(() => bloc.state).thenReturn(const ProfileInitial());
+    // La entrada de observabilidad del app bar gatea por rol: el harness
+    // arranca como WORKER (icono oculto); los tests del gate lo suben.
+    auth = _MockAuthBloc();
+    when(() => auth.state).thenReturn(
+      const AuthAuthenticated(
+        Identity(userId: 'u1', email: 'x@x', orgId: 'o1', role: 'WORKER'),
+      ),
+    );
   });
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: BlocProvider<ProfileBloc>.value(
-      value: bloc,
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<ProfileBloc>.value(value: bloc),
+        BlocProvider<AuthBloc>.value(value: auth),
+      ],
       child: const Scaffold(
         appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
         body: SizedBox.shrink(),
@@ -81,8 +98,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppDesignTheme.dark(),
-        home: BlocProvider<ProfileBloc>.value(
-          value: bloc,
+        home: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<ProfileBloc>.value(value: bloc),
+            BlocProvider<AuthBloc>.value(value: auth),
+          ],
           child: const Scaffold(
             appBar: ChatThreadAppBar(botId: 'b1', chatLid: '123-456@g.us'),
             body: SizedBox.shrink(),
@@ -205,8 +225,11 @@ void main() {
           theme: AppDesignTheme.dark(),
           home: RepositoryProvider<WaLabelsRepository>.value(
             value: waRepo,
-            child: BlocProvider<ProfileBloc>.value(
-              value: bloc,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<ProfileBloc>.value(value: bloc),
+                BlocProvider<AuthBloc>.value(value: auth),
+              ],
               child: const Scaffold(
                 appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
                 body: SizedBox.shrink(),
@@ -240,8 +263,11 @@ void main() {
           theme: AppDesignTheme.dark(),
           home: RepositoryProvider<FlowRunRepository>.value(
             value: runRepo,
-            child: BlocProvider<ProfileBloc>.value(
-              value: bloc,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<ProfileBloc>.value(value: bloc),
+                BlocProvider<AuthBloc>.value(value: auth),
+              ],
               child: const Scaffold(
                 appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
                 body: SizedBox.shrink(),
@@ -253,6 +279,23 @@ void main() {
       await tester.tap(find.byKey(const Key('thread.run_flow')));
       await tester.pumpAndSettle();
       expect(find.byType(FlowRunSheet), findsOneWidget);
+    });
+  });
+
+  group('entrada de observabilidad (ai-log)', () {
+    testWidgets('WORKER no ve el icono', (tester) async {
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('thread.ai_log')), findsNothing);
+    });
+
+    testWidgets('ADMIN ve el icono', (tester) async {
+      when(() => auth.state).thenReturn(
+        const AuthAuthenticated(
+          Identity(userId: 'u1', email: 'x@x', orgId: 'o1', role: 'ADMIN'),
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('thread.ai_log')), findsOneWidget);
     });
   });
 }

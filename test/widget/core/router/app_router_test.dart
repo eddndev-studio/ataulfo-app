@@ -68,6 +68,7 @@ import 'package:ataulfo/features/templates/presentation/pages/template_detail_pa
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
+import 'package:ataulfo/features/ai_log/domain/ai_log_repository.dart';
 import 'package:ataulfo/features/notes/domain/repositories/notes_repository.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
@@ -108,6 +109,8 @@ class _MockTriggersRepo extends Mock implements TriggersRepository {}
 class _MockLabelsRepo extends Mock implements LabelsRepository {}
 
 class _MockNotesRepo extends Mock implements NotesRepository {}
+
+class _MockAiLogRepo extends Mock implements AiLogRepository {}
 
 class _MockTrainerRepo extends Mock implements TrainerRepository {}
 
@@ -329,6 +332,7 @@ void main() {
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       notesRepository: _MockNotesRepo(),
+      aiLogRepository: _MockAiLogRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
@@ -769,6 +773,7 @@ void main() {
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       notesRepository: _MockNotesRepo(),
+      aiLogRepository: _MockAiLogRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
@@ -854,6 +859,7 @@ void main() {
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       notesRepository: _MockNotesRepo(),
+      aiLogRepository: _MockAiLogRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
@@ -1141,6 +1147,7 @@ void main() {
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       notesRepository: _MockNotesRepo(),
+      aiLogRepository: _MockAiLogRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
@@ -1382,6 +1389,7 @@ void main() {
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       notesRepository: _MockNotesRepo(),
+      aiLogRepository: _MockAiLogRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),

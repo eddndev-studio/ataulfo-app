@@ -30,6 +30,7 @@ import 'features/trainer/data/datasources/preview_datasource.dart';
 import 'features/trainer/data/datasources/trainer_datasource.dart';
 import 'features/trainer/data/datasources/workspace_datasource.dart';
 import 'features/trainer/data/repositories/trainer_repositories_impl.dart';
+import 'features/ai_log/data/ai_log_datasource.dart';
 import 'features/notes/data/datasources/notes_datasource.dart';
 import 'features/labels/data/repositories/labels_repository_impl.dart';
 import 'features/notes/data/repositories/notes_repository_impl.dart';
@@ -209,6 +210,11 @@ Future<void> main() async {
     datasource: DioNotesDatasource(mainDio),
   );
 
+  // Observabilidad del bot (S12): el ai-log del chat real, ADMIN+.
+  final aiLogRepository = AiLogRepositoryImpl(
+    datasource: DioAiLogDatasource(mainDio),
+  );
+
   // Agente entrenador + Workspace + Preview (S24): tres superficies del
   // mismo arco, page-scoped en sus rutas.
   final trainerRepository = TrainerRepositoryImpl(
@@ -295,6 +301,7 @@ Future<void> main() async {
     quickRepliesRepository: quickRepliesRepository,
     labelsRepository: labelsRepository,
     notesRepository: notesRepository,
+    aiLogRepository: aiLogRepository,
     trainerRepository: trainerRepository,
     workspaceRepository: workspaceRepository,
     previewRepository: previewRepository,

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../conversations/domain/entities/conversation.dart';
 import '../../../flow_run/presentation/widgets/flow_run_sheet.dart';
 import '../../../notes/presentation/widgets/notes_sheet.dart';
@@ -74,6 +76,25 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
           icon: const Icon(Icons.sticky_note_2_outlined),
           onPressed: () =>
               NotesSheet.open(context, botId: botId, chatLid: chatLid),
+        ),
+        // Observabilidad del bot (S12): qué pensó, qué tools usó y qué
+        // costó cada corrida del motor en ESTE chat. Solo ADMIN+ (el
+        // backend igual rechaza con 403; ocultarlo evita el botón roto).
+        BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, authState) {
+            if (authState is! AuthAuthenticated ||
+                !isAdminOrAbove(authState.identity.role)) {
+              return const SizedBox.shrink();
+            }
+            return IconButton(
+              key: const Key('thread.ai_log'),
+              tooltip: 'Razonamiento del bot',
+              icon: const Icon(Icons.psychology_outlined),
+              onPressed: () => context.push(
+                '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/ai-log',
+              ),
+            );
+          },
         ),
       ],
       title: BlocBuilder<ProfileBloc, ProfileState>(
