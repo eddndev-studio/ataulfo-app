@@ -81,6 +81,24 @@ void main() {
         expect(c.silenceLabelIds, <String>['l1', 'l2']);
       },
     );
+
+    test('parsea disabled_tool_groups cuando viaja', () {
+      final c = AiConfigDto.fromJson(
+        aiJson()..['disabled_tool_groups'] = <dynamic>['flujos', 'documentos'],
+      );
+      expect(c.disabledToolGroups, <String>['flujos', 'documentos']);
+    });
+
+    test('disabled_tool_groups ausente ⇒ vacío (clave aditiva, omitempty)', () {
+      expect(AiConfigDto.fromJson(aiJson()).disabledToolGroups, isEmpty);
+    });
+
+    test('disabled_tool_groups filtra elementos no-string', () {
+      final c = AiConfigDto.fromJson(
+        aiJson()..['disabled_tool_groups'] = <dynamic>['flujos', 9, null],
+      );
+      expect(c.disabledToolGroups, <String>['flujos']);
+    });
   });
 
   group('TemplateResp.fromJson', () {

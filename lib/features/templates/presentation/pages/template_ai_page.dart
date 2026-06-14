@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/ai/tool_groups.dart';
+import '../../../../core/ai/tool_groups_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -296,6 +298,13 @@ class _StatGrid extends StatelessWidget {
           value: _silenceLabelsValue(ai.silenceLabelIds.length),
           onTap: isMutating ? null : () => _pickSilenceLabels(context),
         ),
+        const SizedBox(height: AppTokens.cardGap),
+        _StatTile(
+          tileKey: const Key('template_ai.tile.tool_groups'),
+          label: 'Permisos de herramientas',
+          value: _toolGroupsValue(ai.disabledToolGroups),
+          onTap: isMutating ? null : () => _pickToolGroups(context),
+        ),
       ],
     );
   }
@@ -305,6 +314,16 @@ class _StatGrid extends StatelessWidget {
     1 => '1 etiqueta',
     _ => '$n etiquetas',
   };
+
+  /// Resumen "habilitados/total grupos". Solo cuenta grupos conocidos como
+  /// apagados (un id desconocido no reduce el conteo de habilitados).
+  static String _toolGroupsValue(List<String> disabled) {
+    final total = ToolGroup.values.length;
+    final known = ToolGroup.values.map((g) => g.wire).toSet();
+    final knownDisabled = disabled.where(known.contains).length;
+    final enabled = total - knownDisabled;
+    return enabled == total ? 'Todos habilitados' : '$enabled/$total grupos';
+  }
 
   void _dispatch(BuildContext context, AIConfig next) {
     context.read<TemplateDetailBloc>().add(
@@ -388,6 +407,19 @@ class _StatGrid extends StatelessWidget {
     );
     if (picked == null || !context.mounted) return;
     _dispatch(context, ai.copyWith(silenceLabelIds: picked));
+  }
+
+  Future<void> _pickToolGroups(BuildContext context) async {
+    // Catálogo de grupos estático del cliente: el sheet no necesita bloc.
+    final picked = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) =>
+          ToolGroupsSheet(initialDisabledGroups: ai.disabledToolGroups),
+    );
+    if (picked == null || !context.mounted) return;
+    _dispatch(context, ai.copyWith(disabledToolGroups: picked));
   }
 }
 

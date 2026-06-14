@@ -64,6 +64,7 @@ class AIConfig {
     required this.contextMessages,
     this.responseDelaySeconds = 0,
     this.silenceLabelIds = const <String>[],
+    this.disabledToolGroups = const <String>[],
   });
 
   final bool enabled;
@@ -86,6 +87,12 @@ class AIConfig {
   /// backend lo conserva tal cual; la igualdad lo compara por posición.
   final List<String> silenceLabelIds;
 
+  /// Deny-list de grupos de capacidad del agente IA que la plantilla apaga
+  /// (ids de `ToolGroup`). Vacío = todos habilitados. El Bot puede sumar más
+  /// grupos apagados (unión); el set efectivo lo resuelve el backend. Se guarda
+  /// como ids crudos (tolerante a un grupo futuro), igual que silenceLabelIds.
+  final List<String> disabledToolGroups;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -98,7 +105,8 @@ class AIConfig {
         other.systemPrompt == systemPrompt &&
         other.contextMessages == contextMessages &&
         other.responseDelaySeconds == responseDelaySeconds &&
-        _stringListEquals(other.silenceLabelIds, silenceLabelIds);
+        _stringListEquals(other.silenceLabelIds, silenceLabelIds) &&
+        _stringListEquals(other.disabledToolGroups, disabledToolGroups);
   }
 
   @override
@@ -112,6 +120,7 @@ class AIConfig {
     contextMessages,
     responseDelaySeconds,
     Object.hashAll(silenceLabelIds),
+    Object.hashAll(disabledToolGroups),
   );
 
   /// Copia con campos reemplazados — base de las ediciones por-campo del
@@ -126,6 +135,7 @@ class AIConfig {
     int? contextMessages,
     int? responseDelaySeconds,
     List<String>? silenceLabelIds,
+    List<String>? disabledToolGroups,
   }) => AIConfig(
     enabled: enabled ?? this.enabled,
     provider: provider ?? this.provider,
@@ -136,6 +146,7 @@ class AIConfig {
     contextMessages: contextMessages ?? this.contextMessages,
     responseDelaySeconds: responseDelaySeconds ?? this.responseDelaySeconds,
     silenceLabelIds: silenceLabelIds ?? this.silenceLabelIds,
+    disabledToolGroups: disabledToolGroups ?? this.disabledToolGroups,
   );
 }
 

@@ -703,6 +703,7 @@ void main() {
             'context_messages': 20,
             'response_delay_seconds': 0,
             'silence_label_ids': <String>[],
+            'disabled_tool_groups': <String>[],
           },
         });
       },
@@ -733,6 +734,39 @@ void main() {
 
         final aiBody = captured.single['ai'] as Map<String, dynamic>;
         expect(aiBody['silence_label_ids'], <String>['l-vip', 'l-humano']);
+      },
+    );
+
+    test(
+      'serializa disabled_tool_groups (snake_case) en el body del PUT',
+      () async {
+        final captured = <Map<String, dynamic>>[];
+        when(
+          () => dio.put<Map<String, dynamic>>(
+            '/templates/t1',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((invocation) async {
+          captured.add(
+            invocation.namedArguments[#data] as Map<String, dynamic>,
+          );
+          return respMap(200, body: tplJson(version: 2));
+        });
+
+        await ds.update(
+          id: 't1',
+          name: 'Soporte',
+          version: 1,
+          ai: ai.copyWith(
+            disabledToolGroups: const <String>['flujos', 'documentos'],
+          ),
+        );
+
+        final aiBody = captured.single['ai'] as Map<String, dynamic>;
+        expect(aiBody['disabled_tool_groups'], <String>[
+          'flujos',
+          'documentos',
+        ]);
       },
     );
 

@@ -39,6 +39,7 @@ class BotsRepositoryImpl implements BotsRepository {
     bool? paused,
     bool? aiDisabled,
     Map<String, String>? variableValues,
+    List<String>? disabledToolGroups,
   }) => _ds.update(
     id: id,
     version: version,
@@ -46,6 +47,7 @@ class BotsRepositoryImpl implements BotsRepository {
     paused: paused,
     aiDisabled: aiDisabled,
     variableValues: variableValues,
+    disabledToolGroups: disabledToolGroups,
   );
 
   @override

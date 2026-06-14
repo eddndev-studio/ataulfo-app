@@ -17,6 +17,7 @@ import '../widgets/bot_clone_sheet.dart';
 import '../widgets/bot_connection_card.dart';
 import '../widgets/bot_detail_header.dart';
 import '../widgets/bot_edit_sheet.dart';
+import '../widgets/bot_tool_permissions.dart';
 import '../widgets/bot_toggle_row.dart';
 
 /// Detalle de un Bot (S04): el HUB del bot. Identidad en el header de
@@ -200,6 +201,11 @@ class _LoadedView extends StatelessWidget {
                           color: AppTokens.divider,
                         ),
                         BotAiToggle(bot: bot, isMutating: isMutating),
+                        const Divider(
+                          height: AppTokens.sp6,
+                          color: AppTokens.divider,
+                        ),
+                        BotToolPermissions(bot: bot, isMutating: isMutating),
                       ],
                     ),
                   ),

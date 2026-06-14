@@ -19,6 +19,7 @@ class TemplatesMapper {
     contextMessages: dto.contextMessages,
     responseDelaySeconds: dto.responseDelaySeconds,
     silenceLabelIds: dto.silenceLabelIds,
+    disabledToolGroups: dto.disabledToolGroups,
   );
 
   static Template templateRespToEntity(TemplateResp resp) => Template(

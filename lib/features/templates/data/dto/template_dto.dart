@@ -91,6 +91,7 @@ class AiConfigDto {
     required this.contextMessages,
     this.responseDelaySeconds = 0,
     this.silenceLabelIds = const <String>[],
+    this.disabledToolGroups = const <String>[],
   });
 
   factory AiConfigDto.fromJson(Map<String, dynamic> json) {
@@ -121,6 +122,12 @@ class AiConfigDto {
     final silenceLabelIds = silenceRaw is List
         ? silenceRaw.whereType<String>().toList(growable: false)
         : const <String>[];
+    // Clave aditiva (permisos de herramientas): el backend la omite (omitempty)
+    // cuando no apaga ningún grupo; ausente ⇒ lista vacía (todo habilitado).
+    final groupsRaw = json['disabled_tool_groups'];
+    final disabledToolGroups = groupsRaw is List
+        ? groupsRaw.whereType<String>().toList(growable: false)
+        : const <String>[];
     return AiConfigDto(
       enabled: enabled,
       provider: provider,
@@ -133,6 +140,7 @@ class AiConfigDto {
       contextMessages: contextMessages,
       responseDelaySeconds: delayRaw is int ? delayRaw : 0,
       silenceLabelIds: silenceLabelIds,
+      disabledToolGroups: disabledToolGroups,
     );
   }
 
@@ -145,4 +153,5 @@ class AiConfigDto {
   final int contextMessages;
   final int responseDelaySeconds;
   final List<String> silenceLabelIds;
+  final List<String> disabledToolGroups;
 }

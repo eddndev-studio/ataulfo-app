@@ -14,6 +14,7 @@ class BotResp {
     required this.version,
     required this.paused,
     required this.aiDisabled,
+    this.disabledToolGroups = const <String>[],
   });
 
   factory BotResp.fromJson(Map<String, dynamic> json) {
@@ -39,6 +40,13 @@ class BotResp {
     if (identifier != null && identifier is! String) {
       throw const FormatException('botResp: identifier no es String ni null');
     }
+    // Clave aditiva (override de permisos del bot): el backend la emite como
+    // array; un server previo al campo no la manda ⇒ lista vacía. Se filtra a
+    // strings por defensa de contrato.
+    final groupsRaw = json['disabled_tool_groups'];
+    final disabledToolGroups = groupsRaw is List
+        ? groupsRaw.whereType<String>().toList(growable: false)
+        : const <String>[];
     return BotResp(
       id: id,
       orgId: orgId,
@@ -49,6 +57,7 @@ class BotResp {
       version: version,
       paused: paused,
       aiDisabled: aiDisabled,
+      disabledToolGroups: disabledToolGroups,
     );
   }
 
@@ -61,6 +70,7 @@ class BotResp {
   final int version;
   final bool paused;
   final bool aiDisabled;
+  final List<String> disabledToolGroups;
 }
 
 /// Body de `PUT /bots/:id` (`ataulfo-go/internal/adapters/httpbots/dto.go`
@@ -81,6 +91,7 @@ class BotUpdateReq {
     this.paused,
     this.aiDisabled,
     this.variableValues,
+    this.disabledToolGroups,
   });
 
   final int version;
@@ -89,11 +100,16 @@ class BotUpdateReq {
   final bool? aiDisabled;
   final Map<String, String>? variableValues;
 
+  /// Tristate: null ⇒ se OMITE (no toca el override); `[]` ⇒ limpiar; `[..]` ⇒
+  /// set. El bot SUMA grupos apagados sobre los de su plantilla (unión).
+  final List<String>? disabledToolGroups;
+
   Map<String, dynamic> toJson() => <String, dynamic>{
     if (name != null) 'name': name,
     if (paused != null) 'paused': paused,
     if (aiDisabled != null) 'ai_disabled': aiDisabled,
     if (variableValues != null) 'variable_values': variableValues,
+    if (disabledToolGroups != null) 'disabled_tool_groups': disabledToolGroups,
     'version': version,
   };
 }

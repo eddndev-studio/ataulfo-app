@@ -63,6 +63,7 @@ class BotDetailBloc extends Bloc<BotDetailEvent, BotDetailState> {
         name: event.name,
         paused: event.paused,
         aiDisabled: event.aiDisabled,
+        disabledToolGroups: event.disabledToolGroups,
       ),
     );
   }
@@ -182,20 +183,45 @@ class BotDetailLoadRequested extends BotDetailEvent {
 /// La `version` NO viaja en el evento — la toma del snapshot vigente en el
 /// bloc (CAS). Lo despachan los controles de detalle (pausar, IA, renombrar).
 class BotDetailUpdateRequested extends BotDetailEvent {
-  const BotDetailUpdateRequested({this.name, this.paused, this.aiDisabled});
+  const BotDetailUpdateRequested({
+    this.name,
+    this.paused,
+    this.aiDisabled,
+    this.disabledToolGroups,
+  });
 
   final String? name;
   final bool? paused;
   final bool? aiDisabled;
+
+  /// Override de permisos del bot (tristate): null ⇒ no tocar; lista ⇒ set/limpiar.
+  final List<String>? disabledToolGroups;
 
   @override
   bool operator ==(Object other) =>
       other is BotDetailUpdateRequested &&
       other.name == name &&
       other.paused == paused &&
-      other.aiDisabled == aiDisabled;
+      other.aiDisabled == aiDisabled &&
+      _nullableListEquals(other.disabledToolGroups, disabledToolGroups);
   @override
-  int get hashCode => Object.hash(name, paused, aiDisabled);
+  int get hashCode => Object.hash(
+    name,
+    paused,
+    aiDisabled,
+    disabledToolGroups == null ? null : Object.hashAll(disabledToolGroups!),
+  );
+}
+
+/// Igualdad de dos listas nullable (para el override tristate del evento):
+/// ambas null ⇒ iguales; una null ⇒ distintas; si no, igualdad posicional.
+bool _nullableListEquals(List<String>? a, List<String>? b) {
+  if (a == null || b == null) return a == b;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// Clona el Bot con el `name` dado (`POST /bots/:id/clone`). El éxito navega al

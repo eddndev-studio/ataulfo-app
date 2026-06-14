@@ -33,6 +33,20 @@ const _b1Paused = Bot(
   aiDisabled: false,
 );
 
+// Resultado del PUT que setea el override de permisos del bot: version+1.
+const _b1Restricted = Bot(
+  id: 'b1',
+  orgId: 'o1',
+  templateId: 't1',
+  name: 'Soporte',
+  channel: BotChannel.waUnofficial,
+  identifier: '52155...',
+  version: 4,
+  paused: false,
+  aiDisabled: false,
+  disabledToolGroups: <String>['flujos'],
+);
+
 // Snapshot fresco que devuelve el re-GET tras un 409: otra edición ganó la
 // carrera (version saltó a 6).
 const _b1Fresh = Bot(
@@ -173,6 +187,43 @@ void main() {
           paused: true,
           aiDisabled: null,
           variableValues: null,
+        ),
+      ).called(1),
+    );
+
+    blocTest<BotDetailBloc, BotDetailState>(
+      'UpdateRequested(disabledToolGroups) OK → Mutating → Loaded(version+1)',
+      build: () {
+        when(
+          () => repo.update(
+            id: 'b1',
+            version: 3,
+            name: null,
+            paused: null,
+            aiDisabled: null,
+            variableValues: null,
+            disabledToolGroups: const <String>['flujos'],
+          ),
+        ).thenAnswer((_) async => _b1Restricted);
+        return BotDetailBloc(repo: repo, id: 'b1');
+      },
+      seed: () => const BotDetailLoaded(_b1),
+      act: (b) => b.add(
+        const BotDetailUpdateRequested(disabledToolGroups: <String>['flujos']),
+      ),
+      expect: () => const <BotDetailState>[
+        BotDetailMutating(_b1),
+        BotDetailLoaded(_b1Restricted),
+      ],
+      verify: (_) => verify(
+        () => repo.update(
+          id: 'b1',
+          version: 3,
+          name: null,
+          paused: null,
+          aiDisabled: null,
+          variableValues: null,
+          disabledToolGroups: const <String>['flujos'],
         ),
       ).called(1),
     );

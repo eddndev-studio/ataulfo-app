@@ -20,6 +20,7 @@ class BotsMapper {
     version: resp.version,
     paused: resp.paused,
     aiDisabled: resp.aiDisabled,
+    disabledToolGroups: resp.disabledToolGroups,
   );
 
   static BotVariablesSnapshot variablesSnapshotFromResp(

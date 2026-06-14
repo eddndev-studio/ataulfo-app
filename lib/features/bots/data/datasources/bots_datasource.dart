@@ -45,6 +45,7 @@ abstract interface class BotsDatasource {
     bool? paused,
     bool? aiDisabled,
     Map<String, String>? variableValues,
+    List<String>? disabledToolGroups,
   });
 
   /// `GET /bots/:id/variables` (ADMIN+) ⇒ `{version, template_id,
@@ -159,6 +160,7 @@ class DioBotsDatasource implements BotsDatasource {
     bool? paused,
     bool? aiDisabled,
     Map<String, String>? variableValues,
+    List<String>? disabledToolGroups,
   }) async {
     try {
       final res = await _dio.put<Map<String, dynamic>>(
@@ -169,6 +171,7 @@ class DioBotsDatasource implements BotsDatasource {
           paused: paused,
           aiDisabled: aiDisabled,
           variableValues: variableValues,
+          disabledToolGroups: disabledToolGroups,
         ).toJson(),
       );
       final body = res.data;

@@ -200,6 +200,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
               'context_messages': ai.contextMessages,
               'response_delay_seconds': ai.responseDelaySeconds,
               'silence_label_ids': ai.silenceLabelIds,
+              'disabled_tool_groups': ai.disabledToolGroups,
             },
         },
       );

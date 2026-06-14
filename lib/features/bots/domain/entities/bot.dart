@@ -38,6 +38,7 @@ class Bot {
     required this.version,
     required this.paused,
     required this.aiDisabled,
+    this.disabledToolGroups = const <String>[],
   });
 
   final String id;
@@ -52,6 +53,13 @@ class Bot {
   final bool paused;
   final bool aiDisabled;
 
+  /// Override por-Bot de la deny-list de grupos de capacidad del agente IA
+  /// (ids de `ToolGroup`): grupos que ESTE bot apaga ADEMÁS de los que apaga su
+  /// plantilla. El permiso efectivo es la unión plantilla ∪ bot; el bot sólo
+  /// restringe. Vacío = no añade restricciones. Ids crudos (tolerante a un grupo
+  /// futuro), igual que el override del backend.
+  final List<String> disabledToolGroups;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -64,7 +72,8 @@ class Bot {
         other.identifier == identifier &&
         other.version == version &&
         other.paused == paused &&
-        other.aiDisabled == aiDisabled;
+        other.aiDisabled == aiDisabled &&
+        _listEquals(other.disabledToolGroups, disabledToolGroups);
   }
 
   @override
@@ -78,5 +87,17 @@ class Bot {
     version,
     paused,
     aiDisabled,
+    Object.hashAll(disabledToolGroups),
   );
+}
+
+/// Igualdad posicional de dos listas de strings (sin depender de `foundation`),
+/// para comparar el override de grupos del Bot.
+bool _listEquals(List<String> a, List<String> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
