@@ -9,6 +9,7 @@ void main() {
     // 422 al guardar o un grupo que no se pinta.
     test('los ids de wire coinciden con el contrato del backend', () {
       expect(ToolGroup.values.map((g) => g.wire).toList(), <String>[
+        'mensajeria',
         'acuse',
         'etiquetas',
         'notas',

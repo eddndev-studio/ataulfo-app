@@ -7,13 +7,21 @@ import 'package:flutter/material.dart';
 /// `aitools.ValidGroups()` del backend (lowercase español); un test guard lo
 /// verifica para que el drift cross-repo salga en CI, no en runtime.
 ///
-/// Las herramientas núcleo (enviar mensaje y cerrar turno) NO son un grupo: el
-/// agente siempre las tiene. Por eso no aparecen aquí.
+/// La única herramienta núcleo (cerrar turno) NO es un grupo: el agente siempre
+/// la tiene. Por eso no aparece aquí. La mensajería (responder por texto) SÍ es
+/// un grupo gateable.
 ///
 /// Esto es un catálogo de PRESENTACIÓN (icono + label + descripción); la config
 /// del dominio guarda solo los ids (`List<String>`), igual que las etiquetas de
 /// silencio — tolerante a que el backend agregue un grupo futuro.
 enum ToolGroup {
+  mensajeria(
+    'mensajeria',
+    'Mensajería',
+    'Responder por texto a la persona. Si la desactivas, el bot no enviará '
+        'mensajes escritos (solo podrá usar sus otras capacidades).',
+    Icons.chat_bubble_outline,
+  ),
   acuse(
     'acuse',
     'Acuse y reacción',

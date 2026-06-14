@@ -13,9 +13,10 @@ void main() {
     List<String> locked = const <String>[],
     required Future<void> Function(WidgetTester) edit,
   }) async {
-    // Viewport alto: el sheet lista 10 filas + cabecera + botón; con la
-    // ventana por defecto algunas filas quedan fuera del viewport del ListView
-    // (lazy) y find.byKey no las hallaría. Con espacio de sobra, todo se monta.
+    // Viewport alto: el sheet lista 11 filas (10 grupos + núcleo) + cabecera +
+    // botón; con la ventana por defecto algunas filas quedan fuera del viewport
+    // del ListView (lazy) y find.byKey no las hallaría. Con espacio de sobra,
+    // todo se monta.
     tester.view.physicalSize = const Size(1200, 3000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -69,6 +70,42 @@ void main() {
           // flujos arranca apagado ⇒ tocarlo lo HABILITA (sale de la deny-list).
           await tapKey(t, 'tool_groups.sheet.option.flujos');
           // notas arranca habilitado ⇒ tocarlo lo DESHABILITA.
+          await tapKey(t, 'tool_groups.sheet.option.notas');
+          await tapKey(t, 'tool_groups.sheet.save');
+        },
+      );
+      expect(result, <String>['notas']);
+    },
+  );
+
+  testWidgets(
+    'mensajería es un grupo gateable: deshabilitarla entra en la deny-list',
+    (tester) async {
+      final result = await openAndEdit(
+        tester,
+        initial: const <String>[],
+        edit: (t) async {
+          // mensajería arranca habilitada ⇒ tocarla la DESHABILITA (canal de
+          // texto apagado). Es el comportamiento estrella de este release.
+          await tapKey(t, 'tool_groups.sheet.option.mensajeria');
+          await tapKey(t, 'tool_groups.sheet.save');
+        },
+      );
+      expect(result, <String>['mensajeria']);
+    },
+  );
+
+  testWidgets(
+    'mensajería bloqueada por la plantilla no es tappable ni entra en el resultado',
+    (tester) async {
+      final result = await openAndEdit(
+        tester,
+        initial: const <String>[],
+        locked: const <String>['mensajeria'],
+        edit: (t) async {
+          // La plantilla ya apagó la mensajería: el bot la ve bloqueada y
+          // tocarla no hace nada (onTap null), ni entra en su deny-list.
+          await tapKey(t, 'tool_groups.sheet.option.mensajeria');
           await tapKey(t, 'tool_groups.sheet.option.notas');
           await tapKey(t, 'tool_groups.sheet.save');
         },

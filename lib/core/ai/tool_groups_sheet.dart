@@ -10,9 +10,9 @@ import 'tool_groups.dart';
 /// apagados de ESTE nivel) — un casillero marcado = grupo habilitado.
 ///
 /// Compartido por la plantilla (línea base) y el bot (override). El catálogo de
-/// grupos es estático del cliente (no se pide al backend); las herramientas
-/// núcleo (enviar mensaje, cerrar turno) no son un grupo y se muestran como una
-/// fila informativa siempre activa.
+/// grupos es estático del cliente (no se pide al backend); la herramienta núcleo
+/// (cerrar turno) no es un grupo y se muestra como una fila informativa siempre
+/// activa. La mensajería sí es un grupo configurable más.
 ///
 /// `lockedDisabledGroups` son grupos ya apagados por un nivel superior (la
 /// plantilla, cuando se edita un Bot): se muestran apagados y bloqueados, y
@@ -122,8 +122,8 @@ class _ToolGroupsSheetState extends State<ToolGroupsSheet> {
   }
 }
 
-/// Fila informativa del núcleo: enviar mensaje y cerrar turno están SIEMPRE
-/// activos (sin ellos el bot no podría responder), no son configurables.
+/// Fila informativa del núcleo: cerrar el turno está SIEMPRE activo (sin él el
+/// agente no podría terminar conscientemente), no es configurable.
 class _CoreRow extends StatelessWidget {
   const _CoreRow();
 
@@ -140,19 +140,15 @@ class _CoreRow extends StatelessWidget {
         children: <Widget>[
           const Icon(Icons.lock_outline, color: AppTokens.text2, size: 22),
           const SizedBox(width: AppTokens.sp2),
-          const Icon(
-            Icons.chat_bubble_outline,
-            color: AppTokens.text2,
-            size: 20,
-          ),
+          const Icon(Icons.task_alt, color: AppTokens.text2, size: 20),
           const SizedBox(width: AppTokens.sp2),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Mensajería (núcleo)', style: textTheme.bodyMedium),
+                Text('Cierre de turno (núcleo)', style: textTheme.bodyMedium),
                 Text(
-                  'Responder y cerrar el turno. Siempre activo.',
+                  'El bot siempre puede cerrar su turno. Siempre activo.',
                   style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
                 ),
               ],
