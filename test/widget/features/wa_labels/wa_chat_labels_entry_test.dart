@@ -2,9 +2,12 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_live_event.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_mapping.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +20,8 @@ class _MockConvBloc extends MockBloc<ConversationsEvent, ConversationsState>
     implements ConversationsBloc {}
 
 class _MockWaRepo extends Mock implements WaLabelsRepository {}
+
+class _MockChatLabelsRepo extends Mock implements ChatLabelsRepository {}
 
 const _dm = Conversation(
   chatLid: 'lid-dm',
@@ -37,10 +42,12 @@ const _dm = Conversation(
 void main() {
   late _MockConvBloc conv;
   late _MockWaRepo repo;
+  late _MockChatLabelsRepo chatLabelsRepo;
 
   setUp(() {
     conv = _MockConvBloc();
     repo = _MockWaRepo();
+    chatLabelsRepo = _MockChatLabelsRepo();
     when(() => conv.botId).thenReturn('b1');
     when(() => conv.state).thenReturn(
       const ConversationsLoaded(
@@ -53,8 +60,14 @@ void main() {
       () => repo.listChatAssocs(any()),
     ).thenAnswer((_) async => <WaChatAssoc>[]);
     when(
+      () => repo.listMappings(any()),
+    ).thenAnswer((_) async => <WaLabelMapping>[]);
+    when(
       () => repo.liveEvents(any()),
     ).thenAnswer((_) => const Stream<WaLabelLiveEvent>.empty());
+    when(
+      () => chatLabelsRepo.listForChat(any(), any()),
+    ).thenAnswer((_) async => <Label>[]);
   });
 
   Widget app() {
@@ -63,8 +76,13 @@ void main() {
       routes: <RouteBase>[
         GoRoute(
           path: '/conv',
-          builder: (_, _) => RepositoryProvider<WaLabelsRepository>.value(
-            value: repo,
+          builder: (_, _) => MultiRepositoryProvider(
+            providers: <RepositoryProvider<dynamic>>[
+              RepositoryProvider<WaLabelsRepository>.value(value: repo),
+              RepositoryProvider<ChatLabelsRepository>.value(
+                value: chatLabelsRepo,
+              ),
+            ],
             child: BlocProvider<ConversationsBloc>.value(
               value: conv,
               child: const Scaffold(body: ConversationsListPage()),
@@ -93,7 +111,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // El sheet se abrió...
-    expect(find.text('Etiquetas en este chat'), findsOneWidget);
+    expect(find.text('Etiquetas de este chat'), findsOneWidget);
     // ...y NO se navegó al hilo (el tap lo absorbió el IconButton).
     expect(find.text('HILO_SENTINEL'), findsNothing);
   });

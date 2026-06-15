@@ -2,6 +2,9 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/conversations/presentation/widgets/chat_labels_sheet.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
 import 'package:ataulfo/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:ataulfo/features/flow_run/domain/entities/runnable_flow.dart';
@@ -11,8 +14,8 @@ import 'package:ataulfo/features/profile/presentation/widgets/chat_thread_app_ba
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_live_event.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_mapping.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
-import 'package:ataulfo/features/wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,6 +29,8 @@ class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
+
+class _MockChatLabelsRepo extends Mock implements ChatLabelsRepository {}
 
 class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
 
@@ -216,15 +221,27 @@ void main() {
         () => waRepo.listChatAssocs(any()),
       ).thenAnswer((_) async => <WaChatAssoc>[]);
       when(
+        () => waRepo.listMappings(any()),
+      ).thenAnswer((_) async => <WaLabelMapping>[]);
+      when(
         () => waRepo.liveEvents(any()),
       ).thenAnswer((_) => const Stream<WaLabelLiveEvent>.empty());
+      final chatLabelsRepo = _MockChatLabelsRepo();
+      when(
+        () => chatLabelsRepo.listForChat(any(), any()),
+      ).thenAnswer((_) async => <Label>[]);
       when(() => bloc.state).thenReturn(const ProfileLoading());
 
       await tester.pumpWidget(
         MaterialApp(
           theme: AppDesignTheme.dark(),
-          home: RepositoryProvider<WaLabelsRepository>.value(
-            value: waRepo,
+          home: MultiRepositoryProvider(
+            providers: <RepositoryProvider<dynamic>>[
+              RepositoryProvider<WaLabelsRepository>.value(value: waRepo),
+              RepositoryProvider<ChatLabelsRepository>.value(
+                value: chatLabelsRepo,
+              ),
+            ],
             child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<ProfileBloc>.value(value: bloc),
@@ -240,7 +257,7 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('thread.labels')));
       await tester.pumpAndSettle();
-      expect(find.byType(WaChatLabelsSheet), findsOneWidget);
+      expect(find.byType(ChatLabelsSheet), findsOneWidget);
     });
   });
 

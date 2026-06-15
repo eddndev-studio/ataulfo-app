@@ -51,6 +51,7 @@ import '../../features/flows/presentation/bloc/flows_bloc.dart';
 import '../../features/flows/presentation/bloc/media_names_cubit.dart';
 import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
+import '../../features/labels/domain/repositories/chat_labels_repository.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/trainer/domain/repositories/trainer_repositories.dart';
 import '../../features/trainer/presentation/bloc/preview_bloc.dart';
@@ -152,6 +153,7 @@ class AppRouter {
     required WaLabelsRepository waLabelsRepository,
     required QuickRepliesRepository quickRepliesRepository,
     required LabelsRepository labelsRepository,
+    required ChatLabelsRepository chatLabelsRepository,
     required NotesRepository notesRepository,
     required AiLogRepository aiLogRepository,
     required TrainerRepository trainerRepository,
@@ -181,6 +183,7 @@ class AppRouter {
        _waLabelsRepo = waLabelsRepository,
        _quickRepliesRepo = quickRepliesRepository,
        _labelsRepo = labelsRepository,
+       _chatLabelsRepo = chatLabelsRepository,
        _notesRepo = notesRepository,
        _aiLogRepo = aiLogRepository,
        _trainerRepo = trainerRepository,
@@ -211,6 +214,7 @@ class AppRouter {
   final WaLabelsRepository _waLabelsRepo;
   final QuickRepliesRepository _quickRepliesRepo;
   final LabelsRepository _labelsRepo;
+  final ChatLabelsRepository _chatLabelsRepo;
   final TrainerRepository _trainerRepo;
   final WorkspaceRepository _workspaceRepo;
   final PreviewRepository _previewRepo;
@@ -615,10 +619,19 @@ class AppRouter {
         path: '/bots/:id/sessions',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          // El repo de etiquetas WA cuelga del scope para el sheet de etiquetas
-          // por chat (la fila de la bandeja lo abre con su chatLid + kind).
-          return RepositoryProvider<WaLabelsRepository>.value(
-            value: _waLabelsRepo,
+          // Los repos de etiquetas cuelgan del scope para el sheet de etiquetas
+          // por chat (la fila de la bandeja lo abre con su chatLid + kind): las
+          // etiquetas WhatsApp (sección "WhatsApp" + mapeos) y los Labels
+          // internos puestos al chat (sección "Internas", solo lectura).
+          return MultiRepositoryProvider(
+            providers: <RepositoryProvider<dynamic>>[
+              RepositoryProvider<WaLabelsRepository>.value(
+                value: _waLabelsRepo,
+              ),
+              RepositoryProvider<ChatLabelsRepository>.value(
+                value: _chatLabelsRepo,
+              ),
+            ],
             child: BlocProvider<ConversationsBloc>(
               create: (_) =>
                   ConversationsBloc(repo: _conversationsRepo, botId: id)
@@ -653,6 +666,9 @@ class AppRouter {
               ),
               RepositoryProvider<WaLabelsRepository>.value(
                 value: _waLabelsRepo,
+              ),
+              RepositoryProvider<ChatLabelsRepository>.value(
+                value: _chatLabelsRepo,
               ),
               RepositoryProvider<FlowRunRepository>.value(value: _flowRunRepo),
               RepositoryProvider<NotesRepository>.value(value: _notesRepo),

@@ -4,6 +4,7 @@ import '../../domain/entities/label.dart';
 import '../../domain/failures/labels_failure.dart';
 import '../dto/label_dto.dart';
 import '../mappers/labels_mapper.dart';
+import 'labels_dio_errors.dart';
 
 /// Puerto de datos del catálogo de Labels internos (S10), org-scoped. Lectura
 /// (`GET /labels`) y mutaciones (`POST`/`PUT`/`DELETE /labels`). Lanza
@@ -52,7 +53,7 @@ class DioLabelsDatasource implements LabelsDatasource {
     } on LabelsFailure {
       rethrow;
     } on DioException catch (e) {
-      throw _mapDioException(e);
+      throw mapLabelsDioException(e);
     } on FormatException {
       throw const LabelsUnknownFailure();
     } on TypeError {
@@ -98,7 +99,7 @@ class DioLabelsDatasource implements LabelsDatasource {
     try {
       await _dio.delete<void>('/labels/$id');
     } on DioException catch (e) {
-      throw _mapDioException(e);
+      throw mapLabelsDioException(e);
     }
   }
 
@@ -117,36 +118,11 @@ class DioLabelsDatasource implements LabelsDatasource {
     } on LabelsFailure {
       rethrow;
     } on DioException catch (e) {
-      throw _mapDioException(e);
+      throw mapLabelsDioException(e);
     } on FormatException {
       throw const LabelsUnknownFailure();
     } on TypeError {
       throw const LabelsUnknownFailure();
-    }
-  }
-
-  LabelsFailure _mapDioException(DioException e) {
-    switch (e.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        return const LabelsTimeoutFailure();
-      case DioExceptionType.connectionError:
-        return const LabelsNetworkFailure();
-      case DioExceptionType.badResponse:
-        final status = e.response?.statusCode ?? 0;
-        if (status == 403) return const LabelsForbiddenFailure();
-        if (status == 404) return const LabelsNotFoundFailure();
-        if (status == 409) return const LabelsDuplicateNameFailure();
-        if (status == 422) return const LabelsValidationFailure();
-        if (status >= 500 && status < 600) {
-          return const LabelsServerFailure();
-        }
-        return const LabelsUnknownFailure();
-      case DioExceptionType.cancel:
-      case DioExceptionType.badCertificate:
-      case DioExceptionType.unknown:
-        return const LabelsUnknownFailure();
     }
   }
 }

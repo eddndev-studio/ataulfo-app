@@ -25,6 +25,7 @@ import 'features/flow_run/data/datasources/flow_run_datasource.dart';
 import 'features/flow_run/data/repositories/flow_run_repository_impl.dart';
 import 'features/flows/data/datasources/flows_datasource.dart';
 import 'features/flows/data/repositories/flows_repository_impl.dart';
+import 'features/labels/data/datasources/chat_labels_datasource.dart';
 import 'features/labels/data/datasources/labels_datasource.dart';
 import 'features/trainer/data/datasources/preview_datasource.dart';
 import 'features/trainer/data/datasources/trainer_datasource.dart';
@@ -32,6 +33,7 @@ import 'features/trainer/data/datasources/workspace_datasource.dart';
 import 'features/trainer/data/repositories/trainer_repositories_impl.dart';
 import 'features/ai_log/data/ai_log_datasource.dart';
 import 'features/notes/data/datasources/notes_datasource.dart';
+import 'features/labels/data/repositories/chat_labels_repository_impl.dart';
 import 'features/labels/data/repositories/labels_repository_impl.dart';
 import 'features/notes/data/repositories/notes_repository_impl.dart';
 import 'features/media/data/cache/caching_media_thumbnail_loader.dart';
@@ -204,6 +206,12 @@ Future<void> main() async {
     datasource: DioLabelsDatasource(mainDio),
   );
 
+  // Aplicación de Labels internos por chat: el sheet de etiquetas del chat
+  // (sección "Internas") los lee/aplica/quita. Mismo mainDio (Bearer).
+  final chatLabelsRepository = ChatLabelsRepositoryImpl(
+    datasource: DioChatLabelsDatasource(mainDio),
+  );
+
   // Cuaderno de notas (S14): panel chat-scoped del hilo; mismo cuaderno que
   // escribe el agente IA con save_note.
   final notesRepository = NotesRepositoryImpl(
@@ -300,6 +308,7 @@ Future<void> main() async {
     waLabelsRepository: waLabelsRepository,
     quickRepliesRepository: quickRepliesRepository,
     labelsRepository: labelsRepository,
+    chatLabelsRepository: chatLabelsRepository,
     notesRepository: notesRepository,
     aiLogRepository: aiLogRepository,
     trainerRepository: trainerRepository,

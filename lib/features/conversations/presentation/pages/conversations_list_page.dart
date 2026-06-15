@@ -11,10 +11,10 @@ import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/smart_timestamp.dart';
-import '../../../wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import '../../domain/entities/conversation.dart';
 import '../../domain/failures/conversations_failure.dart';
 import '../bloc/conversations_bloc.dart';
+import '../widgets/chat_labels_sheet.dart';
 
 /// Listado de conversaciones de un bot (S07 RF#7). Consume el
 /// `ConversationsBloc` del scope (lo cabla la ruta `/bots/:id/sessions` con el
@@ -380,13 +380,13 @@ class _ConversationTile extends StatelessWidget {
               ],
             ),
           ),
-          // Acción secundaria: etiquetar este chat con etiquetas de WhatsApp.
+          // Acción secundaria: etiquetas de este chat (internas + WhatsApp).
           // El tap del icono no dispara el onTap del card (lo absorbe el botón).
           IconButton(
             key: Key('conversation.labels.${c.chatLid}'),
-            tooltip: 'Etiquetas de WhatsApp',
+            tooltip: 'Etiquetas',
             icon: const Icon(Icons.label_outline, color: AppTokens.text2),
-            onPressed: () => WaChatLabelsSheet.open(
+            onPressed: () => ChatLabelsSheet.open(
               context,
               botId: context.read<ConversationsBloc>().botId,
               chatLid: c.chatLid,

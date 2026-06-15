@@ -7,9 +7,9 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../conversations/domain/entities/conversation.dart';
+import '../../../conversations/presentation/widgets/chat_labels_sheet.dart';
 import '../../../flow_run/presentation/widgets/flow_run_sheet.dart';
 import '../../../notes/presentation/widgets/notes_sheet.dart';
-import '../../../wa_labels/presentation/widgets/wa_chat_labels_sheet.dart';
 import '../bloc/profile_bloc.dart';
 
 /// App bar del hilo de mensajes con identidad real: avatar (foto) + nombre del
@@ -54,13 +54,13 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
           onPressed: () =>
               FlowRunSheet.open(context, botId: botId, chatLid: chatLid),
         ),
-        // Etiquetar este chat con etiquetas de WhatsApp (reusa el sheet de la
-        // lista de conversaciones). El `WaLabelsRepository` lo provee la ruta.
+        // Etiquetas de este chat (internas + WhatsApp; reusa el sheet de la
+        // lista de conversaciones). Los repos los provee la ruta.
         IconButton(
           key: const Key('thread.labels'),
-          tooltip: 'Etiquetas de WhatsApp',
+          tooltip: 'Etiquetas',
           icon: const Icon(Icons.label_outline),
-          onPressed: () => WaChatLabelsSheet.open(
+          onPressed: () => ChatLabelsSheet.open(
             context,
             botId: botId,
             chatLid: chatLid,
