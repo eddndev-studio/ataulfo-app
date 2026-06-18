@@ -63,6 +63,9 @@ import '../../features/trainer/presentation/pages/workspace_page.dart';
 import '../../features/ai_log/domain/ai_log_repository.dart';
 import '../../features/ai_log/presentation/bloc/ai_log_bloc.dart';
 import '../../features/ai_log/presentation/pages/ai_log_page.dart';
+import '../../features/executions/domain/execution_repository.dart';
+import '../../features/executions/presentation/cubit/executions_cubit.dart';
+import '../../features/executions/presentation/pages/executions_page.dart';
 import '../../features/notes/domain/repositories/notes_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/labels/presentation/bloc/labels_bloc.dart';
@@ -156,6 +159,7 @@ class AppRouter {
     required ChatLabelsRepository chatLabelsRepository,
     required NotesRepository notesRepository,
     required AiLogRepository aiLogRepository,
+    required ExecutionRepository executionsRepository,
     required TrainerRepository trainerRepository,
     required WorkspaceRepository workspaceRepository,
     required PreviewRepository previewRepository,
@@ -186,6 +190,7 @@ class AppRouter {
        _chatLabelsRepo = chatLabelsRepository,
        _notesRepo = notesRepository,
        _aiLogRepo = aiLogRepository,
+       _executionsRepo = executionsRepository,
        _trainerRepo = trainerRepository,
        _workspaceRepo = workspaceRepository,
        _previewRepo = previewRepository,
@@ -220,6 +225,7 @@ class AppRouter {
   final PreviewRepository _previewRepo;
   final NotesRepository _notesRepo;
   final AiLogRepository _aiLogRepo;
+  final ExecutionRepository _executionsRepo;
   final MembershipsRepository _membershipsRepo;
   final MembersRepository _membersRepo;
   final InvitationsRepository _invitationsRepo;
@@ -753,6 +759,30 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Razonamiento del bot')),
               body: const AiLogPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Historial de ejecuciones de flujo del chat (S11): qué corrió, con
+        // qué estado y por qué falló. Sub-ruta del hilo (segmento extra). El
+        // backend la protege con ADMIN+ (la entrada del app bar también se
+        // oculta para roles menores); page-scoped, carga al montarse. Resuelve
+        // los nombres de flujo contra el catálogo corrible (best-effort).
+        path: '/bots/:id/sessions/:chatLid/executions',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final chatLid = state.pathParameters['chatLid']!;
+          return BlocProvider<ExecutionsCubit>(
+            create: (_) => ExecutionsCubit(
+              execRepo: _executionsRepo,
+              flowRunRepo: _flowRunRepo,
+              botId: id,
+              chatLid: chatLid,
+            )..load(),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Ejecuciones del chat')),
+              body: const ExecutionsPage(),
             ),
           );
         },

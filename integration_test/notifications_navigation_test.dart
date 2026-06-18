@@ -15,6 +15,8 @@ import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/ai_log/domain/ai_log_repository.dart';
+import 'package:ataulfo/features/executions/domain/entities/execution.dart';
+import 'package:ataulfo/features/executions/domain/execution_repository.dart';
 import 'package:ataulfo/features/notes/domain/repositories/notes_repository.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
@@ -73,6 +75,14 @@ class _MockChatLabelsRepo extends Mock implements ChatLabelsRepository {}
 class _MockNotesRepo extends Mock implements NotesRepository {}
 
 class _MockAiLogRepo extends Mock implements AiLogRepository {}
+
+class _FakeExecutionsRepo implements ExecutionRepository {
+  @override
+  Future<List<Execution>> listBySession({
+    required String botId,
+    required String chatLid,
+  }) async => const <Execution>[];
+}
 
 class _MockTrainerRepo extends Mock implements TrainerRepository {}
 
@@ -159,6 +169,7 @@ void main() {
       chatLabelsRepository: _MockChatLabelsRepo(),
       notesRepository: _MockNotesRepo(),
       aiLogRepository: _MockAiLogRepo(),
+      executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),

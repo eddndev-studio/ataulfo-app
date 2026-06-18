@@ -96,6 +96,24 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
             );
           },
         ),
+        // Historial de ejecuciones de flujo de ESTE chat (S11): qué corrió y
+        // por qué falló. Solo ADMIN+ (el backend igual rechaza con 403).
+        BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, authState) {
+            if (authState is! AuthAuthenticated ||
+                !isAdminOrAbove(authState.identity.role)) {
+              return const SizedBox.shrink();
+            }
+            return IconButton(
+              key: const Key('thread.executions'),
+              tooltip: 'Ejecuciones del chat',
+              icon: const Icon(Icons.history_outlined),
+              onPressed: () => context.push(
+                '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/executions',
+              ),
+            );
+          },
+        ),
       ],
       title: BlocBuilder<ProfileBloc, ProfileState>(
         builder: (context, state) {

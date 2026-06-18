@@ -1,3 +1,5 @@
+import 'package:ataulfo/features/executions/domain/entities/execution.dart';
+import 'package:ataulfo/features/executions/domain/execution_repository.dart';
 import 'package:ataulfo/app.dart';
 import 'package:ataulfo/core/design/widgets/app_background.dart';
 import 'package:ataulfo/core/router/app_router.dart';
@@ -104,6 +106,14 @@ class _FakeMediaFilePicker implements MediaFilePicker {
   Future<List<PickedMedia>> pickMultiple() async => const <PickedMedia>[];
 }
 
+class _FakeExecutionsRepo implements ExecutionRepository {
+  @override
+  Future<List<Execution>> listBySession({
+    required String botId,
+    required String chatLid,
+  }) async => const <Execution>[];
+}
+
 void main() {
   late _MockAuthBloc authBloc;
   late AppRouter router;
@@ -149,6 +159,7 @@ void main() {
       chatLabelsRepository: _MockChatLabelsRepo(),
       notesRepository: _MockNotesRepo(),
       aiLogRepository: _MockAiLogRepo(),
+      executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),

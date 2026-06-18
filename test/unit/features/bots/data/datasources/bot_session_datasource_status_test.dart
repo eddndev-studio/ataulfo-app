@@ -73,6 +73,26 @@ void main() {
       },
     );
 
+    test(
+      'DISCONNECTED con reason+disconnectedAt → SessionStatus los porta',
+      () async {
+        when(
+          () => dio.get<Map<String, dynamic>>('/bots/b1/session'),
+        ).thenAnswer(
+          (_) async => ok(<String, dynamic>{
+            'state': 'DISCONNECTED',
+            'reason': 'logged_out',
+            'disconnectedAt': '2026-06-14T10:30:00Z',
+          }),
+        );
+
+        final s = await ds.getSessionState('b1');
+        expect(s.state, SessionState.disconnected);
+        expect(s.disconnectReason, 'logged_out');
+        expect(s.disconnectedAt, DateTime.utc(2026, 6, 14, 10, 30));
+      },
+    );
+
     test('CONNECTING y RECONNECTING parsean', () async {
       when(
         () => dio.get<Map<String, dynamic>>('/bots/b1/session'),

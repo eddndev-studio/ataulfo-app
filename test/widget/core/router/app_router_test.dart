@@ -1,3 +1,5 @@
+import 'package:ataulfo/features/executions/domain/entities/execution.dart';
+import 'package:ataulfo/features/executions/domain/execution_repository.dart';
 import 'dart:async';
 
 import 'package:ataulfo/core/design/widgets/app_button.dart';
@@ -220,6 +222,14 @@ Widget _host(AppRouter router, AuthBloc authBloc) =>
       child: MaterialApp.router(routerConfig: router.router),
     );
 
+class _FakeExecutionsRepo implements ExecutionRepository {
+  @override
+  Future<List<Execution>> listBySession({
+    required String botId,
+    required String chatLid,
+  }) async => const <Execution>[];
+}
+
 void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsRepo botsRepo;
@@ -337,6 +347,7 @@ void main() {
       chatLabelsRepository: _MockChatLabelsRepo(),
       notesRepository: _MockNotesRepo(),
       aiLogRepository: _MockAiLogRepo(),
+      executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
@@ -779,6 +790,7 @@ void main() {
       chatLabelsRepository: _MockChatLabelsRepo(),
       notesRepository: _MockNotesRepo(),
       aiLogRepository: _MockAiLogRepo(),
+      executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
@@ -866,6 +878,7 @@ void main() {
       chatLabelsRepository: _MockChatLabelsRepo(),
       notesRepository: _MockNotesRepo(),
       aiLogRepository: _MockAiLogRepo(),
+      executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
@@ -1155,6 +1168,7 @@ void main() {
       chatLabelsRepository: _MockChatLabelsRepo(),
       notesRepository: _MockNotesRepo(),
       aiLogRepository: _MockAiLogRepo(),
+      executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
@@ -1398,6 +1412,7 @@ void main() {
       chatLabelsRepository: _MockChatLabelsRepo(),
       notesRepository: _MockNotesRepo(),
       aiLogRepository: _MockAiLogRepo(),
+      executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),

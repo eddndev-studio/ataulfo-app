@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/util/smart_timestamp.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_session_status_bloc.dart';
@@ -80,6 +81,33 @@ void main() {
     expect(find.text('Sin conexión'), findsOneWidget);
     expect(find.widgetWithText(AppButton, 'Conectar WhatsApp'), findsOneWidget);
   });
+
+  testWidgets(
+    'DISCONNECTED con razón+timestamp: explica por qué y desde cuándo',
+    (tester) async {
+      final since = DateTime.utc(2026, 6, 14, 10, 30);
+      seed(
+        BotSessionStatusLoaded(
+          SessionStatus(
+            state: SessionState.disconnected,
+            disconnectReason: 'logged_out',
+            disconnectedAt: since,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.text('Sin conexión'), findsOneWidget);
+      // La razón se vuelve copy legible y el instante se muestra (no el código).
+      expect(find.textContaining('vincular'), findsOneWidget);
+      expect(find.byType(BotConnectionCard), findsOneWidget);
+      expect(
+        find.textContaining(smartTimestamp(since.millisecondsSinceEpoch)),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('PAIRING: "Emparejando…" + CTA "Abrir emparejamiento"', (
     tester,

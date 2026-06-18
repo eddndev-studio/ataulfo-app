@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/util/smart_timestamp.dart';
 import 'package:ataulfo/features/notifications/domain/entities/notification_inbox_item.dart';
 import 'package:ataulfo/features/notifications/domain/entities/notification_preference.dart';
 import 'package:ataulfo/features/notifications/domain/failures/notifications_failure.dart';
@@ -40,6 +43,43 @@ final _alertItem = NotificationInboxItem(
   status: NotificationInboxStatus.unread,
   createdAt: DateTime.utc(2026, 6, 12, 12),
   updatedAt: DateTime.utc(2026, 6, 12, 12),
+);
+
+final _flowFailedItem = NotificationInboxItem(
+  id: 'ni-3',
+  eventType: NotificationEventType.flowFailed,
+  botId: 'b1',
+  chatLid: '5215550000002',
+  title: 'Flujo "Bienvenida" fallido',
+  body: 'No se pudo enviar el archivo. Reintenta en un momento.',
+  priority: NotificationPriority.high,
+  count: 1,
+  status: NotificationInboxStatus.unread,
+  createdAt: DateTime.utc(2026, 6, 14, 9),
+  updatedAt: DateTime.utc(2026, 6, 14, 9),
+  payload: const <String, String>{
+    'code': 'send_upload_rejected',
+    'detail': 'upload failed with status code 400',
+    'flowName': 'Bienvenida',
+  },
+);
+
+NotificationInboxItem _failed(String id) => NotificationInboxItem(
+  id: id,
+  eventType: NotificationEventType.flowFailed,
+  botId: 'b1',
+  chatLid: '5215550000002',
+  title: 'Flujo fallido $id',
+  body: 'No se pudo enviar el archivo.',
+  priority: NotificationPriority.high,
+  count: 1,
+  status: NotificationInboxStatus.unread,
+  createdAt: DateTime.utc(2026, 6, 14, 9),
+  updatedAt: DateTime.utc(2026, 6, 14, 9),
+  payload: const <String, String>{
+    'code': 'send_upload_rejected',
+    'detail': 'upload failed with status code 400',
+  },
 );
 
 void main() {
@@ -120,6 +160,98 @@ void main() {
       () => bloc.add(const NotificationMarkReadRequested('ni-1')),
     ).called(1);
   });
+
+  testWidgets('el ítem muestra su marca de tiempo', (tester) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(NotificationsLoaded(items: <NotificationInboxItem>[_item]));
+
+    await tester.pumpWidget(host());
+
+    expect(
+      find.text(smartTimestamp(_item.updatedAt.millisecondsSinceEpoch)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'detalle técnico colapsado por defecto, se expande con su botón',
+    (tester) async {
+      when(() => bloc.state).thenReturn(
+        NotificationsLoaded(items: <NotificationInboxItem>[_flowFailedItem]),
+      );
+
+      await tester.pumpWidget(host());
+
+      // Colapsado: el code/detail crudo NO se ve hasta expandir.
+      expect(find.text('send_upload_rejected'), findsNothing);
+      expect(find.textContaining('status code 400'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('notifications.item.ni-3.expand')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('notifications.item.ni-3.detail')),
+        findsOneWidget,
+      );
+      expect(find.text('send_upload_rejected'), findsOneWidget);
+      expect(find.textContaining('status code 400'), findsOneWidget);
+    },
+  );
+
+  testWidgets('expandir el detalle NO marca leído (sin conflicto de tap)', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      NotificationsLoaded(items: <NotificationInboxItem>[_flowFailedItem]),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.byKey(const Key('notifications.item.ni-3.expand')));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => bloc.add(const NotificationMarkReadRequested('ni-3')));
+  });
+
+  testWidgets(
+    'el estado de expansión no migra a otro ítem al recomponerse la lista',
+    (tester) async {
+      final a = _failed('ni-a');
+      final b = _failed('ni-b');
+      final c = _failed('ni-c');
+      final controller = StreamController<NotificationsState>();
+      addTearDown(controller.close);
+      whenListen(
+        bloc,
+        controller.stream,
+        initialState: NotificationsLoaded(
+          items: <NotificationInboxItem>[a, b, c],
+        ),
+      );
+
+      await tester.pumpWidget(host());
+
+      // Expandir el de en medio (b): por posición, su estado caería sobre c al
+      // quitarse un ítem anterior.
+      await tester.tap(find.byKey(const Key('notifications.item.ni-b.expand')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('notifications.item.ni-b.detail')),
+        findsOneWidget,
+      );
+
+      // Quitar el primero (a): la lista se recompone a [b, c]. Con una key
+      // estable por id, el detalle abierto NO se cuela en c, que nunca se
+      // expandió (sin key, el estado _expanded migraría por posición).
+      controller.add(NotificationsLoaded(items: <NotificationInboxItem>[b, c]));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('notifications.item.ni-c.detail')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('empty muestra estado vacío', (tester) async {
     when(

@@ -4,10 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_card.dart';
 import '../../domain/entities/notification_inbox_item.dart';
-import '../../domain/entities/notification_preference.dart';
 import '../bloc/notifications_bloc.dart';
+import '../widgets/notification_inbox_tile.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -79,92 +78,15 @@ class _NotificationsList extends StatelessWidget {
             );
           }
           final item = items[index - 1];
-          return _NotificationItem(item: item);
+          // Key estable por id: el estado de expansión del tile sigue al ítem,
+          // no a su posición, cuando la lista se recompone (p. ej. al marcar
+          // otro como leído).
+          return NotificationInboxTile(key: ValueKey(item.id), item: item);
         },
         separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
         itemCount: items.length + 1,
       ),
     );
-  }
-}
-
-class _NotificationItem extends StatelessWidget {
-  const _NotificationItem({required this.item});
-
-  final NotificationInboxItem item;
-
-  /// Un agent.alert con chat conocido navega a la conversación (el bot
-  /// pidió ayuda AHÍ) y de paso se marca leído; el resto conserva el tap
-  /// de marcar-leído de siempre.
-  void _onTap(BuildContext context) {
-    context.read<NotificationsBloc>().add(
-      NotificationMarkReadRequested(item.id),
-    );
-    final botId = item.botId;
-    final chatLid = item.chatLid;
-    if (item.eventType == NotificationEventType.agentAlert &&
-        botId != null &&
-        chatLid != null) {
-      context.push('/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      key: Key('notifications.item.${item.id}'),
-      onTap: () => _onTap(context),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(_iconFor(item.eventType), color: _colorFor(item.priority)),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    color: AppTokens.text1,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: AppTokens.sp2),
-                Text(item.body, style: const TextStyle(color: AppTokens.text2)),
-                if (item.count > 1) ...<Widget>[
-                  const SizedBox(height: AppTokens.sp3),
-                  Text(
-                    '${item.count} eventos',
-                    style: const TextStyle(color: AppTokens.textDisabled),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          // Ícono de "marcar leído": un chevron prometería navegación a un
-          // detalle que no existe.
-          const Icon(Icons.done_outlined, color: AppTokens.text2),
-        ],
-      ),
-    );
-  }
-
-  static IconData _iconFor(NotificationEventType type) {
-    return switch (type) {
-      NotificationEventType.messageInboundNew => Icons.chat_bubble_outline,
-      NotificationEventType.botDisconnected => Icons.link_off_outlined,
-      NotificationEventType.flowFailed => Icons.error_outline,
-      NotificationEventType.agentAlert => Icons.support_agent_outlined,
-    };
-  }
-
-  static Color _colorFor(NotificationPriority priority) {
-    return switch (priority) {
-      NotificationPriority.low => AppTokens.success,
-      NotificationPriority.normal => AppTokens.primary,
-      NotificationPriority.high => AppTokens.danger,
-    };
   }
 }
 

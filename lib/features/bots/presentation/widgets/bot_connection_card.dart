@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/util/smart_timestamp.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/entities/session_status.dart';
 import '../bloc/bot_session_status_bloc.dart';
@@ -132,15 +133,42 @@ class BotConnectionCard extends StatelessWidget {
             color: AppTokens.warning,
             ctaLabel: 'Gestionar conexión',
           ),
-          SessionState.disconnected => const _ConnectionView(
-            title: 'Sin conexión',
-            caption: 'Vincula WhatsApp para que el bot reciba mensajes.',
-            icon: Icons.link_off,
-            color: AppTokens.danger,
-            ctaLabel: 'Conectar WhatsApp',
-          ),
+          SessionState.disconnected => _disconnectedView(s),
         },
       };
+
+  /// DISCONNECTED con causa capturada: el caption explica POR QUÉ cayó y, si el
+  /// runtime lo selló, DESDE CUÁNDO. Sin causa (de nacimiento, bot no-corriendo)
+  /// cae al caption genérico de "conecta WhatsApp". Honesto: razón y sello
+  /// vienen del servidor, no se infieren en el cliente.
+  static _ConnectionView _disconnectedView(SessionStatus s) {
+    var caption = _disconnectCopy(s.disconnectReason);
+    final since = s.disconnectedAt;
+    if (since != null) {
+      caption =
+          '$caption · Desde ${smartTimestamp(since.millisecondsSinceEpoch)}';
+    }
+    return _ConnectionView(
+      title: 'Sin conexión',
+      caption: caption,
+      icon: Icons.link_off,
+      color: AppTokens.danger,
+      ctaLabel: 'Conectar WhatsApp',
+    );
+  }
+
+  /// Mapa código→copy de las razones de desconexión que captura el runtime
+  /// (`agentic-go` `channel.DisconnectReason`). Un código nuevo/desconocido cae
+  /// a la copy genérica: la card no rompe ante drift de contrato.
+  static String _disconnectCopy(String? reason) => switch (reason) {
+    'logged_out' =>
+      'WhatsApp cerró la sesión. Vuelve a vincular el dispositivo.',
+    'reconnect_exhausted' => 'Se perdió la conexión y no se pudo restablecer.',
+    'connect_failed' => 'No se pudo establecer la conexión con WhatsApp.',
+    'pairing_timeout' => 'El emparejamiento expiró sin completarse.',
+    'pairing_failed' => 'El emparejamiento no se pudo completar.',
+    _ => 'Vincula WhatsApp para que el bot reciba mensajes.',
+  };
 }
 
 /// Proyección de presentación de un estado de sesión: copy + glifo + CTA.
