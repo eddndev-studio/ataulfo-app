@@ -55,6 +55,8 @@ import '../../features/labels/domain/repositories/chat_labels_repository.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/trainer/domain/repositories/trainer_repositories.dart';
 import '../../features/trainer/presentation/bloc/preview_bloc.dart';
+import '../../features/platform_agent/domain/repositories/platform_agent_repository.dart';
+import '../../features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
 import '../../features/trainer/presentation/bloc/trainer_chat_bloc.dart';
 import '../../features/trainer/presentation/bloc/workspace_bloc.dart';
 import '../../features/trainer/presentation/pages/preview_page.dart';
@@ -163,6 +165,8 @@ class AppRouter {
     required TrainerRepository trainerRepository,
     required WorkspaceRepository workspaceRepository,
     required PreviewRepository previewRepository,
+    required PlatformAgentRepository platformAgentRepository,
+    required PlatformAgentEvents platformAgentEvents,
     required MembershipsRepository membershipsRepository,
     required MembersRepository membersRepository,
     required InvitationsRepository invitationsRepository,
@@ -194,6 +198,8 @@ class AppRouter {
        _trainerRepo = trainerRepository,
        _workspaceRepo = workspaceRepository,
        _previewRepo = previewRepository,
+       _platformAgentRepo = platformAgentRepository,
+       _platformAgentEvents = platformAgentEvents,
        _membershipsRepo = membershipsRepository,
        _membersRepo = membersRepository,
        _invitationsRepo = invitationsRepository,
@@ -223,6 +229,8 @@ class AppRouter {
   final TrainerRepository _trainerRepo;
   final WorkspaceRepository _workspaceRepo;
   final PreviewRepository _previewRepo;
+  final PlatformAgentRepository _platformAgentRepo;
+  final PlatformAgentEvents _platformAgentEvents;
   final NotesRepository _notesRepo;
   final AiLogRepository _aiLogRepo;
   final ExecutionRepository _executionsRepo;
@@ -458,6 +466,16 @@ class AppRouter {
                       // SnackBar.
                       BlocProvider<ResendVerificationCubit>(
                         create: (_) => ResendVerificationCubit(_authRepo),
+                      ),
+                      // Asistente de plataforma, scoped al shell: el dock vive
+                      // sobre las 4 tabs. La carga se difiere hasta la 1ª
+                      // apertura (el dock dispara PaChatStarted), sin coste en
+                      // el arranque si el operador nunca lo abre.
+                      BlocProvider<PlatformAgentChatBloc>(
+                        create: (_) => PlatformAgentChatBloc(
+                          repo: _platformAgentRepo,
+                          events: _platformAgentEvents,
+                        ),
                       ),
                     ],
                     // Blocs page-scoped a nivel del shell: cambiar de tab no

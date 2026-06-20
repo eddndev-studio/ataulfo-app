@@ -20,6 +20,7 @@ import 'package:ataulfo/features/labels/domain/repositories/chat_labels_reposito
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/ai_log/domain/ai_log_repository.dart';
 import 'package:ataulfo/features/notes/domain/repositories/notes_repository.dart';
+import 'package:ataulfo/features/platform_agent/domain/repositories/platform_agent_repository.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/quick_replies/domain/repositories/quick_replies_repository.dart';
@@ -81,6 +82,10 @@ class _MockTrainerRepo extends Mock implements TrainerRepository {}
 class _MockWorkspaceRepo extends Mock implements WorkspaceRepository {}
 
 class _MockPreviewRepo extends Mock implements PreviewRepository {}
+
+class _MockPlatformAgentRepo extends Mock implements PlatformAgentRepository {}
+
+class _MockPlatformAgentEvents extends Mock implements PlatformAgentEvents {}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
@@ -163,6 +168,8 @@ void main() {
       trainerRepository: _MockTrainerRepo(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
+      platformAgentRepository: _MockPlatformAgentRepo(),
+      platformAgentEvents: _MockPlatformAgentEvents(),
       membershipsRepository: membershipsRepo,
       membersRepository: membersRepo,
       invitationsRepository: invitationsRepo,

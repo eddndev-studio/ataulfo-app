@@ -28,6 +28,9 @@ import 'features/flows/data/repositories/flows_repository_impl.dart';
 import 'features/labels/data/datasources/chat_labels_datasource.dart';
 import 'features/labels/data/datasources/labels_datasource.dart';
 import 'features/trainer/data/datasources/preview_datasource.dart';
+import 'features/platform_agent/data/datasources/platform_agent_datasource.dart';
+import 'features/platform_agent/data/datasources/platform_agent_events_datasource.dart';
+import 'features/platform_agent/data/repositories/platform_agent_repositories_impl.dart';
 import 'features/trainer/data/datasources/trainer_datasource.dart';
 import 'features/trainer/data/datasources/workspace_datasource.dart';
 import 'features/trainer/data/repositories/trainer_repositories_impl.dart';
@@ -241,6 +244,15 @@ Future<void> main() async {
     datasource: DioPreviewDatasource(mainDio),
   );
 
+  // Asistente de plataforma (org-scoped): chat CRUD + turno síncrono y un
+  // stream SSE de progreso. Vive como dock sobre el shell.
+  final platformAgentRepository = PlatformAgentRepositoryImpl(
+    datasource: DioPlatformAgentDatasource(mainDio),
+  );
+  final platformAgentEvents = PlatformAgentEventsImpl(
+    datasource: DioPlatformAgentEventsDatasource(mainDio),
+  );
+
   final membershipsRepository = MembershipsRepositoryImpl(
     datasource: DioMembershipsDatasource(mainDio),
   );
@@ -321,6 +333,8 @@ Future<void> main() async {
     trainerRepository: trainerRepository,
     workspaceRepository: workspaceRepository,
     previewRepository: previewRepository,
+    platformAgentRepository: platformAgentRepository,
+    platformAgentEvents: platformAgentEvents,
     membershipsRepository: membershipsRepository,
     membersRepository: membersRepository,
     invitationsRepository: invitationsRepository,

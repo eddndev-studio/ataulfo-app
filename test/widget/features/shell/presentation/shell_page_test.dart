@@ -8,6 +8,9 @@ import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
 import 'package:ataulfo/features/labels/presentation/pages/labels_admin_page.dart';
+import 'package:ataulfo/features/platform_agent/domain/failures/pa_failure.dart';
+import 'package:ataulfo/features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
+import 'package:ataulfo/features/platform_agent/presentation/pages/platform_agent_page.dart';
 import 'package:ataulfo/features/settings/presentation/pages/settings_page.dart';
 import 'package:ataulfo/features/shell/presentation/pages/shell_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -31,6 +34,9 @@ class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
 
 class _MockLabelsAdminBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
     implements LabelsAdminBloc {}
+
+class _MockPaBloc extends MockBloc<PaChatEvent, PaChatState>
+    implements PlatformAgentChatBloc {}
 
 class _MockBotsRepository extends Mock implements BotsRepository {}
 
@@ -560,5 +566,49 @@ void main() {
         reason: 'El shell debe cablear el avatar → tab Ajustes.',
       );
     });
+  });
+
+  group('pestaña Asistente', () {
+    Widget hostWithAssistant(_MockPaBloc pa) {
+      // Estado terminal (sin spinner): solo verificamos que la página se monte
+      // al abrir la tab. La carga real la cubre platform_agent_page_test.
+      whenListen(
+        pa,
+        const Stream<PaChatState>.empty(),
+        initialState: const PaChatFailed(PaServerFailure()),
+      );
+      return MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<AuthBloc>.value(value: authBloc),
+          BlocProvider<BotsBloc>.value(value: botsBloc),
+          BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+          BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
+          BlocProvider<PlatformAgentChatBloc>.value(value: pa),
+        ],
+        child: const MaterialApp(home: ShellPage()),
+      );
+    }
+
+    testWidgets(
+      'tab Asistente: se monta SOLO al abrirla (lazy en IndexedStack)',
+      (tester) async {
+        useViewport(tester, widthDp: 420);
+        final pa = _MockPaBloc();
+        await tester.pumpWidget(hostWithAssistant(pa));
+
+        // Antes de abrir: el IndexedStack la sustituye por un SizedBox.
+        expect(find.byType(PlatformAgentPage), findsNothing);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(BottomNavigationBar),
+            matching: find.text('Asistente'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(PlatformAgentPage), findsOneWidget);
+      },
+    );
   });
 }

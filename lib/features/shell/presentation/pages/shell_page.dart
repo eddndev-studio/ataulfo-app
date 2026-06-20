@@ -7,6 +7,7 @@ import '../../../bots/presentation/pages/bots_list_page.dart';
 import '../../../bots/presentation/widgets/bot_create_sheet.dart';
 import '../../../labels/presentation/pages/labels_admin_page.dart';
 import '../../../labels/presentation/widgets/label_edit_sheet.dart';
+import '../../../platform_agent/presentation/pages/platform_agent_page.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../templates/presentation/pages/templates_list_page.dart';
 import '../../../templates/presentation/widgets/template_create_sheet.dart';
@@ -38,11 +39,16 @@ class ShellPage extends StatefulWidget {
 class _ShellPageState extends State<ShellPage> {
   int _index = 0;
 
+  // El asistente va de último para no recorrer los índices existentes
+  // (Ajustes sigue en 3, que es a donde apuntan los onOpenSettings).
+  static const int _assistantIndex = 4;
+
   static const List<_TabSpec> _tabs = <_TabSpec>[
     _TabSpec(label: 'Bots', icon: Icons.smart_toy_outlined),
     _TabSpec(label: 'Plantillas', icon: Icons.description_outlined),
     _TabSpec(label: 'Etiquetas', icon: Icons.label_outline),
     _TabSpec(label: 'Ajustes', icon: Icons.settings_outlined),
+    _TabSpec(label: 'Asistente', icon: Icons.auto_awesome),
   ];
 
   // Los bodies ya no son `static const` porque BotsListPage/TemplatesListPage
@@ -73,11 +79,23 @@ class _ShellPageState extends State<ShellPage> {
         // de verificación se apila ENCIMA del contenido de las tabs (sólo se
         // pinta a sí mismo cuando el correo no está verificado), idéntico en
         // ambos layouts (compact y rail).
+        // La pestaña del asistente se materializa SOLO cuando está activa: así
+        // su chat (que lee PlatformAgentChatBloc y muestra un spinner mientras
+        // carga) no vive offstage en el IndexedStack — evita el spinner oculto
+        // que colgaría pumpAndSettle y difiere la carga hasta abrir la tab.
         final body = Column(
           children: <Widget>[
             const EmailVerificationBanner(),
             Expanded(
-              child: IndexedStack(index: _index, children: _bodies),
+              child: IndexedStack(
+                index: _index,
+                children: <Widget>[
+                  ..._bodies,
+                  _index == _assistantIndex
+                      ? const PlatformAgentPage()
+                      : const SizedBox.shrink(),
+                ],
+              ),
             ),
           ],
         );
