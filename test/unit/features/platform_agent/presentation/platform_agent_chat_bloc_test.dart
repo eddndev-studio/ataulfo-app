@@ -189,6 +189,78 @@ void main() {
   );
 
   blocTest<PlatformAgentChatBloc, PaChatState>(
+    'MessageSent: recarga rezagada (sin el turno) — el assistant del POST igual aparece',
+    build: build,
+    seed: () => loaded(),
+    setUp: () {
+      when(
+        () => repo.sendMessage(
+          conversationId: 'c1',
+          content: any(named: 'content'),
+        ),
+      ).thenAnswer((_) async => _msg('m9', 'assistant', 'tienes 3 bots'));
+      // Carrera read-after-write: la recarga aún no ve el turno recién escrito.
+      when(
+        () => repo.listMessages(
+          conversationId: 'c1',
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const PaMessagesPage(messages: <PaMessage>[], nextCursor: ''),
+      );
+    },
+    act: (b) => b.add(const PaChatMessageSent('cuántos bots')),
+    expect: () => <dynamic>[
+      isA<PaChatLoaded>().having((s) => s.sending, 'sending', true),
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
+          .having(
+            (s) => s.messages.where((m) => m.content == 'tienes 3 bots').length,
+            'assistant del POST visible',
+            1,
+          )
+          .having(
+            (s) => s.messages.where((m) => m.content == 'cuántos bots').length,
+            'user conservado',
+            1,
+          ),
+    ],
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'MessageSent: recarga FALLA tras turno OK — conserva la respuesta, sin sendFailure',
+    build: build,
+    seed: () => loaded(),
+    setUp: () {
+      when(
+        () => repo.sendMessage(
+          conversationId: 'c1',
+          content: any(named: 'content'),
+        ),
+      ).thenAnswer((_) async => _msg('m9', 'assistant', 'tienes 3 bots'));
+      when(
+        () => repo.listMessages(
+          conversationId: 'c1',
+          limit: any(named: 'limit'),
+        ),
+      ).thenThrow(const PaServerFailure());
+    },
+    act: (b) => b.add(const PaChatMessageSent('cuántos bots')),
+    expect: () => <dynamic>[
+      isA<PaChatLoaded>().having((s) => s.sending, 'sending', true),
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
+          .having((s) => s.sendFailure, 'sin fallo (el turno fue OK)', isNull)
+          .having(
+            (s) => s.messages.where((m) => m.content == 'tienes 3 bots').length,
+            'assistant conservado',
+            1,
+          ),
+    ],
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
     'MessageSent con 502 ⇒ sending=false + sendFailure',
     build: build,
     seed: () => loaded(),

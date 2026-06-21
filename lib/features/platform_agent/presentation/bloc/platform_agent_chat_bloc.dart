@@ -298,16 +298,30 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       if (!isClosed) add(PaChatProgressReceived(e));
     }, onError: (Object _) {});
     try {
-      await _repo.sendMessage(
+      final assistant = await _repo.sendMessage(
         conversationId: convId,
         content: event.content,
         model: current.selectedModelId.isEmpty ? null : current.selectedModelId,
       );
       await _progressSub?.cancel();
       _progressSub = null;
+      // El POST síncrono YA devolvió el assistant final. Recargamos para traer el
+      // hilo completo (incl. mensajes de tool), pero la recarga es ACCESORIA: si
+      // llega rezagada y aún no ve el turno recién escrito (carrera lectura-tras-
+      // escritura), o si falla, NO se pierde la respuesta — se cae al hilo en mano
+      // (user optimista + assistant devuelto). Antes la recarga era la única
+      // fuente: una recarga rezagada borraba el turno del hilo visible.
+      final inHand = <PaMessage>[...current.messages, optimistic, assistant];
+      List<PaMessage> messages;
+      try {
+        final reloaded = await _loadMessages(convId);
+        messages = reloaded.any((m) => m.id == assistant.id) ? reloaded : inHand;
+      } on PaFailure {
+        messages = inHand;
+      }
       emit(
         current.copyWith(
-          messages: await _loadMessages(convId),
+          messages: messages,
           sending: false,
           liveProgress: '',
           clearSendFailure: true,
