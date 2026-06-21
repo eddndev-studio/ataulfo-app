@@ -315,7 +315,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       List<PaMessage> messages;
       try {
         final reloaded = await _loadMessages(convId);
-        messages = reloaded.any((m) => m.id == assistant.id) ? reloaded : inHand;
+        messages = reloaded.any((m) => m.id == assistant.id)
+            ? reloaded
+            : inHand;
       } on PaFailure {
         messages = inHand;
       }
