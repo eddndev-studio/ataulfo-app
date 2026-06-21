@@ -33,5 +33,7 @@ class ProviderBadge extends StatelessWidget {
     AIProvider.gemini => 'Gemini',
     AIProvider.minimax => 'MiniMax',
     AIProvider.deepseek => 'DeepSeek',
+    AIProvider.glm => 'GLM',
+    AIProvider.kimi => 'Kimi',
   };
 }

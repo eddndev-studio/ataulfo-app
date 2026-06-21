@@ -36,6 +36,16 @@ void main() {
       await pump(tester, AIProvider.deepseek);
       expect(find.text('DeepSeek'), findsOneWidget);
     });
+
+    testWidgets('glm → "GLM"', (tester) async {
+      await pump(tester, AIProvider.glm);
+      expect(find.text('GLM'), findsOneWidget);
+    });
+
+    testWidgets('kimi → "Kimi"', (tester) async {
+      await pump(tester, AIProvider.kimi);
+      expect(find.text('Kimi'), findsOneWidget);
+    });
   });
 
   group('ProviderBadge — estilo', () {

@@ -6,13 +6,19 @@ enum AIProvider {
   openai,
   gemini,
   minimax,
-  deepseek;
+  deepseek,
+  // GLM (Zhipu) y Kimi (Moonshot): familias open-weight servidas por los
+  // hosts occidentales zero-retention del backend.
+  glm,
+  kimi;
 
   static AIProvider fromWire(String raw) => switch (raw) {
     'OPENAI' => AIProvider.openai,
     'GEMINI' => AIProvider.gemini,
     'MINIMAX' => AIProvider.minimax,
     'DEEPSEEK' => AIProvider.deepseek,
+    'GLM' => AIProvider.glm,
+    'KIMI' => AIProvider.kimi,
     _ => throw ArgumentError.value(raw, 'AIProvider.fromWire'),
   };
 
@@ -24,6 +30,8 @@ enum AIProvider {
     AIProvider.gemini => 'GEMINI',
     AIProvider.minimax => 'MINIMAX',
     AIProvider.deepseek => 'DEEPSEEK',
+    AIProvider.glm => 'GLM',
+    AIProvider.kimi => 'KIMI',
   };
 }
 

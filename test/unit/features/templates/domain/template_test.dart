@@ -19,6 +19,20 @@ void main() {
       expect(AIProvider.fromWire('DEEPSEEK'), AIProvider.deepseek);
     });
 
+    test('"GLM" → glm', () {
+      expect(AIProvider.fromWire('GLM'), AIProvider.glm);
+    });
+
+    test('"KIMI" → kimi', () {
+      expect(AIProvider.fromWire('KIMI'), AIProvider.kimi);
+    });
+
+    test('round-trip estructural: fromWire(p.toWire()) == p para todo p', () {
+      for (final p in AIProvider.values) {
+        expect(AIProvider.fromWire(p.toWire()), p);
+      }
+    });
+
     test('valor desconocido lanza ArgumentError (fail-loud)', () {
       // Política espejo de BotChannel: si el backend agrega un proveedor
       // (p. ej. "ANTHROPIC") el cliente debe enterarse en boot y romper, no
