@@ -217,8 +217,10 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
   StreamSubscription<PaProgressEvent>? _progressSub;
 
   @override
-  Future<void> close() async {
-    await _progressSub?.cancel();
+  Future<void> close() {
+    // Cancelar una suscripción SSE viva aguarda el desmonte del socket, que
+    // puede no completar; el cierre del bloc no debe colgarse en él.
+    unawaited(_progressSub?.cancel());
     return super.close();
   }
 
@@ -293,7 +295,10 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     );
     // Indicador en vivo: suscripción de progreso per-turn. Best-effort —
     // cosmético; si el SSE no conecta, el indicador se queda en "Pensando…".
-    await _progressSub?.cancel();
+    // El cancel NO se espera: cancelar una suscripción SSE viva aguarda el
+    // desmonte del socket (que el server mantiene abierto) y puede no completar
+    // — esperarlo colgaría el cierre del turno en "Pensando…" sin salida.
+    unawaited(_progressSub?.cancel());
     _progressSub = _events.progress(convId).listen((e) {
       if (!isClosed) add(PaChatProgressReceived(e));
     }, onError: (Object _) {});
@@ -303,39 +308,57 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         content: event.content,
         model: current.selectedModelId.isEmpty ? null : current.selectedModelId,
       );
-      await _progressSub?.cancel();
+      unawaited(_progressSub?.cancel());
       _progressSub = null;
-      // El POST síncrono YA devolvió el assistant final. Recargamos para traer el
-      // hilo completo (incl. mensajes de tool), pero la recarga es ACCESORIA: si
-      // llega rezagada y aún no ve el turno recién escrito (carrera lectura-tras-
-      // escritura), o si falla, NO se pierde la respuesta — se cae al hilo en mano
-      // (user optimista + assistant devuelto). Antes la recarga era la única
-      // fuente: una recarga rezagada borraba el turno del hilo visible.
-      final inHand = <PaMessage>[...current.messages, optimistic, assistant];
-      List<PaMessage> messages;
-      try {
-        final reloaded = await _loadMessages(convId);
-        messages = reloaded.any((m) => m.id == assistant.id)
-            ? reloaded
-            : inHand;
-      } on PaFailure {
-        messages = inHand;
-      }
+      // El POST síncrono YA devolvió el assistant final: cerramos el turno de
+      // INMEDIATO (sending=false con el hilo en mano). Invariante: una vez que
+      // el POST vuelve, NADA — ni el cancel del SSE ni la recarga — puede
+      // bloquear este cierre, o el chat se queda en "Pensando…".
       emit(
         current.copyWith(
-          messages: messages,
+          messages: <PaMessage>[...current.messages, optimistic, assistant],
           sending: false,
           liveProgress: '',
           clearSendFailure: true,
         ),
       );
+      // Recarga best-effort (follow-up, ya con el turno cerrado): trae el hilo
+      // completo del server, incl. los mensajes de tool que el POST no devuelve.
+      await _reloadThread(emit, convId, assistant.id);
     } on PaFailure catch (f) {
       // Revertir el optimista: el 502 deja el user message fuera del hilo
       // (reintentable). `current` es el estado pre-optimista.
-      await _progressSub?.cancel();
+      unawaited(_progressSub?.cancel());
       _progressSub = null;
       emit(current.copyWith(sending: false, liveProgress: '', sendFailure: f));
     }
+  }
+
+  /// Recarga el hilo tras cerrar un turno, para sumar los mensajes de tool que
+  /// el POST síncrono no devuelve. Best-effort y NO bloqueante del cierre (se
+  /// llama DESPUÉS de emitir sending=false): si falla, llega rezagada (sin ver
+  /// el turno recién escrito), o el operador ya cambió de hilo, no se aplica —
+  /// nunca pisa un hilo que el operador ya tiene abierto.
+  Future<void> _reloadThread(
+    Emitter<PaChatState> emit,
+    String conversationId,
+    String assistantId,
+  ) async {
+    List<PaMessage> reloaded;
+    try {
+      reloaded = await _loadMessages(conversationId);
+    } on PaFailure {
+      return;
+    }
+    if (!reloaded.any((m) => m.id == assistantId)) return; // recarga rezagada
+    if (isClosed) return;
+    final s = state;
+    if (s is! PaChatLoaded ||
+        s.activeConversation.id != conversationId ||
+        s.sending) {
+      return;
+    }
+    emit(s.copyWith(messages: reloaded));
   }
 
   void _onProgressReceived(

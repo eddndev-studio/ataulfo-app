@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_conversation.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_message.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_models.dart';
@@ -12,6 +14,55 @@ import 'package:mocktail/mocktail.dart';
 class _MockRepo extends Mock implements PlatformAgentRepository {}
 
 class _MockEvents extends Mock implements PlatformAgentEvents {}
+
+/// Stream cuyo `cancel()` NUNCA completa: reproduce el desmonte de un socket
+/// SSE vivo que el servidor mantiene abierto. Entrega los eventos del inner
+/// con normalidad; solo el cancel cuelga. Es el corazón del bug: si el bloc
+/// `await`ea este cancel antes de cerrar el turno, se queda en "Pensando…".
+class _HangingCancelStream<T> extends Stream<T> {
+  _HangingCancelStream(this._inner);
+
+  final Stream<T> _inner;
+
+  @override
+  StreamSubscription<T> listen(
+    void Function(T event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) => _HangingSubscription<T>(
+    _inner.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    ),
+  );
+}
+
+class _HangingSubscription<T> implements StreamSubscription<T> {
+  _HangingSubscription(this._inner);
+
+  final StreamSubscription<T> _inner;
+
+  @override
+  Future<void> cancel() => Completer<void>().future; // nunca completa
+
+  @override
+  void onData(void Function(T data)? handleData) => _inner.onData(handleData);
+  @override
+  void onError(Function? handleError) => _inner.onError(handleError);
+  @override
+  void onDone(void Function()? handleDone) => _inner.onDone(handleDone);
+  @override
+  void pause([Future<void>? resumeSignal]) => _inner.pause(resumeSignal);
+  @override
+  void resume() => _inner.resume();
+  @override
+  bool get isPaused => _inner.isPaused;
+  @override
+  Future<E> asFuture<E>([E? futureValue]) => _inner.asFuture<E>(futureValue);
+}
 
 PaConversation _conv({String id = 'c1'}) => PaConversation(
   id: id,
@@ -170,10 +221,13 @@ void main() {
     },
     act: (b) => b.add(const PaChatMessageSent('cuántos bots')),
     expect: () => <dynamic>[
+      // 1) optimista: sending + Pensando… + el user en mano.
       isA<PaChatLoaded>()
           .having((s) => s.sending, 'sending', true)
           .having((s) => s.liveProgress, 'progress', 'Pensando…')
           .having((s) => s.messages.last.content, 'optimista', 'cuántos bots'),
+      // 2) cierre INMEDIATO del turno con el assistant que devolvió el POST —
+      // NO espera ni el cancel del SSE ni la recarga.
       isA<PaChatLoaded>()
           .having((s) => s.sending, 'sending', false)
           .having((s) => s.liveProgress, 'progress', '')
@@ -182,10 +236,65 @@ void main() {
             'tiene assistant',
             true,
           ),
+      // 3) recarga follow-up best-effort: trae el hilo completo del server.
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
+          .having((s) => s.messages.first.id, 'reload ASC', 'm8'),
     ],
     verify: (_) {
       verify(() => events.progress('c1')).called(1);
     },
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'MessageSent: cancelar el SSE vivo cuelga — el turno IGUAL se cierra '
+    '(sending=false con la respuesta), no se queda en Pensando…',
+    build: build,
+    seed: () => loaded(),
+    setUp: () {
+      // El SSE conecta y su cancel NUNCA completa (socket vivo que no cierra).
+      when(() => events.progress(any())).thenAnswer(
+        (_) => _HangingCancelStream<PaProgressEvent>(
+          const Stream<PaProgressEvent>.empty(),
+        ),
+      );
+      when(
+        () => repo.sendMessage(
+          conversationId: 'c1',
+          content: any(named: 'content'),
+        ),
+      ).thenAnswer((_) async => _msg('m9', 'assistant', 'tienes 3 bots'));
+      when(
+        () => repo.listMessages(
+          conversationId: 'c1',
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async => PaMessagesPage(
+          messages: <PaMessage>[
+            _msg('m9', 'assistant', 'tienes 3 bots'),
+            _msg('m8', 'user', 'cuántos bots'),
+          ],
+          nextCursor: '',
+        ),
+      );
+    },
+    act: (b) => b.add(const PaChatMessageSent('cuántos bots')),
+    expect: () => <dynamic>[
+      isA<PaChatLoaded>().having((s) => s.sending, 'sending', true),
+      // Antes del fix esto NUNCA llega: el bloc se queda colgado en el
+      // `await cancel()` del SSE. El turno debe cerrarse pese al cancel colgado.
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
+          .having(
+            (s) => s.messages.where((m) => m.content == 'tienes 3 bots').length,
+            'assistant del POST visible',
+            1,
+          ),
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
+          .having((s) => s.messages.first.id, 'reload ASC', 'm8'),
+    ],
   );
 
   blocTest<PlatformAgentChatBloc, PaChatState>(
