@@ -102,6 +102,7 @@ import '../../features/messages/presentation/bloc/messages_bloc.dart';
 import '../../features/messages/presentation/bloc/thread_audio_cubit.dart';
 import '../../features/messages/presentation/pages/message_thread_page.dart';
 import '../../features/monitor/data/datasources/monitor_activity_datasource.dart';
+import '../../features/monitor/data/datasources/monitor_catchup_datasource.dart';
 import '../../features/monitor/presentation/cubit/monitor_attention_cubit.dart';
 import '../../features/monitor/presentation/cubit/monitor_live_cubit.dart';
 import '../../features/notifications/domain/repositories/notifications_repository.dart';
@@ -169,6 +170,7 @@ class AppRouter {
     required TrainerEvents trainerEvents,
     required MonitorActivityDatasource monitorActivity,
     required MonitorBotActivityDatasource monitorBotActivity,
+    MonitorCatchupDatasource? monitorCatchup,
     required WorkspaceRepository workspaceRepository,
     required PreviewRepository previewRepository,
     required PlatformAgentRepository platformAgentRepository,
@@ -205,6 +207,7 @@ class AppRouter {
        _trainerEvents = trainerEvents,
        _monitorActivity = monitorActivity,
        _monitorBotActivity = monitorBotActivity,
+       _monitorCatchup = monitorCatchup,
        _workspaceRepo = workspaceRepository,
        _previewRepo = previewRepository,
        _platformAgentRepo = platformAgentRepository,
@@ -239,6 +242,10 @@ class AppRouter {
   final TrainerEvents _trainerEvents;
   final MonitorActivityDatasource _monitorActivity;
   final MonitorBotActivityDatasource _monitorBotActivity;
+
+  /// Catch-up del run en curso (opcional): null ⇒ el monitor arranca vacío como
+  /// antes; presente ⇒ el cubit hidrata el timeline al abrir el chat.
+  final MonitorCatchupDatasource? _monitorCatchup;
   final WorkspaceRepository _workspaceRepo;
 
   /// El operador actual es ADMIN+ (gatea la observación del monitor: el endpoint
@@ -774,7 +781,10 @@ class AppRouter {
                 // menores el cubit queda inerte y el footer no se pinta.
                 BlocProvider<MonitorLiveCubit>(
                   create: (_) {
-                    final cubit = MonitorLiveCubit(_monitorActivity);
+                    final cubit = MonitorLiveCubit(
+                      _monitorActivity,
+                      catchup: _monitorCatchup,
+                    );
                     if (_isAdmin) cubit.watch(id, chatLid);
                     return cubit;
                   },

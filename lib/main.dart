@@ -33,6 +33,7 @@ import 'features/platform_agent/data/datasources/platform_agent_events_datasourc
 import 'features/platform_agent/data/repositories/platform_agent_repositories_impl.dart';
 import 'features/trainer/data/datasources/trainer_datasource.dart';
 import 'features/monitor/data/datasources/monitor_activity_datasource.dart';
+import 'features/monitor/data/datasources/monitor_catchup_datasource.dart';
 import 'features/trainer/data/datasources/trainer_events_datasource.dart';
 import 'features/trainer/data/datasources/workspace_datasource.dart';
 import 'features/trainer/data/repositories/trainer_repositories_impl.dart';
@@ -316,6 +317,9 @@ Future<void> main() async {
   // Actividad del bot runtime: monitor por-chat + feed bot-scoped (mismo
   // datasource, dos interfaces).
   final monitorActivityDs = DioMonitorActivityDatasource(mainDio);
+  // Catch-up del run en curso: hidrata el timeline al abrir un chat a mitad de
+  // una corrida reusando los endpoints ai-log (no abre canal nuevo).
+  final monitorCatchupDs = DioMonitorCatchupDatasource(mainDio);
 
   final router = AppRouter(
     authBloc: authBloc,
@@ -342,6 +346,7 @@ Future<void> main() async {
     // (operador): implementa ambas interfaces.
     monitorActivity: monitorActivityDs,
     monitorBotActivity: monitorActivityDs,
+    monitorCatchup: monitorCatchupDs,
     workspaceRepository: workspaceRepository,
     previewRepository: previewRepository,
     platformAgentRepository: platformAgentRepository,
