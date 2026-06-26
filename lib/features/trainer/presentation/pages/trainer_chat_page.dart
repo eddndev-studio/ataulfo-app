@@ -9,6 +9,7 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/assistant_markdown.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
+import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
 import '../../../../core/design/widgets/typing_bubble.dart';
 import '../../domain/entities/trainer_conversation.dart';
@@ -530,6 +531,10 @@ class _MessageTile extends StatelessWidget {
       if (inspect != null) {
         return _InspectFlowCard(messageId: message.id, data: inspect);
       }
+      final history = _PromptHistoryData.fromMessage(message);
+      if (history != null) {
+        return _PromptHistoryCard(messageId: message.id, data: history);
+      }
       final err = _ToolErrorData.fromMessage(message);
       if (err != null) {
         return _ToolErrorCard(messageId: message.id, data: err);
@@ -950,6 +955,197 @@ IconData _stepTypeIcon(String type) => switch (type) {
 /// Tarjeta de inspección de un flujo (resultado de inspect_flow): el entrenador
 /// ve la estructura sin abrir el editor. Colapsada muestra el nombre + conteos;
 /// al tocarla expande los pasos (con su ícono de tipo) y los disparadores.
+/// Una versión archivada del prompt: id (para pedir restaurar), preview y cuándo.
+class _PromptVersionItem {
+  const _PromptVersionItem({
+    required this.id,
+    required this.preview,
+    required this.createdAt,
+  });
+
+  final int id;
+  final String preview;
+  final DateTime createdAt;
+}
+
+/// Resultado de list_prompt_history: el historial de versiones del prompt para
+/// que el operador vea qué hubo antes y pida restaurar una por su id.
+class _PromptHistoryData {
+  const _PromptHistoryData({required this.versions});
+
+  final List<_PromptVersionItem> versions;
+
+  static _PromptHistoryData? fromMessage(TrainerMessage m) {
+    final raw = m.toolResultsRaw;
+    if (raw == null) return null;
+    Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map<String, dynamic>) return null;
+    if (decoded['toolName'] != 'list_prompt_history') return null;
+    final content = decoded['content'];
+    if (content is! String) return null;
+    Object? inner;
+    try {
+      inner = jsonDecode(content);
+    } on FormatException {
+      return null;
+    }
+    if (inner is! Map<String, dynamic>) return null;
+    final out = <_PromptVersionItem>[];
+    final rawV = inner['versions'];
+    if (rawV is List) {
+      for (final v in rawV) {
+        if (v is Map<String, dynamic>) {
+          out.add(
+            _PromptVersionItem(
+              id: (v['id'] as num?)?.toInt() ?? 0,
+              preview: v['preview']?.toString() ?? '',
+              createdAt:
+                  DateTime.tryParse(v['created_at']?.toString() ?? '') ??
+                  DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+            ),
+          );
+        }
+      }
+    }
+    return _PromptHistoryData(versions: out);
+  }
+}
+
+/// Tarjeta colapsable del historial del prompt: lista las versiones previas con
+/// su id, preview y cuándo. La restauración la pide el operador por chat (el
+/// agente llama a restore_prompt_version, que confirma antes de pisar el prompt).
+class _PromptHistoryCard extends StatefulWidget {
+  const _PromptHistoryCard({required this.messageId, required this.data});
+
+  final String messageId;
+  final _PromptHistoryData data;
+
+  @override
+  State<_PromptHistoryCard> createState() => _PromptHistoryCardState();
+}
+
+class _PromptHistoryCardState extends State<_PromptHistoryCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final versions = widget.data.versions;
+    final header = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const Icon(Icons.history_outlined, size: 16, color: AppTokens.primary),
+        const SizedBox(width: AppTokens.sp2),
+        Flexible(
+          child: Text(
+            versions.isEmpty
+                ? 'Historial del prompt: sin versiones'
+                : 'Historial del prompt (${versions.length})',
+            style: theme.textTheme.labelMedium?.copyWith(color: AppTokens.text1),
+          ),
+        ),
+        if (versions.isNotEmpty) ...<Widget>[
+          const SizedBox(width: AppTokens.sp1),
+          Icon(
+            _expanded ? Icons.expand_less : Icons.expand_more,
+            key: Key('trainer.prompt_history_card.${widget.messageId}.expand'),
+            size: 16,
+            color: AppTokens.text2,
+          ),
+        ],
+      ],
+    );
+    return Align(
+      alignment: Alignment.center,
+      child: GestureDetector(
+        onTap: versions.isEmpty
+            ? null
+            : () => setState(() => _expanded = !_expanded),
+        child: Container(
+          key: Key('trainer.prompt_history_card.${widget.messageId}'),
+          margin: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp3,
+            vertical: AppTokens.sp2,
+          ),
+          decoration: BoxDecoration(
+            color: AppTokens.surface2,
+            borderRadius: BorderRadius.circular(
+              _expanded ? AppTokens.radiusCard : AppTokens.radiusPill,
+            ),
+            border: Border.all(color: AppTokens.divider),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              header,
+              if (_expanded) ...<Widget>[
+                const SizedBox(height: AppTokens.sp2),
+                for (final v in versions) _PromptVersionRow(item: v),
+                const SizedBox(height: AppTokens.sp1),
+                Text(
+                  'Pídeme restaurar una versión por su id.',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppTokens.text2,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PromptVersionRow extends StatelessWidget {
+  const _PromptVersionRow({required this.item});
+
+  final _PromptVersionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Text(
+                'Versión #${item.id}',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: AppTokens.text1,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: AppTokens.sp2),
+              MessageTimestamp(at: item.createdAt),
+            ],
+          ),
+          if (item.preview.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppTokens.sp1),
+              child: Text(
+                item.preview,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTokens.text2,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _InspectFlowCard extends StatefulWidget {
   const _InspectFlowCard({required this.messageId, required this.data});
 
