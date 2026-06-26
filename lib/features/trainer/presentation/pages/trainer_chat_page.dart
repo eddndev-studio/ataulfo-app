@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
+import '../../../../core/design/widgets/assistant_markdown.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
 import '../../../../core/design/widgets/typing_bubble.dart';
@@ -494,12 +495,14 @@ class _MessageTile extends StatelessWidget {
               ),
           ],
           if (message.content.isNotEmpty)
-            Text(
-              message.content,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
-            ),
+            message.isAssistant
+                ? AssistantMarkdown(data: message.content)
+                : Text(
+                    message.content,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+                  ),
         ],
       ),
     );

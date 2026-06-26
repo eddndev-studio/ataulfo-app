@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:ataulfo/core/design/widgets/assistant_markdown.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_message.dart';
 import 'package:ataulfo/features/platform_agent/presentation/widgets/pa_message_tile.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,14 @@ PaMessage _toolMsg(String raw) => PaMessage(
   content: '',
   createdAt: DateTime.utc(2026, 6, 10),
   toolResultsRaw: raw,
+);
+
+PaMessage _textMsg(String role, String content) => PaMessage(
+  id: 'm1',
+  conversationId: 'c1',
+  role: role,
+  content: content,
+  createdAt: DateTime.utc(2026, 6, 10),
 );
 
 Widget _wrap(Widget child) =>
@@ -150,5 +159,20 @@ void main() {
     await tester.tap(find.byKey(const Key('pa.tool_card.header')));
     await tester.pumpAndSettle();
     expect(find.textContaining('confirmaci'), findsOneWidget);
+  });
+
+  testWidgets('assistant rinde Markdown; user queda en Text plano', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(PaMessageTile(message: _textMsg('assistant', '**negrita**'))),
+    );
+    expect(find.byType(AssistantMarkdown), findsOneWidget);
+
+    await tester.pumpWidget(
+      _wrap(PaMessageTile(message: _textMsg('user', '**negrita**'))),
+    );
+    expect(find.byType(AssistantMarkdown), findsNothing);
+    expect(find.text('**negrita**'), findsOneWidget);
   });
 }

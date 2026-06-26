@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/assistant_markdown.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
@@ -48,12 +49,7 @@ class PaMessageTile extends StatelessWidget {
           if (message.content.isNotEmpty)
             ChatBubble(
               mine: false,
-              child: Text(
-                message.content,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
-              ),
+              child: AssistantMarkdown(data: message.content),
             ),
           MessageTimestamp(at: message.createdAt),
         ],
