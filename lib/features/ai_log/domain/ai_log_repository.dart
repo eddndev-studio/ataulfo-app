@@ -17,4 +17,19 @@ abstract interface class AiLogRepository {
     required String chatLid,
     int? before,
   });
+
+  /// Resuelve la corrida de IA que produjo un OUTBOUND (su wamid) → runId, o
+  /// `null` si el mensaje no salió de la IA.
+  Future<String?> runForMessage({
+    required String botId,
+    required String chatLid,
+    required String externalId,
+  });
+
+  /// Entries de UNA corrida (ASC) por su runId.
+  Future<List<AiLogEntry>> byRun({
+    required String botId,
+    required String chatLid,
+    required String runId,
+  });
 }

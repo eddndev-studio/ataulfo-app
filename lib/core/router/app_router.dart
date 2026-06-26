@@ -812,12 +812,26 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final chatLid = state.pathParameters['chatLid']!;
+          // `?msg=<wamid>` = drill-through inverso: muestra SOLO la corrida que
+          // produjo ese OUTBOUND. Ausente = log completo de la sesión.
+          final msg = state.uri.queryParameters['msg'];
           return BlocProvider<AiLogBloc>(
             create: (_) =>
-                AiLogBloc(repo: _aiLogRepo, botId: id, chatLid: chatLid)
+                AiLogBloc(
+                    repo: _aiLogRepo,
+                    botId: id,
+                    chatLid: chatLid,
+                    targetExternalId: msg,
+                  )
                   ..add(const AiLogLoadRequested()),
             child: Scaffold(
-              appBar: AppBar(title: const Text('Razonamiento del bot')),
+              appBar: AppBar(
+                title: Text(
+                  msg == null
+                      ? 'Razonamiento del bot'
+                      : 'Razonamiento de este mensaje',
+                ),
+              ),
               body: const AiLogPage(),
             ),
           );

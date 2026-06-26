@@ -12,9 +12,11 @@ class AiLogBloc extends Bloc<AiLogEvent, AiLogState> {
     required AiLogRepository repo,
     required String botId,
     required String chatLid,
+    String? targetExternalId,
   }) : _repo = repo,
        _botId = botId,
        _chatLid = chatLid,
+       _targetExternalId = targetExternalId,
        super(const AiLogLoading()) {
     on<AiLogLoadRequested>(_onLoad);
     on<AiLogMoreRequested>(_onMore);
@@ -24,6 +26,11 @@ class AiLogBloc extends Bloc<AiLogEvent, AiLogState> {
   final String _botId;
   final String _chatLid;
 
+  /// Modo drill-through: si viene un wamid, la vista muestra SOLO la corrida
+  /// que produjo ese OUTBOUND (resuelta del log), sin paginar el resto del
+  /// historial. Null = vista normal del log de la sesión.
+  final String? _targetExternalId;
+
   Future<void> _onLoad(
     AiLogLoadRequested event,
     Emitter<AiLogState> emit,
@@ -31,12 +38,57 @@ class AiLogBloc extends Bloc<AiLogEvent, AiLogState> {
     if (state is! AiLogLoading) {
       emit(const AiLogLoading());
     }
+    if (_targetExternalId != null) {
+      await _loadSingleRun(emit, _targetExternalId);
+      return;
+    }
     try {
       final page = await _repo.page(botId: _botId, chatLid: _chatLid);
       emit(
         AiLogLoaded(
           entries: page.items,
           nextBefore: page.nextBefore,
+          isLoadingMore: false,
+        ),
+      );
+    } on AiLogFailure catch (f) {
+      emit(AiLogFailed(f));
+    }
+  }
+
+  /// Resuelve el wamid → corrida y carga solo sus entries. Sin corrida (el
+  /// mensaje no salió de la IA) ⇒ Loaded vacío: la vista muestra el aviso, no
+  /// un error. byRun devuelve ASC; se invierte a DESC porque la vista agrupa
+  /// asumiendo el orden del wire (más recientes primero).
+  Future<void> _loadSingleRun(
+    Emitter<AiLogState> emit,
+    String externalId,
+  ) async {
+    try {
+      final runId = await _repo.runForMessage(
+        botId: _botId,
+        chatLid: _chatLid,
+        externalId: externalId,
+      );
+      if (runId == null) {
+        emit(
+          const AiLogLoaded(
+            entries: <AiLogEntry>[],
+            nextBefore: null,
+            isLoadingMore: false,
+          ),
+        );
+        return;
+      }
+      final entries = await _repo.byRun(
+        botId: _botId,
+        chatLid: _chatLid,
+        runId: runId,
+      );
+      emit(
+        AiLogLoaded(
+          entries: entries.reversed.toList(growable: false),
+          nextBefore: null,
           isLoadingMore: false,
         ),
       );

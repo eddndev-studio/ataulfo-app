@@ -5,6 +5,8 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_chat_composer.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
@@ -21,10 +23,14 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockMessagesBloc extends MockBloc<MessagesEvent, MessagesState>
     implements MessagesBloc {}
+
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
 
 class _MockFilePicker extends Mock implements MediaFilePicker {}
 
@@ -76,16 +82,21 @@ void main() {
   late _MockMessagesBloc bloc;
   late _MockThreadAudioCubit audio;
   late _MockMediaOpener opener;
+  late _MockAuthBloc authBloc;
 
   setUp(() {
     bloc = _MockMessagesBloc();
     audio = _MockThreadAudioCubit();
     opener = _MockMediaOpener();
+    authBloc = _MockAuthBloc();
     when(() => bloc.state).thenReturn(const MessagesInitial());
     when(
       () => bloc.reactFailures,
     ).thenAnswer((_) => const Stream<void>.empty());
     when(() => audio.state).thenReturn(const ThreadAudioState());
+    // Por defecto sin sesión: el drill-through (ADMIN+) queda oculto y la
+    // reacción funciona igual; los tests que lo prueban fijan un estado ADMIN.
+    when(() => authBloc.state).thenReturn(const AuthInitial());
   });
 
   Widget host() => MaterialApp(
@@ -96,6 +107,7 @@ void main() {
         providers: <BlocProvider<dynamic>>[
           BlocProvider<MessagesBloc>.value(value: bloc),
           BlocProvider<ThreadAudioCubit>.value(value: audio),
+          BlocProvider<AuthBloc>.value(value: authBloc),
           // El footer de actividad live lo lee del scope; inerte aquí (sin
           // observar) ⇒ no pinta nada.
           BlocProvider<MonitorLiveCubit>(
@@ -563,6 +575,120 @@ void main() {
           const MessagesReactRequested(messageId: 'm1', emoji: '👍'),
         ),
       ).called(1);
+    });
+  });
+
+  group('drill-through al razonamiento (S24)', () {
+    Widget hostRouted(AuthState authState) {
+      when(() => authBloc.state).thenReturn(authState);
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => RepositoryProvider<MediaOpener>.value(
+              value: opener,
+              child: MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<MessagesBloc>.value(value: bloc),
+                  BlocProvider<ThreadAudioCubit>.value(value: audio),
+                  BlocProvider<AuthBloc>.value(value: authBloc),
+                  BlocProvider<MonitorLiveCubit>(
+                    create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+                  ),
+                ],
+                child: const Scaffold(body: MessageThreadPage()),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/bots/:id/sessions/:chatLid/ai-log',
+            builder: (_, _) => const Scaffold(body: Text('ai-log-stub')),
+          ),
+        ],
+      );
+      return MaterialApp.router(
+        theme: AppDesignTheme.dark(),
+        routerConfig: router,
+      );
+    }
+
+    setUp(() {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(
+              externalId: 'om1',
+              direction: MessageDirection.outbound,
+              content: 'respuesta del bot',
+            ),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      when(() => bloc.botId).thenReturn('b1');
+      when(() => bloc.chatLid).thenReturn('lid-1');
+    });
+
+    testWidgets('ADMIN + OUTBOUND: ofrece "Ver razonamiento" y navega', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        hostRouted(
+          const AuthAuthenticated(
+            Identity(userId: 'u', email: 'x@x', orgId: 'o', role: 'ADMIN'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('respuesta del bot'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('message.drill.om1')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('message.drill.om1')));
+      await tester.pumpAndSettle();
+      expect(find.text('ai-log-stub'), findsOneWidget);
+    });
+
+    testWidgets('WORKER no ve el drill; la reacción sigue disponible', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        hostRouted(
+          const AuthAuthenticated(
+            Identity(userId: 'u', email: 'x@x', orgId: 'o', role: 'WORKER'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('respuesta del bot'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('message.drill.om1')), findsNothing);
+      expect(find.byKey(const Key('reaction.pick.om1.👍')), findsOneWidget);
+    });
+
+    testWidgets('INBOUND no ofrece drill aunque seas ADMIN', (tester) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[msg(externalId: 'im1', content: 'hola bot')],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(
+        hostRouted(
+          const AuthAuthenticated(
+            Identity(userId: 'u', email: 'x@x', orgId: 'o', role: 'ADMIN'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('hola bot'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('message.drill.im1')), findsNothing);
     });
   });
 

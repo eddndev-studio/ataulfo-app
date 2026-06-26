@@ -7,10 +7,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/util/smart_timestamp.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/failures/messages_failure.dart';
 import '../../domain/reactions.dart';
@@ -520,8 +523,23 @@ const List<String> _quickReactions = <String>[
 /// Hoja inferior con los emojis de reacción rápida. Al elegir uno despacha
 /// `MessagesReactRequested` para ese mensaje; la reacción aparece por el eco SSE
 /// (el bloc no la pinta optimista). Captura el bloc ANTES del await del sheet.
-Future<void> _showReactionPicker(BuildContext context, String messageId) async {
+Future<void> _showReactionPicker(
+  BuildContext context,
+  String messageId, {
+  required bool isOutbound,
+}) async {
   final bloc = context.read<MessagesBloc>();
+  // Drill-through inverso: para un OUTBOUND y operador ADMIN+, la hoja ofrece
+  // saltar a la corrida de IA que generó el mensaje (el backend igual exige
+  // ADMIN+ en la vista; ocultarlo evita la acción rota).
+  final auth = context.read<AuthBloc>().state;
+  final canDrill =
+      isOutbound &&
+      auth is AuthAuthenticated &&
+      isAdminOrAbove(auth.identity.role);
+  // Solo se resuelve el router cuando hay drill (evita exigir GoRouter en el
+  // camino de pura reacción).
+  final router = canDrill ? GoRouter.of(context) : null;
   final emoji = await showModalBottomSheet<String>(
     context: context,
     backgroundColor: AppTokens.surface1,
@@ -531,19 +549,44 @@ Future<void> _showReactionPicker(BuildContext context, String messageId) async {
           horizontal: AppTokens.sp4,
           vertical: AppTokens.sp5,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            for (final e in _quickReactions)
-              InkWell(
-                key: Key('reaction.pick.$messageId.$e'),
-                borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-                onTap: () => Navigator.of(sheetContext).pop(e),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppTokens.sp2),
-                  child: Text(e, style: const TextStyle(fontSize: 28)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                for (final e in _quickReactions)
+                  InkWell(
+                    key: Key('reaction.pick.$messageId.$e'),
+                    borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+                    onTap: () => Navigator.of(sheetContext).pop(e),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppTokens.sp2),
+                      child: Text(e, style: const TextStyle(fontSize: 28)),
+                    ),
+                  ),
+              ],
+            ),
+            if (canDrill) ...<Widget>[
+              const Divider(height: AppTokens.sp6),
+              ListTile(
+                key: Key('message.drill.$messageId'),
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.psychology_outlined),
+                title: const Text('Ver razonamiento del bot'),
+                subtitle: const Text(
+                  'La corrida de IA que generó este mensaje',
                 ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  router!.push(
+                    '/bots/${bloc.botId}'
+                    '/sessions/${Uri.encodeComponent(bloc.chatLid)}'
+                    '/ai-log?msg=${Uri.encodeComponent(messageId)}',
+                  );
+                },
               ),
+            ],
           ],
         ),
       ),
@@ -597,7 +640,11 @@ class _MessageBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             GestureDetector(
-              onLongPress: () => _showReactionPicker(context, m.externalId),
+              onLongPress: () => _showReactionPicker(
+                context,
+                m.externalId,
+                isOutbound: isOutbound,
+              ),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.sizeOf(context).width * 0.78,

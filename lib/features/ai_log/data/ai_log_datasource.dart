@@ -13,6 +13,21 @@ abstract interface class AiLogDatasource {
     required String chatLid,
     int? before,
   });
+
+  /// Resuelve la corrida que produjo un OUTBOUND (su wamid) → runId, o `null`
+  /// si el mensaje no salió de la IA (404). Drill-through inverso del hilo.
+  Future<String?> runForMessage({
+    required String botId,
+    required String chatLid,
+    required String externalId,
+  });
+
+  /// Trae las entries de UNA corrida (ASC, sin paginar) por su runId.
+  Future<List<AiLogEntry>> byRun({
+    required String botId,
+    required String chatLid,
+    required String runId,
+  });
 }
 
 /// `GET /sessions/:botId/:chatLid/ai-log?before=&limit=` (ADMIN+). El
@@ -38,6 +53,56 @@ class DioAiLogDatasource implements AiLogDatasource {
         throw const AiLogUnknownFailure();
       }
       return _parsePage(body);
+    } on AiLogFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDio(e);
+    } on FormatException {
+      throw const AiLogUnknownFailure();
+    } on TypeError {
+      throw const AiLogUnknownFailure();
+    }
+  }
+
+  @override
+  Future<String?> runForMessage({
+    required String botId,
+    required String chatLid,
+    required String externalId,
+  }) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/sessions/$botId/${Uri.encodeComponent(chatLid)}/ai-log/run-for-message',
+        queryParameters: <String, dynamic>{'externalId': externalId},
+      );
+      final runId = res.data?['runId'];
+      return runId is String && runId.isNotEmpty ? runId : null;
+    } on DioException catch (e) {
+      // 404 = sin corrida (mensaje ajeno a la IA): no es error, es "null".
+      if (e.type == DioExceptionType.badResponse &&
+          e.response?.statusCode == 404) {
+        return null;
+      }
+      throw _mapDio(e);
+    }
+  }
+
+  @override
+  Future<List<AiLogEntry>> byRun({
+    required String botId,
+    required String chatLid,
+    required String runId,
+  }) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/sessions/$botId/${Uri.encodeComponent(chatLid)}/ai-log',
+        queryParameters: <String, dynamic>{'run': runId},
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const AiLogUnknownFailure();
+      }
+      return _parsePage(body).items;
     } on AiLogFailure {
       rethrow;
     } on DioException catch (e) {
@@ -134,4 +199,22 @@ class AiLogRepositoryImpl implements AiLogRepository {
     required String chatLid,
     int? before,
   }) => _ds.page(botId: botId, chatLid: chatLid, before: before);
+
+  @override
+  Future<String?> runForMessage({
+    required String botId,
+    required String chatLid,
+    required String externalId,
+  }) => _ds.runForMessage(
+    botId: botId,
+    chatLid: chatLid,
+    externalId: externalId,
+  );
+
+  @override
+  Future<List<AiLogEntry>> byRun({
+    required String botId,
+    required String chatLid,
+    required String runId,
+  }) => _ds.byRun(botId: botId, chatLid: chatLid, runId: runId);
 }

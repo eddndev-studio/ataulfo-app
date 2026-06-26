@@ -56,6 +56,11 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   final String _botId;
   final String _chatLid;
 
+  /// Sesión del hilo (bot + chat) para que la UI arme rutas dependientes del
+  /// chat (p.ej. el drill-through a la corrida de IA de un mensaje).
+  String get botId => _botId;
+  String get chatLid => _chatLid;
+
   /// Genera la idempotency-key (`clientToken`) de cada envío. Inyectable para
   /// tests deterministas; por defecto un UUID v4.
   final String Function() _newToken;

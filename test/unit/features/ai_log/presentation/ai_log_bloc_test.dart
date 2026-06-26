@@ -94,6 +94,74 @@ void main() {
   );
 
   blocTest<AiLogBloc, AiLogState>(
+    'drill-through: resuelve el wamid → corrida y carga sus entries (sin cursor)',
+    build: () {
+      when(
+        () => repo.runForMessage(
+          botId: 'b1',
+          chatLid: 'c1',
+          externalId: 'WAM9',
+        ),
+      ).thenAnswer((_) async => 'run-7');
+      when(
+        () => repo.byRun(botId: 'b1', chatLid: 'c1', runId: 'run-7'),
+      ).thenAnswer((_) async => <AiLogEntry>[e(7)]);
+      return AiLogBloc(
+        repo: repo,
+        botId: 'b1',
+        chatLid: 'c1',
+        targetExternalId: 'WAM9',
+      );
+    },
+    act: (bloc) => bloc.add(const AiLogLoadRequested()),
+    expect: () => <Matcher>[
+      isA<AiLogLoaded>()
+          .having((s) => s.entries.length, 'entries', 1)
+          .having((s) => s.nextBefore, 'nextBefore', isNull),
+    ],
+    verify: (_) {
+      verifyNever(
+        () => repo.page(
+          botId: any(named: 'botId'),
+          chatLid: any(named: 'chatLid'),
+        ),
+      );
+    },
+  );
+
+  blocTest<AiLogBloc, AiLogState>(
+    'drill-through: sin corrida (mensaje ajeno a la IA) → Loaded vacío',
+    build: () {
+      when(
+        () => repo.runForMessage(
+          botId: 'b1',
+          chatLid: 'c1',
+          externalId: 'WAM9',
+        ),
+      ).thenAnswer((_) async => null);
+      return AiLogBloc(
+        repo: repo,
+        botId: 'b1',
+        chatLid: 'c1',
+        targetExternalId: 'WAM9',
+      );
+    },
+    act: (bloc) => bloc.add(const AiLogLoadRequested()),
+    expect: () => <Matcher>[
+      isA<AiLogLoaded>().having((s) => s.entries, 'entries', isEmpty),
+    ],
+    verify: (_) {
+      verifyNever(
+        () => repo.byRun(
+          botId: any(named: 'botId'),
+          chatLid: any(named: 'chatLid'),
+          runId: any(named: 'runId'),
+        ),
+      );
+    },
+  );
+
+  blocTest<AiLogBloc, AiLogState>(
     'fallo del load → Failed',
     build: () {
       when(

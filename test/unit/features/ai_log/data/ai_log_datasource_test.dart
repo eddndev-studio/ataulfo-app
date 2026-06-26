@@ -110,6 +110,99 @@ void main() {
     expect(captured[0], containsPair('before', 41));
   });
 
+  test('runForMessage 200 → runId; externalId viaja en el query', () async {
+    when(
+      () => dio.get<Map<String, dynamic>>(
+        any(),
+        queryParameters: any(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer((_) async => ok(<String, dynamic>{'runId': 'run-7'}));
+
+    final runId = await ds.runForMessage(
+      botId: 'b1',
+      chatLid: 'chat@lid',
+      externalId: 'WAM9',
+    );
+
+    expect(runId, 'run-7');
+    final captured = verify(
+      () => dio.get<Map<String, dynamic>>(
+        captureAny(),
+        queryParameters: captureAny(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).captured;
+    expect(captured[0], '/sessions/b1/chat%40lid/ai-log/run-for-message');
+    expect(captured[1], containsPair('externalId', 'WAM9'));
+  });
+
+  test('runForMessage 404 → null (el mensaje no lo generó la IA)', () async {
+    when(
+      () => dio.get<Map<String, dynamic>>(
+        any(),
+        queryParameters: any(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).thenThrow(
+      DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: '/x'),
+          statusCode: 404,
+        ),
+        type: DioExceptionType.badResponse,
+      ),
+    );
+
+    final runId = await ds.runForMessage(
+      botId: 'b1',
+      chatLid: 'c1',
+      externalId: 'WAM9',
+    );
+    expect(runId, isNull);
+  });
+
+  test('byRun → entries de la corrida; run viaja en el query', () async {
+    when(
+      () => dio.get<Map<String, dynamic>>(
+        any(),
+        queryParameters: any(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => ok(<String, dynamic>{
+        'items': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 7,
+            'runId': 'run-7',
+            'role': 'assistant',
+            'content': 'ya te confirmo',
+            'createdAt': '2026-06-12T12:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    final entries = await ds.byRun(
+      botId: 'b1',
+      chatLid: 'chat@lid',
+      runId: 'run-7',
+    );
+
+    expect(entries, hasLength(1));
+    expect(entries.single.runId, 'run-7');
+    final captured = verify(
+      () => dio.get<Map<String, dynamic>>(
+        captureAny(),
+        queryParameters: captureAny(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).captured;
+    expect(captured[0], '/sessions/b1/chat%40lid/ai-log');
+    expect(captured[1], containsPair('run', 'run-7'));
+  });
+
   test('403 → AiLogForbiddenFailure', () async {
     when(
       () => dio.get<Map<String, dynamic>>(
