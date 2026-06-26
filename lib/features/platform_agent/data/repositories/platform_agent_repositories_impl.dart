@@ -52,6 +52,9 @@ class PlatformAgentRepositoryImpl implements PlatformAgentRepository {
 
   @override
   Future<PaModels> listModels() => _ds.listModels();
+
+  @override
+  void cancelSend() => _ds.cancelInFlight();
 }
 
 /// Impl del stream de progreso: delega al datasource SSE.

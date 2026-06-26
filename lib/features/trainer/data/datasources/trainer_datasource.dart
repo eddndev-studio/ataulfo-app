@@ -55,12 +55,20 @@ abstract interface class TrainerDatasource {
   /// Allowlist de modelos del entrenador + default de la plataforma. El
   /// caller la trata como best-effort: cualquier fallo oculta el selector.
   Future<TrainerModels> listModels({required String templateId});
+
+  /// Aborta el turno de chat en vuelo (si lo hay): el `sendMessage` colgado
+  /// lanza un fallo de cancelación. No-op si no hay turno corriendo.
+  void cancelInFlight();
 }
 
 class DioTrainerDatasource implements TrainerDatasource {
   DioTrainerDatasource(this._dio);
 
   final Dio _dio;
+
+  /// Token del turno de chat en vuelo: lo arma `sendMessage` y lo dispara
+  /// `cancelInFlight`. Uno a la vez (un turno por hilo).
+  CancelToken? _inFlight;
 
   String _base(String templateId) =>
       '/templates/$templateId/trainer/conversations';
@@ -164,6 +172,8 @@ class DioTrainerDatasource implements TrainerDatasource {
     String? model,
     List<String> attachments = const <String>[],
   }) async {
+    final token = CancelToken();
+    _inFlight = token;
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '${_base(templateId)}/$conversationId/messages',
@@ -173,6 +183,7 @@ class DioTrainerDatasource implements TrainerDatasource {
           if (attachments.isNotEmpty) 'attachments': attachments,
         },
         options: Options(receiveTimeout: turnReceiveTimeout),
+        cancelToken: token,
       );
       final body = res.data;
       if (body == null) throw const TrainerUnknownFailure();
@@ -185,8 +196,13 @@ class DioTrainerDatasource implements TrainerDatasource {
       throw const TrainerUnknownFailure();
     } on TypeError {
       throw const TrainerUnknownFailure();
+    } finally {
+      if (identical(_inFlight, token)) _inFlight = null;
     }
   }
+
+  @override
+  void cancelInFlight() => _inFlight?.cancel();
 
   @override
   Future<TrainerAttachment> uploadAttachment({

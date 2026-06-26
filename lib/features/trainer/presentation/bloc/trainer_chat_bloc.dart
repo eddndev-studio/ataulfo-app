@@ -84,6 +84,26 @@ final class TrainerChatModelSelected extends TrainerChatEvent {
   int get hashCode => modelId.hashCode;
 }
 
+/// El operador detiene el turno en vuelo: aborta el POST y revierte el optimista.
+final class TrainerChatTurnCancelRequested extends TrainerChatEvent {
+  const TrainerChatTurnCancelRequested();
+}
+
+/// El composer cambió: persiste el borrador del hilo activo (sin re-emitir por
+/// tecla; el borrador se siembra al cambiar de hilo).
+final class TrainerChatDraftChanged extends TrainerChatEvent {
+  const TrainerChatDraftChanged(this.text);
+
+  final String text;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TrainerChatDraftChanged && other.text == text;
+
+  @override
+  int get hashCode => text.hashCode;
+}
+
 /// Progreso en vivo del turno recibido por SSE. Lo emite la suscripción
 /// per-turn; el handler lo traduce a la etiqueta del indicador
 /// ("Pensando…/Usando {tool}…"). Cosmético: nunca toca el contenido del hilo.
@@ -133,6 +153,8 @@ final class TrainerChatLoaded extends TrainerChatState {
     this.selectedModelId = '',
     this.pendingAttachments = const <TrainerAttachment>[],
     this.attaching = false,
+    this.lastAttemptedContent = '',
+    this.draft = '',
   });
 
   final TrainerConversation conversation;
@@ -170,6 +192,14 @@ final class TrainerChatLoaded extends TrainerChatState {
   /// true mientras un adjunto sube (el clip muestra spinner).
   final bool attaching;
 
+  /// Texto del último turno enviado, conservado al fallar para que "Reintentar"
+  /// lo re-despache y el composer lo recupere. '' si no hay nada que reintentar.
+  final String lastAttemptedContent;
+
+  /// Borrador del composer del hilo activo; se siembra al cambiar de hilo o al
+  /// cancelar (la persistencia por-hilo vive en el bloc, en memoria).
+  final String draft;
+
   TrainerChatLoaded copyWith({
     TrainerConversation? conversation,
     List<TrainerConversation>? conversations,
@@ -181,6 +211,8 @@ final class TrainerChatLoaded extends TrainerChatState {
     String? selectedModelId,
     List<TrainerAttachment>? pendingAttachments,
     bool? attaching,
+    String? lastAttemptedContent,
+    String? draft,
   }) => TrainerChatLoaded(
     conversation: conversation ?? this.conversation,
     conversations: conversations ?? this.conversations,
@@ -193,6 +225,8 @@ final class TrainerChatLoaded extends TrainerChatState {
     selectedModelId: selectedModelId ?? this.selectedModelId,
     pendingAttachments: pendingAttachments ?? this.pendingAttachments,
     attaching: attaching ?? this.attaching,
+    lastAttemptedContent: lastAttemptedContent ?? this.lastAttemptedContent,
+    draft: draft ?? this.draft,
   );
 
   @override
@@ -208,7 +242,9 @@ final class TrainerChatLoaded extends TrainerChatState {
       other.defaultModelId == defaultModelId &&
       other.selectedModelId == selectedModelId &&
       listEquals(other.pendingAttachments, pendingAttachments) &&
-      other.attaching == attaching;
+      other.attaching == attaching &&
+      other.lastAttemptedContent == lastAttemptedContent &&
+      other.draft == draft;
 
   @override
   int get hashCode => Object.hash(
@@ -223,6 +259,8 @@ final class TrainerChatLoaded extends TrainerChatState {
     selectedModelId,
     Object.hashAll(pendingAttachments),
     attaching,
+    lastAttemptedContent,
+    draft,
   );
 }
 
@@ -245,10 +283,21 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     on<TrainerChatConversationSelected>(_onConversationSelected);
     on<TrainerChatModelSelected>(_onModelSelected);
     on<TrainerChatProgressReceived>(_onProgressReceived);
+    on<TrainerChatTurnCancelRequested>(_onTurnCancelRequested);
+    on<TrainerChatDraftChanged>(_onDraftChanged);
   }
 
   final TrainerRepository _repo;
   final String _templateId;
+
+  /// Borradores del composer por conversationId (en memoria): sobreviven la
+  /// destrucción del estado del composer al cerrar/reabrir la pantalla.
+  final Map<String, String> _drafts = <String, String>{};
+
+  /// true entre que el operador pide cancelar y que el POST abortado lanza:
+  /// la guarda hace que el catch trague la excepción de cancelación en vez de
+  /// pintarla como fallo real.
+  bool _cancelRequested = false;
 
   /// Picker de archivos (nil ⇒ el composer oculta el clip — DX/tests).
   final MediaFilePicker? _picker;
@@ -337,6 +386,8 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
   ) async {
     final current = state;
     if (current is! TrainerChatLoaded || current.sending) return;
+    _cancelRequested = false;
+    _drafts.remove(current.conversation.id);
     final optimistic = TrainerMessage(
       id: 'optimistic',
       conversationId: current.conversation.id,
@@ -351,6 +402,8 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         sending: true,
         liveProgress: 'Pensando…',
         clearSendFailure: true,
+        lastAttemptedContent: event.content,
+        draft: '',
       ),
     );
     // Indicador en vivo: suscripción de progreso per-turn. Best-effort —
@@ -386,14 +439,29 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
           liveProgress: '',
           clearSendFailure: true,
           pendingAttachments: const <TrainerAttachment>[],
+          lastAttemptedContent: '',
         ),
       );
     } on TrainerFailure catch (f) {
-      // Revertir el optimista: el server no persistió el turno (502 del
-      // motor deja el user message fuera del hilo — reintentable).
       unawaited(_progressSub?.cancel());
       _progressSub = null;
-      emit(current.copyWith(sending: false, liveProgress: '', sendFailure: f));
+      // El turno se canceló: el handler de cancelación ya dejó el estado limpio.
+      // Tragamos la excepción del POST abortado en vez de pintarla como fallo.
+      if (_cancelRequested) {
+        _cancelRequested = false;
+        return;
+      }
+      // Revertir el optimista: el server no persistió el turno (502 del motor
+      // deja el user message fuera del hilo — reintentable). `current` conserva
+      // los adjuntos pendientes y guardamos el texto para "Reintentar".
+      emit(
+        current.copyWith(
+          sending: false,
+          liveProgress: '',
+          sendFailure: f,
+          lastAttemptedContent: event.content,
+        ),
+      );
     }
   }
 
@@ -459,6 +527,46 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     emit(current.copyWith(selectedModelId: event.modelId));
   }
 
+  void _onTurnCancelRequested(
+    TrainerChatTurnCancelRequested event,
+    Emitter<TrainerChatState> emit,
+  ) {
+    final current = state;
+    if (current is! TrainerChatLoaded || !current.sending) return;
+    _cancelRequested = true;
+    _repo.cancelSend();
+    unawaited(_progressSub?.cancel());
+    _progressSub = null;
+    // Devolver el texto cancelado al borrador para que el operador lo reedite;
+    // los adjuntos pendientes se conservan (current.copyWith no los toca).
+    final cancelled = current.lastAttemptedContent;
+    if (cancelled.isNotEmpty) {
+      _drafts[current.conversation.id] = cancelled;
+    }
+    emit(
+      current.copyWith(
+        messages: current.messages
+            .where((m) => m.id != 'optimistic')
+            .toList(growable: false),
+        sending: false,
+        liveProgress: '',
+        clearSendFailure: true,
+        draft: cancelled,
+      ),
+    );
+  }
+
+  void _onDraftChanged(
+    TrainerChatDraftChanged event,
+    Emitter<TrainerChatState> emit,
+  ) {
+    final current = state;
+    if (current is! TrainerChatLoaded) return;
+    // Persistir sin re-emitir: el composer es la fuente de verdad mientras el
+    // hilo está abierto; el borrador se siembra al cambiar de hilo o cancelar.
+    _drafts[current.conversation.id] = event.text;
+  }
+
   Future<void> _onConversationSelected(
     TrainerChatConversationSelected event,
     Emitter<TrainerChatState> emit,
@@ -480,6 +588,7 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
           conversation: target,
           messages: await _loadMessages(target.id),
           clearSendFailure: true,
+          draft: _drafts[target.id] ?? '',
         ),
       );
     } on TrainerFailure catch (f) {

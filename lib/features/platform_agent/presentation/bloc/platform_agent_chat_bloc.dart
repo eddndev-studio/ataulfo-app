@@ -105,6 +105,26 @@ final class PaChatModelSelected extends PaChatEvent {
   int get hashCode => modelId.hashCode;
 }
 
+/// El operador detiene el turno en vuelo: aborta el POST y revierte el optimista.
+final class PaChatTurnCancelRequested extends PaChatEvent {
+  const PaChatTurnCancelRequested();
+}
+
+/// El composer cambió: persiste el borrador del hilo activo (sin re-emitir por
+/// tecla; el borrador se siembra al cambiar de hilo).
+final class PaChatDraftChanged extends PaChatEvent {
+  const PaChatDraftChanged(this.text);
+
+  final String text;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PaChatDraftChanged && other.text == text;
+
+  @override
+  int get hashCode => text.hashCode;
+}
+
 /// Interno: un frame de progreso del SSE del turno en vuelo. Alimenta el
 /// indicador en vivo; no toca el hilo de mensajes.
 final class PaChatProgressReceived extends PaChatEvent {
@@ -153,6 +173,8 @@ final class PaChatLoaded extends PaChatState {
     this.selectedModelId = '',
     this.nextCursor = '',
     this.loadingMore = false,
+    this.lastAttemptedContent = '',
+    this.draft = '',
   });
 
   /// Hilos del operador, DESC por updatedAt (para el selector de historial).
@@ -190,6 +212,14 @@ final class PaChatLoaded extends PaChatState {
   /// true mientras se cargan mensajes viejos (load-more en vuelo).
   final bool loadingMore;
 
+  /// Texto del último turno enviado, conservado al fallar para que "Reintentar"
+  /// lo re-despache y el composer lo recupere. '' cuando no hay nada que reintentar.
+  final String lastAttemptedContent;
+
+  /// Borrador del composer del hilo ACTIVO; se siembra al cambiar de hilo o al
+  /// cancelar (la persistencia por-hilo vive en el bloc, en memoria).
+  final String draft;
+
   PaChatLoaded copyWith({
     List<PaConversation>? conversations,
     PaConversation? activeConversation,
@@ -201,6 +231,8 @@ final class PaChatLoaded extends PaChatState {
     String? selectedModelId,
     String? nextCursor,
     bool? loadingMore,
+    String? lastAttemptedContent,
+    String? draft,
   }) => PaChatLoaded(
     conversations: conversations ?? this.conversations,
     activeConversation: activeConversation ?? this.activeConversation,
@@ -213,6 +245,8 @@ final class PaChatLoaded extends PaChatState {
     selectedModelId: selectedModelId ?? this.selectedModelId,
     nextCursor: nextCursor ?? this.nextCursor,
     loadingMore: loadingMore ?? this.loadingMore,
+    lastAttemptedContent: lastAttemptedContent ?? this.lastAttemptedContent,
+    draft: draft ?? this.draft,
   );
 
   @override
@@ -228,7 +262,9 @@ final class PaChatLoaded extends PaChatState {
       other.defaultModelId == defaultModelId &&
       other.selectedModelId == selectedModelId &&
       other.nextCursor == nextCursor &&
-      other.loadingMore == loadingMore;
+      other.loadingMore == loadingMore &&
+      other.lastAttemptedContent == lastAttemptedContent &&
+      other.draft == draft;
 
   @override
   int get hashCode => Object.hash(
@@ -243,6 +279,8 @@ final class PaChatLoaded extends PaChatState {
     selectedModelId,
     nextCursor,
     loadingMore,
+    lastAttemptedContent,
+    draft,
   );
 }
 
@@ -262,10 +300,21 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     on<PaChatConversationSelected>(_onConversationSelected);
     on<PaChatProgressReceived>(_onProgressReceived);
     on<PaChatModelSelected>(_onModelSelected);
+    on<PaChatTurnCancelRequested>(_onTurnCancelRequested);
+    on<PaChatDraftChanged>(_onDraftChanged);
   }
 
   final PlatformAgentRepository _repo;
   final PlatformAgentEvents _events;
+
+  /// Borradores del composer por conversationId (en memoria): sobreviven el
+  /// cambio de pestaña del shell, que destruye el estado del composer.
+  final Map<String, String> _drafts = <String, String>{};
+
+  /// true entre que el operador pide cancelar y que el POST abortado lanza:
+  /// la guarda hace que el catch del envío trague la excepción de cancelación
+  /// en vez de pintarla como fallo real.
+  bool _cancelRequested = false;
 
   /// Suscripción de progreso del turno en vuelo (per-turn): se abre al enviar
   /// y se cancela al volver el POST o al cerrarse el bloc.
@@ -340,6 +389,8 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     final current = state;
     if (current is! PaChatLoaded || current.sending) return;
     final convId = current.activeConversation.id;
+    _cancelRequested = false;
+    _drafts.remove(convId);
     final optimistic = PaMessage(
       id: 'optimistic',
       conversationId: convId,
@@ -353,6 +404,8 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         sending: true,
         liveProgress: 'Pensando…',
         clearSendFailure: true,
+        lastAttemptedContent: event.content,
+        draft: '',
       ),
     );
     // Indicador en vivo: suscripción de progreso per-turn. Best-effort —
@@ -382,17 +435,33 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           sending: false,
           liveProgress: '',
           clearSendFailure: true,
+          lastAttemptedContent: '',
         ),
       );
       // Recarga best-effort (follow-up, ya con el turno cerrado): trae el hilo
       // completo del server, incl. los mensajes de tool que el POST no devuelve.
       await _reloadThread(emit, convId, assistant.id);
     } on PaFailure catch (f) {
-      // Revertir el optimista: el 502 deja el user message fuera del hilo
-      // (reintentable). `current` es el estado pre-optimista.
       unawaited(_progressSub?.cancel());
       _progressSub = null;
-      emit(current.copyWith(sending: false, liveProgress: '', sendFailure: f));
+      // El turno se canceló: el handler de cancelación ya dejó el estado limpio
+      // (optimista revertido, sending=false). Tragamos la excepción del POST
+      // abortado en vez de pintarla como fallo.
+      if (_cancelRequested) {
+        _cancelRequested = false;
+        return;
+      }
+      // Revertir el optimista: el 502 deja el user message fuera del hilo
+      // (reintentable). `current` es el estado pre-optimista; conservamos el
+      // texto para que "Reintentar" lo recupere.
+      emit(
+        current.copyWith(
+          sending: false,
+          liveProgress: '',
+          sendFailure: f,
+          lastAttemptedContent: event.content,
+        ),
+      );
     }
   }
 
@@ -504,6 +573,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           nextCursor: page.nextCursor,
           liveProgress: '',
           clearSendFailure: true,
+          draft: _drafts[target.id] ?? '',
         ),
       );
     } on PaFailure catch (f) {
@@ -622,5 +692,41 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     final current = state;
     if (current is! PaChatLoaded) return;
     emit(current.copyWith(selectedModelId: event.modelId));
+  }
+
+  void _onTurnCancelRequested(
+    PaChatTurnCancelRequested event,
+    Emitter<PaChatState> emit,
+  ) {
+    final current = state;
+    if (current is! PaChatLoaded || !current.sending) return;
+    _cancelRequested = true;
+    _repo.cancelSend();
+    unawaited(_progressSub?.cancel());
+    _progressSub = null;
+    // Devolver el texto cancelado al borrador para que el operador lo reedite.
+    final cancelled = current.lastAttemptedContent;
+    if (cancelled.isNotEmpty) {
+      _drafts[current.activeConversation.id] = cancelled;
+    }
+    emit(
+      current.copyWith(
+        messages: current.messages
+            .where((m) => m.id != 'optimistic')
+            .toList(growable: false),
+        sending: false,
+        liveProgress: '',
+        clearSendFailure: true,
+        draft: cancelled,
+      ),
+    );
+  }
+
+  void _onDraftChanged(PaChatDraftChanged event, Emitter<PaChatState> emit) {
+    final current = state;
+    if (current is! PaChatLoaded) return;
+    // Persistir sin re-emitir: el composer es la fuente de verdad mientras el
+    // hilo está abierto; el borrador se siembra al cambiar de hilo o cancelar.
+    _drafts[current.activeConversation.id] = event.text;
   }
 }

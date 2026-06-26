@@ -106,6 +106,7 @@ void main() {
           '/templates/t1/trainer/conversations/c1/messages',
           data: any(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
         (_) async => _resp(
@@ -133,6 +134,7 @@ void main() {
                   '/templates/t1/trainer/conversations/c1/messages',
                   data: captureAny(named: 'data'),
                   options: any(named: 'options'),
+                  cancelToken: any(named: 'cancelToken'),
                 ),
               ).captured.single
               as Map<String, dynamic>;

@@ -36,6 +36,10 @@ abstract interface class PlatformAgentRepository {
   /// Allowlist de modelos + default de la plataforma (best-effort: el caller
   /// oculta el selector ante cualquier fallo).
   Future<PaModels> listModels();
+
+  /// Aborta el turno en vuelo (si lo hay): el `sendMessage` colgado lanza un
+  /// fallo de cancelación. No-op si no hay turno corriendo.
+  void cancelSend();
 }
 
 /// Puerto del stream de progreso del turno (SSE). Una suscripción por hilo;

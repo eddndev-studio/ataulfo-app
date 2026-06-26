@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_conversation.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_message.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_models.dart';
@@ -35,17 +37,22 @@ PaChatLoaded _loaded({
   PaFailure? sendFailure,
   List<PaMessage>? messages,
   List<PaConversation>? conversations,
+  PaConversation? active,
   List<PaModelOption> models = const <PaModelOption>[],
   String selectedModelId = '',
+  String lastAttemptedContent = '',
+  String draft = '',
 }) => PaChatLoaded(
   conversations: conversations ?? <PaConversation>[_conv()],
-  activeConversation: _conv(),
+  activeConversation: active ?? _conv(),
   messages: messages ?? <PaMessage>[_msg('m1', 'assistant', 'tienes 3 bots')],
   sending: sending,
   liveProgress: liveProgress,
   sendFailure: sendFailure,
   models: models,
   selectedModelId: selectedModelId,
+  lastAttemptedContent: lastAttemptedContent,
+  draft: draft,
 );
 
 void main() {
@@ -196,5 +203,72 @@ void main() {
   ) async {
     await pump(tester, _loaded());
     expect(find.byKey(const Key('pa.model.button')), findsNothing);
+  });
+
+  testWidgets('fallo de envío: "Reintentar" re-despacha el último texto', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      _loaded(
+        sendFailure: const PaServerFailure(),
+        lastAttemptedContent: 'cuántos bots',
+      ),
+    );
+    expect(find.byKey(const Key('pa.send_failure.retry')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('pa.send_failure.retry')));
+    verify(
+      () => bloc.add(const PaChatMessageSent('cuántos bots')),
+    ).called(1);
+  });
+
+  testWidgets('turno en vuelo: "Detener" dispara TurnCancelRequested', (
+    tester,
+  ) async {
+    await pump(tester, _loaded(sending: true, liveProgress: 'Pensando…'));
+    expect(find.byKey(const Key('pa.turn_cancel')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('pa.turn_cancel')));
+    verify(() => bloc.add(const PaChatTurnCancelRequested())).called(1);
+  });
+
+  testWidgets('al cambiar de hilo el composer muestra el borrador del nuevo', (
+    tester,
+  ) async {
+    final controller = StreamController<PaChatState>();
+    addTearDown(controller.close);
+    whenListen(
+      bloc,
+      controller.stream,
+      initialState: _loaded(
+        conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 700,
+            child: BlocProvider<PlatformAgentChatBloc>.value(
+              value: bloc,
+              child: const PlatformAgentPage(),
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.add(
+      _loaded(
+        conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+        active: _conv(id: 'c2'),
+        messages: const <PaMessage>[],
+        draft: 'borrador de c2',
+      ),
+    );
+    await tester.pump();
+    final field = tester.widget<TextField>(
+      find.byKey(const Key('pa.composer.field')),
+    );
+    expect(field.controller?.text, 'borrador de c2');
   });
 }

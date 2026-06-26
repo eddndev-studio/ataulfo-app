@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
+import 'package:ataulfo/features/trainer/domain/entities/trainer_attachment.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_conversation.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_message.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_models.dart';
@@ -399,6 +402,138 @@ void main() {
               'fallo expuesto',
               isA<TrainerEngineFailure>(),
             ),
+      ],
+    );
+
+    blocTest<TrainerChatBloc, TrainerChatState>(
+      'MessageSent fallido conserva lastAttemptedContent (Reintentar)',
+      build: build,
+      seed: () => TrainerChatLoaded(
+        conversation: _conv,
+        messages: const <TrainerMessage>[],
+        sending: false,
+      ),
+      setUp: () {
+        when(
+          () => repo.sendMessage(
+            templateId: 't1',
+            conversationId: 'c1',
+            content: 'hola',
+            attachments: any(named: 'attachments'),
+          ),
+        ).thenThrow(const TrainerEngineFailure());
+      },
+      act: (b) => b.add(const TrainerChatMessageSent('hola')),
+      expect: () => <dynamic>[
+        isA<TrainerChatLoaded>()
+            .having((s) => s.sending, 'optimista', true)
+            .having((s) => s.lastAttemptedContent, 'intento', 'hola'),
+        isA<TrainerChatLoaded>()
+            .having((s) => s.sending, 'off', false)
+            .having((s) => s.sendFailure, 'fallo', isNotNull)
+            .having((s) => s.lastAttemptedContent, 'intento preservado', 'hola'),
+      ],
+    );
+
+    blocTest<TrainerChatBloc, TrainerChatState>(
+      'TurnCancelRequested aborta el turno, conserva adjuntos y NO emite fallo',
+      build: build,
+      seed: () => TrainerChatLoaded(
+        conversation: _conv,
+        messages: const <TrainerMessage>[],
+        sending: false,
+        pendingAttachments: const <TrainerAttachment>[
+          TrainerAttachment(
+            ref: 'r1',
+            mime: 'image/png',
+            name: 'a.png',
+            sizeBytes: 10,
+          ),
+        ],
+      ),
+      setUp: () {
+        final hang = Completer<TrainerMessage>();
+        when(
+          () => repo.sendMessage(
+            templateId: 't1',
+            conversationId: 'c1',
+            content: 'hola',
+            attachments: any(named: 'attachments'),
+          ),
+        ).thenAnswer((_) => hang.future);
+        when(() => repo.cancelSend()).thenAnswer((_) {
+          if (!hang.isCompleted) hang.completeError(const TrainerUnknownFailure());
+        });
+      },
+      act: (b) async {
+        b.add(const TrainerChatMessageSent('hola'));
+        await Future<void>.delayed(Duration.zero);
+        b.add(const TrainerChatTurnCancelRequested());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => <dynamic>[
+        isA<TrainerChatLoaded>().having((s) => s.sending, 'optimista', true),
+        isA<TrainerChatLoaded>()
+            .having((s) => s.sending, 'cancelado', false)
+            .having((s) => s.sendFailure, 'sin fallo', isNull)
+            .having((s) => s.pendingAttachments.length, 'adjuntos', 1)
+            .having(
+              (s) => s.messages.any((m) => m.id == 'optimistic'),
+              'optimista revertido',
+              false,
+            ),
+      ],
+      verify: (_) {
+        verify(() => repo.cancelSend()).called(1);
+      },
+    );
+
+    blocTest<TrainerChatBloc, TrainerChatState>(
+      'el draft se guarda por conversación y no se filtra entre hilos',
+      build: build,
+      seed: () => TrainerChatLoaded(
+        conversation: _conv,
+        conversations: <TrainerConversation>[
+          _conv,
+          TrainerConversation(
+            id: 'c2',
+            templateId: 't1',
+            title: 'Otro',
+            createdAt: DateTime.utc(2026, 6, 10),
+            updatedAt: DateTime.utc(2026, 6, 10),
+          ),
+        ],
+        messages: const <TrainerMessage>[],
+        sending: false,
+      ),
+      setUp: () {
+        when(
+          () => repo.listMessages(
+            templateId: 't1',
+            conversationId: any(named: 'conversationId'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => const TrainerMessagesPage(
+            messages: <TrainerMessage>[],
+            nextCursor: '',
+          ),
+        );
+      },
+      act: (b) async {
+        b.add(const TrainerChatDraftChanged('borrador c1'));
+        await Future<void>.delayed(Duration.zero);
+        b.add(const TrainerChatConversationSelected('c2'));
+        await Future<void>.delayed(Duration.zero);
+        b.add(const TrainerChatConversationSelected('c1'));
+      },
+      expect: () => <dynamic>[
+        isA<TrainerChatLoaded>()
+            .having((s) => s.conversation.id, 'activo', 'c2')
+            .having((s) => s.draft, 'draft c2', ''),
+        isA<TrainerChatLoaded>()
+            .having((s) => s.conversation.id, 'activo', 'c1')
+            .having((s) => s.draft, 'draft c1', 'borrador c1'),
       ],
     );
   });

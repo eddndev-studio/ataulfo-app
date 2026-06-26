@@ -197,6 +197,58 @@ class _ChatView extends StatefulWidget {
 }
 
 class _ChatViewState extends State<_ChatView> {
+  /// Controller externo: es el origen del borrador (que el bloc persiste por
+  /// hilo) y permite re-sembrar el composer al cambiar de hilo, fallar o cancelar.
+  final TextEditingController _composer = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _composer.text = widget.state.draft;
+    _composer.addListener(_onComposerChanged);
+  }
+
+  @override
+  void didUpdateWidget(_ChatView old) {
+    super.didUpdateWidget(old);
+    final prev = old.state;
+    final cur = widget.state;
+    final convChanged = prev.conversation.id != cur.conversation.id;
+    final failureAppeared = prev.sendFailure == null && cur.sendFailure != null;
+    final cancelRestore =
+        prev.sending &&
+        !cur.sending &&
+        cur.sendFailure == null &&
+        cur.draft.isNotEmpty;
+    // Sembrar el composer SOLO en transiciones puntuales (cambio de hilo o
+    // cancelación restauran el borrador; un fallo recupera el texto enviado),
+    // nunca en un rebuild ordinario, para no pisar lo que el operador teclea.
+    if (convChanged || cancelRestore) {
+      _setComposer(cur.draft);
+    } else if (failureAppeared) {
+      _setComposer(cur.lastAttemptedContent);
+    }
+  }
+
+  void _onComposerChanged() {
+    context.read<TrainerChatBloc>().add(
+      TrainerChatDraftChanged(_composer.text),
+    );
+  }
+
+  void _setComposer(String text) {
+    if (_composer.text == text) return;
+    _composer.text = text;
+    _composer.selection = TextSelection.collapsed(offset: text.length);
+  }
+
+  @override
+  void dispose() {
+    _composer.removeListener(_onComposerChanged);
+    _composer.dispose();
+    super.dispose();
+  }
+
   void _send(String text) {
     if (widget.state.sending) return;
     context.read<TrainerChatBloc>().add(TrainerChatMessageSent(text));
@@ -229,11 +281,41 @@ class _ChatViewState extends State<_ChatView> {
         ),
         if (s.sendFailure != null)
           Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp3,
+              vertical: AppTokens.sp1,
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    trainerFailureCopy(s.sendFailure!),
+                    key: const Key('trainer.send_failure'),
+                    style: const TextStyle(color: AppTokens.danger),
+                  ),
+                ),
+                if (s.lastAttemptedContent.isNotEmpty)
+                  AppButton.text(
+                    key: const Key('trainer.send_failure.retry'),
+                    label: 'Reintentar',
+                    onPressed: () => _send(s.lastAttemptedContent),
+                  ),
+              ],
+            ),
+          ),
+        if (s.sending)
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
-            child: Text(
-              trainerFailureCopy(s.sendFailure!),
-              key: const Key('trainer.send_failure'),
-              style: const TextStyle(color: AppTokens.danger),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: AppButton.text(
+                key: const Key('trainer.turn_cancel'),
+                label: 'Detener',
+                icon: Icons.stop_rounded,
+                onPressed: () => context.read<TrainerChatBloc>().add(
+                  const TrainerChatTurnCancelRequested(),
+                ),
+              ),
             ),
           ),
         if (s.messages.isEmpty && !s.sending)
@@ -275,6 +357,7 @@ class _ChatViewState extends State<_ChatView> {
             ),
           ),
         AppChatComposer(
+          controller: _composer,
           fieldKey: const Key('trainer.composer.field'),
           sendKey: const Key('trainer.composer.send'),
           hint: 'Cuéntale de tu negocio…',

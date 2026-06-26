@@ -117,6 +117,9 @@ class TrainerRepositoryImpl implements TrainerRepository {
   @override
   Future<TrainerModels> listModels({required String templateId}) =>
       _ds.listModels(templateId: templateId);
+
+  @override
+  void cancelSend() => _ds.cancelInFlight();
 }
 
 class PreviewRepositoryImpl implements PreviewRepository {

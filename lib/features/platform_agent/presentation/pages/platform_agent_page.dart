@@ -379,11 +379,55 @@ class _ChatView extends StatefulWidget {
 
 class _ChatViewState extends State<_ChatView> {
   /// Controller compartido: las acciones rápidas PREFIJAN el texto del composer
-  /// (el operador lo edita antes de enviar) en vez de auto-enviar.
+  /// (el operador lo edita antes de enviar) en vez de auto-enviar. También es el
+  /// origen del borrador, que el bloc persiste por hilo.
   final TextEditingController _composer = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _composer.text = widget.state.draft;
+    _composer.addListener(_onComposerChanged);
+  }
+
+  @override
+  void didUpdateWidget(_ChatView old) {
+    super.didUpdateWidget(old);
+    final prev = old.state;
+    final cur = widget.state;
+    final convChanged =
+        prev.activeConversation.id != cur.activeConversation.id;
+    final failureAppeared = prev.sendFailure == null && cur.sendFailure != null;
+    final cancelRestore =
+        prev.sending &&
+        !cur.sending &&
+        cur.sendFailure == null &&
+        cur.draft.isNotEmpty;
+    // Sembrar el composer SOLO en transiciones puntuales: cambio de hilo o
+    // cancelación restauran el borrador; un fallo recupera el texto enviado.
+    // Nunca en un rebuild ordinario, para no pisar lo que el operador teclea.
+    if (convChanged || cancelRestore) {
+      _setComposer(cur.draft);
+    } else if (failureAppeared) {
+      _setComposer(cur.lastAttemptedContent);
+    }
+  }
+
+  void _onComposerChanged() {
+    context.read<PlatformAgentChatBloc>().add(
+      PaChatDraftChanged(_composer.text),
+    );
+  }
+
+  void _setComposer(String text) {
+    if (_composer.text == text) return;
+    _composer.text = text;
+    _composer.selection = TextSelection.collapsed(offset: text.length);
+  }
+
+  @override
   void dispose() {
+    _composer.removeListener(_onComposerChanged);
     _composer.dispose();
     super.dispose();
   }
@@ -437,11 +481,41 @@ class _ChatViewState extends State<_ChatView> {
         ),
         if (s.sendFailure != null)
           Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp3,
+              vertical: AppTokens.sp1,
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    platformAgentFailureCopy(s.sendFailure!),
+                    key: const Key('pa.send_failure'),
+                    style: const TextStyle(color: AppTokens.danger),
+                  ),
+                ),
+                if (s.lastAttemptedContent.isNotEmpty)
+                  AppButton.text(
+                    key: const Key('pa.send_failure.retry'),
+                    label: 'Reintentar',
+                    onPressed: () => onSend(s.lastAttemptedContent),
+                  ),
+              ],
+            ),
+          ),
+        if (s.sending)
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
-            child: Text(
-              platformAgentFailureCopy(s.sendFailure!),
-              key: const Key('pa.send_failure'),
-              style: const TextStyle(color: AppTokens.danger),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: AppButton.text(
+                key: const Key('pa.turn_cancel'),
+                label: 'Detener',
+                icon: Icons.stop_rounded,
+                onPressed: () => context.read<PlatformAgentChatBloc>().add(
+                  const PaChatTurnCancelRequested(),
+                ),
+              ),
             ),
           ),
         AppChatComposer(

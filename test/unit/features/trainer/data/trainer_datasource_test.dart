@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/trainer/data/datasources/trainer_datasource.dart';
 import 'package:ataulfo/features/trainer/data/dto/trainer_dtos.dart';
 import 'package:ataulfo/features/trainer/domain/failures/trainer_failure.dart';
@@ -143,6 +145,7 @@ void main() {
           any(),
           data: any(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
         (_) async => Response(
@@ -168,6 +171,7 @@ void main() {
             any(),
             data: any(named: 'data'),
             options: any(named: 'options'),
+            cancelToken: any(named: 'cancelToken'),
           ),
         ).thenAnswer(
           (_) async => Response(
@@ -186,6 +190,7 @@ void main() {
             any(),
             data: any(named: 'data'),
             options: captureAny(named: 'options'),
+            cancelToken: any(named: 'cancelToken'),
           ),
         ).captured;
         final opts = captured.single as Options?;
@@ -207,6 +212,7 @@ void main() {
             any(),
             data: any(named: 'data'),
             options: any(named: 'options'),
+            cancelToken: any(named: 'cancelToken'),
           ),
         ).thenAnswer(
           (_) async => Response(
@@ -227,6 +233,7 @@ void main() {
             any(),
             data: captureAny(named: 'data'),
             options: any(named: 'options'),
+            cancelToken: any(named: 'cancelToken'),
           ),
         ).captured;
         expect(captured.single, <String, dynamic>{
@@ -244,11 +251,45 @@ void main() {
             any(),
             data: captureAny(named: 'data'),
             options: any(named: 'options'),
+            cancelToken: any(named: 'cancelToken'),
           ),
         ).captured;
         expect(captured.single, <String, dynamic>{'content': 'x'});
       },
     );
+
+    test('cancelInFlight aborta el POST del turno en vuelo', () async {
+      CancelToken? captured;
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((inv) {
+        captured = inv.namedArguments[#cancelToken] as CancelToken?;
+        final completer = Completer<Response<Map<String, dynamic>>>();
+        captured!.whenCancel.then(
+          (_) => completer.completeError(
+            DioException(
+              requestOptions: RequestOptions(path: '/x'),
+              type: DioExceptionType.cancel,
+            ),
+          ),
+        );
+        return completer.future;
+      });
+      final future = ds.sendMessage(
+        templateId: 't1',
+        conversationId: 'c1',
+        content: 'x',
+      );
+      await Future<void>.delayed(Duration.zero);
+      ds.cancelInFlight();
+      await expectLater(future, throwsA(isA<TrainerFailure>()));
+      expect(captured!.isCancelled, isTrue);
+    });
 
     test('502 del motor ⇒ TrainerEngineFailure', () async {
       when(
@@ -256,6 +297,7 @@ void main() {
           any(),
           data: any(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
         DioException(

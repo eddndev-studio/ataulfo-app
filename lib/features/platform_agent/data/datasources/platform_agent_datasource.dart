@@ -41,12 +41,20 @@ abstract interface class PlatformAgentDatasource {
   /// Allowlist de modelos del agente + default de la plataforma. El caller la
   /// trata como best-effort: cualquier fallo oculta el selector.
   Future<PaModels> listModels();
+
+  /// Aborta el turno en vuelo (si lo hay). El POST colgado lanza un fallo de
+  /// cancelación que el caller distingue de un error real. No-op sin turno.
+  void cancelInFlight();
 }
 
 class DioPlatformAgentDatasource implements PlatformAgentDatasource {
   DioPlatformAgentDatasource(this._dio);
 
   final Dio _dio;
+
+  /// Token del turno en vuelo: lo arma `sendMessage` y lo dispara
+  /// `cancelInFlight`. Uno a la vez (el chat corre un turno por hilo).
+  CancelToken? _inFlight;
 
   static const String _base = '/platform-agent/conversations';
 
@@ -170,11 +178,14 @@ class DioPlatformAgentDatasource implements PlatformAgentDatasource {
     required String content,
     String? model,
   }) async {
+    final token = CancelToken();
+    _inFlight = token;
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '$_base/$conversationId/messages',
         data: <String, dynamic>{'content': content, 'model': ?model},
         options: Options(receiveTimeout: paTurnReceiveTimeout),
+        cancelToken: token,
       );
       final body = res.data;
       if (body == null) throw const PaUnknownFailure();
@@ -187,8 +198,13 @@ class DioPlatformAgentDatasource implements PlatformAgentDatasource {
       throw const PaUnknownFailure();
     } on TypeError {
       throw const PaUnknownFailure();
+    } finally {
+      if (identical(_inFlight, token)) _inFlight = null;
     }
   }
+
+  @override
+  void cancelInFlight() => _inFlight?.cancel();
 
   @override
   Future<PaModels> listModels() async {

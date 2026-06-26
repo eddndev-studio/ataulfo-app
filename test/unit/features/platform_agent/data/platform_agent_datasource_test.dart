@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/platform_agent/data/datasources/platform_agent_datasource.dart';
 import 'package:ataulfo/features/platform_agent/data/repositories/platform_agent_repositories_impl.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_conversation.dart';
@@ -165,6 +167,7 @@ void main() {
           any(),
           data: any(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
         (_) async => Response(
@@ -184,6 +187,7 @@ void main() {
           '/platform-agent/conversations/c1/messages',
           data: <String, dynamic>{'content': '¿cuántos bots tengo?'},
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);
     });
@@ -194,6 +198,7 @@ void main() {
           any(),
           data: any(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
         (_) async => Response(
@@ -208,10 +213,40 @@ void main() {
           any(),
           data: any(named: 'data'),
           options: captureAny(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).captured;
       final opts = captured.single as Options?;
       expect(opts?.receiveTimeout, const Duration(seconds: 180));
+    });
+
+    test('cancelInFlight aborta el POST del turno en vuelo', () async {
+      CancelToken? captured;
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((inv) {
+        captured = inv.namedArguments[#cancelToken] as CancelToken?;
+        final completer = Completer<Response<Map<String, dynamic>>>();
+        captured!.whenCancel.then(
+          (_) => completer.completeError(
+            DioException(
+              requestOptions: RequestOptions(path: '/x'),
+              type: DioExceptionType.cancel,
+            ),
+          ),
+        );
+        return completer.future;
+      });
+      final future = ds.sendMessage(conversationId: 'c1', content: 'x');
+      await Future<void>.delayed(Duration.zero);
+      ds.cancelInFlight();
+      await expectLater(future, throwsA(isA<PaFailure>()));
+      expect(captured!.isCancelled, isTrue);
     });
 
     test('502 del motor ⇒ PaEngineFailure', () async {
@@ -220,6 +255,7 @@ void main() {
           any(),
           data: any(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
         DioException(
@@ -303,6 +339,11 @@ void main() {
       final out = await repo.createConversation();
       expect(out, conv);
     });
+
+    test('cancelSend delega a cancelInFlight', () {
+      repo.cancelSend();
+      verify(() => mock.cancelInFlight()).called(1);
+    });
   });
 
   group('modelos', () {
@@ -334,6 +375,7 @@ void main() {
           any(),
           data: any(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
         (_) async => Response(
@@ -353,6 +395,7 @@ void main() {
           any(),
           data: captureAny(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).captured;
       expect(captured.single, <String, dynamic>{
@@ -366,6 +409,7 @@ void main() {
           any(),
           data: captureAny(named: 'data'),
           options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).captured;
       expect(captured.single, <String, dynamic>{'content': 'x'});

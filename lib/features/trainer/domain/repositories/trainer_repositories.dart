@@ -67,6 +67,10 @@ abstract interface class TrainerRepository {
 
   /// Allowlist de modelos del entrenador (best-effort en el caller).
   Future<TrainerModels> listModels({required String templateId});
+
+  /// Aborta el turno de chat en vuelo (si lo hay): el `sendMessage` colgado
+  /// lanza un fallo de cancelación. No-op si no hay turno corriendo.
+  void cancelSend();
 }
 
 /// Puerto de realtime del turno del entrenador: progreso en vivo por SSE

@@ -664,4 +664,103 @@ void main() {
           .having((s) => s.messages.first.content, 'mensajes del nuevo', 'de c2'),
     ],
   );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'MessageSent fallido conserva lastAttemptedContent y marca sendFailure',
+    build: build,
+    seed: () => loaded(),
+    setUp: () {
+      when(
+        () => repo.sendMessage(
+          conversationId: 'c1',
+          content: any(named: 'content'),
+        ),
+      ).thenThrow(const PaServerFailure());
+    },
+    act: (b) => b.add(const PaChatMessageSent('hola')),
+    expect: () => <dynamic>[
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'optimista', true)
+          .having((s) => s.lastAttemptedContent, 'intento', 'hola'),
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
+          .having((s) => s.sendFailure, 'fallo', isNotNull)
+          .having((s) => s.lastAttemptedContent, 'intento preservado', 'hola'),
+    ],
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'TurnCancelRequested aborta el turno: revierte el optimista y NO emite fallo',
+    build: build,
+    seed: () => loaded(),
+    setUp: () {
+      final hang = Completer<PaMessage>();
+      when(
+        () => repo.sendMessage(
+          conversationId: 'c1',
+          content: any(named: 'content'),
+        ),
+      ).thenAnswer((_) => hang.future);
+      when(() => repo.cancelSend()).thenAnswer((_) {
+        if (!hang.isCompleted) hang.completeError(const PaUnknownFailure());
+      });
+    },
+    act: (b) async {
+      b.add(const PaChatMessageSent('hola'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const PaChatTurnCancelRequested());
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    },
+    expect: () => <dynamic>[
+      isA<PaChatLoaded>().having((s) => s.sending, 'optimista', true),
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'cancelado', false)
+          .having((s) => s.sendFailure, 'sin fallo', isNull)
+          .having(
+            (s) => s.messages.any((m) => m.id == 'optimistic'),
+            'optimista revertido',
+            false,
+          ),
+    ],
+    verify: (_) {
+      verify(() => repo.cancelSend()).called(1);
+    },
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'el draft se guarda por conversación y no se filtra entre hilos',
+    build: build,
+    seed: () => PaChatLoaded(
+      conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      activeConversation: _conv(),
+      messages: const <PaMessage>[],
+      sending: false,
+    ),
+    setUp: () {
+      when(
+        () => repo.listMessages(
+          conversationId: any(named: 'conversationId'),
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const PaMessagesPage(messages: <PaMessage>[], nextCursor: ''),
+      );
+    },
+    act: (b) async {
+      b.add(const PaChatDraftChanged('borrador c1'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const PaChatConversationSelected('c2'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const PaChatConversationSelected('c1'));
+    },
+    expect: () => <dynamic>[
+      isA<PaChatLoaded>()
+          .having((s) => s.activeConversation.id, 'activo', 'c2')
+          .having((s) => s.draft, 'draft c2', ''),
+      isA<PaChatLoaded>()
+          .having((s) => s.activeConversation.id, 'activo', 'c1')
+          .having((s) => s.draft, 'draft c1', 'borrador c1'),
+    ],
+  );
 }
