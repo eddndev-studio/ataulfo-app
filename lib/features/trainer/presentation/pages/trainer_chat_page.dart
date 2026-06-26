@@ -8,7 +8,9 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
+import '../../../../core/design/widgets/reasoning_disclosure.dart';
 import '../../../../core/design/widgets/typing_bubble.dart';
+import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../bloc/trainer_chat_bloc.dart';
@@ -44,6 +46,12 @@ class TrainerChatPage extends StatelessWidget {
                 context.push('/templates/$templateId/trainer/preview'),
           ),
           IconButton(
+            key: const Key('trainer.threads'),
+            tooltip: 'Conversaciones',
+            icon: const Icon(Icons.forum_outlined),
+            onPressed: () => _showThreads(context),
+          ),
+          IconButton(
             key: const Key('trainer.new_conversation'),
             tooltip: 'Nueva conversación',
             icon: const Icon(Icons.add_comment_outlined),
@@ -63,6 +71,62 @@ class TrainerChatPage extends StatelessWidget {
           TrainerChatFailed(:final failure) => _FailedView(failure: failure),
           TrainerChatLoaded() => _ChatView(state: state),
         },
+      ),
+    );
+  }
+
+  void _showThreads(BuildContext context) {
+    final bloc = context.read<TrainerChatBloc>();
+    final state = bloc.state;
+    if (state is! TrainerChatLoaded) return;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetCtx) => _ThreadList(
+        conversations: state.conversations,
+        activeId: state.conversation.id,
+        onSelect: (id) {
+          bloc.add(TrainerChatConversationSelected(id));
+          Navigator.of(sheetCtx).pop();
+        },
+      ),
+    );
+  }
+}
+
+/// Selector de hilos: lista de conversaciones del entrenamiento (la activa
+/// marcada). Tocar una la activa y cierra el cajón.
+class _ThreadList extends StatelessWidget {
+  const _ThreadList({
+    required this.conversations,
+    required this.activeId,
+    required this.onSelect,
+  });
+
+  final List<TrainerConversation> conversations;
+  final String activeId;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        key: const Key('trainer.threads.list'),
+        shrinkWrap: true,
+        children: <Widget>[
+          for (final c in conversations)
+            ListTile(
+              key: Key('trainer.threads.item.${c.id}'),
+              leading: Icon(
+                c.id == activeId
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: c.id == activeId ? AppTokens.primary : AppTokens.text2,
+              ),
+              title: Text(c.title),
+              selected: c.id == activeId,
+              onTap: () => onSelect(c.id),
+            ),
+        ],
       ),
     );
   }
@@ -154,7 +218,7 @@ class _ChatViewState extends State<_ChatView> {
                   itemCount: s.messages.length + (s.sending ? 1 : 0),
                   itemBuilder: (context, i) {
                     if (s.sending && i == 0) {
-                      return const TypingBubble(key: Key('trainer.typing'));
+                      return _LiveProgress(label: s.liveProgress);
                     }
                     final idx =
                         s.messages.length - 1 - (i - (s.sending ? 1 : 0));
@@ -234,6 +298,37 @@ class _ChatViewState extends State<_ChatView> {
             ),
           ],
         ),
+      ],
+    );
+  }
+}
+
+/// Indicador en vivo del turno: la burbuja de "escribiendo" + la etiqueta de
+/// progreso del SSE ("Pensando…/Usando {tool}…"). Sin etiqueta (SSE no conectó
+/// aún) muestra solo el typing.
+class _LiveProgress extends StatelessWidget {
+  const _LiveProgress({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        const TypingBubble(key: Key('trainer.typing')),
+        if (label.isNotEmpty) ...<Widget>[
+          const SizedBox(width: AppTokens.sp2),
+          Flexible(
+            child: Text(
+              label,
+              key: const Key('trainer.live_progress'),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppTokens.text2),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -347,16 +442,26 @@ class _MessageTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (message.isTool) {
+      final inspect = _InspectFlowData.fromMessage(message);
+      if (inspect != null) {
+        return _InspectFlowCard(messageId: message.id, data: inspect);
+      }
+      final err = _ToolErrorData.fromMessage(message);
+      if (err != null) {
+        return _ToolErrorCard(messageId: message.id, data: err);
+      }
       final card = _ChangeCardData.fromMessage(message);
       if (card == null) return const SizedBox.shrink();
       return _ChangeCard(messageId: message.id, data: card);
     }
-    if (message.isAssistant && message.content.isEmpty) {
+    if (message.isAssistant &&
+        message.content.isEmpty &&
+        message.thinking.isEmpty) {
       // Turno puro tool_calls: la acción se cuenta con la tarjeta del tool
       // result; una burbuja vacía solo mete ruido.
       return const SizedBox.shrink();
     }
-    return ChatBubble(
+    final bubble = ChatBubble(
       mine: message.isUser,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,6 +503,19 @@ class _MessageTile extends StatelessWidget {
         ],
       ),
     );
+    // El razonamiento del assistant (si viaja) va colapsado SOBRE la burbuja.
+    if (message.isAssistant && message.thinking.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          ReasoningDisclosure(reasoning: message.thinking, keyId: message.id),
+          if (message.content.isNotEmpty || message.attachments.isNotEmpty)
+            bubble,
+        ],
+      );
+    }
+    return bubble;
   }
 }
 
@@ -421,6 +539,120 @@ class _ChangeDiff {
 /// escritura. Las lecturas (overview/read_*/list_*/done) no rinden tarjeta.
 /// `name`/`diff` salen del envelope ANIDADO (content es un string JSON) y
 /// alimentan la vista expandida; sin detalle, la tarjeta es plana.
+/// Un fallo de tool (error_kind) que antes se descartaba: ahora el operador lo
+/// ve. toolName + el envelope error_kind, traducido a copy legible.
+class _ToolErrorData {
+  const _ToolErrorData({required this.toolName, required this.kind});
+
+  final String toolName;
+  final String kind;
+
+  static _ToolErrorData? fromMessage(TrainerMessage m) {
+    final raw = m.toolResultsRaw;
+    if (raw == null) return null;
+    Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map<String, dynamic>) return null;
+    final content = decoded['content'];
+    if (content is! String) return null;
+    Object? inner;
+    try {
+      inner = jsonDecode(content);
+    } on FormatException {
+      return null;
+    }
+    if (inner is! Map<String, dynamic>) return null;
+    final kind = inner['error_kind'];
+    if (kind is! String || kind.isEmpty) return null;
+    return _ToolErrorData(
+      toolName: decoded['toolName']?.toString() ?? '',
+      kind: kind,
+    );
+  }
+}
+
+/// Traduce un error_kind del entrenador a copy en español para el operador.
+String trainerToolErrorCopy(String kind) {
+  switch (kind) {
+    case 'anchor_not_found':
+      return 'No encontré el ancla en el texto actual; vuelve a leerlo y reintenta.';
+    case 'anchor_not_unique':
+      return 'El ancla aparece varias veces; agrega contexto para que sea única.';
+    case 'empty_anchor':
+      return 'El ancla vacía solo aplica sobre contenido vacío (bootstrap).';
+    case 'no_change':
+      return 'El texto nuevo es igual al anterior: no hubo cambio.';
+    case 'not_found':
+      return 'No se encontró el recurso.';
+    case 'already_exists':
+      return 'Ya existe un recurso con ese nombre.';
+    case 'invalid_input':
+      return 'Dato inválido por las reglas del negocio.';
+    case 'invalid_args':
+      return 'Argumentos inválidos para la herramienta.';
+    case 'version_conflict':
+      return 'Conflicto de versión: algo cambió mientras editabas, reintenta.';
+    case 'variable_in_use':
+      return 'La variable está en uso por algún bot; limpia esos valores primero.';
+    default:
+      return 'La herramienta falló ($kind).';
+  }
+}
+
+/// Tarjeta de error de un tool: registro centrado de un fallo (no una burbuja).
+class _ToolErrorCard extends StatelessWidget {
+  const _ToolErrorCard({required this.messageId, required this.data});
+
+  final String messageId;
+  final _ToolErrorData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Align(
+      alignment: Alignment.center,
+      child: Container(
+        key: Key('trainer.error_card.$messageId'),
+        margin: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp3,
+          vertical: AppTokens.sp2,
+        ),
+        constraints: const BoxConstraints(maxWidth: 520),
+        decoration: BoxDecoration(
+          color: AppTokens.surface2,
+          borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+          border: Border.all(color: AppTokens.danger),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.warning_amber_rounded,
+              size: 16,
+              color: AppTokens.danger,
+            ),
+            const SizedBox(width: AppTokens.sp2),
+            Flexible(
+              child: Text(
+                data.toolName.isNotEmpty
+                    ? '${data.toolName}: ${trainerToolErrorCopy(data.kind)}'
+                    : trainerToolErrorCopy(data.kind),
+                style: theme.textTheme.bodySmall?.copyWith(color: AppTokens.text1),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ChangeCardData {
   const _ChangeCardData({
     required this.icon,
@@ -513,6 +745,264 @@ class _ChangeCardData {
       ),
       _ => null,
     };
+  }
+}
+
+/// Un paso del flujo, proyectado para la tarjeta de inspección.
+class _InspectStep {
+  const _InspectStep({
+    required this.type,
+    required this.content,
+    required this.mediaRef,
+  });
+
+  final String type;
+  final String content;
+  final String mediaRef;
+
+  /// Resumen legible: el contenido (texto) o, si es multimedia, su ref.
+  String get summary => content.isNotEmpty ? content : mediaRef;
+}
+
+/// Resultado de inspect_flow proyectado a la tarjeta: nombre del flujo + sus
+/// pasos en orden y los disparadores que lo activan. El envelope del wire del
+/// entrenador es camelCase ({toolName, content}); content es un STRING JSON
+/// doble-codificado con la estructura del flujo (claves snake_case).
+class _InspectFlowData {
+  const _InspectFlowData({
+    required this.name,
+    required this.isActive,
+    required this.steps,
+    required this.triggers,
+  });
+
+  final String name;
+  final bool isActive;
+  final List<_InspectStep> steps;
+  final List<String> triggers;
+
+  static _InspectFlowData? fromMessage(TrainerMessage m) {
+    final raw = m.toolResultsRaw;
+    if (raw == null) return null;
+    Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map<String, dynamic>) return null;
+    if (decoded['toolName'] != 'inspect_flow') return null;
+    final content = decoded['content'];
+    if (content is! String) return null;
+    Object? inner;
+    try {
+      inner = jsonDecode(content);
+    } on FormatException {
+      return null;
+    }
+    if (inner is! Map<String, dynamic>) return null;
+    if (inner.containsKey('error_kind')) return null; // un error no es inspección
+
+    final steps = <_InspectStep>[];
+    final rawSteps = inner['steps'];
+    if (rawSteps is List) {
+      for (final s in rawSteps) {
+        if (s is Map<String, dynamic>) {
+          steps.add(
+            _InspectStep(
+              type: s['type']?.toString() ?? '',
+              content: s['content']?.toString() ?? '',
+              mediaRef: s['media_ref']?.toString() ?? '',
+            ),
+          );
+        }
+      }
+    }
+    final triggers = <String>[];
+    final rawTriggers = inner['triggers'];
+    if (rawTriggers is List) {
+      for (final tr in rawTriggers) {
+        if (tr is Map<String, dynamic>) {
+          triggers.add(_triggerLabel(tr));
+        }
+      }
+    }
+    return _InspectFlowData(
+      name: inner['name']?.toString() ?? 'Flujo',
+      isActive: inner['is_active'] == true,
+      steps: steps,
+      triggers: triggers,
+    );
+  }
+
+  static String _triggerLabel(Map<String, dynamic> tr) {
+    final type = tr['trigger_type']?.toString() ?? '';
+    if (type == 'TEXT') {
+      return "TEXT '${tr['keyword']?.toString() ?? ''}'";
+    }
+    if (type == 'LABEL') {
+      return 'LABEL ${tr['label_action']?.toString() ?? ''}';
+    }
+    return type;
+  }
+}
+
+/// Ícono por tipo de paso (para la tarjeta de inspección).
+IconData _stepTypeIcon(String type) => switch (type) {
+  'TEXT' => Icons.short_text,
+  'IMAGE' => Icons.image_outlined,
+  'VIDEO' => Icons.videocam_outlined,
+  'DOCUMENT' => Icons.description_outlined,
+  'AUDIO' || 'PTT' => Icons.audiotrack_outlined,
+  'STICKER' => Icons.emoji_emotions_outlined,
+  'LABEL' => Icons.label_outline,
+  'CONDITIONAL_TIME' => Icons.schedule_outlined,
+  'END' => Icons.stop_circle_outlined,
+  _ => Icons.circle_outlined,
+};
+
+/// Tarjeta de inspección de un flujo (resultado de inspect_flow): el entrenador
+/// ve la estructura sin abrir el editor. Colapsada muestra el nombre + conteos;
+/// al tocarla expande los pasos (con su ícono de tipo) y los disparadores.
+class _InspectFlowCard extends StatefulWidget {
+  const _InspectFlowCard({required this.messageId, required this.data});
+
+  final String messageId;
+  final _InspectFlowData data;
+
+  @override
+  State<_InspectFlowCard> createState() => _InspectFlowCardState();
+}
+
+class _InspectFlowCardState extends State<_InspectFlowCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.data;
+    final theme = Theme.of(context);
+    final header = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const Icon(Icons.account_tree_outlined, size: 16, color: AppTokens.primary),
+        const SizedBox(width: AppTokens.sp2),
+        Flexible(
+          child: Text(
+            'Flujo: ${data.name}',
+            style: theme.textTheme.labelMedium?.copyWith(color: AppTokens.text1),
+          ),
+        ),
+        const SizedBox(width: AppTokens.sp1),
+        Icon(
+          _expanded ? Icons.expand_less : Icons.expand_more,
+          key: Key('trainer.inspect_card.${widget.messageId}.expand'),
+          size: 16,
+          color: AppTokens.text2,
+        ),
+      ],
+    );
+    return Align(
+      alignment: Alignment.center,
+      child: GestureDetector(
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: Container(
+          key: Key('trainer.inspect_card.${widget.messageId}'),
+          margin: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp3,
+            vertical: AppTokens.sp2,
+          ),
+          decoration: BoxDecoration(
+            color: AppTokens.surface2,
+            borderRadius: BorderRadius.circular(
+              _expanded ? AppTokens.radiusCard : AppTokens.radiusPill,
+            ),
+            border: Border.all(color: AppTokens.divider),
+          ),
+          child: _expanded
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    header,
+                    const SizedBox(height: AppTokens.sp2),
+                    _InspectFlowDetail(data: data),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    header,
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppTokens.sp1),
+                      child: Text(
+                        '${data.steps.length} pasos · ${data.triggers.length} disparadores',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppTokens.text2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InspectFlowDetail extends StatelessWidget {
+  const _InspectFlowDetail({required this.data});
+
+  final _InspectFlowData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final small = theme.textTheme.bodySmall?.copyWith(color: AppTokens.text1);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        for (var i = 0; i < data.steps.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1 / 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  _stepTypeIcon(data.steps[i].type),
+                  size: 14,
+                  color: AppTokens.text2,
+                ),
+                const SizedBox(width: AppTokens.sp2),
+                Expanded(
+                  child: Text('${i + 1}. ${data.steps[i].summary}', style: small),
+                ),
+              ],
+            ),
+          ),
+        if (data.triggers.isNotEmpty) ...<Widget>[
+          const SizedBox(height: AppTokens.sp2),
+          Text(
+            'Disparadores',
+            style: theme.textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+          ),
+          for (final t in data.triggers)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1 / 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(Icons.bolt_outlined, size: 14, color: AppTokens.text2),
+                  const SizedBox(width: AppTokens.sp2),
+                  Flexible(child: Text(t, style: small)),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
   }
 }
 

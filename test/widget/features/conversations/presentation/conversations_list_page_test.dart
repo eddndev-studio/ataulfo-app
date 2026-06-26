@@ -85,6 +85,36 @@ void main() {
     },
   );
 
+  testWidgets('un chat con señal de atención muestra la píldora "Atención"', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const ConversationsLoaded(
+        items: <Conversation>[_dm, _group],
+        isRefreshing: false,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: BlocProvider<ConversationsBloc>.value(
+          value: bloc,
+          child: const Scaffold(
+            body: ConversationsListPage(needsAttention: <String>{'lid-dm'}),
+          ),
+        ),
+      ),
+    );
+    expect(
+      find.byKey(const Key('conversation.attention.lid-dm')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('conversation.attention.lid-grp')),
+      findsNothing,
+    );
+  });
+
   testWidgets('cada conversación expone la acción de etiquetas de WhatsApp', (
     tester,
   ) async {

@@ -101,6 +101,9 @@ import '../../features/messages/domain/repositories/messages_repository.dart';
 import '../../features/messages/presentation/bloc/messages_bloc.dart';
 import '../../features/messages/presentation/bloc/thread_audio_cubit.dart';
 import '../../features/messages/presentation/pages/message_thread_page.dart';
+import '../../features/monitor/data/datasources/monitor_activity_datasource.dart';
+import '../../features/monitor/presentation/cubit/monitor_attention_cubit.dart';
+import '../../features/monitor/presentation/cubit/monitor_live_cubit.dart';
 import '../../features/notifications/domain/repositories/notifications_repository.dart';
 import '../../features/notifications/presentation/bloc/notification_preferences_bloc.dart';
 import '../../features/notifications/presentation/bloc/notifications_bloc.dart';
@@ -163,6 +166,9 @@ class AppRouter {
     required AiLogRepository aiLogRepository,
     required ExecutionRepository executionsRepository,
     required TrainerRepository trainerRepository,
+    required TrainerEvents trainerEvents,
+    required MonitorActivityDatasource monitorActivity,
+    required MonitorBotActivityDatasource monitorBotActivity,
     required WorkspaceRepository workspaceRepository,
     required PreviewRepository previewRepository,
     required PlatformAgentRepository platformAgentRepository,
@@ -196,6 +202,9 @@ class AppRouter {
        _aiLogRepo = aiLogRepository,
        _executionsRepo = executionsRepository,
        _trainerRepo = trainerRepository,
+       _trainerEvents = trainerEvents,
+       _monitorActivity = monitorActivity,
+       _monitorBotActivity = monitorBotActivity,
        _workspaceRepo = workspaceRepository,
        _previewRepo = previewRepository,
        _platformAgentRepo = platformAgentRepository,
@@ -227,7 +236,17 @@ class AppRouter {
   final LabelsRepository _labelsRepo;
   final ChatLabelsRepository _chatLabelsRepo;
   final TrainerRepository _trainerRepo;
+  final TrainerEvents _trainerEvents;
+  final MonitorActivityDatasource _monitorActivity;
+  final MonitorBotActivityDatasource _monitorBotActivity;
   final WorkspaceRepository _workspaceRepo;
+
+  /// El operador actual es ADMIN+ (gatea la observación del monitor: el endpoint
+  /// SSE de actividad es ADMIN+; no abrimos el socket para roles menores).
+  bool get _isAdmin {
+    final s = _authBloc.state;
+    return s is AuthAuthenticated && isAdminOrAbove(s.identity.role);
+  }
   final PreviewRepository _previewRepo;
   final PlatformAgentRepository _platformAgentRepo;
   final PlatformAgentEvents _platformAgentEvents;
@@ -656,13 +675,26 @@ class AppRouter {
                 value: _chatLabelsRepo,
               ),
             ],
-            child: BlocProvider<ConversationsBloc>(
-              create: (_) =>
-                  ConversationsBloc(repo: _conversationsRepo, botId: id)
-                    ..add(const ConversationsLoadRequested()),
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<ConversationsBloc>(
+                  create: (_) =>
+                      ConversationsBloc(repo: _conversationsRepo, botId: id)
+                        ..add(const ConversationsLoadRequested()),
+                ),
+                // Señales de atención del bot (falló/alerta) por chat: tier
+                // operador (WORKER+), feed bot-scoped. Destaca filas en la bandeja.
+                BlocProvider<MonitorAttentionCubit>(
+                  create: (_) =>
+                      MonitorAttentionCubit(_monitorBotActivity)..watch(id),
+                ),
+              ],
               child: Scaffold(
                 appBar: AppBar(title: const Text('Conversaciones')),
-                body: const ConversationsListPage(),
+                body: BlocBuilder<MonitorAttentionCubit, MonitorAttentionState>(
+                  builder: (context, attn) =>
+                      ConversationsListPage(needsAttention: attn.needsAttention),
+                ),
               ),
             ),
           );
@@ -730,6 +762,16 @@ class AppRouter {
                     botId: id,
                     chatLid: chatLid,
                   )..add(const ProfileLoadRequested()),
+                ),
+                // Actividad EN VIVO del bot runtime (footer + píldora de estado).
+                // Solo ADMIN+ abre el SSE (el endpoint es ADMIN+); para roles
+                // menores el cubit queda inerte y el footer no se pinta.
+                BlocProvider<MonitorLiveCubit>(
+                  create: (_) {
+                    final cubit = MonitorLiveCubit(_monitorActivity);
+                    if (_isAdmin) cubit.watch(id, chatLid);
+                    return cubit;
+                  },
                 ),
               ],
               child: Scaffold(
@@ -928,6 +970,7 @@ class AppRouter {
               repo: _trainerRepo,
               templateId: id,
               picker: FilePickerMediaFilePicker(),
+              events: _trainerEvents,
             )..add(const TrainerChatStarted()),
             child: TrainerChatPage(templateId: id),
           );

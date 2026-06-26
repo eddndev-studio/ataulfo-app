@@ -19,6 +19,13 @@ class PlatformAgentRepositoryImpl implements PlatformAgentRepository {
       _ds.createConversation(title: title);
 
   @override
+  Future<PaConversation> renameConversation(String id, String title) =>
+      _ds.renameConversation(id, title);
+
+  @override
+  Future<void> deleteConversation(String id) => _ds.deleteConversation(id);
+
+  @override
   Future<List<PaConversation>> listConversations() => _ds.listConversations();
 
   @override

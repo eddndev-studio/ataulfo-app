@@ -72,6 +72,8 @@ import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/ai_log/domain/ai_log_repository.dart';
+import 'package:ataulfo/features/monitor/data/datasources/monitor_activity_datasource.dart';
+import 'package:ataulfo/features/monitor/domain/entities/monitor_event.dart';
 import 'package:ataulfo/features/notes/domain/repositories/notes_repository.dart';
 import 'package:ataulfo/features/platform_agent/domain/repositories/platform_agent_repository.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
@@ -127,6 +129,19 @@ class _MockPreviewRepo extends Mock implements PreviewRepository {}
 class _MockPlatformAgentRepo extends Mock implements PlatformAgentRepository {}
 
 class _MockPlatformAgentEvents extends Mock implements PlatformAgentEvents {}
+
+class _MockTrainerEvents extends Mock implements TrainerEvents {}
+
+class _FakeMonitorActivity
+    implements MonitorActivityDatasource, MonitorBotActivityDatasource {
+  @override
+  Stream<MonitorEvent> activity(String botId, String chatLid) =>
+      const Stream<MonitorEvent>.empty();
+
+  @override
+  Stream<MonitorEvent> botActivity(String botId) =>
+      const Stream<MonitorEvent>.empty();
+}
 
 class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
@@ -354,6 +369,9 @@ void main() {
       aiLogRepository: _MockAiLogRepo(),
       executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
+      trainerEvents: _MockTrainerEvents(),
+      monitorActivity: _FakeMonitorActivity(),
+      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -799,6 +817,9 @@ void main() {
       aiLogRepository: _MockAiLogRepo(),
       executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
+      trainerEvents: _MockTrainerEvents(),
+      monitorActivity: _FakeMonitorActivity(),
+      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -889,6 +910,9 @@ void main() {
       aiLogRepository: _MockAiLogRepo(),
       executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
+      trainerEvents: _MockTrainerEvents(),
+      monitorActivity: _FakeMonitorActivity(),
+      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -1181,6 +1205,9 @@ void main() {
       aiLogRepository: _MockAiLogRepo(),
       executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
+      trainerEvents: _MockTrainerEvents(),
+      monitorActivity: _FakeMonitorActivity(),
+      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -1427,6 +1454,9 @@ void main() {
       aiLogRepository: _MockAiLogRepo(),
       executionsRepository: _FakeExecutionsRepo(),
       trainerRepository: _MockTrainerRepo(),
+      trainerEvents: _MockTrainerEvents(),
+      monitorActivity: _FakeMonitorActivity(),
+      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),

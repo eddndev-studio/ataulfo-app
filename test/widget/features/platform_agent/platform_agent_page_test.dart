@@ -131,6 +131,29 @@ void main() {
     verify(() => bloc.add(const PaChatConversationSelected('c2'))).called(1);
   });
 
+  testWidgets('historial: eliminar un hilo confirma y dispara Deleted', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      _loaded(
+        conversations: <PaConversation>[
+          _conv(),
+          _conv(id: 'c2', title: 'Ventas'),
+        ],
+      ),
+    );
+    await tester.tap(find.byKey(const Key('pa.history')));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const Key('pa.history.menu.c2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Eliminar').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pa.history.delete.confirm')));
+    await tester.pumpAndSettle();
+    verify(() => bloc.add(const PaChatConversationDeleted('c2'))).called(1);
+  });
+
   testWidgets('enviar texto dispara MessageSent', (tester) async {
     await pump(tester, _loaded());
     await tester.enterText(

@@ -14,6 +14,12 @@ import 'pa_turn_timeout.dart';
 abstract interface class PlatformAgentDatasource {
   Future<PaConversation> createConversation({String title});
 
+  /// Renombra el hilo (PATCH). Devuelve el hilo actualizado.
+  Future<PaConversation> renameConversation(String id, String title);
+
+  /// Borra el hilo y sus mensajes (DELETE).
+  Future<void> deleteConversation(String id);
+
   Future<List<PaConversation>> listConversations();
 
   /// Página DESC del historial; cursor vacío ⇒ primera página.
@@ -62,6 +68,36 @@ class DioPlatformAgentDatasource implements PlatformAgentDatasource {
       throw const PaUnknownFailure();
     } on TypeError {
       throw const PaUnknownFailure();
+    }
+  }
+
+  @override
+  Future<PaConversation> renameConversation(String id, String title) async {
+    try {
+      final res = await _dio.patch<Map<String, dynamic>>(
+        '$_base/$id',
+        data: <String, dynamic>{'title': title},
+      );
+      final body = res.data;
+      if (body == null) throw const PaUnknownFailure();
+      return PaConversationDto.fromJson(body).toEntity();
+    } on PaFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw mapPlatformAgentDioException(e);
+    } on FormatException {
+      throw const PaUnknownFailure();
+    } on TypeError {
+      throw const PaUnknownFailure();
+    }
+  }
+
+  @override
+  Future<void> deleteConversation(String id) async {
+    try {
+      await _dio.delete<void>('$_base/$id');
+    } on DioException catch (e) {
+      throw mapPlatformAgentDioException(e);
     }
   }
 

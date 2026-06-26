@@ -9,6 +9,12 @@ import '../entities/pa_progress.dart';
 abstract interface class PlatformAgentRepository {
   Future<PaConversation> createConversation({String title});
 
+  /// Renombra un hilo; devuelve el hilo actualizado.
+  Future<PaConversation> renameConversation(String id, String title);
+
+  /// Borra un hilo (y sus mensajes).
+  Future<void> deleteConversation(String id);
+
   /// Hilos del operador en la org activa, DESC por updatedAt.
   Future<List<PaConversation>> listConversations();
 

@@ -64,12 +64,13 @@ class _HangingSubscription<T> implements StreamSubscription<T> {
   Future<E> asFuture<E>([E? futureValue]) => _inner.asFuture<E>(futureValue);
 }
 
-PaConversation _conv({String id = 'c1'}) => PaConversation(
-  id: id,
-  title: 'Operación',
-  createdAt: DateTime.utc(2026, 6, 10),
-  updatedAt: DateTime.utc(2026, 6, 10),
-);
+PaConversation _conv({String id = 'c1', String title = 'Operación'}) =>
+    PaConversation(
+      id: id,
+      title: title,
+      createdAt: DateTime.utc(2026, 6, 10),
+      updatedAt: DateTime.utc(2026, 6, 10),
+    );
 
 PaMessage _msg(String id, String role, String content, {String conv = 'c1'}) =>
     PaMessage(
@@ -536,5 +537,131 @@ void main() {
         ),
       ).called(1);
     },
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'LoadMore antepone los mensajes viejos en ASC y actualiza el cursor',
+    build: build,
+    setUp: () {
+      when(
+        () => repo.listMessages(
+          conversationId: 'c1',
+          cursor: 'cur1',
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async => PaMessagesPage(
+          // El wire entrega DESC; el bloc invierte a ASC y antepone.
+          messages: <PaMessage>[
+            _msg('old2', 'assistant', 'b'),
+            _msg('old1', 'user', 'a'),
+          ],
+          nextCursor: 'cur2',
+        ),
+      );
+    },
+    seed: () => PaChatLoaded(
+      conversations: <PaConversation>[_conv()],
+      activeConversation: _conv(),
+      messages: <PaMessage>[_msg('recent', 'user', 'hola')],
+      sending: false,
+      nextCursor: 'cur1',
+    ),
+    act: (b) => b.add(const PaChatLoadMore()),
+    expect: () => <Matcher>[
+      isA<PaChatLoaded>().having((s) => s.loadingMore, 'loadingMore', true),
+      isA<PaChatLoaded>()
+          .having(
+            (s) => s.messages.map((m) => m.id).toList(),
+            'orden ASC',
+            <String>['old1', 'old2', 'recent'],
+          )
+          .having((s) => s.nextCursor, 'cursor', 'cur2')
+          .having((s) => s.loadingMore, 'loadingMore', false),
+    ],
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'LoadMore sin cursor (no hay más) no emite',
+    build: build,
+    seed: () => loaded(messages: <PaMessage>[_msg('m1', 'user', 'hola')]),
+    act: (b) => b.add(const PaChatLoadMore()),
+    expect: () => <Matcher>[],
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'ConversationRenamed actualiza el título en la lista y en el activo',
+    build: build,
+    setUp: () => when(
+      () => repo.renameConversation('c1', 'Nuevo'),
+    ).thenAnswer((_) async => _conv(title: 'Nuevo')),
+    seed: () => PaChatLoaded(
+      conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      activeConversation: _conv(),
+      messages: const <PaMessage>[],
+      sending: false,
+    ),
+    act: (b) => b.add(const PaChatConversationRenamed('c1', 'Nuevo')),
+    expect: () => <Matcher>[
+      isA<PaChatLoaded>()
+          .having((s) => s.activeConversation.title, 'activo', 'Nuevo')
+          .having(
+            (s) => s.conversations.firstWhere((c) => c.id == 'c1').title,
+            'lista',
+            'Nuevo',
+          ),
+    ],
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'ConversationDeleted (no activo) lo quita de la lista',
+    build: build,
+    setUp: () =>
+        when(() => repo.deleteConversation('c2')).thenAnswer((_) async {}),
+    seed: () => PaChatLoaded(
+      conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      activeConversation: _conv(),
+      messages: const <PaMessage>[],
+      sending: false,
+    ),
+    act: (b) => b.add(const PaChatConversationDeleted('c2')),
+    expect: () => <Matcher>[
+      isA<PaChatLoaded>()
+          .having((s) => s.conversations.length, 'lista', 1)
+          .having((s) => s.activeConversation.id, 'activo intacto', 'c1'),
+    ],
+  );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'ConversationDeleted (activo) cambia al hilo restante y carga sus mensajes',
+    build: build,
+    setUp: () {
+      when(() => repo.deleteConversation('c1')).thenAnswer((_) async {});
+      when(
+        () => repo.listMessages(
+          conversationId: 'c2',
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async => PaMessagesPage(
+          messages: <PaMessage>[_msg('m-c2', 'assistant', 'de c2', conv: 'c2')],
+          nextCursor: '',
+        ),
+      );
+    },
+    seed: () => PaChatLoaded(
+      conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      activeConversation: _conv(),
+      messages: const <PaMessage>[],
+      sending: false,
+    ),
+    act: (b) => b.add(const PaChatConversationDeleted('c1')),
+    expect: () => <Matcher>[
+      isA<PaChatLoaded>()
+          .having((s) => s.conversations.length, 'lista', 1)
+          .having((s) => s.activeConversation.id, 'nuevo activo', 'c2')
+          .having((s) => s.messages.first.content, 'mensajes del nuevo', 'de c2'),
+    ],
   );
 }

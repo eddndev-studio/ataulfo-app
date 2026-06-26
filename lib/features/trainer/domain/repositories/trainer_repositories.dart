@@ -6,6 +6,7 @@ import '../entities/trainer_attachment.dart';
 import '../entities/trainer_conversation.dart';
 import '../entities/trainer_message.dart';
 import '../entities/trainer_models.dart';
+import '../entities/trainer_progress.dart';
 import '../entities/workspace_doc.dart';
 
 /// Puertos de dominio de la superficie del entrenador. Tres repositorios
@@ -66,6 +67,16 @@ abstract interface class TrainerRepository {
 
   /// Allowlist de modelos del entrenador (best-effort en el caller).
   Future<TrainerModels> listModels({required String templateId});
+}
+
+/// Puerto de realtime del turno del entrenador: progreso en vivo por SSE
+/// (pensando/tool/completed/failed). Lo satisface un datasource de la capa de
+/// datos; el dominio sólo conoce el contrato y la entidad de progreso.
+abstract interface class TrainerEvents {
+  Stream<TrainerProgressEvent> progress(
+    String templateId,
+    String conversationId,
+  );
 }
 
 abstract interface class PreviewRepository {

@@ -5,6 +5,9 @@ import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/widgets/chat_labels_sheet.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
+import 'package:ataulfo/features/monitor/data/datasources/monitor_activity_datasource.dart';
+import 'package:ataulfo/features/monitor/domain/entities/monitor_event.dart';
+import 'package:ataulfo/features/monitor/presentation/cubit/monitor_live_cubit.dart';
 import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
 import 'package:ataulfo/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:ataulfo/features/flow_run/domain/entities/runnable_flow.dart';
@@ -34,6 +37,12 @@ class _MockChatLabelsRepo extends Mock implements ChatLabelsRepository {}
 
 class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
 
+class _FakeMonitorDs implements MonitorActivityDatasource {
+  @override
+  Stream<MonitorEvent> activity(String botId, String chatLid) =>
+      const Stream<MonitorEvent>.empty();
+}
+
 void main() {
   late _MockProfileBloc bloc;
   late _MockAuthBloc auth;
@@ -56,6 +65,9 @@ void main() {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<ProfileBloc>.value(value: bloc),
         BlocProvider<AuthBloc>.value(value: auth),
+        BlocProvider<MonitorLiveCubit>(
+          create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+        ),
       ],
       child: const Scaffold(
         appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
@@ -107,6 +119,9 @@ void main() {
           providers: <BlocProvider<dynamic>>[
             BlocProvider<ProfileBloc>.value(value: bloc),
             BlocProvider<AuthBloc>.value(value: auth),
+            BlocProvider<MonitorLiveCubit>(
+              create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+            ),
           ],
           child: const Scaffold(
             appBar: ChatThreadAppBar(botId: 'b1', chatLid: '123-456@g.us'),
@@ -246,6 +261,9 @@ void main() {
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<ProfileBloc>.value(value: bloc),
                 BlocProvider<AuthBloc>.value(value: auth),
+                BlocProvider<MonitorLiveCubit>(
+                  create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+                ),
               ],
               child: const Scaffold(
                 appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
@@ -284,6 +302,9 @@ void main() {
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<ProfileBloc>.value(value: bloc),
                 BlocProvider<AuthBloc>.value(value: auth),
+                BlocProvider<MonitorLiveCubit>(
+                  create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+                ),
               ],
               child: const Scaffold(
                 appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),

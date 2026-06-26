@@ -14,6 +14,9 @@ import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/thread_audio_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
+import 'package:ataulfo/features/monitor/data/datasources/monitor_activity_datasource.dart';
+import 'package:ataulfo/features/monitor/domain/entities/monitor_event.dart';
+import 'package:ataulfo/features/monitor/presentation/cubit/monitor_live_cubit.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -31,6 +34,12 @@ class _MockThreadAudioCubit extends MockCubit<ThreadAudioState>
     implements ThreadAudioCubit {}
 
 class _MockMediaOpener extends Mock implements MediaOpener {}
+
+class _FakeMonitorDs implements MonitorActivityDatasource {
+  @override
+  Stream<MonitorEvent> activity(String botId, String chatLid) =>
+      const Stream<MonitorEvent>.empty();
+}
 
 Message msg({
   String externalId = 'e1',
@@ -87,6 +96,11 @@ void main() {
         providers: <BlocProvider<dynamic>>[
           BlocProvider<MessagesBloc>.value(value: bloc),
           BlocProvider<ThreadAudioCubit>.value(value: audio),
+          // El footer de actividad live lo lee del scope; inerte aquí (sin
+          // observar) ⇒ no pinta nada.
+          BlocProvider<MonitorLiveCubit>(
+            create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+          ),
         ],
         child: const Scaffold(body: MessageThreadPage()),
       ),
@@ -726,6 +740,9 @@ void main() {
           providers: <BlocProvider<dynamic>>[
             BlocProvider<MessagesBloc>.value(value: bloc),
             BlocProvider<ThreadAudioCubit>.value(value: audio),
+            BlocProvider<MonitorLiveCubit>(
+              create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+            ),
           ],
           child: const Scaffold(body: MessageThreadPage()),
         ),

@@ -32,6 +32,8 @@ import 'features/platform_agent/data/datasources/platform_agent_datasource.dart'
 import 'features/platform_agent/data/datasources/platform_agent_events_datasource.dart';
 import 'features/platform_agent/data/repositories/platform_agent_repositories_impl.dart';
 import 'features/trainer/data/datasources/trainer_datasource.dart';
+import 'features/monitor/data/datasources/monitor_activity_datasource.dart';
+import 'features/trainer/data/datasources/trainer_events_datasource.dart';
 import 'features/trainer/data/datasources/workspace_datasource.dart';
 import 'features/trainer/data/repositories/trainer_repositories_impl.dart';
 import 'features/ai_log/data/ai_log_datasource.dart';
@@ -311,6 +313,10 @@ Future<void> main() async {
   // abre CUALQUIER tipo (audio/video/PDF/Office), no sólo imágenes.
   final mediaFilePicker = FilePickerMediaFilePicker();
 
+  // Actividad del bot runtime: monitor por-chat + feed bot-scoped (mismo
+  // datasource, dos interfaces).
+  final monitorActivityDs = DioMonitorActivityDatasource(mainDio);
+
   final router = AppRouter(
     authBloc: authBloc,
     authRepository: authRepository,
@@ -331,6 +337,11 @@ Future<void> main() async {
     aiLogRepository: aiLogRepository,
     executionsRepository: executionsRepository,
     trainerRepository: trainerRepository,
+    trainerEvents: DioTrainerEventsDatasource(mainDio),
+    // Un solo datasource sirve el monitor por-chat (ADMIN+) y el feed bot-scoped
+    // (operador): implementa ambas interfaces.
+    monitorActivity: monitorActivityDs,
+    monitorBotActivity: monitorActivityDs,
     workspaceRepository: workspaceRepository,
     previewRepository: previewRepository,
     platformAgentRepository: platformAgentRepository,

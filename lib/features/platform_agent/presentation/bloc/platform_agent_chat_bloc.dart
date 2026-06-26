@@ -41,6 +41,42 @@ final class PaChatNewConversationRequested extends PaChatEvent {
   const PaChatNewConversationRequested();
 }
 
+/// El operador pide cargar el tramo de historial anterior (mensajes viejos).
+final class PaChatLoadMore extends PaChatEvent {
+  const PaChatLoadMore();
+}
+
+/// Renombrar un hilo del historial.
+final class PaChatConversationRenamed extends PaChatEvent {
+  const PaChatConversationRenamed(this.id, this.title);
+
+  final String id;
+  final String title;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PaChatConversationRenamed &&
+      other.id == id &&
+      other.title == title;
+
+  @override
+  int get hashCode => Object.hash(id, title);
+}
+
+/// Eliminar un hilo del historial.
+final class PaChatConversationDeleted extends PaChatEvent {
+  const PaChatConversationDeleted(this.id);
+
+  final String id;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PaChatConversationDeleted && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
 final class PaChatConversationSelected extends PaChatEvent {
   const PaChatConversationSelected(this.id);
 
@@ -115,6 +151,8 @@ final class PaChatLoaded extends PaChatState {
     this.models = const <PaModelOption>[],
     this.defaultModelId = '',
     this.selectedModelId = '',
+    this.nextCursor = '',
+    this.loadingMore = false,
   });
 
   /// Hilos del operador, DESC por updatedAt (para el selector de historial).
@@ -146,6 +184,12 @@ final class PaChatLoaded extends PaChatState {
   /// Elección vigente del operador; '' = default (el turno viaja sin model).
   final String selectedModelId;
 
+  /// Cursor de la página anterior (más vieja); '' = no hay más historial.
+  final String nextCursor;
+
+  /// true mientras se cargan mensajes viejos (load-more en vuelo).
+  final bool loadingMore;
+
   PaChatLoaded copyWith({
     List<PaConversation>? conversations,
     PaConversation? activeConversation,
@@ -155,6 +199,8 @@ final class PaChatLoaded extends PaChatState {
     bool clearSendFailure = false,
     String? liveProgress,
     String? selectedModelId,
+    String? nextCursor,
+    bool? loadingMore,
   }) => PaChatLoaded(
     conversations: conversations ?? this.conversations,
     activeConversation: activeConversation ?? this.activeConversation,
@@ -165,6 +211,8 @@ final class PaChatLoaded extends PaChatState {
     models: models,
     defaultModelId: defaultModelId,
     selectedModelId: selectedModelId ?? this.selectedModelId,
+    nextCursor: nextCursor ?? this.nextCursor,
+    loadingMore: loadingMore ?? this.loadingMore,
   );
 
   @override
@@ -178,7 +226,9 @@ final class PaChatLoaded extends PaChatState {
       other.liveProgress == liveProgress &&
       listEquals(other.models, models) &&
       other.defaultModelId == defaultModelId &&
-      other.selectedModelId == selectedModelId;
+      other.selectedModelId == selectedModelId &&
+      other.nextCursor == nextCursor &&
+      other.loadingMore == loadingMore;
 
   @override
   int get hashCode => Object.hash(
@@ -191,6 +241,8 @@ final class PaChatLoaded extends PaChatState {
     Object.hashAll(models),
     defaultModelId,
     selectedModelId,
+    nextCursor,
+    loadingMore,
   );
 }
 
@@ -204,6 +256,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     on<PaChatStarted>(_onStarted);
     on<PaChatMessageSent>(_onMessageSent);
     on<PaChatNewConversationRequested>(_onNewConversation);
+    on<PaChatLoadMore>(_onLoadMore);
+    on<PaChatConversationRenamed>(_onConversationRenamed);
+    on<PaChatConversationDeleted>(_onConversationDeleted);
     on<PaChatConversationSelected>(_onConversationSelected);
     on<PaChatProgressReceived>(_onProgressReceived);
     on<PaChatModelSelected>(_onModelSelected);
@@ -224,13 +279,18 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     return super.close();
   }
 
-  Future<List<PaMessage>> _loadMessages(String conversationId) async {
+  Future<({List<PaMessage> messages, String nextCursor})> _loadMessages(
+    String conversationId,
+  ) async {
     final page = await _repo.listMessages(
       conversationId: conversationId,
       limit: _pageLimit,
     );
     // El wire entrega DESC (recientes primero); el hilo renderiza ASC.
-    return page.messages.reversed.toList(growable: false);
+    return (
+      messages: page.messages.reversed.toList(growable: false),
+      nextCursor: page.nextCursor,
+    );
   }
 
   /// Allowlist de modelos, best-effort: el selector es accesorio — CUALQUIER
@@ -256,11 +316,13 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           : await _repo.createConversation(title: _newTitle);
       final list = convs.isNotEmpty ? convs : <PaConversation>[active];
       final models = await _loadModels();
+      final page = await _loadMessages(active.id);
       emit(
         PaChatLoaded(
           conversations: list,
           activeConversation: active,
-          messages: await _loadMessages(active.id),
+          messages: page.messages,
+          nextCursor: page.nextCursor,
           sending: false,
           models: models.options,
           defaultModelId: models.defaultId,
@@ -344,13 +406,15 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     String conversationId,
     String assistantId,
   ) async {
-    List<PaMessage> reloaded;
+    ({List<PaMessage> messages, String nextCursor}) reloaded;
     try {
       reloaded = await _loadMessages(conversationId);
     } on PaFailure {
       return;
     }
-    if (!reloaded.any((m) => m.id == assistantId)) return; // recarga rezagada
+    if (!reloaded.messages.any((m) => m.id == assistantId)) {
+      return; // recarga rezagada
+    }
     if (isClosed) return;
     final s = state;
     if (s is! PaChatLoaded ||
@@ -358,7 +422,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         s.sending) {
       return;
     }
-    emit(s.copyWith(messages: reloaded));
+    emit(s.copyWith(messages: reloaded.messages, nextCursor: reloaded.nextCursor));
   }
 
   void _onProgressReceived(
@@ -432,10 +496,119 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     }
     if (target == null) return;
     try {
+      final page = await _loadMessages(target.id);
       emit(
         current.copyWith(
           activeConversation: target,
-          messages: await _loadMessages(target.id),
+          messages: page.messages,
+          nextCursor: page.nextCursor,
+          liveProgress: '',
+          clearSendFailure: true,
+        ),
+      );
+    } on PaFailure catch (f) {
+      emit(current.copyWith(sendFailure: f));
+    }
+  }
+
+  Future<void> _onLoadMore(
+    PaChatLoadMore event,
+    Emitter<PaChatState> emit,
+  ) async {
+    final current = state;
+    if (current is! PaChatLoaded ||
+        current.loadingMore ||
+        current.sending ||
+        current.nextCursor.isEmpty) {
+      return;
+    }
+    emit(current.copyWith(loadingMore: true));
+    try {
+      final page = await _repo.listMessages(
+        conversationId: current.activeConversation.id,
+        cursor: current.nextCursor,
+        limit: _pageLimit,
+      );
+      final after = state;
+      if (after is! PaChatLoaded) return;
+      // El wire del tramo viejo viene DESC; invertir a ASC y ANTEPONER.
+      final older = page.messages.reversed.toList(growable: false);
+      emit(
+        after.copyWith(
+          messages: <PaMessage>[...older, ...after.messages],
+          nextCursor: page.nextCursor,
+          loadingMore: false,
+        ),
+      );
+    } on PaFailure {
+      final after = state;
+      if (after is! PaChatLoaded) return;
+      emit(after.copyWith(loadingMore: false));
+    }
+  }
+
+  Future<void> _onConversationRenamed(
+    PaChatConversationRenamed event,
+    Emitter<PaChatState> emit,
+  ) async {
+    final current = state;
+    if (current is! PaChatLoaded) return;
+    try {
+      final updated = await _repo.renameConversation(event.id, event.title);
+      emit(
+        current.copyWith(
+          conversations: current.conversations
+              .map((c) => c.id == updated.id ? updated : c)
+              .toList(growable: false),
+          activeConversation: current.activeConversation.id == updated.id
+              ? updated
+              : current.activeConversation,
+        ),
+      );
+    } on PaFailure catch (f) {
+      emit(current.copyWith(sendFailure: f));
+    }
+  }
+
+  Future<void> _onConversationDeleted(
+    PaChatConversationDeleted event,
+    Emitter<PaChatState> emit,
+  ) async {
+    final current = state;
+    if (current is! PaChatLoaded) return;
+    try {
+      await _repo.deleteConversation(event.id);
+      final remaining = current.conversations
+          .where((c) => c.id != event.id)
+          .toList(growable: false);
+      // Borró un hilo NO activo: basta quitarlo de la lista.
+      if (event.id != current.activeConversation.id) {
+        emit(current.copyWith(conversations: remaining));
+        return;
+      }
+      // Borró el ACTIVO: si quedan hilos, abre el más reciente; si no, crea uno.
+      if (remaining.isEmpty) {
+        final fresh = await _repo.createConversation(title: _newTitle);
+        emit(
+          current.copyWith(
+            conversations: <PaConversation>[fresh],
+            activeConversation: fresh,
+            messages: const <PaMessage>[],
+            nextCursor: '',
+            liveProgress: '',
+            clearSendFailure: true,
+          ),
+        );
+        return;
+      }
+      final next = remaining.first;
+      final page = await _loadMessages(next.id);
+      emit(
+        current.copyWith(
+          conversations: remaining,
+          activeConversation: next,
+          messages: page.messages,
+          nextCursor: page.nextCursor,
           liveProgress: '',
           clearSendFailure: true,
         ),

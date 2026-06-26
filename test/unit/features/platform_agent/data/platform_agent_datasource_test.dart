@@ -93,6 +93,39 @@ void main() {
         () => dio.get<List<dynamic>>('/platform-agent/conversations'),
       ).called(1);
     });
+
+    test('PATCH renombra el hilo (id en el path, title en el body)', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/x'),
+          statusCode: 200,
+          data: convJson(),
+        ),
+      );
+      final c = await ds.renameConversation('c1', 'Soporte VIP');
+      expect(c.id, 'c1');
+      verify(
+        () => dio.patch<Map<String, dynamic>>(
+          '/platform-agent/conversations/c1',
+          data: <String, dynamic>{'title': 'Soporte VIP'},
+        ),
+      ).called(1);
+    });
+
+    test('DELETE borra el hilo (id en el path)', () async {
+      when(() => dio.delete<void>(any())).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/x'),
+          statusCode: 204,
+        ),
+      );
+      await ds.deleteConversation('c1');
+      verify(
+        () => dio.delete<void>('/platform-agent/conversations/c1'),
+      ).called(1);
+    });
   });
 
   group('mensajes', () {

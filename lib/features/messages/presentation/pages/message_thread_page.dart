@@ -16,6 +16,8 @@ import '../../domain/failures/messages_failure.dart';
 import '../../domain/reactions.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/thread_audio_cubit.dart';
+import '../../../monitor/presentation/widgets/alert_banner.dart';
+import '../../../monitor/presentation/widgets/live_activity.dart';
 import '../widgets/message_composer.dart';
 import '../widgets/message_media.dart';
 
@@ -60,6 +62,11 @@ class MessageThreadPage extends StatelessWidget {
                   MessagesFailed(failure: final f) => _FailedView(failure: f),
                 },
               ),
+              // Alerta crítica del bot (desconexión, etc.) y actividad EN VIVO
+              // entre el hilo y el composer. Inertes para no-admin (cubit sin
+              // observar) ⇒ no pintan.
+              const AlertBanner(),
+              const LiveActivity(),
               // El composer sólo con hilo cargado: enviar exige una conversación
               // abierta (en Loading/Failed no hay a dónde escribir).
               if (state is MessagesLoaded) const MessageComposer(),

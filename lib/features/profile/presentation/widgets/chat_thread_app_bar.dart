@@ -9,6 +9,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../conversations/domain/entities/conversation.dart';
 import '../../../conversations/presentation/widgets/chat_labels_sheet.dart';
 import '../../../flow_run/presentation/widgets/flow_run_sheet.dart';
+import '../../../monitor/presentation/widgets/bot_state_pill.dart';
 import '../../../notes/presentation/widgets/notes_sheet.dart';
 import '../bloc/profile_bloc.dart';
 
@@ -145,11 +146,20 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                     AppAvatar(name: name, size: 36, imageUrl: photo),
                     const SizedBox(width: AppTokens.sp3),
                     Expanded(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleMedium,
+                          ),
+                          // Estado en vivo del bot (Pensando / falló); oculto en
+                          // reposo. Lo alimenta el MonitorLiveCubit del scope.
+                          const BotStatePill(),
+                        ],
                       ),
                     ),
                   ],

@@ -24,7 +24,11 @@ import '../widgets/chat_labels_sheet.dart';
 /// La fila navega al hilo de mensajes (S09, `/bots/:id/sessions/:chatLid`); el
 /// botId lo aporta el `ConversationsBloc` del scope.
 class ConversationsListPage extends StatelessWidget {
-  const ConversationsListPage({super.key});
+  const ConversationsListPage({super.key, this.needsAttention = const <String>{}});
+
+  /// chatLids con una señal de atención del bot (falló / alerta). La ruta los
+  /// inyecta desde el MonitorAttentionCubit; vacío por defecto.
+  final Set<String> needsAttention;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +36,10 @@ class ConversationsListPage extends StatelessWidget {
       builder: (context, state) => switch (state) {
         ConversationsInitial() ||
         ConversationsLoading() => const _LoadingView(),
-        ConversationsLoaded(items: final items) => _LoadedView(items: items),
+        ConversationsLoaded(items: final items) => _LoadedView(
+          items: items,
+          needsAttention: needsAttention,
+        ),
         ConversationsFailed(failure: final f) => _FailedView(failure: f),
       },
     );
@@ -55,9 +62,10 @@ class _LoadingView extends StatelessWidget {
 enum _TrayFilter { all, unread, archived }
 
 class _LoadedView extends StatefulWidget {
-  const _LoadedView({required this.items});
+  const _LoadedView({required this.items, this.needsAttention = const <String>{}});
 
   final List<Conversation> items;
+  final Set<String> needsAttention;
 
   @override
   State<_LoadedView> createState() => _LoadedViewState();
@@ -177,7 +185,10 @@ class _LoadedViewState extends State<_LoadedView> {
                   )
                 else
                   for (final c in visible) ...<Widget>[
-                    _ConversationTile(conversation: c),
+                    _ConversationTile(
+                      conversation: c,
+                      needsAttention: widget.needsAttention.contains(c.chatLid),
+                    ),
                     const SizedBox(height: AppTokens.cardGap),
                   ],
               ],
@@ -269,9 +280,15 @@ class _FailedView extends StatelessWidget {
 /// (no leído / fijado / archivado); silenciado no se muestra (vive en
 /// `mutedUntil`, lo usará una rebanada futura).
 class _ConversationTile extends StatelessWidget {
-  const _ConversationTile({required this.conversation});
+  const _ConversationTile({
+    required this.conversation,
+    this.needsAttention = false,
+  });
 
   final Conversation conversation;
+
+  /// El bot falló o levantó una alerta en este chat (del monitor en vivo).
+  final bool needsAttention;
 
   @override
   Widget build(BuildContext context) {
@@ -295,6 +312,12 @@ class _ConversationTile extends StatelessWidget {
     final showSecondaryRow = secondary.isNotEmpty || hasUnread;
 
     final pills = <Widget>[
+      if (needsAttention)
+        AppPill.danger(
+          key: Key('conversation.attention.${c.chatLid}'),
+          label: 'Atención',
+          dot: AppPillDot.danger,
+        ),
       if (c.isMarkedUnread) const AppPill.primary(label: 'No leído'),
       if (c.isPinned) const AppPill.neutral(label: 'Fijado'),
       if (c.isArchived) const AppPill.neutral(label: 'Archivado'),

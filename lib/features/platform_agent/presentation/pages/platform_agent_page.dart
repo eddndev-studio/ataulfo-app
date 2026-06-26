@@ -50,6 +50,16 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
     setState(() => _showHistory = false);
   }
 
+  void _rename(String id, String title) {
+    context.read<PlatformAgentChatBloc>().add(
+      PaChatConversationRenamed(id, title),
+    );
+  }
+
+  void _delete(String id) {
+    context.read<PlatformAgentChatBloc>().add(PaChatConversationDeleted(id));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -81,6 +91,8 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
                           conversations: state.conversations,
                           activeId: state.activeConversation.id,
                           onSelect: _select,
+                          onRename: _rename,
+                          onDelete: _delete,
                         )
                       : _ChatView(state: state, onSend: _send),
               },
@@ -246,11 +258,15 @@ class _HistoryList extends StatelessWidget {
     required this.conversations,
     required this.activeId,
     required this.onSelect,
+    required this.onRename,
+    required this.onDelete,
   });
 
   final List<PaConversation> conversations;
   final String activeId;
   final ValueChanged<String> onSelect;
+  final void Function(String id, String title) onRename;
+  final ValueChanged<String> onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -274,38 +290,148 @@ class _HistoryList extends StatelessWidget {
               color: active ? AppTokens.primary : AppTokens.text1,
             ),
           ),
+          trailing: PopupMenuButton<String>(
+            key: Key('pa.history.menu.${c.id}'),
+            icon: const Icon(Icons.more_vert, color: AppTokens.text2),
+            onSelected: (action) {
+              if (action == 'rename') {
+                _promptRename(context, c);
+              } else if (action == 'delete') {
+                _confirmDelete(context, c);
+              }
+            },
+            itemBuilder: (_) => const <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(value: 'rename', child: Text('Renombrar')),
+              PopupMenuItem<String>(value: 'delete', child: Text('Eliminar')),
+            ],
+          ),
           onTap: () => onSelect(c.id),
         );
       },
     );
   }
+
+  Future<void> _promptRename(BuildContext context, PaConversation c) async {
+    final ctrl = TextEditingController(text: c.title);
+    final newTitle = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Renombrar conversación'),
+        content: TextField(
+          key: const Key('pa.history.rename.field'),
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Nombre'),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('pa.history.rename.confirm'),
+            onPressed: () => Navigator.of(dialogCtx).pop(ctrl.text.trim()),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newTitle != null && newTitle.isNotEmpty && newTitle != c.title) {
+      onRename(c.id, newTitle);
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, PaConversation c) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Eliminar conversación'),
+        content: const Text(
+          'Se borrará el hilo y sus mensajes. No se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('pa.history.delete.confirm'),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok ?? false) onDelete(c.id);
+  }
 }
 
-class _ChatView extends StatelessWidget {
+class _ChatView extends StatefulWidget {
   const _ChatView({required this.state, required this.onSend});
 
   final PaChatLoaded state;
   final ValueChanged<String> onSend;
 
   @override
+  State<_ChatView> createState() => _ChatViewState();
+}
+
+class _ChatViewState extends State<_ChatView> {
+  /// Controller compartido: las acciones rápidas PREFIJAN el texto del composer
+  /// (el operador lo edita antes de enviar) en vez de auto-enviar.
+  final TextEditingController _composer = TextEditingController();
+
+  @override
+  void dispose() {
+    _composer.dispose();
+    super.dispose();
+  }
+
+  void _prefill(String text) {
+    _composer.text = text;
+    _composer.selection = TextSelection.collapsed(offset: text.length);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final s = state;
+    final s = widget.state;
+    final onSend = widget.onSend;
     return Column(
       children: <Widget>[
         Expanded(
           child: (s.messages.isEmpty && !s.sending)
-              ? const _EmptyHint()
+              ? _EmptyHint(onQuickAction: _prefill)
               : ListView.builder(
                   reverse: true,
                   padding: const EdgeInsets.all(AppTokens.sp3),
-                  itemCount: s.messages.length + (s.sending ? 1 : 0),
+                  itemCount:
+                      s.messages.length +
+                      (s.sending ? 1 : 0) +
+                      (s.nextCursor.isNotEmpty ? 1 : 0),
                   itemBuilder: (context, i) {
                     if (s.sending && i == 0) {
                       return _LiveProgress(label: s.liveProgress);
                     }
+                    // El cargar-más vive en el tope visual (último índice del
+                    // reverse), por encima del mensaje más viejo.
+                    final base = s.messages.length + (s.sending ? 1 : 0);
+                    if (s.nextCursor.isNotEmpty && i == base) {
+                      return _LoadMoreButton(
+                        loading: s.loadingMore,
+                        onTap: () => context.read<PlatformAgentChatBloc>().add(
+                          const PaChatLoadMore(),
+                        ),
+                      );
+                    }
                     final idx =
                         s.messages.length - 1 - (i - (s.sending ? 1 : 0));
-                    return PaMessageTile(message: s.messages[idx]);
+                    return PaMessageTile(
+                      message: s.messages[idx],
+                      onConfirm: s.sending
+                          ? null
+                          : () => onSend('Sí, confírmalo y procede.'),
+                    );
                   },
                 ),
         ),
@@ -319,6 +445,7 @@ class _ChatView extends StatelessWidget {
             ),
           ),
         AppChatComposer(
+          controller: _composer,
           fieldKey: const Key('pa.composer.field'),
           sendKey: const Key('pa.composer.send'),
           hint: 'Pídele algo a tu asistente…',
@@ -359,8 +486,85 @@ class _LiveProgress extends StatelessWidget {
   }
 }
 
+/// Una acción rápida del estado vacío: etiqueta visible + texto con el que
+/// prefija el composer (puede diferir, p.ej. dejar el bot/flujo a completar).
+class _QuickAction {
+  const _QuickAction({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.prefill,
+  });
+
+  final String id;
+  final String label;
+  final IconData icon;
+  final String prefill;
+}
+
+const List<_QuickAction> _quickActions = <_QuickAction>[
+  _QuickAction(
+    id: 'bots',
+    label: '¿Cuántos bots tengo?',
+    icon: Icons.smart_toy_outlined,
+    prefill: '¿Cuántos bots tengo y cómo se llaman?',
+  ),
+  _QuickAction(
+    id: 'pause',
+    label: 'Pausar un bot',
+    icon: Icons.pause_circle_outline,
+    prefill: 'Pausa el bot ',
+  ),
+  _QuickAction(
+    id: 'audit',
+    label: 'Auditar un flujo',
+    icon: Icons.fact_check_outlined,
+    prefill: 'Audita el flujo ',
+  ),
+  _QuickAction(
+    id: 'clone',
+    label: 'Duplicar un flujo',
+    icon: Icons.copy_all_outlined,
+    prefill: 'Duplica el flujo ',
+  ),
+];
+
+/// Botón "cargar mensajes anteriores" al tope del hilo; spinner mientras viaja.
+class _LoadMoreButton extends StatelessWidget {
+  const _LoadMoreButton({required this.loading, required this.onTap});
+
+  final bool loading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+        child: loading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+                ),
+              )
+            : TextButton(
+                key: const Key('pa.load_more'),
+                onPressed: onTap,
+                child: const Text('Cargar mensajes anteriores'),
+              ),
+      ),
+    );
+  }
+}
+
 class _EmptyHint extends StatelessWidget {
-  const _EmptyHint();
+  const _EmptyHint({required this.onQuickAction});
+
+  /// Prefija el composer con el arranque de una acción rápida.
+  final ValueChanged<String> onQuickAction;
 
   @override
   Widget build(BuildContext context) {
@@ -386,6 +590,21 @@ class _EmptyHint extends StatelessWidget {
               'un cambio afecte a varios bots.',
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            ),
+            const SizedBox(height: AppTokens.sp4),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: AppTokens.sp2,
+              runSpacing: AppTokens.sp2,
+              children: <Widget>[
+                for (final a in _quickActions)
+                  ActionChip(
+                    key: Key('pa.quick_action.${a.id}'),
+                    avatar: Icon(a.icon, size: 16, color: AppTokens.primary),
+                    label: Text(a.label),
+                    onPressed: () => onQuickAction(a.prefill),
+                  ),
+              ],
             ),
           ],
         ),

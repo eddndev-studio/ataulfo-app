@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -5,6 +7,7 @@ import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
 import '../../domain/entities/trainer_models.dart';
+import '../../domain/entities/trainer_progress.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../domain/repositories/trainer_repositories.dart';
@@ -39,6 +42,20 @@ final class TrainerChatNewConversationRequested extends TrainerChatEvent {
   const TrainerChatNewConversationRequested();
 }
 
+/// El operador elige otro hilo del selector.
+final class TrainerChatConversationSelected extends TrainerChatEvent {
+  const TrainerChatConversationSelected(this.id);
+
+  final String id;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TrainerChatConversationSelected && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
 /// El operador elige el modelo del entrenador para los próximos turnos.
 /// id vacío ⇒ volver al default de la plataforma (el turno viaja sin model).
 /// El operador quiere adjuntar un archivo al turno: abre el picker y, si
@@ -65,6 +82,15 @@ final class TrainerChatModelSelected extends TrainerChatEvent {
 
   @override
   int get hashCode => modelId.hashCode;
+}
+
+/// Progreso en vivo del turno recibido por SSE. Lo emite la suscripción
+/// per-turn; el handler lo traduce a la etiqueta del indicador
+/// ("Pensando…/Usando {tool}…"). Cosmético: nunca toca el contenido del hilo.
+final class TrainerChatProgressReceived extends TrainerChatEvent {
+  const TrainerChatProgressReceived(this.event);
+
+  final TrainerProgressEvent event;
 }
 
 sealed class TrainerChatState {
@@ -99,6 +125,8 @@ final class TrainerChatLoaded extends TrainerChatState {
     required this.conversation,
     required this.messages,
     required this.sending,
+    this.conversations = const <TrainerConversation>[],
+    this.liveProgress = '',
     this.sendFailure,
     this.models = const <TrainerModelOption>[],
     this.defaultModelId = '',
@@ -109,11 +137,19 @@ final class TrainerChatLoaded extends TrainerChatState {
 
   final TrainerConversation conversation;
 
+  /// Conversaciones del entrenamiento (DESC por updatedAt) para el selector de
+  /// hilos. La activa es `conversation`.
+  final List<TrainerConversation> conversations;
+
   /// Hilo en orden cronológico ASC (listo para render).
   final List<TrainerMessage> messages;
 
   /// true mientras el turno viaja (composer bloqueado + typing indicator).
   final bool sending;
+
+  /// Etiqueta del indicador en vivo del turno ("Pensando…/Usando {tool}…"),
+  /// alimentada por SSE. '' cuando no hay turno o el progreso aún no llega.
+  final String liveProgress;
 
   /// Fallo del ÚLTIMO turno (el hilo sigue usable); null si no hubo.
   final TrainerFailure? sendFailure;
@@ -135,17 +171,22 @@ final class TrainerChatLoaded extends TrainerChatState {
   final bool attaching;
 
   TrainerChatLoaded copyWith({
+    TrainerConversation? conversation,
+    List<TrainerConversation>? conversations,
     List<TrainerMessage>? messages,
     bool? sending,
+    String? liveProgress,
     TrainerFailure? sendFailure,
     bool clearSendFailure = false,
     String? selectedModelId,
     List<TrainerAttachment>? pendingAttachments,
     bool? attaching,
   }) => TrainerChatLoaded(
-    conversation: conversation,
+    conversation: conversation ?? this.conversation,
+    conversations: conversations ?? this.conversations,
     messages: messages ?? this.messages,
     sending: sending ?? this.sending,
+    liveProgress: liveProgress ?? this.liveProgress,
     sendFailure: clearSendFailure ? null : (sendFailure ?? this.sendFailure),
     models: models,
     defaultModelId: defaultModelId,
@@ -158,8 +199,10 @@ final class TrainerChatLoaded extends TrainerChatState {
   bool operator ==(Object other) =>
       other is TrainerChatLoaded &&
       other.conversation == conversation &&
+      listEquals(other.conversations, conversations) &&
       listEquals(other.messages, messages) &&
       other.sending == sending &&
+      other.liveProgress == liveProgress &&
       other.sendFailure == sendFailure &&
       listEquals(other.models, models) &&
       other.defaultModelId == defaultModelId &&
@@ -170,8 +213,10 @@ final class TrainerChatLoaded extends TrainerChatState {
   @override
   int get hashCode => Object.hash(
     conversation,
+    Object.hashAll(conversations),
     Object.hashAll(messages),
     sending,
+    liveProgress,
     sendFailure,
     Object.hashAll(models),
     defaultModelId,
@@ -186,16 +231,20 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     required TrainerRepository repo,
     required String templateId,
     MediaFilePicker? picker,
+    TrainerEvents? events,
   }) : _repo = repo,
        _templateId = templateId,
        _picker = picker,
+       _events = events,
        super(const TrainerChatLoading()) {
     on<TrainerChatStarted>(_onStarted);
     on<TrainerChatMessageSent>(_onMessageSent);
     on<TrainerChatAttachRequested>(_onAttachRequested);
     on<TrainerChatAttachmentRemoved>(_onAttachmentRemoved);
     on<TrainerChatNewConversationRequested>(_onNewConversation);
+    on<TrainerChatConversationSelected>(_onConversationSelected);
     on<TrainerChatModelSelected>(_onModelSelected);
+    on<TrainerChatProgressReceived>(_onProgressReceived);
   }
 
   final TrainerRepository _repo;
@@ -203,6 +252,23 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
 
   /// Picker de archivos (nil ⇒ el composer oculta el clip — DX/tests).
   final MediaFilePicker? _picker;
+
+  /// Realtime del turno (nil ⇒ sin indicador en vivo: el turno sigue funcionando
+  /// con "Pensando…" estático). Best-effort, cosmético.
+  final TrainerEvents? _events;
+
+  /// Suscripción de progreso del turno en vuelo (per-turn): se abre al enviar y
+  /// se cancela al volver el POST o al cerrarse el bloc.
+  StreamSubscription<TrainerProgressEvent>? _progressSub;
+
+  @override
+  Future<void> close() {
+    // Cancelar una suscripción SSE viva aguarda el desmonte del socket, que el
+    // server mantiene abierto y puede no completar; el cierre del bloc no debe
+    // colgarse en él.
+    unawaited(_progressSub?.cancel());
+    return super.close();
+  }
 
   /// Allowlist de modelos, best-effort: el selector es accesorio — CUALQUIER
   /// fallo (backend sin la ruta, red, wire inesperado) lo oculta sin tocar
@@ -235,16 +301,25 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     emit(const TrainerChatLoading());
     try {
       final convs = await _repo.listConversations(templateId: _templateId);
-      final conv = convs.isNotEmpty
-          ? convs.first
-          : await _repo.createConversation(
-              templateId: _templateId,
-              title: 'Entrenamiento',
-            );
+      final sorted = <TrainerConversation>[...convs]
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      final TrainerConversation conv;
+      final List<TrainerConversation> list;
+      if (sorted.isNotEmpty) {
+        conv = sorted.first;
+        list = sorted;
+      } else {
+        conv = await _repo.createConversation(
+          templateId: _templateId,
+          title: 'Entrenamiento',
+        );
+        list = <TrainerConversation>[conv];
+      }
       final models = await _loadModels();
       emit(
         TrainerChatLoaded(
           conversation: conv,
+          conversations: list,
           messages: await _loadMessages(conv.id),
           sending: false,
           models: models.options,
@@ -274,9 +349,24 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       current.copyWith(
         messages: <TrainerMessage>[...current.messages, optimistic],
         sending: true,
+        liveProgress: 'Pensando…',
         clearSendFailure: true,
       ),
     );
+    // Indicador en vivo: suscripción de progreso per-turn. Best-effort —
+    // cosmético; si no hay puerto de eventos o el SSE no conecta, el indicador
+    // se queda en "Pensando…". El cancel NO se espera: cancelar una suscripción
+    // SSE viva aguarda el desmonte del socket (que el server mantiene abierto) y
+    // puede no completar — esperarlo colgaría el cierre del turno en "Pensando…".
+    unawaited(_progressSub?.cancel());
+    _progressSub = _events
+        ?.progress(_templateId, current.conversation.id)
+        .listen(
+          (e) {
+            if (!isClosed) add(TrainerChatProgressReceived(e));
+          },
+          onError: (Object _) {},
+        );
     try {
       await _repo.sendMessage(
         templateId: _templateId,
@@ -287,10 +377,13 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
             .map((a) => a.ref)
             .toList(growable: false),
       );
+      unawaited(_progressSub?.cancel());
+      _progressSub = null;
       emit(
         current.copyWith(
           messages: await _loadMessages(current.conversation.id),
           sending: false,
+          liveProgress: '',
           clearSendFailure: true,
           pendingAttachments: const <TrainerAttachment>[],
         ),
@@ -298,7 +391,9 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     } on TrainerFailure catch (f) {
       // Revertir el optimista: el server no persistió el turno (502 del
       // motor deja el user message fuera del hilo — reintentable).
-      emit(current.copyWith(sending: false, sendFailure: f));
+      unawaited(_progressSub?.cancel());
+      _progressSub = null;
+      emit(current.copyWith(sending: false, liveProgress: '', sendFailure: f));
     }
   }
 
@@ -364,6 +459,54 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     emit(current.copyWith(selectedModelId: event.modelId));
   }
 
+  Future<void> _onConversationSelected(
+    TrainerChatConversationSelected event,
+    Emitter<TrainerChatState> emit,
+  ) async {
+    final current = state;
+    if (current is! TrainerChatLoaded || current.sending) return;
+    if (event.id == current.conversation.id) return; // ya activa
+    TrainerConversation? target;
+    for (final c in current.conversations) {
+      if (c.id == event.id) {
+        target = c;
+        break;
+      }
+    }
+    if (target == null) return;
+    try {
+      emit(
+        current.copyWith(
+          conversation: target,
+          messages: await _loadMessages(target.id),
+          clearSendFailure: true,
+        ),
+      );
+    } on TrainerFailure catch (f) {
+      emit(current.copyWith(sendFailure: f));
+    }
+  }
+
+  void _onProgressReceived(
+    TrainerChatProgressReceived event,
+    Emitter<TrainerChatState> emit,
+  ) {
+    final current = state;
+    if (current is! TrainerChatLoaded || !current.sending) return;
+    if (event.event.conversationId != current.conversation.id) return;
+    final label = _progressLabel(event.event);
+    if (label.isEmpty || label == current.liveProgress) return;
+    emit(current.copyWith(liveProgress: label));
+  }
+
+  String _progressLabel(TrainerProgressEvent e) {
+    if (e.isTool) {
+      return e.toolName.isNotEmpty ? 'Usando ${e.toolName}…' : 'Trabajando…';
+    }
+    if (e.isThinking) return 'Pensando…';
+    return ''; // terminal: el cierre del POST limpia el indicador.
+  }
+
   Future<void> _onNewConversation(
     TrainerChatNewConversationRequested event,
     Emitter<TrainerChatState> emit,
@@ -391,6 +534,10 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       emit(
         TrainerChatLoaded(
           conversation: conv,
+          conversations: <TrainerConversation>[
+            conv,
+            ...?preserved?.conversations,
+          ],
           messages: const <TrainerMessage>[],
           sending: false,
           models: models.options,
