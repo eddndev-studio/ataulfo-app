@@ -37,6 +37,7 @@ import 'features/monitor/data/datasources/monitor_catchup_datasource.dart';
 import 'features/trainer/data/datasources/trainer_events_datasource.dart';
 import 'features/trainer/data/datasources/workspace_datasource.dart';
 import 'features/trainer/data/repositories/trainer_repositories_impl.dart';
+import 'features/ai_ledger/data/ai_ledger_datasource.dart';
 import 'features/ai_log/data/ai_log_datasource.dart';
 import 'features/executions/data/execution_datasource.dart';
 import 'features/notes/data/datasources/notes_datasource.dart';
@@ -229,6 +230,10 @@ Future<void> main() async {
   final aiLogRepository = AiLogRepositoryImpl(
     datasource: DioAiLogDatasource(mainDio),
   );
+  // Bitácora de acciones con efecto (S30): SÓLO lo que el bot cambió, ADMIN+.
+  final aiLedgerRepository = AiLedgerRepositoryImpl(
+    datasource: DioAiLedgerDatasource(mainDio),
+  );
 
   // Historial de ejecuciones de flujo del chat (S11), ADMIN+.
   final executionsRepository = ExecutionRepositoryImpl(
@@ -339,6 +344,7 @@ Future<void> main() async {
     chatLabelsRepository: chatLabelsRepository,
     notesRepository: notesRepository,
     aiLogRepository: aiLogRepository,
+    aiLedgerRepository: aiLedgerRepository,
     executionsRepository: executionsRepository,
     trainerRepository: trainerRepository,
     trainerEvents: DioTrainerEventsDatasource(mainDio),

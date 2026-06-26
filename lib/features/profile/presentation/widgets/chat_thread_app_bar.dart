@@ -98,6 +98,25 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
             );
           },
         ),
+        // Bitácora de acciones con efecto (S30): SÓLO lo que el bot CAMBIÓ
+        // (envío, etiqueta, flujo, nota…), en texto de negocio. Solo ADMIN+ (el
+        // backend igual rechaza con 403; ocultarlo evita el botón roto).
+        BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, authState) {
+            if (authState is! AuthAuthenticated ||
+                !isAdminOrAbove(authState.identity.role)) {
+              return const SizedBox.shrink();
+            }
+            return IconButton(
+              key: const Key('thread.ai_ledger'),
+              tooltip: 'Bitácora de acciones',
+              icon: const Icon(Icons.receipt_long_outlined),
+              onPressed: () => context.push(
+                '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/ai-ledger',
+              ),
+            );
+          },
+        ),
         // Historial de ejecuciones de flujo de ESTE chat (S11): qué corrió y
         // por qué falló. Solo ADMIN+ (el backend igual rechaza con 403).
         BlocBuilder<AuthBloc, AuthState>(

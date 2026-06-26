@@ -62,6 +62,9 @@ import '../../features/trainer/presentation/bloc/workspace_bloc.dart';
 import '../../features/trainer/presentation/pages/preview_page.dart';
 import '../../features/trainer/presentation/pages/trainer_chat_page.dart';
 import '../../features/trainer/presentation/pages/workspace_page.dart';
+import '../../features/ai_ledger/domain/ai_ledger_repository.dart';
+import '../../features/ai_ledger/presentation/bloc/ai_ledger_bloc.dart';
+import '../../features/ai_ledger/presentation/pages/ai_ledger_page.dart';
 import '../../features/ai_log/domain/ai_log_repository.dart';
 import '../../features/ai_log/presentation/bloc/ai_log_bloc.dart';
 import '../../features/ai_log/presentation/pages/ai_log_page.dart';
@@ -165,6 +168,7 @@ class AppRouter {
     required ChatLabelsRepository chatLabelsRepository,
     required NotesRepository notesRepository,
     required AiLogRepository aiLogRepository,
+    AiLedgerRepository? aiLedgerRepository,
     required ExecutionRepository executionsRepository,
     required TrainerRepository trainerRepository,
     required TrainerEvents trainerEvents,
@@ -202,6 +206,7 @@ class AppRouter {
        _chatLabelsRepo = chatLabelsRepository,
        _notesRepo = notesRepository,
        _aiLogRepo = aiLogRepository,
+       _aiLedgerRepo = aiLedgerRepository,
        _executionsRepo = executionsRepository,
        _trainerRepo = trainerRepository,
        _trainerEvents = trainerEvents,
@@ -259,6 +264,10 @@ class AppRouter {
   final PlatformAgentEvents _platformAgentEvents;
   final NotesRepository _notesRepo;
   final AiLogRepository _aiLogRepo;
+
+  /// Bitácora de acciones con efecto (opcional): null en tests que no navegan a
+  /// la ruta; main siempre la provee.
+  final AiLedgerRepository? _aiLedgerRepo;
   final ExecutionRepository _executionsRepo;
   final MembershipsRepository _membershipsRepo;
   final MembersRepository _membersRepo;
@@ -849,6 +858,30 @@ class AppRouter {
                 ),
               ),
               body: const AiLogPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Bitácora de acciones con efecto del chat (S30): SÓLO lo que el bot
+        // CAMBIÓ, en texto de negocio. Sub-ruta del hilo (segmento `/ai-ledger`
+        // extra). ADMIN+ en backend (la entrada del app bar se oculta a roles
+        // menores); page-scoped, carga al montarse.
+        path: '/bots/:id/sessions/:chatLid/ai-ledger',
+        builder: (context, state) {
+          final repo = _aiLedgerRepo;
+          if (repo == null) {
+            return const Scaffold(body: SizedBox.shrink());
+          }
+          final id = state.pathParameters['id']!;
+          final chatLid = state.pathParameters['chatLid']!;
+          return BlocProvider<AiLedgerBloc>(
+            create: (_) =>
+                AiLedgerBloc(repo: repo, botId: id, chatLid: chatLid)
+                  ..add(const AiLedgerLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Bitácora de acciones')),
+              body: const AiLedgerPage(),
             ),
           );
         },
