@@ -11,6 +11,7 @@ import '../../../conversations/presentation/widgets/chat_labels_sheet.dart';
 import '../../../flow_run/presentation/widgets/flow_run_sheet.dart';
 import '../../../monitor/presentation/widgets/bot_state_pill.dart';
 import '../../../notes/presentation/widgets/notes_sheet.dart';
+import '../../../takeover/presentation/widgets/ai_takeover_sheet.dart';
 import '../bloc/profile_bloc.dart';
 
 /// App bar del hilo de mensajes con identidad real: avatar (foto) + nombre del
@@ -111,6 +112,27 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
               icon: const Icon(Icons.history_outlined),
               onPressed: () => context.push(
                 '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/executions',
+              ),
+            );
+          },
+        ),
+        // Toma del chat (S25): pausar/reanudar al bot en ESTA conversación
+        // aplicando una etiqueta de silencio. Solo ADMIN+ — leer las etiquetas
+        // de silencio del bot exige acceso a la plantilla (ADMIN+ en backend).
+        BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, authState) {
+            if (authState is! AuthAuthenticated ||
+                !isAdminOrAbove(authState.identity.role)) {
+              return const SizedBox.shrink();
+            }
+            return IconButton(
+              key: const Key('thread.takeover'),
+              tooltip: 'Control del bot',
+              icon: const Icon(Icons.smart_toy_outlined),
+              onPressed: () => AiTakeoverSheet.open(
+                context,
+                botId: botId,
+                chatLid: chatLid,
               ),
             );
           },

@@ -336,4 +336,21 @@ void main() {
       expect(find.byKey(const Key('thread.ai_log')), findsOneWidget);
     });
   });
+
+  group('toma del chat (takeover)', () {
+    testWidgets('WORKER no ve el control del bot', (tester) async {
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('thread.takeover')), findsNothing);
+    });
+
+    testWidgets('ADMIN ve el control del bot', (tester) async {
+      when(() => auth.state).thenReturn(
+        const AuthAuthenticated(
+          Identity(userId: 'u1', email: 'x@x', orgId: 'o1', role: 'ADMIN'),
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('thread.takeover')), findsOneWidget);
+    });
+  });
 }

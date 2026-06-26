@@ -730,6 +730,12 @@ class AppRouter {
               RepositoryProvider<NotesRepository>.value(value: _notesRepo),
               // Abre documentos/videos del hilo con una app externa.
               RepositoryProvider<MediaOpener>.value(value: _mediaOpener),
+              // Toma del chat (S25): resolver las etiquetas de silencio del bot
+              // exige bot→plantilla; el sheet del app bar las compone.
+              RepositoryProvider<BotsRepository>.value(value: _botsRepo),
+              RepositoryProvider<TemplatesRepository>.value(
+                value: _templatesRepo,
+              ),
             ],
             child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[

@@ -13,4 +13,12 @@ class ChatLabelsRepositoryImpl implements ChatLabelsRepository {
   @override
   Future<List<Label>> listForChat(String botId, String chatLid) =>
       _ds.listForChat(botId, chatLid);
+
+  @override
+  Future<void> addToChat(String botId, String chatLid, String labelId) =>
+      _ds.addToChat(botId, chatLid, labelId);
+
+  @override
+  Future<void> removeFromChat(String botId, String chatLid, String labelId) =>
+      _ds.removeFromChat(botId, chatLid, labelId);
 }

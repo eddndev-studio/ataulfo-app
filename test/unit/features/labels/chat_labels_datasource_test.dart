@@ -143,4 +143,55 @@ void main() {
       );
     });
   });
+
+  group('addToChat / removeFromChat', () {
+    test('POST /sessions/{botId}/{chatLid}/labels/{id} (chatLid encodeado)', () async {
+      when(
+        () => dio.post<void>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response<void>(
+          requestOptions: RequestOptions(path: '/x'),
+          statusCode: 204,
+        ),
+      );
+
+      await ds.addToChat('b1', '52155@s.whatsapp.net', 'lab-1');
+
+      final captured = verify(
+        () => dio.post<void>(captureAny(), options: any(named: 'options')),
+      ).captured;
+      expect(
+        captured.single,
+        '/sessions/b1/${Uri.encodeComponent('52155@s.whatsapp.net')}/labels/lab-1',
+      );
+    });
+
+    test('DELETE /sessions/{botId}/{chatLid}/labels/{id}', () async {
+      when(
+        () => dio.delete<void>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response<void>(
+          requestOptions: RequestOptions(path: '/x'),
+          statusCode: 204,
+        ),
+      );
+
+      await ds.removeFromChat('b1', 'c1', 'lab-1');
+
+      final captured = verify(
+        () => dio.delete<void>(captureAny(), options: any(named: 'options')),
+      ).captured;
+      expect(captured.single, '/sessions/b1/c1/labels/lab-1');
+    });
+
+    test('error de red → LabelsFailure tipada (no crash)', () async {
+      when(
+        () => dio.post<void>(any(), options: any(named: 'options')),
+      ).thenThrow(bad(403));
+      await expectLater(
+        () => ds.addToChat('b1', 'c1', 'lab-1'),
+        throwsA(isA<LabelsForbiddenFailure>()),
+      );
+    });
+  });
 }

@@ -14,6 +14,15 @@ abstract interface class ChatLabelsDatasource {
   /// `GET /sessions/{botId}/{chatLid}/labels`. Labels internos aplicados a este
   /// chat. Vacía es válida. 404 si el bot no es de la org.
   Future<List<Label>> listForChat(String botId, String chatLid);
+
+  /// `POST /sessions/{botId}/{chatLid}/labels/{labelId}`. Asocia el label al
+  /// chat (idempotente en el backend). Lo usa la toma del chat por el operador
+  /// (aplicar una etiqueta de silencio para pausar al bot ahí).
+  Future<void> addToChat(String botId, String chatLid, String labelId);
+
+  /// `DELETE /sessions/{botId}/{chatLid}/labels/{labelId}`. Quita la asociación
+  /// (idempotente). Reanuda al bot al retirar la etiqueta de silencio.
+  Future<void> removeFromChat(String botId, String chatLid, String labelId);
 }
 
 class DioChatLabelsDatasource implements ChatLabelsDatasource {
@@ -43,6 +52,32 @@ class DioChatLabelsDatasource implements ChatLabelsDatasource {
       throw const LabelsUnknownFailure();
     } on TypeError {
       throw const LabelsUnknownFailure();
+    }
+  }
+
+  @override
+  Future<void> addToChat(String botId, String chatLid, String labelId) async {
+    try {
+      await _dio.post<void>(
+        '/sessions/$botId/${Uri.encodeComponent(chatLid)}/labels/$labelId',
+      );
+    } on DioException catch (e) {
+      throw mapLabelsDioException(e);
+    }
+  }
+
+  @override
+  Future<void> removeFromChat(
+    String botId,
+    String chatLid,
+    String labelId,
+  ) async {
+    try {
+      await _dio.delete<void>(
+        '/sessions/$botId/${Uri.encodeComponent(chatLid)}/labels/$labelId',
+      );
+    } on DioException catch (e) {
+      throw mapLabelsDioException(e);
     }
   }
 }
