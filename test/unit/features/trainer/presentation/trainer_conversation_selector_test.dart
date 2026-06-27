@@ -22,7 +22,9 @@ void main() {
 
   setUp(() {
     repo = _MockRepo();
-    when(() => repo.listModels(templateId: any(named: 'templateId'))).thenAnswer(
+    when(
+      () => repo.listModels(templateId: any(named: 'templateId')),
+    ).thenAnswer(
       (_) async =>
           const TrainerModels(options: <TrainerModelOption>[], defaultId: ''),
     );

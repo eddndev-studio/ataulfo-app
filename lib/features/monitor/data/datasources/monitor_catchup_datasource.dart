@@ -9,11 +9,18 @@ abstract interface class MonitorCatchupDatasource {
   /// Run más reciente del chat (id + cuándo), o `null` si no hay log o el id es
   /// vacío (filas históricas pre-migración). Best-effort: cualquier fallo → null
   /// (no hidratar nunca debe derribar el hilo).
-  Future<({String runId, DateTime at})?> activeRun(String botId, String chatLid);
+  Future<({String runId, DateTime at})?> activeRun(
+    String botId,
+    String chatLid,
+  );
 
   /// Eventos YA persistidos de una corrida (assistant→aiTurn, tool→aiTool; user
   /// omitido), en el orden ascendente que entrega el log.
-  Future<List<MonitorEvent>> catchup(String botId, String chatLid, String runId);
+  Future<List<MonitorEvent>> catchup(
+    String botId,
+    String chatLid,
+    String runId,
+  );
 }
 
 /// Reusa `GET /sessions/:botId/:chatLid/ai-log` (ADMIN+): `?limit=1` descubre el

@@ -119,43 +119,52 @@ void main() {
           toolName: tool,
         );
 
-    test('hidrata una corrida fresca y deduplica el borde por timestamp', () async {
-      final t0 = DateTime.now().toUtc();
-      final catchup = _FakeCatchup(
-        run: (runId: 'R1', at: t0.add(const Duration(seconds: 1))),
-        snapshot: <MonitorEvent>[
-          at(MonitorEventKind.aiTurn, t0),
+    test(
+      'hidrata una corrida fresca y deduplica el borde por timestamp',
+      () async {
+        final t0 = DateTime.now().toUtc();
+        final catchup = _FakeCatchup(
+          run: (runId: 'R1', at: t0.add(const Duration(seconds: 1))),
+          snapshot: <MonitorEvent>[
+            at(MonitorEventKind.aiTurn, t0),
+            at(
+              MonitorEventKind.aiTool,
+              t0.add(const Duration(seconds: 1)),
+              tool: 'send_message',
+            ),
+          ],
+        );
+        final cubit = MonitorLiveCubit(ds, catchup: catchup);
+        cubit.watch('b1', 'c1');
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(cubit.state.events, hasLength(2));
+
+        // Duplicado (mismo run, dentro del corte) se descarta.
+        ds.ctrl.add(at(MonitorEventKind.aiTool, t0, tool: 'dup'));
+        await Future<void>.delayed(Duration.zero);
+        expect(cubit.state.events, hasLength(2));
+
+        // Evento live posterior al corte se conserva.
+        ds.ctrl.add(
           at(
             MonitorEventKind.aiTool,
-            t0.add(const Duration(seconds: 1)),
-            tool: 'send_message',
+            t0.add(const Duration(seconds: 5)),
+            tool: 'nuevo',
           ),
-        ],
-      );
-      final cubit = MonitorLiveCubit(ds, catchup: catchup);
-      cubit.watch('b1', 'c1');
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(cubit.state.events, hasLength(2));
-
-      // Duplicado (mismo run, dentro del corte) se descarta.
-      ds.ctrl.add(at(MonitorEventKind.aiTool, t0, tool: 'dup'));
-      await Future<void>.delayed(Duration.zero);
-      expect(cubit.state.events, hasLength(2));
-
-      // Evento live posterior al corte se conserva.
-      ds.ctrl.add(
-        at(MonitorEventKind.aiTool, t0.add(const Duration(seconds: 5)), tool: 'nuevo'),
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(cubit.state.events, hasLength(3));
-      expect(cubit.state.events.last.toolName, 'nuevo');
-      await cubit.close();
-    });
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(cubit.state.events, hasLength(3));
+        expect(cubit.state.events.last.toolName, 'nuevo');
+        await cubit.close();
+      },
+    );
 
     test('corrida vieja no se hidrata (gate de frescura)', () async {
       final catchup = _FakeCatchup(
         run: (runId: 'R1', at: DateTime.utc(2020)),
-        snapshot: <MonitorEvent>[at(MonitorEventKind.aiTurn, DateTime.utc(2020))],
+        snapshot: <MonitorEvent>[
+          at(MonitorEventKind.aiTurn, DateTime.utc(2020)),
+        ],
       );
       final cubit = MonitorLiveCubit(ds, catchup: catchup);
       cubit.watch('b1', 'c1');
@@ -198,31 +207,40 @@ void main() {
       });
     });
 
-    test('un evento live re-arma la guarda (no marca colgada una corrida viva)', () {
-      fakeAsync((async) {
-        final t0 = DateTime.now().toUtc();
-        final catchup = _FakeCatchup(
-          run: (runId: 'R1', at: t0),
-          snapshot: <MonitorEvent>[at(MonitorEventKind.aiTurn, t0)],
-        );
-        final cubit = MonitorLiveCubit(
-          ds,
-          catchup: catchup,
-          stuckTurnTimeout: const Duration(seconds: 5),
-        );
-        cubit.watch('b1', 'c1');
-        async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 3));
-        ds.ctrl.add(
-          at(MonitorEventKind.aiTool, t0.add(const Duration(seconds: 10)), tool: 'x'),
-        );
-        async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 3)); // 6s total; re-armado a los 3s
-        expect(cubit.state.events.last.kind, MonitorEventKind.aiTool);
-        expect(cubit.state.stalled, isFalse);
-        cubit.close();
-      });
-    });
+    test(
+      'un evento live re-arma la guarda (no marca colgada una corrida viva)',
+      () {
+        fakeAsync((async) {
+          final t0 = DateTime.now().toUtc();
+          final catchup = _FakeCatchup(
+            run: (runId: 'R1', at: t0),
+            snapshot: <MonitorEvent>[at(MonitorEventKind.aiTurn, t0)],
+          );
+          final cubit = MonitorLiveCubit(
+            ds,
+            catchup: catchup,
+            stuckTurnTimeout: const Duration(seconds: 5),
+          );
+          cubit.watch('b1', 'c1');
+          async.flushMicrotasks();
+          async.elapse(const Duration(seconds: 3));
+          ds.ctrl.add(
+            at(
+              MonitorEventKind.aiTool,
+              t0.add(const Duration(seconds: 10)),
+              tool: 'x',
+            ),
+          );
+          async.flushMicrotasks();
+          async.elapse(
+            const Duration(seconds: 3),
+          ); // 6s total; re-armado a los 3s
+          expect(cubit.state.events.last.kind, MonitorEventKind.aiTool);
+          expect(cubit.state.stalled, isFalse);
+          cubit.close();
+        });
+      },
+    );
 
     test('un evento real tras stalled limpia el flag', () {
       fakeAsync((async) {
@@ -242,7 +260,11 @@ void main() {
         expect(cubit.state.stalled, isTrue);
         // Llega actividad real: el turno seguía vivo, se rehabilita "Pensando…".
         ds.ctrl.add(
-          at(MonitorEventKind.aiTool, t0.add(const Duration(seconds: 20)), tool: 'x'),
+          at(
+            MonitorEventKind.aiTool,
+            t0.add(const Duration(seconds: 20)),
+            tool: 'x',
+          ),
         );
         async.flushMicrotasks();
         expect(cubit.state.stalled, isFalse);
@@ -251,31 +273,37 @@ void main() {
       });
     });
 
-    test('hidratar un run ya terminado no arma la guarda (no lo marca colgado)', () {
-      fakeAsync((async) {
-        final t0 = DateTime.now().toUtc();
-        // El terminal real llegó (p.ej. live durante la hidratación) y quedó como
-        // último evento del merge: no hay nada que vigilar.
-        final catchup = _FakeCatchup(
-          run: (runId: 'R1', at: t0),
-          snapshot: <MonitorEvent>[
-            at(MonitorEventKind.aiTurn, t0),
-            at(MonitorEventKind.aiCompleted, t0.add(const Duration(seconds: 1))),
-          ],
-        );
-        final cubit = MonitorLiveCubit(
-          ds,
-          catchup: catchup,
-          stuckTurnTimeout: const Duration(seconds: 5),
-        );
-        cubit.watch('b1', 'c1');
-        async.flushMicrotasks();
-        expect(cubit.state.events.last.kind, MonitorEventKind.aiCompleted);
-        async.elapse(const Duration(seconds: 6));
-        expect(cubit.state.stalled, isFalse);
-        cubit.close();
-      });
-    });
+    test(
+      'hidratar un run ya terminado no arma la guarda (no lo marca colgado)',
+      () {
+        fakeAsync((async) {
+          final t0 = DateTime.now().toUtc();
+          // El terminal real llegó (p.ej. live durante la hidratación) y quedó como
+          // último evento del merge: no hay nada que vigilar.
+          final catchup = _FakeCatchup(
+            run: (runId: 'R1', at: t0),
+            snapshot: <MonitorEvent>[
+              at(MonitorEventKind.aiTurn, t0),
+              at(
+                MonitorEventKind.aiCompleted,
+                t0.add(const Duration(seconds: 1)),
+              ),
+            ],
+          );
+          final cubit = MonitorLiveCubit(
+            ds,
+            catchup: catchup,
+            stuckTurnTimeout: const Duration(seconds: 5),
+          );
+          cubit.watch('b1', 'c1');
+          async.flushMicrotasks();
+          expect(cubit.state.events.last.kind, MonitorEventKind.aiCompleted);
+          async.elapse(const Duration(seconds: 6));
+          expect(cubit.state.stalled, isFalse);
+          cubit.close();
+        });
+      },
+    );
   });
 }
 
@@ -288,8 +316,10 @@ class _FakeCatchup implements MonitorCatchupDatasource {
   final List<MonitorEvent> snapshot;
 
   @override
-  Future<({String runId, DateTime at})?> activeRun(String botId, String chatLid) async =>
-      run;
+  Future<({String runId, DateTime at})?> activeRun(
+    String botId,
+    String chatLid,
+  ) async => run;
 
   @override
   Future<List<MonitorEvent>> catchup(

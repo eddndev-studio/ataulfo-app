@@ -370,7 +370,10 @@ void main() {
 
     test('la semilla descarta tombstones del catálogo', () {
       final bloc = seeded(
-        catalog: <WaLabel>[_wa(), _wa(id: '1001', deleted: true)],
+        catalog: <WaLabel>[
+          _wa(),
+          _wa(id: '1001', deleted: true),
+        ],
       );
       final s = bloc.state as WaChatLabelsLoaded;
       expect(s.catalog.map((l) => l.waLabelId), <String>['1000']);
@@ -393,14 +396,25 @@ void main() {
       },
     );
 
+    test('semilla con catálogo vacío: cae a la consulta HTTP (no distingue '
+        'vacío-real de degradado)', () async {
+      stubLoad();
+      when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
+      final bloc = seeded(catalog: <WaLabel>[])
+        ..add(const WaChatLabelsLoadRequested());
+      await bloc.stream.firstWhere((s) => s is WaChatLabelsLoaded);
+
+      verify(() => repo.listCatalog('b1')).called(1);
+      verify(() => repo.listChatAssocs('b1')).called(1);
+      await bloc.close();
+    });
+
     test(
-      'semilla con catálogo vacío: cae a la consulta HTTP (no distingue '
-      'vacío-real de degradado)',
+      'sin semilla: re-consulta HTTP como siempre (camino del hilo)',
       () async {
         stubLoad();
         when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
-        final bloc = seeded(catalog: <WaLabel>[])
-          ..add(const WaChatLabelsLoadRequested());
+        final bloc = build()..add(const WaChatLabelsLoadRequested());
         await bloc.stream.firstWhere((s) => s is WaChatLabelsLoaded);
 
         verify(() => repo.listCatalog('b1')).called(1);
@@ -408,16 +422,5 @@ void main() {
         await bloc.close();
       },
     );
-
-    test('sin semilla: re-consulta HTTP como siempre (camino del hilo)', () async {
-      stubLoad();
-      when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
-      final bloc = build()..add(const WaChatLabelsLoadRequested());
-      await bloc.stream.firstWhere((s) => s is WaChatLabelsLoaded);
-
-      verify(() => repo.listCatalog('b1')).called(1);
-      verify(() => repo.listChatAssocs('b1')).called(1);
-      await bloc.close();
-    });
   });
 }

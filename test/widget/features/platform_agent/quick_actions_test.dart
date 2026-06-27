@@ -38,11 +38,7 @@ void main() {
   });
 
   Future<void> pump(WidgetTester tester) async {
-    whenListen(
-      bloc,
-      const Stream<PaChatState>.empty(),
-      initialState: _empty(),
-    );
+    whenListen(bloc, const Stream<PaChatState>.empty(), initialState: _empty());
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

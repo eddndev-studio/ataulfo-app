@@ -160,7 +160,7 @@ void main() {
       );
       expect(
         tester.getSemantics(find.byType(AppRadio<int>)),
-        containsSemantics(
+        isSemantics(
           isInMutuallyExclusiveGroup: true,
           hasCheckedState: true,
           isChecked: true,
@@ -180,7 +180,7 @@ void main() {
       );
       expect(
         tester.getSemantics(find.byType(AppRadio<int>)),
-        containsSemantics(isInMutuallyExclusiveGroup: true, isChecked: false),
+        isSemantics(isInMutuallyExclusiveGroup: true, isChecked: false),
       );
       handle.dispose();
     });

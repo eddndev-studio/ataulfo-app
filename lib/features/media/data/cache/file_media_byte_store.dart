@@ -18,12 +18,19 @@ import '../../domain/repositories/media_byte_store.dart';
 /// [directoryProvider] permite inyectar un directorio temporal en tests (sin
 /// tocar el plugin nativo). En producción cae al cache dir de la app.
 class FileMediaByteStore implements MediaByteStore {
-  FileMediaByteStore({Future<Directory> Function()? directoryProvider})
-    : _directoryProvider = directoryProvider ?? getApplicationCacheDirectory;
+  FileMediaByteStore({
+    Future<Directory> Function()? directoryProvider,
+    String subdir = 'media_bytes',
+  }) : _directoryProvider = directoryProvider ?? getApplicationCacheDirectory,
+       _subdir = subdir;
 
   final Future<Directory> Function() _directoryProvider;
 
-  static const _subdir = 'media_bytes';
+  /// Namespace en disco. Por defecto `media_bytes` (miniaturas de la galería);
+  /// otros consumidores (p. ej. la media full de los mensajes) usan el suyo para
+  /// no colisionar — un mismo `ref` puede cachear contenidos distintos
+  /// (miniatura vs. imagen completa) en namespaces separados.
+  final String _subdir;
 
   // Sufijo único por escritura (proceso-local): dos writes concurrentes del
   // mismo ref no comparten el temporal y por tanto no chocan en el rename.

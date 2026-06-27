@@ -191,7 +191,7 @@ void main() {
       );
       expect(
         tester.getSemantics(find.byType(AppChoiceChip)),
-        containsSemantics(
+        isSemantics(
           isButton: true,
           isSelected: true,
           label: 'Diseño',
@@ -211,7 +211,7 @@ void main() {
       );
       expect(
         tester.getSemantics(find.byType(AppChoiceChip)),
-        containsSemantics(isButton: true, isSelected: false),
+        isSemantics(isButton: true, isSelected: false),
       );
       handle.dispose();
     });

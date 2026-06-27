@@ -5,6 +5,7 @@ import 'package:ataulfo/features/conversations/presentation/cubit/inbox_labels_c
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
+import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label_live_event.dart';
@@ -16,6 +17,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../../support/noop_profile_photo_cache.dart';
 
 class _MockConvBloc extends MockBloc<ConversationsEvent, ConversationsState>
     implements ConversationsBloc {}
@@ -82,6 +85,9 @@ void main() {
               RepositoryProvider<WaLabelsRepository>.value(value: repo),
               RepositoryProvider<ChatLabelsRepository>.value(
                 value: chatLabelsRepo,
+              ),
+              RepositoryProvider<ProfilePhotoCache>.value(
+                value: NoopProfilePhotoCache(),
               ),
             ],
             child: MultiBlocProvider(

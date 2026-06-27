@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:ataulfo/features/executions/domain/entities/execution.dart';
 import 'package:ataulfo/features/executions/domain/execution_repository.dart';
 import 'package:ataulfo/app.dart';
 import 'package:ataulfo/core/design/widgets/app_background.dart';
+import 'package:ataulfo/core/network/connectivity_cubit.dart';
+import 'package:ataulfo/core/network/connectivity_monitor.dart';
 import 'package:ataulfo/core/router/app_router.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
@@ -12,7 +16,11 @@ import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
+import 'package:ataulfo/features/messages/data/cache/message_media_cache.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
+import 'package:ataulfo/features/profile/data/cache/file_profile_photo_store.dart';
+import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
+import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
 import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
 import 'package:ataulfo/features/flow_run/domain/repositories/flow_run_repository.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
@@ -46,6 +54,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../support/fake_chat_media.dart';
+import '../support/fake_message_media_cache.dart';
 import '../support/fake_thumbnail_loader.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
@@ -134,13 +143,48 @@ class _FakeExecutionsRepo implements ExecutionRepository {
   }) async => const <Execution>[];
 }
 
+class _StubConnMonitor implements ConnectivityMonitor {
+  @override
+  Future<bool> isOnline() async => true;
+  @override
+  Stream<bool> get onlineChanges => const Stream<bool>.empty();
+}
+
+// Perfil sin foto: alimenta la caché de fotos del avatar sin tocar la red.
+class _FakeProfileRepoNoPhoto implements ProfileRepository {
+  @override
+  Future<ChatProfile> fetch(String botId, String chatLid) async => ChatProfile(
+    chatLid: chatLid,
+    isGroup: false,
+    phone: null,
+    displayName: null,
+    photoUrl: null,
+    isArchived: false,
+    isPinned: false,
+    isMarkedUnread: false,
+    mutedUntil: null,
+  );
+}
+
 void main() {
   late _MockAuthBloc authBloc;
   late AppRouter router;
+  late ConnectivityCubit connectivityCubit;
+  late ProfilePhotoCache profilePhotoCache;
+  late MessageMediaCache messageMediaCache;
+  late Directory photoTmp;
 
-  setUp(() {
+  setUp(() async {
     authBloc = _MockAuthBloc();
     when(() => authBloc.state).thenReturn(const AuthInitial());
+    connectivityCubit = ConnectivityCubit(_StubConnMonitor());
+    photoTmp = await Directory.systemTemp.createTemp('app_test_photos');
+    profilePhotoCache = ProfilePhotoCache(
+      profileRepo: _FakeProfileRepoNoPhoto(),
+      download: (_) async => null,
+      store: FileProfilePhotoStore(directoryProvider: () async => photoTmp),
+    );
+    messageMediaCache = fakeMessageMediaCache();
     final botsRepo = _MockBotsRepo();
     final templatesRepo = _MockTemplatesRepo();
     final membershipsRepo = _MockMembershipsRepo();
@@ -202,11 +246,23 @@ void main() {
     );
   });
 
+  tearDown(() async {
+    await connectivityCubit.close();
+    if (photoTmp.existsSync()) await photoTmp.delete(recursive: true);
+  });
+
   testWidgets('AtaulfoApp cabla AppDesignTheme.dark() al MaterialApp', (
     tester,
   ) async {
     await tester.pumpWidget(
-      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
+      AtaulfoApp(
+        router: router,
+        authBloc: authBloc,
+        connectivityCubit: connectivityCubit,
+        profilePhotoCache: profilePhotoCache,
+        messageMediaCache: messageMediaCache,
+        onSignedOut: () {},
+      ),
     );
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
@@ -220,7 +276,14 @@ void main() {
   testWidgets('AtaulfoApp pinta el glow de fondo (AppBackground) detrás de '
       'todas las rutas vía el builder del MaterialApp', (tester) async {
     await tester.pumpWidget(
-      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
+      AtaulfoApp(
+        router: router,
+        authBloc: authBloc,
+        connectivityCubit: connectivityCubit,
+        profilePhotoCache: profilePhotoCache,
+        messageMediaCache: messageMediaCache,
+        onSignedOut: () {},
+      ),
     );
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
@@ -237,7 +300,14 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
+      AtaulfoApp(
+        router: router,
+        authBloc: authBloc,
+        connectivityCubit: connectivityCubit,
+        profilePhotoCache: profilePhotoCache,
+        messageMediaCache: messageMediaCache,
+        onSignedOut: () {},
+      ),
     );
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
@@ -271,6 +341,9 @@ void main() {
         AtaulfoApp(
           router: router,
           authBloc: authBloc,
+          connectivityCubit: connectivityCubit,
+          profilePhotoCache: profilePhotoCache,
+          messageMediaCache: messageMediaCache,
           onSignedOut: () => signedOut++,
         ),
       );

@@ -440,7 +440,11 @@ void main() {
         isA<TrainerChatLoaded>()
             .having((s) => s.sending, 'off', false)
             .having((s) => s.sendFailure, 'fallo', isNotNull)
-            .having((s) => s.lastAttemptedContent, 'intento preservado', 'hola'),
+            .having(
+              (s) => s.lastAttemptedContent,
+              'intento preservado',
+              'hola',
+            ),
       ],
     );
 
@@ -471,7 +475,9 @@ void main() {
           ),
         ).thenAnswer((_) => hang.future);
         when(() => repo.cancelSend()).thenAnswer((_) {
-          if (!hang.isCompleted) hang.completeError(const TrainerUnknownFailure());
+          if (!hang.isCompleted) {
+            hang.completeError(const TrainerUnknownFailure());
+          }
         });
       },
       act: (b) async {

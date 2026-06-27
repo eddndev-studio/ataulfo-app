@@ -33,13 +33,15 @@ class DioMonitorActivityDatasource
   final Dio _dio;
 
   @override
-  Stream<MonitorEvent> activity(String botId, String chatLid) =>
-      reconnectingStream<MonitorEvent>(
-        () => _connect('/sessions/$botId/$chatLid/ai-activity'),
-        // Al reconectar, emite un sentinel para que el consumidor pinte la salud
-        // del SSE (la actividad puede ir atrasada tras la caída).
-        reconnectMarker: _reconnectSentinel,
-      );
+  Stream<MonitorEvent> activity(
+    String botId,
+    String chatLid,
+  ) => reconnectingStream<MonitorEvent>(
+    () => _connect('/sessions/$botId/$chatLid/ai-activity'),
+    // Al reconectar, emite un sentinel para que el consumidor pinte la salud
+    // del SSE (la actividad puede ir atrasada tras la caída).
+    reconnectMarker: _reconnectSentinel,
+  );
 
   static MonitorEvent _reconnectSentinel() => MonitorEvent(
     kind: MonitorEventKind.reconnect,
@@ -49,7 +51,9 @@ class DioMonitorActivityDatasource
 
   @override
   Stream<MonitorEvent> botActivity(String botId) =>
-      reconnectingStream<MonitorEvent>(() => _connect('/bots/$botId/ai-activity'));
+      reconnectingStream<MonitorEvent>(
+        () => _connect('/bots/$botId/ai-activity'),
+      );
 
   Stream<MonitorEvent> _connect(String path) async* {
     final cancel = CancelToken();

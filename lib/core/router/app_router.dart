@@ -121,6 +121,7 @@ import '../../features/profile/presentation/widgets/chat_thread_app_bar.dart';
 import '../../features/quick_replies/domain/repositories/quick_replies_repository.dart';
 import '../../features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
+import '../../features/splash/presentation/pages/reconnecting_view.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/templates/domain/repositories/templates_repository.dart';
 import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
@@ -260,6 +261,7 @@ class AppRouter {
     final s = _authBloc.state;
     return s is AuthAuthenticated && isAdminOrAbove(s.identity.role);
   }
+
   final PreviewRepository _previewRepo;
   final PlatformAgentRepository _platformAgentRepo;
   final PlatformAgentEvents _platformAgentEvents;
@@ -305,7 +307,17 @@ class AppRouter {
     redirect: _redirect,
     observers: <NavigatorObserver>[_routeObserver],
     routes: <RouteBase>[
-      GoRoute(path: '/', builder: (_, _) => const SplashPage()),
+      GoRoute(
+        // El Splash mientras se resuelve la sesión; la vista de reconexión
+        // cuando hay sesión persistida pero no hay red para verificarla (mismo
+        // destino del redirect, contenido según el estado del AuthBloc).
+        path: '/',
+        builder: (context, _) => BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) => state is AuthOfflinePending
+              ? const ReconnectingView()
+              : const SplashPage(),
+        ),
+      ),
       GoRoute(
         // Selección de organización para el usuario multi-membership sin org
         // activa. Monta la lista de orgs (MembershipsBloc) y el switch
@@ -715,8 +727,9 @@ class AppRouter {
               child: Scaffold(
                 appBar: AppBar(title: const Text('Conversaciones')),
                 body: BlocBuilder<MonitorAttentionCubit, MonitorAttentionState>(
-                  builder: (context, attn) =>
-                      ConversationsListPage(needsAttention: attn.needsAttention),
+                  builder: (context, attn) => ConversationsListPage(
+                    needsAttention: attn.needsAttention,
+                  ),
                 ),
               ),
             ),
@@ -848,14 +861,12 @@ class AppRouter {
           // produjo ese OUTBOUND. Ausente = log completo de la sesión.
           final msg = state.uri.queryParameters['msg'];
           return BlocProvider<AiLogBloc>(
-            create: (_) =>
-                AiLogBloc(
-                    repo: _aiLogRepo,
-                    botId: id,
-                    chatLid: chatLid,
-                    targetExternalId: msg,
-                  )
-                  ..add(const AiLogLoadRequested()),
+            create: (_) => AiLogBloc(
+              repo: _aiLogRepo,
+              botId: id,
+              chatLid: chatLid,
+              targetExternalId: msg,
+            )..add(const AiLogLoadRequested()),
             child: Scaffold(
               appBar: AppBar(
                 title: Text(
@@ -1397,6 +1408,13 @@ String? redirectForState(AuthState auth, String location) {
       // Antes del primer check sólo conocemos el destino crudo. Una ruta
       // pública (incluida su query con token) se preserva; cualquier otra
       // vuelve a `/` (Splash) para evitar parpadeos hasta que el bloc decida.
+      if (_isPublic(location)) return null;
+      return location == '/' ? null : '/';
+    case AuthOfflinePending():
+      // Misma política que el arranque: con sesión persistida pero sin red para
+      // verificarla, se sostiene en `/` (que pinta la vista de reconexión) en
+      // vez de mandar al login. Las rutas públicas se preservan por si el
+      // operador quiere ir a login a propósito.
       if (_isPublic(location)) return null;
       return location == '/' ? null : '/';
     case AuthUnauthenticated():

@@ -43,6 +43,20 @@ void main() {
     });
   });
 
+  group('AuthOfflinePending', () {
+    test('value-equality por tipo', () {
+      expect(const AuthOfflinePending(), const AuthOfflinePending());
+      expect(
+        const AuthOfflinePending().hashCode,
+        const AuthOfflinePending().hashCode,
+      );
+    });
+
+    test('es distinto de AuthUnauthenticated (no es un logout)', () {
+      expect(const AuthOfflinePending(), isNot(const AuthUnauthenticated()));
+    });
+  });
+
   group('AuthBloc', () {
     test('estado inicial = AuthInitial (todavía no verificado)', () {
       final bloc = AuthBloc(_MockRepo());
@@ -99,7 +113,8 @@ void main() {
       );
 
       blocTest<AuthBloc, AuthState>(
-        'con tokens + me() falla por red → AuthUnauthenticated (no retiene tokens en sesión)',
+        'con tokens + me() falla por red → AuthOfflinePending '
+        '(la sesión sobrevive; no manda al login)',
         build: () {
           final repo = _MockRepo();
           when(repo.hasTokens).thenAnswer((_) async => true);
@@ -107,7 +122,7 @@ void main() {
           return AuthBloc(repo);
         },
         act: (bloc) => bloc.add(const AuthCheckRequested()),
-        expect: () => const <AuthState>[AuthUnauthenticated()],
+        expect: () => const <AuthState>[AuthOfflinePending()],
       );
     });
 

@@ -36,18 +36,15 @@ class MonitorAttentionCubit extends Cubit<MonitorAttentionState> {
   /// colgar al desmontarse y no debe bloquear).
   void watch(String botId) {
     unawaited(_sub?.cancel());
-    _sub = _ds.botActivity(botId).listen(
-      (e) {
-        if (isClosed || !_needsAttention(e.kind) || e.chatLid.isEmpty) return;
-        if (state.needsAttention.contains(e.chatLid)) return;
-        emit(
-          MonitorAttentionState(
-            needsAttention: <String>{...state.needsAttention, e.chatLid},
-          ),
-        );
-      },
-      onError: (Object _) {},
-    );
+    _sub = _ds.botActivity(botId).listen((e) {
+      if (isClosed || !_needsAttention(e.kind) || e.chatLid.isEmpty) return;
+      if (state.needsAttention.contains(e.chatLid)) return;
+      emit(
+        MonitorAttentionState(
+          needsAttention: <String>{...state.needsAttention, e.chatLid},
+        ),
+      );
+    }, onError: (Object _) {});
   }
 
   /// Retira un chat del conjunto (el operador lo abrió / lo atendió).

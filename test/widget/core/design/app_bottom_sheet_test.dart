@@ -82,29 +82,28 @@ void main() {
     expect(material.color, const Color(0xFF010203));
   });
 
-  testWidgets(
-    'la hoja trae drag handle y es arrastrable para descartar',
-    (tester) async {
-      setTopInset(tester, 0);
-      await tester.pumpWidget(
-        host(
-          (context) => showAppBottomSheet<void>(
-            context,
-            isScrollControlled: true,
-            builder: (_) => const SizedBox(key: Key('sheet'), height: 100),
-          ),
+  testWidgets('la hoja trae drag handle y es arrastrable para descartar', (
+    tester,
+  ) async {
+    setTopInset(tester, 0);
+    await tester.pumpWidget(
+      host(
+        (context) => showAppBottomSheet<void>(
+          context,
+          isScrollControlled: true,
+          builder: (_) => const SizedBox(key: Key('sheet'), height: 100),
         ),
-      );
+      ),
+    );
 
-      await tester.tap(find.text('abrir'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
 
-      // El SingleChildScrollView de las hojas se come el gesto vertical; el
-      // drag handle es la zona dedicada para arrastrar y cerrar. enableDrag
-      // queda en su default (true) para que ese arrastre descarte.
-      final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
-      expect(sheet.showDragHandle, isTrue);
-      expect(sheet.enableDrag, isTrue);
-    },
-  );
+    // El SingleChildScrollView de las hojas se come el gesto vertical; el
+    // drag handle es la zona dedicada para arrastrar y cerrar. enableDrag
+    // queda en su default (true) para que ese arrastre descarte.
+    final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+    expect(sheet.showDragHandle, isTrue);
+    expect(sheet.enableDrag, isTrue);
+  });
 }

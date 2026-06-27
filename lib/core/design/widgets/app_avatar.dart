@@ -21,6 +21,7 @@ class AppAvatar extends StatelessWidget {
     required this.name,
     this.size = 40,
     this.imageUrl,
+    this.imageProvider,
   });
 
   final String name;
@@ -30,6 +31,11 @@ class AppAvatar extends StatelessWidget {
   /// círculo con el anillo de marca; al fallar o no estar (`null`) cae a la
   /// inicial. Mantiene la misma forma y semántica que la variante de iniciales.
   final String? imageUrl;
+
+  /// Fuente de imagen local opcional (p. ej. `MemoryImage` de la caché de fotos
+  /// en disco). Se usa cuando no hay [imageUrl]; permite servir la foto cacheada
+  /// sin depender de una URL viva. Mismo recorte/anillo y caída a la inicial.
+  final ImageProvider? imageProvider;
 
   /// Grosor del anillo de marca. Fijo en cualquier tamaño: un borde más
   /// delgado se perdería en avatares chicos y uno proporcional al diámetro
@@ -50,6 +56,43 @@ class AppAvatar extends StatelessWidget {
       ),
     );
     final url = imageUrl;
+    final dim = size - _ringWidth * 2;
+    // La foto se inserta dentro del anillo (padding = grosor del anillo) y se
+    // recorta en círculo, para que el borde de marca siga visible igual que en
+    // la variante de iniciales (no lo tapa el BoxFit.cover).
+    Widget framed(Widget img) => Padding(
+      padding: const EdgeInsets.all(_ringWidth),
+      child: ClipOval(child: img),
+    );
+    Widget content;
+    if (url != null) {
+      content = framed(
+        Image.network(
+          url,
+          width: dim,
+          height: dim,
+          fit: BoxFit.cover,
+          // Foto rota / R2 caído / aún cargando ⇒ la inicial.
+          errorBuilder: (context, error, stackTrace) => Center(child: label()),
+          loadingBuilder: (context, child, progress) =>
+              progress == null ? child : Center(child: label()),
+        ),
+      );
+    } else if (imageProvider != null) {
+      content = framed(
+        Image(
+          image: imageProvider!,
+          width: dim,
+          height: dim,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Center(child: label()),
+          frameBuilder: (context, child, frame, wasSync) =>
+              (frame == null && !wasSync) ? Center(child: label()) : child,
+        ),
+      );
+    } else {
+      content = label();
+    }
     return Semantics(
       label: name,
       excludeSemantics: true,
@@ -63,27 +106,7 @@ class AppAvatar extends StatelessWidget {
         ),
         alignment: Alignment.center,
         clipBehavior: Clip.none,
-        child: url == null
-            ? label()
-            // La foto se inserta dentro del anillo (padding = grosor del anillo)
-            // y se recorta en círculo, para que el borde de marca siga visible
-            // igual que en la variante de iniciales (no lo tapa el BoxFit.cover).
-            : Padding(
-                padding: const EdgeInsets.all(_ringWidth),
-                child: ClipOval(
-                  child: Image.network(
-                    url,
-                    width: size - _ringWidth * 2,
-                    height: size - _ringWidth * 2,
-                    fit: BoxFit.cover,
-                    // Foto rota / R2 caído / aún cargando ⇒ la inicial.
-                    errorBuilder: (context, error, stackTrace) =>
-                        Center(child: label()),
-                    loadingBuilder: (context, child, progress) =>
-                        progress == null ? child : Center(child: label()),
-                  ),
-                ),
-              ),
+        child: content,
       ),
     );
   }

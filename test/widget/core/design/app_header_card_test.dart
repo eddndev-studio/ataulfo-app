@@ -45,7 +45,7 @@ void main() {
 
     expect(
       tester.getSemantics(find.byKey(const Key('header.avatar'))),
-      containsSemantics(label: 'Perfil', isButton: true),
+      isSemantics(label: 'Perfil', isButton: true),
     );
   });
 

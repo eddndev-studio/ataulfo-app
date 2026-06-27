@@ -71,22 +71,29 @@ TrainerConversation _conv({String id = 'c1'}) => TrainerConversation(
   updatedAt: DateTime.utc(2026, 6, 10),
 );
 
-TrainerMessage _msg(String id, String role, String content, {String conv = 'c1'}) =>
-    TrainerMessage(
-      id: id,
-      conversationId: conv,
-      role: role,
-      content: content,
-      createdAt: DateTime.utc(2026, 6, 10, 10),
-    );
+TrainerMessage _msg(
+  String id,
+  String role,
+  String content, {
+  String conv = 'c1',
+}) => TrainerMessage(
+  id: id,
+  conversationId: conv,
+  role: role,
+  content: content,
+  createdAt: DateTime.utc(2026, 6, 10, 10),
+);
 
-TrainerProgressEvent _prog(String kind, {String tool = '', String conv = 'c1'}) =>
-    TrainerProgressEvent(
-      kind: kind,
-      conversationId: conv,
-      at: DateTime.utc(2026, 6, 10, 10),
-      toolName: tool,
-    );
+TrainerProgressEvent _prog(
+  String kind, {
+  String tool = '',
+  String conv = 'c1',
+}) => TrainerProgressEvent(
+  kind: kind,
+  conversationId: conv,
+  at: DateTime.utc(2026, 6, 10, 10),
+  toolName: tool,
+);
 
 void main() {
   setUpAll(() {
@@ -167,7 +174,11 @@ void main() {
       // Recarga: aparece la respuesta del server.
       isA<TrainerChatLoaded>()
           .having((s) => s.sending, 'sending', false)
-          .having((s) => s.messages.any((m) => m.isAssistant), 'assistant', true),
+          .having(
+            (s) => s.messages.any((m) => m.isAssistant),
+            'assistant',
+            true,
+          ),
     ],
     verify: (_) {
       verify(() => events.progress('t1', 'c1')).called(1);

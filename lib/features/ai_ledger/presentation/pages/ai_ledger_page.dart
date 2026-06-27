@@ -90,7 +90,11 @@ class _ActionRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(_iconFor(action.toolName), size: 20, color: AppTokens.chatAccent),
+          Icon(
+            _iconFor(action.toolName),
+            size: 20,
+            color: AppTokens.chatAccent,
+          ),
           const SizedBox(width: AppTokens.sp3),
           Expanded(
             child: Column(
@@ -191,5 +195,6 @@ class _FailedView extends StatelessWidget {
 String ledgerFailureCopy(AiLedgerFailure f) => switch (f) {
   AiLedgerNetworkFailure() => 'Sin conexión con el servidor.',
   AiLedgerForbiddenFailure() => 'Necesitas rol ADMIN para ver la bitácora.',
-  AiLedgerUnknownFailure() => 'No pudimos cargar la bitácora. Inténtalo de nuevo.',
+  AiLedgerUnknownFailure() =>
+    'No pudimos cargar la bitácora. Inténtalo de nuevo.',
 };

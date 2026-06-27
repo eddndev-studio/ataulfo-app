@@ -740,7 +740,9 @@ class _ToolErrorCard extends StatelessWidget {
                 data.toolName.isNotEmpty
                     ? '${data.toolName}: ${trainerToolErrorCopy(data.kind)}'
                     : trainerToolErrorCopy(data.kind),
-                style: theme.textTheme.bodySmall?.copyWith(color: AppTokens.text1),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTokens.text1,
+                ),
               ),
             ),
           ],
@@ -898,7 +900,9 @@ class _InspectFlowData {
       return null;
     }
     if (inner is! Map<String, dynamic>) return null;
-    if (inner.containsKey('error_kind')) return null; // un error no es inspección
+    if (inner.containsKey('error_kind')) {
+      return null; // un error no es inspección
+    }
 
     final steps = <_InspectStep>[];
     final rawSteps = inner['steps'];
@@ -1001,7 +1005,9 @@ class _PromptHistoryData {
       return null;
     }
     if (inner is! Map<String, dynamic>) return null;
-    if (inner.containsKey('error_kind')) return null; // un fallo no es historial
+    if (inner.containsKey('error_kind')) {
+      return null; // un fallo no es historial
+    }
     final out = <_PromptVersionItem>[];
     final rawV = inner['versions'];
     if (rawV is List) {
@@ -1053,7 +1059,9 @@ class _PromptHistoryCardState extends State<_PromptHistoryCard> {
             versions.isEmpty
                 ? 'Historial del prompt: sin versiones'
                 : 'Historial del prompt (${versions.length})',
-            style: theme.textTheme.labelMedium?.copyWith(color: AppTokens.text1),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: AppTokens.text1,
+            ),
           ),
         ),
         if (versions.isNotEmpty) ...<Widget>[
@@ -1173,12 +1181,18 @@ class _InspectFlowCardState extends State<_InspectFlowCard> {
     final header = Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        const Icon(Icons.account_tree_outlined, size: 16, color: AppTokens.primary),
+        const Icon(
+          Icons.account_tree_outlined,
+          size: 16,
+          color: AppTokens.primary,
+        ),
         const SizedBox(width: AppTokens.sp2),
         Flexible(
           child: Text(
             'Flujo: ${data.name}',
-            style: theme.textTheme.labelMedium?.copyWith(color: AppTokens.text1),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: AppTokens.text1,
+            ),
           ),
         ),
         const SizedBox(width: AppTokens.sp1),
@@ -1266,7 +1280,10 @@ class _InspectFlowDetail extends StatelessWidget {
                 ),
                 const SizedBox(width: AppTokens.sp2),
                 Expanded(
-                  child: Text('${i + 1}. ${data.steps[i].summary}', style: small),
+                  child: Text(
+                    '${i + 1}. ${data.steps[i].summary}',
+                    style: small,
+                  ),
                 ),
               ],
             ),
@@ -1283,7 +1300,11 @@ class _InspectFlowDetail extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  const Icon(Icons.bolt_outlined, size: 14, color: AppTokens.text2),
+                  const Icon(
+                    Icons.bolt_outlined,
+                    size: 14,
+                    color: AppTokens.text2,
+                  ),
                   const SizedBox(width: AppTokens.sp2),
                   Flexible(child: Text(t, style: small)),
                 ],

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
@@ -6,11 +8,18 @@ import '../../../../core/design/tokens.dart';
 /// [InteractiveViewer] y cierre con un tap (o el botón de cerrar). Ruta
 /// transparente push-eada sobre el hilo — sin Scaffold propio, el fondo lo
 /// pinta el contenedor.
-Future<void> showMediaViewer(BuildContext context, String url) {
+///
+/// Sirve [bytes] cacheados (offline / firma expirada) si los hay; si no, cae a
+/// [url] (firma viva). Al menos uno debe venir.
+Future<void> showMediaViewer(
+  BuildContext context, {
+  Uint8List? bytes,
+  String? url,
+}) {
   return Navigator.of(context).push(
     PageRouteBuilder<void>(
       opaque: false,
-      pageBuilder: (context, _, _) => _MediaViewer(url: url),
+      pageBuilder: (context, _, _) => _MediaViewer(bytes: bytes, url: url),
       transitionsBuilder: (context, animation, _, child) =>
           FadeTransition(opacity: animation, child: child),
     ),
@@ -18,9 +27,43 @@ Future<void> showMediaViewer(BuildContext context, String url) {
 }
 
 class _MediaViewer extends StatelessWidget {
-  const _MediaViewer({required this.url});
+  const _MediaViewer({this.bytes, this.url});
 
-  final String url;
+  final Uint8List? bytes;
+  final String? url;
+
+  static const _broken = Icon(
+    Icons.broken_image_outlined,
+    size: 48,
+    color: AppTokens.text2,
+  );
+
+  /// Prefiere los bytes cacheados (offline / firma expirada); si no, la URL viva.
+  Widget _image() {
+    final b = bytes;
+    if (b != null) {
+      return Image.memory(
+        b,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => _broken,
+      );
+    }
+    final u = url;
+    if (u == null) return _broken;
+    return Image.network(
+      u,
+      fit: BoxFit.contain,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+          ),
+        );
+      },
+      errorBuilder: (_, _, _) => _broken,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,27 +80,7 @@ class _MediaViewer extends StatelessWidget {
             Positioned.fill(
               child: InteractiveViewer(
                 maxScale: 5,
-                child: Center(
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppTokens.primary,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stack) => const Icon(
-                      Icons.broken_image_outlined,
-                      size: 48,
-                      color: AppTokens.text2,
-                    ),
-                  ),
-                ),
+                child: Center(child: _image()),
               ),
             ),
             Positioned(

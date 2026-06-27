@@ -36,6 +36,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             ? AuthAuthenticated(identity)
             : AuthAuthenticatedNoOrg(identity),
       );
+    } on NetworkFailure {
+      // Hay tokens persistidos pero la verificación no llegó al servidor por
+      // falta de red. NO es un cierre de sesión: los tokens siguen guardados.
+      // Se entra a un estado de reconexión (el router muestra una vista que
+      // reintenta al volver la red) en vez de mandar al login y aparentar que
+      // la sesión se perdió. Cualquier otro fallo SÍ es rechazo real de sesión.
+      emit(const AuthOfflinePending());
     } on AuthFailure {
       emit(const AuthUnauthenticated());
     }
@@ -132,4 +139,19 @@ class AuthUnauthenticated extends AuthState {
 
   @override
   int get hashCode => (AuthUnauthenticated).hashCode;
+}
+
+/// Hay una sesión persistida pero no se pudo verificar contra el servidor por
+/// falta de red. NO es un cierre de sesión: los tokens siguen guardados y el
+/// arranque reintenta al volver la conexión. Estado separado de
+/// `AuthUnauthenticated` para que el router muestre una vista de reconexión en
+/// lugar del login, que daría a entender —falsamente— que la sesión se perdió.
+class AuthOfflinePending extends AuthState {
+  const AuthOfflinePending();
+
+  @override
+  bool operator ==(Object other) => other is AuthOfflinePending;
+
+  @override
+  int get hashCode => (AuthOfflinePending).hashCode;
 }

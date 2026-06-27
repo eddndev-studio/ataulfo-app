@@ -86,7 +86,12 @@ void main() {
         'order': 0,
         'content': 'Hola, ¿en qué te ayudo?',
       },
-      <String, Object?>{'id': 's2', 'type': 'IMAGE', 'order': 1, 'media_ref': 'img1'},
+      <String, Object?>{
+        'id': 's2',
+        'type': 'IMAGE',
+        'order': 1,
+        'media_ref': 'img1',
+      },
     ],
     'triggers': <Object?>[
       <String, Object?>{
@@ -99,22 +104,26 @@ void main() {
     ],
   };
 
-  testWidgets('inspect_flow: colapsado muestra el flujo; al expandir, pasos y triggers', (
-    tester,
-  ) async {
-    await pump(tester, <TrainerMessage>[
-      _toolMsg('m3', _toolResults('inspect_flow', inspectEnvelope())),
-    ]);
+  testWidgets(
+    'inspect_flow: colapsado muestra el flujo; al expandir, pasos y triggers',
+    (tester) async {
+      await pump(tester, <TrainerMessage>[
+        _toolMsg('m3', _toolResults('inspect_flow', inspectEnvelope())),
+      ]);
 
-    expect(find.byKey(const Key('trainer.inspect_card.m3')), findsOneWidget);
-    expect(find.textContaining('Bienvenida'), findsOneWidget);
-    // Colapsado: el contenido de los pasos aún no se ve.
-    expect(find.textContaining('¿en qué te ayudo'), findsNothing);
+      expect(find.byKey(const Key('trainer.inspect_card.m3')), findsOneWidget);
+      expect(find.textContaining('Bienvenida'), findsOneWidget);
+      // Colapsado: el contenido de los pasos aún no se ve.
+      expect(find.textContaining('¿en qué te ayudo'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('trainer.inspect_card.m3')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('trainer.inspect_card.m3')));
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining('¿en qué te ayudo'), findsOneWidget);
-    expect(find.textContaining('hola'), findsWidgets); // keyword del disparador
-  });
+      expect(find.textContaining('¿en qué te ayudo'), findsOneWidget);
+      expect(
+        find.textContaining('hola'),
+        findsWidgets,
+      ); // keyword del disparador
+    },
+  );
 }

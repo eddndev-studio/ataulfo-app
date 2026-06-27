@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/domain/failures/conversations_failure.dart';
 import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
-import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -27,147 +28,175 @@ const _c2 = Conversation(
   mutedUntil: null,
 );
 
+/// Cede el loop para drenar microtasks (eventos del bloc + futures de refresh).
+Future<void> tick() => Future<void>.delayed(Duration.zero);
+
 void main() {
-  ConversationsBloc build(_MockRepo repo) =>
-      ConversationsBloc(repo: repo, botId: 'b1');
+  late _MockRepo repo;
+  late StreamController<List<Conversation>> watch;
 
-  group('ConversationsBloc', () {
-    test('estado inicial = ConversationsInitial', () {
-      expect(build(_MockRepo()).state, const ConversationsInitial());
-    });
+  setUp(() {
+    repo = _MockRepo();
+    watch = StreamController<List<Conversation>>.broadcast();
+    when(() => repo.watchForBot('b1')).thenAnswer((_) => watch.stream);
+  });
 
-    group('ConversationsLoadRequested', () {
-      blocTest<ConversationsBloc, ConversationsState>(
-        'ok → [Loading, Loaded(items, false)] y pide listForBot(botId)',
-        build: () {
-          final repo = _MockRepo();
-          when(
-            () => repo.listForBot('b1'),
-          ).thenAnswer((_) async => const <Conversation>[_c1, _c2]);
-          return build(repo);
-        },
-        act: (b) => b.add(const ConversationsLoadRequested()),
-        expect: () => const <ConversationsState>[
-          ConversationsLoading(),
-          ConversationsLoaded(
-            items: <Conversation>[_c1, _c2],
-            isRefreshing: false,
-          ),
-        ],
-        verify: (_) {},
-      );
+  tearDown(() => watch.close());
 
-      blocTest<ConversationsBloc, ConversationsState>(
-        'ok [] → [Loading, Loaded(empty)]',
-        build: () {
-          final repo = _MockRepo();
-          when(
-            () => repo.listForBot('b1'),
-          ).thenAnswer((_) async => const <Conversation>[]);
-          return build(repo);
-        },
-        act: (b) => b.add(const ConversationsLoadRequested()),
-        expect: () => const <ConversationsState>[
-          ConversationsLoading(),
-          ConversationsLoaded(items: <Conversation>[], isRefreshing: false),
-        ],
-      );
+  ConversationsBloc build() => ConversationsBloc(repo: repo, botId: 'b1');
 
-      blocTest<ConversationsBloc, ConversationsState>(
-        '404 → [Loading, Failed(NotFound)]',
-        build: () {
-          final repo = _MockRepo();
-          when(() => repo.listForBot('b1')).thenAnswer(
-            (_) => Future<List<Conversation>>.error(
-              const ConversationsNotFoundFailure(),
-            ),
-          );
-          return build(repo);
-        },
-        act: (b) => b.add(const ConversationsLoadRequested()),
-        expect: () => const <ConversationsState>[
-          ConversationsLoading(),
-          ConversationsFailed(ConversationsNotFoundFailure()),
-        ],
-      );
+  test('estado inicial = ConversationsInitial', () {
+    expect(build().state, const ConversationsInitial());
+  });
 
-      blocTest<ConversationsBloc, ConversationsState>(
-        'network → [Loading, Failed(Network)]',
-        build: () {
-          final repo = _MockRepo();
-          when(() => repo.listForBot('b1')).thenAnswer(
-            (_) => Future<List<Conversation>>.error(
-              const ConversationsNetworkFailure(),
-            ),
-          );
-          return build(repo);
-        },
-        act: (b) => b.add(const ConversationsLoadRequested()),
-        expect: () => const <ConversationsState>[
-          ConversationsLoading(),
-          ConversationsFailed(ConversationsNetworkFailure()),
-        ],
-      );
-    });
+  test(
+    'load: Loading, dispara refresh, y la emisión del watch → Loaded',
+    () async {
+      when(() => repo.refresh('b1')).thenAnswer((_) async {});
+      final bloc = build();
+      final states = <ConversationsState>[];
+      final sub = bloc.stream.listen(states.add);
 
-    group('ConversationsRefreshRequested', () {
-      blocTest<ConversationsBloc, ConversationsState>(
-        'desde Loaded → Loaded(prev, true) y luego Loaded(nuevos, false)',
-        build: () {
-          final repo = _MockRepo();
-          when(
-            () => repo.listForBot('b1'),
-          ).thenAnswer((_) async => const <Conversation>[_c2]);
-          return build(repo);
-        },
-        seed: () => const ConversationsLoaded(
-          items: <Conversation>[_c1],
+      bloc.add(const ConversationsLoadRequested());
+      await tick(); // Load -> Loading + suscribe + refresh (ok, sin items aún)
+      watch.add(const <Conversation>[_c1, _c2]); // write-through del refresh
+      await tick();
+
+      expect(states, const <ConversationsState>[
+        ConversationsLoading(),
+        ConversationsLoaded(
+          items: <Conversation>[_c1, _c2],
           isRefreshing: false,
         ),
-        act: (b) => b.add(const ConversationsRefreshRequested()),
-        expect: () => const <ConversationsState>[
-          ConversationsLoaded(items: <Conversation>[_c1], isRefreshing: true),
-          ConversationsLoaded(items: <Conversation>[_c2], isRefreshing: false),
-        ],
-      );
+      ]);
+      verify(() => repo.refresh('b1')).called(1);
 
-      blocTest<ConversationsBloc, ConversationsState>(
-        'desde Loaded con error → mantiene visible la lista y emite Failed',
-        build: () {
-          final repo = _MockRepo();
-          when(() => repo.listForBot('b1')).thenAnswer(
-            (_) => Future<List<Conversation>>.error(
-              const ConversationsNetworkFailure(),
-            ),
-          );
-          return build(repo);
-        },
-        seed: () => const ConversationsLoaded(
-          items: <Conversation>[_c1],
-          isRefreshing: false,
-        ),
-        act: (b) => b.add(const ConversationsRefreshRequested()),
-        expect: () => const <ConversationsState>[
-          ConversationsLoaded(items: <Conversation>[_c1], isRefreshing: true),
-          ConversationsFailed(ConversationsNetworkFailure()),
-        ],
-      );
+      await sub.cancel();
+      await bloc.close();
+    },
+  );
 
-      blocTest<ConversationsBloc, ConversationsState>(
-        'desde Initial cae a load (no hay prev que refrescar)',
-        build: () {
-          final repo = _MockRepo();
-          when(
-            () => repo.listForBot('b1'),
-          ).thenAnswer((_) async => const <Conversation>[_c1]);
-          return build(repo);
-        },
-        act: (b) => b.add(const ConversationsRefreshRequested()),
-        expect: () => const <ConversationsState>[
-          ConversationsLoading(),
-          ConversationsLoaded(items: <Conversation>[_c1], isRefreshing: false),
-        ],
-      );
-    });
+  test('load con bandeja vacía → Loaded([])', () async {
+    when(() => repo.refresh('b1')).thenAnswer((_) async {});
+    final bloc = build();
+    final states = <ConversationsState>[];
+    final sub = bloc.stream.listen(states.add);
+
+    bloc.add(const ConversationsLoadRequested());
+    await tick();
+    watch.add(const <Conversation>[]);
+    await tick();
+
+    expect(
+      states.last,
+      const ConversationsLoaded(items: [], isRefreshing: false),
+    );
+    await sub.cancel();
+    await bloc.close();
+  });
+
+  test('refresh falla sin caché → Failed', () async {
+    final done = Completer<void>();
+    when(() => repo.refresh('b1')).thenAnswer((_) => done.future);
+    final bloc = build();
+    final states = <ConversationsState>[];
+    final sub = bloc.stream.listen(states.add);
+
+    bloc.add(const ConversationsLoadRequested());
+    await tick(); // Loading; refresh en curso; sin emisión del watch (sin caché)
+    done.completeError(const ConversationsNetworkFailure());
+    await tick();
+
+    expect(states, const <ConversationsState>[
+      ConversationsLoading(),
+      ConversationsFailed(ConversationsNetworkFailure()),
+    ]);
+    await sub.cancel();
+    await bloc.close();
+  });
+
+  test('refresh falla CON caché → sirve la caché (no Failed)', () async {
+    final done = Completer<void>();
+    when(() => repo.refresh('b1')).thenAnswer((_) => done.future);
+    final bloc = build();
+    final states = <ConversationsState>[];
+    final sub = bloc.stream.listen(states.add);
+
+    bloc.add(const ConversationsLoadRequested());
+    await tick(); // Loading; refresh en curso (isRefreshing=true)
+    watch.add(const <Conversation>[_c1]); // caché local
+    await tick(); // Loaded([_c1], true)
+    done.completeError(const ConversationsNetworkFailure());
+    await tick(); // catch: con caché no degrada → Loaded([_c1], false)
+
+    expect(
+      states.last,
+      const ConversationsLoaded(items: [_c1], isRefreshing: false),
+    );
+    expect(states.whereType<ConversationsFailed>(), isEmpty);
+    await sub.cancel();
+    await bloc.close();
+  });
+
+  test('error del watch sin caché → Failed', () async {
+    when(() => repo.refresh('b1')).thenAnswer((_) async {});
+    final bloc = build();
+    final states = <ConversationsState>[];
+    final sub = bloc.stream.listen(states.add);
+
+    bloc.add(const ConversationsLoadRequested());
+    await tick();
+    watch.addError(const ConversationsNetworkFailure());
+    await tick();
+
+    expect(
+      states.last,
+      const ConversationsFailed(ConversationsNetworkFailure()),
+    );
+    await sub.cancel();
+    await bloc.close();
+  });
+
+  test('error del watch CON caché → mantiene la caché (no Failed)', () async {
+    when(() => repo.refresh('b1')).thenAnswer((_) async {});
+    final bloc = build();
+    final states = <ConversationsState>[];
+    final sub = bloc.stream.listen(states.add);
+
+    bloc.add(const ConversationsLoadRequested());
+    await tick();
+    watch.add(const <Conversation>[_c1]);
+    await tick();
+    watch.addError(const ConversationsNetworkFailure());
+    await tick();
+
+    expect(states.whereType<ConversationsFailed>(), isEmpty);
+    expect(
+      states.last,
+      const ConversationsLoaded(items: [_c1], isRefreshing: false),
+    );
+    await sub.cancel();
+    await bloc.close();
+  });
+
+  test('emisiones posteriores del watch actualizan la lista', () async {
+    when(() => repo.refresh('b1')).thenAnswer((_) async {});
+    final bloc = build();
+    final states = <ConversationsState>[];
+    final sub = bloc.stream.listen(states.add);
+
+    bloc.add(const ConversationsLoadRequested());
+    await tick();
+    watch.add(const <Conversation>[_c1]);
+    await tick();
+    watch.add(const <Conversation>[_c1, _c2]); // p. ej. realtime/refresh futuro
+    await tick();
+
+    expect(
+      states.last,
+      const ConversationsLoaded(items: [_c1, _c2], isRefreshing: false),
+    );
+    await sub.cancel();
+    await bloc.close();
   });
 }

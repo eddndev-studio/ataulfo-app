@@ -501,7 +501,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         s.sending) {
       return;
     }
-    emit(s.copyWith(messages: reloaded.messages, nextCursor: reloaded.nextCursor));
+    emit(
+      s.copyWith(messages: reloaded.messages, nextCursor: reloaded.nextCursor),
+    );
   }
 
   void _onProgressReceived(

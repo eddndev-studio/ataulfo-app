@@ -74,10 +74,10 @@ void main() {
     expect(find.byType(AssistantMarkdown), findsOneWidget);
   });
 
-  testWidgets('burbuja user queda en Text plano (sin Markdown)', (tester) async {
-    await pump(tester, <TrainerMessage>[
-      _textMsg('m1', 'user', '**negrita**'),
-    ]);
+  testWidgets('burbuja user queda en Text plano (sin Markdown)', (
+    tester,
+  ) async {
+    await pump(tester, <TrainerMessage>[_textMsg('m1', 'user', '**negrita**')]);
     expect(find.byType(AssistantMarkdown), findsNothing);
     expect(find.text('**negrita**'), findsOneWidget);
   });

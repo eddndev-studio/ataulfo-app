@@ -25,7 +25,10 @@ class AcceptInvitePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, auth) => switch (auth) {
-        AuthInitial() => const _LoadingView(),
+        // Sesión aún no resuelta (arranque o esperando red para verificarla):
+        // no se puede mostrar el formulario (identidad sin confirmar) ni
+        // afirmar que no hay sesión.
+        AuthInitial() || AuthOfflinePending() => const _LoadingView(),
         AuthUnauthenticated() => const _AuthPrompt(),
         AuthAuthenticated() || AuthAuthenticatedNoOrg() => _AcceptForm(
           // El destino tras aceptar depende del estado de sesión: con org

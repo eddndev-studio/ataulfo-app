@@ -143,7 +143,7 @@ void main() {
       await pumpCheckbox(tester, AppCheckbox(value: true, onChanged: (_) {}));
       expect(
         tester.getSemantics(find.byType(AppCheckbox)),
-        containsSemantics(
+        isSemantics(
           hasCheckedState: true,
           isChecked: true,
           hasEnabledState: true,
@@ -164,7 +164,7 @@ void main() {
       );
       expect(
         tester.getSemantics(find.byType(AppCheckbox)),
-        containsSemantics(
+        isSemantics(
           hasCheckedState: true,
           isChecked: false,
           hasEnabledState: true,

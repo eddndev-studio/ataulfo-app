@@ -389,14 +389,12 @@ class _StepsListView extends StatelessWidget {
                 ),
               );
             },
-            onReorder: (oldIdx, newIdx) {
-              // ReorderableListView semántica: al mover hacia abajo, el
-              // newIdx que entrega ya cuenta el slot que el item dejó
-              // libre, así que conviene normalizarlo restando 1.
-              final adjusted = newIdx > oldIdx ? newIdx - 1 : newIdx;
+            onReorderItem: (oldIdx, newIdx) {
+              // onReorderItem entrega el newIdx ya ajustado a la lista sin el
+              // elemento movido, así que se inserta directo (sin normalizar).
               final ids = <String>[for (final s in steps) s.id];
               final moved = ids.removeAt(oldIdx);
-              ids.insert(adjusted, moved);
+              ids.insert(newIdx, moved);
               bloc.add(FlowStepsReorderRequested(ids));
             },
           ),

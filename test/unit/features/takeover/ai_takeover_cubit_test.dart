@@ -108,7 +108,8 @@ void main() {
           .having((s) => s.busy, 'busy', false)
           .having((s) => s.paused, 'paused', true),
     ],
-    verify: (_) => verify(() => chatLabels.addToChat('b1', 'c1', 's1')).called(1),
+    verify: (_) =>
+        verify(() => chatLabels.addToChat('b1', 'c1', 's1')).called(1),
   );
 
   blocTest<AiTakeoverCubit, AiTakeoverState>(
@@ -137,16 +138,12 @@ void main() {
   blocTest<AiTakeoverCubit, AiTakeoverState>(
     'toggle sin configurar → no-op (no toca el repo)',
     build: build,
-    seed: () => const AiTakeoverReady(
-      silenceIds: <String>[],
-      presentIds: <String>[],
-    ),
+    seed: () =>
+        const AiTakeoverReady(silenceIds: <String>[], presentIds: <String>[]),
     act: (c) => c.toggle(),
     expect: () => <Matcher>[],
     verify: (_) {
-      verifyNever(
-        () => chatLabels.addToChat(any(), any(), any()),
-      );
+      verifyNever(() => chatLabels.addToChat(any(), any(), any()));
     },
   );
 

@@ -42,8 +42,10 @@ void main() {
         limit: any(named: 'limit'),
       ),
     ).thenAnswer(
-      (_) async =>
-          const TrainerMessagesPage(messages: <TrainerMessage>[], nextCursor: ''),
+      (_) async => const TrainerMessagesPage(
+        messages: <TrainerMessage>[],
+        nextCursor: '',
+      ),
     );
   });
 
@@ -69,9 +71,6 @@ void main() {
     expect(find.text('Sobre envíos'), findsOneWidget);
     expect(find.text('Saludo inicial'), findsOneWidget);
     // El hilo inactivo es seleccionable.
-    expect(
-      find.byKey(const Key('trainer.threads.item.c1')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('trainer.threads.item.c1')), findsOneWidget);
   });
 }

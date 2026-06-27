@@ -61,9 +61,7 @@ class InboxLabelsCubit extends Cubit<InboxLabelsState> {
         for (final l in catalogRaw)
           if (!l.deleted) l,
       ];
-      final byId = <String, WaLabel>{
-        for (final l in catalog) l.waLabelId: l,
-      };
+      final byId = <String, WaLabel>{for (final l in catalog) l.waLabelId: l};
 
       final byChat = <String, List<WaLabel>>{};
       for (final a in assocs) {

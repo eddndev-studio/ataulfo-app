@@ -58,9 +58,7 @@ void main() {
           any(),
           queryParameters: any(named: 'queryParameters'),
         ),
-      ).thenAnswer(
-        (_) async => _resp(<String, dynamic>{'items': <dynamic>[]}),
-      );
+      ).thenAnswer((_) async => _resp(<String, dynamic>{'items': <dynamic>[]}));
       expect(await ds.activeRun('b1', 'c1'), isNull);
     });
 

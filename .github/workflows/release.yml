@@ -70,6 +70,9 @@ jobs:
       - name: Pub get
         run: flutter pub get
 
+      - name: Generate code (drift / build_runner)
+        run: dart run build_runner build
+
       # versionName desde el tag (v0.1.0 -> 0.1.0); versionCode desde el nº de run.
       - name: Build release APK
         run: |
@@ -121,6 +124,9 @@ jobs:
 
       - name: Pub get
         run: flutter pub get
+
+      - name: Generate code (drift / build_runner)
+        run: dart run build_runner build
 
       # versionName desde el tag (v0.2.0 -> 0.2.0), consistente con el APK.
       - name: Build release Linux

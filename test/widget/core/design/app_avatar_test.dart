@@ -1,8 +1,25 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
+
+// PNG válido de 1×1 transparente: bytes decodificables para que el Image no
+// dispare el errorBuilder y ensucie el log (la aserción mira el Image, no el
+// pixel).
+final _png1x1 = Uint8List.fromList(<int>[
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, //
+  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, //
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, //
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, //
+  0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, //
+  0x54, 0x78, 0x9C, 0x62, 0x00, 0x01, 0x00, 0x00, //
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, //
+  0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, //
+  0x42, 0x60, 0x82,
+]);
 
 void main() {
   Future<void> pumpAvatar(WidgetTester tester, Widget w) async {
@@ -164,6 +181,26 @@ void main() {
         const AppAvatar(name: 'a', imageUrl: 'https://invalid.test/falla.jpg'),
       );
       await tester.pump(const Duration(seconds: 1));
+      expect(find.text('A'), findsOneWidget);
+    });
+  });
+
+  group('AppAvatar — foto (imageProvider)', () {
+    testWidgets('con imageProvider renderiza un Image (foto local cacheada)', (
+      tester,
+    ) async {
+      await pumpAvatar(
+        tester,
+        AppAvatar(name: 'a', imageProvider: MemoryImage(_png1x1)),
+      );
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('sin url ni provider muestra la inicial (sin Image)', (
+      tester,
+    ) async {
+      await pumpAvatar(tester, const AppAvatar(name: 'ada'));
+      expect(find.byType(Image), findsNothing);
       expect(find.text('A'), findsOneWidget);
     });
   });

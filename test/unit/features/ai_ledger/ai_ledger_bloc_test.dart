@@ -25,10 +25,11 @@ void main() {
     'LoadRequested → Loading, Loaded(items)',
     build: () => AiLedgerBloc(repo: repo, botId: 'b1', chatLid: 'c1'),
     setUp: () {
-      when(
-        () => repo.page(botId: 'b1', chatLid: 'c1'),
-      ).thenAnswer(
-        (_) async => AiLedgerPageResult(items: <LedgerAction>[_a(2), _a(1)], nextBefore: 1),
+      when(() => repo.page(botId: 'b1', chatLid: 'c1')).thenAnswer(
+        (_) async => AiLedgerPageResult(
+          items: <LedgerAction>[_a(2), _a(1)],
+          nextBefore: 1,
+        ),
       );
     },
     act: (b) => b.add(const AiLedgerLoadRequested()),
@@ -48,10 +49,9 @@ void main() {
       isLoadingMore: false,
     ),
     setUp: () {
-      when(
-        () => repo.page(botId: 'b1', chatLid: 'c1', before: 5),
-      ).thenAnswer(
-        (_) async => AiLedgerPageResult(items: <LedgerAction>[_a(4)], nextBefore: null),
+      when(() => repo.page(botId: 'b1', chatLid: 'c1', before: 5)).thenAnswer(
+        (_) async =>
+            AiLedgerPageResult(items: <LedgerAction>[_a(4)], nextBefore: null),
       );
     },
     act: (b) => b.add(const AiLedgerMoreRequested()),

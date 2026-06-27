@@ -6,12 +6,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/smart_timestamp.dart';
+import '../../../profile/data/cache/profile_photo_cache.dart';
+import '../../../profile/presentation/widgets/profile_avatar.dart';
 import '../../../wa_labels/domain/entities/wa_label.dart';
 import '../../../wa_labels/presentation/widgets/wa_label_palette.dart';
 import '../../domain/entities/conversation.dart';
@@ -440,7 +441,13 @@ class _ConversationTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            AppAvatar(name: title, size: _kInboxAvatarSize),
+            ProfileAvatar(
+              cache: context.read<ProfilePhotoCache>(),
+              botId: context.read<ConversationsBloc>().botId,
+              chatLid: c.chatLid,
+              name: title,
+              size: _kInboxAvatarSize,
+            ),
             const SizedBox(width: AppTokens.sp3),
             Expanded(
               child: Column(

@@ -205,11 +205,8 @@ class AiLogRepositoryImpl implements AiLogRepository {
     required String botId,
     required String chatLid,
     required String externalId,
-  }) => _ds.runForMessage(
-    botId: botId,
-    chatLid: chatLid,
-    externalId: externalId,
-  );
+  }) =>
+      _ds.runForMessage(botId: botId, chatLid: chatLid, externalId: externalId);
 
   @override
   Future<List<AiLogEntry>> byRun({

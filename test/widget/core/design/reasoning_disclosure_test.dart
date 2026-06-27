@@ -2,8 +2,9 @@ import 'package:ataulfo/core/design/widgets/reasoning_disclosure.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _wrap(Widget child) =>
-    MaterialApp(home: Scaffold(body: Center(child: child)));
+Widget _wrap(Widget child) => MaterialApp(
+  home: Scaffold(body: Center(child: child)),
+);
 
 void main() {
   testWidgets('colapsado muestra "Razonamiento"; al expandir, el texto', (

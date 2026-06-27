@@ -1,4 +1,6 @@
 import 'package:ataulfo/app.dart';
+import 'package:ataulfo/core/network/connectivity_cubit.dart';
+import 'package:ataulfo/core/network/connectivity_monitor.dart';
 import 'package:ataulfo/core/router/app_router.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
@@ -34,6 +36,7 @@ import 'package:ataulfo/features/messages/domain/repositories/messages_repositor
 import 'package:ataulfo/features/notifications/domain/entities/notification_inbox_item.dart';
 import 'package:ataulfo/features/notifications/domain/entities/notification_preference.dart';
 import 'package:ataulfo/features/notifications/domain/repositories/notifications_repository.dart';
+import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/quick_replies/domain/repositories/quick_replies_repository.dart';
@@ -46,10 +49,18 @@ import 'package:integration_test/integration_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../test/support/fake_chat_media.dart';
+import '../test/support/fake_message_media_cache.dart';
 import '../test/support/fake_thumbnail_loader.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
+
+class _StubConnMonitor implements ConnectivityMonitor {
+  @override
+  Future<bool> isOnline() async => true;
+  @override
+  Stream<bool> get onlineChanges => const Stream<bool>.empty();
+}
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
@@ -212,7 +223,17 @@ void main() {
     );
 
     await tester.pumpWidget(
-      AtaulfoApp(router: router, authBloc: authBloc, onSignedOut: () {}),
+      AtaulfoApp(
+        router: router,
+        authBloc: authBloc,
+        connectivityCubit: ConnectivityCubit(_StubConnMonitor()),
+        profilePhotoCache: ProfilePhotoCache(
+          profileRepo: _MockProfileRepo(),
+          download: (_) async => null,
+        ),
+        messageMediaCache: fakeMessageMediaCache(),
+        onSignedOut: () {},
+      ),
     );
     await _pumpUntil(tester, find.text('Bots'));
 

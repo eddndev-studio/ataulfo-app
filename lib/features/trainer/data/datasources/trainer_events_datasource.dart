@@ -78,7 +78,8 @@ class DioTrainerEventsDatasource implements TrainerEvents {
       return TrainerProgressEvent(
         kind: kind,
         conversationId: conversationId,
-        at: DateTime.tryParse(json['at'] as String? ?? '')?.toUtc() ??
+        at:
+            DateTime.tryParse(json['at'] as String? ?? '')?.toUtc() ??
             DateTime.now().toUtc(),
         runId: json['runId'] as String? ?? '',
         iteration: json['iteration'] as int? ?? 0,

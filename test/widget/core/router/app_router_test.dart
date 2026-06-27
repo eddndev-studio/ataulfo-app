@@ -3,7 +3,10 @@ import 'package:ataulfo/features/executions/domain/execution_repository.dart';
 import 'dart:async';
 
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/network/connectivity_cubit.dart';
+import 'package:ataulfo/core/network/connectivity_monitor.dart';
 import 'package:ataulfo/core/router/app_router.dart';
+import 'package:ataulfo/features/splash/presentation/pages/reconnecting_view.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
@@ -35,6 +38,7 @@ import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/invitations/domain/entities/invitation.dart';
 import 'package:ataulfo/features/invitations/domain/repositories/invitations_repository.dart';
 import 'package:ataulfo/features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
@@ -49,7 +53,7 @@ import 'package:ataulfo/features/memberships/domain/repositories/memberships_rep
 import 'package:ataulfo/features/memberships/presentation/pages/memberships_page.dart';
 import 'package:ataulfo/features/memberships/presentation/pages/select_org_page.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
-import 'package:ataulfo/features/messages/domain/entities/message_page.dart';
+import 'package:ataulfo/features/messages/domain/entities/outbox_entry.dart';
 import 'package:ataulfo/features/messages/domain/entities/thread_live_event.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
@@ -88,6 +92,7 @@ import 'package:mocktail/mocktail.dart';
 
 import '../../../support/fake_chat_media.dart';
 import '../../../support/fake_thumbnail_loader.dart';
+import '../../../support/noop_profile_photo_cache.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
@@ -236,10 +241,30 @@ const _profile = ChatProfile(
   mutedUntil: null,
 );
 
+/// Monitor de conectividad trivial (siempre online, sin cambios) para la
+/// `ConnectivityCubit` que la vista de reconexión lee. Provisto de forma
+/// perezosa: solo se materializa cuando una ruta lo consume.
+class _AlwaysOnlineMonitor implements ConnectivityMonitor {
+  @override
+  Future<bool> isOnline() async => true;
+
+  @override
+  Stream<bool> get onlineChanges => const Stream<bool>.empty();
+}
+
 Widget _host(AppRouter router, AuthBloc authBloc) =>
-    BlocProvider<AuthBloc>.value(
-      value: authBloc,
-      child: MaterialApp.router(routerConfig: router.router),
+    RepositoryProvider<ProfilePhotoCache>.value(
+      value: NoopProfilePhotoCache(),
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<AuthBloc>.value(value: authBloc),
+          // Perezoso: las rutas que no son la de reconexión nunca lo crean.
+          BlocProvider<ConnectivityCubit>(
+            create: (_) => ConnectivityCubit(_AlwaysOnlineMonitor()),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router.router),
+      ),
     );
 
 class _FakeExecutionsRepo implements ExecutionRepository {
@@ -345,6 +370,21 @@ void main() {
     when(
       () => messagesRepo.live(any()),
     ).thenAnswer((_) => const Stream<ThreadLiveEvent>.empty());
+    // DB-as-source: el hilo observa watchThread y dispara refresh/markRead al
+    // abrir; defaults inertes para que el pumpAndSettle del montaje termine.
+    when(
+      () => messagesRepo.watchThread(any(), any()),
+    ).thenAnswer((_) => const Stream<List<Message>>.empty());
+    when(
+      () => messagesRepo.watchPending(any(), any()),
+    ).thenAnswer((_) => const Stream<List<OutboxEntry>>.empty());
+    when(() => messagesRepo.threadCursor(any(), any())).thenAnswer((_) async {
+      return null;
+    });
+    when(() => messagesRepo.refreshThread(any(), any())).thenAnswer((_) async {
+      return null;
+    });
+    when(() => messagesRepo.markRead(any(), any())).thenAnswer((_) async => 0);
     // El hilo monta un ProfileBloc que dispara fetch al construirse (alimenta
     // el header); un perfil terminal deja que pumpAndSettle termine.
     when(
@@ -399,6 +439,18 @@ void main() {
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('AuthOfflinePending → / muestra ReconnectingView (no el login)', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthOfflinePending());
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pump();
+
+    expect(find.byType(ReconnectingView), findsOneWidget);
+    expect(find.byType(LoginPage), findsNothing);
   });
 
   testWidgets('AuthAuthenticated → /home muestra BotsListPage', (tester) async {
@@ -676,8 +728,9 @@ void main() {
       // infinito que el widget test (que inyecta un bloc mock) no detecta.
       when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
       when(
-        () => conversationsRepo.listForBot('b1'),
-      ).thenAnswer((_) async => const <Conversation>[]);
+        () => conversationsRepo.watchForBot('b1'),
+      ).thenAnswer((_) => Stream.value(const <Conversation>[]));
+      when(() => conversationsRepo.refresh('b1')).thenAnswer((_) async {});
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
@@ -685,7 +738,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ConversationsListPage), findsOneWidget);
-      verify(() => conversationsRepo.listForBot('b1')).called(1);
+      verify(() => conversationsRepo.watchForBot('b1')).called(1);
+      verify(() => conversationsRepo.refresh('b1')).called(1);
     },
   );
 
@@ -698,11 +752,6 @@ void main() {
       // equivocado o ..add(load) caído daría spinner infinito que el widget
       // test (bloc mock) no detecta.
       when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-      when(
-        () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
-      ).thenAnswer(
-        (_) async => const MessagePage(messages: <Message>[], prevCursor: null),
-      );
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
@@ -710,9 +759,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MessageThreadPage), findsOneWidget);
-      verify(
-        () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
-      ).called(1);
+      verify(() => messagesRepo.watchThread('b1', 'lid-1')).called(1);
+      verify(() => messagesRepo.refreshThread('b1', 'lid-1')).called(1);
     },
   );
 
@@ -722,8 +770,8 @@ void main() {
       // El tap de la fila empuja la ruta del hilo con el chatLid de la
       // conversación; confirma el cableado fila→navegación end-to-end.
       when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-      when(() => conversationsRepo.listForBot('b1')).thenAnswer(
-        (_) async => const <Conversation>[
+      when(() => conversationsRepo.watchForBot('b1')).thenAnswer(
+        (_) => Stream.value(const <Conversation>[
           Conversation(
             chatLid: 'lid-1',
             kind: ConversationKind.dm,
@@ -733,13 +781,9 @@ void main() {
             isMarkedUnread: false,
             mutedUntil: null,
           ),
-        ],
+        ]),
       );
-      when(
-        () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
-      ).thenAnswer(
-        (_) async => const MessagePage(messages: <Message>[], prevCursor: null),
-      );
+      when(() => conversationsRepo.refresh('b1')).thenAnswer((_) async {});
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
@@ -750,9 +794,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MessageThreadPage), findsOneWidget);
-      verify(
-        () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
-      ).called(1);
+      verify(() => messagesRepo.watchThread('b1', 'lid-1')).called(1);
     },
   );
 
@@ -764,11 +806,6 @@ void main() {
     // header no-tappable rompería el "revisar perfil" sin que los widget tests
     // aislados lo noten.
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-    when(
-      () => messagesRepo.thread('b1', 'lid-1', cursor: null, limit: null),
-    ).thenAnswer(
-      (_) async => const MessagePage(messages: <Message>[], prevCursor: null),
-    );
 
     await tester.pumpWidget(_host(router, authBloc));
     await tester.pumpAndSettle();

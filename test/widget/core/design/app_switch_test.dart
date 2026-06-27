@@ -160,7 +160,7 @@ void main() {
       await pumpSwitch(tester, AppSwitch(value: true, onChanged: (_) {}));
       expect(
         tester.getSemantics(find.byType(AppSwitch)),
-        containsSemantics(
+        isSemantics(
           hasToggledState: true,
           isToggled: true,
           hasEnabledState: true,
@@ -176,7 +176,7 @@ void main() {
       await pumpSwitch(tester, AppSwitch(value: false, onChanged: (_) {}));
       expect(
         tester.getSemantics(find.byType(AppSwitch)),
-        containsSemantics(hasToggledState: true, isToggled: false),
+        isSemantics(hasToggledState: true, isToggled: false),
       );
       handle.dispose();
     });

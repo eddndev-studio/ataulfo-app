@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
@@ -10,21 +10,26 @@ import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/messages/data/cache/message_media_cache.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
+import 'package:ataulfo/features/messages/presentation/widgets/message_media.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/thread_audio_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
 import 'package:ataulfo/features/monitor/data/datasources/monitor_activity_datasource.dart';
 import 'package:ataulfo/features/monitor/domain/entities/monitor_event.dart';
 import 'package:ataulfo/features/monitor/presentation/cubit/monitor_live_cubit.dart';
 import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../../../support/fake_message_media_cache.dart';
 
 class _MockMessagesBloc extends MockBloc<MessagesEvent, MessagesState>
     implements MessagesBloc {}
@@ -55,6 +60,7 @@ Message msg({
   String type = 'text',
   String content = 'hola',
   String? quotedId,
+  String? mediaRef,
   String? mediaUrl,
   MessageStatus? status,
   int ts = 1700,
@@ -66,11 +72,18 @@ Message msg({
   direction: direction,
   type: type,
   content: content,
-  mediaRef: null,
+  mediaRef: mediaRef,
   mediaUrl: mediaUrl,
   quotedId: quotedId,
   timestampMs: ts,
   status: status,
+);
+
+/// 1x1 PNG válido: que Image.memory decodifique sin caer al errorBuilder.
+final _pngBytes = Uint8List.fromList(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  ),
 );
 
 void main() {
@@ -99,22 +112,25 @@ void main() {
     when(() => authBloc.state).thenReturn(const AuthInitial());
   });
 
-  Widget host() => MaterialApp(
+  Widget host({MessageMediaCache? mediaCache}) => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: RepositoryProvider<MediaOpener>.value(
-      value: opener,
-      child: MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<MessagesBloc>.value(value: bloc),
-          BlocProvider<ThreadAudioCubit>.value(value: audio),
-          BlocProvider<AuthBloc>.value(value: authBloc),
-          // El footer de actividad live lo lee del scope; inerte aquí (sin
-          // observar) ⇒ no pinta nada.
-          BlocProvider<MonitorLiveCubit>(
-            create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
-          ),
-        ],
-        child: const Scaffold(body: MessageThreadPage()),
+    home: RepositoryProvider<MessageMediaCache>.value(
+      value: mediaCache ?? fakeMessageMediaCache(),
+      child: RepositoryProvider<MediaOpener>.value(
+        value: opener,
+        child: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<MessagesBloc>.value(value: bloc),
+            BlocProvider<ThreadAudioCubit>.value(value: audio),
+            BlocProvider<AuthBloc>.value(value: authBloc),
+            // El footer de actividad live lo lee del scope; inerte aquí (sin
+            // observar) ⇒ no pinta nada.
+            BlocProvider<MonitorLiveCubit>(
+              create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+            ),
+          ],
+          child: const Scaffold(body: MessageThreadPage()),
+        ),
       ),
     ),
   );
@@ -402,8 +418,14 @@ void main() {
     expect(find.text('[location]'), findsOneWidget);
   });
 
-  group('multimedia (render por tipo via mediaUrl)', () {
-    Future<void> pumpMsg(WidgetTester tester, Message m) async {
+  group('multimedia (render por tipo)', () {
+    final pngBytes = _pngBytes;
+
+    Future<void> pumpMsg(
+      WidgetTester tester,
+      Message m, {
+      MessageMediaCache? cache,
+    }) async {
       when(() => bloc.state).thenReturn(
         MessagesLoaded(
           items: <Message>[m],
@@ -411,29 +433,46 @@ void main() {
           isLoadingOlder: false,
         ),
       );
-      await tester.pumpWidget(host());
+      await tester.pumpWidget(host(mediaCache: cache));
     }
 
-    testWidgets('imagen con mediaUrl renderiza un Image', (tester) async {
+    testWidgets('imagen con bytes en caché renderiza un Image', (tester) async {
       await pumpMsg(
         tester,
         msg(
           externalId: 'img',
           type: 'image',
           content: '',
+          mediaRef: 'ref-x',
           mediaUrl: 'https://cdn/x.jpg',
         ),
+        cache: fakeMessageMediaCache(downloadResult: pngBytes),
       );
+      await tester.pumpAndSettle(); // resuelve la carga async + el decode
       expect(find.byType(Image), findsOneWidget);
     });
 
-    testWidgets('imagen sin mediaUrl → placeholder de tipo (sin Image)', (
+    testWidgets('imagen sin mediaRef → placeholder de tipo (sin Image)', (
       tester,
     ) async {
       await pumpMsg(tester, msg(externalId: 'img', type: 'image', content: ''));
       expect(find.byType(Image), findsNothing);
       expect(find.text('Imagen'), findsOneWidget);
     });
+
+    testWidgets(
+      'imagen con mediaRef pero sin bytes (offline) → no disponible',
+      (tester) async {
+        await pumpMsg(
+          tester,
+          // Sin mediaUrl ni caché: la resolución da null.
+          msg(externalId: 'img', type: 'image', content: '', mediaRef: 'ref-x'),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(Image), findsNothing);
+        expect(find.text('Imagen no disponible'), findsOneWidget);
+      },
+    );
 
     testWidgets('imagen con caption muestra el texto', (tester) async {
       await pumpMsg(
@@ -442,10 +481,96 @@ void main() {
           externalId: 'img',
           type: 'image',
           content: 'mira esto',
+          mediaRef: 'ref-x',
           mediaUrl: 'https://cdn/x.jpg',
         ),
+        cache: fakeMessageMediaCache(downloadResult: pngBytes),
       );
+      await tester.pump();
       expect(find.text('mira esto'), findsOneWidget);
+    });
+
+    // Arnés que reconstruye MessageMediaContent con un mensaje cambiante (mismo
+    // slot ⇒ didUpdateWidget en _MessageImage), con la caché REAL (su lógica
+    // url-null→null decide). Valida la corrección del fix de S9.
+    Future<void> pumpContent(
+      WidgetTester tester, {
+      required MessageMediaCache cache,
+      required ValueListenable<Message> message,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: RepositoryProvider<MessageMediaCache>.value(
+            value: cache,
+            child: Scaffold(
+              body: ValueListenableBuilder<Message>(
+                valueListenable: message,
+                builder: (_, m, _) => MessageMediaContent(message: m),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets(
+      'imagen: la firma viva que llega tras "no disponible" dispara la descarga',
+      (tester) async {
+        final cache = fakeMessageMediaCache(downloadResult: pngBytes);
+        final m = ValueNotifier<Message>(
+          msg(externalId: 'i9', type: 'image', content: '', mediaRef: 'ref-i9'),
+        );
+        addTearDown(m.dispose);
+
+        await pumpContent(tester, cache: cache, message: m);
+        await tester.pumpAndSettle();
+        // Sin firma viva la caché no tiene de dónde bajar → no disponible.
+        expect(find.text('Imagen no disponible'), findsOneWidget);
+        expect(find.byType(Image), findsNothing);
+
+        // Llega la firma (reconexión): el mismo slot reintenta y descarga.
+        m.value = msg(
+          externalId: 'i9',
+          type: 'image',
+          content: '',
+          mediaRef: 'ref-i9',
+          mediaUrl: 'https://cdn/i9.jpg',
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(Image), findsOneWidget);
+      },
+    );
+
+    testWidgets('imagen: reciclar el slot a otro ref descarta la imagen vieja', (
+      tester,
+    ) async {
+      final cache = fakeMessageMediaCache(downloadResult: pngBytes);
+      final m = ValueNotifier<Message>(
+        msg(
+          externalId: 'a',
+          type: 'image',
+          content: '',
+          mediaRef: 'ref-a',
+          mediaUrl: 'https://cdn/a.jpg',
+        ),
+      );
+      addTearDown(m.dispose);
+
+      await pumpContent(tester, cache: cache, message: m);
+      await tester.pumpAndSettle();
+      expect(find.byType(Image), findsOneWidget); // ref-a resuelve bytes
+
+      // El slot se recicla a otro ref SIN firma viva: no debe seguir pintando A.
+      m.value = msg(
+        externalId: 'b',
+        type: 'image',
+        content: '',
+        mediaRef: 'ref-b',
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(Image), findsNothing);
+      expect(find.text('Imagen no disponible'), findsOneWidget);
     });
 
     testWidgets('video → tarjeta de tipo (ícono + etiqueta)', (tester) async {
@@ -1051,9 +1176,19 @@ void main() {
     testWidgets('imagen con mediaUrl: tap abre el visor y un tap lo cierra', (
       tester,
     ) async {
-      seed(msg(externalId: 'i1', type: 'image', mediaUrl: 'https://m/i.jpg'));
+      seed(
+        msg(
+          externalId: 'i1',
+          type: 'image',
+          mediaRef: 'ref-i1',
+          mediaUrl: 'https://m/i.jpg',
+        ),
+      );
 
-      await tester.pumpWidget(host());
+      await tester.pumpWidget(
+        host(mediaCache: fakeMessageMediaCache(downloadResult: _pngBytes)),
+      );
+      await tester.pumpAndSettle(); // resuelve la carga de bytes de la imagen
       await tester.tap(find.byKey(const Key('message.image.i1')));
       await tester.pumpAndSettle();
 

@@ -8,6 +8,7 @@ import 'package:ataulfo/features/conversations/domain/failures/conversations_fai
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/cubit/inbox_labels_cubit.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
+import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
@@ -16,6 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../../../support/noop_profile_photo_cache.dart';
 
 class _MockConversationsBloc
     extends MockBloc<ConversationsEvent, ConversationsState>
@@ -56,6 +59,9 @@ void main() {
   setUp(() {
     bloc = _MockConversationsBloc();
     when(() => bloc.state).thenReturn(const ConversationsInitial());
+    // El avatar de cada fila lee `botId` en build (resuelve la foto del chat);
+    // sin stub, el getter del mock devuelve null y revienta el tile.
+    when(() => bloc.botId).thenReturn('b1');
     // Por defecto sin etiquetas: la bandeja se prueba sin blobs ni chips de
     // etiqueta salvo cuando un test los siembra explícitamente.
     inbox = _MockInboxLabelsCubit();
@@ -64,12 +70,15 @@ void main() {
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<ConversationsBloc>.value(value: bloc),
-        BlocProvider<InboxLabelsCubit>.value(value: inbox),
-      ],
-      child: const Scaffold(body: ConversationsListPage()),
+    home: RepositoryProvider<ProfilePhotoCache>.value(
+      value: NoopProfilePhotoCache(),
+      child: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<ConversationsBloc>.value(value: bloc),
+          BlocProvider<InboxLabelsCubit>.value(value: inbox),
+        ],
+        child: const Scaffold(body: ConversationsListPage()),
+      ),
     ),
   );
 
@@ -113,13 +122,16 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppDesignTheme.dark(),
-        home: MultiBlocProvider(
-          providers: <BlocProvider<dynamic>>[
-            BlocProvider<ConversationsBloc>.value(value: bloc),
-            BlocProvider<InboxLabelsCubit>.value(value: inbox),
-          ],
-          child: const Scaffold(
-            body: ConversationsListPage(needsAttention: <String>{'lid-dm'}),
+        home: RepositoryProvider<ProfilePhotoCache>.value(
+          value: NoopProfilePhotoCache(),
+          child: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<ConversationsBloc>.value(value: bloc),
+              BlocProvider<InboxLabelsCubit>.value(value: inbox),
+            ],
+            child: const Scaffold(
+              body: ConversationsListPage(needsAttention: <String>{'lid-dm'}),
+            ),
           ),
         ),
       ),
@@ -616,12 +628,15 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             theme: AppDesignTheme.dark(),
-            home: MultiBlocProvider(
-              providers: <BlocProvider<dynamic>>[
-                BlocProvider<ConversationsBloc>.value(value: bloc),
-                BlocProvider<InboxLabelsCubit>.value(value: realCubit),
-              ],
-              child: const Scaffold(body: ConversationsListPage()),
+            home: RepositoryProvider<ProfilePhotoCache>.value(
+              value: NoopProfilePhotoCache(),
+              child: MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<ConversationsBloc>.value(value: bloc),
+                  BlocProvider<InboxLabelsCubit>.value(value: realCubit),
+                ],
+                child: const Scaffold(body: ConversationsListPage()),
+              ),
             ),
           ),
         );

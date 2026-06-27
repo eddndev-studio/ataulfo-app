@@ -81,7 +81,9 @@ class _AlertBannerState extends State<AlertBanner> {
                   const SizedBox(height: 2),
                   Text(
                     alert.detail,
-                    style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppTokens.text2,
+                    ),
                   ),
                 ],
               ],

@@ -22,7 +22,9 @@ class BotStatePill extends StatelessWidget {
     final state = _stateOf(live.events);
     if (state == null) return const SizedBox.shrink();
     final (kind, label) = state;
-    final color = kind == _PillKind.error ? AppTokens.danger : AppTokens.primary;
+    final color = kind == _PillKind.error
+        ? AppTokens.danger
+        : AppTokens.primary;
     return Container(
       key: const Key('monitor.bot_state_pill'),
       margin: const EdgeInsets.only(top: 2),

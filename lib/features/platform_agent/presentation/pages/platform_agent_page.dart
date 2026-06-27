@@ -398,8 +398,7 @@ class _ChatViewState extends State<_ChatView> {
     super.didUpdateWidget(old);
     final prev = old.state;
     final cur = widget.state;
-    final convChanged =
-        prev.activeConversation.id != cur.activeConversation.id;
+    final convChanged = prev.activeConversation.id != cur.activeConversation.id;
     final failureAppeared = prev.sendFailure == null && cur.sendFailure != null;
     final cancelRestore =
         prev.sending &&

@@ -50,3 +50,6 @@ ios/build/
 # Symbol files
 **/*.lock
 !pubspec.lock
+
+# Código generado (drift / build_runner)
+*.g.dart

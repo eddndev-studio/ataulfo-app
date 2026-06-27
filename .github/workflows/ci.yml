@@ -20,7 +20,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.5'
+          flutter-version: '3.44.4'
           channel: stable
           cache: true
 
@@ -29,6 +29,9 @@ jobs:
 
       - name: Pub get
         run: flutter pub get
+
+      - name: Generate code (drift / build_runner)
+        run: dart run build_runner build
 
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed .

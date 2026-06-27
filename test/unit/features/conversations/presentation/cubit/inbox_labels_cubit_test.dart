@@ -26,9 +26,9 @@ void main() {
   });
 
   test('load compone catálogo (sin tombstones) y byChat por chat', () async {
-    when(() => repo.listCatalog('b1')).thenAnswer(
-      (_) async => const <WaLabel>[_a, _b, _c],
-    );
+    when(
+      () => repo.listCatalog('b1'),
+    ).thenAnswer((_) async => const <WaLabel>[_a, _b, _c]);
     when(() => repo.listChatAssocs('b1')).thenAnswer(
       (_) async => const <WaChatAssoc>[
         WaChatAssoc(chatLid: 'chat-1', waLabelId: 'A', labeled: true),
@@ -85,19 +85,22 @@ void main() {
     addTearDown(cubit.close);
   });
 
-  test('degrada a vacío si falla el catálogo (las etiquetas son mejora)', () async {
-    when(() => repo.listCatalog('b1')).thenThrow(Exception('boom'));
-    when(
-      () => repo.listChatAssocs('b1'),
-    ).thenAnswer((_) async => const <WaChatAssoc>[]);
+  test(
+    'degrada a vacío si falla el catálogo (las etiquetas son mejora)',
+    () async {
+      when(() => repo.listCatalog('b1')).thenThrow(Exception('boom'));
+      when(
+        () => repo.listChatAssocs('b1'),
+      ).thenAnswer((_) async => const <WaChatAssoc>[]);
 
-    final cubit = build();
-    await cubit.load();
+      final cubit = build();
+      await cubit.load();
 
-    expect(cubit.state.catalog, isEmpty);
-    expect(cubit.state.byChat, isEmpty);
-    addTearDown(cubit.close);
-  });
+      expect(cubit.state.catalog, isEmpty);
+      expect(cubit.state.byChat, isEmpty);
+      addTearDown(cubit.close);
+    },
+  );
 
   test('degrada a vacío si fallan las asociaciones', () async {
     when(

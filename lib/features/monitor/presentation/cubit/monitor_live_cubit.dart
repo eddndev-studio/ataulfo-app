@@ -36,7 +36,8 @@ class MonitorLiveState {
       other.stalled == stalled;
 
   @override
-  int get hashCode => Object.hash(Object.hashAll(events), reconnecting, stalled);
+  int get hashCode =>
+      Object.hash(Object.hashAll(events), reconnecting, stalled);
 }
 
 /// Se suscribe al SSE `ai-activity` del chat abierto y acumula los eventos. NO
@@ -93,7 +94,9 @@ class MonitorLiveCubit extends Cubit<MonitorLiveState> {
     _guard = null;
     _hydratedRunId = '';
     _snapshotCutoff = null;
-    _sub = _ds.activity(botId, chatLid).listen(_onEvent, onError: (Object _) {});
+    _sub = _ds
+        .activity(botId, chatLid)
+        .listen(_onEvent, onError: (Object _) {});
     if (_catchup != null) unawaited(_hydrate(botId, chatLid));
   }
 
@@ -115,7 +118,9 @@ class MonitorLiveCubit extends Cubit<MonitorLiveState> {
       }
       _rearmGuard(e);
     }
-    emit(MonitorLiveState(events: _bounded(<MonitorEvent>[...state.events, e])));
+    emit(
+      MonitorLiveState(events: _bounded(<MonitorEvent>[...state.events, e])),
+    );
   }
 
   Future<void> _hydrate(String botId, String chatLid) async {

@@ -53,6 +53,30 @@ void main() {
     });
   });
 
+  group('redirectForState — AuthOfflinePending', () {
+    test('/ se deja pasar (pinta la vista de reconexión, no el login)', () {
+      expect(redirectForState(const AuthOfflinePending(), '/'), isNull);
+    });
+
+    test('ruta protegida → / (reconexión), NUNCA /login', () {
+      // El punto del estado: con sesión persistida pero sin red, no se aparenta
+      // un cierre de sesión mandando al login.
+      expect(redirectForState(const AuthOfflinePending(), '/home'), '/');
+      expect(redirectForState(const AuthOfflinePending(), '/bots/b1'), '/');
+    });
+
+    test('ruta pública se preserva (login a propósito sigue alcanzable)', () {
+      expect(redirectForState(const AuthOfflinePending(), '/login'), isNull);
+      expect(
+        redirectForState(
+          const AuthOfflinePending(),
+          '/reset-password?token=abc',
+        ),
+        isNull,
+      );
+    });
+  });
+
   group('redirectForState — AuthUnauthenticated', () {
     test('rutas públicas son alcanzables sin sesión', () {
       for (final loc in <String>[

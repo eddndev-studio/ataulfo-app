@@ -26,10 +26,9 @@ class AssistantMarkdown extends StatelessWidget {
 
   MarkdownStyleSheet _styleSheet(BuildContext context) {
     final theme = Theme.of(context);
-    final body =
-        (theme.textTheme.bodyLarge ?? const TextStyle()).copyWith(
-          color: AppTokens.text1,
-        );
+    final body = (theme.textTheme.bodyLarge ?? const TextStyle()).copyWith(
+      color: AppTokens.text1,
+    );
     TextStyle heading(double size, FontWeight weight) =>
         body.copyWith(fontSize: size, fontWeight: weight);
 

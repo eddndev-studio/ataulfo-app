@@ -31,13 +31,12 @@ class AiTakeoverSheet extends StatelessWidget {
       context,
       backgroundColor: AppTokens.surface1,
       builder: (_) => BlocProvider<AiTakeoverCubit>(
-        create: (_) =>
-            AiTakeoverCubit(
-              resolver: resolver,
-              chatLabels: chatLabels,
-              botId: botId,
-              chatLid: chatLid,
-            )..load(),
+        create: (_) => AiTakeoverCubit(
+          resolver: resolver,
+          chatLabels: chatLabels,
+          botId: botId,
+          chatLid: chatLid,
+        )..load(),
         child: const AiTakeoverSheet(),
       ),
     );
@@ -64,7 +63,10 @@ class AiTakeoverSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Control del bot en este chat', style: textTheme.titleMedium),
+              Text(
+                'Control del bot en este chat',
+                style: textTheme.titleMedium,
+              ),
               const SizedBox(height: AppTokens.sp4),
               switch (state) {
                 AiTakeoverLoading() => const Center(
@@ -78,7 +80,11 @@ class AiTakeoverSheet extends StatelessWidget {
                   key: const Key('takeover.error'),
                   style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
                 ),
-                AiTakeoverReady(:final configured, :final paused, :final busy) =>
+                AiTakeoverReady(
+                  :final configured,
+                  :final paused,
+                  :final busy,
+                ) =>
                   _ready(context, textTheme, configured, paused, busy),
               },
             ],

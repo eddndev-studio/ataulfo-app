@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../data/cache/message_media_cache.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/repositories/media_opener.dart';
 import '../bloc/thread_audio_cubit.dart';
@@ -27,10 +30,15 @@ class MessageMediaContent extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final m = message;
     final url = m.mediaUrl;
+    final mediaRef = m.mediaRef;
     final media = switch (m.type) {
-      'image' || 'sticker' when url != null => _TappableImage(
+      // La imagen/sticker se sirve por `mediaRef` desde la caché en disco
+      // (offline / firma expirada); `mediaUrl` sólo se usa para bajarla una vez.
+      'image' || 'sticker' when mediaRef != null => _MessageImage(
+        cache: context.read<MessageMediaCache>(),
+        mediaRef: mediaRef,
+        mediaUrl: url,
         id: m.externalId,
-        url: url,
         sticker: m.type == 'sticker',
       ),
       'image' => _typedCard(context, Icons.image_outlined, 'Imagen'),
@@ -113,57 +121,112 @@ Widget _typedCard(BuildContext context, IconData icon, String label) {
   );
 }
 
-/// Miniatura de imagen/sticker; tap abre el visor fullscreen con zoom.
-class _TappableImage extends StatelessWidget {
-  const _TappableImage({
+/// Miniatura de imagen/sticker servida por `mediaRef` desde la caché en disco
+/// ([MessageMediaCache]): se ve offline y sobrevive a la expiración de la firma.
+/// Mientras resuelve muestra un spinner; sin bytes (offline sin caché / firma
+/// caída) cae a la tarjeta "no disponible". Tap → visor fullscreen con los bytes.
+class _MessageImage extends StatefulWidget {
+  const _MessageImage({
+    required this.cache,
+    required this.mediaRef,
+    required this.mediaUrl,
     required this.id,
-    required this.url,
     required this.sticker,
   });
 
+  final MessageMediaCache cache;
+  final String mediaRef;
+  final String? mediaUrl;
   final String id;
-  final String url;
   final bool sticker;
 
   @override
+  State<_MessageImage> createState() => _MessageImageState();
+}
+
+class _MessageImageState extends State<_MessageImage> {
+  Uint8List? _bytes;
+  bool _resolved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_MessageImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // El widget se recicla al hacer scroll (mismo slot, otra imagen): si cambió
+    // el ref, olvida los bytes viejos y recarga.
+    if (oldWidget.mediaRef != widget.mediaRef) {
+      _bytes = null;
+      _resolved = false;
+      _load();
+    } else if (_bytes == null && oldWidget.mediaUrl != widget.mediaUrl) {
+      // Llegó la firma viva (p. ej. al reconectar) y aún no hay bytes: reintenta
+      // ahora que hay de dónde bajar. (Con bytes ya en caché la URL es
+      // irrelevante: la entrega es por disco.)
+      _resolved = false;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final ref = widget.mediaRef;
+    final b = await widget.cache.bytesFor(ref, widget.mediaUrl);
+    // Si el slot se recicló a otro ref mientras cargaba, no pintes el viejo.
+    if (!mounted || ref != widget.mediaRef) return;
+    setState(() {
+      _bytes = b;
+      _resolved = true;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final side = sticker ? 120.0 : 220.0;
-    return GestureDetector(
-      key: Key('message.image.$id'),
-      onTap: () => showMediaViewer(context, url),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-        child: Image.network(
-          url,
-          width: side,
-          height: side,
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return SizedBox(
-              width: side,
-              height: side,
-              child: const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppTokens.primary,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          errorBuilder: (context, error, stack) => _typedCard(
-            context,
-            Icons.broken_image_outlined,
-            sticker ? 'Sticker no disponible' : 'Imagen no disponible',
+    final side = widget.sticker ? 120.0 : 220.0;
+    final b = _bytes;
+    if (b != null) {
+      return GestureDetector(
+        key: Key('message.image.${widget.id}'),
+        onTap: () => showMediaViewer(context, bytes: b, url: widget.mediaUrl),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+          child: Image.memory(
+            b,
+            width: side,
+            height: side,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stack) => _typedCard(
+              context,
+              Icons.broken_image_outlined,
+              widget.sticker ? 'Sticker no disponible' : 'Imagen no disponible',
+            ),
           ),
         ),
-      ),
+      );
+    }
+    if (!_resolved) {
+      return SizedBox(
+        width: side,
+        height: side,
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+            ),
+          ),
+        ),
+      );
+    }
+    return _typedCard(
+      context,
+      Icons.broken_image_outlined,
+      widget.sticker ? 'Sticker no disponible' : 'Imagen no disponible',
     );
   }
 }

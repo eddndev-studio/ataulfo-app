@@ -106,23 +106,24 @@ void main() {
     expect(find.textContaining('9'), findsWidgets); // el id de la versión
   });
 
-  testWidgets('list_prompt_history con error NO se enmascara como "sin versiones"', (
-    tester,
-  ) async {
-    await pump(tester, <TrainerMessage>[
-      _toolMsg(
-        'm1',
-        _toolResults('list_prompt_history', <String, Object?>{
-          'error_kind': 'builtin_error',
-          'detail': 'db caída',
-        }),
-      ),
-    ]);
-    // Un fallo del tool debe caer a la tarjeta de error, no a la de historial.
-    expect(
-      find.byKey(const Key('trainer.prompt_history_card.m1')),
-      findsNothing,
-    );
-    expect(find.textContaining('sin versiones'), findsNothing);
-  });
+  testWidgets(
+    'list_prompt_history con error NO se enmascara como "sin versiones"',
+    (tester) async {
+      await pump(tester, <TrainerMessage>[
+        _toolMsg(
+          'm1',
+          _toolResults('list_prompt_history', <String, Object?>{
+            'error_kind': 'builtin_error',
+            'detail': 'db caída',
+          }),
+        ),
+      ]);
+      // Un fallo del tool debe caer a la tarjeta de error, no a la de historial.
+      expect(
+        find.byKey(const Key('trainer.prompt_history_card.m1')),
+        findsNothing,
+      );
+      expect(find.textContaining('sin versiones'), findsNothing);
+    },
+  );
 }

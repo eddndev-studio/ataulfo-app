@@ -271,7 +271,7 @@ void main() {
       );
       expect(
         tester.getSemantics(find.byType(AppButton)),
-        containsSemantics(
+        isSemantics(
           isButton: true,
           label: 'Crear',
           hasEnabledState: true,
@@ -292,11 +292,7 @@ void main() {
       );
       expect(
         tester.getSemantics(find.byType(AppButton)),
-        containsSemantics(
-          isButton: true,
-          hasEnabledState: true,
-          isEnabled: false,
-        ),
+        isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
       );
       handle.dispose();
     });

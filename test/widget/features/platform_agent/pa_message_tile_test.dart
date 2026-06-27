@@ -8,13 +8,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Construye el `tool_results` tal como llega del wire: jsonb crudo con claves
 /// snake_case y `content` DOBLE-CODIFICADO (string JSON del output del tool).
-String _toolRaw(String toolName, Map<String, dynamic> content) => jsonEncode(
-  <String, dynamic>{
-    'tool_call_id': 'tc1',
-    'tool_name': toolName,
-    'content': jsonEncode(content),
-  },
-);
+String _toolRaw(String toolName, Map<String, dynamic> content) =>
+    jsonEncode(<String, dynamic>{
+      'tool_call_id': 'tc1',
+      'tool_name': toolName,
+      'content': jsonEncode(content),
+    });
 
 PaMessage _toolMsg(String raw) => PaMessage(
   id: 'm1',
@@ -33,8 +32,9 @@ PaMessage _textMsg(String role, String content) => PaMessage(
   createdAt: DateTime.utc(2026, 6, 10),
 );
 
-Widget _wrap(Widget child) =>
-    MaterialApp(home: Scaffold(body: Center(child: child)));
+Widget _wrap(Widget child) => MaterialApp(
+  home: Scaffold(body: Center(child: child)),
+);
 
 void main() {
   testWidgets('lee el nombre del tool de tool_name (snake_case del wire)', (
@@ -42,9 +42,7 @@ void main() {
   ) async {
     // Sin detalle estructurado: chip plano, no expandible. Prueba el fix del
     // bug latente (leer tool_name, no toolName) — antes decía "Acción ejecutada".
-    final raw = _toolRaw('list_bots', <String, dynamic>{
-      'bots': <dynamic>[],
-    });
+    final raw = _toolRaw('list_bots', <String, dynamic>{'bots': <dynamic>[]});
     await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
     expect(find.text('Usó list_bots'), findsOneWidget);
     expect(find.byKey(const Key('pa.tool_card.header')), findsNothing);
@@ -107,59 +105,64 @@ void main() {
     ],
   });
 
-  testWidgets('requires_confirmation: nombra los bots y ofrece Confirmar/Cancelar', (
-    tester,
-  ) async {
-    var confirmed = false;
-    await tester.pumpWidget(
-      _wrap(
-        PaMessageTile(
-          message: _toolMsg(confirmRaw()),
-          onConfirm: () => confirmed = true,
+  testWidgets(
+    'requires_confirmation: nombra los bots y ofrece Confirmar/Cancelar',
+    (tester) async {
+      var confirmed = false;
+      await tester.pumpWidget(
+        _wrap(
+          PaMessageTile(
+            message: _toolMsg(confirmRaw()),
+            onConfirm: () => confirmed = true,
+          ),
         ),
-      ),
-    );
-    expect(find.textContaining('Ventas'), findsOneWidget);
-    expect(find.textContaining('Soporte'), findsOneWidget);
-    expect(find.byKey(const Key('pa.confirm.accept')), findsOneWidget);
+      );
+      expect(find.textContaining('Ventas'), findsOneWidget);
+      expect(find.textContaining('Soporte'), findsOneWidget);
+      expect(find.byKey(const Key('pa.confirm.accept')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('pa.confirm.accept')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('pa.confirm.accept')));
+      await tester.pumpAndSettle();
 
-    expect(confirmed, isTrue);
-    // Tras actuar, los botones desaparecen (no doble-confirmación).
-    expect(find.byKey(const Key('pa.confirm.accept')), findsNothing);
-  });
+      expect(confirmed, isTrue);
+      // Tras actuar, los botones desaparecen (no doble-confirmación).
+      expect(find.byKey(const Key('pa.confirm.accept')), findsNothing);
+    },
+  );
 
-  testWidgets('requires_confirmation: Cancelar no confirma y retira los botones', (
-    tester,
-  ) async {
-    var confirmed = false;
-    await tester.pumpWidget(
-      _wrap(
-        PaMessageTile(
-          message: _toolMsg(confirmRaw()),
-          onConfirm: () => confirmed = true,
+  testWidgets(
+    'requires_confirmation: Cancelar no confirma y retira los botones',
+    (tester) async {
+      var confirmed = false;
+      await tester.pumpWidget(
+        _wrap(
+          PaMessageTile(
+            message: _toolMsg(confirmRaw()),
+            onConfirm: () => confirmed = true,
+          ),
         ),
-      ),
-    );
-    await tester.tap(find.byKey(const Key('pa.confirm.cancel')));
-    await tester.pumpAndSettle();
+      );
+      await tester.tap(find.byKey(const Key('pa.confirm.cancel')));
+      await tester.pumpAndSettle();
 
-    expect(confirmed, isFalse);
-    expect(find.byKey(const Key('pa.confirm.accept')), findsNothing);
-  });
+      expect(confirmed, isFalse);
+      expect(find.byKey(const Key('pa.confirm.accept')), findsNothing);
+    },
+  );
 
-  testWidgets('requires_confirmation sin onConfirm degrada a tarjeta de error', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(confirmRaw()))));
-    // Sin callback no hay botones: cae a la tarjeta expandible genérica.
-    expect(find.byKey(const Key('pa.confirm.accept')), findsNothing);
-    await tester.tap(find.byKey(const Key('pa.tool_card.header')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('confirmaci'), findsOneWidget);
-  });
+  testWidgets(
+    'requires_confirmation sin onConfirm degrada a tarjeta de error',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(PaMessageTile(message: _toolMsg(confirmRaw()))),
+      );
+      // Sin callback no hay botones: cae a la tarjeta expandible genérica.
+      expect(find.byKey(const Key('pa.confirm.accept')), findsNothing);
+      await tester.tap(find.byKey(const Key('pa.tool_card.header')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('confirmaci'), findsOneWidget);
+    },
+  );
 
   testWidgets('assistant rinde Markdown; user queda en Text plano', (
     tester,

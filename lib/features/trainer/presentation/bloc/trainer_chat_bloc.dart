@@ -414,12 +414,9 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     unawaited(_progressSub?.cancel());
     _progressSub = _events
         ?.progress(_templateId, current.conversation.id)
-        .listen(
-          (e) {
-            if (!isClosed) add(TrainerChatProgressReceived(e));
-          },
-          onError: (Object _) {},
-        );
+        .listen((e) {
+          if (!isClosed) add(TrainerChatProgressReceived(e));
+        }, onError: (Object _) {});
     try {
       await _repo.sendMessage(
         templateId: _templateId,

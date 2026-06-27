@@ -1,13 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/conversation.dart';
 import '../../domain/failures/conversations_failure.dart';
 import '../../domain/repositories/conversations_repository.dart';
 
-/// Bloc del listado de conversaciones de un bot (S07 RF#7). Se construye con
-/// el `botId` (la ruta `/bots/:id/sessions` lo aporta), como `BotDetailBloc`.
-/// `isRefreshing` dentro de `ConversationsLoaded` deja que el pull-to-refresh
-/// no oculte la lista mientras se refresca.
+/// Bloc del listado de conversaciones de un bot (S07 RF#7). DB-as-source: el
+/// bloc **observa** `repo.watchForBot` (la DB local) y dispara `repo.refresh`
+/// para el write-through HTTP. `isRefreshing` deja que el pull-to-refresh no
+/// oculte la lista. Offline, el watch sigue sirviendo la caché: un refresh
+/// fallido con caché no escondida no degrada a error.
 class ConversationsBloc extends Bloc<ConversationsEvent, ConversationsState> {
   ConversationsBloc({
     required ConversationsRepository repo,
@@ -17,25 +20,55 @@ class ConversationsBloc extends Bloc<ConversationsEvent, ConversationsState> {
        super(const ConversationsInitial()) {
     on<ConversationsLoadRequested>(_onLoad);
     on<ConversationsRefreshRequested>(_onRefresh);
+    on<_ConversationsDbEmitted>(_onDbEmitted);
+    on<_ConversationsWatchFailed>(_onWatchFailed);
   }
 
   final ConversationsRepository _repo;
   final String _botId;
 
+  StreamSubscription<List<Conversation>>? _sub;
+  List<Conversation>? _items;
+  bool _refreshing = false;
+
   /// El bot al que pertenece esta bandeja. Lo usa la fila para navegar al hilo
-  /// (`/bots/:id/sessions/:chatLid`) sin tener que recibir el id por separado.
+  /// (`/bots/:id/sessions/:chatLid`) sin recibir el id por separado.
   String get botId => _botId;
 
   Future<void> _onLoad(
     ConversationsLoadRequested event,
     Emitter<ConversationsState> emit,
   ) async {
-    emit(const ConversationsLoading());
-    try {
-      final items = await _repo.listForBot(_botId);
-      emit(ConversationsLoaded(items: items, isRefreshing: false));
-    } on ConversationsFailure catch (f) {
-      emit(ConversationsFailed(f));
+    if (_items == null) emit(const ConversationsLoading());
+    // Una sola suscripción al watch; los reintentos solo re-disparan el refresh.
+    _sub ??= _repo
+        .watchForBot(_botId)
+        .listen(
+          (items) => add(_ConversationsDbEmitted(items)),
+          onError: (Object e) {
+            if (e is ConversationsFailure) add(_ConversationsWatchFailed(e));
+          },
+        );
+    add(const ConversationsRefreshRequested());
+  }
+
+  void _onDbEmitted(
+    _ConversationsDbEmitted event,
+    Emitter<ConversationsState> emit,
+  ) {
+    _items = event.items;
+    emit(ConversationsLoaded(items: event.items, isRefreshing: _refreshing));
+  }
+
+  void _onWatchFailed(
+    _ConversationsWatchFailed event,
+    Emitter<ConversationsState> emit,
+  ) {
+    // Con caché se mantiene lo último visto; sin ella, el error del watch sí
+    // sube a la UI para ofrecer reintentar.
+    final cached = _items;
+    if (cached == null || cached.isEmpty) {
+      emit(ConversationsFailed(event.failure));
     }
   }
 
@@ -43,18 +76,34 @@ class ConversationsBloc extends Bloc<ConversationsEvent, ConversationsState> {
     ConversationsRefreshRequested event,
     Emitter<ConversationsState> emit,
   ) async {
-    final current = state;
-    if (current is! ConversationsLoaded) {
-      add(const ConversationsLoadRequested());
-      return;
+    _refreshing = true;
+    final before = _items;
+    if (before != null) {
+      emit(ConversationsLoaded(items: before, isRefreshing: true));
     }
-    emit(ConversationsLoaded(items: current.items, isRefreshing: true));
     try {
-      final items = await _repo.listForBot(_botId);
-      emit(ConversationsLoaded(items: items, isRefreshing: false));
+      await _repo.refresh(_botId);
+      _refreshing = false;
+      final after = _items;
+      if (after != null) {
+        emit(ConversationsLoaded(items: after, isRefreshing: false));
+      }
     } on ConversationsFailure catch (f) {
-      emit(ConversationsFailed(f));
+      _refreshing = false;
+      final cached = _items;
+      if (cached != null && cached.isNotEmpty) {
+        // Fallo de red con caché: offline-first sirve lo último visto.
+        emit(ConversationsLoaded(items: cached, isRefreshing: false));
+      } else {
+        emit(ConversationsFailed(f));
+      }
     }
+  }
+
+  @override
+  Future<void> close() {
+    _sub?.cancel();
+    return super.close();
   }
 }
 
@@ -78,6 +127,18 @@ class ConversationsRefreshRequested extends ConversationsEvent {
   bool operator ==(Object other) => other is ConversationsRefreshRequested;
   @override
   int get hashCode => (ConversationsRefreshRequested).hashCode;
+}
+
+/// Interno: nueva emisión del watch de la DB. Lleva la lista ya mapeada.
+class _ConversationsDbEmitted extends ConversationsEvent {
+  const _ConversationsDbEmitted(this.items);
+  final List<Conversation> items;
+}
+
+/// Interno: el watch de la DB emitió un error (ya tipado por el repo).
+class _ConversationsWatchFailed extends ConversationsEvent {
+  const _ConversationsWatchFailed(this.failure);
+  final ConversationsFailure failure;
 }
 
 // States --------------------------------------------------------------------

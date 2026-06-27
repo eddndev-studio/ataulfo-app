@@ -97,11 +97,8 @@ void main() {
     'drill-through: resuelve el wamid → corrida y carga sus entries (sin cursor)',
     build: () {
       when(
-        () => repo.runForMessage(
-          botId: 'b1',
-          chatLid: 'c1',
-          externalId: 'WAM9',
-        ),
+        () =>
+            repo.runForMessage(botId: 'b1', chatLid: 'c1', externalId: 'WAM9'),
       ).thenAnswer((_) async => 'run-7');
       when(
         () => repo.byRun(botId: 'b1', chatLid: 'c1', runId: 'run-7'),
@@ -133,11 +130,8 @@ void main() {
     'drill-through: sin corrida (mensaje ajeno a la IA) → Loaded vacío',
     build: () {
       when(
-        () => repo.runForMessage(
-          botId: 'b1',
-          chatLid: 'c1',
-          externalId: 'WAM9',
-        ),
+        () =>
+            repo.runForMessage(botId: 'b1', chatLid: 'c1', externalId: 'WAM9'),
       ).thenAnswer((_) async => null);
       return AiLogBloc(
         repo: repo,

@@ -596,7 +596,10 @@ void main() {
       () => repo.renameConversation('c1', 'Nuevo'),
     ).thenAnswer((_) async => _conv(title: 'Nuevo')),
     seed: () => PaChatLoaded(
-      conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      conversations: <PaConversation>[
+        _conv(),
+        _conv(id: 'c2'),
+      ],
       activeConversation: _conv(),
       messages: const <PaMessage>[],
       sending: false,
@@ -619,7 +622,10 @@ void main() {
     setUp: () =>
         when(() => repo.deleteConversation('c2')).thenAnswer((_) async {}),
     seed: () => PaChatLoaded(
-      conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      conversations: <PaConversation>[
+        _conv(),
+        _conv(id: 'c2'),
+      ],
       activeConversation: _conv(),
       messages: const <PaMessage>[],
       sending: false,
@@ -651,7 +657,10 @@ void main() {
       );
     },
     seed: () => PaChatLoaded(
-      conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      conversations: <PaConversation>[
+        _conv(),
+        _conv(id: 'c2'),
+      ],
       activeConversation: _conv(),
       messages: const <PaMessage>[],
       sending: false,
@@ -661,7 +670,11 @@ void main() {
       isA<PaChatLoaded>()
           .having((s) => s.conversations.length, 'lista', 1)
           .having((s) => s.activeConversation.id, 'nuevo activo', 'c2')
-          .having((s) => s.messages.first.content, 'mensajes del nuevo', 'de c2'),
+          .having(
+            (s) => s.messages.first.content,
+            'mensajes del nuevo',
+            'de c2',
+          ),
     ],
   );
 
@@ -731,7 +744,10 @@ void main() {
     'el draft se guarda por conversación y no se filtra entre hilos',
     build: build,
     seed: () => PaChatLoaded(
-      conversations: <PaConversation>[_conv(), _conv(id: 'c2')],
+      conversations: <PaConversation>[
+        _conv(),
+        _conv(id: 'c2'),
+      ],
       activeConversation: _conv(),
       messages: const <PaMessage>[],
       sending: false,

@@ -77,7 +77,11 @@ class PaMessageTile extends StatelessWidget {
 /// Un campo que cambió en una escritura: ruta, valor previo y nuevo (ya como
 /// texto legible). Espejo del `fieldChange` del backend.
 class _FieldChange {
-  const _FieldChange({required this.field, required this.from, required this.to});
+  const _FieldChange({
+    required this.field,
+    required this.from,
+    required this.to,
+  });
 
   final String field;
   final String from;
@@ -327,7 +331,9 @@ class _ExpandableToolCardState extends State<_ExpandableToolCard> {
   @override
   Widget build(BuildContext context) {
     final r = widget.result;
-    final label = r.toolName.isNotEmpty ? 'Usó ${r.toolName}' : 'Acción ejecutada';
+    final label = r.toolName.isNotEmpty
+        ? 'Usó ${r.toolName}'
+        : 'Acción ejecutada';
 
     if (!r.hasDetail) {
       return _ToolChip(label: label);
@@ -378,13 +384,19 @@ class _ToolDetail extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Icon(Icons.warning_amber_rounded, size: 16, color: AppTokens.danger),
+            const Icon(
+              Icons.warning_amber_rounded,
+              size: 16,
+              color: AppTokens.danger,
+            ),
             const SizedBox(width: AppTokens.sp2),
             Expanded(
               child: Text(
                 paToolErrorCopy(result.errorKind),
                 key: const Key('pa.tool_card.error'),
-                style: theme.textTheme.bodySmall?.copyWith(color: AppTokens.text1),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTokens.text1,
+                ),
               ),
             ),
           ],
@@ -397,7 +409,9 @@ class _ToolDetail extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1 / 2),
             child: Text(
               '${c.field}: ${c.from} → ${c.to}',
-              style: theme.textTheme.bodySmall?.copyWith(color: AppTokens.text1),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppTokens.text1,
+              ),
             ),
           ),
         );
@@ -443,7 +457,9 @@ class _ToolChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTokens.surface2,
           borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-          border: Border.all(color: error ? AppTokens.danger : AppTokens.divider),
+          border: Border.all(
+            color: error ? AppTokens.danger : AppTokens.divider,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

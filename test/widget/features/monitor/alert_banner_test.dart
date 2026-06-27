@@ -53,7 +53,11 @@ void main() {
 
   testWidgets('una alerta se muestra con título y detalle', (tester) async {
     await _pump(tester, cubit, <MonitorEvent>[
-      _alert('Bot desconectado', 'El bot Ventas perdió la sesión de WhatsApp', 0),
+      _alert(
+        'Bot desconectado',
+        'El bot Ventas perdió la sesión de WhatsApp',
+        0,
+      ),
     ]);
     expect(find.byKey(const Key('monitor.alert_banner')), findsOneWidget);
     expect(find.textContaining('Bot desconectado'), findsOneWidget);

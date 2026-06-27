@@ -1,9 +1,13 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
+import 'core/db/app_db.dart';
+import 'core/network/connectivity_cubit.dart';
+import 'core/network/connectivity_plus_monitor.dart';
 import 'core/network/dio_client.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/device_id_provider.dart';
@@ -19,6 +23,7 @@ import 'features/bots/data/datasources/bot_session_datasource.dart';
 import 'features/bots/data/datasources/bots_datasource.dart';
 import 'features/bots/data/repositories/bot_session_repository_impl.dart';
 import 'features/bots/data/repositories/bots_repository_impl.dart';
+import 'features/conversations/data/datasources/conversations_dao.dart';
 import 'features/conversations/data/datasources/conversations_datasource.dart';
 import 'features/conversations/data/repositories/conversations_repository_impl.dart';
 import 'features/flow_run/data/datasources/flow_run_datasource.dart';
@@ -58,16 +63,21 @@ import 'features/members/data/datasources/members_datasource.dart';
 import 'features/members/data/repositories/members_repository_impl.dart';
 import 'features/memberships/data/datasources/memberships_datasource.dart';
 import 'features/memberships/data/repositories/memberships_repository_impl.dart';
+import 'features/messages/data/datasources/messages_dao.dart';
 import 'features/messages/data/datasources/messages_datasource.dart';
 import 'features/messages/data/datasources/messages_events_datasource.dart';
+import 'features/messages/data/cache/message_media_cache.dart';
+import 'features/messages/data/datasources/outbox_dao.dart';
 import 'features/messages/data/media/dio_media_opener.dart';
 import 'features/messages/data/media/just_audio_engine.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
+import 'features/messages/data/sync/sync_coordinator.dart';
 import 'features/notifications/application/push_display_bootstrap.dart';
 import 'features/notifications/application/push_registration_coordinator.dart';
 import 'features/notifications/application/push_token_provider_resolver.dart';
 import 'features/notifications/data/datasources/notifications_datasource.dart';
 import 'features/notifications/data/repositories/notifications_repository_impl.dart';
+import 'features/profile/data/cache/profile_photo_cache.dart';
 import 'features/profile/data/datasources/profile_datasource.dart';
 import 'features/profile/data/repositories/profile_repository_impl.dart';
 import 'features/templates/data/datasources/templates_datasource.dart';
@@ -122,6 +132,17 @@ Future<void> main() async {
 
   final mainDio = DioClient.create(baseUrl: baseUrl);
 
+  // Almacén local (drift/SQLite): única fuente de verdad offline del núcleo
+  // conversacional. Se abre de forma perezosa; se purga al cerrar sesión
+  // (abajo) para no dejar verdad local de una cuenta a la siguiente.
+  final db = AppDb();
+
+  // Señal de conectividad proactiva (online/offline): el cubit arranca el
+  // monitoreo al lanzar la app y la UI/consumidores la leen globalmente. El
+  // monitor también alimentará a los repos y al coordinador de sync.
+  final connectivity = ConnectivityPlusMonitor();
+  final connectivityCubit = ConnectivityCubit(connectivity);
+
   // `late` difiere la captura del bloc: la closure de onUnrecoverable se
   // construye antes que `authBloc`, pero solo se ejecuta en runtime.
   late final AuthBloc authBloc;
@@ -166,15 +187,46 @@ Future<void> main() async {
 
   final conversationsRepository = ConversationsRepositoryImpl(
     datasource: DioConversationsDatasource(mainDio),
+    dao: ConversationsDao(db),
   );
 
-  final messagesRepository = MessagesRepositoryImpl(
-    datasource: DioMessagesDatasource(mainDio),
-    events: DioMessagesEventsDatasource(mainDio),
+  final messagesDao = MessagesDao(db);
+  final messagesDatasource = DioMessagesDatasource(mainDio);
+  final outboxDao = OutboxDao(db);
+
+  // Coordinador de sincronización: drena el outbox (escrituras encoladas) al
+  // reconectar y reconcilia el resultado contra la DB local. Comparte el DAO y
+  // el datasource del repositorio. Arranca rescatando operaciones huérfanas.
+  final syncCoordinator = SyncCoordinator(
+    db: db,
+    outbox: outboxDao,
+    messages: messagesDao,
+    datasource: messagesDatasource,
+    connectivity: connectivity,
   );
+
+  // El envío va al outbox durable; `requestSync` dispara el drain para que salga
+  // ya si hay red. La burbuja pendiente la observa el bloc vía watchPending.
+  final messagesRepository = MessagesRepositoryImpl(
+    datasource: messagesDatasource,
+    events: DioMessagesEventsDatasource(mainDio),
+    dao: messagesDao,
+    outbox: outboxDao,
+    requestSync: () => unawaited(syncCoordinator.drain()),
+  );
+
+  unawaited(syncCoordinator.start());
 
   final profileRepository = ProfileRepositoryImpl(
     datasource: DioProfileDatasource(mainDio),
+  );
+
+  // Caché de fotos de perfil (L1 memoria + L2 disco). La descarga usa un Dio
+  // propio SIN interceptor de auth: la `photoUrl` es una URL pública efímera del
+  // CDN de Meta, no un endpoint de negocio, así que no lleva Bearer.
+  final profilePhotoCache = ProfilePhotoCache(
+    profileRepo: profileRepository,
+    download: _downloadBytes,
   );
 
   final templatesRepository = TemplatesRepositoryImpl(
@@ -314,6 +366,15 @@ Future<void> main() async {
     download: DioThumbnailDownloader().call,
   );
 
+  // Cache de bytes de la media de los MENSAJES por `ref` (imagen/sticker del
+  // hilo): se ve offline y sobrevive a la expiración de la firma. Namespace de
+  // disco propio ('message_media'): la galería cachea MINIATURAS bajo el mismo
+  // ref, contenido distinto de la imagen completa del mensaje.
+  final messageMediaCache = MessageMediaCache(
+    store: FileMediaByteStore(subdir: 'message_media'),
+    download: _downloadBytes,
+  );
+
   // El picker es un puerto sin estado; el adaptador concreto envuelve
   // `file_picker` y lee bytes cross-platform (no toca dart:io). file_picker
   // abre CUALQUIER tipo (audio/video/PDF/Office), no sólo imágenes.
@@ -394,13 +455,45 @@ Future<void> main() async {
     AtaulfoApp(
       router: router,
       authBloc: authBloc,
-      // Al cerrar sesión, purga las cachés de sesión (media y respuestas
-      // rápidas) para no servir el catálogo de una cuenta a la siguiente sin
-      // reiniciar la app.
+      connectivityCubit: connectivityCubit,
+      profilePhotoCache: profilePhotoCache,
+      messageMediaCache: messageMediaCache,
+      // Al cerrar sesión, purga las cachés de sesión (media, respuestas rápidas
+      // y fotos de perfil) para no servir el catálogo de una cuenta a la
+      // siguiente sin reiniciar la app.
       onSignedOut: () {
         mediaRepository.invalidate();
         quickRepliesRepository.invalidate();
+        unawaited(profilePhotoCache.invalidate());
+        // Limpia la memoria de la caché de media de mensajes (los bytes en disco
+        // son inmutables y org-safe — el ref embebe el tenant —, se conservan).
+        messageMediaCache.invalidate();
+        // Fencea cualquier reconciliación del outbox en vuelo ANTES de purgar:
+        // un envío que confirme tras el borrado no debe repoblar la DB.
+        syncCoordinator.reset();
+        // Borra la verdad local (drift): ninguna fila de la cuenta anterior
+        // debe persistir. Fire-and-forget: el router redirige a /login y nada
+        // vuelve a leer la DB durante el borrado.
+        unawaited(db.clearAllData());
       },
     ),
   );
+}
+
+/// Descarga bytes de una URL (fotos de perfil, media de mensajes) con timeouts
+/// explícitos: una URL del CDN que se cuelga no debe dejar la descarga (ni el
+/// slot de dedup de la caché) colgada para siempre. `null` si falla.
+Future<Uint8List?> _downloadBytes(String url) async {
+  try {
+    final res = await Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    ).get<List<int>>(url, options: Options(responseType: ResponseType.bytes));
+    final data = res.data;
+    return data == null ? null : Uint8List.fromList(data);
+  } catch (_) {
+    return null;
+  }
 }

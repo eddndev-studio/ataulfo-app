@@ -27,7 +27,6 @@ linter:
     # Estilo
     always_declare_return_types: true
     avoid_dynamic_calls: true
-    avoid_returning_null_for_future: true
     avoid_slow_async_io: true
     avoid_type_to_string: true
     prefer_const_constructors: true
@@ -53,3 +52,8 @@ linter:
     test_types_in_equals: true
     throw_in_finally: true
     use_build_context_synchronously: true
+
+    # Deshabilitado a propósito: el código asigna parámetros a campos privados
+    # de forma explícita (cuerpo/lista de inicialización); no se fuerza el
+    # formal inicializador `this._campo`.
+    prefer_initializing_formals: false
