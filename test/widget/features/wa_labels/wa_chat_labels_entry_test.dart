@@ -1,6 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
+import 'package:ataulfo/features/conversations/presentation/cubit/inbox_labels_cubit.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
@@ -83,8 +84,14 @@ void main() {
                 value: chatLabelsRepo,
               ),
             ],
-            child: BlocProvider<ConversationsBloc>.value(
-              value: conv,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<ConversationsBloc>.value(value: conv),
+                BlocProvider<InboxLabelsCubit>(
+                  create: (_) =>
+                      InboxLabelsCubit(repo: repo, botId: 'b1')..load(),
+                ),
+              ],
               child: const Scaffold(body: ConversationsListPage()),
             ),
           ),
@@ -125,4 +132,41 @@ void main() {
 
     expect(find.text('HILO_SENTINEL'), findsOneWidget);
   });
+
+  testWidgets(
+    'abrir el sheet desde la bandeja siembra WhatsApp: no re-consulta '
+    'catálogo ni asociaciones',
+    (tester) async {
+      // Catálogo no-vacío + una asociación a este chat: la bandeja los carga
+      // una vez y el sheet debe reusarlos en vez de volver a pedirlos.
+      when(() => repo.listCatalog('b1')).thenAnswer(
+        (_) async => const <WaLabel>[
+          WaLabel(waLabelId: 'w1', name: 'VIP', color: 3, deleted: false),
+        ],
+      );
+      when(() => repo.listChatAssocs('b1')).thenAnswer(
+        (_) async => const <WaChatAssoc>[
+          WaChatAssoc(chatLid: 'lid-dm', waLabelId: 'w1', labeled: true),
+        ],
+      );
+
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle(); // InboxLabelsCubit.load() resuelve aquí
+
+      // La bandeja cargó el catálogo + asociaciones exactamente una vez. Verify
+      // de mocktail consume estas interacciones: el verifyNever de abajo solo
+      // mira lo que pase DESPUÉS de abrir el sheet.
+      verify(() => repo.listCatalog('b1')).called(1);
+      verify(() => repo.listChatAssocs('b1')).called(1);
+
+      await tester.tap(find.byKey(const Key('conversation.labels.lid-dm')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Etiquetas de este chat'), findsOneWidget);
+      // El sheet se sembró del caché: abrirlo no dispara ninguna consulta nueva
+      // de catálogo ni de asociaciones.
+      verifyNever(() => repo.listCatalog(any()));
+      verifyNever(() => repo.listChatAssocs(any()));
+    },
+  );
 }

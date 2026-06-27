@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -19,8 +20,8 @@ class RenameOrgSheet extends StatefulWidget {
     BuildContext context, {
     required String currentName,
   }) {
-    return showModalBottomSheet<String>(
-      context: context,
+    return showAppBottomSheet<String>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => RenameOrgSheet(currentName: currentName),

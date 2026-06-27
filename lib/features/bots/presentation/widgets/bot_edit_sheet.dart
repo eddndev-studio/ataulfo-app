@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -27,8 +28,8 @@ class BotEditSheet extends StatefulWidget {
 
   static void openEdit(BuildContext context, Bot bot) {
     final bloc = context.read<BotDetailBloc>();
-    showModalBottomSheet<void>(
-      context: context,
+    showAppBottomSheet<void>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => BlocProvider<BotDetailBloc>.value(

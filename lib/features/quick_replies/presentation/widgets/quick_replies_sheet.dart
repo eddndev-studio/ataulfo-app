@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../domain/entities/quick_reply.dart';
@@ -22,8 +23,8 @@ class QuickRepliesSheet extends StatelessWidget {
   /// Abre el selector y resuelve con el `message` elegido, o `null` si se cierra
   /// sin elegir.
   static Future<String?> open(BuildContext context, List<QuickReply> items) {
-    return showModalBottomSheet<String>(
-      context: context,
+    return showAppBottomSheet<String>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => QuickRepliesSheet(items: items),

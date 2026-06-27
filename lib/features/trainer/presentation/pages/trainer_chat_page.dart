@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
@@ -81,8 +82,8 @@ class TrainerChatPage extends StatelessWidget {
     final bloc = context.read<TrainerChatBloc>();
     final state = bloc.state;
     if (state is! TrainerChatLoaded) return;
-    showModalBottomSheet<void>(
-      context: context,
+    showAppBottomSheet<void>(
+      context,
       builder: (sheetCtx) => _ThreadList(
         conversations: state.conversations,
         activeId: state.conversation.id,

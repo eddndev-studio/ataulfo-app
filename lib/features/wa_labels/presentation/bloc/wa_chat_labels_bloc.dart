@@ -18,26 +18,55 @@ import '../../domain/repositories/wa_labels_repository.dart';
 /// ignora. Ante reconexión reconcilia contra HTTP. Espeja el patrón de
 /// `WaLabelsBloc` (mutación con snapshot + realtime).
 class WaChatLabelsBloc extends Bloc<WaChatLabelsEvent, WaChatLabelsState> {
+  /// `seedCatalog`/`seedAssociated` siembran el estado inicial desde un caché
+  /// ya cargado (el de la bandeja): si el catálogo viene no-vacío, arranca en
+  /// `Loaded` y la carga inicial NO re-consulta HTTP, solo se engancha al
+  /// realtime. Un catálogo sembrado vacío cae a la consulta normal, porque no se
+  /// distingue "el bot no tiene etiquetas" de "el caché degradó por un fallo".
   WaChatLabelsBloc({
     required WaLabelsRepository repo,
     required String botId,
     required String chatLid,
     required ConversationKind kind,
+    List<WaLabel>? seedCatalog,
+    Set<String>? seedAssociated,
   }) : _repo = repo,
        _botId = botId,
        _chatLid = chatLid,
        _kind = kind,
-       super(const WaChatLabelsLoading()) {
+       _seeded = seedCatalog != null && seedCatalog.isNotEmpty,
+       super(_initial(seedCatalog, seedAssociated)) {
     on<WaChatLabelsLoadRequested>(_onLoad);
     on<WaChatLabelsToggleRequested>(_onToggle);
     on<WaChatLabelsLive>(_onLive);
     on<WaChatLabelsReconnected>(_onReconnected);
   }
 
+  /// Estado inicial: `Loaded` con la semilla (sin tombstones) si trae catálogo,
+  /// o `Loading` para el camino que consulta HTTP.
+  static WaChatLabelsState _initial(
+    List<WaLabel>? seedCatalog,
+    Set<String>? seedAssociated,
+  ) {
+    if (seedCatalog == null || seedCatalog.isEmpty) {
+      return const WaChatLabelsLoading();
+    }
+    return WaChatLabelsLoaded(
+      catalog: <WaLabel>[
+        for (final l in seedCatalog)
+          if (!l.deleted) l,
+      ],
+      associated: seedAssociated ?? const <String>{},
+    );
+  }
+
   final WaLabelsRepository _repo;
   final String _botId;
   final String _chatLid;
   final ConversationKind _kind;
+
+  /// El estado arrancó sembrado del caché: la carga inicial omite el fetch HTTP.
+  final bool _seeded;
 
   StreamSubscription<WaLabelLiveEvent>? _liveSub;
   bool _refetching = false;
@@ -46,6 +75,13 @@ class WaChatLabelsBloc extends Bloc<WaChatLabelsEvent, WaChatLabelsState> {
     WaChatLabelsLoadRequested event,
     Emitter<WaChatLabelsState> emit,
   ) async {
+    if (_seeded) {
+      // Catálogo y asociaciones llegaron sembrados del caché de la bandeja: no
+      // re-consultamos HTTP. Solo nos enganchamos al realtime para mantener
+      // vivo este chat; la reconexión reconcilia contra HTTP si el socket cae.
+      _startLive();
+      return;
+    }
     if (state is! WaChatLabelsLoading) {
       emit(const WaChatLabelsLoading());
     }

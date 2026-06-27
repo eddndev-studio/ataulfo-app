@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/i18n/role_labels.dart';
@@ -74,8 +75,8 @@ class MemberEditSheet extends StatefulWidget {
     required bool isSelf,
     bool callerIsOwner = false,
   }) {
-    return showModalBottomSheet<MemberSheetResult>(
-      context: context,
+    return showAppBottomSheet<MemberSheetResult>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => MemberEditSheet(

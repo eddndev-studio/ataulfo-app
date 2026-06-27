@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -6,14 +8,16 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/smart_timestamp.dart';
+import '../../../wa_labels/domain/entities/wa_label.dart';
+import '../../../wa_labels/presentation/widgets/wa_label_palette.dart';
 import '../../domain/entities/conversation.dart';
 import '../../domain/failures/conversations_failure.dart';
 import '../bloc/conversations_bloc.dart';
+import '../cubit/inbox_labels_cubit.dart';
 import '../widgets/chat_labels_sheet.dart';
 
 /// Listado de conversaciones de un bot (S07 RF#7). Consume el
@@ -24,7 +28,10 @@ import '../widgets/chat_labels_sheet.dart';
 /// La fila navega al hilo de mensajes (S09, `/bots/:id/sessions/:chatLid`); el
 /// botId lo aporta el `ConversationsBloc` del scope.
 class ConversationsListPage extends StatelessWidget {
-  const ConversationsListPage({super.key, this.needsAttention = const <String>{}});
+  const ConversationsListPage({
+    super.key,
+    this.needsAttention = const <String>{},
+  });
 
   /// chatLids con una señal de atención del bot (falló / alerta). La ruta los
   /// inyecta desde el MonitorAttentionCubit; vacío por defecto.
@@ -61,8 +68,16 @@ class _LoadingView extends StatelessWidget {
 /// su propio filtro, como en mensajería); `unread` = pendientes de atender.
 enum _TrayFilter { all, unread, archived }
 
+/// Diámetro del avatar de la fila. Compartido entre el avatar y el sangrado
+/// del divisor para que ambos deriven del mismo valor (el divisor alinea con
+/// el inicio del texto: padding + avatar + gap).
+const double _kInboxAvatarSize = 40;
+
 class _LoadedView extends StatefulWidget {
-  const _LoadedView({required this.items, this.needsAttention = const <String>{}});
+  const _LoadedView({
+    required this.items,
+    this.needsAttention = const <String>{},
+  });
 
   final List<Conversation> items;
   final Set<String> needsAttention;
@@ -74,6 +89,11 @@ class _LoadedView extends StatefulWidget {
 class _LoadedViewState extends State<_LoadedView> {
   final TextEditingController _searchCtrl = TextEditingController();
   _TrayFilter _filter = _TrayFilter.all;
+
+  /// Etiqueta WhatsApp activa como filtro (`waLabelId`), o `null` si el filtro
+  /// activo es una vista (Todas/No leídas/Archivadas). La fila de chips es de
+  /// selección única: una etiqueta y una vista no están activas a la vez.
+  String? _labelFilter;
 
   @override
   void initState() {
@@ -87,9 +107,32 @@ class _LoadedViewState extends State<_LoadedView> {
     super.dispose();
   }
 
-  /// Bandeja visible: filtro de vista + búsqueda por nombre/teléfono, con
-  /// las fijadas primero (orden estable dentro de cada grupo).
-  List<Conversation> get _visible {
+  /// Selecciona una vista (Todas/No leídas/Archivadas) y limpia el filtro de
+  /// etiqueta: las dos caras de la fila de chips son mutuamente excluyentes.
+  void _selectView(_TrayFilter f) => setState(() {
+    _filter = f;
+    _labelFilter = null;
+  });
+
+  /// Alterna el filtro por una etiqueta. Activarla resetea la vista a Todas
+  /// (la etiqueta pasa a ser el único filtro); re-tocar la activa vuelve a
+  /// Todas.
+  void _toggleLabel(String waLabelId) => setState(() {
+    if (_labelFilter == waLabelId) {
+      _labelFilter = null;
+    } else {
+      _labelFilter = waLabelId;
+      _filter = _TrayFilter.all;
+    }
+  });
+
+  /// Bandeja visible: filtro de vista o de etiqueta + búsqueda por
+  /// nombre/teléfono, con las fijadas primero (orden estable en cada grupo).
+  /// `labelFilter` es el filtro de etiqueta ya reconciliado contra el catálogo.
+  List<Conversation> _visibleWith(
+    Map<String, List<WaLabel>> byChat,
+    String? labelFilter,
+  ) {
     final query = _searchCtrl.text.trim().toLowerCase();
     final byFilter = widget.items.where(
       (c) => switch (_filter) {
@@ -99,9 +142,16 @@ class _LoadedViewState extends State<_LoadedView> {
         _TrayFilter.archived => c.isArchived,
       },
     );
-    final byQuery = query.isEmpty
+    final byLabel = labelFilter == null
         ? byFilter
         : byFilter.where(
+            (c) => (byChat[c.chatLid] ?? const <WaLabel>[]).any(
+              (l) => l.waLabelId == labelFilter,
+            ),
+          );
+    final byQuery = query.isEmpty
+        ? byLabel
+        : byLabel.where(
             (c) =>
                 _titleOf(c).toLowerCase().contains(query) ||
                 (c.phone?.contains(query) ?? false),
@@ -115,10 +165,51 @@ class _LoadedViewState extends State<_LoadedView> {
 
   @override
   Widget build(BuildContext context) {
-    final visible = _visible;
+    final inboxLabels = context.watch<InboxLabelsCubit>().state;
+    final labelsByChat = inboxLabels.byChat;
+    // Filtro efectivo: si la etiqueta activa ya no está en el catálogo (la
+    // borraron o WhatsApp cayó al recargar), su chip desaparece — reconciliamos
+    // a "sin filtro de etiqueta" para no dejar la bandeja vacía y sin chip
+    // marcado. El estado crudo `_labelFilter` no se toca aquí (sin setState en
+    // build); el render simplemente lo ignora cuando ya no aplica.
+    final effectiveLabel =
+        inboxLabels.catalog.any((l) => l.waLabelId == _labelFilter)
+        ? _labelFilter
+        : null;
+    final visible = _visibleWith(labelsByChat, effectiveLabel);
+    final filterChips = <Widget>[
+      AppChoiceChip(
+        key: const Key('conversations.filter.all'),
+        label: 'Todas',
+        selected: effectiveLabel == null && _filter == _TrayFilter.all,
+        onSelected: (_) => _selectView(_TrayFilter.all),
+      ),
+      AppChoiceChip(
+        key: const Key('conversations.filter.unread'),
+        label: 'No leídas',
+        selected: effectiveLabel == null && _filter == _TrayFilter.unread,
+        onSelected: (_) => _selectView(_TrayFilter.unread),
+      ),
+      AppChoiceChip(
+        key: const Key('conversations.filter.archived'),
+        label: 'Archivadas',
+        selected: effectiveLabel == null && _filter == _TrayFilter.archived,
+        onSelected: (_) => _selectView(_TrayFilter.archived),
+      ),
+      for (final l in inboxLabels.catalog)
+        AppChoiceChip(
+          key: Key('conversations.filter.label.${l.waLabelId}'),
+          label: l.name,
+          selected: effectiveLabel == l.waLabelId,
+          onSelected: (_) => _toggleLabel(l.waLabelId),
+        ),
+    ];
     return RefreshIndicator(
       onRefresh: () async {
         final bloc = context.read<ConversationsBloc>();
+        // El pull-to-refresh también recarga las etiquetas WhatsApp (blobs y
+        // chips): viajan en otra fuente, así que se refrescan en paralelo.
+        unawaited(context.read<InboxLabelsCubit>().load());
         bloc.add(const ConversationsRefreshRequested());
         await bloc.stream.firstWhere(
           (s) =>
@@ -130,47 +221,44 @@ class _LoadedViewState extends State<_LoadedView> {
           ? const _EmptyView()
           : ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                AppTokens.sp4,
-                AppTokens.sp4,
-                AppTokens.sp4,
-                AppTokens.sp4 + context.safeBottomInset,
+              // Padding solo vertical: las filas van a sangre (full-bleed) con
+              // su propio padding interno, como una bandeja de mensajería; el
+              // buscador y los filtros conservan su margen horizontal.
+              padding: EdgeInsets.only(
+                top: AppTokens.sp4,
+                bottom: AppTokens.sp4 + context.safeBottomInset,
               ),
               children: <Widget>[
-                AppTextField(
-                  key: const Key('conversations.search'),
-                  label: 'Buscar conversación',
-                  hint: 'Nombre o teléfono',
-                  controller: _searchCtrl,
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTokens.sp4,
+                  ),
+                  child: AppTextField(
+                    key: const Key('conversations.search'),
+                    label: 'Buscar conversación',
+                    hint: 'Nombre o teléfono',
+                    controller: _searchCtrl,
+                  ),
                 ),
                 const SizedBox(height: AppTokens.sp3),
-                Wrap(
-                  spacing: AppTokens.sp2,
-                  children: <Widget>[
-                    AppChoiceChip(
-                      key: const Key('conversations.filter.all'),
-                      label: 'Todas',
-                      selected: _filter == _TrayFilter.all,
-                      onSelected: (_) =>
-                          setState(() => _filter = _TrayFilter.all),
-                    ),
-                    AppChoiceChip(
-                      key: const Key('conversations.filter.unread'),
-                      label: 'No leídas',
-                      selected: _filter == _TrayFilter.unread,
-                      onSelected: (_) =>
-                          setState(() => _filter = _TrayFilter.unread),
-                    ),
-                    AppChoiceChip(
-                      key: const Key('conversations.filter.archived'),
-                      label: 'Archivadas',
-                      selected: _filter == _TrayFilter.archived,
-                      onSelected: (_) =>
-                          setState(() => _filter = _TrayFilter.archived),
-                    ),
-                  ],
+                // Fila de filtros en scroll horizontal (vistas + etiquetas):
+                // una sola línea que crece con el catálogo sin robar alto, al
+                // estilo de la bandeja de mensajería.
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTokens.sp4,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      for (var i = 0; i < filterChips.length; i++) ...<Widget>[
+                        if (i > 0) const SizedBox(width: AppTokens.sp2),
+                        filterChips[i],
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: AppTokens.sp4),
+                const SizedBox(height: AppTokens.sp2),
                 if (visible.isEmpty)
                   Padding(
                     key: const Key('conversations.no_results'),
@@ -184,12 +272,17 @@ class _LoadedViewState extends State<_LoadedView> {
                     ),
                   )
                 else
-                  for (final c in visible) ...<Widget>[
+                  for (var i = 0; i < visible.length; i++) ...<Widget>[
                     _ConversationTile(
-                      conversation: c,
-                      needsAttention: widget.needsAttention.contains(c.chatLid),
+                      conversation: visible[i],
+                      needsAttention: widget.needsAttention.contains(
+                        visible[i].chatLid,
+                      ),
+                      labels:
+                          labelsByChat[visible[i].chatLid] ?? const <WaLabel>[],
+                      catalog: inboxLabels.catalog,
                     ),
-                    const SizedBox(height: AppTokens.cardGap),
+                    if (i < visible.length - 1) const _InboxDivider(),
                   ],
               ],
             ),
@@ -283,12 +376,22 @@ class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.conversation,
     this.needsAttention = false,
+    this.labels = const <WaLabel>[],
+    this.catalog = const <WaLabel>[],
   });
 
   final Conversation conversation;
 
   /// El bot falló o levantó una alerta en este chat (del monitor en vivo).
   final bool needsAttention;
+
+  /// Etiquetas WhatsApp aplicadas a este chat, resueltas para pintarlas como
+  /// blobs de color. Vacío si el bot no tiene etiquetas o aún no cargaron.
+  final List<WaLabel> labels;
+
+  /// Catálogo WhatsApp del bot, ya cargado por la bandeja. Siembra la hoja de
+  /// etiquetas al abrirla para que no re-consulte catálogo + asociaciones.
+  final List<WaLabel> catalog;
 
   @override
   Widget build(BuildContext context) {
@@ -323,100 +426,177 @@ class _ConversationTile extends StatelessWidget {
       if (c.isArchived) const AppPill.neutral(label: 'Archivado'),
     ];
 
-    return AppCard(
+    return InkWell(
+      key: Key('conversation.tile.${c.chatLid}'),
       onTap: () => context.push(
         '/bots/${context.read<ConversationsBloc>().botId}'
         '/sessions/${Uri.encodeComponent(c.chatLid)}',
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          AppAvatar(name: title),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium,
-                      ),
-                    ),
-                    if (hasLast) ...<Widget>[
-                      const SizedBox(width: AppTokens.sp2),
-                      Text(
-                        smartTimestamp(c.lastMessageTimestampMs!),
-                        style: textTheme.labelSmall?.copyWith(
-                          // La hora se tiñe del verde de sección cuando hay
-                          // no-leídos: el acento "ligero" que la bandeja comparte
-                          // con el tick de leído del hilo.
-                          color: hasUnread
-                              ? AppTokens.chatAccent
-                              : AppTokens.text2,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                if (showSecondaryRow) ...<Widget>[
-                  const SizedBox(height: 2),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp4,
+          vertical: AppTokens.sp3,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            AppAvatar(name: title, size: _kInboxAvatarSize),
+            const SizedBox(width: AppTokens.sp3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
                   Row(
                     children: <Widget>[
-                      if (previewIcon != null) ...<Widget>[
-                        Icon(
-                          previewIcon,
-                          size: 14,
-                          color: hasUnread ? AppTokens.text1 : AppTokens.text2,
-                        ),
-                        const SizedBox(width: AppTokens.sp1),
-                      ],
                       Expanded(
                         child: Text(
-                          secondary,
-                          key: Key('conversation.preview.${c.chatLid}'),
+                          title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: previewStyle,
+                          style: textTheme.titleMedium,
                         ),
                       ),
-                      if (c.unreadCount > 0) ...<Widget>[
+                      if (hasLast) ...<Widget>[
                         const SizedBox(width: AppTokens.sp2),
-                        _UnreadBadge(count: c.unreadCount, chatLid: c.chatLid),
+                        Text(
+                          smartTimestamp(c.lastMessageTimestampMs!),
+                          style: textTheme.labelSmall?.copyWith(
+                            // La hora se tiñe del verde de sección cuando hay
+                            // no-leídos: el acento "ligero" que la bandeja comparte
+                            // con el tick de leído del hilo.
+                            color: hasUnread
+                                ? AppTokens.chatAccent
+                                : AppTokens.text2,
+                          ),
+                        ),
                       ],
                     ],
                   ),
+                  if (showSecondaryRow) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: <Widget>[
+                        if (previewIcon != null) ...<Widget>[
+                          Icon(
+                            previewIcon,
+                            size: 14,
+                            color: hasUnread
+                                ? AppTokens.text1
+                                : AppTokens.text2,
+                          ),
+                          const SizedBox(width: AppTokens.sp1),
+                        ],
+                        Expanded(
+                          child: Text(
+                            secondary,
+                            key: Key('conversation.preview.${c.chatLid}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: previewStyle,
+                          ),
+                        ),
+                        if (c.unreadCount > 0) ...<Widget>[
+                          const SizedBox(width: AppTokens.sp2),
+                          _UnreadBadge(
+                            count: c.unreadCount,
+                            chatLid: c.chatLid,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                  if (labels.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp1),
+                    Wrap(
+                      spacing: AppTokens.sp1,
+                      runSpacing: AppTokens.sp1,
+                      children: <Widget>[
+                        for (final l in labels) _LabelBlob(label: l),
+                      ],
+                    ),
+                  ],
+                  if (pills.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp2),
+                    Wrap(
+                      spacing: AppTokens.sp2,
+                      runSpacing: AppTokens.sp2,
+                      children: pills,
+                    ),
+                  ],
                 ],
-                if (pills.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: AppTokens.sp2),
-                  Wrap(
-                    spacing: AppTokens.sp2,
-                    runSpacing: AppTokens.sp2,
-                    children: pills,
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
-          // Acción secundaria: etiquetas de este chat (internas + WhatsApp).
-          // El tap del icono no dispara el onTap del card (lo absorbe el botón).
-          IconButton(
-            key: Key('conversation.labels.${c.chatLid}'),
-            tooltip: 'Etiquetas',
-            icon: const Icon(Icons.label_outline, color: AppTokens.text2),
-            onPressed: () => ChatLabelsSheet.open(
-              context,
-              botId: context.read<ConversationsBloc>().botId,
-              chatLid: c.chatLid,
-              kind: c.kind,
+            // Acción secundaria: etiquetas de este chat (internas + WhatsApp).
+            // El tap del icono no dispara el onTap de la fila (lo absorbe el botón).
+            IconButton(
+              key: Key('conversation.labels.${c.chatLid}'),
+              tooltip: 'Etiquetas',
+              icon: const Icon(Icons.label_outline, color: AppTokens.text2),
+              onPressed: () => ChatLabelsSheet.open(
+                context,
+                botId: context.read<ConversationsBloc>().botId,
+                chatLid: c.chatLid,
+                kind: c.kind,
+                // Siembra la sección WhatsApp desde el caché de la bandeja: el
+                // catálogo completo y las etiquetas ya aplicadas a este chat.
+                seedCatalog: catalog,
+                seedAssociated: <String>{for (final l in labels) l.waLabelId},
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Divisor hairline entre filas de la bandeja, sangrado para alinear con el
+/// texto (pasado el avatar), al estilo de una lista de mensajería.
+class _InboxDivider extends StatelessWidget {
+  const _InboxDivider();
+
+  @override
+  Widget build(BuildContext context) => const Divider(
+    height: 1,
+    thickness: 1,
+    indent: AppTokens.sp4 + _kInboxAvatarSize + AppTokens.sp3,
+    endIndent: AppTokens.sp4,
+    color: AppTokens.divider,
+  );
+}
+
+/// Blob de color de una etiqueta WhatsApp: cápsula con tinte del color de la
+/// etiqueta (resuelto del índice de paleta) y el nombre en ese mismo color.
+/// Compacto, para apilarse varios en una fila de la bandeja sin saturar.
+class _LabelBlob extends StatelessWidget {
+  const _LabelBlob({required this.label});
+
+  final WaLabel label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = WaLabelPalette.resolve(label.color);
+    // El fondo es el color al 18% sobre el lienzo oscuro; el texto va en el
+    // mismo color, pero con un piso de luminancia para que los swatches
+    // oscuros (azul/índigo) no caigan bajo el contraste legible.
+    final hsl = HSLColor.fromColor(color);
+    final textColor = hsl
+        .withLightness(hsl.lightness < 0.7 ? 0.7 : hsl.lightness)
+        .toColor();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+      ),
+      child: Text(
+        label.name,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

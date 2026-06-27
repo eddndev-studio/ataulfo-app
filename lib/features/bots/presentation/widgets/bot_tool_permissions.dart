@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/ai/tool_groups_sheet.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../templates/domain/entities/template.dart';
@@ -43,8 +44,8 @@ class _BotToolPermissionsState extends State<BotToolPermissions> {
 
   Future<void> _edit(List<String> lockedGroups) async {
     final bloc = context.read<BotDetailBloc>();
-    final picked = await showModalBottomSheet<List<String>>(
-      context: context,
+    final picked = await showAppBottomSheet<List<String>>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => ToolGroupsSheet(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/i18n/role_labels.dart';
@@ -32,8 +33,8 @@ class InviteSheet extends StatefulWidget {
   /// Abre la hoja y resuelve con los datos de la invitación, o `null` si se
   /// descartó sin enviar.
   static Future<InviteSheetResult?> open(BuildContext context) {
-    return showModalBottomSheet<InviteSheetResult>(
-      context: context,
+    return showAppBottomSheet<InviteSheetResult>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => const InviteSheet(),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/ai/tool_groups.dart';
 import '../../../../core/ai/tool_groups_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
@@ -336,8 +337,8 @@ class _StatGrid extends StatelessWidget {
     if (cat == null) return;
     final bloc = context.read<TemplateDetailBloc>();
     final picked =
-        await showModalBottomSheet<({AIProvider provider, String model})>(
-          context: context,
+        await showAppBottomSheet<({AIProvider provider, String model})>(
+          context,
           isScrollControlled: true,
           backgroundColor: AppTokens.surface1,
           builder: (_) => _ModelSheet(catalog: cat, current: ai.model),
@@ -351,8 +352,8 @@ class _StatGrid extends StatelessWidget {
   }
 
   Future<void> _pickTemperature(BuildContext context) async {
-    final picked = await showModalBottomSheet<double>(
-      context: context,
+    final picked = await showAppBottomSheet<double>(
+      context,
       backgroundColor: AppTokens.surface1,
       builder: (_) => _TemperatureSheet(initial: ai.temperature),
     );
@@ -361,8 +362,8 @@ class _StatGrid extends StatelessWidget {
   }
 
   Future<void> _pickThinking(BuildContext context) async {
-    final picked = await showModalBottomSheet<ThinkingLevel>(
-      context: context,
+    final picked = await showAppBottomSheet<ThinkingLevel>(
+      context,
       backgroundColor: AppTokens.surface1,
       builder: (_) => _ThinkingSheet(current: ai.thinkingLevel),
     );
@@ -371,8 +372,8 @@ class _StatGrid extends StatelessWidget {
   }
 
   Future<void> _pickContext(BuildContext context) async {
-    final picked = await showModalBottomSheet<int>(
-      context: context,
+    final picked = await showAppBottomSheet<int>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => _ContextSheet(initial: ai.contextMessages),
@@ -382,8 +383,8 @@ class _StatGrid extends StatelessWidget {
   }
 
   Future<void> _pickDelay(BuildContext context) async {
-    final picked = await showModalBottomSheet<int>(
-      context: context,
+    final picked = await showAppBottomSheet<int>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => _DelaySheet(initial: ai.responseDelaySeconds),
@@ -396,8 +397,8 @@ class _StatGrid extends StatelessWidget {
     // El catálogo (LabelsBloc) vive a nivel de ruta; el sheet abre en otra
     // rama del árbol (navigator), así que se le pasa por value.
     final labelsBloc = context.read<LabelsBloc>();
-    final picked = await showModalBottomSheet<List<String>>(
-      context: context,
+    final picked = await showAppBottomSheet<List<String>>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => BlocProvider<LabelsBloc>.value(
@@ -411,8 +412,8 @@ class _StatGrid extends StatelessWidget {
 
   Future<void> _pickToolGroups(BuildContext context) async {
     // Catálogo de grupos estático del cliente: el sheet no necesita bloc.
-    final picked = await showModalBottomSheet<List<String>>(
-      context: context,
+    final picked = await showAppBottomSheet<List<String>>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) =>

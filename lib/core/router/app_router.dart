@@ -41,6 +41,7 @@ import '../../features/bots/presentation/pages/bot_maintenance_page.dart';
 import '../../features/bots/presentation/pages/bot_variables_page.dart';
 import '../../features/conversations/domain/repositories/conversations_repository.dart';
 import '../../features/conversations/presentation/bloc/conversations_bloc.dart';
+import '../../features/conversations/presentation/cubit/inbox_labels_cubit.dart';
 import '../../features/conversations/presentation/pages/conversations_list_page.dart';
 import '../../features/flow_run/domain/repositories/flow_run_repository.dart';
 import '../../features/flows/domain/repositories/flows_repository.dart';
@@ -703,6 +704,12 @@ class AppRouter {
                 BlocProvider<MonitorAttentionCubit>(
                   create: (_) =>
                       MonitorAttentionCubit(_monitorBotActivity)..watch(id),
+                ),
+                // Etiquetas WhatsApp del bot para la bandeja: blobs por chat y
+                // chips de filtro. Carga al montar; degrada a vacío si falla.
+                BlocProvider<InboxLabelsCubit>(
+                  create: (_) =>
+                      InboxLabelsCubit(repo: _waLabelsRepo, botId: id)..load(),
                 ),
               ],
               child: Scaffold(

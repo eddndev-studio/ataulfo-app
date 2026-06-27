@@ -13,6 +13,9 @@ import 'package:ataulfo/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:ataulfo/features/flow_run/domain/entities/runnable_flow.dart';
 import 'package:ataulfo/features/flow_run/domain/repositories/flow_run_repository.dart';
 import 'package:ataulfo/features/flow_run/presentation/widgets/flow_run_sheet.dart';
+import 'package:ataulfo/features/notes/domain/entities/note.dart';
+import 'package:ataulfo/features/notes/domain/repositories/notes_repository.dart';
+import 'package:ataulfo/features/notes/presentation/widgets/notes_sheet.dart';
 import 'package:ataulfo/features/profile/presentation/widgets/chat_thread_app_bar.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
@@ -23,6 +26,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockProfileBloc extends MockBloc<ProfileEvent, ProfileState>
@@ -36,6 +40,8 @@ class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 class _MockChatLabelsRepo extends Mock implements ChatLabelsRepository {}
 
 class _MockFlowRunRepo extends Mock implements FlowRunRepository {}
+
+class _MockNotesRepo extends Mock implements NotesRepository {}
 
 class _FakeMonitorDs implements MonitorActivityDatasource {
   @override
@@ -279,14 +285,35 @@ void main() {
     });
   });
 
-  group('correr flujo', () {
-    testWidgets('muestra el botón de correr flujo', (tester) async {
+  group('menú de acciones (⋮)', () {
+    testWidgets('el botón de menú está visible (cualquier rol)', (
+      tester,
+    ) async {
       when(() => bloc.state).thenReturn(const ProfileLoading());
       await tester.pumpWidget(host());
-      expect(find.byKey(const Key('thread.run_flow')), findsOneWidget);
+      expect(find.byKey(const Key('thread.more')), findsOneWidget);
     });
 
-    testWidgets('tocar abre el sheet de correr flujo', (tester) async {
+    testWidgets('correr flujo y notas viven en el menú, no en la barra', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const ProfileLoading());
+      await tester.pumpWidget(host());
+      // Cerrado: las acciones del menú no están en el árbol.
+      expect(find.byKey(const Key('thread.run_flow')), findsNothing);
+      expect(find.byKey(const Key('thread.notes')), findsNothing);
+      // Abierto: aparecen como entradas del menú.
+      await tester.tap(find.byKey(const Key('thread.more')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('thread.run_flow')), findsOneWidget);
+      expect(find.byKey(const Key('thread.notes')), findsOneWidget);
+    });
+  });
+
+  group('correr flujo', () {
+    testWidgets('tocar la entrada del menú abre el sheet de correr flujo', (
+      tester,
+    ) async {
       final runRepo = _MockFlowRunRepo();
       when(
         () => runRepo.listRunnable(any()),
@@ -314,26 +341,162 @@ void main() {
           ),
         ),
       );
+      await tester.tap(find.byKey(const Key('thread.more')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('thread.run_flow')));
       await tester.pumpAndSettle();
       expect(find.byType(FlowRunSheet), findsOneWidget);
     });
   });
 
-  group('entrada de observabilidad (ai-log)', () {
-    testWidgets('WORKER no ve el icono', (tester) async {
+  group('notas', () {
+    testWidgets('tocar la entrada del menú abre el sheet de notas', (
+      tester,
+    ) async {
+      final notesRepo = _MockNotesRepo();
+      when(
+        () => notesRepo.listChatNotes(
+          botId: any(named: 'botId'),
+          chatLid: any(named: 'chatLid'),
+        ),
+      ).thenAnswer((_) async => <Note>[]);
+      when(() => bloc.state).thenReturn(const ProfileLoading());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: RepositoryProvider<NotesRepository>.value(
+            value: notesRepo,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<ProfileBloc>.value(value: bloc),
+                BlocProvider<AuthBloc>.value(value: auth),
+                BlocProvider<MonitorLiveCubit>(
+                  create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+                ),
+              ],
+              child: const Scaffold(
+                appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
+                body: SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('thread.more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('thread.notes')));
+      await tester.pumpAndSettle();
+      expect(find.byType(NotesSheet), findsOneWidget);
+    });
+  });
+
+  group('observabilidad en el menú (solo ADMIN)', () {
+    testWidgets('WORKER: el menú no lista las entradas de observabilidad', (
+      tester,
+    ) async {
       await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('thread.more')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('thread.ai_log')), findsNothing);
+      expect(find.byKey(const Key('thread.ai_ledger')), findsNothing);
+      expect(find.byKey(const Key('thread.executions')), findsNothing);
+      // Pero el menú NO queda vacío: correr flujo y notas siguen ahí.
+      expect(find.byKey(const Key('thread.run_flow')), findsOneWidget);
+      expect(find.byKey(const Key('thread.notes')), findsOneWidget);
     });
 
-    testWidgets('ADMIN ve el icono', (tester) async {
+    testWidgets('ADMIN: el menú lista razonamiento, bitácora y ejecuciones', (
+      tester,
+    ) async {
       when(() => auth.state).thenReturn(
         const AuthAuthenticated(
           Identity(userId: 'u1', email: 'x@x', orgId: 'o1', role: 'ADMIN'),
         ),
       );
       await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('thread.more')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('thread.ai_log')), findsOneWidget);
+      expect(find.byKey(const Key('thread.ai_ledger')), findsOneWidget);
+      expect(find.byKey(const Key('thread.executions')), findsOneWidget);
+    });
+  });
+
+  group('navegación de observabilidad (solo ADMIN)', () {
+    // Cada entrada del menú empuja una ruta distinta: si una quedara cableada a
+    // la URL de otra, este test la detecta (cada destino tiene un marcador
+    // único). Cubre por comportamiento las 3 ramas de navegación del menú, a la
+    // par de correr flujo/notas que ya se prueban tocando.
+    GoRouter buildRouter() => GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => const Scaffold(
+            appBar: ChatThreadAppBar(botId: 'b1', chatLid: 'lid-dm'),
+            body: SizedBox.shrink(),
+          ),
+        ),
+        GoRoute(
+          path: '/bots/:botId/sessions/:chatLid/ai-log',
+          builder: (_, _) => const Text('PAGE_AI_LOG'),
+        ),
+        GoRoute(
+          path: '/bots/:botId/sessions/:chatLid/ai-ledger',
+          builder: (_, _) => const Text('PAGE_AI_LEDGER'),
+        ),
+        GoRoute(
+          path: '/bots/:botId/sessions/:chatLid/executions',
+          builder: (_, _) => const Text('PAGE_EXECUTIONS'),
+        ),
+      ],
+    );
+
+    Future<void> expectNavigates(
+      WidgetTester tester,
+      String itemKey,
+      String pageText,
+    ) async {
+      when(() => auth.state).thenReturn(
+        const AuthAuthenticated(
+          Identity(userId: 'u1', email: 'x@x', orgId: 'o1', role: 'ADMIN'),
+        ),
+      );
+      when(() => bloc.state).thenReturn(const ProfileLoading());
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<ProfileBloc>.value(value: bloc),
+            BlocProvider<AuthBloc>.value(value: auth),
+            BlocProvider<MonitorLiveCubit>(
+              create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+            ),
+          ],
+          child: MaterialApp.router(
+            theme: AppDesignTheme.dark(),
+            routerConfig: buildRouter(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('thread.more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(itemKey)));
+      await tester.pumpAndSettle();
+      expect(find.text(pageText), findsOneWidget);
+    }
+
+    testWidgets('Razonamiento del bot navega a ai-log', (tester) async {
+      await expectNavigates(tester, 'thread.ai_log', 'PAGE_AI_LOG');
+    });
+
+    testWidgets('Bitácora de acciones navega a ai-ledger', (tester) async {
+      await expectNavigates(tester, 'thread.ai_ledger', 'PAGE_AI_LEDGER');
+    });
+
+    testWidgets('Ejecuciones del chat navega a executions', (tester) async {
+      await expectNavigates(tester, 'thread.executions', 'PAGE_EXECUTIONS');
     });
   });
 

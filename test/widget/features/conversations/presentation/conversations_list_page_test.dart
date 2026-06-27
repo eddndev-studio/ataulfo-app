@@ -2,12 +2,15 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
-import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/domain/failures/conversations_failure.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
+import 'package:ataulfo/features/conversations/presentation/cubit/inbox_labels_cubit.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
+import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
+import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,6 +20,11 @@ import 'package:mocktail/mocktail.dart';
 class _MockConversationsBloc
     extends MockBloc<ConversationsEvent, ConversationsState>
     implements ConversationsBloc {}
+
+class _MockInboxLabelsCubit extends MockCubit<InboxLabelsState>
+    implements InboxLabelsCubit {}
+
+class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
 
 const _dm = Conversation(
   chatLid: 'lid-dm',
@@ -43,16 +51,24 @@ void main() {
   });
 
   late _MockConversationsBloc bloc;
+  late _MockInboxLabelsCubit inbox;
 
   setUp(() {
     bloc = _MockConversationsBloc();
     when(() => bloc.state).thenReturn(const ConversationsInitial());
+    // Por defecto sin etiquetas: la bandeja se prueba sin blobs ni chips de
+    // etiqueta salvo cuando un test los siembra explícitamente.
+    inbox = _MockInboxLabelsCubit();
+    when(() => inbox.state).thenReturn(const InboxLabelsState());
   });
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: BlocProvider<ConversationsBloc>.value(
-      value: bloc,
+    home: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<ConversationsBloc>.value(value: bloc),
+        BlocProvider<InboxLabelsCubit>.value(value: inbox),
+      ],
       child: const Scaffold(body: ConversationsListPage()),
     ),
   );
@@ -66,24 +82,24 @@ void main() {
     expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
-  testWidgets(
-    'Loaded con N conversaciones renderiza una AppCard por cada una',
-    (tester) async {
-      when(() => bloc.state).thenReturn(
-        const ConversationsLoaded(
-          items: <Conversation>[_dm, _group],
-          isRefreshing: false,
-        ),
-      );
-      await tester.pumpWidget(host());
+  testWidgets('Loaded con N conversaciones renderiza una fila por cada una', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const ConversationsLoaded(
+        items: <Conversation>[_dm, _group],
+        isRefreshing: false,
+      ),
+    );
+    await tester.pumpWidget(host());
 
-      expect(find.byType(AppCard), findsNWidgets(2));
-      expect(find.byType(AppAvatar), findsNWidgets(2));
-      // DM se identifica por phone (no hay nombre aún); GROUP por etiqueta.
-      expect(find.text('5215550001'), findsOneWidget);
-      expect(find.text('Grupo'), findsOneWidget);
-    },
-  );
+    expect(find.byKey(const Key('conversation.tile.lid-dm')), findsOneWidget);
+    expect(find.byKey(const Key('conversation.tile.lid-grp')), findsOneWidget);
+    expect(find.byType(AppAvatar), findsNWidgets(2));
+    // DM se identifica por phone (no hay nombre aún); GROUP por etiqueta.
+    expect(find.text('5215550001'), findsOneWidget);
+    expect(find.text('Grupo'), findsOneWidget);
+  });
 
   testWidgets('un chat con señal de atención muestra la píldora "Atención"', (
     tester,
@@ -97,8 +113,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppDesignTheme.dark(),
-        home: BlocProvider<ConversationsBloc>.value(
-          value: bloc,
+        home: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<ConversationsBloc>.value(value: bloc),
+            BlocProvider<InboxLabelsCubit>.value(value: inbox),
+          ],
           child: const Scaffold(
             body: ConversationsListPage(needsAttention: <String>{'lid-dm'}),
           ),
@@ -148,7 +167,7 @@ void main() {
       const ConversationsLoaded(items: <Conversation>[], isRefreshing: false),
     );
     await tester.pumpWidget(host());
-    expect(find.byType(AppCard), findsNothing);
+    expect(find.byType(AppAvatar), findsNothing);
     expect(find.byKey(const Key('conversations.empty')), findsOneWidget);
   });
 
@@ -345,6 +364,289 @@ void main() {
       );
       expect(find.byKey(const Key('conversation.unread.lid-dm')), findsNothing);
     });
+  });
+
+  group('blobs de etiquetas WhatsApp por chat', () {
+    const vip = WaLabel(waLabelId: 'A', name: 'VIP', color: 0, deleted: false);
+
+    testWidgets('un chat con etiquetas muestra un blob por cada una', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const ConversationsLoaded(
+          items: <Conversation>[_dm],
+          isRefreshing: false,
+        ),
+      );
+      when(() => inbox.state).thenReturn(
+        const InboxLabelsState(
+          catalog: <WaLabel>[vip],
+          byChat: <String, List<WaLabel>>{
+            'lid-dm': <WaLabel>[vip],
+          },
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      // Scoped al tile: el blob, no un chip de filtro homónimo.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('conversation.tile.lid-dm')),
+          matching: find.text('VIP'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('un chat sin etiquetas no muestra blobs en su fila', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const ConversationsLoaded(
+          items: <Conversation>[_dm],
+          isRefreshing: false,
+        ),
+      );
+      when(() => inbox.state).thenReturn(const InboxLabelsState());
+      await tester.pumpWidget(host());
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('conversation.tile.lid-dm')),
+          matching: find.text('VIP'),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('el texto del blob se aclara para etiquetas oscuras', (
+      tester,
+    ) async {
+      // Índice 9 (índigo) es un swatch oscuro: el blob sube la luminancia del
+      // texto para que siga legible sobre el tinte oscuro.
+      const indigo = WaLabel(
+        waLabelId: 'A',
+        name: 'Índigo',
+        color: 9,
+        deleted: false,
+      );
+      when(() => bloc.state).thenReturn(
+        const ConversationsLoaded(
+          items: <Conversation>[_dm],
+          isRefreshing: false,
+        ),
+      );
+      when(() => inbox.state).thenReturn(
+        const InboxLabelsState(
+          catalog: <WaLabel>[indigo],
+          byChat: <String, List<WaLabel>>{
+            'lid-dm': <WaLabel>[indigo],
+          },
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      final blob = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const Key('conversation.tile.lid-dm')),
+          matching: find.text('Índigo'),
+        ),
+      );
+      expect(
+        HSLColor.fromColor(blob.style!.color!).lightness,
+        greaterThanOrEqualTo(0.7),
+      );
+    });
+  });
+
+  group('filtros por etiqueta WhatsApp', () {
+    const vip = WaLabel(waLabelId: 'A', name: 'VIP', color: 0, deleted: false);
+    const soporte = WaLabel(
+      waLabelId: 'B',
+      name: 'Soporte',
+      color: 3,
+      deleted: false,
+    );
+
+    Conversation conv({required String chatLid, required String displayName}) =>
+        Conversation(
+          chatLid: chatLid,
+          kind: ConversationKind.dm,
+          phone: '521555',
+          displayName: displayName,
+          isArchived: false,
+          isPinned: false,
+          isMarkedUnread: false,
+          mutedUntil: null,
+          lastMessagePreview: 'hola',
+          lastMessageType: 'text',
+          lastMessageDirection: 'INBOUND',
+          lastMessageTimestampMs: 1700000000000,
+        );
+
+    testWidgets('los chips de filtro se generan desde el catálogo', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        const ConversationsLoaded(
+          items: <Conversation>[_dm],
+          isRefreshing: false,
+        ),
+      );
+      when(
+        () => inbox.state,
+      ).thenReturn(const InboxLabelsState(catalog: <WaLabel>[vip, soporte]));
+      await tester.pumpWidget(host());
+      expect(
+        find.byKey(const Key('conversations.filter.label.A')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('conversations.filter.label.B')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sin catálogo no hay chips de etiqueta', (tester) async {
+      when(() => bloc.state).thenReturn(
+        const ConversationsLoaded(
+          items: <Conversation>[_dm],
+          isRefreshing: false,
+        ),
+      );
+      when(() => inbox.state).thenReturn(const InboxLabelsState());
+      await tester.pumpWidget(host());
+      expect(
+        find.byKey(const Key('conversations.filter.label.A')),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+      'tocar un chip de etiqueta filtra a los chats con esa etiqueta',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          ConversationsLoaded(
+            items: <Conversation>[
+              conv(chatLid: 'l1', displayName: 'Con VIP'),
+              conv(chatLid: 'l2', displayName: 'Sin etiqueta'),
+            ],
+            isRefreshing: false,
+          ),
+        );
+        when(() => inbox.state).thenReturn(
+          const InboxLabelsState(
+            catalog: <WaLabel>[vip],
+            byChat: <String, List<WaLabel>>{
+              'l1': <WaLabel>[vip],
+            },
+          ),
+        );
+        await tester.pumpWidget(host());
+
+        expect(find.text('Con VIP'), findsOneWidget);
+        expect(find.text('Sin etiqueta'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('conversations.filter.label.A')));
+        await tester.pump();
+
+        expect(find.text('Con VIP'), findsOneWidget);
+        expect(find.text('Sin etiqueta'), findsNothing);
+      },
+    );
+
+    testWidgets('re-tocar el chip activo lo deselecciona (vuelve a Todas)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        ConversationsLoaded(
+          items: <Conversation>[
+            conv(chatLid: 'l1', displayName: 'Con VIP'),
+            conv(chatLid: 'l2', displayName: 'Sin etiqueta'),
+          ],
+          isRefreshing: false,
+        ),
+      );
+      when(() => inbox.state).thenReturn(
+        const InboxLabelsState(
+          catalog: <WaLabel>[vip],
+          byChat: <String, List<WaLabel>>{
+            'l1': <WaLabel>[vip],
+          },
+        ),
+      );
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('conversations.filter.label.A')));
+      await tester.pump();
+      expect(find.text('Sin etiqueta'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('conversations.filter.label.A')));
+      await tester.pump();
+      expect(find.text('Sin etiqueta'), findsOneWidget);
+    });
+
+    testWidgets(
+      'si la etiqueta activa desaparece del catálogo, vuelve a mostrar todo',
+      (tester) async {
+        // Cubit real para poder recargar y emitir un catálogo sin la etiqueta.
+        final repo = _MockWaLabelsRepo();
+        when(
+          () => repo.listCatalog('b1'),
+        ).thenAnswer((_) async => const <WaLabel>[vip]);
+        when(() => repo.listChatAssocs('b1')).thenAnswer(
+          (_) async => const <WaChatAssoc>[
+            WaChatAssoc(chatLid: 'l1', waLabelId: 'A', labeled: true),
+          ],
+        );
+        final realCubit = InboxLabelsCubit(repo: repo, botId: 'b1');
+        addTearDown(realCubit.close);
+        await realCubit.load();
+
+        when(() => bloc.state).thenReturn(
+          ConversationsLoaded(
+            items: <Conversation>[
+              conv(chatLid: 'l1', displayName: 'Con VIP'),
+              conv(chatLid: 'l2', displayName: 'Sin etiqueta'),
+            ],
+            isRefreshing: false,
+          ),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            home: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<ConversationsBloc>.value(value: bloc),
+                BlocProvider<InboxLabelsCubit>.value(value: realCubit),
+              ],
+              child: const Scaffold(body: ConversationsListPage()),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(find.byKey(const Key('conversations.filter.label.A')));
+        await tester.pump();
+        // Filtrado por A: solo el chat con la etiqueta.
+        expect(find.text('Sin etiqueta'), findsNothing);
+
+        // A desaparece del catálogo (borrada o WhatsApp cae) en la recarga.
+        when(
+          () => repo.listCatalog('b1'),
+        ).thenAnswer((_) async => const <WaLabel>[]);
+        when(
+          () => repo.listChatAssocs('b1'),
+        ).thenAnswer((_) async => const <WaChatAssoc>[]);
+        await realCubit.load();
+        await tester.pump();
+
+        // Reconciliado: el filtro colgado se ignora y la bandeja vuelve a todo.
+        expect(find.text('Sin etiqueta'), findsOneWidget);
+        expect(find.text('Con VIP'), findsOneWidget);
+      },
+    );
   });
 
   group('bandeja: búsqueda, filtros y jerarquía', () {

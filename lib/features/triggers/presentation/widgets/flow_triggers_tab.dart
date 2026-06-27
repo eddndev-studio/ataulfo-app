@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -110,7 +111,7 @@ class FlowTriggersBody extends StatelessWidget {
 /// flow del editor como `scopedFlow`. El sheet ya sabe que no hay
 /// `FlowsBloc` y oculta el dropdown.
 ///
-/// `showModalBottomSheet` monta el sheet en una ruta nueva del
+/// El sheet se monta en una ruta nueva del
 /// `Navigator` que NO hereda los providers de esta página: leemos los
 /// blocs aquí (en el context de la página) y los re-proveemos `.value`
 /// al subtree del modal. Sin esto, el selector de etiqueta del sheet no
@@ -118,8 +119,8 @@ class FlowTriggersBody extends StatelessWidget {
 void _openSheet(BuildContext context, fdom.Flow flow, {Trigger? editing}) {
   final triggersBloc = context.read<TriggersBloc>();
   final labelsBloc = context.read<LabelsBloc>();
-  showModalBottomSheet<void>(
-    context: context,
+  showAppBottomSheet<void>(
+    context,
     isScrollControlled: true,
     builder: (_) => MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[

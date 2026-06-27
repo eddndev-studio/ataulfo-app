@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -576,8 +577,8 @@ class _StepCard extends StatelessWidget {
 void _openStepSheet(BuildContext context, sdom.Step? step) {
   final bloc = context.read<FlowStepsBloc>();
   final labelsRepo = context.read<LabelsRepository>();
-  showModalBottomSheet<void>(
-    context: context,
+  showAppBottomSheet<void>(
+    context,
     isScrollControlled: true,
     builder: (sheetCtx) => MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[

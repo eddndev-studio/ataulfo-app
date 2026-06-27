@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../domain/entities/workspace_doc.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../../domain/repositories/trainer_repositories.dart';
@@ -26,8 +27,8 @@ class WorkspaceDocSheet extends StatelessWidget {
   static Future<void> _open(BuildContext context, String? name) {
     final bloc = context.read<WorkspaceBloc>();
     final repo = context.read<WorkspaceRepository>();
-    return showModalBottomSheet<void>(
-      context: context,
+    return showAppBottomSheet<void>(
+      context,
       isScrollControlled: true,
       builder: (_) => MultiBlocProvider(
         providers: <BlocProvider<dynamic>>[

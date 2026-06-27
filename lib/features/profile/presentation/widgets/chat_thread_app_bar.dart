@@ -41,23 +41,38 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
     return isGroup ? ConversationKind.group : ConversationKind.dm;
   }
 
+  /// Despacha la acción elegida en el menú "⋮": las cotidianas abren un sheet
+  /// sobre este chat; las de observabilidad empujan su pantalla dedicada.
+  void _onMenuAction(BuildContext context, _ThreadAction action) {
+    switch (action) {
+      case _ThreadAction.runFlow:
+        FlowRunSheet.open(context, botId: botId, chatLid: chatLid);
+      case _ThreadAction.notes:
+        NotesSheet.open(context, botId: botId, chatLid: chatLid);
+      case _ThreadAction.reasoning:
+        context.push(
+          '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/ai-log',
+        );
+      case _ThreadAction.ledger:
+        context.push(
+          '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/ai-ledger',
+        );
+      case _ThreadAction.executions:
+        context.push(
+          '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/executions',
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return AppBar(
       titleSpacing: 0,
       actions: <Widget>[
-        // Correr un flujo sobre este chat (S11). El `FlowRunRepository` lo
-        // provee la ruta. Acción operativa del monitor (WORKER+ en el backend).
-        IconButton(
-          key: const Key('thread.run_flow'),
-          tooltip: 'Correr un flujo',
-          icon: const Icon(Icons.play_circle_outline),
-          onPressed: () =>
-              FlowRunSheet.open(context, botId: botId, chatLid: chatLid),
-        ),
         // Etiquetas de este chat (internas + WhatsApp; reusa el sheet de la
-        // lista de conversaciones). Los repos los provee la ruta.
+        // lista de conversaciones). Acción frecuente: queda visible en la barra.
+        // Los repos los provee la ruta.
         IconButton(
           key: const Key('thread.labels'),
           tooltip: 'Etiquetas',
@@ -69,90 +84,84 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
             kind: _kindFrom(context.read<ProfileBloc>().state),
           ),
         ),
-        // Cuaderno de notas del chat (S14): el mismo que lee/escribe el
-        // agente IA (save_note/read_notes). El `NotesRepository` lo provee
-        // la ruta.
-        IconButton(
-          key: const Key('thread.notes'),
-          tooltip: 'Notas del chat',
-          icon: const Icon(Icons.sticky_note_2_outlined),
-          onPressed: () =>
-              NotesSheet.open(context, botId: botId, chatLid: chatLid),
-        ),
-        // Observabilidad del bot (S12): qué pensó, qué tools usó y qué
-        // costó cada corrida del motor en ESTE chat. Solo ADMIN+ (el
-        // backend igual rechaza con 403; ocultarlo evita el botón roto).
+        // El control del bot y el resto de acciones se agrupan tras una sola
+        // lectura del rol para no saturar la barra. "Control del bot"
+        // (pausar/reanudar) queda visible para ADMIN+ porque leer las etiquetas
+        // de silencio exige acceso a la plantilla; correr flujo y notas viven
+        // siempre en el menú (operación cotidiana, sin gate); y las pantallas
+        // de observabilidad (razonamiento/bitácora/ejecuciones) se agregan al
+        // menú solo para ADMIN+ (el backend igual rechaza con 403).
         BlocBuilder<AuthBloc, AuthState>(
           builder: (context, authState) {
-            if (authState is! AuthAuthenticated ||
-                !isAdminOrAbove(authState.identity.role)) {
-              return const SizedBox.shrink();
-            }
-            return IconButton(
-              key: const Key('thread.ai_log'),
-              tooltip: 'Razonamiento del bot',
-              icon: const Icon(Icons.psychology_outlined),
-              onPressed: () => context.push(
-                '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/ai-log',
-              ),
-            );
-          },
-        ),
-        // Bitácora de acciones con efecto (S30): SÓLO lo que el bot CAMBIÓ
-        // (envío, etiqueta, flujo, nota…), en texto de negocio. Solo ADMIN+ (el
-        // backend igual rechaza con 403; ocultarlo evita el botón roto).
-        BlocBuilder<AuthBloc, AuthState>(
-          builder: (context, authState) {
-            if (authState is! AuthAuthenticated ||
-                !isAdminOrAbove(authState.identity.role)) {
-              return const SizedBox.shrink();
-            }
-            return IconButton(
-              key: const Key('thread.ai_ledger'),
-              tooltip: 'Bitácora de acciones',
-              icon: const Icon(Icons.receipt_long_outlined),
-              onPressed: () => context.push(
-                '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/ai-ledger',
-              ),
-            );
-          },
-        ),
-        // Historial de ejecuciones de flujo de ESTE chat (S11): qué corrió y
-        // por qué falló. Solo ADMIN+ (el backend igual rechaza con 403).
-        BlocBuilder<AuthBloc, AuthState>(
-          builder: (context, authState) {
-            if (authState is! AuthAuthenticated ||
-                !isAdminOrAbove(authState.identity.role)) {
-              return const SizedBox.shrink();
-            }
-            return IconButton(
-              key: const Key('thread.executions'),
-              tooltip: 'Ejecuciones del chat',
-              icon: const Icon(Icons.history_outlined),
-              onPressed: () => context.push(
-                '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/executions',
-              ),
-            );
-          },
-        ),
-        // Toma del chat (S25): pausar/reanudar al bot en ESTA conversación
-        // aplicando una etiqueta de silencio. Solo ADMIN+ — leer las etiquetas
-        // de silencio del bot exige acceso a la plantilla (ADMIN+ en backend).
-        BlocBuilder<AuthBloc, AuthState>(
-          builder: (context, authState) {
-            if (authState is! AuthAuthenticated ||
-                !isAdminOrAbove(authState.identity.role)) {
-              return const SizedBox.shrink();
-            }
-            return IconButton(
-              key: const Key('thread.takeover'),
-              tooltip: 'Control del bot',
-              icon: const Icon(Icons.smart_toy_outlined),
-              onPressed: () => AiTakeoverSheet.open(
-                context,
-                botId: botId,
-                chatLid: chatLid,
-              ),
+            final isAdmin =
+                authState is AuthAuthenticated &&
+                isAdminOrAbove(authState.identity.role);
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (isAdmin)
+                  IconButton(
+                    key: const Key('thread.takeover'),
+                    tooltip: 'Control del bot',
+                    icon: const Icon(Icons.smart_toy_outlined),
+                    onPressed: () => AiTakeoverSheet.open(
+                      context,
+                      botId: botId,
+                      chatLid: chatLid,
+                    ),
+                  ),
+                PopupMenuButton<_ThreadAction>(
+                  key: const Key('thread.more'),
+                  tooltip: 'Más acciones',
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (action) => _onMenuAction(context, action),
+                  itemBuilder: (context) => <PopupMenuEntry<_ThreadAction>>[
+                    const PopupMenuItem<_ThreadAction>(
+                      key: Key('thread.run_flow'),
+                      value: _ThreadAction.runFlow,
+                      child: _MenuItem(
+                        icon: Icons.play_circle_outline,
+                        label: 'Correr un flujo',
+                      ),
+                    ),
+                    const PopupMenuItem<_ThreadAction>(
+                      key: Key('thread.notes'),
+                      value: _ThreadAction.notes,
+                      child: _MenuItem(
+                        icon: Icons.sticky_note_2_outlined,
+                        label: 'Notas del chat',
+                      ),
+                    ),
+                    if (isAdmin) ...<PopupMenuEntry<_ThreadAction>>[
+                      const PopupMenuDivider(),
+                      const PopupMenuItem<_ThreadAction>(
+                        key: Key('thread.ai_log'),
+                        value: _ThreadAction.reasoning,
+                        child: _MenuItem(
+                          icon: Icons.psychology_outlined,
+                          label: 'Razonamiento del bot',
+                        ),
+                      ),
+                      const PopupMenuItem<_ThreadAction>(
+                        key: Key('thread.ai_ledger'),
+                        value: _ThreadAction.ledger,
+                        child: _MenuItem(
+                          icon: Icons.receipt_long_outlined,
+                          label: 'Bitácora de acciones',
+                        ),
+                      ),
+                      const PopupMenuItem<_ThreadAction>(
+                        key: Key('thread.executions'),
+                        value: _ThreadAction.executions,
+                        child: _MenuItem(
+                          icon: Icons.history_outlined,
+                          label: 'Ejecuciones del chat',
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             );
           },
         ),
@@ -210,6 +219,32 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// Acción seleccionable del menú "⋮" del hilo. Cada valor mapea a un sheet del
+/// chat o a una pantalla de observabilidad.
+enum _ThreadAction { runFlow, notes, reasoning, ledger, executions }
+
+/// Contenido de una entrada del menú: ícono + etiqueta de texto. El texto es
+/// justo lo que los íconos sueltos del app bar no comunicaban.
+class _MenuItem extends StatelessWidget {
+  const _MenuItem({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Icon(icon, size: 20),
+        const SizedBox(width: AppTokens.sp3),
+        // Acotar el texto al ancho del menú: si no cabe en una línea, envuelve
+        // (como cualquier ítem de menú), en vez de desbordar el Row.
+        Flexible(child: Text(label)),
+      ],
     );
   }
 }

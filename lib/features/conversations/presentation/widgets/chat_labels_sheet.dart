@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../labels/domain/repositories/chat_labels_repository.dart';
 import '../../../labels/presentation/bloc/chat_labels_bloc.dart';
 import '../../../labels/presentation/widgets/chat_internal_labels_section.dart';
+import '../../../wa_labels/domain/entities/wa_label.dart';
 import '../../../wa_labels/domain/repositories/wa_labels_repository.dart';
 import '../../../wa_labels/presentation/bloc/wa_chat_labels_bloc.dart';
 import '../../../wa_labels/presentation/widgets/wa_chat_labels_section.dart';
@@ -28,16 +30,23 @@ class ChatLabelsSheet extends StatelessWidget {
   /// mapeos para la anotación) y el de Labels internos por chat (sección
   /// Internas, solo lectura). El `loadMappedLabelIds` resuelve qué etiquetas
   /// internas están mapeadas a WhatsApp (best-effort: si falla, sin anotación).
+  ///
+  /// `seedCatalog`/`seedAssociated` siembran la sección WhatsApp desde un caché
+  /// ya cargado (la bandeja): si vienen, la sección no re-consulta el catálogo
+  /// ni las asociaciones del bot al abrir. El hilo no las pasa (no tiene caché)
+  /// y la sección consulta normal.
   static void open(
     BuildContext context, {
     required String botId,
     required String chatLid,
     required ConversationKind kind,
+    List<WaLabel>? seedCatalog,
+    Set<String>? seedAssociated,
   }) {
     final waRepo = context.read<WaLabelsRepository>();
     final chatRepo = context.read<ChatLabelsRepository>();
-    showModalBottomSheet<void>(
-      context: context,
+    showAppBottomSheet<void>(
+      context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
       builder: (_) => MultiBlocProvider(
@@ -59,6 +68,8 @@ class ChatLabelsSheet extends StatelessWidget {
               botId: botId,
               chatLid: chatLid,
               kind: kind,
+              seedCatalog: seedCatalog,
+              seedAssociated: seedAssociated,
             )..add(const WaChatLabelsLoadRequested()),
           ),
         ],

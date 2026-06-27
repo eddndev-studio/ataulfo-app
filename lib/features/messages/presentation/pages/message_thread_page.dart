@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -540,8 +541,8 @@ Future<void> _showReactionPicker(
   // Solo se resuelve el router cuando hay drill (evita exigir GoRouter en el
   // camino de pura reacción).
   final router = canDrill ? GoRouter.of(context) : null;
-  final emoji = await showModalBottomSheet<String>(
-    context: context,
+  final emoji = await showAppBottomSheet<String>(
+    context,
     backgroundColor: AppTokens.surface1,
     builder: (sheetContext) => SafeArea(
       child: Padding(

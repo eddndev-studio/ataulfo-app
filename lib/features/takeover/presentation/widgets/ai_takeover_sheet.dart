@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../bots/domain/repositories/bots_repository.dart';
@@ -26,8 +27,8 @@ class AiTakeoverSheet extends StatelessWidget {
       bots: context.read<BotsRepository>(),
       templates: context.read<TemplatesRepository>(),
     );
-    return showModalBottomSheet<void>(
-      context: context,
+    return showAppBottomSheet<void>(
+      context,
       backgroundColor: AppTokens.surface1,
       builder: (_) => BlocProvider<AiTakeoverCubit>(
         create: (_) =>

@@ -346,4 +346,78 @@ void main() {
       await bloc.close();
     });
   });
+
+  group('siembra desde caché', () {
+    WaChatLabelsBloc seeded({
+      List<WaLabel>? catalog,
+      Set<String>? associated,
+    }) => WaChatLabelsBloc(
+      repo: repo,
+      botId: 'b1',
+      chatLid: 'c1',
+      kind: ConversationKind.dm,
+      seedCatalog: catalog ?? <WaLabel>[_wa(), _wa(id: '1001')],
+      seedAssociated: associated ?? const <String>{'1000'},
+    );
+
+    test('arranca en Loaded con la semilla, sin estado de carga', () {
+      final bloc = seeded();
+      final s = bloc.state as WaChatLabelsLoaded;
+      expect(s.catalog.map((l) => l.waLabelId), <String>['1000', '1001']);
+      expect(s.associated, <String>{'1000'});
+      addTearDown(bloc.close);
+    });
+
+    test('la semilla descarta tombstones del catálogo', () {
+      final bloc = seeded(
+        catalog: <WaLabel>[_wa(), _wa(id: '1001', deleted: true)],
+      );
+      final s = bloc.state as WaChatLabelsLoaded;
+      expect(s.catalog.map((l) => l.waLabelId), <String>['1000']);
+      addTearDown(bloc.close);
+    });
+
+    test(
+      'sembrado: NO re-consulta HTTP al cargar, pero sí engancha realtime',
+      () async {
+        when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
+        final bloc = seeded()..add(const WaChatLabelsLoadRequested());
+        // Deja correr el handler (asíncrono) antes de verificar.
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        verifyNever(() => repo.listCatalog(any()));
+        verifyNever(() => repo.listChatAssocs(any()));
+        verify(() => repo.liveEvents('b1')).called(1);
+        expect(bloc.state, isA<WaChatLabelsLoaded>());
+        await bloc.close();
+      },
+    );
+
+    test(
+      'semilla con catálogo vacío: cae a la consulta HTTP (no distingue '
+      'vacío-real de degradado)',
+      () async {
+        stubLoad();
+        when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
+        final bloc = seeded(catalog: <WaLabel>[])
+          ..add(const WaChatLabelsLoadRequested());
+        await bloc.stream.firstWhere((s) => s is WaChatLabelsLoaded);
+
+        verify(() => repo.listCatalog('b1')).called(1);
+        verify(() => repo.listChatAssocs('b1')).called(1);
+        await bloc.close();
+      },
+    );
+
+    test('sin semilla: re-consulta HTTP como siempre (camino del hilo)', () async {
+      stubLoad();
+      when(() => repo.liveEvents('b1')).thenAnswer((_) => live.stream);
+      final bloc = build()..add(const WaChatLabelsLoadRequested());
+      await bloc.stream.firstWhere((s) => s is WaChatLabelsLoaded);
+
+      verify(() => repo.listCatalog('b1')).called(1);
+      verify(() => repo.listChatAssocs('b1')).called(1);
+      await bloc.close();
+    });
+  });
 }
