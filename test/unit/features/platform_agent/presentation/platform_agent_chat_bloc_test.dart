@@ -763,4 +763,20 @@ void main() {
           .having((s) => s.draft, 'draft c1', 'borrador c1'),
     ],
   );
+
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'activeDraft expone el borrador vivo del hilo activo (resembrar el composer al remontar)',
+    build: build,
+    seed: () => PaChatLoaded(
+      conversations: <PaConversation>[_conv()],
+      activeConversation: _conv(),
+      messages: const <PaMessage>[],
+      sending: false,
+    ),
+    // DraftChanged NO emite (no reconstruye el chat por tecla); el borrador vive
+    // en _drafts y solo activeDraft lo ve — eso es lo que el remount necesita.
+    act: (b) => b.add(const PaChatDraftChanged('texto sin enviar')),
+    expect: () => <dynamic>[],
+    verify: (b) => expect(b.activeDraft, 'texto sin enviar'),
+  );
 }

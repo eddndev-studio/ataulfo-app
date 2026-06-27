@@ -173,7 +173,7 @@ void main() {
       await cubit.close();
     });
 
-    test('guarda de turno colgado sintetiza el cierre de una corrida hidratada', () {
+    test('guarda de turno colgado marca stalled SIN inventar un terminal', () {
       fakeAsync((async) {
         final t0 = DateTime.now().toUtc();
         final catchup = _FakeCatchup(
@@ -188,13 +188,17 @@ void main() {
         cubit.watch('b1', 'c1');
         async.flushMicrotasks();
         expect(cubit.state.events.last.kind, MonitorEventKind.aiTurn);
+        expect(cubit.state.stalled, isFalse);
         async.elapse(const Duration(seconds: 6));
-        expect(cubit.state.events.last.kind, MonitorEventKind.aiCompleted);
+        // Se marca colgado, pero la línea de tiempo sigue veraz (sin aiCompleted
+        // falso): un turno solo lento no debe ganar un terminal inventado.
+        expect(cubit.state.stalled, isTrue);
+        expect(cubit.state.events.last.kind, MonitorEventKind.aiTurn);
         cubit.close();
       });
     });
 
-    test('un evento live re-arma la guarda (no cierra una corrida viva)', () {
+    test('un evento live re-arma la guarda (no marca colgada una corrida viva)', () {
       fakeAsync((async) {
         final t0 = DateTime.now().toUtc();
         final catchup = _FakeCatchup(
@@ -215,6 +219,60 @@ void main() {
         async.flushMicrotasks();
         async.elapse(const Duration(seconds: 3)); // 6s total; re-armado a los 3s
         expect(cubit.state.events.last.kind, MonitorEventKind.aiTool);
+        expect(cubit.state.stalled, isFalse);
+        cubit.close();
+      });
+    });
+
+    test('un evento real tras stalled limpia el flag', () {
+      fakeAsync((async) {
+        final t0 = DateTime.now().toUtc();
+        final catchup = _FakeCatchup(
+          run: (runId: 'R1', at: t0),
+          snapshot: <MonitorEvent>[at(MonitorEventKind.aiTurn, t0)],
+        );
+        final cubit = MonitorLiveCubit(
+          ds,
+          catchup: catchup,
+          stuckTurnTimeout: const Duration(seconds: 5),
+        );
+        cubit.watch('b1', 'c1');
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 6));
+        expect(cubit.state.stalled, isTrue);
+        // Llega actividad real: el turno seguía vivo, se rehabilita "Pensando…".
+        ds.ctrl.add(
+          at(MonitorEventKind.aiTool, t0.add(const Duration(seconds: 20)), tool: 'x'),
+        );
+        async.flushMicrotasks();
+        expect(cubit.state.stalled, isFalse);
+        expect(cubit.state.events.last.kind, MonitorEventKind.aiTool);
+        cubit.close();
+      });
+    });
+
+    test('hidratar un run ya terminado no arma la guarda (no lo marca colgado)', () {
+      fakeAsync((async) {
+        final t0 = DateTime.now().toUtc();
+        // El terminal real llegó (p.ej. live durante la hidratación) y quedó como
+        // último evento del merge: no hay nada que vigilar.
+        final catchup = _FakeCatchup(
+          run: (runId: 'R1', at: t0),
+          snapshot: <MonitorEvent>[
+            at(MonitorEventKind.aiTurn, t0),
+            at(MonitorEventKind.aiCompleted, t0.add(const Duration(seconds: 1))),
+          ],
+        );
+        final cubit = MonitorLiveCubit(
+          ds,
+          catchup: catchup,
+          stuckTurnTimeout: const Duration(seconds: 5),
+        );
+        cubit.watch('b1', 'c1');
+        async.flushMicrotasks();
+        expect(cubit.state.events.last.kind, MonitorEventKind.aiCompleted);
+        async.elapse(const Duration(seconds: 6));
+        expect(cubit.state.stalled, isFalse);
         cubit.close();
       });
     });

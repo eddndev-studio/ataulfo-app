@@ -32,6 +32,8 @@ class LiveActivity extends StatelessWidget {
         label: 'Reconectando…',
       );
     }
+    // Turno presunto colgado: ocultar el footer en vez de seguir "pensando".
+    if (state.stalled) return const SizedBox.shrink();
     final label = _activeLabel(state.events);
     if (label == null) return const SizedBox.shrink();
     return _row(

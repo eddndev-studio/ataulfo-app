@@ -31,7 +31,11 @@ void main() {
   late _MockBloc bloc;
 
   setUpAll(() => registerFallbackValue(const PaChatStarted()));
-  setUp(() => bloc = _MockBloc());
+  setUp(() {
+    bloc = _MockBloc();
+    // La página lee el borrador vivo del bloc al montar el composer.
+    when(() => bloc.activeDraft).thenReturn('');
+  });
 
   Future<void> pump(WidgetTester tester) async {
     whenListen(

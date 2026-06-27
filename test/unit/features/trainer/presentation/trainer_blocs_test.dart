@@ -181,6 +181,15 @@ void main() {
               'optimista',
               'mejora el prompt',
             ),
+        // Cierre inmediato (sending=false) con el optimista visible: "Detener"
+        // ya no queda vivo durante la recarga.
+        isA<TrainerChatLoaded>()
+            .having((s) => s.sending, 'cierre inmediato', false)
+            .having(
+              (s) => s.messages.last.content,
+              'optimista visible',
+              'mejora el prompt',
+            ),
         isA<TrainerChatLoaded>()
             .having((s) => s.sending, 'sending off', false)
             .having((s) => s.messages.length, 'recargado', 3),

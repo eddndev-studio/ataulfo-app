@@ -432,9 +432,13 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       );
       unawaited(_progressSub?.cancel());
       _progressSub = null;
+      // El POST (200) YA persistió el turno: cerramos de INMEDIATO (sending=false)
+      // para que "Detener" no siga vivo durante la recarga —si se tocara ahí,
+      // revertiría un turno ya guardado y dejaría su texto en el composer. El
+      // optimista mantiene visible el mensaje enviado hasta que llega el hilo.
       emit(
         current.copyWith(
-          messages: await _loadMessages(current.conversation.id),
+          messages: <TrainerMessage>[...current.messages, optimistic],
           sending: false,
           liveProgress: '',
           clearSendFailure: true,
@@ -442,6 +446,9 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
           lastAttemptedContent: '',
         ),
       );
+      // Recarga best-effort (turno ya cerrado): trae el hilo real del server,
+      // incl. la respuesta y los tool results que el POST no devuelve.
+      await _reloadThread(emit, current.conversation.id);
     } on TrainerFailure catch (f) {
       unawaited(_progressSub?.cancel());
       _progressSub = null;
@@ -463,6 +470,30 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         ),
       );
     }
+  }
+
+  /// Recarga el hilo tras cerrar un turno (se llama DESPUÉS de emitir
+  /// sending=false). Best-effort y no bloqueante del cierre: si falla, el
+  /// optimista ya deja visible el mensaje enviado; si el operador cambió de hilo
+  /// o arrancó otro envío, no se aplica —nunca pisa un hilo que ya tiene abierto.
+  Future<void> _reloadThread(
+    Emitter<TrainerChatState> emit,
+    String conversationId,
+  ) async {
+    List<TrainerMessage> reloaded;
+    try {
+      reloaded = await _loadMessages(conversationId);
+    } on TrainerFailure {
+      return;
+    }
+    if (isClosed) return;
+    final s = state;
+    if (s is! TrainerChatLoaded ||
+        s.conversation.id != conversationId ||
+        s.sending) {
+      return;
+    }
+    emit(s.copyWith(messages: reloaded));
   }
 
   Future<void> _onAttachRequested(

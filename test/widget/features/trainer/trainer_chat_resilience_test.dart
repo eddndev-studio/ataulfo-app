@@ -117,6 +117,15 @@ void main() {
         attachments: any(named: 'attachments'),
       ),
     ).called(2);
+    // Tras el reintento exitoso el composer queda VACÍO: "Reintentar" no pasa por
+    // el composer, así que sin limpiar quedaría el texto ya enviado (reenvío).
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('trainer.composer.field')))
+          .controller
+          ?.text,
+      '',
+    );
   });
 
   testWidgets('turno en vuelo: "Detener" cancela y limpia el estado', (

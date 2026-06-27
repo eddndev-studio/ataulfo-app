@@ -159,9 +159,14 @@ void main() {
           .having((s) => s.sending, 'sending', true)
           .having((s) => s.liveProgress, 'progress', 'Pensando…')
           .having((s) => s.messages.last.content, 'optimista', 'hola'),
+      // Cierre inmediato: sending=false, indicador limpio; aún solo el optimista.
       isA<TrainerChatLoaded>()
           .having((s) => s.sending, 'sending', false)
           .having((s) => s.liveProgress, 'progress', '')
+          .having((s) => s.messages.last.content, 'optimista visible', 'hola'),
+      // Recarga: aparece la respuesta del server.
+      isA<TrainerChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
           .having((s) => s.messages.any((m) => m.isAssistant), 'assistant', true),
     ],
     verify: (_) {
@@ -208,6 +213,11 @@ void main() {
     act: (b) => b.add(const TrainerChatMessageSent('hola')),
     expect: () => <dynamic>[
       isA<TrainerChatLoaded>().having((s) => s.sending, 'sending', true),
+      // Cierre inmediato (sending=false) aunque el cancel del SSE cuelgue.
+      isA<TrainerChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
+          .having((s) => s.messages.last.content, 'optimista visible', 'hola'),
+      // Recarga: la respuesta del server entra al hilo.
       isA<TrainerChatLoaded>()
           .having((s) => s.sending, 'sending', false)
           .having(

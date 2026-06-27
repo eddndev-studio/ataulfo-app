@@ -64,6 +64,8 @@ void main() {
 
   setUp(() {
     bloc = _MockBloc();
+    // La página lee el borrador vivo del bloc al montar el composer.
+    when(() => bloc.activeDraft).thenReturn('');
   });
 
   Future<void> pump(WidgetTester tester, PaChatState state) async {
@@ -95,6 +97,16 @@ void main() {
     await pump(tester, _loaded());
     expect(find.text('tienes 3 bots'), findsOneWidget);
     expect(find.byKey(const Key('pa.composer.field')), findsOneWidget);
+  });
+
+  testWidgets('al montar siembra el composer desde el borrador VIVO del bloc, no state.draft', (
+    tester,
+  ) async {
+    // Simula el remonte tras volver a la pestaña: el bloc conserva el borrador
+    // en _drafts (activeDraft) aunque state.draft esté rancio ('').
+    when(() => bloc.activeDraft).thenReturn('recordatorio: preguntar X');
+    await pump(tester, _loaded(draft: ''));
+    expect(find.text('recordatorio: preguntar X'), findsOneWidget);
   });
 
   testWidgets('sending muestra el indicador en vivo', (tester) async {
@@ -270,5 +282,51 @@ void main() {
       find.byKey(const Key('pa.composer.field')),
     );
     expect(field.controller?.text, 'borrador de c2');
+  });
+
+  testWidgets('Reintentar limpia el composer (no re-despacha por él el texto ya enviado)', (
+    tester,
+  ) async {
+    final controller = StreamController<PaChatState>();
+    addTearDown(controller.close);
+    whenListen(bloc, controller.stream, initialState: _loaded());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 700,
+            child: BlocProvider<PlatformAgentChatBloc>.value(
+              value: bloc,
+              child: const PlatformAgentPage(),
+            ),
+          ),
+        ),
+      ),
+    );
+    // Falla un envío: el composer recupera el texto para Reintentar.
+    controller.add(
+      _loaded(sendFailure: const PaServerFailure(), lastAttemptedContent: 'hola'),
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('pa.composer.field')))
+          .controller
+          ?.text,
+      'hola',
+    );
+    // Reintentar re-despacha y limpia el composer: el texto ya está comprometido,
+    // dejarlo invitaría a reenviarlo a mano.
+    await tester.tap(find.byKey(const Key('pa.send_failure.retry')));
+    await tester.pump();
+    verify(() => bloc.add(const PaChatMessageSent('hola'))).called(1);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('pa.composer.field')))
+          .controller
+          ?.text,
+      '',
+    );
   });
 }

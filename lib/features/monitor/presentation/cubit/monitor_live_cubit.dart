@@ -14,6 +14,7 @@ class MonitorLiveState {
   const MonitorLiveState({
     this.events = const <MonitorEvent>[],
     this.reconnecting = false,
+    this.stalled = false,
   });
 
   final List<MonitorEvent> events;
@@ -21,14 +22,21 @@ class MonitorLiveState {
   /// El SSE se cayó y está reintentando: la actividad en vivo puede ir atrasada.
   final bool reconnecting;
 
+  /// La guarda de turno colgado disparó: tras una corrida activa no llegó más
+  /// actividad, así que se la presume terminada (su terminal real no se
+  /// persiste). La UI deja de mostrar "Pensando…" SIN inventar un evento en la
+  /// línea de tiempo; el siguiente evento real lo limpia.
+  final bool stalled;
+
   @override
   bool operator ==(Object other) =>
       other is MonitorLiveState &&
       listEquals(other.events, events) &&
-      other.reconnecting == reconnecting;
+      other.reconnecting == reconnecting &&
+      other.stalled == stalled;
 
   @override
-  int get hashCode => Object.hash(Object.hashAll(events), reconnecting);
+  int get hashCode => Object.hash(Object.hashAll(events), reconnecting, stalled);
 }
 
 /// Se suscribe al SSE `ai-activity` del chat abierto y acumula los eventos. NO
@@ -40,16 +48,19 @@ class MonitorLiveState {
 /// con lo que la corrida en curso ya hizo (reusando el log persistido) en vez de
 /// arrancar vacío: descubre el run reciente, y si es fresco trae sus entries y
 /// las funde con el stream live (deduplicando el borde por timestamp). Como los
-/// eventos terminales (completed/failed) NO se persisten, una guarda de turno
-/// colgado sintetiza el cierre si tras hidratar no llega más actividad — sin ella
-/// una corrida recién terminada se quedaría en "Pensando…" para siempre.
+/// eventos terminales (completed/failed) NO se persisten, una guarda marca el
+/// estado como "colgado" (flag `stalled`) si tras hidratar no llega más actividad
+/// — sin ella una corrida recién terminada se quedaría en "Pensando…" para
+/// siempre. El flag NO inventa un evento en la línea de tiempo (que sería falso
+/// en un turno solo lento): solo apaga el "Pensando…"; el siguiente evento real
+/// lo limpia.
 class MonitorLiveCubit extends Cubit<MonitorLiveState> {
   MonitorLiveCubit(
     this._ds, {
     int maxEvents = 100,
     MonitorCatchupDatasource? catchup,
     Duration freshness = const Duration(minutes: 5),
-    Duration stuckTurnTimeout = const Duration(seconds: 40),
+    Duration stuckTurnTimeout = const Duration(seconds: 90),
   }) : _max = maxEvents,
        _catchup = catchup,
        _freshness = freshness,
@@ -131,7 +142,10 @@ class MonitorLiveCubit extends Cubit<MonitorLiveState> {
       final merged = <MonitorEvent>[...snapshot, ...keptLive]
         ..sort((a, b) => a.at.compareTo(b.at));
       emit(MonitorLiveState(events: _bounded(merged)));
-      _armGuard(run.runId);
+      // Solo armar si el turno sigue abierto: si un terminal real ya llegó live
+      // durante la hidratación, no hay nada que vigilar (evita marcar colgado un
+      // run ya cerrado).
+      if (merged.isNotEmpty && !_isTerminal(merged.last)) _armGuard(run.runId);
     } on Object {
       // Hidratar es best-effort: cualquier fallo deja el monitor como hoy
       // (arranca vacío y se llena con lo live).
@@ -141,11 +155,14 @@ class MonitorLiveCubit extends Cubit<MonitorLiveState> {
   List<MonitorEvent> _bounded(List<MonitorEvent> events) =>
       events.length > _max ? events.sublist(events.length - _max) : events;
 
+  static bool _isTerminal(MonitorEvent e) =>
+      e.kind == MonitorEventKind.aiCompleted ||
+      e.kind == MonitorEventKind.aiFailed;
+
   /// Re-arma la guarda en cada actividad: un evento terminal real la cancela
   /// (no hay turno colgado); uno no-terminal reinicia la cuenta.
   void _rearmGuard(MonitorEvent e) {
-    if (e.kind == MonitorEventKind.aiCompleted ||
-        e.kind == MonitorEventKind.aiFailed) {
+    if (_isTerminal(e)) {
       _guard?.cancel();
       _guard = null;
       return;
@@ -156,23 +173,14 @@ class MonitorLiveCubit extends Cubit<MonitorLiveState> {
   void _armGuard(String runId) {
     _guard?.cancel();
     _guard = Timer(_stuckTimeout, () {
-      if (isClosed) return;
-      // Sintetiza el cierre ausente: el footer/píldora derivan "activo" del
-      // último evento, así que un aiCompleted al final apaga el "Pensando…".
-      emit(
-        MonitorLiveState(
-          events: _bounded(<MonitorEvent>[
-            ...state.events,
-            MonitorEvent(
-              kind: MonitorEventKind.aiCompleted,
-              topic: 'ai.completed',
-              at: DateTime.now().toUtc(),
-              runId: runId,
-            ),
-          ]),
-        ),
-      );
       _guard = null;
+      if (isClosed) return;
+      // El turno se presume colgado: marca el estado (la píldora/footer dejan de
+      // mostrar "Pensando…") en vez de inventar un aiCompleted, que sería falso
+      // si el turno solo iba lento. El próximo evento real limpia el flag.
+      final events = state.events;
+      if (events.isNotEmpty && _isTerminal(events.last)) return;
+      emit(MonitorLiveState(events: events, stalled: true));
     });
   }
 

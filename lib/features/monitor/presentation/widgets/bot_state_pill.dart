@@ -16,8 +16,10 @@ class BotStatePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final events = context.watch<MonitorLiveCubit>().state.events;
-    final state = _stateOf(events);
+    final live = context.watch<MonitorLiveCubit>().state;
+    // Turno presunto colgado: no afirmar "Pensando…" (el terminal real no llegó).
+    if (live.stalled) return const SizedBox.shrink();
+    final state = _stateOf(live.events);
     if (state == null) return const SizedBox.shrink();
     final (kind, label) = state;
     final color = kind == _PillKind.error ? AppTokens.danger : AppTokens.primary;

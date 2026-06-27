@@ -386,7 +386,10 @@ class _ChatViewState extends State<_ChatView> {
   @override
   void initState() {
     super.initState();
-    _composer.text = widget.state.draft;
+    // Al (re)montar —incl. al volver a la pestaña del shell, que destruyó el
+    // composer— resembrar desde el borrador VIVO del bloc, no desde state.draft
+    // (que está rancio: DraftChanged no emite). Así el texto sin enviar persiste.
+    _composer.text = context.read<PlatformAgentChatBloc>().activeDraft;
     _composer.addListener(_onComposerChanged);
   }
 
@@ -498,7 +501,12 @@ class _ChatViewState extends State<_ChatView> {
                   AppButton.text(
                     key: const Key('pa.send_failure.retry'),
                     label: 'Reintentar',
-                    onPressed: () => onSend(s.lastAttemptedContent),
+                    // Reintentar re-despacha sin pasar por el composer; limpiarlo
+                    // evita que el texto ya enviado quede y se reenvíe a mano.
+                    onPressed: () {
+                      _setComposer('');
+                      onSend(s.lastAttemptedContent);
+                    },
                   ),
               ],
             ),

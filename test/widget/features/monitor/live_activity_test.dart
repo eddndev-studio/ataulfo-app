@@ -116,4 +116,21 @@ void main() {
 
     expect(find.byKey(const Key('monitor.live_activity')), findsNothing);
   });
+
+  testWidgets('turno colgado (stalled) oculta el footer aunque el último sea activo', (
+    tester,
+  ) async {
+    whenListen(
+      cubit,
+      const Stream<MonitorLiveState>.empty(),
+      initialState: MonitorLiveState(
+        events: <MonitorEvent>[_ev(MonitorEventKind.aiTool, toolName: 'x')],
+        stalled: true,
+      ),
+    );
+    await tester.pumpWidget(_wrap(cubit));
+    await tester.pump();
+
+    expect(find.byKey(const Key('monitor.live_activity')), findsNothing);
+  });
 }

@@ -66,4 +66,20 @@ void main() {
     await _pump(tester, cubit, <MonitorEvent>[]);
     expect(find.byKey(const Key('monitor.bot_state_pill')), findsNothing);
   });
+
+  testWidgets('turno colgado (stalled) ⇒ sin píldora aunque el último sea activo', (
+    tester,
+  ) async {
+    whenListen(
+      cubit,
+      const Stream<MonitorLiveState>.empty(),
+      initialState: MonitorLiveState(
+        events: <MonitorEvent>[_ev(MonitorEventKind.aiTool)],
+        stalled: true,
+      ),
+    );
+    await tester.pumpWidget(_wrap(cubit));
+    await tester.pump();
+    expect(find.byKey(const Key('monitor.bot_state_pill')), findsNothing);
+  });
 }

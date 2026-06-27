@@ -311,6 +311,16 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
   /// cambio de pestaña del shell, que destruye el estado del composer.
   final Map<String, String> _drafts = <String, String>{};
 
+  /// Borrador vigente del hilo activo. La página lo lee al (re)montarse —p.ej.
+  /// al volver a la pestaña del shell, que destruye y recrea el composer— porque
+  /// _drafts es la verdad viva (se actualiza en cada tecla), mientras state.draft
+  /// solo se refresca en transiciones puntuales (selección de hilo, cancelación).
+  String get activeDraft {
+    final s = state;
+    if (s is PaChatLoaded) return _drafts[s.activeConversation.id] ?? s.draft;
+    return '';
+  }
+
   /// true entre que el operador pide cancelar y que el POST abortado lanza:
   /// la guarda hace que el catch del envío trague la excepción de cancelación
   /// en vez de pintarla como fallo real.

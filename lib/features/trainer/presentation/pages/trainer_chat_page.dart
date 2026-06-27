@@ -299,7 +299,12 @@ class _ChatViewState extends State<_ChatView> {
                   AppButton.text(
                     key: const Key('trainer.send_failure.retry'),
                     label: 'Reintentar',
-                    onPressed: () => _send(s.lastAttemptedContent),
+                    // Reintentar re-despacha sin pasar por el composer; limpiarlo
+                    // evita que el texto ya enviado quede y se reenvíe a mano.
+                    onPressed: () {
+                      _setComposer('');
+                      _send(s.lastAttemptedContent);
+                    },
                   ),
               ],
             ),
@@ -995,6 +1000,7 @@ class _PromptHistoryData {
       return null;
     }
     if (inner is! Map<String, dynamic>) return null;
+    if (inner.containsKey('error_kind')) return null; // un fallo no es historial
     final out = <_PromptVersionItem>[];
     final rawV = inner['versions'];
     if (rawV is List) {
