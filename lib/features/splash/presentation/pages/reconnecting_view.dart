@@ -93,10 +93,7 @@ class _ReconnectingViewState extends State<ReconnectingView> {
                   valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
                 ),
                 const SizedBox(height: AppTokens.sp4),
-                TextButton(
-                  onPressed: _retry,
-                  child: const Text('Reintentar'),
-                ),
+                TextButton(onPressed: _retry, child: const Text('Reintentar')),
               ],
             ),
           ),
