@@ -70,6 +70,20 @@ enum ToolGroup {
     'Percepción',
     'Describir imágenes y leer el texto de documentos adjuntos.',
     Icons.visibility_outlined,
+  ),
+  subagentes(
+    'subagentes',
+    'Subagentes',
+    'Delegar una tarea interna a un subagente auxiliar que trabaja y devuelve '
+        'su resultado (nunca le habla a la persona).',
+    Icons.hub_outlined,
+  ),
+  historial(
+    'historial',
+    'Historial',
+    'Leer los mensajes reales de la conversación, incluidos los de operadores '
+        'humanos y los de flujos automáticos.',
+    Icons.forum_outlined,
   );
 
   const ToolGroup(this.wire, this.label, this.description, this.icon);
