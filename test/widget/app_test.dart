@@ -262,6 +262,7 @@ void main() {
         profilePhotoCache: profilePhotoCache,
         messageMediaCache: messageMediaCache,
         onSignedOut: () {},
+        onOrgChanged: () {},
       ),
     );
 
@@ -283,6 +284,7 @@ void main() {
         profilePhotoCache: profilePhotoCache,
         messageMediaCache: messageMediaCache,
         onSignedOut: () {},
+        onOrgChanged: () {},
       ),
     );
 
@@ -307,6 +309,7 @@ void main() {
         profilePhotoCache: profilePhotoCache,
         messageMediaCache: messageMediaCache,
         onSignedOut: () {},
+        onOrgChanged: () {},
       ),
     );
 
@@ -345,6 +348,7 @@ void main() {
           profilePhotoCache: profilePhotoCache,
           messageMediaCache: messageMediaCache,
           onSignedOut: () => signedOut++,
+          onOrgChanged: () {},
         ),
       );
       await tester.pump(); // procesa Authenticated
@@ -353,4 +357,12 @@ void main() {
       expect(signedOut, 1);
     },
   );
+
+  // El cambio de org activa (Authenticated org-A → Authenticated org-B) dispara
+  // onOrgChanged (purga la verdad reconstruible, conserva el outbox), NO
+  // onSignedOut. La detección vive en `isActiveOrgChange` (probada en
+  // test/unit/app/is_active_org_change_test.dart); el `listenWhen` sólo admite
+  // ese caso o Unauthenticated, así que el `else` del listener es onOrgChanged
+  // por construcción. No se renderiza aquí el home autenticado (arrastra deps de
+  // bandeja ajenas a esta frontera).
 }

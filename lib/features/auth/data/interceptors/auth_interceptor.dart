@@ -89,6 +89,13 @@ class AuthInterceptor extends Interceptor {
         final fresh = await _refreshDs.refresh(tokens.refreshToken);
         await _storage.save(fresh);
         completer.complete(fresh);
+      } on NetworkFailure catch (e) {
+        // Caída de red durante el refresh: NO es un rechazo de credenciales.
+        // El refresh token sigue siendo válido; conservar la sesión y propagar
+        // el error como reintentable. Un parpadeo de red jamás debe desloguear
+        // (NetworkFailure es subtipo de AuthFailure, así que va ANTES del catch
+        // genérico, o el storage se purgaría por error).
+        completer.completeError(e);
       } on AuthFailure catch (e) {
         // Sólo el leader purga y señala: si lo hicieran también los
         // followers, onUnrecoverable se invocaría N veces y el storage

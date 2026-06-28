@@ -71,26 +71,26 @@ void main() {
       expect(decoration.shape, BoxShape.circle);
     });
 
-    testWidgets('interior en superficie oscura del kit (surface2/surface3)', (
+    testWidgets('relleno del fallback tomado de la paleta determinista', (
       tester,
     ) async {
-      // El anillo amarillo es el protagonista; el relleno se mantiene en una
-      // superficie oscura para que la inicial y el borde resalten. El kit
-      // admite tanto surface2 como surface3 para este relleno.
+      // Sin aro, el relleno del fallback sin foto es un color de la paleta de
+      // avatar (elegido de forma determinista por contacto), no una superficie
+      // fija del kit.
       await pumpAvatar(tester, const AppAvatar(name: 'a'));
 
       final decoration = rootContainer(tester).decoration as BoxDecoration;
-      expect(decoration.color, anyOf(AppTokens.surface2, AppTokens.surface3));
+      expect(AppTokens.avatarFallbackPalette, contains(decoration.color));
     });
 
-    testWidgets('anillo: borde primary alrededor del avatar', (tester) async {
-      // Detalle nuevo del re-skin (UserIcon): un anillo amarillo perimetral.
+    testWidgets('sin anillo: el avatar no tiene borde', (tester) async {
+      // El re-skin retira el aro amarillo perimetral: foto/relleno a círculo
+      // completo, sin borde (un anillo competía con la foto y dejaba un halo
+      // fantasma si solo se cambiaba el color).
       await pumpAvatar(tester, const AppAvatar(name: 'a'));
 
       final decoration = rootContainer(tester).decoration as BoxDecoration;
-      expect(decoration.border, isNotNull);
-      expect(decoration.border?.top.color, AppTokens.primary);
-      expect(decoration.border?.top.width, greaterThan(0));
+      expect(decoration.border, isNull);
     });
 
     testWidgets(
@@ -151,12 +151,9 @@ void main() {
       expect(find.byType(Image), findsOneWidget);
     });
 
-    testWidgets('la foto se inserta dentro del anillo (no lo tapa)', (
-      tester,
-    ) async {
-      // El Image se dimensiona al diámetro menos 2× el grosor del anillo, de
-      // modo que el borde de marca sigue visible como en la variante de
-      // iniciales (regresión: foto a tamaño completo se comía el anillo).
+    testWidgets('la foto ocupa el círculo completo', (tester) async {
+      // Sin aro, la foto se dimensiona al diámetro completo y se recorta en
+      // círculo (ClipOval); ya no se inserta con el padding del grosor del aro.
       await pumpAvatar(
         tester,
         const AppAvatar(
@@ -166,8 +163,7 @@ void main() {
         ),
       );
       final img = tester.widget<Image>(find.byType(Image));
-      expect(img.width, lessThan(64));
-      expect(img.width, 64 - 2 * 2.0);
+      expect(img.width, 64);
     });
 
     testWidgets('foto que no carga cae a la inicial (errorBuilder)', (
@@ -203,5 +199,77 @@ void main() {
       expect(find.byType(Image), findsNothing);
       expect(find.text('A'), findsOneWidget);
     });
+  });
+
+  group('AppAvatar — color determinista', () {
+    // Réplica del hash del widget (FNV-1a) para fijar el contrato: si el widget
+    // cambiara de algoritmo, el color esperado dejaría de coincidir.
+    int refIndex(String key) {
+      var hash = 0x811c9dc5;
+      for (final r in key.runes) {
+        hash = ((hash ^ r) * 0x01000193) & 0xFFFFFFFF;
+      }
+      return hash % AppTokens.avatarFallbackPalette.length;
+    }
+
+    testWidgets('colorKey fija el color (FNV-1a) e ignora el name', (
+      tester,
+    ) async {
+      const key = 'chat-lid-42';
+      final expected = AppTokens.avatarFallbackPalette[refIndex(key)];
+
+      await pumpAvatar(
+        tester,
+        const AppAvatar(name: 'Cargando…', colorKey: key),
+      );
+      expect(
+        (rootContainer(tester).decoration as BoxDecoration).color,
+        expected,
+      );
+
+      // Mismo colorKey, name distinto → mismo color: estable en la transición
+      // placeholder→nombre real y entre dispositivos.
+      await pumpAvatar(
+        tester,
+        const AppAvatar(name: 'Nombre Real', colorKey: key),
+      );
+      expect(
+        (rootContainer(tester).decoration as BoxDecoration).color,
+        expected,
+      );
+    });
+
+    testWidgets('sin colorKey deriva del name (último recurso)', (
+      tester,
+    ) async {
+      const name = 'Ventas MX';
+      final expected = AppTokens.avatarFallbackPalette[refIndex(name)];
+      await pumpAvatar(tester, const AppAvatar(name: name));
+      expect(
+        (rootContainer(tester).decoration as BoxDecoration).color,
+        expected,
+      );
+    });
+
+    test(
+      'cada tono de la paleta conserva ≥4.5:1 contra la inicial (text1)',
+      () {
+        double ratio(Color a, Color b) {
+          final la = a.computeLuminance();
+          final lb = b.computeLuminance();
+          final hi = la > lb ? la : lb;
+          final lo = la > lb ? lb : la;
+          return (hi + 0.05) / (lo + 0.05);
+        }
+
+        for (final c in AppTokens.avatarFallbackPalette) {
+          expect(
+            ratio(c, AppTokens.text1),
+            greaterThanOrEqualTo(4.5),
+            reason: 'tono $c bajo el mínimo AA contra text1',
+          );
+        }
+      },
+    );
   });
 }

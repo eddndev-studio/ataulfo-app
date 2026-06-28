@@ -233,6 +233,7 @@ void main() {
         ),
         messageMediaCache: fakeMessageMediaCache(),
         onSignedOut: () {},
+        onOrgChanged: () {},
       ),
     );
     await _pumpUntil(tester, find.text('Bots'));

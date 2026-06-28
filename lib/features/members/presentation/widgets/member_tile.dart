@@ -28,7 +28,7 @@ class MemberTile extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: <Widget>[
-          AppAvatar(name: member.email),
+          AppAvatar(name: member.email, colorKey: member.email),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(

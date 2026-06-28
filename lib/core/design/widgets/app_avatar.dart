@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../tokens.dart';
 
-/// Avatar circular del design system: círculo con un anillo perimetral
-/// [AppTokens.primary], relleno en superficie oscura del kit y la inicial
-/// uppercase del nombre. Es el reemplazo del [CircleAvatar] de Material,
-/// que arrastra el tinte primary del theme y un radius de 20 implícito.
-///
-/// El anillo amarillo es el protagonista del re-skin (patrón UserIcon del
-/// kit); el relleno se mantiene en una superficie oscura ([AppTokens.surface3])
-/// para que la inicial y el borde resalten contra el fondo.
+/// Avatar circular del design system: círculo plano sin borde, con la foto
+/// recortada a círculo completo o, en su defecto, la inicial uppercase del
+/// nombre sobre un relleno oscuro. Es el reemplazo del [CircleAvatar] de
+/// Material, que arrastra el tinte primary del theme y un radius de 20
+/// implícito.
 ///
 /// `size` parametriza diámetro total — los listados usan 40 (densidad
 /// alta) y los detalles 64 (header). El font-size del label escala con el
@@ -22,25 +19,28 @@ class AppAvatar extends StatelessWidget {
     this.size = 40,
     this.imageUrl,
     this.imageProvider,
+    this.colorKey,
   });
 
   final String name;
   final double size;
 
-  /// Foto opcional (URL firmada/efímera). Si viene, se carga recortada en el
-  /// círculo con el anillo de marca; al fallar o no estar (`null`) cae a la
-  /// inicial. Mantiene la misma forma y semántica que la variante de iniciales.
+  /// Clave estable del contacto para derivar el color de fondo del fallback sin
+  /// foto (un id de servidor: chatLid, email, org id…). El mismo valor produce
+  /// siempre el mismo color en cualquier pantalla y dispositivo. Si es `null`,
+  /// se usa [name] como último recurso, que pierde estabilidad si el nombre
+  /// cambia en runtime (p. ej. de un placeholder al nombre real).
+  final String? colorKey;
+
+  /// Foto opcional (URL firmada/efímera). Si viene, se recorta al círculo
+  /// completo; al fallar o no estar (`null`) cae a la inicial. Mantiene la misma
+  /// forma y semántica que la variante de iniciales.
   final String? imageUrl;
 
   /// Fuente de imagen local opcional (p. ej. `MemoryImage` de la caché de fotos
   /// en disco). Se usa cuando no hay [imageUrl]; permite servir la foto cacheada
-  /// sin depender de una URL viva. Mismo recorte/anillo y caída a la inicial.
+  /// sin depender de una URL viva. Mismo recorte al círculo y caída a la inicial.
   final ImageProvider? imageProvider;
-
-  /// Grosor del anillo de marca. Fijo en cualquier tamaño: un borde más
-  /// delgado se perdería en avatares chicos y uno proporcional al diámetro
-  /// engordaría de más en el header.
-  static const double _ringWidth = 2.0;
 
   @override
   Widget build(BuildContext context) {
@@ -56,14 +56,11 @@ class AppAvatar extends StatelessWidget {
       ),
     );
     final url = imageUrl;
-    final dim = size - _ringWidth * 2;
-    // La foto se inserta dentro del anillo (padding = grosor del anillo) y se
-    // recorta en círculo, para que el borde de marca siga visible igual que en
-    // la variante de iniciales (no lo tapa el BoxFit.cover).
-    Widget framed(Widget img) => Padding(
-      padding: const EdgeInsets.all(_ringWidth),
-      child: ClipOval(child: img),
-    );
+    final fillColor =
+        AppTokens.avatarFallbackPalette[_paletteIndex(colorKey ?? name)];
+    final dim = size;
+    // La foto ocupa el círculo completo y se recorta con ClipOval.
+    Widget framed(Widget img) => ClipOval(child: img);
     Widget content;
     if (url != null) {
       content = framed(
@@ -99,16 +96,27 @@ class AppAvatar extends StatelessWidget {
       child: Container(
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          color: AppTokens.surface3,
-          shape: BoxShape.circle,
-          border: Border.all(color: AppTokens.primary, width: _ringWidth),
-        ),
+        decoration: BoxDecoration(color: fillColor, shape: BoxShape.circle),
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         child: content,
       ),
     );
+  }
+
+  /// Índice determinista en [AppTokens.avatarFallbackPalette] derivado de una
+  /// clave estable. Usa FNV-1a (no `String.hashCode`, que está sembrado por
+  /// ejecución y no sería estable entre runs ni dispositivos).
+  static int _paletteIndex(String key) =>
+      _fnv1a(key) % AppTokens.avatarFallbackPalette.length;
+
+  /// FNV-1a de 32 bits sobre los runes de [s]. Determinista y portable.
+  static int _fnv1a(String s) {
+    var hash = 0x811c9dc5;
+    for (final r in s.runes) {
+      hash = ((hash ^ r) * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash;
   }
 
   static String _initial(String s) {

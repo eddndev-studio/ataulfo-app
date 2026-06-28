@@ -31,7 +31,7 @@ class InvitationTile extends StatelessWidget {
     return AppCard(
       child: Row(
         children: <Widget>[
-          AppAvatar(name: invitation.email),
+          AppAvatar(name: invitation.email, colorKey: invitation.email),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(

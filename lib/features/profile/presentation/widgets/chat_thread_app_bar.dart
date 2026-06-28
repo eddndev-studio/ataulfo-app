@@ -193,7 +193,12 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: ExcludeSemantics(
                 child: Row(
                   children: <Widget>[
-                    AppAvatar(name: name, size: 36, imageUrl: photo),
+                    AppAvatar(
+                      name: name,
+                      size: 36,
+                      imageUrl: photo,
+                      colorKey: chatLid,
+                    ),
                     const SizedBox(width: AppTokens.sp3),
                     Expanded(
                       child: Column(

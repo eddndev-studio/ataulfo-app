@@ -33,7 +33,7 @@ class OrgMembershipTile extends StatelessWidget {
       onTap: isActive ? null : onTap,
       child: Row(
         children: <Widget>[
-          AppAvatar(name: membership.orgName),
+          AppAvatar(name: membership.orgName, colorKey: membership.orgId),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/profile/data/cache/file_profile_photo_store.dart';
 import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
@@ -104,5 +105,23 @@ void main() {
 
     expect(find.byType(Image), findsNothing);
     expect(find.text('A'), findsOneWidget);
+  });
+
+  testWidgets('reenvía chatLid como colorKey (color estable del mismo chat)', (
+    tester,
+  ) async {
+    // El color del fallback debe derivarse del chatLid, no del nombre: así el
+    // mismo chat sale del mismo color en la bandeja y en el hilo, y no cambia
+    // cuando el nombre pasa de un placeholder al real.
+    final cache = ProfilePhotoCache(
+      profileRepo: _StubProfileRepo(null),
+      download: (_) async => null,
+      store: store(),
+    );
+    await pump(tester, cache);
+    await tester.pumpAndSettle();
+
+    final avatar = tester.widget<AppAvatar>(find.byType(AppAvatar));
+    expect(avatar.colorKey, '111@lid');
   });
 }

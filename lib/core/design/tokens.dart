@@ -54,6 +54,26 @@ class _Orange {
   static const Color s300 = Color(0xFFFFB74D);
 }
 
+// Paleta de relleno para el fallback de avatar sin foto. NO proviene del kit
+// (Primitives): es una adición curada de tonos oscuros de baja saturación para
+// dar a cada contacto un color de fondo estable y propio, al estilo de las apps
+// de mensajería. Cada tono es lo bastante oscuro para que la inicial en
+// [AppTokens.text1] conserve ≥4.5:1 (AA). Privada como el resto de primitivas;
+// solo [AppTokens.avatarFallbackPalette] la expone.
+class _AvatarFill {
+  const _AvatarFill._();
+  static const Color slate = Color(0xFF38454F);
+  static const Color teal = Color(0xFF2E5048);
+  static const Color blue = Color(0xFF2C4263);
+  static const Color indigo = Color(0xFF3A3D66);
+  static const Color violet = Color(0xFF4A3A64);
+  static const Color plum = Color(0xFF563457);
+  static const Color rose = Color(0xFF5A3540);
+  static const Color terracotta = Color(0xFF563E2E);
+  static const Color olive = Color(0xFF45491F);
+  static const Color green = Color(0xFF2F5238);
+}
+
 /// Tokens visuales canónicos del cliente (Figma · colección Semantic).
 ///
 /// Solo dark mode — el producto no tiene tema claro hoy. Cada token resuelve
@@ -106,6 +126,25 @@ class AppTokens {
   /// fills ni chrome. Rol propio: NO es [success] (`teal/500`, otra primitiva,
   /// significa éxito), aunque ambos sean verdosos.
   static const Color chatAccent = _Green.s500;
+
+  // ── Avatar ────────────────────────────────────────────────────────────────
+  /// Paleta de relleno para el avatar sin foto. El color se elige de forma
+  /// determinista a partir de una clave estable del contacto (un hash sobre la
+  /// clave indexa esta lista), de modo que el mismo contacto siempre obtiene el
+  /// mismo color en cualquier pantalla y dispositivo. Tonos oscuros y
+  /// desaturados: la inicial clara ([text1]) conserva ≥4.5:1 sobre cualquiera.
+  static const List<Color> avatarFallbackPalette = <Color>[
+    _AvatarFill.slate,
+    _AvatarFill.teal,
+    _AvatarFill.blue,
+    _AvatarFill.indigo,
+    _AvatarFill.violet,
+    _AvatarFill.plum,
+    _AvatarFill.rose,
+    _AvatarFill.terracotta,
+    _AvatarFill.olive,
+    _AvatarFill.green,
+  ];
 
   // ── Text ────────────────────────────────────────────────────────────────
   static const Color text1 = _Gray.s100;

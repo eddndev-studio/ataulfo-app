@@ -7,7 +7,7 @@ import '../../data/cache/profile_photo_cache.dart';
 
 /// [AppAvatar] que resuelve la foto del chat por la caché de fotos en disco
 /// ([ProfilePhotoCache]). Mientras no haya bytes (cargando / sin foto) muestra
-/// la inicial; cuando llegan, los pinta vía [MemoryImage] dentro del anillo.
+/// la inicial; cuando llegan, los pinta vía [MemoryImage] recortados al círculo.
 ///
 /// Es un wrapper con estado sobre el avatar sin estado del kit: aísla el ciclo
 /// de carga asíncrona (initState + reinicio al cambiar de chat) de la
@@ -74,6 +74,9 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
       name: widget.name,
       size: widget.size,
       imageProvider: b == null ? null : MemoryImage(b),
+      // Clave estable del chat: el color del fallback no cambia con el nombre ni
+      // difiere entre la bandeja y el hilo.
+      colorKey: widget.chatLid,
     );
   }
 }

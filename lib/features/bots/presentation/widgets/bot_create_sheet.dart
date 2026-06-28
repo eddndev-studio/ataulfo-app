@@ -323,7 +323,7 @@ class _PickTile extends StatelessWidget {
       onTap: () => onPick(template),
       child: Row(
         children: <Widget>[
-          AppAvatar(name: template.name),
+          AppAvatar(name: template.name, colorKey: template.id),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(

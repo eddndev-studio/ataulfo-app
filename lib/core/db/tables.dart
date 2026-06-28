@@ -9,9 +9,11 @@ import 'package:drift/drift.dart';
 // `.name`. El nombre de la fila generada lleva sufijo `Row` para no chocar con
 // las entidades de dominio (`Conversation`, `Message`).
 //
-// Al cambiar cualquier tabla aquí, sube `schemaVersion` en app_db.dart: la
-// recreación destructiva de `onUpgrade` sólo corre si la versión cambia; de lo
-// contrario un dispositivo con la DB vieja conserva el esquema previo.
+// Al cambiar cualquier tabla aquí, sube `schemaVersion` en app_db.dart Y añade
+// el paso de migración incremental en `onUpgrade`: drift sólo migra si la
+// versión cambia, y el paso debe conservar el outbox (escrituras sin
+// sincronizar). Un cambio de tabla sin subir versión deja a un dispositivo con
+// la DB vieja en el esquema previo y revienta en runtime ("no such column").
 
 /// Conversaciones de la bandeja. PK `(botId, chatLid)` = invariante I-S1.
 /// `lastMessage*` es una proyección plana del último mensaje (los cuatro campos

@@ -20,24 +20,26 @@ class AppDb extends _$AppDb {
   AppDb.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
-      // El almacén local es un espejo reconstruible de la verdad del servidor:
-      // mientras el esquema evoluciona se recrea (drop + createAll) en vez de
-      // migrar. OJO: drift sólo invoca onUpgrade cuando `schemaVersion` cambia,
-      // así que CADA cambio en `tables.dart` debe subir `schemaVersion`; si no,
-      // un dispositivo con la DB vieja conserva el esquema previo y revienta en
-      // runtime ("no such column"). Sustituir por migraciones incrementales
-      // antes de que el outbox guarde escrituras sin sincronizar que deban
-      // sobrevivir a un upgrade.
-      for (final table in allTables.toList().reversed) {
-        await m.deleteTable(table.actualTableName);
-      }
-      await m.createAll();
+      // Migraciones incrementales y NO destructivas. El outbox guarda
+      // escrituras hechas sin red que aún no se sincronizan: JAMÁS se dropea o
+      // se perderían mensajes/marcas/reacciones del usuario. Las tablas
+      // reconstruibles (espejo de la verdad del servidor) sí pueden recrearse
+      // en el paso de migración cuando su esquema cambie —un re-pull las
+      // repuebla—, pero nunca con un drop global. Cada versión nueva añade su
+      // propio bloque aditivo `if (from < N) { ... }`; drift sólo invoca
+      // onUpgrade cuando `schemaVersion` sube, así que cada cambio en
+      // `tables.dart` debe subir la versión Y traer su paso de migración (un
+      // guard de CI lo verifica), o un dispositivo viejo revienta en runtime.
+      //
+      // v1→v2: corte de la recreación destructiva a migración incremental. El
+      // esquema no cambió, así que este paso no toca datos: conserva la caché y
+      // el outbox intactos.
     },
   );
 
@@ -49,6 +51,19 @@ class AppDb extends _$AppDb {
       for (final table in allTables) {
         await delete(table).go();
       }
+    });
+  }
+
+  /// Borra sólo la verdad local RECONSTRUIBLE (conversaciones, mensajes y
+  /// cursores), conservando el outbox. Se invoca al cambiar de organización
+  /// activa: el espejo del servidor de la org anterior no debe verse en la
+  /// nueva (un re-pull lo repuebla), pero las escrituras hechas sin red que aún
+  /// no se sincronizan NO se pierden. Transaccional.
+  Future<void> clearReadData() {
+    return transaction(() async {
+      await delete(conversations).go();
+      await delete(messages).go();
+      await delete(syncCursors).go();
     });
   }
 }

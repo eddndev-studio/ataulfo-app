@@ -476,6 +476,19 @@ Future<void> main() async {
         // vuelve a leer la DB durante el borrado.
         unawaited(db.clearAllData());
       },
+      // Al cambiar de organización activa (mismo usuario, otra org): purga las
+      // cachés de sesión y la verdad local RECONSTRUIBLE para no mostrar datos
+      // de la org anterior en la nueva; el outbox (escrituras sin sincronizar)
+      // se CONSERVA (no se pierde una escritura offline por cambiar de org).
+      onOrgChanged: () {
+        mediaRepository.invalidate();
+        quickRepliesRepository.invalidate();
+        unawaited(profilePhotoCache.invalidate());
+        messageMediaCache.invalidate();
+        // Fencea cualquier reconciliación del outbox en vuelo antes de purgar.
+        syncCoordinator.reset();
+        unawaited(db.clearReadData());
+      },
     ),
   );
 }

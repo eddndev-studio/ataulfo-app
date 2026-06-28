@@ -178,6 +178,38 @@ void main() {
   });
 
   test(
+    'clearReadData vacía las tablas reconstruibles pero conserva el outbox',
+    () async {
+      await insertConv('b1', 'c1');
+      await insertMsg('b1', 'e1');
+      await db
+          .into(db.syncCursors)
+          .insert(SyncCursorsCompanion.insert(botId: 'b1', chatLid: 'c1'));
+      await db
+          .into(db.outbox)
+          .insert(
+            OutboxCompanion.insert(
+              botId: 'b1',
+              chatLid: 'c1',
+              opType: 'send_message',
+              payload: '{"text":"sin red"}',
+              createdAtMs: 1,
+              updatedAtMs: 1,
+            ),
+          );
+
+      await db.clearReadData();
+
+      // Espejo reconstruible purgado (un re-pull lo repuebla en la nueva org).
+      expect(await db.select(db.conversations).get(), isEmpty);
+      expect(await db.select(db.messages).get(), isEmpty);
+      expect(await db.select(db.syncCursors).get(), isEmpty);
+      // El outbox (escrituras sin sincronizar) SOBREVIVE al cambio de org.
+      expect(await db.select(db.outbox).get(), hasLength(1));
+    },
+  );
+
+  test(
     'ámbito por botId: una consulta de un bot no ve filas de otro',
     () async {
       await insertConv('b1', 'c1');

@@ -11,6 +11,16 @@ import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/messages/data/cache/message_media_cache.dart';
 import 'features/profile/data/cache/profile_photo_cache.dart';
 
+/// True cuando la organización ACTIVA cambió entre dos estados autenticados
+/// (mismo usuario, otra org), como tras un cambio de organización. Es la
+/// frontera que dispara la purga de la verdad local reconstruible: la del
+/// servidor de la org anterior no debe verse en la nueva. No incluye
+/// login/logout ni la transición a/desde "sin org activa": sólo org→otra-org.
+bool isActiveOrgChange(AuthState previous, AuthState current) =>
+    previous is AuthAuthenticated &&
+    current is AuthAuthenticated &&
+    previous.identity.orgId != current.identity.orgId;
+
 /// Widget raíz. Recibe el router y el AuthBloc ya construidos (composición
 /// desde main) — testeable sin inicializar plataforma.
 ///
@@ -30,6 +40,7 @@ class AtaulfoApp extends StatelessWidget {
     required this.profilePhotoCache,
     required this.messageMediaCache,
     required this.onSignedOut,
+    required this.onOrgChanged,
   });
 
   final AppRouter router;
@@ -55,6 +66,12 @@ class AtaulfoApp extends StatelessWidget {
   /// la verdad local de una cuenta a la siguiente sin reiniciar la app.
   final VoidCallback onSignedOut;
 
+  /// Se invoca al cambiar de organización activa (mismo usuario, otra org). La
+  /// composición lo enchufa a la purga de la verdad local RECONSTRUIBLE y de las
+  /// cachés de sesión, conservando el outbox, para no mostrar datos de la org
+  /// anterior en la nueva.
+  final VoidCallback onOrgChanged;
+
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
@@ -68,8 +85,18 @@ class AtaulfoApp extends StatelessWidget {
           BlocProvider<ConnectivityCubit>.value(value: connectivityCubit),
         ],
         child: BlocListener<AuthBloc, AuthState>(
-          listenWhen: (previous, current) => current is AuthUnauthenticated,
-          listener: (_, _) => onSignedOut(),
+          // Dos fronteras de sesión: el logout purga TODO; el cambio de org
+          // activa purga sólo la verdad reconstruible (conserva el outbox).
+          listenWhen: (previous, current) =>
+              current is AuthUnauthenticated ||
+              isActiveOrgChange(previous, current),
+          listener: (_, state) {
+            if (state is AuthUnauthenticated) {
+              onSignedOut();
+            } else {
+              onOrgChanged();
+            }
+          },
           child: MaterialApp.router(
             title: 'Ataúlfo',
             debugShowCheckedModeBanner: false,

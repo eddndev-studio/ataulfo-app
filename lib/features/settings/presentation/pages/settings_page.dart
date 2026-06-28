@@ -158,7 +158,11 @@ class _ProfileHeader extends StatelessWidget {
               const SizedBox(height: AppTokens.sp5),
               Row(
                 children: <Widget>[
-                  AppAvatar(name: user.initial, size: 56),
+                  AppAvatar(
+                    name: user.initial,
+                    size: 56,
+                    colorKey: identity.email,
+                  ),
                   const SizedBox(width: AppTokens.sp4),
                   Expanded(
                     child: Column(

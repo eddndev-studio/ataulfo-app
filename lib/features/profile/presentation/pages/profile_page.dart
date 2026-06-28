@@ -61,7 +61,12 @@ class _ProfileView extends StatelessWidget {
       padding: const EdgeInsets.all(AppTokens.sp6),
       children: <Widget>[
         Center(
-          child: AppAvatar(name: title, size: 96, imageUrl: p.photoUrl),
+          child: AppAvatar(
+            name: title,
+            size: 96,
+            imageUrl: p.photoUrl,
+            colorKey: p.chatLid,
+          ),
         ),
         const SizedBox(height: AppTokens.sp4),
         Text(title, textAlign: TextAlign.center, style: textTheme.titleLarge),

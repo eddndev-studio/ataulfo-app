@@ -447,4 +447,90 @@ void main() {
       expect(adapter.captured, hasLength(2));
     });
   });
+
+  group('AuthInterceptor.onError 401 con refresh caído por red', () {
+    test(
+      'NO purga la sesión ni señala logout; propaga el error (reintentable)',
+      () async {
+        await storage.save(
+          const AuthTokens(
+            accessToken: 'OLD-ACCESS',
+            refreshToken: 'OLD-REFRESH',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          ),
+        );
+
+        adapter.handler = (_) async => _jsonBody(401, <String, dynamic>{});
+        when(
+          () => refreshDs.refresh('OLD-REFRESH'),
+        ).thenThrow(const NetworkFailure());
+
+        await expectLater(
+          dio.get<dynamic>('/bots/abc'),
+          throwsA(isA<DioException>()),
+        );
+
+        // La sesión SOBREVIVE: un parpadeo de red durante el refresh no es un
+        // rechazo de credenciales. El access sigue siendo el válido y se
+        // reintenta al reconectar; jamás se desloguea por falta de red.
+        expect(await storage.read(), isNotNull);
+        expect(unrecoverableCalls, 0);
+        // No hubo retry: solo el hit original llegó al transporte.
+        expect(adapter.captured, hasLength(1));
+        verify(() => refreshDs.refresh('OLD-REFRESH')).called(1);
+      },
+    );
+
+    test(
+      'dos 401 simultáneos con refresh caído por red: ninguno purga, un refresh',
+      () async {
+        await storage.save(
+          const AuthTokens(
+            accessToken: 'OLD-ACCESS',
+            refreshToken: 'OLD-REFRESH',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          ),
+        );
+
+        adapter.handler = (options) async {
+          if (options.headers['Authorization'] == 'Bearer OLD-ACCESS') {
+            return _jsonBody(401, <String, dynamic>{});
+          }
+          return _jsonBody(200, <String, dynamic>{});
+        };
+
+        final gate = Completer<AuthTokens>();
+        when(
+          () => refreshDs.refresh('OLD-REFRESH'),
+        ).thenAnswer((_) => gate.future);
+
+        final f1 = dio.get<dynamic>('/a');
+        final f2 = dio.get<dynamic>('/b');
+        // Adjunta las expectativas ANTES de provocar el rechazo: si la red cae
+        // mientras nadie escucha el future, Dart lo marca como error async no
+        // manejado y reprueba el test aunque el rechazo sea el esperado.
+        final done1 = expectLater(f1, throwsA(isA<DioException>()));
+        final done2 = expectLater(f2, throwsA(isA<DioException>()));
+
+        // Drena el event loop para que ambos entren a onError y compartan el
+        // mismo refresh en vuelo (leader + follower) antes de que caiga la red.
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        verify(() => refreshDs.refresh('OLD-REFRESH')).called(1);
+
+        gate.completeError(const NetworkFailure());
+
+        await done1;
+        await done2;
+
+        // Ni el leader ni el follower purgan: la sesión sobrevive a la caída.
+        expect(await storage.read(), isNotNull);
+        expect(unrecoverableCalls, 0);
+        verifyNoMoreInteractions(refreshDs);
+      },
+    );
+  });
 }
