@@ -21,6 +21,7 @@ void main() {
         'percepcion',
         'subagentes',
         'historial',
+        'analisis',
       ]);
     });
 
@@ -30,6 +31,7 @@ void main() {
         expect(ToolGroup.fromWireOrNull('flujos'), ToolGroup.flujos);
         expect(ToolGroup.fromWireOrNull('percepcion'), ToolGroup.percepcion);
         expect(ToolGroup.fromWireOrNull('historial'), ToolGroup.historial);
+        expect(ToolGroup.fromWireOrNull('analisis'), ToolGroup.analisis);
         expect(ToolGroup.fromWireOrNull('no_existe'), isNull);
       },
     );

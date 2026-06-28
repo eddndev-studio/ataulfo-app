@@ -84,6 +84,13 @@ enum ToolGroup {
     'Leer los mensajes reales de la conversación, incluidos los de operadores '
         'humanos y los de flujos automáticos.',
     Icons.forum_outlined,
+  ),
+  analisis(
+    'analisis',
+    'Análisis',
+    'Diseccionar la conversación con un modelo auxiliar (resumen, hechos, '
+        'sentimiento). Corre un modelo con costo; apágalo para evitarlo.',
+    Icons.insights_outlined,
   );
 
   const ToolGroup(this.wire, this.label, this.description, this.icon);
