@@ -10,9 +10,15 @@ enum MonitorEventKind {
   flowFailed,
   alert,
   unknown,
-  // Sentinel CLIENTE (no viene del wire): el stream se reconectó. Lo emite el
-  // reconnectMarker del datasource para que el consumidor pinte la salud del SSE.
+  // Sentinel CLIENTE (no viene del wire): el feed SSE no está vivo (cayó o está
+  // reintentando). Lo emiten el reconnectMarker/disconnectMarker del datasource
+  // para que el consumidor pinte la salud del SSE.
   reconnect,
+  // Sentinel CLIENTE (no viene del wire): la conexión SSE quedó establecida (el
+  // feed está vivo de nuevo). Lo emite el datasource tras el handshake HTTP, para
+  // que el consumidor APAGUE el aviso de salud aunque el bot esté inactivo (sin
+  // esto, "Reconectando…" se quedaría pegado hasta la siguiente actividad).
+  connected,
 }
 
 /// Un evento de la actividad EN VIVO del bot runtime de un chat, recibido por el

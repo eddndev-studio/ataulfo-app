@@ -30,10 +30,16 @@ Future<void> expoBackoff(int attempt) {
 /// cerrarlo, [reconnectMarker]: si se da, su valor se emite al stream cada vez
 /// que se REESTABLECE una conexión (no en la primera), como señal para que el
 /// consumidor reconcilie contra la verdad autoritativa (p. ej. un fetch HTTP).
+///
+/// [disconnectMarker]: si se da, su valor se emite en cuanto una conexión CAE
+/// (cierre o error), antes de esperar el backoff —no al cancelar el consumidor—.
+/// Permite que el consumidor avise del corte durante todo el hueco (no solo al
+/// reintentar), p. ej. un indicador de salud del feed.
 Stream<T> reconnectingStream<T>(
   Stream<T> Function() connect, {
   Future<void> Function(int attempt) backoff = expoBackoff,
   T Function()? reconnectMarker,
+  T Function()? disconnectMarker,
 }) {
   late StreamController<T> controller;
   StreamSubscription<T>? inner;
@@ -73,7 +79,8 @@ Stream<T> reconnectingStream<T>(
       await closed.future;
       await inner?.cancel();
       inner = null;
-      if (cancelled) break;
+      if (cancelled) break; // cancelación del consumidor: no es una caída
+      if (disconnectMarker != null) controller.add(disconnectMarker());
       attempt = delivered ? 1 : attempt + 1;
       await backoff(attempt);
     }

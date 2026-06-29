@@ -100,6 +100,35 @@ void main() {
     ],
   );
 
+  blocTest<MonitorLiveCubit, MonitorLiveState>(
+    'un sentinel connected limpia reconnecting SIN actividad del bot',
+    build: () => MonitorLiveCubit(ds),
+    act: (c) async {
+      c.watch('b1', 'chat1');
+      ds.ctrl.add(_ev(MonitorEventKind.reconnect));
+      await Future<void>.delayed(Duration.zero);
+      ds.ctrl.add(_ev(MonitorEventKind.connected));
+      await Future<void>.delayed(Duration.zero);
+    },
+    expect: () => <dynamic>[
+      isA<MonitorLiveState>().having((s) => s.reconnecting, 'cayó', true),
+      isA<MonitorLiveState>()
+          .having((s) => s.reconnecting, 'feed vivo de nuevo', false)
+          .having((s) => s.events.length, 'connected no es un evento', 0),
+    ],
+  );
+
+  blocTest<MonitorLiveCubit, MonitorLiveState>(
+    'connected estando ya en vivo es no-op (no re-emite)',
+    build: () => MonitorLiveCubit(ds),
+    act: (c) async {
+      c.watch('b1', 'chat1');
+      ds.ctrl.add(_ev(MonitorEventKind.connected));
+      await Future<void>.delayed(Duration.zero);
+    },
+    expect: () => <dynamic>[],
+  );
+
   test('close cancela la suscripción (no fuga)', () async {
     final c = MonitorLiveCubit(ds)..watch('b1', 'chat1');
     await c.close();

@@ -108,6 +108,15 @@ class MonitorLiveCubit extends Cubit<MonitorLiveState> {
       emit(MonitorLiveState(events: state.events, reconnecting: true));
       return;
     }
+    // El feed quedó vivo de nuevo: apaga el aviso sin sumar al historial ni
+    // tocar `stalled` (es salud del SSE, no del turno). No-op si ya estábamos en
+    // vivo, para no re-emitir el mismo estado.
+    if (e.kind == MonitorEventKind.connected) {
+      if (state.reconnecting) {
+        emit(MonitorLiveState(events: state.events, stalled: state.stalled));
+      }
+      return;
+    }
     if (_catchup != null) {
       final cutoff = _snapshotCutoff;
       // Duplicado del snapshot: el mismo run, dentro de la ventana ya hidratada.

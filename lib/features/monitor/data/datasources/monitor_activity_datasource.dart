@@ -37,14 +37,23 @@ class DioMonitorActivityDatasource
     String botId,
     String chatLid,
   ) => reconnectingStream<MonitorEvent>(
-    () => _connect('/sessions/$botId/$chatLid/ai-activity'),
-    // Al reconectar, emite un sentinel para que el consumidor pinte la salud
-    // del SSE (la actividad puede ir atrasada tras la caída).
+    () => _connect('/sessions/$botId/$chatLid/ai-activity', live: true),
+    // Salud del SSE para el footer del hilo: el disconnect se emite al CAER el
+    // feed (banner ON durante todo el hueco); el connected (desde _connect, tras
+    // el handshake) lo APAGA aunque el bot esté inactivo. El reconnect adicional
+    // cubre el arranque de cada reintento.
     reconnectMarker: _reconnectSentinel,
+    disconnectMarker: _reconnectSentinel,
   );
 
   static MonitorEvent _reconnectSentinel() => MonitorEvent(
     kind: MonitorEventKind.reconnect,
+    topic: '',
+    at: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+  );
+
+  static MonitorEvent _connectedSentinel() => MonitorEvent(
+    kind: MonitorEventKind.connected,
     topic: '',
     at: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
   );
@@ -55,7 +64,10 @@ class DioMonitorActivityDatasource
         () => _connect('/bots/$botId/ai-activity'),
       );
 
-  Stream<MonitorEvent> _connect(String path) async* {
+  /// [live] marca el feed por-chat: emite un sentinel `connected` tras el
+  /// handshake HTTP, para que su consumidor apague el aviso de salud. La bandeja
+  /// (botActivity) no lo pide: no pinta salud del SSE.
+  Stream<MonitorEvent> _connect(String path, {bool live = false}) async* {
     final cancel = CancelToken();
     try {
       final res = await _dio.get<ResponseBody>(
@@ -71,6 +83,7 @@ class DioMonitorActivityDatasource
       );
       final body = res.data;
       if (body == null) return;
+      if (live) yield _connectedSentinel();
       await for (final ev in decodeSseEvents(body.stream)) {
         if (ev.event.isEmpty) continue; // pings/comentarios sin topic
         final parsed = _tryParse(ev.event, ev.data);

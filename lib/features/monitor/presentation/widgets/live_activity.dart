@@ -111,6 +111,7 @@ class LiveActivity extends StatelessWidget {
       case MonitorEventKind.alert:
       case MonitorEventKind.unknown:
       case MonitorEventKind.reconnect:
+      case MonitorEventKind.connected:
         return null;
     }
   }

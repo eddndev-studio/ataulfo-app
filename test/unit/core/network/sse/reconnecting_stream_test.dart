@@ -167,6 +167,42 @@ void main() {
     },
   );
 
+  test(
+    'emite disconnectMarker al CAER la conexión, antes de reconectar',
+    () async {
+      final controllers = <StreamController<int>>[];
+      final bk = recordingBackoff();
+
+      final stream = reconnectingStream<int>(
+        () {
+          final c = StreamController<int>();
+          controllers.add(c);
+          return c.stream;
+        },
+        backoff: bk.fn,
+        disconnectMarker: () => -9, // valor distinguible de los mensajes
+      );
+
+      final got = <int>[];
+      final sub = stream.listen(got.add);
+      await Future<void>.delayed(Duration.zero);
+
+      controllers[0].add(1);
+      await Future<void>.delayed(Duration.zero);
+      await controllers[0].close(); // cae → emite el disconnect ANTES del backoff
+      await Future<void>.delayed(Duration.zero);
+      controllers[1].add(2);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        got,
+        <int>[1, -9, 2],
+        reason: 'el disconnect (-9) aparece al caer la conexión, no al reconectar',
+      );
+      await sub.cancel();
+    },
+  );
+
   test('al cancelar mientras está conectado NO vuelve a conectar', () async {
     var calls = 0;
     final controllers = <StreamController<int>>[];
