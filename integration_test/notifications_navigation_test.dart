@@ -1,4 +1,5 @@
 import 'package:ataulfo/app.dart';
+import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/core/network/connectivity_cubit.dart';
 import 'package:ataulfo/core/network/connectivity_monitor.dart';
 import 'package:ataulfo/core/router/app_router.dart';
@@ -225,6 +226,7 @@ void main() {
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
+      audioRecorder: const NoopAudioRecorder(),
     );
 
     await tester.pumpWidget(
