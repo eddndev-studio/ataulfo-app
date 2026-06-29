@@ -103,6 +103,7 @@ import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
 import '../../features/memberships/presentation/pages/select_org_page.dart';
 import '../../features/messages/domain/repositories/audio_engine.dart';
+import '../../features/messages/domain/repositories/audio_recorder.dart';
 import '../../features/messages/domain/repositories/media_opener.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
 import '../../features/messages/presentation/bloc/messages_bloc.dart';
@@ -195,6 +196,7 @@ class AppRouter {
     required MediaThumbnailLoader mediaThumbnailLoader,
     required MediaOpener mediaOpener,
     required AudioEngine Function() audioEngineFactory,
+    required AudioRecorder audioRecorder,
   }) : _authBloc = authBloc,
        _authRepo = authRepository,
        _botsRepo = botsRepository,
@@ -233,7 +235,8 @@ class AppRouter {
        _mediaFilePicker = mediaFilePicker,
        _mediaThumbnailLoader = mediaThumbnailLoader,
        _mediaOpener = mediaOpener,
-       _audioEngineFactory = audioEngineFactory;
+       _audioEngineFactory = audioEngineFactory,
+       _audioRecorder = audioRecorder;
 
   final AuthBloc _authBloc;
   final AuthRepository _authRepo;
@@ -291,6 +294,11 @@ class AppRouter {
   /// Fabrica el motor de audio del hilo: un engine NUEVO por visita (el
   /// cubit lo dispone al cerrar la ruta; un singleton quedaría dispuesto).
   final AudioEngine Function() _audioEngineFactory;
+
+  /// Grabador de notas de voz, singleton de la app (Noop fuera de Android).
+  /// A diferencia del player, una sola instancia sirve toda la app (el
+  /// plugin nativo es de instancia única) y vive el ciclo del proceso.
+  final AudioRecorder _audioRecorder;
 
   /// Observer compartido entre el Navigator del GoRouter y los list pages
   /// del shell. El GoRouter notifica push/pop sobre este observer; las
@@ -762,6 +770,9 @@ class AppRouter {
               RepositoryProvider<MediaFilePicker>.value(
                 value: _mediaFilePicker,
               ),
+              // Grabador de notas de voz para el composer (Noop fuera de
+              // Android: el botón 🎤 no se ofrece si no está soportado).
+              RepositoryProvider<AudioRecorder>.value(value: _audioRecorder),
               RepositoryProvider<WaLabelsRepository>.value(
                 value: _waLabelsRepo,
               ),

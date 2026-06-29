@@ -5,7 +5,9 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
+import 'package:ataulfo/features/messages/domain/repositories/audio_recorder.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
 import 'package:ataulfo/features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
@@ -59,6 +61,9 @@ void main() {
       providers: <RepositoryProvider<dynamic>>[
         RepositoryProvider<MediaFilePicker>.value(value: picker),
         RepositoryProvider<MediaRepository>.value(value: mediaRepo),
+        RepositoryProvider<AudioRecorder>.value(
+          value: const NoopAudioRecorder(),
+        ),
       ],
       child: MultiBlocProvider(
         providers: <BlocProvider<dynamic>>[

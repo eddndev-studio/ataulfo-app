@@ -1,4 +1,5 @@
 import 'package:ataulfo/features/executions/domain/entities/execution.dart';
+import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/executions/domain/execution_repository.dart';
 import 'dart:async';
 
@@ -432,6 +433,7 @@ void main() {
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
+      audioRecorder: const NoopAudioRecorder(),
       profileRepository: profileRepo,
     );
   });
@@ -878,6 +880,7 @@ void main() {
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
+      audioRecorder: const NoopAudioRecorder(),
       profileRepository: profileRepo,
     );
 
@@ -972,6 +975,7 @@ void main() {
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
+      audioRecorder: const NoopAudioRecorder(),
       profileRepository: profileRepo,
     );
 
@@ -1268,6 +1272,7 @@ void main() {
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
+      audioRecorder: const NoopAudioRecorder(),
       profileRepository: profileRepo,
     );
 
@@ -1518,6 +1523,7 @@ void main() {
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
+      audioRecorder: const NoopAudioRecorder(),
       profileRepository: profileRepo,
     );
 

@@ -35,6 +35,7 @@ abstract interface class MessagesDatasource {
     required String type,
     String content,
     String? mediaRef,
+    List<int>? waveform,
   });
 
   /// `POST /sessions/:botId/:chatLid/mark-read`. Marca como leídos los INBOUND
@@ -102,6 +103,7 @@ class DioMessagesDatasource implements MessagesDatasource {
     required String type,
     String content = '',
     String? mediaRef,
+    List<int>? waveform,
   }) async {
     try {
       final res = await _dio.post<Map<String, dynamic>>(
@@ -111,6 +113,7 @@ class DioMessagesDatasource implements MessagesDatasource {
           'type': type,
           'content': content,
           'mediaRef': ?mediaRef,
+          'waveform': ?waveform,
         },
       );
       final body = res.data;

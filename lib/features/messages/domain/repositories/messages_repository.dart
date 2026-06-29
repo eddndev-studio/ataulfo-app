@@ -57,6 +57,7 @@ abstract interface class MessagesRepository {
     required String type,
     String content,
     String? mediaRef,
+    List<int>? waveform,
   });
 
   /// Escrituras encoladas del chat (burbujas "enviando/fallido"), observadas

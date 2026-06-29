@@ -24,4 +24,18 @@ void main() {
           'Sin esta permission en main, el APK release no puede abrir sockets.',
     );
   });
+
+  test('main AndroidManifest declara android.permission.RECORD_AUDIO', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+
+    expect(
+      manifest,
+      contains('android.permission.RECORD_AUDIO'),
+      reason:
+          'Sin RECORD_AUDIO en el manifest del flavor main, la grabación de '
+          'notas de voz no puede acceder al micrófono en el APK release.',
+    );
+  });
 }

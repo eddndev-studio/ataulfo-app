@@ -20,7 +20,8 @@ class OutboxDao {
   final DateTime Function() _now;
 
   /// Encola un envío de mensaje (texto o media). El `payload` lleva lo que la UI
-  /// necesita para pintar la burbuja antes de confirmar (`type`/`content`/`mediaRef`).
+  /// necesita para pintar la burbuja antes de confirmar (`type`/`content`/`mediaRef`)
+  /// y, para notas de voz, el `waveform` que viaja al wire al confirmar.
   Future<int> enqueueSend({
     required String botId,
     required String chatLid,
@@ -28,12 +29,14 @@ class OutboxDao {
     required String type,
     required String content,
     String? mediaRef,
+    List<int>? waveform,
   }) {
     final nowMs = _nowMs();
     final payload = jsonEncode(<String, dynamic>{
       'type': type,
       'content': content,
       'mediaRef': ?mediaRef,
+      'waveform': ?waveform,
     });
     return _db
         .into(_db.outbox)

@@ -370,10 +370,11 @@ class _PendingBubble extends StatelessWidget {
       color: AppTokens.text2,
       fontSize: AppTokens.captionSize,
     );
-    // Texto de la burbuja: el contenido, o una etiqueta para imagen sin caption.
+    // Texto de la burbuja: el contenido, o una etiqueta por tipo cuando el
+    // envío de media no trae caption (la nota de voz nunca lo trae).
     final body = p.type == 'text' || p.content.isNotEmpty
         ? p.content
-        : '[imagen]';
+        : _mediaPlaceholder(p.type);
     return Align(
       key: Key('message.pending.${p.clientToken}'),
       alignment: Alignment.centerRight,
@@ -478,6 +479,15 @@ class _PendingFailed extends StatelessWidget {
     );
   }
 }
+
+/// Etiqueta de la burbuja optimista de un envío de media sin caption.
+String _mediaPlaceholder(String type) => switch (type) {
+  'ptt' => '[nota de voz]',
+  'image' => '[imagen]',
+  'video' => '[video]',
+  'document' => '[documento]',
+  _ => '[$type]',
+};
 
 /// Motivo legible del fallo de un envío para el operador.
 String _pendingErrorText(MessagesFailure f) => switch (f) {

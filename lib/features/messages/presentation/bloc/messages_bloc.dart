@@ -358,6 +358,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         type: event.type,
         content: event.content,
         mediaRef: event.mediaRef,
+        waveform: event.waveform,
       );
     } on Object {
       // El encolado es local; un fallo aquí es excepcional (DB). Best-effort.
@@ -492,27 +493,46 @@ class MessagesReconnected extends MessagesEvent {
   int get hashCode => (MessagesReconnected).hashCode;
 }
 
-/// El operador pide enviar un mensaje (S09). `type` es `text`/`image`; para
-/// imagen `mediaRef` es el ref BARE ya subido y `content` el caption opcional.
+/// El operador pide enviar un mensaje (S09). `type` es `text`/`image`/`ptt`;
+/// para media `mediaRef` es el ref BARE ya subido y `content` el caption
+/// opcional. `waveform` (sólo `ptt`) son las muestras de amplitud 0-100 que
+/// el cliente computó al grabar; el backend las pone en el waveform nativo.
 class MessagesSendRequested extends MessagesEvent {
   const MessagesSendRequested({
     required this.type,
     required this.content,
     this.mediaRef,
+    this.waveform,
   });
 
   final String type;
   final String content;
   final String? mediaRef;
+  final List<int>? waveform;
 
   @override
   bool operator ==(Object other) =>
       other is MessagesSendRequested &&
       other.type == type &&
       other.content == content &&
-      other.mediaRef == mediaRef;
+      other.mediaRef == mediaRef &&
+      _sameWaveform(other.waveform, waveform);
   @override
-  int get hashCode => Object.hash(type, content, mediaRef);
+  int get hashCode => Object.hash(
+    type,
+    content,
+    mediaRef,
+    Object.hashAll(waveform ?? const <int>[]),
+  );
+}
+
+bool _sameWaveform(List<int>? a, List<int>? b) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null || a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// Reintenta un envío fallido reusando su `clientToken` (idempotente).

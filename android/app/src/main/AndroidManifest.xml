@@ -4,6 +4,9 @@
          La obtención del token no lo requiere; la solicitud en runtime queda
          pendiente del lado cliente. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Grabación de notas de voz (Opus-en-Ogg). El permiso en runtime lo
+         solicita el grabador (record.hasPermission) al primer uso. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="Ataúlfo"
         android:name="${applicationName}"

@@ -11,7 +11,9 @@ import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/messages/data/cache/message_media_cache.dart';
+import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
+import 'package:ataulfo/features/messages/domain/repositories/audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
@@ -118,20 +120,23 @@ void main() {
     theme: AppDesignTheme.dark(),
     home: RepositoryProvider<MessageMediaCache>.value(
       value: mediaCache ?? fakeMessageMediaCache(),
-      child: RepositoryProvider<MediaOpener>.value(
-        value: opener,
-        child: MultiBlocProvider(
-          providers: <BlocProvider<dynamic>>[
-            BlocProvider<MessagesBloc>.value(value: bloc),
-            BlocProvider<ThreadAudioCubit>.value(value: audio),
-            BlocProvider<AuthBloc>.value(value: authBloc),
-            // El footer de actividad live lo lee del scope; inerte aquí (sin
-            // observar) ⇒ no pinta nada.
-            BlocProvider<MonitorLiveCubit>(
-              create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
-            ),
-          ],
-          child: const Scaffold(body: MessageThreadPage()),
+      child: RepositoryProvider<AudioRecorder>.value(
+        value: const NoopAudioRecorder(),
+        child: RepositoryProvider<MediaOpener>.value(
+          value: opener,
+          child: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<MessagesBloc>.value(value: bloc),
+              BlocProvider<ThreadAudioCubit>.value(value: audio),
+              BlocProvider<AuthBloc>.value(value: authBloc),
+              // El footer de actividad live lo lee del scope; inerte aquí (sin
+              // observar) ⇒ no pinta nada.
+              BlocProvider<MonitorLiveCubit>(
+                create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+              ),
+            ],
+            child: const Scaffold(body: MessageThreadPage()),
+          ),
         ),
       ),
     ),
@@ -420,6 +425,29 @@ void main() {
     expect(find.text('[location]'), findsOneWidget);
   });
 
+  testWidgets('envío optimista de nota de voz se rotula [nota de voz]', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const MessagesLoaded(
+        items: <Message>[],
+        prevCursor: null,
+        isLoadingOlder: false,
+        pending: <PendingSend>[
+          PendingSend(
+            clientToken: 'ct-voz',
+            type: 'ptt',
+            content: '',
+            mediaRef: 'ref-voz',
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(host());
+    expect(find.text('[nota de voz]'), findsOneWidget);
+    expect(find.text('[imagen]'), findsNothing);
+  });
+
   group('multimedia (render por tipo)', () {
     final pngBytes = _pngBytes;
 
@@ -460,6 +488,12 @@ void main() {
       await pumpMsg(tester, msg(externalId: 'img', type: 'image', content: ''));
       expect(find.byType(Image), findsNothing);
       expect(find.text('Imagen'), findsOneWidget);
+    });
+
+    testWidgets('ptt sin URL firmada → tarjeta "Nota de voz"', (tester) async {
+      await pumpMsg(tester, msg(externalId: 'v', type: 'ptt', content: ''));
+      expect(find.text('Nota de voz'), findsOneWidget);
+      expect(find.text('Audio'), findsNothing);
     });
 
     testWidgets(
@@ -819,18 +853,21 @@ void main() {
         routes: <RouteBase>[
           GoRoute(
             path: '/',
-            builder: (_, _) => RepositoryProvider<MediaOpener>.value(
-              value: opener,
-              child: MultiBlocProvider(
-                providers: <BlocProvider<dynamic>>[
-                  BlocProvider<MessagesBloc>.value(value: bloc),
-                  BlocProvider<ThreadAudioCubit>.value(value: audio),
-                  BlocProvider<AuthBloc>.value(value: authBloc),
-                  BlocProvider<MonitorLiveCubit>(
-                    create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
-                  ),
-                ],
-                child: const Scaffold(body: MessageThreadPage()),
+            builder: (_, _) => RepositoryProvider<AudioRecorder>.value(
+              value: const NoopAudioRecorder(),
+              child: RepositoryProvider<MediaOpener>.value(
+                value: opener,
+                child: MultiBlocProvider(
+                  providers: <BlocProvider<dynamic>>[
+                    BlocProvider<MessagesBloc>.value(value: bloc),
+                    BlocProvider<ThreadAudioCubit>.value(value: audio),
+                    BlocProvider<AuthBloc>.value(value: authBloc),
+                    BlocProvider<MonitorLiveCubit>(
+                      create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+                    ),
+                  ],
+                  child: const Scaffold(body: MessageThreadPage()),
+                ),
               ),
             ),
           ),
@@ -1094,6 +1131,9 @@ void main() {
           RepositoryProvider<MediaFilePicker>.value(value: picker),
           RepositoryProvider<MediaRepository>.value(value: mediaRepo),
           RepositoryProvider<MediaOpener>.value(value: opener),
+          RepositoryProvider<AudioRecorder>.value(
+            value: const NoopAudioRecorder(),
+          ),
         ],
         child: MultiBlocProvider(
           providers: <BlocProvider<dynamic>>[

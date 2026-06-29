@@ -61,6 +61,24 @@ void main() {
     });
   });
 
+  test('enqueueSend de nota de voz guarda el waveform en el payload', () async {
+    await dao.enqueueSend(
+      botId: 'b1',
+      chatLid: 'c1',
+      clientToken: 't1',
+      type: 'ptt',
+      content: '',
+      mediaRef: 'ref-voz',
+      waveform: const <int>[0, 50, 100],
+    );
+    expect(jsonDecode((await only()).payload), {
+      'type': 'ptt',
+      'content': '',
+      'mediaRef': 'ref-voz',
+      'waveform': <int>[0, 50, 100],
+    });
+  });
+
   test(
     'watchForChat emite las ops del chat en orden FIFO por createdAt',
     () async {

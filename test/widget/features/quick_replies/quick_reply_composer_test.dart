@@ -1,5 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
+import 'package:ataulfo/features/messages/domain/repositories/audio_recorder.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
 import 'package:ataulfo/features/quick_replies/domain/entities/quick_reply.dart';
@@ -47,12 +49,15 @@ void main() {
 
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
-    home: MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<MessagesBloc>.value(value: msgBloc),
-        BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
-      ],
-      child: const Scaffold(body: MessageComposer()),
+    home: RepositoryProvider<AudioRecorder>.value(
+      value: const NoopAudioRecorder(),
+      child: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<MessagesBloc>.value(value: msgBloc),
+          BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
+        ],
+        child: const Scaffold(body: MessageComposer()),
+      ),
     ),
   );
 

@@ -240,11 +240,13 @@ class SyncCoordinator {
     final String type;
     final String content;
     final String? mediaRef;
+    final List<int>? waveform;
     try {
       final payload = jsonDecode(row.payload) as Map<String, dynamic>;
       type = payload['type'] as String;
       content = (payload['content'] as String?) ?? '';
       mediaRef = payload['mediaRef'] as String?;
+      waveform = (payload['waveform'] as List<dynamic>?)?.cast<int>();
     } catch (_) {
       // Payload corrupto (error determinista): terminal — reintentar no ayuda.
       await _outbox.markFailedTerminal(row.id, errorKind: 'corrupt_payload');
@@ -258,6 +260,7 @@ class SyncCoordinator {
         type: type,
         content: content,
         mediaRef: mediaRef,
+        waveform: waveform,
       );
       if (_disposed || epoch != _epoch) return _Outcome.success;
       await _db.transaction(() async {

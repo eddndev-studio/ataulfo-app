@@ -52,7 +52,10 @@ class MessageMediaContent extends StatelessWidget {
         url: url,
         ptt: m.type == 'ptt',
       ),
-      'audio' || 'ptt' => _typedCard(context, Icons.mic_none_outlined, 'Audio'),
+      // Sin URL firmada (envío en vuelo / firma caída): tarjeta de tipo. La
+      // nota de voz se nombra como tal; el audio genérico como archivo.
+      'ptt' => _typedCard(context, Icons.mic_none_outlined, 'Nota de voz'),
+      'audio' => _typedCard(context, Icons.mic_none_outlined, 'Audio'),
       'video' when url != null => _OpenableCard(
         id: m.externalId,
         url: url,

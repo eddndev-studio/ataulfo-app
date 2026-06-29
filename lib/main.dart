@@ -71,6 +71,7 @@ import 'features/messages/data/datasources/messages_events_datasource.dart';
 import 'features/messages/data/cache/message_media_cache.dart';
 import 'features/messages/data/datasources/outbox_dao.dart';
 import 'features/messages/data/media/dio_media_opener.dart';
+import 'features/messages/application/audio_recorder_resolver.dart';
 import 'features/messages/data/media/just_audio_engine.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
 import 'features/messages/data/sync/sync_coordinator.dart';
@@ -117,6 +118,13 @@ Future<void> main() async {
   // el resolver inicializa Firebase y usa el provider real solo en Android (con
   // degradación a noop si Firebase falla), y noop directo en desktop/web.
   final pushTokens = await PushTokenProviderResolver(
+    isAndroid: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+  ).resolve();
+
+  // Grabador de notas de voz: real (Opus vía `record`) solo en Android; Noop
+  // en escritorio/web para que la app corra sin micrófono nativo. Singleton
+  // de la app (el plugin nativo es de instancia única).
+  final audioRecorder = AudioRecorderResolver(
     isAndroid: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
   ).resolve();
 
@@ -437,6 +445,7 @@ Future<void> main() async {
     // Dio propio sin Authorization) y player de audio nuevo por visita.
     mediaOpener: DioMediaOpener(),
     audioEngineFactory: JustAudioEngine.new,
+    audioRecorder: audioRecorder,
   );
 
   // Visualización + navegación de push; no-op si el push real no está activo
