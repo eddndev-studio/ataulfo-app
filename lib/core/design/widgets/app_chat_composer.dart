@@ -22,6 +22,7 @@ class AppChatComposer extends StatefulWidget {
     this.hint = 'Mensaje',
     this.enabled = true,
     this.leading = const <Widget>[],
+    this.emptyTrailing,
     this.controller,
     this.fieldKey,
     this.sendKey,
@@ -31,6 +32,12 @@ class AppChatComposer extends StatefulWidget {
   final ValueChanged<String> onSend;
 
   final String hint;
+
+  /// Control que ocupa el slot final (donde va el botón de enviar) MIENTRAS el
+  /// campo está vacío — p. ej. un micrófono de nota de voz. En cuanto hay texto,
+  /// el slot vuelve al botón de enviar. `null` (default) ⇒ el slot es siempre el
+  /// botón de enviar (las demás superficies quedan idénticas).
+  final Widget? emptyTrailing;
 
   /// `false` bloquea campo y envío (turno en vuelo en las superficies
   /// síncronas). El composer se atenúa como los demás controles del kit.
@@ -178,6 +185,14 @@ class _AppChatComposerState extends State<AppChatComposer> {
       ),
     );
 
+    // Slot final: el micrófono mientras el campo está vacío (si el caller lo
+    // ofrece), o el botón de enviar en cuanto hay texto que mandar.
+    final showMic =
+        widget.emptyTrailing != null &&
+        widget.enabled &&
+        _ctrl.text.trim().isEmpty;
+    final trailing = showMic ? widget.emptyTrailing! : send;
+
     final bar = Container(
       key: const Key('app_chat_composer.bar'),
       padding: EdgeInsets.fromLTRB(
@@ -197,7 +212,7 @@ class _AppChatComposerState extends State<AppChatComposer> {
           if (widget.leading.isNotEmpty) const SizedBox(width: AppTokens.sp1),
           Expanded(child: field),
           const SizedBox(width: AppTokens.sp2),
-          send,
+          trailing,
         ],
       ),
     );

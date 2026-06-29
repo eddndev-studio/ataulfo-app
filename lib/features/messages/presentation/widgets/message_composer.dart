@@ -16,17 +16,34 @@ import '../../domain/repositories/audio_recorder.dart';
 import '../bloc/messages_bloc.dart';
 import 'voice_recording_bar.dart';
 
+/// Acción decidida al soltar el micrófono (o al cancelarse el puntero), por si el
+/// dedo se levanta ANTES de que `start()` resuelva: se guarda y se aplica en
+/// cuanto la grabación está lista.
+enum _Release { send, discard, cancel }
+
 /// Caja de redacción del hilo: el [AppChatComposer] del kit con las acciones
-/// propias de esta superficie (adjuntar imagen, respuestas rápidas ⚡ y grabar
-/// nota de voz 🎤) como leading. Despacha `MessagesSendRequested` con el texto
-/// recortado; el bloc pinta la burbuja optimista.
+/// propias de esta superficie (adjuntar imagen y respuestas rápidas ⚡ como
+/// leading; grabar nota de voz 🎤 en el slot final mientras el campo está vacío).
+/// Despacha `MessagesSendRequested` con el texto recortado; el bloc pinta la
+/// burbuja optimista.
 ///
-/// Stateful por el `TextEditingController` (compartido con el composer para
-/// insertar respuestas rápidas y leer el caption del adjunto), por el estado
-/// de subida en vuelo y por la grabación de voz: mientras graba, la barra de
-/// grabación reemplaza al composer.
+/// La nota de voz sigue el gesto de WhatsApp: MANTENER el micrófono graba;
+/// deslizar ARRIBA bloquea (manos libres, con botones); deslizar a la IZQUIERDA
+/// descarta; un toque corto no graba (muestra una pista). Un solo `Listener`
+/// estable envuelve todo el footer y enruta el puntero —así nada se reparenta ni
+/// se desmonta a media pulsación—; el micrófono sólo se LOCALIZA por su
+/// `GlobalKey` al tocar.
+///
+/// Excede el tope de 400 LOC del repo a propósito: concentra todo el estado del
+/// composer del hilo (texto + adjunto + ⚡ + máquina de gesto de voz) en un solo
+/// dueño; partirlo obligaría a cablear el ciclo de grabación a través de un
+/// controlador externo sin ganancia real de claridad.
 class MessageComposer extends StatefulWidget {
-  const MessageComposer({super.key});
+  const MessageComposer({super.key, this.now});
+
+  /// Reloj para medir cuánto se mantuvo el dedo (toque corto vs mantener).
+  /// Inyectable en tests; en producción es `DateTime.now`.
+  final DateTime Function()? now;
 
   @override
   State<MessageComposer> createState() => _MessageComposerState();
@@ -45,20 +62,46 @@ class _MessageComposerState extends State<MessageComposer> {
   /// Si la plataforma puede grabar (Android API>=29). Falso ⇒ sin botón 🎤.
   bool _canRecord = false;
 
-  /// Arrancando la grabación (entre el toque y que `start()` resuelve):
-  /// deshabilita el botón y bloquea la re-entrada por doble toque, que de otro
-  /// modo lanzaría dos grabaciones concurrentes (el grabador es compartido).
+  /// Arrancando la grabación (entre tocar y que `start()` resuelve): bloquea la
+  /// re-entrada por doble toque, que de otro modo lanzaría dos grabaciones
+  /// concurrentes sobre el grabador compartido.
   bool _starting = false;
 
   /// Grabando: la barra de grabación reemplaza al composer.
   bool _recording = false;
 
+  /// Bloqueada (manos libres): se deslizó arriba; soltar el dedo NO envía, y
+  /// aparecen los botones de enviar/descartar de la [VoiceRecordingBar].
+  bool _locked = false;
+
+  /// El dedo cruzó el umbral de cancelar (deslizó a la izquierda): soltar
+  /// descarta. Mientras esté armado, la barra lo señala en rojo.
+  bool _cancelArmed = false;
+
+  /// Avance hacia el bloqueo (0..1): ilumina el candado en la barra de mantener.
+  double _lockProgress = 0;
+
   /// Nota de voz subiéndose tras detener: deshabilita enviar/cancelar.
   bool _sendingVoice = false;
 
-  /// Duración mínima de una nota de voz: por debajo se descarta (toque
-  /// accidental) en vez de enviar un clip vacío.
+  // Estado del gesto del micrófono.
+  final GlobalKey _micKey = GlobalKey();
+  int? _activePointer;
+  Offset _downPos = Offset.zero;
+  DateTime _heldFrom = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Acción pendiente si el dedo se soltó antes de que `start()` resolviera.
+  _Release? _pending;
+
+  /// Duración mínima de una nota: un toque más corto no graba (se descarta y se
+  /// muestra una pista en vez de subir un clip vacío).
   static const Duration _minVoiceDuration = Duration(milliseconds: 700);
+
+  /// Píxeles que hay que deslizar ARRIBA para bloquear / IZQUIERDA para cancelar.
+  static const double _lockThreshold = 80;
+  static const double _cancelThreshold = 100;
+
+  DateTime Function() get _now => widget.now ?? DateTime.now;
 
   @override
   void initState() {
@@ -73,7 +116,7 @@ class _MessageComposerState extends State<MessageComposer> {
   void dispose() {
     // Si el hilo se cierra mientras graba, aborta la grabación huérfana (el
     // recorder es compartido, no se dispone aquí).
-    if (_recording) unawaited(_recorder.cancel());
+    if (_recording || _starting) unawaited(_recorder.cancel());
     _ctrl.dispose();
     super.dispose();
   }
@@ -84,11 +127,176 @@ class _MessageComposerState extends State<MessageComposer> {
     );
   }
 
+  // ── Gesto del micrófono ───────────────────────────────────────────────────
+
+  void _onPointerDown(PointerDownEvent e) {
+    if (!_canRecord || _recording || _starting) return;
+    final box = _micKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final local = box.globalToLocal(e.position);
+    final hitMic =
+        local.dx >= 0 &&
+        local.dy >= 0 &&
+        local.dx <= box.size.width &&
+        local.dy <= box.size.height;
+    if (!hitMic) return; // toque en otro control: que lo maneje normalmente
+    _activePointer = e.pointer;
+    _downPos = e.position;
+    _heldFrom = _now();
+    _pending = null;
+    _locked = false;
+    _cancelArmed = false;
+    _lockProgress = 0;
+    unawaited(_startRecording());
+  }
+
+  void _onPointerMove(PointerMoveEvent e) {
+    if (e.pointer != _activePointer || _locked || !_recording) return;
+    final dy = e.position.dy - _downPos.dy; // < 0 = arriba
+    final dx = e.position.dx - _downPos.dx; // < 0 = izquierda
+    if (-dy >= _lockThreshold) {
+      _lock();
+      return;
+    }
+    final progress = (-dy / _lockThreshold).clamp(0.0, 1.0);
+    final armed = dx <= -_cancelThreshold;
+    if (progress != _lockProgress || armed != _cancelArmed) {
+      setState(() {
+        _lockProgress = progress;
+        _cancelArmed = armed;
+      });
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent e) {
+    if (e.pointer != _activePointer) return;
+    _activePointer = null;
+    if (_locked) return; // manos libres: soltar no envía
+    final held = _now().difference(_heldFrom);
+    final action = _cancelArmed
+        ? _Release.cancel
+        : (held < _minVoiceDuration ? _Release.discard : _Release.send);
+    _applyRelease(action);
+  }
+
+  void _onPointerCancel(PointerCancelEvent e) {
+    if (e.pointer != _activePointer) return;
+    _activePointer = null;
+    if (_locked) return;
+    _applyRelease(_Release.cancel);
+  }
+
+  /// Aplica la acción del release; si aún se está arrancando, la deja pendiente
+  /// para cuando `start()` resuelva (carrera soltar-antes-de-grabar).
+  void _applyRelease(_Release action) {
+    if (_recording) {
+      _runRelease(action);
+    } else if (_starting) {
+      _pending = action;
+    }
+    // Ni grabando ni arrancando (permiso denegado / fallo): nada que hacer.
+  }
+
+  void _runRelease(_Release action) {
+    switch (action) {
+      case _Release.send:
+        unawaited(_stopAndSend());
+      case _Release.discard:
+        unawaited(_discardQuickTap());
+      case _Release.cancel:
+        unawaited(_cancelRecording());
+    }
+  }
+
+  void _lock() {
+    if (!_recording || _locked) return;
+    unawaited(HapticFeedback.mediumImpact());
+    setState(() {
+      _locked = true;
+      _cancelArmed = false;
+      _lockProgress = 1.0;
+    });
+  }
+
+  /// Inicia la grabación: pide permiso de micrófono y arranca el grabador. Sin
+  /// permiso avisa con un SnackBar; un fallo del arranque (encoder no soportado
+  /// pese al gate) degrada con aviso. Si el dedo ya se soltó (carrera), aplica la
+  /// acción pendiente en cuanto la grabación queda lista.
+  Future<void> _startRecording() async {
+    if (_starting || _recording) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _starting = true);
+    var started = false;
+    try {
+      final granted = await _recorder.hasPermission();
+      if (!mounted) return;
+      if (!granted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Permite el micrófono para grabar notas de voz'),
+          ),
+        );
+      } else {
+        await _recorder.start();
+        started = true;
+      }
+    } catch (_) {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('No se pudo iniciar la grabación')),
+        );
+      }
+    }
+    if (!mounted) {
+      if (started) unawaited(_recorder.cancel());
+      return;
+    }
+    if (started) {
+      unawaited(HapticFeedback.mediumImpact());
+      setState(() {
+        _starting = false;
+        _recording = true;
+      });
+      final pending = _pending;
+      _pending = null;
+      if (pending != null) _runRelease(pending);
+    } else {
+      setState(() => _starting = false);
+      _pending = null;
+    }
+  }
+
+  /// Toque corto (no se mantuvo): descarta la grabación y muestra la pista de
+  /// "mantén para grabar". NUNCA sube — un toque accidental no es una nota.
+  Future<void> _discardQuickTap() async {
+    final messenger = ScaffoldMessenger.of(context);
+    unawaited(HapticFeedback.selectionClick());
+    await _recorder.cancel();
+    if (!mounted) return;
+    _resetGesture();
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Mantén para grabar una nota de voz')),
+    );
+  }
+
+  /// Descarta la grabación en curso (deslizó a cancelar / puntero cancelado).
+  Future<void> _cancelRecording() async {
+    unawaited(HapticFeedback.selectionClick());
+    await _recorder.cancel();
+    if (mounted) _resetGesture();
+  }
+
+  void _resetGesture() => setState(() {
+    _recording = false;
+    _locked = false;
+    _cancelArmed = false;
+    _lockProgress = 0;
+  });
+
   /// Adjunta una imagen: elige un archivo, lo sube (`/upload` → ref BARE) y
   /// despacha el envío `type:image` con el texto actual como caption. La burbuja
-  /// optimista la pinta el bloc; un fallo de subida se avisa con un SnackBar
-  /// (sin tocar el bloc, porque aún no hay envío). Captura bloc/picker/repo y el
-  /// messenger ANTES del primer await.
+  /// optimista la pinta el bloc; un fallo de subida se avisa con un SnackBar.
+  /// Captura bloc/picker/repo y el messenger ANTES del primer await.
   Future<void> _attach() async {
     final bloc = context.read<MessagesBloc>();
     final picker = context.read<MediaFilePicker>();
@@ -105,10 +313,6 @@ class _MessageComposerState extends State<MessageComposer> {
         bytes: picked.bytes,
         filename: picked.filename,
       );
-      // El hilo pudo cerrarse o transitar a Loading/Failed durante la subida
-      // (multi-segundo), desmontando el composer y disponiendo `_ctrl`. Sin esta
-      // guarda, `_ctrl.clear()` tocaría un controller dispuesto. Espeja el guard
-      // que ya tiene el `finally`.
       if (!mounted) {
         return;
       }
@@ -137,69 +341,10 @@ class _MessageComposerState extends State<MessageComposer> {
     _ => 'No se pudo subir la imagen',
   };
 
-  /// Inicia la grabación: pide permiso de micrófono y arranca el grabador. Sin
-  /// permiso avisa con un SnackBar; un fallo del arranque (encoder no soportado
-  /// pese al gate) degrada con aviso en vez de tumbar la UI. Captura el
-  /// messenger ANTES del await.
-  Future<void> _startRecording() async {
-    // Bloquea la re-entrada por doble toque ANTES del primer await: sin esto,
-    // dos toques rápidos lanzan dos start() concurrentes sobre el grabador
-    // compartido (timer/suscripción huérfanos).
-    if (_starting || _recording) return;
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _starting = true);
-    // `started` distingue el éxito de cualquier salida (permiso denegado, o un
-    // throw de hasPermission()/start() en el canal de plataforma): así
-    // `_starting` SIEMPRE se resetea si no entramos a grabar, sin dejar el
-    // botón deshabilitado para siempre.
-    var started = false;
-    try {
-      final granted = await _recorder.hasPermission();
-      if (!mounted) return;
-      if (!granted) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Permite el micrófono para grabar notas de voz'),
-          ),
-        );
-      } else {
-        await _recorder.start();
-        started = true;
-      }
-    } catch (_) {
-      if (mounted) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('No se pudo iniciar la grabación')),
-        );
-      }
-    }
-    if (!mounted) {
-      // Se desmontó durante el await: aborta la grabación huérfana.
-      if (started) unawaited(_recorder.cancel());
-      return;
-    }
-    if (started) {
-      unawaited(HapticFeedback.mediumImpact());
-      setState(() {
-        _starting = false;
-        _recording = true;
-      });
-    } else {
-      setState(() => _starting = false);
-    }
-  }
-
-  /// Descarta la grabación en curso y vuelve al composer.
-  Future<void> _cancelRecording() async {
-    unawaited(HapticFeedback.selectionClick());
-    await _recorder.cancel();
-    if (mounted) setState(() => _recording = false);
-  }
-
   /// Detiene la grabación, sube el clip Opus (`/upload` → ref BARE) y despacha
-  /// `type:ptt`. Una grabación vacía (muy corta / fallo) se descarta con aviso;
-  /// un fallo de subida se avisa con un SnackBar. Captura bloc/repo/messenger
-  /// ANTES del primer await.
+  /// `type:ptt`. Una grabación vacía o muy corta se descarta con aviso; un fallo
+  /// de subida se avisa con un SnackBar. Captura bloc/repo/cache/messenger ANTES
+  /// del primer await.
   Future<void> _stopAndSend() async {
     final bloc = context.read<MessagesBloc>();
     final mediaRepo = context.read<MediaRepository>();
@@ -215,20 +360,16 @@ class _MessageComposerState extends State<MessageComposer> {
     }
     if (!mounted) return;
     if (voice == null || voice.bytes.isEmpty) {
-      setState(() {
-        _recording = false;
-        _sendingVoice = false;
-      });
+      _resetGesture();
+      setState(() => _sendingVoice = false);
       messenger.showSnackBar(
         const SnackBar(content: Text('No se grabó audio')),
       );
       return;
     }
     if (voice.duration < _minVoiceDuration) {
-      setState(() {
-        _recording = false;
-        _sendingVoice = false;
-      });
+      _resetGesture();
+      setState(() => _sendingVoice = false);
       messenger.showSnackBar(
         const SnackBar(content: Text('Nota de voz muy corta')),
       );
@@ -257,10 +398,8 @@ class _MessageComposerState extends State<MessageComposer> {
       messenger.showSnackBar(SnackBar(content: Text(_voiceUploadError(f))));
     } finally {
       if (mounted) {
-        setState(() {
-          _recording = false;
-          _sendingVoice = false;
-        });
+        _resetGesture();
+        setState(() => _sendingVoice = false);
       }
     }
   }
@@ -274,7 +413,6 @@ class _MessageComposerState extends State<MessageComposer> {
   /// Abre el selector ⚡ de respuestas rápidas e inserta la elegida. Lee el último
   /// estado del catálogo (cargado al abrir el hilo): si aún no cargó o no hay
   /// respuestas activas, avisa con un SnackBar en vez de abrir un sheet vacío.
-  /// Captura el bloc/messenger ANTES del primer await.
   Future<void> _quickReply() async {
     final messenger = ScaffoldMessenger.of(context);
     final state = context.read<QuickRepliesBloc>().state;
@@ -320,9 +458,48 @@ class _MessageComposerState extends State<MessageComposer> {
     );
   }
 
+  /// El micrófono. Un único `Listener` exterior enruta el puntero; este botón es
+  /// sólo visual + objetivo de hit-test (vía [_micKey]) y semántica. Resaltado
+  /// (círculo primary) mientras se graba.
+  Widget _micButton({required bool active}) => KeyedSubtree(
+    key: _micKey,
+    child: Semantics(
+      button: true,
+      label: 'Grabar nota de voz',
+      child: Container(
+        key: const Key('composer.mic'),
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: active ? AppTokens.primary : Colors.transparent,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.mic_none_outlined,
+          color: active ? AppTokens.onPrimary : AppTokens.text2,
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
-    if (_recording) {
+    // Un solo Listener estable envuelve TODO el footer (composer / barra de
+    // mantener / barra bloqueada): nunca se reparenta ni se desmonta, así el
+    // puntero del gesto se entrega sin interrupción hasta soltar. Es pasivo
+    // (no reclama la arena), así que los toques del campo y los botones siguen
+    // funcionando.
+    return Listener(
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: _onPointerUp,
+      onPointerCancel: _onPointerCancel,
+      child: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_recording && _locked) {
       return VoiceRecordingBar(
         elapsed: _recorder.elapsed,
         amplitude: _recorder.amplitude,
@@ -331,11 +508,20 @@ class _MessageComposerState extends State<MessageComposer> {
         sending: _sendingVoice,
       );
     }
+    if (_recording) {
+      return VoiceHoldBar(
+        elapsed: _recorder.elapsed,
+        cancelArmed: _cancelArmed,
+        lockProgress: _lockProgress,
+        trailing: _micButton(active: true),
+      );
+    }
     return AppChatComposer(
       controller: _ctrl,
       fieldKey: const Key('composer.input'),
       sendKey: const Key('composer.send'),
       onSend: _send,
+      emptyTrailing: _canRecord ? _micButton(active: false) : null,
       leading: <Widget>[
         IconButton(
           key: const Key('composer.attach'),
@@ -357,14 +543,6 @@ class _MessageComposerState extends State<MessageComposer> {
           onPressed: _quickReply,
           icon: const Icon(Icons.bolt),
         ),
-        if (_canRecord)
-          IconButton(
-            key: const Key('composer.mic'),
-            tooltip: 'Grabar nota de voz',
-            color: AppTokens.text2,
-            onPressed: _starting ? null : _startRecording,
-            icon: const Icon(Icons.mic_none_outlined),
-          ),
       ],
     );
   }

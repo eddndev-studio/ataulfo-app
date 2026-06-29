@@ -5,6 +5,13 @@ import 'package:flutter/material.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 
+/// `mm:ss` del tiempo de grabación (compartido por las barras de voz).
+String _fmtClock(Duration d) {
+  final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$m:$s';
+}
+
 /// Barra que reemplaza al composer mientras se graba una nota de voz: punto
 /// rojo + tiempo transcurrido + waveform en vivo + descartar + enviar. La
 /// mecánica de gesto (mantener/bloquear/deslizar a cancelar) se monta encima de
@@ -29,12 +36,6 @@ class VoiceRecordingBar extends StatelessWidget {
 
   /// En vuelo (subiendo el clip): deshabilita enviar y muestra un spinner.
   final bool sending;
-
-  static String _fmt(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +74,7 @@ class VoiceRecordingBar extends StatelessWidget {
             stream: elapsed,
             initialData: Duration.zero,
             builder: (context, snap) => Text(
-              _fmt(snap.data ?? Duration.zero),
+              _fmtClock(snap.data ?? Duration.zero),
               key: const Key('voice.timer'),
               style: textTheme.bodyLarge,
             ),
@@ -175,4 +176,129 @@ class _WaveformPainter extends CustomPainter {
   // nueva de amplitud, así que repintar siempre tiene la cadencia correcta.
   @override
   bool shouldRepaint(_WaveformPainter old) => true;
+}
+
+/// Barra del estado MANTENIENDO (dedo abajo, aún sin bloquear), al estilo de
+/// WhatsApp: mismo cromo que el composer, con la pista de "desliza para
+/// cancelar" y, arriba, un candado que se ilumina conforme el dedo sube hacia el
+/// umbral de bloqueo. El micrófono —que el gesto del composer sigue rastreando—
+/// se monta en [trailing]. Al bloquear, el composer la cambia por la
+/// [VoiceRecordingBar] (con botones de enviar/descartar).
+class VoiceHoldBar extends StatelessWidget {
+  const VoiceHoldBar({
+    required this.elapsed,
+    required this.cancelArmed,
+    required this.lockProgress,
+    required this.trailing,
+    super.key,
+  });
+
+  /// Tiempo transcurrido de la grabación (lo emite el grabador).
+  final Stream<Duration> elapsed;
+
+  /// El dedo cruzó el umbral de cancelar (deslizó a la izquierda): la barra lo
+  /// señala en rojo; soltar descarta.
+  final bool cancelArmed;
+
+  /// Avance hacia el bloqueo (0..1): ilumina el candado conforme el dedo sube.
+  final double lockProgress;
+
+  /// El micrófono (lo provee el composer; el gesto lo sigue rastreando).
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final locking = lockProgress >= 1.0;
+    return Container(
+      key: const Key('voice.hold.bar'),
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp3,
+        AppTokens.sp2,
+        AppTokens.sp3,
+        AppTokens.sp2 + context.safeBottomInset,
+      ),
+      decoration: const BoxDecoration(
+        color: AppTokens.surface1,
+        border: Border(top: BorderSide(color: AppTokens.divider)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Opacity(
+            opacity: (0.35 + 0.65 * lockProgress).clamp(0.0, 1.0),
+            child: Column(
+              key: const Key('voice.lock.hint'),
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(
+                  Icons.lock_outline,
+                  size: 18,
+                  color: locking ? AppTokens.chatAccent : AppTokens.text2,
+                ),
+                const Icon(
+                  Icons.keyboard_arrow_up,
+                  size: 16,
+                  color: AppTokens.text2,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppTokens.sp1),
+          Row(
+            children: <Widget>[
+              const Icon(
+                Icons.fiber_manual_record,
+                size: 12,
+                color: AppTokens.danger,
+              ),
+              const SizedBox(width: AppTokens.sp2),
+              StreamBuilder<Duration>(
+                stream: elapsed,
+                initialData: Duration.zero,
+                builder: (context, snap) => Text(
+                  _fmtClock(snap.data ?? Duration.zero),
+                  key: const Key('voice.timer'),
+                  style: textTheme.bodyLarge,
+                ),
+              ),
+              const SizedBox(width: AppTokens.sp3),
+              Expanded(
+                child: cancelArmed
+                    ? Text(
+                        'Suelta para cancelar',
+                        key: const Key('voice.cancelArmed'),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppTokens.danger,
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const Icon(
+                            Icons.chevron_left,
+                            size: 18,
+                            color: AppTokens.text2,
+                          ),
+                          Flexible(
+                            child: Text(
+                              'Desliza para cancelar',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: AppTokens.text2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              const SizedBox(width: AppTokens.sp2),
+              trailing,
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
