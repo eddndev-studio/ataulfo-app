@@ -48,6 +48,25 @@ void main() {
     },
   );
 
+  test(
+    'cache() siembra disco + L1: bytesFor los sirve sin descargar',
+    () async {
+      var downloads = 0;
+      final cache = make(
+        download: (_) async {
+          downloads++;
+          return null;
+        },
+      );
+
+      await cache.cache('ref', bytes);
+
+      expect(store.data['ref'], bytes, reason: 'persistido en disco');
+      expect(await cache.bytesFor('ref', 'https://cdn/x.ogg'), bytes);
+      expect(downloads, 0, reason: 'servido de caché, jamás baja');
+    },
+  );
+
   test('miss + mediaUrl: descarga, persiste por ref y cachea en L1', () async {
     var downloads = 0;
     final cache = make(

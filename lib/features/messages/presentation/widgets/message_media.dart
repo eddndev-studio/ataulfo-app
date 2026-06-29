@@ -47,12 +47,17 @@ class MessageMediaContent extends StatelessWidget {
         Icons.emoji_emotions_outlined,
         'Sticker',
       ),
-      'audio' || 'ptt' when url != null => AudioMessageContent(
+      // La nota se sirve por `mediaRef` desde la copia local (cacheada al
+      // enviar / descargada una vez al recibir): la burbuja aparece de
+      // inmediato y suena aunque la URL firmada aún no haya llegado; `url` sólo
+      // es respaldo de streaming.
+      'audio' || 'ptt' when mediaRef != null => AudioMessageContent(
         id: m.externalId,
+        mediaRef: mediaRef,
         url: url,
         ptt: m.type == 'ptt',
       ),
-      // Sin URL firmada (envío en vuelo / firma caída): tarjeta de tipo. La
+      // Sin `mediaRef` (no debería pasar en media real): tarjeta de tipo. La
       // nota de voz se nombra como tal; el audio genérico como archivo.
       'ptt' => _typedCard(context, Icons.mic_none_outlined, 'Nota de voz'),
       'audio' => _typedCard(context, Icons.mic_none_outlined, 'Audio'),

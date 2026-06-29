@@ -84,8 +84,9 @@ class MessageThreadPage extends StatelessWidget {
 }
 
 /// Anuncia con SnackBar cuando una nota de voz/audio no se pudo cargar o
-/// reproducir (firma vencida, plataforma sin player). El cubit señala la URL
-/// fallida en `failedUrl`; sólo el CAMBIO de ese campo dispara el aviso.
+/// reproducir (sin copia local ni firma viva, plataforma sin player). El cubit
+/// señala la fuente fallida en `failedKey`; sólo el CAMBIO de ese campo dispara
+/// el aviso.
 class _AudioFailuresListener extends StatelessWidget {
   const _AudioFailuresListener({required this.child});
 
@@ -95,7 +96,7 @@ class _AudioFailuresListener extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocListener<ThreadAudioCubit, ThreadAudioState>(
       listenWhen: (prev, next) =>
-          next.failedUrl != null && prev.failedUrl != next.failedUrl,
+          next.failedKey != null && prev.failedKey != next.failedKey,
       listener: (context, _) => ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo reproducir el audio')),
       ),

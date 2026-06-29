@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:ataulfo/features/messages/domain/repositories/audio_engine.dart';
 import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
 
@@ -9,6 +11,9 @@ class FakeAudioEngine implements AudioEngine {
 
   @override
   Future<void> setUrl(String url) async {}
+
+  @override
+  Future<void> setBytes(Uint8List bytes, String contentType) async {}
 
   @override
   Future<void> play() async {}

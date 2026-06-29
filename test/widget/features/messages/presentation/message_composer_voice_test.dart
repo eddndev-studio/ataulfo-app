@@ -4,6 +4,7 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/messages/data/cache/message_media_cache.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/repositories/audio_recorder.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
@@ -14,6 +15,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../../../support/fake_message_media_cache.dart';
 
 class _MockMessagesBloc extends MockBloc<MessagesEvent, MessagesState>
     implements MessagesBloc {}
@@ -71,12 +74,14 @@ void main() {
   late _MockQuickRepliesBloc qrBloc;
   late _MockFilePicker picker;
   late _MockMediaRepo mediaRepo;
+  late MessageMediaCache mediaCache;
 
   setUp(() {
     msgBloc = _MockMessagesBloc();
     qrBloc = _MockQuickRepliesBloc();
     picker = _MockFilePicker();
     mediaRepo = _MockMediaRepo();
+    mediaCache = fakeMessageMediaCache();
     when(() => msgBloc.state).thenReturn(
       const MessagesLoaded(
         items: <Message>[],
@@ -93,6 +98,7 @@ void main() {
       providers: <RepositoryProvider<dynamic>>[
         RepositoryProvider<MediaFilePicker>.value(value: picker),
         RepositoryProvider<MediaRepository>.value(value: mediaRepo),
+        RepositoryProvider<MessageMediaCache>.value(value: mediaCache),
         RepositoryProvider<AudioRecorder>.value(value: recorder),
       ],
       child: MultiBlocProvider(
@@ -204,6 +210,12 @@ void main() {
         ),
       ),
     ).called(1);
+    // Sembró la caché con los bytes grabados bajo el ref definitivo: la
+    // burbuja reconciliada reproduce desde disco sin round-trip de la firma.
+    expect(
+      await mediaCache.bytesFor('ref-voz', null),
+      Uint8List.fromList(<int>[1, 2, 3]),
+    );
     // Vuelve al composer tras enviar.
     expect(find.byKey(const Key('composer.input')), findsOneWidget);
   });

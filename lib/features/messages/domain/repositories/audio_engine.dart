@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// Puerto del motor de audio del hilo. Abstrae al plugin de reproducción
 /// (just_audio en Android; en plataformas sin implementación las llamadas
 /// lanzan y la UI degrada con aviso). Un engine = una fuente a la vez —
@@ -6,6 +8,14 @@ abstract interface class AudioEngine {
   /// Carga la fuente [url] (streaming de la URL firmada). Lanza si el
   /// formato/transporte no se pudo abrir.
   Future<void> setUrl(String url);
+
+  /// Carga la fuente desde [bytes] ya en memoria (la copia local de la nota:
+  /// cacheada al enviar / descargada una vez al recibir). [contentType] es la
+  /// pista de formato (p. ej. `audio/ogg`). Reproducir el archivo COMPLETO —en
+  /// vez de streamear la URL firmada— hace que el transporte reporte la duración
+  /// de inmediato (la barra de progreso vive). Lanza si el formato no se pudo
+  /// abrir; el llamador degrada al streaming de la URL.
+  Future<void> setBytes(Uint8List bytes, String contentType);
 
   Future<void> play();
 

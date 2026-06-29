@@ -1210,25 +1210,69 @@ void main() {
       );
     }
 
-    testWidgets('audio con mediaUrl: burbuja reproducible, tap → toggle', (
+    testWidgets('audio con mediaRef: burbuja reproducible, tap → toggle', (
       tester,
     ) async {
-      seed(msg(externalId: 'a1', type: 'ptt', mediaUrl: 'https://m/a.ogg'));
-      when(() => audio.toggle(any())).thenAnswer((_) async {});
+      seed(
+        msg(
+          externalId: 'a1',
+          type: 'ptt',
+          mediaRef: 'ref-a1',
+          mediaUrl: 'https://m/a.ogg',
+        ),
+      );
+      when(
+        () => audio.toggle(
+          any(),
+          bytes: any(named: 'bytes'),
+          url: any(named: 'url'),
+          contentType: any(named: 'contentType'),
+        ),
+      ).thenAnswer((_) async {});
 
       await tester.pumpWidget(host());
 
       await tester.tap(find.byKey(const Key('message.audio.a1.toggle')));
-      verify(() => audio.toggle('https://m/a.ogg')).called(1);
+      await tester.pumpAndSettle();
+      // Identidad = mediaRef (no la URL efímera); la URL viaja como respaldo.
+      verify(
+        () => audio.toggle(
+          'ref-a1',
+          bytes: any(named: 'bytes'),
+          url: 'https://m/a.ogg',
+          contentType: any(named: 'contentType'),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('ptt con mediaRef SIN URL firmada: igual es reproducible', (
+      tester,
+    ) async {
+      // Bug del lag: la burbuja se pinta y suena por mediaRef (copia local) sin
+      // esperar la URL firmada — no la tarjeta de adjunto.
+      seed(msg(externalId: 'a1', type: 'ptt', mediaRef: 'ref-a1', content: ''));
+
+      await tester.pumpWidget(host());
+
+      // El reproductor (toggle + barra), no la tarjeta de adjunto estática.
+      expect(find.byKey(const Key('message.audio.a1.toggle')), findsOneWidget);
+      expect(find.byKey(const Key('message.audio.a1.progress')), findsOneWidget);
     });
 
     testWidgets('audio activo: ícono de pausa y barra de progreso buscable', (
       tester,
     ) async {
-      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      seed(
+        msg(
+          externalId: 'a1',
+          type: 'audio',
+          mediaRef: 'ref-a1',
+          mediaUrl: 'https://m/a.ogg',
+        ),
+      );
       when(() => audio.state).thenReturn(
         const ThreadAudioState(
-          url: 'https://m/a.ogg',
+          sourceKey: 'ref-a1',
           playing: true,
           position: Duration(seconds: 5),
           duration: Duration(seconds: 20),
@@ -1249,10 +1293,17 @@ void main() {
     testWidgets('audio activo: pill de velocidad; tap → cycleSpeed', (
       tester,
     ) async {
-      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      seed(
+        msg(
+          externalId: 'a1',
+          type: 'audio',
+          mediaRef: 'ref-a1',
+          mediaUrl: 'https://m/a.ogg',
+        ),
+      );
       when(() => audio.state).thenReturn(
         const ThreadAudioState(
-          url: 'https://m/a.ogg',
+          sourceKey: 'ref-a1',
           playing: true,
           position: Duration(seconds: 5),
           duration: Duration(seconds: 20),
@@ -1269,10 +1320,17 @@ void main() {
     });
 
     testWidgets('arrastrar la barra activa → seek', (tester) async {
-      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      seed(
+        msg(
+          externalId: 'a1',
+          type: 'audio',
+          mediaRef: 'ref-a1',
+          mediaUrl: 'https://m/a.ogg',
+        ),
+      );
       when(() => audio.state).thenReturn(
         const ThreadAudioState(
-          url: 'https://m/a.ogg',
+          sourceKey: 'ref-a1',
           playing: true,
           position: Duration(seconds: 5),
           duration: Duration(seconds: 20),
@@ -1293,10 +1351,17 @@ void main() {
     testWidgets('audio inactivo: barra deshabilitada y sin pill', (
       tester,
     ) async {
-      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      seed(
+        msg(
+          externalId: 'a1',
+          type: 'audio',
+          mediaRef: 'ref-a1',
+          mediaUrl: 'https://m/a.ogg',
+        ),
+      );
       // El player está en OTRA fuente ⇒ esta burbuja está inactiva.
       when(() => audio.state).thenReturn(
-        const ThreadAudioState(url: 'https://m/otra.ogg', playing: true),
+        const ThreadAudioState(sourceKey: 'ref-otra', playing: true),
       );
 
       await tester.pumpWidget(host());
@@ -1315,10 +1380,17 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(320, 640));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      seed(
+        msg(
+          externalId: 'a1',
+          type: 'audio',
+          mediaRef: 'ref-a1',
+          mediaUrl: 'https://m/a.ogg',
+        ),
+      );
       when(() => audio.state).thenReturn(
         const ThreadAudioState(
-          url: 'https://m/a.ogg',
+          sourceKey: 'ref-a1',
           playing: true,
           position: Duration(seconds: 5),
           duration: Duration(seconds: 20),
@@ -1333,7 +1405,7 @@ void main() {
       expect(find.byKey(const Key('message.audio.a1.toggle')), findsOneWidget);
     });
 
-    testWidgets('audio sin mediaUrl cae a la tarjeta de tipo', (tester) async {
+    testWidgets('audio sin mediaRef cae a la tarjeta de tipo', (tester) async {
       seed(msg(externalId: 'a1', type: 'audio'));
       await tester.pumpWidget(host());
       expect(find.text('Audio'), findsOneWidget);
@@ -1341,11 +1413,18 @@ void main() {
     });
 
     testWidgets('audio que falla al cargar anuncia SnackBar', (tester) async {
-      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      seed(
+        msg(
+          externalId: 'a1',
+          type: 'audio',
+          mediaRef: 'ref-a1',
+          mediaUrl: 'https://m/a.ogg',
+        ),
+      );
       whenListen(
         audio,
         Stream<ThreadAudioState>.fromIterable(<ThreadAudioState>[
-          const ThreadAudioState(failedUrl: 'https://m/a.ogg'),
+          const ThreadAudioState(failedKey: 'ref-a1'),
         ]),
         initialState: const ThreadAudioState(),
       );

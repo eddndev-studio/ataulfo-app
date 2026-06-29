@@ -99,6 +99,19 @@ class MessageMediaCache {
     return bytes;
   }
 
+  /// Siembra la caché con bytes ya en mano (la copia local que el cliente
+  /// produjo, p. ej. al GRABAR una nota de voz), bajo su `mediaRef` definitivo
+  /// tras subir. Así la burbuja reproduce desde disco al instante —sin esperar
+  /// el round-trip de la URL firmada— y la duración aparece de inmediato. Un
+  /// fallo de escritura no es fatal: los bytes igual quedan en L1.
+  Future<void> cache(String mediaRef, Uint8List bytes) async {
+    try {
+      await _store.write(mediaRef, bytes);
+    } catch (_) {}
+    _l1[mediaRef] = bytes;
+    _failedAt.remove(mediaRef);
+  }
+
   /// Limpia la memoria (logout). Los bytes en disco se conservan: el ref embebe
   /// el tenant (sin colisión entre cuentas) y son inmutables. Incrementa la
   /// generación para fencear una resolución en vuelo (no repuebla L1 tras logout).

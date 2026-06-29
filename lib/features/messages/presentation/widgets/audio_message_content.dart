@@ -1,26 +1,51 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../data/cache/message_media_cache.dart';
 import '../bloc/thread_audio_cubit.dart';
 
 /// Burbuja de audio reproducible: botón play/pausa + barra de progreso buscable
 /// + posición/duración + control de velocidad. El estado vive en el
 /// [ThreadAudioCubit] del hilo (un player): esta burbuja está "activa" sólo si
-/// la fuente del player es SU URL. Selecciona una vista mínima del estado para
-/// que los ticks de posición de la fuente activa no reconstruyan las demás
+/// la fuente del player es SU `mediaRef`. Selecciona una vista mínima del estado
+/// para que los ticks de posición de la fuente activa no reconstruyan las demás
 /// burbujas de audio del hilo.
-class AudioMessageContent extends StatelessWidget {
+///
+/// Reproduce la copia LOCAL de la nota (cacheada al enviar / descargada una vez
+/// al recibir, por `mediaRef`) en vez de streamear la URL firmada: la burbuja
+/// aparece sin esperar el round-trip de la firma y el transporte reporta la
+/// duración de inmediato (barra viva). Si no hay bytes, degrada al streaming de
+/// `url`.
+class AudioMessageContent extends StatefulWidget {
   const AudioMessageContent({
     super.key,
     required this.id,
+    required this.mediaRef,
     required this.url,
     required this.ptt,
   });
 
   final String id;
-  final String url;
+
+  /// Identidad estable de la nota (clave de caché y de la fuente activa).
+  final String mediaRef;
+
+  /// URL firmada de respaldo (streaming) si no hay copia local. `null` mientras
+  /// la firma no ha llegado: la burbuja igual se pinta y suena desde disco.
+  final String? url;
   final bool ptt;
+
+  @override
+  State<AudioMessageContent> createState() => _AudioMessageContentState();
+}
+
+class _AudioMessageContentState extends State<AudioMessageContent> {
+  /// Resolviendo bytes (descarga de una nota entrante aún sin caché): spinner en
+  /// el botón en vez de un toque muerto.
+  bool _resolving = false;
 
   static String _fmt(Duration d) {
     final m = d.inMinutes;
@@ -35,11 +60,34 @@ class AudioMessageContent extends StatelessWidget {
     return '${n}x';
   }
 
+  /// Resuelve la copia local (o cae a la URL) y la entrega al player. Para la
+  /// nota ya activa es play/pausa: no re-resuelve bytes.
+  Future<void> _onToggle() async {
+    final cubit = context.read<ThreadAudioCubit>();
+    if (cubit.state.sourceKey == widget.mediaRef) {
+      await cubit.toggle(widget.mediaRef);
+      return;
+    }
+    final cache = context.read<MessageMediaCache>();
+    setState(() => _resolving = true);
+    Uint8List? bytes;
+    try {
+      bytes = await cache.bytesFor(widget.mediaRef, widget.url);
+    } catch (_) {
+      bytes = null;
+    }
+    if (!mounted) return;
+    setState(() => _resolving = false);
+    await cubit.toggle(widget.mediaRef, bytes: bytes, url: widget.url);
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final id = widget.id;
+    final ptt = widget.ptt;
     return BlocSelector<ThreadAudioCubit, ThreadAudioState, _AudioView>(
-      selector: (state) => state.url == url
+      selector: (state) => state.sourceKey == widget.mediaRef
           ? _AudioView(
               active: true,
               playing: state.playing,
@@ -63,12 +111,24 @@ class AudioMessageContent extends StatelessWidget {
                 child: InkWell(
                   key: Key('message.audio.$id.toggle'),
                   customBorder: const CircleBorder(),
-                  onTap: () => context.read<ThreadAudioCubit>().toggle(url),
-                  child: Icon(
-                    v.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: AppTokens.onPrimary,
-                    semanticLabel: v.playing ? 'Pausar' : 'Reproducir',
-                  ),
+                  onTap: _resolving ? null : _onToggle,
+                  child: _resolving
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppTokens.onPrimary,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          v.playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          color: AppTokens.onPrimary,
+                          semanticLabel: v.playing ? 'Pausar' : 'Reproducir',
+                        ),
                 ),
               ),
             ),

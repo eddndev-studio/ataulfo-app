@@ -11,6 +11,7 @@ import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../../media/domain/repositories/media_repository.dart';
 import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../../quick_replies/presentation/widgets/quick_replies_sheet.dart';
+import '../../data/cache/message_media_cache.dart';
 import '../../domain/repositories/audio_recorder.dart';
 import '../bloc/messages_bloc.dart';
 import 'voice_recording_bar.dart';
@@ -202,6 +203,7 @@ class _MessageComposerState extends State<MessageComposer> {
   Future<void> _stopAndSend() async {
     final bloc = context.read<MessagesBloc>();
     final mediaRepo = context.read<MediaRepository>();
+    final mediaCache = context.read<MessageMediaCache>();
     final messenger = ScaffoldMessenger.of(context);
 
     setState(() => _sendingVoice = true);
@@ -237,6 +239,11 @@ class _MessageComposerState extends State<MessageComposer> {
         bytes: voice.bytes,
         filename: 'voice.ogg',
       );
+      if (!mounted) return;
+      // Siembra la caché con los bytes grabados bajo el ref definitivo: la
+      // burbuja reconciliada reproduce desde disco al instante (sin esperar la
+      // URL firmada) y la duración aparece de una.
+      await mediaCache.cache(uploaded.ref, voice.bytes);
       if (!mounted) return;
       bloc.add(
         MessagesSendRequested(

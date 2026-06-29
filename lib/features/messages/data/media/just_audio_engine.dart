@@ -1,3 +1,10 @@
+// StreamAudioSource/StreamAudioResponse están marcados @experimental en
+// just_audio, pero son la vía canónica para reproducir bytes en memoria y la
+// versión del paquete está fijada (pin en pubspec): el cambio de API se absorbe
+// en una actualización controlada, no en silencio.
+// ignore_for_file: experimental_member_use
+import 'dart:typed_data';
+
 import 'package:just_audio/just_audio.dart' as ja;
 
 import '../../domain/repositories/audio_engine.dart';
@@ -16,6 +23,11 @@ class JustAudioEngine implements AudioEngine {
   @override
   Future<void> setUrl(String url) async {
     await _player.setUrl(url);
+  }
+
+  @override
+  Future<void> setBytes(Uint8List bytes, String contentType) async {
+    await _player.setAudioSource(_BytesAudioSource(bytes, contentType));
   }
 
   @override
@@ -53,4 +65,29 @@ class JustAudioEngine implements AudioEngine {
 
   @override
   Future<void> dispose() => _player.dispose();
+}
+
+/// Fuente de just_audio respaldada por bytes en memoria: sirve el clip COMPLETO
+/// (honra los range requests del player) con un content-type explícito, así el
+/// extractor abre el contenedor y reporta la duración de una. Es lo que hace que
+/// reproducir la copia local —no streamear la URL firmada— reviva la barra de
+/// progreso de las notas Ogg/Opus.
+class _BytesAudioSource extends ja.StreamAudioSource {
+  _BytesAudioSource(this._bytes, this._contentType);
+
+  final Uint8List _bytes;
+  final String _contentType;
+
+  @override
+  Future<ja.StreamAudioResponse> request([int? start, int? end]) async {
+    final from = start ?? 0;
+    final to = end ?? _bytes.length;
+    return ja.StreamAudioResponse(
+      sourceLength: _bytes.length,
+      contentLength: to - from,
+      offset: from,
+      stream: Stream<List<int>>.value(_bytes.sublist(from, to)),
+      contentType: _contentType,
+    );
+  }
 }
