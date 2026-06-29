@@ -305,10 +305,7 @@ void main() {
 
     expect(find.byKey(const Key('settings.members_tile')), findsNothing);
     expect(find.text('Miembros'), findsNothing);
-    expect(
-      find.byKey(const Key('settings.org_ai_config_tile')),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('settings.org_ai_config_tile')), findsNothing);
   });
 
   testWidgets('WORKER NO ve el tile "Miembros"', (tester) async {
@@ -317,10 +314,7 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('settings.members_tile')), findsNothing);
-    expect(
-      find.byKey(const Key('settings.org_ai_config_tile')),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('settings.org_ai_config_tile')), findsNothing);
   });
 
   testWidgets('tap "Miembros" apila /members (push, no go)', (tester) async {

@@ -22,7 +22,9 @@ void main() {
       disabledToolGroups: <String>['flujos'],
     );
     final wire = TemplatesMapper.aiConfigToWire(original);
-    final back = TemplatesMapper.aiConfigDtoToEntity(AiConfigDto.fromJson(wire));
+    final back = TemplatesMapper.aiConfigDtoToEntity(
+      AiConfigDto.fromJson(wire),
+    );
     expect(back, original);
   });
 

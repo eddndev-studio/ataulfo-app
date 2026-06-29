@@ -71,8 +71,9 @@ void main() {
   setUp(() {
     bloc = _MockBloc();
     catalogBloc = _MockCatalogBloc();
-    when(() => catalogBloc.state)
-        .thenReturn(const CatalogLoaded(catalog: _catalog));
+    when(
+      () => catalogBloc.state,
+    ).thenReturn(const CatalogLoaded(catalog: _catalog));
   });
 
   Widget host() => MaterialApp(
@@ -86,28 +87,41 @@ void main() {
     ),
   );
 
-  testWidgets('Loaded + catálogo: secciones, chips multi-host y lock single',
-      (tester) async {
-    when(() => bloc.state)
-        .thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+  testWidgets('Loaded + catálogo: secciones, chips multi-host y lock single', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
 
     await tester.pumpWidget(host());
 
     expect(find.text('Proveedor por modelo'), findsOneWidget);
     expect(find.text('Valores por defecto'), findsOneWidget);
     // MiniMax-M3 es multi-host ⇒ chips MINIMAX/FIREWORKS/Automático.
-    expect(find.byKey(const Key('org_ai.host.MiniMax-M3.MINIMAX')), findsOneWidget);
-    expect(find.byKey(const Key('org_ai.host.MiniMax-M3.FIREWORKS')), findsOneWidget);
-    expect(find.byKey(const Key('org_ai.host.MiniMax-M3.auto')), findsOneWidget);
+    expect(
+      find.byKey(const Key('org_ai.host.MiniMax-M3.MINIMAX')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('org_ai.host.MiniMax-M3.FIREWORKS')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('org_ai.host.MiniMax-M3.auto')),
+      findsOneWidget,
+    );
     // gpt-5.5 es single-host ⇒ fila bloqueada, sin chips.
     expect(find.byKey(const Key('org_ai.host.gpt-5.5.OPENAI')), findsNothing);
     expect(find.text('Corre en OpenAI'), findsOneWidget);
   });
 
-  testWidgets('tocar un chip de host dispatcha OrgAiConfigHostChanged',
-      (tester) async {
-    when(() => bloc.state)
-        .thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+  testWidgets('tocar un chip de host dispatcha OrgAiConfigHostChanged', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
 
     await tester.pumpWidget(host());
     await tester.tap(find.byKey(const Key('org_ai.host.MiniMax-M3.FIREWORKS')));
@@ -120,12 +134,14 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('Guardar habilitado con cambios → dispatcha SaveRequested',
-      (tester) async {
+  testWidgets('Guardar habilitado con cambios → dispatcha SaveRequested', (
+    tester,
+  ) async {
     // working != saved ⇒ dirty.
     final working = _saved.withHost('MiniMax-M3', 'FIREWORKS');
-    when(() => bloc.state)
-        .thenReturn(OrgAiConfigLoaded(saved: _saved, working: working));
+    when(
+      () => bloc.state,
+    ).thenReturn(OrgAiConfigLoaded(saved: _saved, working: working));
 
     await tester.pumpWidget(host());
     final saveBtn = find.byKey(const Key('org_ai.save'));
@@ -137,8 +153,9 @@ void main() {
   });
 
   testWidgets('Guardar deshabilitado sin cambios', (tester) async {
-    when(() => bloc.state)
-        .thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
 
     await tester.pumpWidget(host());
     expect(
@@ -147,17 +164,16 @@ void main() {
     );
   });
 
-  testWidgets('LoadFailed forbidden → mensaje sin permiso, sin reintentar',
-      (tester) async {
-    when(() => bloc.state)
-        .thenReturn(const OrgAiConfigLoadFailed(OrgAiConfigForbiddenFailure()));
+  testWidgets('LoadFailed forbidden → mensaje sin permiso, sin reintentar', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoadFailed(OrgAiConfigForbiddenFailure()));
 
     await tester.pumpWidget(host());
 
-    expect(
-      find.textContaining('No tienes permiso'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('No tienes permiso'), findsOneWidget);
     expect(find.byKey(const Key('org_ai.retry')), findsNothing);
   });
 }

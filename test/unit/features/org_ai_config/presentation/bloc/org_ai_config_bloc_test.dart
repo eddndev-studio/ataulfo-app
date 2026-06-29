@@ -101,7 +101,11 @@ void main() {
       isA<OrgAiConfigLoaded>()
           .having((s) => s.saving, 'saving', isFalse)
           .having((s) => s.dirty, 'dirty', isFalse)
-          .having((s) => s.saved.hostFor('MiniMax-M3'), 'saved host', 'FIREWORKS'),
+          .having(
+            (s) => s.saved.hostFor('MiniMax-M3'),
+            'saved host',
+            'FIREWORKS',
+          ),
     ],
     verify: (_) => verify(() => repo.update(any())).called(1),
   );
@@ -110,8 +114,9 @@ void main() {
     'SaveRequested 422 → Loaded(saving:false, saveError) y conserva working',
     build: () {
       when(repo.get).thenAnswer((_) async => _saved);
-      when(() => repo.update(any()))
-          .thenThrow(const OrgAiConfigInvalidFailure());
+      when(
+        () => repo.update(any()),
+      ).thenThrow(const OrgAiConfigInvalidFailure());
       return OrgAiConfigBloc(repo);
     },
     act: (b) async {
@@ -127,8 +132,16 @@ void main() {
       isA<OrgAiConfigLoaded>().having((s) => s.saving, 'saving', isTrue),
       isA<OrgAiConfigLoaded>()
           .having((s) => s.saving, 'saving', isFalse)
-          .having((s) => s.saveError, 'saveError', isA<OrgAiConfigInvalidFailure>())
-          .having((s) => s.working.hostFor('MiniMax-M3'), 'working keeps edit', 'FIREWORKS'),
+          .having(
+            (s) => s.saveError,
+            'saveError',
+            isA<OrgAiConfigInvalidFailure>(),
+          )
+          .having(
+            (s) => s.working.hostFor('MiniMax-M3'),
+            'working keeps edit',
+            'FIREWORKS',
+          ),
     ],
   );
 }

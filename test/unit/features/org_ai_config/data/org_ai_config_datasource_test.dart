@@ -66,75 +66,78 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>('/org/ai-config'),
       ).thenThrow(_bad(403));
-      await expectLater(
-        ds.get(),
-        throwsA(isA<OrgAiConfigForbiddenFailure>()),
-      );
+      await expectLater(ds.get(), throwsA(isA<OrgAiConfigForbiddenFailure>()));
     });
   });
 
   group('update', () {
-    test('200 → serializa hosts + defaults snake_case y devuelve la guardada',
-        () async {
-      Map<String, dynamic>? captured;
-      when(
-        () => dio.put<Map<String, dynamic>>(
-          '/org/ai-config',
-          data: any(named: 'data'),
-        ),
-      ).thenAnswer((invocation) async {
-        captured = invocation.namedArguments[#data] as Map<String, dynamic>;
-        return _resp(200, _body());
-      });
+    test(
+      '200 → serializa hosts + defaults snake_case y devuelve la guardada',
+      () async {
+        Map<String, dynamic>? captured;
+        when(
+          () => dio.put<Map<String, dynamic>>(
+            '/org/ai-config',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((invocation) async {
+          captured = invocation.namedArguments[#data] as Map<String, dynamic>;
+          return _resp(200, _body());
+        });
 
-      const input = OrgAiConfig(
-        hosts: <String, String>{'deepseek-v4-pro': 'DEEPSEEK'},
-        defaults: AIConfig(
-          enabled: true,
-          provider: AIProvider.minimax,
-          model: 'MiniMax-M3',
-          temperature: 0.9,
-          thinkingLevel: ThinkingLevel.high,
-          systemPrompt: 'X',
-          contextMessages: 15,
-        ),
-      );
-      await ds.update(input);
+        const input = OrgAiConfig(
+          hosts: <String, String>{'deepseek-v4-pro': 'DEEPSEEK'},
+          defaults: AIConfig(
+            enabled: true,
+            provider: AIProvider.minimax,
+            model: 'MiniMax-M3',
+            temperature: 0.9,
+            thinkingLevel: ThinkingLevel.high,
+            systemPrompt: 'X',
+            contextMessages: 15,
+          ),
+        );
+        await ds.update(input);
 
-      expect(captured, isNotNull);
-      expect(captured!['hosts'], <String, String>{'deepseek-v4-pro': 'DEEPSEEK'});
-      final defaults = captured!['defaults'] as Map<String, dynamic>;
-      expect(defaults['provider'], 'MINIMAX');
-      expect(defaults['model'], 'MiniMax-M3');
-      expect(defaults['thinking_level'], 'HIGH');
-      expect(defaults['context_messages'], 15);
-    });
+        expect(captured, isNotNull);
+        expect(captured!['hosts'], <String, String>{
+          'deepseek-v4-pro': 'DEEPSEEK',
+        });
+        final defaults = captured!['defaults'] as Map<String, dynamic>;
+        expect(defaults['provider'], 'MINIMAX');
+        expect(defaults['model'], 'MiniMax-M3');
+        expect(defaults['thinking_level'], 'HIGH');
+        expect(defaults['context_messages'], 15);
+      },
+    );
 
-    test('422 → OrgAiConfigInvalidFailure (host rechazado / defaults inválidos)',
-        () async {
-      when(
-        () => dio.put<Map<String, dynamic>>(
-          '/org/ai-config',
-          data: any(named: 'data'),
-        ),
-      ).thenThrow(_bad(422));
-      await expectLater(
-        ds.update(
-          const OrgAiConfig(
-            hosts: <String, String>{},
-            defaults: AIConfig(
-              enabled: false,
-              provider: AIProvider.gemini,
-              model: 'gemini-3.1-pro-preview',
-              temperature: 0.7,
-              thinkingLevel: ThinkingLevel.low,
-              systemPrompt: '',
-              contextMessages: 20,
+    test(
+      '422 → OrgAiConfigInvalidFailure (host rechazado / defaults inválidos)',
+      () async {
+        when(
+          () => dio.put<Map<String, dynamic>>(
+            '/org/ai-config',
+            data: any(named: 'data'),
+          ),
+        ).thenThrow(_bad(422));
+        await expectLater(
+          ds.update(
+            const OrgAiConfig(
+              hosts: <String, String>{},
+              defaults: AIConfig(
+                enabled: false,
+                provider: AIProvider.gemini,
+                model: 'gemini-3.1-pro-preview',
+                temperature: 0.7,
+                thinkingLevel: ThinkingLevel.low,
+                systemPrompt: '',
+                contextMessages: 20,
+              ),
             ),
           ),
-        ),
-        throwsA(isA<OrgAiConfigInvalidFailure>()),
-      );
-    });
+          throwsA(isA<OrgAiConfigInvalidFailure>()),
+        );
+      },
+    );
   });
 }

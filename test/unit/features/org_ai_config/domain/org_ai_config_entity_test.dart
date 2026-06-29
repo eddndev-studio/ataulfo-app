@@ -44,7 +44,10 @@ void main() {
         hosts: <String, String>{'MiniMax-M3': 'FIREWORKS'},
         defaults: _defaults,
       );
-      final nd = _defaults.copyWith(provider: AIProvider.openai, model: 'gpt-5.5');
+      final nd = _defaults.copyWith(
+        provider: AIProvider.openai,
+        model: 'gpt-5.5',
+      );
       final next = cfg.withDefaults(nd);
       expect(next.defaults.provider, AIProvider.openai);
       expect(next.hostFor('MiniMax-M3'), 'FIREWORKS');
@@ -52,11 +55,17 @@ void main() {
 
     test('igualdad: hosts (orden-independiente) + defaults', () {
       const a = OrgAiConfig(
-        hosts: <String, String>{'MiniMax-M3': 'FIREWORKS', 'deepseek-v4-pro': 'DEEPSEEK'},
+        hosts: <String, String>{
+          'MiniMax-M3': 'FIREWORKS',
+          'deepseek-v4-pro': 'DEEPSEEK',
+        },
         defaults: _defaults,
       );
       const b = OrgAiConfig(
-        hosts: <String, String>{'deepseek-v4-pro': 'DEEPSEEK', 'MiniMax-M3': 'FIREWORKS'},
+        hosts: <String, String>{
+          'deepseek-v4-pro': 'DEEPSEEK',
+          'MiniMax-M3': 'FIREWORKS',
+        },
         defaults: _defaults,
       );
       expect(a, b);
