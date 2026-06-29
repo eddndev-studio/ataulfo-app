@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -521,15 +522,20 @@ const List<String> _quickReactions = <String>[
   '🙏',
 ];
 
-/// Hoja inferior con los emojis de reacción rápida. Al elegir uno despacha
-/// `MessagesReactRequested` para ese mensaje; la reacción aparece por el eco SSE
-/// (el bloc no la pinta optimista). Captura el bloc ANTES del await del sheet.
-Future<void> _showReactionPicker(
-  BuildContext context,
-  String messageId, {
-  required bool isOutbound,
-}) async {
+/// Hoja inferior de acciones sobre un mensaje (long-press): reacciones rápidas
+/// y, para mensajes de texto, copiar / seleccionar texto. Para un OUTBOUND y
+/// operador ADMIN+ ofrece además saltar a la corrida de IA que lo generó. Al
+/// elegir una reacción despacha `MessagesReactRequested` (la reacción aparece
+/// por el eco SSE; el bloc no la pinta optimista). Captura bloc/messenger/router
+/// ANTES del await del sheet.
+Future<void> _showMessageActions(BuildContext context, Message message) async {
   final bloc = context.read<MessagesBloc>();
+  final messenger = ScaffoldMessenger.of(context);
+  final messageId = message.externalId;
+  final isOutbound = message.direction == MessageDirection.outbound;
+  // Copiar/seleccionar sólo tienen sentido sobre texto con cuerpo; la media
+  // y los mensajes vacíos no los ofrecen.
+  final isText = message.type == 'text' && message.content.trim().isNotEmpty;
   // Drill-through inverso: para un OUTBOUND y operador ADMIN+, la hoja ofrece
   // saltar a la corrida de IA que generó el mensaje (el backend igual exige
   // ADMIN+ en la vista; ocultarlo evita la acción rota).
@@ -541,7 +547,105 @@ Future<void> _showReactionPicker(
   // Solo se resuelve el router cuando hay drill (evita exigir GoRouter en el
   // camino de pura reacción).
   final router = canDrill ? GoRouter.of(context) : null;
+  // El navigator raíz se captura ANTES del await: lo usa "Seleccionar texto"
+  // para abrir su hoja una vez cerrada esta, sin tocar un BuildContext que
+  // cruzó el await.
+  final rootNavigator = Navigator.of(context, rootNavigator: true);
   final emoji = await showAppBottomSheet<String>(
+    context,
+    backgroundColor: AppTokens.surface1,
+    // Las acciones (reacciones + copiar/seleccionar + drill) pueden sumar más
+    // alto que el tope de una hoja no controlada en pantallas chicas; con scroll
+    // controlado la hoja crece al contenido y nada queda inalcanzable.
+    isScrollControlled: true,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp4,
+          vertical: AppTokens.sp5,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: <Widget>[
+                  for (final e in _quickReactions)
+                    InkWell(
+                      key: Key('reaction.pick.$messageId.$e'),
+                      borderRadius: BorderRadius.circular(AppTokens.radiusPill),
+                      onTap: () => Navigator.of(sheetContext).pop(e),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppTokens.sp2),
+                        child: Text(e, style: const TextStyle(fontSize: 28)),
+                      ),
+                    ),
+                ],
+              ),
+              if (isText) ...<Widget>[
+                const Divider(height: AppTokens.sp6),
+                ListTile(
+                  key: Key('message.copy.$messageId'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.copy_outlined),
+                  title: const Text('Copiar'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    Clipboard.setData(ClipboardData(text: message.content));
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Mensaje copiado')),
+                    );
+                  },
+                ),
+                ListTile(
+                  key: Key('message.select.$messageId'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.text_fields_outlined),
+                  title: const Text('Seleccionar texto'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _showSelectableText(rootNavigator.context, message.content);
+                  },
+                ),
+              ],
+              if (canDrill) ...<Widget>[
+                const Divider(height: AppTokens.sp6),
+                ListTile(
+                  key: Key('message.drill.$messageId'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.psychology_outlined),
+                  title: const Text('Ver razonamiento del bot'),
+                  subtitle: const Text(
+                    'La corrida de IA que generó este mensaje',
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    router!.push(
+                      '/bots/${bloc.botId}'
+                      '/sessions/${Uri.encodeComponent(bloc.chatLid)}'
+                      '/ai-log?msg=${Uri.encodeComponent(messageId)}',
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  if (emoji != null) {
+    bloc.add(MessagesReactRequested(messageId: messageId, emoji: emoji));
+  }
+}
+
+/// Hoja inferior con el cuerpo del mensaje en un `SelectableText`, para que el
+/// operador copie un fragmento (un RFC, un número de pedido) en vez del texto
+/// completo.
+Future<void> _showSelectableText(BuildContext context, String content) {
+  final textTheme = Theme.of(context).textTheme;
+  return showAppBottomSheet<void>(
     context,
     backgroundColor: AppTokens.surface1,
     builder: (sheetContext) => SafeArea(
@@ -550,52 +654,14 @@ Future<void> _showReactionPicker(
           horizontal: AppTokens.sp4,
           vertical: AppTokens.sp5,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: <Widget>[
-                for (final e in _quickReactions)
-                  InkWell(
-                    key: Key('reaction.pick.$messageId.$e'),
-                    borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-                    onTap: () => Navigator.of(sheetContext).pop(e),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppTokens.sp2),
-                      child: Text(e, style: const TextStyle(fontSize: 28)),
-                    ),
-                  ),
-              ],
-            ),
-            if (canDrill) ...<Widget>[
-              const Divider(height: AppTokens.sp6),
-              ListTile(
-                key: Key('message.drill.$messageId'),
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.psychology_outlined),
-                title: const Text('Ver razonamiento del bot'),
-                subtitle: const Text(
-                  'La corrida de IA que generó este mensaje',
-                ),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  router!.push(
-                    '/bots/${bloc.botId}'
-                    '/sessions/${Uri.encodeComponent(bloc.chatLid)}'
-                    '/ai-log?msg=${Uri.encodeComponent(messageId)}',
-                  );
-                },
-              ),
-            ],
-          ],
+        child: SelectableText(
+          content,
+          key: const Key('message.select_sheet.text'),
+          style: textTheme.bodyLarge,
         ),
       ),
     ),
   );
-  if (emoji != null) {
-    bloc.add(MessagesReactRequested(messageId: messageId, emoji: emoji));
-  }
 }
 
 /// Burbuja de un mensaje. INBOUND a la izquierda (`surface2`), OUTBOUND a la
@@ -641,11 +707,7 @@ class _MessageBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             GestureDetector(
-              onLongPress: () => _showReactionPicker(
-                context,
-                m.externalId,
-                isOutbound: isOutbound,
-              ),
+              onLongPress: () => _showMessageActions(context, m),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.sizeOf(context).width * 0.78,

@@ -24,6 +24,7 @@ import 'package:ataulfo/features/monitor/presentation/cubit/monitor_live_cubit.d
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -701,6 +702,112 @@ void main() {
         ),
       ).called(1);
     });
+  });
+
+  group('copiar / seleccionar texto (long-press)', () {
+    testWidgets(
+      'un texto ofrece Copiar y Seleccionar; Copiar va al portapapeles y avisa',
+      (tester) async {
+        final copied = <String>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async {
+            if (call.method == 'Clipboard.setData') {
+              copied.add(
+                (call.arguments as Map<Object?, Object?>)['text'] as String,
+              );
+            }
+            return null;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            null,
+          ),
+        );
+
+        when(() => bloc.state).thenReturn(
+          MessagesLoaded(
+            items: <Message>[msg(externalId: 'm1', content: 'hola mundo')],
+            prevCursor: null,
+            isLoadingOlder: false,
+          ),
+        );
+        await tester.pumpWidget(host());
+        await tester.longPress(find.text('hola mundo'));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('message.copy.m1')), findsOneWidget);
+        expect(find.byKey(const Key('message.select.m1')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('message.copy.m1')));
+        await tester.pumpAndSettle();
+
+        expect(copied, <String>['hola mundo']);
+        expect(find.text('Mensaje copiado'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Seleccionar texto abre una superficie con texto seleccionable',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          MessagesLoaded(
+            items: <Message>[
+              msg(externalId: 'm1', content: 'texto largo del cliente'),
+            ],
+            prevCursor: null,
+            isLoadingOlder: false,
+          ),
+        );
+        await tester.pumpWidget(host());
+        await tester.longPress(find.text('texto largo del cliente'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('message.select.m1')));
+        await tester.pumpAndSettle();
+
+        final selectable = tester.widget<SelectableText>(
+          find.byKey(const Key('message.select_sheet.text')),
+        );
+        expect(selectable.data, 'texto largo del cliente');
+      },
+    );
+
+    testWidgets(
+      'un mensaje no-texto no ofrece copiar/seleccionar (sí reaccionar)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          MessagesLoaded(
+            items: <Message>[
+              msg(
+                externalId: 'img1',
+                type: 'image',
+                content: '',
+                mediaRef: 'r/x',
+              ),
+            ],
+            prevCursor: null,
+            isLoadingOlder: false,
+          ),
+        );
+        await tester.pumpWidget(host());
+        await tester.longPress(
+          find
+              .descendant(
+                of: find.byKey(const Key('message.img1')),
+                matching: find.byType(GestureDetector),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('message.copy.img1')), findsNothing);
+        expect(find.byKey(const Key('message.select.img1')), findsNothing);
+        expect(find.byKey(const Key('reaction.pick.img1.👍')), findsOneWidget);
+      },
+    );
   });
 
   group('drill-through al razonamiento (S24)', () {
