@@ -91,6 +91,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(const MessagesLoadRequested());
     registerFallbackValue(Uint8List(0));
+    registerFallbackValue(Duration.zero);
   });
 
   late _MockMessagesBloc bloc;
@@ -1181,7 +1182,7 @@ void main() {
       verify(() => audio.toggle('https://m/a.ogg')).called(1);
     });
 
-    testWidgets('audio activo: ícono de pausa y barra de progreso', (
+    testWidgets('audio activo: ícono de pausa y barra de progreso buscable', (
       tester,
     ) async {
       seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
@@ -1197,11 +1198,99 @@ void main() {
       await tester.pumpWidget(host());
 
       expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
-      final bar = tester.widget<LinearProgressIndicator>(
+      final bar = tester.widget<Slider>(
         find.byKey(const Key('message.audio.a1.progress')),
       );
       expect(bar.value, closeTo(0.25, 0.001));
+      expect(bar.onChanged, isNotNull); // activa ⇒ buscable
       expect(find.textContaining('0:05'), findsOneWidget); // posición en curso
+    });
+
+    testWidgets('audio activo: pill de velocidad; tap → cycleSpeed', (
+      tester,
+    ) async {
+      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      when(() => audio.state).thenReturn(
+        const ThreadAudioState(
+          url: 'https://m/a.ogg',
+          playing: true,
+          position: Duration(seconds: 5),
+          duration: Duration(seconds: 20),
+          speed: 1.5,
+        ),
+      );
+      when(() => audio.cycleSpeed()).thenAnswer((_) async {});
+
+      await tester.pumpWidget(host());
+
+      expect(find.text('1.5x'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('message.audio.a1.speed')));
+      verify(() => audio.cycleSpeed()).called(1);
+    });
+
+    testWidgets('arrastrar la barra activa → seek', (tester) async {
+      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      when(() => audio.state).thenReturn(
+        const ThreadAudioState(
+          url: 'https://m/a.ogg',
+          playing: true,
+          position: Duration(seconds: 5),
+          duration: Duration(seconds: 20),
+        ),
+      );
+      when(() => audio.seek(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(host());
+      await tester.drag(
+        find.byKey(const Key('message.audio.a1.progress')),
+        const Offset(40, 0),
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => audio.seek(any())).called(greaterThanOrEqualTo(1));
+    });
+
+    testWidgets('audio inactivo: barra deshabilitada y sin pill', (
+      tester,
+    ) async {
+      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      // El player está en OTRA fuente ⇒ esta burbuja está inactiva.
+      when(() => audio.state).thenReturn(
+        const ThreadAudioState(url: 'https://m/otra.ogg', playing: true),
+      );
+
+      await tester.pumpWidget(host());
+
+      final bar = tester.widget<Slider>(
+        find.byKey(const Key('message.audio.a1.progress')),
+      );
+      expect(bar.onChanged, isNull); // inactiva ⇒ no buscable
+      expect(find.byKey(const Key('message.audio.a1.speed')), findsNothing);
+    });
+
+    testWidgets('audio activo en pantalla angosta no desborda', (tester) async {
+      // Caso real: split-screen / ~320dp. La burbuja activa (play + barra +
+      // pill) debe encoger, no desbordar el ancho. Sin el Flexible la fila de
+      // anchos fijos rebasa el cap del 78% del ancho.
+      await tester.binding.setSurfaceSize(const Size(320, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      seed(msg(externalId: 'a1', type: 'audio', mediaUrl: 'https://m/a.ogg'));
+      when(() => audio.state).thenReturn(
+        const ThreadAudioState(
+          url: 'https://m/a.ogg',
+          playing: true,
+          position: Duration(seconds: 5),
+          duration: Duration(seconds: 20),
+          speed: 2.0,
+        ),
+      );
+
+      await tester.pumpWidget(host());
+      await tester.pump();
+
+      expect(tester.takeException(), isNull); // sin RenderFlex overflow
+      expect(find.byKey(const Key('message.audio.a1.toggle')), findsOneWidget);
     });
 
     testWidgets('audio sin mediaUrl cae a la tarjeta de tipo', (tester) async {

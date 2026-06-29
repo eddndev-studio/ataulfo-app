@@ -7,7 +7,7 @@ import '../../../../core/design/tokens.dart';
 import '../../data/cache/message_media_cache.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/repositories/media_opener.dart';
-import '../bloc/thread_audio_cubit.dart';
+import 'audio_message_content.dart';
 import 'media_viewer.dart';
 
 /// Contenido de un mensaje no-texto del hilo, interaccionable como en
@@ -47,7 +47,7 @@ class MessageMediaContent extends StatelessWidget {
         Icons.emoji_emotions_outlined,
         'Sticker',
       ),
-      'audio' || 'ptt' when url != null => _AudioContent(
+      'audio' || 'ptt' when url != null => AudioMessageContent(
         id: m.externalId,
         url: url,
         ptt: m.type == 'ptt',
@@ -227,109 +227,6 @@ class _MessageImageState extends State<_MessageImage> {
       context,
       Icons.broken_image_outlined,
       widget.sticker ? 'Sticker no disponible' : 'Imagen no disponible',
-    );
-  }
-}
-
-/// Burbuja de audio reproducible: botón play/pausa + barra de progreso +
-/// posición. El estado vive en el [ThreadAudioCubit] del hilo (un player):
-/// esta burbuja está "activa" sólo si la fuente del player es SU URL.
-class _AudioContent extends StatelessWidget {
-  const _AudioContent({required this.id, required this.url, required this.ptt});
-
-  final String id;
-  final String url;
-  final bool ptt;
-
-  static String _fmt(Duration d) {
-    final m = d.inMinutes;
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return BlocBuilder<ThreadAudioCubit, ThreadAudioState>(
-      builder: (context, state) {
-        final active = state.url == url;
-        final playing = active && state.playing;
-        final duration = active ? state.duration : null;
-        final position = active ? state.position : Duration.zero;
-        final progress =
-            (duration != null && duration.inMilliseconds > 0 && active)
-            ? (position.inMilliseconds / duration.inMilliseconds).clamp(
-                0.0,
-                1.0,
-              )
-            : 0.0;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            SizedBox(
-              width: 40,
-              height: 40,
-              child: Material(
-                color: AppTokens.chatAccent,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  key: Key('message.audio.$id.toggle'),
-                  customBorder: const CircleBorder(),
-                  onTap: () => context.read<ThreadAudioCubit>().toggle(url),
-                  child: Icon(
-                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: AppTokens.onPrimary,
-                    semanticLabel: playing ? 'Pausar' : 'Reproducir',
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: AppTokens.sp3),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                SizedBox(
-                  width: 150,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppTokens.radiusPill),
-                    child: LinearProgressIndicator(
-                      key: Key('message.audio.$id.progress'),
-                      value: progress,
-                      minHeight: 4,
-                      backgroundColor: AppTokens.bgBase.withValues(alpha: 0.4),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppTokens.chatAccent,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppTokens.sp1),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Icon(
-                      ptt ? Icons.mic_none : Icons.audiotrack_outlined,
-                      size: 12,
-                      color: AppTokens.text2,
-                    ),
-                    const SizedBox(width: AppTokens.sp1),
-                    Text(
-                      active
-                          ? '${_fmt(position)}'
-                                '${duration != null ? ' / ${_fmt(duration)}' : ''}'
-                          : (ptt ? 'Nota de voz' : 'Audio'),
-                      style: textTheme.labelSmall?.copyWith(
-                        color: AppTokens.text2,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        );
-      },
     );
   }
 }

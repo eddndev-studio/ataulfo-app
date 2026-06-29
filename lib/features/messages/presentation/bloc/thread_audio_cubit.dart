@@ -13,6 +13,7 @@ class ThreadAudioState {
     this.playing = false,
     this.position = Duration.zero,
     this.duration,
+    this.speed = 1.0,
     this.failedUrl,
   });
 
@@ -26,6 +27,11 @@ class ThreadAudioState {
   /// `null` mientras el transporte no conoce la duración.
   final Duration? duration;
 
+  /// Velocidad de reproducción (1.0 = normal). Es del hilo, no de la fuente:
+  /// se conserva al cambiar de nota y al completar, y se reasienta en el engine
+  /// al cargar una fuente nueva.
+  final double speed;
+
   /// Última URL que no se pudo cargar/reproducir — la UI lo anuncia y este
   /// campo se conserva hasta el siguiente intento (cambia ⇒ nuevo aviso).
   final String? failedUrl;
@@ -35,12 +41,14 @@ class ThreadAudioState {
     bool? playing,
     Duration? position,
     Duration? duration,
+    double? speed,
     String? failedUrl,
   }) => ThreadAudioState(
     url: url ?? this.url,
     playing: playing ?? this.playing,
     position: position ?? this.position,
     duration: duration ?? this.duration,
+    speed: speed ?? this.speed,
     failedUrl: failedUrl ?? this.failedUrl,
   );
 
@@ -51,10 +59,12 @@ class ThreadAudioState {
       other.playing == playing &&
       other.position == position &&
       other.duration == duration &&
+      other.speed == speed &&
       other.failedUrl == failedUrl;
 
   @override
-  int get hashCode => Object.hash(url, playing, position, duration, failedUrl);
+  int get hashCode =>
+      Object.hash(url, playing, position, duration, speed, failedUrl);
 }
 
 /// Controla el audio del hilo contra el [AudioEngine]: toggle por burbuja
@@ -80,6 +90,7 @@ class ThreadAudioCubit extends Cubit<ThreadAudioState> {
           ThreadAudioState(
             url: state.url,
             duration: state.duration,
+            speed: state.speed,
             failedUrl: state.failedUrl,
           ),
         ),
@@ -96,15 +107,20 @@ class ThreadAudioCubit extends Cubit<ThreadAudioState> {
   Future<void> toggle(String url) async {
     try {
       if (state.url != url) {
+        final speed = state.speed;
         await _engine.setUrl(url);
         emit(
           ThreadAudioState(
             url: url,
             // position/duration arrancan de cero para la fuente nueva; los
-            // streams del engine los actualizan enseguida.
+            // streams del engine los actualizan enseguida. La velocidad del
+            // hilo se conserva y se reasienta abajo (just_audio la resetea a
+            // 1.0 al cargar una fuente).
+            speed: speed,
             failedUrl: state.failedUrl,
           ),
         );
+        await _engine.setSpeed(speed);
         await _engine.play();
         return;
       }
@@ -117,6 +133,34 @@ class ThreadAudioCubit extends Cubit<ThreadAudioState> {
       // Transporte/formato caído (URL firmada expirada, plataforma sin
       // plugin…): señalar la URL fallida sin tirar el estado previo.
       emit(state.copyWith(failedUrl: url));
+    }
+  }
+
+  /// Velocidades de reproducción disponibles, en orden de ciclo.
+  static const List<double> _speeds = <double>[1.0, 1.5, 2.0];
+
+  /// Avanza a la siguiente velocidad (1x → 1.5x → 2x → 1x) y la fija en el
+  /// engine. Un fallo de la plataforma no altera el estado.
+  Future<void> cycleSpeed() async {
+    final i = _speeds.indexOf(state.speed);
+    final next = _speeds[(i + 1) % _speeds.length];
+    try {
+      await _engine.setSpeed(next);
+      emit(state.copyWith(speed: next));
+    } on Exception {
+      // Sin player en la plataforma: la velocidad no cambia.
+    }
+  }
+
+  /// Salta a [position] dentro de la fuente activa (scrubbing). Emite la
+  /// posición saltada tras el seek del engine; la barra conserva el valor
+  /// soltado hasta entonces, de modo que no parpadea de regreso.
+  Future<void> seek(Duration position) async {
+    try {
+      await _engine.seek(position);
+      emit(state.copyWith(position: position));
+    } on Exception {
+      // Sin player en la plataforma: el scrubbing no aplica.
     }
   }
 

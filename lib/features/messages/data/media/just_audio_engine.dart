@@ -32,6 +32,12 @@ class JustAudioEngine implements AudioEngine {
   Future<void> pause() => _player.pause();
 
   @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> setSpeed(double speed) => _player.setSpeed(speed);
+
+  @override
   Stream<bool> get playingStream => _player.playingStream;
 
   @override

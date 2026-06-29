@@ -36,6 +36,16 @@ class _FakeEngine implements AudioEngine {
   }
 
   @override
+  Future<void> seek(Duration position) async {
+    calls.add('seek:${position.inMilliseconds}');
+  }
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    calls.add('setSpeed:$speed');
+  }
+
+  @override
   Stream<bool> get playingStream => playing.stream;
   @override
   Stream<Duration> get positionStream => position.stream;
@@ -167,6 +177,70 @@ void main() {
       expect(cubit.state.playing, isFalse);
     },
   );
+
+  test('cycleSpeed alterna 1x→1.5x→2x→1x y lo fija en el engine', () async {
+    await cubit.toggle('https://m/a.ogg');
+    await pump();
+    engine.calls.clear();
+
+    await cubit.cycleSpeed();
+    expect(cubit.state.speed, 1.5);
+    await cubit.cycleSpeed();
+    expect(cubit.state.speed, 2.0);
+    await cubit.cycleSpeed();
+    expect(cubit.state.speed, 1.0);
+
+    expect(engine.calls, <String>[
+      'setSpeed:1.5',
+      'setSpeed:2.0',
+      'setSpeed:1.0',
+    ]);
+  });
+
+  test(
+    'una fuente nueva conserva la velocidad elegida y la reasienta',
+    () async {
+      await cubit.toggle('https://m/a.ogg');
+      await pump();
+      await cubit.cycleSpeed(); // 1.5
+      engine.calls.clear();
+
+      await cubit.toggle('https://m/b.ogg');
+      await pump();
+
+      expect(cubit.state.speed, 1.5);
+      expect(
+        engine.calls,
+        containsAllInOrder(<String>[
+          'setUrl:https://m/b.ogg',
+          'setSpeed:1.5',
+          'play',
+        ]),
+      );
+    },
+  );
+
+  test('al completar conserva la velocidad', () async {
+    await cubit.toggle('https://m/a.ogg');
+    await pump();
+    await cubit.cycleSpeed(); // 1.5
+    engine.completed.add(null);
+    await pump();
+
+    expect(cubit.state.speed, 1.5);
+    expect(cubit.state.position, Duration.zero);
+  });
+
+  test('seek salta en el engine y refleja la posición', () async {
+    await cubit.toggle('https://m/a.ogg');
+    await pump();
+    engine.calls.clear();
+
+    await cubit.seek(const Duration(seconds: 12));
+
+    expect(engine.calls, contains('seek:12000'));
+    expect(cubit.state.position, const Duration(seconds: 12));
+  });
 
   test('close dispone el engine', () async {
     await cubit.close();

@@ -17,6 +17,12 @@ class FakeAudioEngine implements AudioEngine {
   Future<void> pause() async {}
 
   @override
+  Future<void> seek(Duration position) async {}
+
+  @override
+  Future<void> setSpeed(double speed) async {}
+
+  @override
   Stream<bool> get playingStream => const Stream<bool>.empty();
 
   @override

@@ -11,6 +11,13 @@ abstract interface class AudioEngine {
 
   Future<void> pause();
 
+  /// Salta a [position] dentro de la fuente cargada (scrubbing de la barra).
+  Future<void> seek(Duration position);
+
+  /// Fija la velocidad de reproducción ([speed] 1.0 = normal). Se reasienta
+  /// tras cargar una fuente nueva para que la velocidad elegida persista.
+  Future<void> setSpeed(double speed);
+
   /// Reproduciendo o en pausa, según el transporte real.
   Stream<bool> get playingStream;
 
