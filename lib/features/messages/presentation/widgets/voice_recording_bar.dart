@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 
 /// Barra que reemplaza al composer mientras se graba una nota de voz: punto
@@ -38,11 +39,20 @@ class VoiceRecordingBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Padding(
+    // Reemplaza al composer en el mismo lugar; reproduce su cromo (relleno
+    // surface1 + divisor superior + inset de la nav) para que no quede detrás
+    // de la barra del sistema ni flote translúcida sobre el chat.
+    return Container(
       key: const Key('voice.recording.bar'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.sp3,
-        vertical: AppTokens.sp2,
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp3,
+        AppTokens.sp2,
+        AppTokens.sp3,
+        AppTokens.sp2 + context.safeBottomInset,
+      ),
+      decoration: const BoxDecoration(
+        color: AppTokens.surface1,
+        border: Border(top: BorderSide(color: AppTokens.divider)),
       ),
       child: Row(
         children: <Widget>[
