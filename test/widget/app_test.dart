@@ -9,6 +9,7 @@ import 'package:ataulfo/core/network/connectivity_monitor.dart';
 import 'package:ataulfo/core/router/app_router.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
+import 'package:ataulfo/features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -123,6 +124,8 @@ class _MockInvitationsRepo extends Mock implements InvitationsRepository {}
 
 class _MockCatalogRepo extends Mock implements CatalogRepository {}
 
+class _MockOrgAiConfigRepo extends Mock implements OrgAiConfigRepository {}
+
 class _MockMediaRepo extends Mock implements MediaRepository {}
 
 class _MockNotificationsRepo extends Mock implements NotificationsRepository {}
@@ -191,6 +194,7 @@ void main() {
     final membersRepo = _MockMembersRepo();
     final invitationsRepo = _MockInvitationsRepo();
     final catalogRepo = _MockCatalogRepo();
+    final orgAiConfigRepo = _MockOrgAiConfigRepo();
     final notificationsRepo = _MockNotificationsRepo();
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
@@ -236,6 +240,7 @@ void main() {
       membersRepository: membersRepo,
       invitationsRepository: invitationsRepo,
       catalogRepository: catalogRepo,
+      orgAiConfigRepository: orgAiConfigRepo,
       notificationsRepository: notificationsRepo,
       profileRepository: _MockProfileRepo(),
       mediaRepository: _MockMediaRepo(),

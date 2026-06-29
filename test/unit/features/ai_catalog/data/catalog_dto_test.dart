@@ -42,6 +42,27 @@ void main() {
         throwsA(isA<FormatException>()),
       );
     });
+
+    test('parsea hosts seleccionables (lista de strings)', () {
+      final dto = ModelDto.fromJson(<String, dynamic>{
+        'id': 'MiniMax-M3',
+        'supportsTemperature': true,
+        'supportsThinking': true,
+        'hosts': <dynamic>['MINIMAX', 'FIREWORKS'],
+      });
+      expect(dto.hosts, <String>['MINIMAX', 'FIREWORKS']);
+    });
+
+    test('hosts ausente ⇒ lista vacía (wire viejo degrada sin crash)', () {
+      // TOLERANTE como las modalidades: un backend que aún no expone hosts no
+      // debe romper el catálogo. Vacío ⇒ el editor no ofrece selección de host.
+      final dto = ModelDto.fromJson(<String, dynamic>{
+        'id': 'gemini-3.1-pro-preview',
+        'supportsTemperature': true,
+        'supportsThinking': true,
+      });
+      expect(dto.hosts, isEmpty);
+    });
   });
 
   group('ProviderEntryDto.fromJson', () {

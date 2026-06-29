@@ -22,6 +22,23 @@ class TemplatesMapper {
     disabledToolGroups: dto.disabledToolGroups,
   );
 
+  /// Serializa AIConfig al objeto JSON del wire (claves snake_case). Es la
+  /// inversa de `aiConfigDtoToEntity` y la fuente ÚNICA de la serialización:
+  /// la consumen el PUT de templates (`ai`) y el de la config de IA de la org
+  /// (`defaults`), para que ambas formas no deriven por separado.
+  static Map<String, dynamic> aiConfigToWire(AIConfig ai) => <String, dynamic>{
+    'enabled': ai.enabled,
+    'provider': ai.provider.toWire(),
+    'model': ai.model,
+    'temperature': ai.temperature,
+    'thinking_level': ai.thinkingLevel.toWire(),
+    'system_prompt': ai.systemPrompt,
+    'context_messages': ai.contextMessages,
+    'response_delay_seconds': ai.responseDelaySeconds,
+    'silence_label_ids': ai.silenceLabelIds,
+    'disabled_tool_groups': ai.disabledToolGroups,
+  };
+
   static Template templateRespToEntity(TemplateResp resp) => Template(
     id: resp.id,
     orgId: resp.orgId,

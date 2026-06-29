@@ -4,6 +4,28 @@ import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // aiConfigToWire es la inversa de aiConfigDtoToEntity y la fuente única de la
+  // serialización (templates `ai` + org `defaults`). Round-trip: serializar y
+  // re-parsear devuelve el mismo value object — si un campo se cae de un lado,
+  // este test lo caza.
+  test('aiConfigToWire ↔ aiConfigDtoToEntity round-trip', () {
+    const original = AIConfig(
+      enabled: true,
+      provider: AIProvider.minimax,
+      model: 'MiniMax-M3',
+      temperature: 1.1,
+      thinkingLevel: ThinkingLevel.high,
+      systemPrompt: 'Eres soporte.',
+      contextMessages: 15,
+      responseDelaySeconds: 30,
+      silenceLabelIds: <String>['lbl-vip'],
+      disabledToolGroups: <String>['flujos'],
+    );
+    final wire = TemplatesMapper.aiConfigToWire(original);
+    final back = TemplatesMapper.aiConfigDtoToEntity(AiConfigDto.fromJson(wire));
+    expect(back, original);
+  });
+
   AiConfigDto aiDto({
     bool enabled = false,
     String provider = 'GEMINI',

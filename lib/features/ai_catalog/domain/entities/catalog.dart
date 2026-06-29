@@ -80,6 +80,7 @@ class AIModel {
     this.supportsImageInput = false,
     this.supportsAudioInput = false,
     this.supportsDocumentInput = false,
+    this.hosts = const <String>[],
   });
 
   final String id;
@@ -88,6 +89,11 @@ class AIModel {
   final bool supportsImageInput;
   final bool supportsAudioInput;
   final bool supportsDocumentInput;
+
+  /// Hosts SELECCIONABLES para este modelo, en orden estable (wire crudo, como
+  /// `provider`). Vacío o uno ⇒ no hay elección y la config de la org lo pinta
+  /// bloqueado; dos o más ⇒ el admin elige en qué host corre.
+  final List<String> hosts;
 
   @override
   bool operator ==(Object other) {
@@ -98,7 +104,8 @@ class AIModel {
         other.supportsThinking == supportsThinking &&
         other.supportsImageInput == supportsImageInput &&
         other.supportsAudioInput == supportsAudioInput &&
-        other.supportsDocumentInput == supportsDocumentInput;
+        other.supportsDocumentInput == supportsDocumentInput &&
+        _listEquals(other.hosts, hosts);
   }
 
   @override
@@ -109,5 +116,14 @@ class AIModel {
     supportsImageInput,
     supportsAudioInput,
     supportsDocumentInput,
+    Object.hashAll(hosts),
   );
+}
+
+bool _listEquals(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

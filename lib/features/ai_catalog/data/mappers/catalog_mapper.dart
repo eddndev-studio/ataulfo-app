@@ -28,5 +28,6 @@ class CatalogMapper {
     supportsImageInput: dto.supportsImageInput,
     supportsAudioInput: dto.supportsAudioInput,
     supportsDocumentInput: dto.supportsDocumentInput,
+    hosts: dto.hosts,
   );
 }

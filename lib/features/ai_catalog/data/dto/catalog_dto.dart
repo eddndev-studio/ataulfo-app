@@ -67,6 +67,7 @@ class ModelDto {
     this.supportsImageInput = false,
     this.supportsAudioInput = false,
     this.supportsDocumentInput = false,
+    this.hosts = const <String>[],
   });
 
   factory ModelDto.fromJson(Map<String, dynamic> json) {
@@ -80,8 +81,8 @@ class ModelDto {
         'model: clave obligatoria ausente o tipo inválido',
       );
     }
-    // Modalidades de entrada: TOLERANTES (ausentes ⇒ false) — el wire las
-    // ganó después y un backend viejo no debe romper el catálogo.
+    // Modalidades de entrada y hosts: TOLERANTES (ausentes ⇒ vacío/false) — el
+    // wire los ganó después y un backend viejo no debe romper el catálogo.
     return ModelDto(
       id: id,
       supportsTemperature: supportsTemperature,
@@ -89,6 +90,11 @@ class ModelDto {
       supportsImageInput: json['supportsImageInput'] == true,
       supportsAudioInput: json['supportsAudioInput'] == true,
       supportsDocumentInput: json['supportsDocumentInput'] == true,
+      hosts:
+          (json['hosts'] as List<dynamic>?)?.whereType<String>().toList(
+            growable: false,
+          ) ??
+          const <String>[],
     );
   }
 
@@ -98,4 +104,8 @@ class ModelDto {
   final bool supportsImageInput;
   final bool supportsAudioInput;
   final bool supportsDocumentInput;
+
+  /// Hosts SELECCIONABLES para este modelo (wire crudo). Vacío/uno ⇒ sin
+  /// elección (el editor lo pinta bloqueado).
+  final List<String> hosts;
 }

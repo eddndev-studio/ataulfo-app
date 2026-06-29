@@ -275,6 +275,11 @@ void main() {
 
     expect(find.byKey(const Key('settings.members_tile')), findsOneWidget);
     expect(find.text('Miembros'), findsOneWidget);
+    // Mismo gate ADMIN+: la config de IA de la org.
+    expect(
+      find.byKey(const Key('settings.org_ai_config_tile')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('ADMIN ve el tile admin-gated "Miembros"', (tester) async {
@@ -283,6 +288,10 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('settings.members_tile')), findsOneWidget);
+    expect(
+      find.byKey(const Key('settings.org_ai_config_tile')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('SUPERVISOR NO ve el tile "Miembros" (gate cosmético ADMIN+)', (
@@ -296,6 +305,10 @@ void main() {
 
     expect(find.byKey(const Key('settings.members_tile')), findsNothing);
     expect(find.text('Miembros'), findsNothing);
+    expect(
+      find.byKey(const Key('settings.org_ai_config_tile')),
+      findsNothing,
+    );
   });
 
   testWidgets('WORKER NO ve el tile "Miembros"', (tester) async {
@@ -304,6 +317,10 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('settings.members_tile')), findsNothing);
+    expect(
+      find.byKey(const Key('settings.org_ai_config_tile')),
+      findsNothing,
+    );
   });
 
   testWidgets('tap "Miembros" apila /members (push, no go)', (tester) async {
@@ -358,6 +375,9 @@ void main() {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(host());
+    // El botón vive al pie del scroll: asegurar visibilidad antes de tocarlo
+    // (con más tiles arriba puede quedar bajo el fold en pantallas bajas).
+    await tester.ensureVisible(find.widgetWithText(AppButton, 'Cerrar sesión'));
     await tester.tap(find.widgetWithText(AppButton, 'Cerrar sesión'));
     await tester.pumpAndSettle();
 
@@ -377,6 +397,7 @@ void main() {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(host());
+    await tester.ensureVisible(find.widgetWithText(AppButton, 'Cerrar sesión'));
     await tester.tap(find.widgetWithText(AppButton, 'Cerrar sesión'));
     await tester.pumpAndSettle();
 
@@ -427,11 +448,11 @@ void main() {
       final card = find.byKey(const Key('settings.card.sections'));
       expect(card, findsOneWidget);
       expect(tester.widget(card), isA<AppCard>());
-      // OWNER: las 4 áreas como filas (organizaciones, miembros, galería,
-      // notificaciones) — muere la pila de cards sueltas sin jerarquía.
+      // OWNER: las 5 áreas como filas (organizaciones, miembros, config de IA,
+      // galería, notificaciones) — muere la pila de cards sueltas sin jerarquía.
       expect(
         find.descendant(of: card, matching: find.byType(AppSectionLink)),
-        findsNWidgets(4),
+        findsNWidgets(5),
       );
       // Captions: cada fila dice qué hay detrás, no solo el título.
       expect(find.text('Bandeja y preferencias de avisos'), findsOneWidget);

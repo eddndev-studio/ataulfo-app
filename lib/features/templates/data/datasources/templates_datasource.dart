@@ -189,19 +189,7 @@ class DioTemplatesDatasource implements TemplatesDatasource {
         data: <String, dynamic>{
           'name': name,
           'version': version,
-          if (ai != null)
-            'ai': <String, dynamic>{
-              'enabled': ai.enabled,
-              'provider': ai.provider.toWire(),
-              'model': ai.model,
-              'temperature': ai.temperature,
-              'thinking_level': ai.thinkingLevel.toWire(),
-              'system_prompt': ai.systemPrompt,
-              'context_messages': ai.contextMessages,
-              'response_delay_seconds': ai.responseDelaySeconds,
-              'silence_label_ids': ai.silenceLabelIds,
-              'disabled_tool_groups': ai.disabledToolGroups,
-            },
+          if (ai != null) 'ai': TemplatesMapper.aiConfigToWire(ai),
         },
       );
       final body = res.data;

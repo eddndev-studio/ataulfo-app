@@ -229,6 +229,14 @@ class _SectionsCard extends StatelessWidget {
               caption: 'Roles, invitaciones y acceso a bots',
               onTap: () => context.push('/members'),
             ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.org_ai_config_tile'),
+              icon: Icons.smart_toy_outlined,
+              title: 'Configuración de IA',
+              caption: 'Proveedor por modelo y valores por defecto',
+              onTap: () => context.push('/org/ai-config'),
+            ),
           ],
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
           AppSectionLink(

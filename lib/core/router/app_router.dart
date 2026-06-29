@@ -6,6 +6,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/ai_catalog/domain/repositories/catalog_repository.dart';
 import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
+import '../../features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
+import '../../features/org_ai_config/presentation/bloc/org_ai_config_bloc.dart';
+import '../../features/org_ai_config/presentation/pages/org_ai_config_page.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/accept_invitation_cubit.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
@@ -185,6 +188,7 @@ class AppRouter {
     required MembersRepository membersRepository,
     required InvitationsRepository invitationsRepository,
     required CatalogRepository catalogRepository,
+    required OrgAiConfigRepository orgAiConfigRepository,
     required NotificationsRepository notificationsRepository,
     required MediaRepository mediaRepository,
     required MediaFilePicker mediaFilePicker,
@@ -223,6 +227,7 @@ class AppRouter {
        _membersRepo = membersRepository,
        _invitationsRepo = invitationsRepository,
        _catalogRepo = catalogRepository,
+       _orgAiConfigRepo = orgAiConfigRepository,
        _notificationsRepo = notificationsRepository,
        _mediaRepo = mediaRepository,
        _mediaFilePicker = mediaFilePicker,
@@ -276,6 +281,7 @@ class AppRouter {
   final MembersRepository _membersRepo;
   final InvitationsRepository _invitationsRepo;
   final CatalogRepository _catalogRepo;
+  final OrgAiConfigRepository _orgAiConfigRepo;
   final NotificationsRepository _notificationsRepo;
   final MediaRepository _mediaRepo;
   final MediaFilePicker _mediaFilePicker;
@@ -1033,6 +1039,31 @@ class AppRouter {
               ),
             ],
             child: const TemplateAiPage(),
+          );
+        },
+      ),
+      GoRoute(
+        // Config de IA a nivel ORG (ADMIN/OWNER): proveedor por modelo +
+        // defaults de plantillas nuevas. El gate de la tile en Settings es
+        // cosmético; la autoridad real es el 403 del backend (cae en
+        // OrgAiConfigLoadFailed → "sin permiso"). CatalogBloc alimenta los
+        // hosts seleccionables y el picker de modelo de los defaults.
+        path: '/org/ai-config',
+        builder: (context, state) {
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<OrgAiConfigBloc>(
+                create: (_) =>
+                    OrgAiConfigBloc(_orgAiConfigRepo)
+                      ..add(const OrgAiConfigLoadRequested()),
+              ),
+              BlocProvider<CatalogBloc>(
+                create: (_) =>
+                    CatalogBloc(_catalogRepo)
+                      ..add(const CatalogLoadRequested()),
+              ),
+            ],
+            child: const OrgAiConfigPage(),
           );
         },
       ),
