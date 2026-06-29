@@ -9,6 +9,7 @@ import '../../domain/ai_log_runs.dart';
 import '../../domain/entities/ai_log_entry.dart';
 import '../../domain/failures/ai_log_failure.dart';
 import '../bloc/ai_log_bloc.dart';
+import '../widgets/tool_result_view.dart';
 
 /// Vista de observabilidad del bot (ADMIN+): el ConversationLog del chat
 /// real dividido POR CORRIDA del motor — qué dijo el cliente, qué pensó el
@@ -171,7 +172,7 @@ class _EntryTile extends StatelessWidget {
             ],
           ),
         ),
-        AiLogRole.tool => _ToolResult(entry: entry),
+        AiLogRole.tool => ToolResultView(entry: entry),
         AiLogRole.unknown => Text(
           'Turno no soportado — actualiza la app.',
           style: textTheme.bodySmall?.copyWith(
@@ -262,65 +263,6 @@ class _Reasoning extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Resultado de una tool: colapsado a una línea, expandible al contenido
-/// completo que el modelo recibió.
-class _ToolResult extends StatelessWidget {
-  const _ToolResult({required this.entry});
-
-  final AiLogEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      // Borde sin relleno vía `shape`; al ser un Material, el ListTile del
-      // ExpansionTile encuentra superficie aquí y no hereda el fondo coloreado
-      // de la AppCard contenedora (que dispararía el assert de Material 3).
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: AppTokens.divider),
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          key: Key('ai_log.tool_result.${entry.id}'),
-          tilePadding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
-          childrenPadding: const EdgeInsets.fromLTRB(
-            AppTokens.sp3,
-            0,
-            AppTokens.sp3,
-            AppTokens.sp3,
-          ),
-          leading: const Icon(
-            Icons.build_circle_outlined,
-            size: 18,
-            color: AppTokens.text2,
-          ),
-          title: Text(
-            'Resultado · ${entry.toolName}',
-            style: textTheme.labelMedium,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          children: <Widget>[
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                entry.content.isEmpty ? '(vacío)' : entry.content,
-                style: textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  color: AppTokens.text2,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

@@ -117,4 +117,103 @@ void main() {
     await pump(tester);
     expect(find.byKey(const Key('ai_log.empty')), findsOneWidget);
   });
+
+  // ── dispatch del turno role=tool por toolName ────────────────────────
+  group('render de turnos tool por toolName', () {
+    const analysisWire =
+        '{"kind":"chat_analysis","summary":"resumen X","facts":[],'
+        '"sentiment":"","timeline":[],"truncated":false}';
+    const subagentWire =
+        '{"status":"completed","summary":"hice la tarea","result":"r"}';
+
+    void load(AiLogEntry entry) {
+      when(() => bloc.state).thenReturn(
+        AiLogLoaded(
+          entries: <AiLogEntry>[entry],
+          nextBefore: null,
+          isLoadingMore: false,
+        ),
+      );
+    }
+
+    testWidgets('analyze_chat con envelope válido → AnalysisCard, no el blob', (
+      tester,
+    ) async {
+      load(
+        e(
+          5,
+          role: AiLogRole.tool,
+          toolName: 'analyze_chat',
+          content: analysisWire,
+        ),
+      );
+      await pump(tester);
+      expect(find.text('resumen X'), findsOneWidget);
+      expect(find.byKey(const Key('ai_log.tool_result.5')), findsNothing);
+    });
+
+    testWidgets('spawn_agent con outcome válido → SubagentOutcomeCard', (
+      tester,
+    ) async {
+      load(
+        e(
+          6,
+          role: AiLogRole.tool,
+          toolName: 'spawn_agent',
+          content: subagentWire,
+        ),
+      );
+      await pump(tester);
+      expect(find.text('hice la tarea'), findsOneWidget);
+      expect(find.text('Completado'), findsOneWidget);
+      expect(find.byKey(const Key('ai_log.tool_result.6')), findsNothing);
+    });
+
+    testWidgets('GATE: analyze_chat con content malformado → cae al blob', (
+      tester,
+    ) async {
+      load(
+        e(
+          7,
+          role: AiLogRole.tool,
+          toolName: 'analyze_chat',
+          content: 'no soy json',
+        ),
+      );
+      await pump(tester);
+      expect(find.byKey(const Key('ai_log.tool_result.7')), findsOneWidget);
+      // El blob del fallback conserva el icono de la tool (no el default).
+      expect(find.byIcon(Icons.insights_outlined), findsOneWidget);
+    });
+
+    testWidgets('toolName desconocido (read_messages) → blob con su icono', (
+      tester,
+    ) async {
+      load(
+        e(
+          8,
+          role: AiLogRole.tool,
+          toolName: 'read_messages',
+          content: '[{"x":1}]',
+        ),
+      );
+      await pump(tester);
+      expect(find.byKey(const Key('ai_log.tool_result.8')), findsOneWidget);
+      expect(find.byIcon(Icons.mail_outline), findsOneWidget);
+    });
+
+    testWidgets('search_messages → blob con icono de búsqueda', (tester) async {
+      load(
+        e(9, role: AiLogRole.tool, toolName: 'search_messages', content: '[]'),
+      );
+      await pump(tester);
+      expect(find.byIcon(Icons.search), findsOneWidget);
+    });
+
+    testWidgets('tool sin icono propio → icono por defecto', (tester) async {
+      load(e(10, role: AiLogRole.tool, toolName: 'apply_label', content: 'ok'));
+      await pump(tester);
+      expect(find.byIcon(Icons.build_circle_outlined), findsOneWidget);
+    });
+  });
 }
