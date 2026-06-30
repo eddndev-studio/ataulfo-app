@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../data/cache/message_media_cache.dart';
+import '../../data/media/ogg_opus_duration.dart';
 import '../bloc/thread_audio_cubit.dart';
 
 /// Burbuja de audio reproducible: botón play/pausa + barra de progreso buscable
@@ -78,7 +79,16 @@ class _AudioMessageContentState extends State<AudioMessageContent> {
     }
     if (!mounted) return;
     setState(() => _resolving = false);
-    await cubit.toggle(widget.mediaRef, bytes: bytes, url: widget.url);
+    // El transporte no reporta de forma fiable la duración de las notas
+    // Opus/Ogg; calcularla del contenedor (los bytes ya en mano) siembra la
+    // barra de progreso en ambos sentidos. `null` si no se pudo derivar.
+    final ms = bytes == null ? null : oggOpusDurationMs(bytes);
+    await cubit.toggle(
+      widget.mediaRef,
+      bytes: bytes,
+      url: widget.url,
+      fallbackDuration: ms == null ? null : Duration(milliseconds: ms),
+    );
   }
 
   @override

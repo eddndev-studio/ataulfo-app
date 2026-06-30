@@ -1227,6 +1227,7 @@ void main() {
           bytes: any(named: 'bytes'),
           url: any(named: 'url'),
           contentType: any(named: 'contentType'),
+          fallbackDuration: any(named: 'fallbackDuration'),
         ),
       ).thenAnswer((_) async {});
 
@@ -1241,6 +1242,7 @@ void main() {
           bytes: any(named: 'bytes'),
           url: 'https://m/a.ogg',
           contentType: any(named: 'contentType'),
+          fallbackDuration: any(named: 'fallbackDuration'),
         ),
       ).called(1);
     });

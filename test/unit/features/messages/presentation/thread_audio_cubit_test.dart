@@ -214,6 +214,43 @@ void main() {
     expect(cubit.state.position, const Duration(seconds: 7));
   });
 
+  test('fallbackDuration siembra la duración de inmediato', () async {
+    await cubit.toggle(
+      'ref-a',
+      bytes: bytes,
+      fallbackDuration: const Duration(seconds: 3),
+    );
+    await pump();
+    // Sin que el engine haya emitido nada: la barra ya tiene duración.
+    expect(cubit.state.duration, const Duration(seconds: 3));
+  });
+
+  test('una duración real (>0) del engine pisa la sembrada', () async {
+    await cubit.toggle(
+      'ref-a',
+      bytes: bytes,
+      fallbackDuration: const Duration(seconds: 3),
+    );
+    await pump();
+    engine.duration.add(const Duration(seconds: 5));
+    await pump();
+    expect(cubit.state.duration, const Duration(seconds: 5));
+  });
+
+  test('null o cero del engine NO pisan la sembrada', () async {
+    await cubit.toggle(
+      'ref-a',
+      bytes: bytes,
+      fallbackDuration: const Duration(seconds: 3),
+    );
+    await pump();
+    engine.duration.add(null);
+    engine.duration.add(Duration.zero);
+    await pump();
+    // El transporte aún no conoce la duración; conserva la sembrada del clip.
+    expect(cubit.state.duration, const Duration(seconds: 3));
+  });
+
   test(
     'al completar: deja de reproducir y la posición vuelve a cero',
     () async {

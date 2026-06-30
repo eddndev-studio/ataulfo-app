@@ -85,9 +85,14 @@ class ThreadAudioCubit extends Cubit<ThreadAudioState> {
       _engine.positionStream.listen(
         (position) => emit(state.copyWith(position: position)),
       ),
-      _engine.durationStream.listen(
-        (duration) => emit(state.copyWith(duration: duration)),
-      ),
+      _engine.durationStream.listen((duration) {
+        // Sólo una duración real (>0) pisa el estado: un `null` o un `0`
+        // transitorio del transporte (común con Opus/Ogg, donde no siempre la
+        // reporta) no debe borrar la duración sembrada del propio clip.
+        if (duration != null && duration > Duration.zero) {
+          emit(state.copyWith(duration: duration));
+        }
+      }),
       _engine.completedStream.listen(
         (_) => emit(
           ThreadAudioState(
@@ -118,6 +123,7 @@ class ThreadAudioCubit extends Cubit<ThreadAudioState> {
     Uint8List? bytes,
     String? url,
     String contentType = 'audio/ogg',
+    Duration? fallbackDuration,
   }) async {
     try {
       if (state.sourceKey != key) {
@@ -126,10 +132,12 @@ class ThreadAudioCubit extends Cubit<ThreadAudioState> {
         emit(
           ThreadAudioState(
             sourceKey: key,
-            // position/duration arrancan de cero para la fuente nueva; los
-            // streams del engine los actualizan enseguida. La velocidad del
-            // hilo se conserva y se reasienta abajo (just_audio la resetea a
-            // 1.0 al cargar una fuente).
+            // position arranca de cero; la duración se SIEMBRA con
+            // [fallbackDuration] (calculada del clip) para que la barra viva
+            // aunque el transporte no la reporte; una duración real del engine
+            // la pisará después. La velocidad del hilo se conserva y se
+            // reasienta abajo (just_audio la resetea a 1.0 al cargar fuente).
+            duration: fallbackDuration,
             speed: speed,
             failedKey: state.failedKey,
           ),
