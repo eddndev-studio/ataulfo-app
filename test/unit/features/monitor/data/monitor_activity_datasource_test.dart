@@ -48,7 +48,10 @@ void main() {
     ).thenAnswer((_) async => r);
   }
 
-  final turnFrame = frame('ai.turn', jsonEncode(<String, dynamic>{'runId': 'R1'}));
+  final turnFrame = frame(
+    'ai.turn',
+    jsonEncode(<String, dynamic>{'runId': 'R1'}),
+  );
 
   test(
     'activity emite un sentinel connected al establecer la conexión, antes de los frames',

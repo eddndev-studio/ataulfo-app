@@ -157,17 +157,20 @@ void main() {
     expect(cubit.state.sourceKey, isNull);
   });
 
-  test('toggle sobre el mismo ref reproduciendo pausa (sin re-cargar)', () async {
-    await cubit.toggle('ref-a', bytes: bytes);
-    await pump();
-    engine.calls.clear();
+  test(
+    'toggle sobre el mismo ref reproduciendo pausa (sin re-cargar)',
+    () async {
+      await cubit.toggle('ref-a', bytes: bytes);
+      await pump();
+      engine.calls.clear();
 
-    await cubit.toggle('ref-a');
-    await pump();
+      await cubit.toggle('ref-a');
+      await pump();
 
-    expect(engine.calls, <String>['pause']);
-    expect(cubit.state.playing, isFalse);
-  });
+      expect(engine.calls, <String>['pause']);
+      expect(cubit.state.playing, isFalse);
+    },
+  );
 
   test('toggle sobre el mismo ref pausado reanuda donde iba', () async {
     await cubit.toggle('ref-a', bytes: bytes);
@@ -211,16 +214,19 @@ void main() {
     expect(cubit.state.position, const Duration(seconds: 7));
   });
 
-  test('al completar: deja de reproducir y la posición vuelve a cero', () async {
-    await cubit.toggle('ref-a', bytes: bytes);
-    await pump();
-    engine.position.add(const Duration(seconds: 30));
-    engine.completed.add(null);
-    await pump();
+  test(
+    'al completar: deja de reproducir y la posición vuelve a cero',
+    () async {
+      await cubit.toggle('ref-a', bytes: bytes);
+      await pump();
+      engine.position.add(const Duration(seconds: 30));
+      engine.completed.add(null);
+      await pump();
 
-    expect(cubit.state.playing, isFalse);
-    expect(cubit.state.position, Duration.zero);
-  });
+      expect(cubit.state.playing, isFalse);
+      expect(cubit.state.position, Duration.zero);
+    },
+  );
 
   test(
     'si el engine falla al cargar la url, señala failedKey y no adopta la fuente',
@@ -255,21 +261,28 @@ void main() {
     ]);
   });
 
-  test('una fuente nueva conserva la velocidad elegida y la reasienta', () async {
-    await cubit.toggle('ref-a', bytes: bytes);
-    await pump();
-    await cubit.cycleSpeed(); // 1.5
-    engine.calls.clear();
+  test(
+    'una fuente nueva conserva la velocidad elegida y la reasienta',
+    () async {
+      await cubit.toggle('ref-a', bytes: bytes);
+      await pump();
+      await cubit.cycleSpeed(); // 1.5
+      engine.calls.clear();
 
-    await cubit.toggle('ref-b', bytes: bytes);
-    await pump();
+      await cubit.toggle('ref-b', bytes: bytes);
+      await pump();
 
-    expect(cubit.state.speed, 1.5);
-    expect(
-      engine.calls,
-      containsAllInOrder(<String>['setBytes:4:audio/ogg', 'setSpeed:1.5', 'play']),
-    );
-  });
+      expect(cubit.state.speed, 1.5);
+      expect(
+        engine.calls,
+        containsAllInOrder(<String>[
+          'setBytes:4:audio/ogg',
+          'setSpeed:1.5',
+          'play',
+        ]),
+      );
+    },
+  );
 
   test('al completar conserva la velocidad', () async {
     await cubit.toggle('ref-a', bytes: bytes);

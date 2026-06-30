@@ -189,7 +189,8 @@ void main() {
 
       controllers[0].add(1);
       await Future<void>.delayed(Duration.zero);
-      await controllers[0].close(); // cae → emite el disconnect ANTES del backoff
+      await controllers[0]
+          .close(); // cae → emite el disconnect ANTES del backoff
       await Future<void>.delayed(Duration.zero);
       controllers[1].add(2);
       await Future<void>.delayed(Duration.zero);
@@ -197,7 +198,8 @@ void main() {
       expect(
         got,
         <int>[1, -9, 2],
-        reason: 'el disconnect (-9) aparece al caer la conexión, no al reconectar',
+        reason:
+            'el disconnect (-9) aparece al caer la conexión, no al reconectar',
       );
       await sub.cancel();
     },

@@ -234,7 +234,10 @@ void main() {
 
     expect(recorder.stopCalls, 1);
     verify(
-      () => mediaRepo.upload(bytes: any(named: 'bytes'), filename: 'voice.ogg'),
+      () => mediaRepo.upload(
+        bytes: any(named: 'bytes'),
+        filename: 'voice.ogg',
+      ),
     ).called(1);
     verify(
       () => msgBloc.add(
@@ -253,28 +256,29 @@ void main() {
     expect(find.byKey(const Key('composer.input')), findsOneWidget);
   });
 
-  testWidgets('un toque corto NO graba: pista "mantén para grabar", sin subir', (
-    tester,
-  ) async {
-    final recorder = _FakeRecorder(result: voice());
-    await tester.pumpWidget(host(recorder));
-    await tester.pump();
-    final g = await pressMic(tester);
-    await g.up(); // sin avanzar el reloj: mantuvo < umbral
-    await tester.pumpAndSettle();
+  testWidgets(
+    'un toque corto NO graba: pista "mantén para grabar", sin subir',
+    (tester) async {
+      final recorder = _FakeRecorder(result: voice());
+      await tester.pumpWidget(host(recorder));
+      await tester.pump();
+      final g = await pressMic(tester);
+      await g.up(); // sin avanzar el reloj: mantuvo < umbral
+      await tester.pumpAndSettle();
 
-    expect(recorder.cancelCalls, 1);
-    expect(recorder.stopCalls, 0);
-    verifyNever(
-      () => mediaRepo.upload(
-        bytes: any(named: 'bytes'),
-        filename: any(named: 'filename'),
-      ),
-    );
-    verifyNever(() => msgBloc.add(any()));
-    expect(find.text('Mantén para grabar una nota de voz'), findsOneWidget);
-    expect(find.text('No se grabó audio'), findsNothing);
-  });
+      expect(recorder.cancelCalls, 1);
+      expect(recorder.stopCalls, 0);
+      verifyNever(
+        () => mediaRepo.upload(
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+        ),
+      );
+      verifyNever(() => msgBloc.add(any()));
+      expect(find.text('Mantén para grabar una nota de voz'), findsOneWidget);
+      expect(find.text('No se grabó audio'), findsNothing);
+    },
+  );
 
   testWidgets('deslizar a la IZQUIERDA y soltar descarta (sin subir)', (
     tester,

@@ -18,21 +18,21 @@ void main() {
     ),
   );
 
-  Container barContainer(WidgetTester tester) => tester.widget<Container>(
-    find.byKey(const Key('voice.recording.bar')),
+  Container barContainer(WidgetTester tester) =>
+      tester.widget<Container>(find.byKey(const Key('voice.recording.bar')));
+
+  testWidgets(
+    'la barra es un Container con relleno surface1 y divisor superior',
+    (tester) async {
+      await tester.pumpWidget(host());
+
+      final container = barContainer(tester);
+      final decoration = container.decoration! as BoxDecoration;
+      expect(decoration.color, AppTokens.surface1);
+      expect(decoration.border, isA<Border>());
+      expect((decoration.border! as Border).top.color, AppTokens.divider);
+    },
   );
-
-  testWidgets('la barra es un Container con relleno surface1 y divisor superior', (
-    tester,
-  ) async {
-    await tester.pumpWidget(host());
-
-    final container = barContainer(tester);
-    final decoration = container.decoration! as BoxDecoration;
-    expect(decoration.color, AppTokens.surface1);
-    expect(decoration.border, isA<Border>());
-    expect((decoration.border! as Border).top.color, AppTokens.divider);
-  });
 
   testWidgets('el padding inferior reserva el inset de la nav del sistema', (
     tester,

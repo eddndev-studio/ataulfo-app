@@ -1256,7 +1256,10 @@ void main() {
 
       // El reproductor (toggle + barra), no la tarjeta de adjunto estática.
       expect(find.byKey(const Key('message.audio.a1.toggle')), findsOneWidget);
-      expect(find.byKey(const Key('message.audio.a1.progress')), findsOneWidget);
+      expect(
+        find.byKey(const Key('message.audio.a1.progress')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('audio activo: ícono de pausa y barra de progreso buscable', (
