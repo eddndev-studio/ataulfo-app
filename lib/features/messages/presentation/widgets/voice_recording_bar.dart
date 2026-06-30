@@ -88,7 +88,9 @@ class VoiceRecordingBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppTokens.sp3),
-          Expanded(child: LiveWaveform(amplitude: amplitude, paused: paused)),
+          Expanded(
+            child: LiveWaveform(amplitude: amplitude, paused: paused),
+          ),
           const SizedBox(width: AppTokens.sp1),
           IconButton(
             key: const Key('voice.pauseToggle'),

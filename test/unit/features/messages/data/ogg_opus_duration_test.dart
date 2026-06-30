@@ -4,8 +4,7 @@ import 'package:ataulfo/features/messages/data/media/ogg_opus_duration.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Bytes little-endian de un uint64 (posición de granule del page Ogg).
-List<int> _u64le(int v) =>
-    List<int>.generate(8, (i) => (v >> (8 * i)) & 0xFF);
+List<int> _u64le(int v) => List<int>.generate(8, (i) => (v >> (8 * i)) & 0xFF);
 
 /// Un page Ogg sintético: cabecera de 27 bytes + tabla de lacing + payload.
 /// El parser ignora el CRC, así que va en cero.
@@ -73,11 +72,7 @@ void main() {
         ..._page(granule: 0, headerType: 0x02, payload: _opusHead(preSkip)),
         // page intermedio sin fin de paquete: granule = -1 (0xFFFF..FF)
         ..._page(granule: -1, headerType: 0x00, payload: <int>[9, 9, 9]),
-        ..._page(
-          granule: lastGranule,
-          headerType: 0x04,
-          payload: <int>[1, 2],
-        ),
+        ..._page(granule: lastGranule, headerType: 0x04, payload: <int>[1, 2]),
       ]);
       expect(oggOpusDurationMs(bytes), 2000);
     });

@@ -26,8 +26,9 @@ void main() {
     return copied;
   }
 
-  Widget host(Widget child) =>
-      MaterialApp(home: Scaffold(body: Center(child: child)));
+  Widget host(Widget child) => MaterialApp(
+    home: Scaffold(body: Center(child: child)),
+  );
 
   testWidgets('long-press abre la hoja; Copiar copia y avisa', (tester) async {
     final copied = interceptClipboard(tester);

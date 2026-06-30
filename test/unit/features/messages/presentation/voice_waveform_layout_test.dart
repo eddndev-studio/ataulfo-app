@@ -63,7 +63,10 @@ void main() {
         gap: gap,
         phase: 0.5,
       );
-      expect(atHalf.first.xCenter, closeTo(at0.first.xCenter - 0.5 * pitch, 1e-9));
+      expect(
+        atHalf.first.xCenter,
+        closeTo(at0.first.xCenter - 0.5 * pitch, 1e-9),
+      );
     });
 
     test('con pocas muestras sólo devuelve esas (llena desde la derecha)', () {

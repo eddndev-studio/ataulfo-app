@@ -12,7 +12,10 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: SizedBox(width: 200, child: LiveWaveform(amplitude: amp.stream)),
+            body: SizedBox(
+              width: 200,
+              child: LiveWaveform(amplitude: amp.stream),
+            ),
           ),
         ),
       );
@@ -28,7 +31,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('en pausa ignora las muestras nuevas (no anima)', (tester) async {
+    testWidgets('en pausa ignora las muestras nuevas (no anima)', (
+      tester,
+    ) async {
       final amp = StreamController<double>.broadcast();
       addTearDown(amp.close);
       await tester.pumpWidget(
@@ -55,11 +60,16 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: SizedBox(width: 200, child: LiveWaveform(amplitude: amp.stream)),
+            body: SizedBox(
+              width: 200,
+              child: LiveWaveform(amplitude: amp.stream),
+            ),
           ),
         ),
       );
-      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: SizedBox())),
+      );
       // Tras desmontar, una emisión no debe tocar estado desmontado.
       amp.add(70);
       await tester.pump();

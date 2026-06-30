@@ -180,7 +180,10 @@ class _WaveformPainter extends CustomPainter {
       ..strokeWidth = barWidth;
     final mid = size.height / 2;
     for (final b in layout) {
-      final h = (bars[b.sampleIndex] / 100 * size.height).clamp(2.0, size.height);
+      final h = (bars[b.sampleIndex] / 100 * size.height).clamp(
+        2.0,
+        size.height,
+      );
       canvas.drawLine(
         Offset(b.xCenter, mid - h / 2),
         Offset(b.xCenter, mid + h / 2),
