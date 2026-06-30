@@ -190,6 +190,7 @@ class VoiceHoldBar extends StatelessWidget {
     required this.cancelArmed,
     required this.lockProgress,
     required this.trailing,
+    this.sending = false,
     super.key,
   });
 
@@ -205,6 +206,11 @@ class VoiceHoldBar extends StatelessWidget {
 
   /// El micrófono (lo provee el composer; el gesto lo sigue rastreando).
   final Widget trailing;
+
+  /// Se soltó manteniendo (envío directo) y el clip se está subiendo: oculta las
+  /// pistas de gesto y muestra "Enviando…" en vez de dejar la barra colgada con
+  /// "desliza para cancelar" durante la subida.
+  final bool sending;
 
   @override
   Widget build(BuildContext context) {
@@ -225,25 +231,27 @@ class VoiceHoldBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Opacity(
-            opacity: (0.35 + 0.65 * lockProgress).clamp(0.0, 1.0),
-            child: Column(
-              key: const Key('voice.lock.hint'),
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(
-                  Icons.lock_outline,
-                  size: 18,
-                  color: locking ? AppTokens.chatAccent : AppTokens.text2,
-                ),
-                const Icon(
-                  Icons.keyboard_arrow_up,
-                  size: 16,
-                  color: AppTokens.text2,
-                ),
-              ],
+          // Mientras sube no hay gesto que guiar: oculta el candado.
+          if (!sending)
+            Opacity(
+              opacity: (0.35 + 0.65 * lockProgress).clamp(0.0, 1.0),
+              child: Column(
+                key: const Key('voice.lock.hint'),
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(
+                    Icons.lock_outline,
+                    size: 18,
+                    color: locking ? AppTokens.chatAccent : AppTokens.text2,
+                  ),
+                  const Icon(
+                    Icons.keyboard_arrow_up,
+                    size: 16,
+                    color: AppTokens.text2,
+                  ),
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: AppTokens.sp1),
           Row(
             children: <Widget>[
@@ -263,42 +271,59 @@ class VoiceHoldBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppTokens.sp3),
-              Expanded(
-                child: cancelArmed
-                    ? Text(
-                        'Suelta para cancelar',
-                        key: const Key('voice.cancelArmed'),
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: AppTokens.danger,
-                        ),
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          const Icon(
-                            Icons.chevron_left,
-                            size: 18,
-                            color: AppTokens.text2,
-                          ),
-                          Flexible(
-                            child: Text(
-                              'Desliza para cancelar',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: AppTokens.text2,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
+              Expanded(child: _hint(textTheme)),
               const SizedBox(width: AppTokens.sp2),
               trailing,
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _hint(TextTheme textTheme) {
+    if (sending) {
+      return Row(
+        key: const Key('voice.sending'),
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: AppTokens.sp2),
+          Flexible(
+            child: Text(
+              'Enviando…',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            ),
+          ),
+        ],
+      );
+    }
+    if (cancelArmed) {
+      return Text(
+        'Suelta para cancelar',
+        key: const Key('voice.cancelArmed'),
+        style: textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const Icon(Icons.chevron_left, size: 18, color: AppTokens.text2),
+        Flexible(
+          child: Text(
+            'Desliza para cancelar',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+          ),
+        ),
+      ],
     );
   }
 }

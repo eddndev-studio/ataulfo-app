@@ -203,6 +203,46 @@ void main() {
     },
   );
 
+  test(
+    'un evento excluido por countsAsDelivery NO reinicia el backoff',
+    () async {
+      final controllers = <StreamController<int>>[];
+      final bk = recordingBackoff();
+
+      final stream = reconnectingStream<int>(
+        () {
+          final c = StreamController<int>();
+          controllers.add(c);
+          return c.stream;
+        },
+        backoff: bk.fn,
+        // -1 es un sentinel inyectado (no cuenta como entrega).
+        countsAsDelivery: (e) => e != -1,
+      );
+
+      final sub = stream.listen((_) {});
+      await Future<void>.delayed(Duration.zero);
+
+      // Conexión 1: sólo emite el sentinel -1 y cae → NO debe reiniciar (escala).
+      controllers[0].add(-1);
+      await Future<void>.delayed(Duration.zero);
+      await controllers[0].close();
+      await Future<void>.delayed(Duration.zero);
+      // Conexión 2: ídem, sólo el sentinel y cae.
+      controllers[1].add(-1);
+      await Future<void>.delayed(Duration.zero);
+      await controllers[1].close();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        bk.attempts,
+        <int>[1, 2],
+        reason: 'el sentinel no entrega: el intento escala 1,2 (sin reinicio)',
+      );
+      await sub.cancel();
+    },
+  );
+
   test('al cancelar mientras está conectado NO vuelve a conectar', () async {
     var calls = 0;
     final controllers = <StreamController<int>>[];

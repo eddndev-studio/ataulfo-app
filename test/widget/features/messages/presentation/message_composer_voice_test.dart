@@ -13,6 +13,7 @@ import 'package:ataulfo/features/messages/presentation/widgets/message_composer.
 import 'package:ataulfo/features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -379,4 +380,53 @@ void main() {
       expect(find.byKey(const Key('composer.input')), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'accesibilidad: el micrófono expone una acción tap (activable por lector)',
+    (tester) async {
+      // El gesto de mantener no es operable por lector de pantalla; sin una
+      // acción semántica `tap` AT no podría grabar. (Antes era un Container
+      // pasivo sin acción.)
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(host(_FakeRecorder()));
+      await tester.pump();
+
+      final data = tester
+          .getSemantics(find.byKey(const Key('composer.mic')))
+          .getSemanticsData();
+      expect(data.hasAction(SemanticsAction.tap), isTrue);
+      expect(data.label, contains('Grabar nota de voz'));
+      handle.dispose();
+    },
+  );
+
+  testWidgets('soltar manteniendo muestra "Enviando…" durante la subida', (
+    tester,
+  ) async {
+    final uploadGate = Completer<UploadedMedia>();
+    final recorder = _FakeRecorder(result: voice());
+    when(
+      () => mediaRepo.upload(
+        bytes: any(named: 'bytes'),
+        filename: any(named: 'filename'),
+      ),
+    ).thenAnswer((_) => uploadGate.future);
+
+    await tester.pumpWidget(host(recorder));
+    await tester.pump();
+    final g = await pressMic(tester);
+    fakeNow = fakeNow.add(const Duration(seconds: 1));
+    await g.up();
+    await tester.pump(); // stop() + _sendingVoice=true
+    await tester.pump(const Duration(milliseconds: 10));
+
+    // La barra de mantener muestra el spinner de envío, no "desliza para
+    // cancelar", mientras la subida está en vuelo.
+    expect(find.byKey(const Key('voice.sending')), findsOneWidget);
+    expect(find.byKey(const Key('voice.cancelArmed')), findsNothing);
+
+    uploadGate.complete(const UploadedMedia(ref: 'ref-voz', previewUrl: null));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('composer.input')), findsOneWidget);
+  });
 }

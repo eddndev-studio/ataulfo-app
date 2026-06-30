@@ -44,6 +44,10 @@ class DioMonitorActivityDatasource
     // cubre el arranque de cada reintento.
     reconnectMarker: _reconnectSentinel,
     disconnectMarker: _reconnectSentinel,
+    // El sentinel `connected` lo inyectamos nosotros tras el handshake: NO es
+    // entrega de actividad real, así que no debe reiniciar el backoff (un 200 que
+    // cierra de inmediato martillearía cada 0.5s).
+    countsAsDelivery: (e) => e.kind != MonitorEventKind.connected,
   );
 
   static MonitorEvent _reconnectSentinel() => MonitorEvent(

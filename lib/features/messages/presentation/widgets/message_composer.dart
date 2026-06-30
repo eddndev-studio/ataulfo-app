@@ -461,11 +461,17 @@ class _MessageComposerState extends State<MessageComposer> {
   /// El micrófono. Un único `Listener` exterior enruta el puntero; este botón es
   /// sólo visual + objetivo de hit-test (vía [_micKey]) y semántica. Resaltado
   /// (círculo primary) mientras se graba.
+  ///
+  /// El gesto de mantener no es operable por lector de pantalla (explore-by-touch
+  /// se come la pulsación), así que expone una ACCIÓN semántica `onTap` que
+  /// arranca la grabación en modo BLOQUEADO: la [VoiceRecordingBar] resultante
+  /// trae botones accesibles de enviar/descartar. Sin esto, AT no podría grabar.
   Widget _micButton({required bool active}) => KeyedSubtree(
     key: _micKey,
     child: Semantics(
       button: true,
       label: 'Grabar nota de voz',
+      onTap: active ? null : _startLockedForA11y,
       child: Container(
         key: const Key('composer.mic'),
         width: 48,
@@ -481,6 +487,16 @@ class _MessageComposerState extends State<MessageComposer> {
       ),
     ),
   );
+
+  /// Ruta accesible (acción semántica `onTap`): arranca la grabación y la deja
+  /// BLOQUEADA, para que el lector de pantalla llegue a los botones de
+  /// enviar/descartar de la [VoiceRecordingBar] sin depender del gesto de
+  /// mantener.
+  Future<void> _startLockedForA11y() async {
+    if (_starting || _recording) return;
+    await _startRecording();
+    if (mounted && _recording) setState(() => _locked = true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -513,6 +529,7 @@ class _MessageComposerState extends State<MessageComposer> {
         elapsed: _recorder.elapsed,
         cancelArmed: _cancelArmed,
         lockProgress: _lockProgress,
+        sending: _sendingVoice,
         trailing: _micButton(active: true),
       );
     }

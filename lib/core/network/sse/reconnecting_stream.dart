@@ -35,11 +35,19 @@ Future<void> expoBackoff(int attempt) {
 /// (cierre o error), antes de esperar el backoff —no al cancelar el consumidor—.
 /// Permite que el consumidor avise del corte durante todo el hueco (no solo al
 /// reintentar), p. ej. un indicador de salud del feed.
+///
+/// [countsAsDelivery]: filtra qué eventos REINICIAN el backoff. Por defecto
+/// (null) cualquier evento entregado cuenta como conexión sana. Un productor que
+/// inyecta sentinels propios (p. ej. un "connected" tras el handshake) debe
+/// excluirlos: si no, un servidor que devuelve 200 y cierra de inmediato emitiría
+/// el sentinel en cada intento, reiniciando el backoff a 0.5s en bucle en vez de
+/// crecer hacia el techo.
 Stream<T> reconnectingStream<T>(
   Stream<T> Function() connect, {
   Future<void> Function(int attempt) backoff = expoBackoff,
   T Function()? reconnectMarker,
   T Function()? disconnectMarker,
+  bool Function(T event)? countsAsDelivery,
 }) {
   late StreamController<T> controller;
   StreamSubscription<T>? inner;
@@ -64,7 +72,9 @@ Stream<T> reconnectingStream<T>(
       connectionClosed = closed;
       inner = connect().listen(
         (event) {
-          delivered = true;
+          if (countsAsDelivery == null || countsAsDelivery(event)) {
+            delivered = true;
+          }
           controller.add(event);
         },
         onError: (Object _) => releaseConnection(),
