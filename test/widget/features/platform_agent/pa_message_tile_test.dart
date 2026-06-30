@@ -4,6 +4,7 @@ import 'package:ataulfo/core/design/widgets/assistant_markdown.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_message.dart';
 import 'package:ataulfo/features/platform_agent/presentation/widgets/pa_message_tile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Construye el `tool_results` tal como llega del wire: jsonb crudo con claves
@@ -163,6 +164,46 @@ void main() {
       expect(find.textContaining('confirmaci'), findsOneWidget);
     },
   );
+
+  testWidgets('long-press en burbuja de assistant copia el contenido', (
+    tester,
+  ) async {
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _wrap(PaMessageTile(message: _textMsg('assistant', 'respuesta del bot'))),
+    );
+    await tester.longPress(find.byType(AssistantMarkdown));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('copy.pa.m1.copy')));
+    await tester.pumpAndSettle();
+    expect(copied, <String>['respuesta del bot']);
+  });
+
+  testWidgets('la tarjeta de tool NO es copiable (long-press no abre hoja)', (
+    tester,
+  ) async {
+    final raw = _toolRaw('list_bots', <String, dynamic>{'bots': <dynamic>[]});
+    await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
+    await tester.longPress(find.text('Usó list_bots'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('copy.pa.m1.copy')), findsNothing);
+  });
 
   testWidgets('assistant rinde Markdown; user queda en Text plano', (
     tester,

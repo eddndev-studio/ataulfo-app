@@ -6,6 +6,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/assistant_markdown.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
+import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
 import '../../domain/entities/pa_message.dart';
@@ -47,9 +48,13 @@ class PaMessageTile extends StatelessWidget {
           if (hasThinking)
             ReasoningDisclosure(reasoning: message.thinking, keyId: message.id),
           if (message.content.isNotEmpty)
-            ChatBubble(
-              mine: false,
-              child: AssistantMarkdown(data: message.content),
+            CopyableBubble(
+              text: message.content,
+              keyId: 'pa.${message.id}',
+              child: ChatBubble(
+                mine: false,
+                child: AssistantMarkdown(data: message.content),
+              ),
             ),
           MessageTimestamp(at: message.createdAt),
         ],
@@ -59,13 +64,17 @@ class PaMessageTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        ChatBubble(
-          mine: message.isUser,
-          child: Text(
-            message.content,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+        CopyableBubble(
+          text: message.content,
+          keyId: 'pa.${message.id}',
+          child: ChatBubble(
+            mine: message.isUser,
+            child: Text(
+              message.content,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+            ),
           ),
         ),
         MessageTimestamp(at: message.createdAt),

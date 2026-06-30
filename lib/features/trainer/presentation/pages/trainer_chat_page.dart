@@ -10,6 +10,7 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/assistant_markdown.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
+import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
 import '../../../../core/design/widgets/typing_bubble.dart';
@@ -556,7 +557,7 @@ class _MessageTile extends StatelessWidget {
       // result; una burbuja vacía solo mete ruido.
       return const SizedBox.shrink();
     }
-    final bubble = ChatBubble(
+    final rawBubble = ChatBubble(
       mine: message.isUser,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,6 +600,13 @@ class _MessageTile extends StatelessWidget {
                   ),
         ],
       ),
+    );
+    // Long-press para copiar/seleccionar el texto del turno (vacío en burbujas
+    // sólo-adjunto: el wrapper no engancha el gesto).
+    final bubble = CopyableBubble(
+      text: message.content,
+      keyId: 'trainer.${message.id}',
+      child: rawBubble,
     );
     // El razonamiento del assistant (si viaja) va colapsado SOBRE la burbuja.
     if (message.isAssistant && message.thinking.isNotEmpty) {

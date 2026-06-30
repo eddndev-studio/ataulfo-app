@@ -6,6 +6,7 @@ import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositorie
 import 'package:ataulfo/features/trainer/presentation/bloc/trainer_chat_bloc.dart';
 import 'package:ataulfo/features/trainer/presentation/pages/trainer_chat_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -80,5 +81,35 @@ void main() {
     await pump(tester, <TrainerMessage>[_textMsg('m1', 'user', '**negrita**')]);
     expect(find.byType(AssistantMarkdown), findsNothing);
     expect(find.text('**negrita**'), findsOneWidget);
+  });
+
+  testWidgets('long-press en burbuja del entrenador copia el contenido', (
+    tester,
+  ) async {
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await pump(tester, <TrainerMessage>[
+      _textMsg('m1', 'assistant', 'hola entrenador'),
+    ]);
+    await tester.longPress(find.byType(AssistantMarkdown));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('copy.trainer.m1.copy')));
+    await tester.pumpAndSettle();
+    expect(copied, <String>['hola entrenador']);
   });
 }
