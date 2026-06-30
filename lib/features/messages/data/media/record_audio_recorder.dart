@@ -36,6 +36,12 @@ class RecordAudioRecorder implements AudioRecorder {
   /// y el listener de amplitud descarta muestras hasta reanudar.
   bool _paused = false;
 
+  /// Epoch de la sesión: lo incrementa cada teardown ([_stopStreams], que corre
+  /// en start/stop/cancel/dispose). Un [resume] suspendido en el round-trip de
+  /// la plataforma lo compara al volver para NO re-armar el ticker sobre una
+  /// grabación ya detenida (el grabador es un singleton de la app).
+  int _generation = 0;
+
   /// Muestras de amplitud (0-100) capturadas en vivo; al detener se reducen a
   /// 64 para el waveform nativo de la nota de voz.
   final List<int> _samples = <int>[];
@@ -84,6 +90,8 @@ class RecordAudioRecorder implements AudioRecorder {
   }
 
   void _startTicker() {
+    // Idempotente: nunca dejar dos tickers vivos sobre el mismo grabador.
+    _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
       _elapsed.add(_watch.elapsed);
     });
@@ -104,7 +112,12 @@ class RecordAudioRecorder implements AudioRecorder {
   Future<void> resume() async {
     if (!_paused) return;
     _paused = false;
+    final generation = _generation;
     await _rec.resume();
+    // Si entre tanto la grabación se detuvo/canceló (teardown ⇒ nueva
+    // generación) o se volvió a pausar, NO re-armar: dejaría un ticker
+    // huérfano emitiendo sobre un grabador ya detenido.
+    if (_generation != generation || _paused) return;
     // Continúa el mismo clip: el stopwatch reanuda (excluye la pausa) y el
     // ticker vuelve a publicar el transcurrido.
     _watch.start();
@@ -153,6 +166,9 @@ class RecordAudioRecorder implements AudioRecorder {
   }
 
   void _stopStreams() {
+    // Nueva generación: invalida cualquier resume() aún suspendido en el
+    // round-trip de la plataforma para que no re-arme el ticker al volver.
+    _generation++;
     _paused = false;
     _watch.stop();
     _ticker?.cancel();

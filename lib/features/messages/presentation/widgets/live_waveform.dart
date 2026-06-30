@@ -118,6 +118,11 @@ class _LiveWaveformState extends State<LiveWaveform>
     super.didUpdateWidget(old);
     if (widget.paused && !old.paused) {
       _phase.stop();
+    } else if (!widget.paused && old.paused) {
+      // Al reanudar, re-ancla a la derecha (phase 0) hasta que la próxima
+      // muestra dispare el deslizamiento. Sin esto se commitearía el `phase`
+      // congelado al pausar y el tren saltaría a la izquierda un frame.
+      _phase.reset();
     }
   }
 

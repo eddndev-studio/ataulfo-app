@@ -54,6 +54,33 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('reanudar tras pausa re-ancla sin reventar', (tester) async {
+      final amp = StreamController<double>.broadcast();
+      addTearDown(amp.close);
+
+      Widget tree(bool paused) => MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 200,
+            child: LiveWaveform(amplitude: amp.stream, paused: paused),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(tree(false));
+      amp.add(60);
+      // Deja el deslizamiento a media animación (phase != 0).
+      await tester.pump(const Duration(milliseconds: 40));
+
+      // Pausa (congela) y luego reanuda: la transición de reanudar re-ancla.
+      await tester.pumpWidget(tree(true));
+      await tester.pump();
+      await tester.pumpWidget(tree(false));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('cancela la suscripción al desmontar', (tester) async {
       final amp = StreamController<double>.broadcast();
       addTearDown(amp.close);
