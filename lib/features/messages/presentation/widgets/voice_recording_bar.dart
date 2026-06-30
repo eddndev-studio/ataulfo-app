@@ -21,6 +21,8 @@ class VoiceRecordingBar extends StatelessWidget {
     required this.amplitude,
     required this.onCancel,
     required this.onSend,
+    required this.onPauseResume,
+    this.paused = false,
     this.sending = false,
     super.key,
   });
@@ -32,6 +34,13 @@ class VoiceRecordingBar extends StatelessWidget {
   final Stream<double> amplitude;
   final VoidCallback onCancel;
   final VoidCallback onSend;
+
+  /// Pausa/reanuda la grabación (manos libres): el tiempo y el waveform se
+  /// congelan sin descartar el clip.
+  final VoidCallback onPauseResume;
+
+  /// Grabación pausada: el waveform se congela y el botón muestra "reanudar".
+  final bool paused;
 
   /// En vuelo (subiendo el clip): deshabilita enviar y muestra un spinner.
   final bool sending;
@@ -79,8 +88,16 @@ class VoiceRecordingBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppTokens.sp3),
-          Expanded(child: LiveWaveform(amplitude: amplitude)),
-          const SizedBox(width: AppTokens.sp2),
+          Expanded(child: LiveWaveform(amplitude: amplitude, paused: paused)),
+          const SizedBox(width: AppTokens.sp1),
+          IconButton(
+            key: const Key('voice.pauseToggle'),
+            tooltip: paused ? 'Reanudar' : 'Pausar',
+            color: AppTokens.text1,
+            onPressed: sending ? null : onPauseResume,
+            icon: Icon(paused ? Icons.play_arrow : Icons.pause),
+          ),
+          const SizedBox(width: AppTokens.sp1),
           IconButton.filled(
             key: const Key('voice.send'),
             tooltip: 'Enviar nota de voz',

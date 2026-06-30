@@ -49,6 +49,8 @@ class _FakeRecorder implements AudioRecorder {
   int startCalls = 0;
   int stopCalls = 0;
   int cancelCalls = 0;
+  int pauseCalls = 0;
+  int resumeCalls = 0;
 
   @override
   Future<bool> isSupported() async => supported;
@@ -68,6 +70,10 @@ class _FakeRecorder implements AudioRecorder {
 
   @override
   Future<void> cancel() async => cancelCalls++;
+  @override
+  Future<void> pause() async => pauseCalls++;
+  @override
+  Future<void> resume() async => resumeCalls++;
   @override
   Stream<double> get amplitude => const Stream<double>.empty();
   @override
@@ -338,6 +344,82 @@ void main() {
     await tester.pump();
     await g.up(); // bloqueado: manos libres
     await tester.pump();
+
+    await tester.tap(find.byKey(const Key('voice.send')));
+    await tester.pumpAndSettle();
+
+    expect(recorder.stopCalls, 1);
+    verify(
+      () => msgBloc.add(
+        const MessagesSendRequested(
+          type: 'ptt',
+          content: '',
+          mediaRef: 'ref-voz',
+          waveform: <int>[10, 20, 30],
+        ),
+      ),
+    ).called(1);
+  });
+
+  testWidgets('bloqueado: pausar congela y reanudar continúa la grabación', (
+    tester,
+  ) async {
+    final recorder = _FakeRecorder(result: voice());
+    await tester.pumpWidget(host(recorder));
+    await tester.pump();
+    final g = await pressMic(tester);
+    await g.moveBy(const Offset(0, -120)); // bloquea
+    await tester.pump();
+    await g.up();
+    await tester.pump();
+
+    final bar = find.byKey(const Key('voice.recording.bar'));
+    expect(find.byKey(const Key('voice.pauseToggle')), findsOneWidget);
+    expect(
+      find.descendant(of: bar, matching: find.byIcon(Icons.pause)),
+      findsOneWidget,
+    );
+
+    // Pausar: llama al grabador y el botón pasa a "reanudar" (play).
+    await tester.tap(find.byKey(const Key('voice.pauseToggle')));
+    await tester.pump();
+    expect(recorder.pauseCalls, 1);
+    expect(recorder.resumeCalls, 0);
+    expect(
+      find.descendant(of: bar, matching: find.byIcon(Icons.play_arrow)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: bar, matching: find.byIcon(Icons.pause)),
+      findsNothing,
+    );
+
+    // Reanudar: llama al grabador y vuelve a "pausar".
+    await tester.tap(find.byKey(const Key('voice.pauseToggle')));
+    await tester.pump();
+    expect(recorder.resumeCalls, 1);
+    expect(
+      find.descendant(of: bar, matching: find.byIcon(Icons.pause)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('bloqueado y en pausa: enviar igual sube y despacha', (
+    tester,
+  ) async {
+    final recorder = _FakeRecorder(result: voice());
+    stubUpload();
+    await tester.pumpWidget(host(recorder));
+    await tester.pump();
+    final g = await pressMic(tester);
+    await g.moveBy(const Offset(0, -120));
+    await tester.pump();
+    await g.up();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('voice.pauseToggle')));
+    await tester.pump();
+    expect(recorder.pauseCalls, 1);
 
     await tester.tap(find.byKey(const Key('voice.send')));
     await tester.pumpAndSettle();

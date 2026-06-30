@@ -32,6 +32,10 @@ class RecordAudioRecorder implements AudioRecorder {
   Timer? _ticker;
   final Stopwatch _watch = Stopwatch();
 
+  /// Grabación pausada (manos libres): el stopwatch y el ticker están detenidos
+  /// y el listener de amplitud descarta muestras hasta reanudar.
+  bool _paused = false;
+
   /// Muestras de amplitud (0-100) capturadas en vivo; al detener se reducen a
   /// 64 para el waveform nativo de la nota de voz.
   final List<int> _samples = <int>[];
@@ -66,16 +70,45 @@ class RecordAudioRecorder implements AudioRecorder {
     _watch
       ..reset()
       ..start();
-    _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      _elapsed.add(_watch.elapsed);
-    });
+    _startTicker();
     _ampSub = _rec.onAmplitudeChanged(const Duration(milliseconds: 100)).listen(
       (a) {
+        // En pausa el grabador no captura; descarta cualquier muestra rezagada
+        // para que ni el waveform del wire ni el feedback en vivo avancen.
+        if (_paused) return;
         final v = _normalize(a.current);
         _samples.add(v.round());
         _amplitude.add(v);
       },
     );
+  }
+
+  void _startTicker() {
+    _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      _elapsed.add(_watch.elapsed);
+    });
+  }
+
+  @override
+  Future<void> pause() async {
+    if (_paused) return;
+    _paused = true;
+    // Congela el tiempo y deja de emitir transcurrido; el archivo se conserva.
+    _watch.stop();
+    _ticker?.cancel();
+    _ticker = null;
+    await _rec.pause();
+  }
+
+  @override
+  Future<void> resume() async {
+    if (!_paused) return;
+    _paused = false;
+    await _rec.resume();
+    // Continúa el mismo clip: el stopwatch reanuda (excluye la pausa) y el
+    // ticker vuelve a publicar el transcurrido.
+    _watch.start();
+    _startTicker();
   }
 
   @override
@@ -120,6 +153,7 @@ class RecordAudioRecorder implements AudioRecorder {
   }
 
   void _stopStreams() {
+    _paused = false;
     _watch.stop();
     _ticker?.cancel();
     _ticker = null;

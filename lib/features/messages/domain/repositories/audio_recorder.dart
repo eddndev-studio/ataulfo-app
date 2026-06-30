@@ -46,6 +46,15 @@ abstract interface class AudioRecorder {
   /// Detiene y descarta la grabación.
   Future<void> cancel();
 
+  /// Pausa la grabación en curso conservando el mismo archivo (manos libres,
+  /// al estilo de WhatsApp): el tiempo transcurrido y el waveform se congelan;
+  /// [resume] continúa el mismo clip. No-op si no se está grabando.
+  Future<void> pause();
+
+  /// Reanuda una grabación pausada con [pause], continuando el mismo archivo.
+  /// No-op si no estaba pausada.
+  Future<void> resume();
+
   /// Amplitud del micrófono normalizada a `0..100` mientras graba.
   Stream<double> get amplitude;
 

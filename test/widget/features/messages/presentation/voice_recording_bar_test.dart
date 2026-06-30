@@ -13,6 +13,7 @@ void main() {
           amplitude: const Stream<double>.empty(),
           onCancel: () {},
           onSend: () {},
+          onPauseResume: () {},
         ),
       ),
     ),

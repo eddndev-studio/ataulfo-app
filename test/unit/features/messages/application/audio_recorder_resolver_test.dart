@@ -17,6 +17,10 @@ class _StubRecorder implements AudioRecorder {
   @override
   Future<void> cancel() async {}
   @override
+  Future<void> pause() async {}
+  @override
+  Future<void> resume() async {}
+  @override
   Stream<double> get amplitude => const Stream<double>.empty();
   @override
   Stream<Duration> get elapsed => const Stream<Duration>.empty();

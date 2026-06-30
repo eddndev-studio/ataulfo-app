@@ -84,6 +84,11 @@ class _MessageComposerState extends State<MessageComposer> {
   /// Nota de voz subiéndose tras detener: deshabilita enviar/cancelar.
   bool _sendingVoice = false;
 
+  /// Grabación pausada (sólo en estado bloqueado, manos libres): el grabador
+  /// congeló tiempo+waveform conservando el clip; reanudar continúa el mismo
+  /// archivo.
+  bool _paused = false;
+
   // Estado del gesto del micrófono.
   final GlobalKey _micKey = GlobalKey();
   int? _activePointer;
@@ -291,7 +296,22 @@ class _MessageComposerState extends State<MessageComposer> {
     _locked = false;
     _cancelArmed = false;
     _lockProgress = 0;
+    _paused = false;
   });
+
+  /// Pausa/reanuda la grabación bloqueada (manos libres). Refleja el estado
+  /// real tras el await del grabador; sólo aplica en estado bloqueado y nunca
+  /// durante la subida.
+  Future<void> _togglePause() async {
+    if (!_recording || !_locked || _sendingVoice) return;
+    if (_paused) {
+      await _recorder.resume();
+      if (mounted) setState(() => _paused = false);
+    } else {
+      await _recorder.pause();
+      if (mounted) setState(() => _paused = true);
+    }
+  }
 
   /// Adjunta una imagen: elige un archivo, lo sube (`/upload` → ref BARE) y
   /// despacha el envío `type:image` con el texto actual como caption. La burbuja
@@ -521,6 +541,8 @@ class _MessageComposerState extends State<MessageComposer> {
         amplitude: _recorder.amplitude,
         onCancel: _cancelRecording,
         onSend: _stopAndSend,
+        onPauseResume: _togglePause,
+        paused: _paused,
         sending: _sendingVoice,
       );
     }

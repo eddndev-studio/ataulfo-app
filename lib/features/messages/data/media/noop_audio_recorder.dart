@@ -23,6 +23,12 @@ class NoopAudioRecorder implements AudioRecorder {
   Future<void> cancel() async {}
 
   @override
+  Future<void> pause() async {}
+
+  @override
+  Future<void> resume() async {}
+
+  @override
   Stream<double> get amplitude => const Stream<double>.empty();
 
   @override
