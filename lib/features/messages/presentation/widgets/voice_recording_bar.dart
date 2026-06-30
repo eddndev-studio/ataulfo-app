@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import 'live_waveform.dart';
 
 /// `mm:ss` del tiempo de grabación (compartido por las barras de voz).
 String _fmtClock(Duration d) {
@@ -80,7 +79,7 @@ class VoiceRecordingBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppTokens.sp3),
-          Expanded(child: _LiveWaveform(amplitude: amplitude)),
+          Expanded(child: LiveWaveform(amplitude: amplitude)),
           const SizedBox(width: AppTokens.sp2),
           IconButton.filled(
             key: const Key('voice.send'),
@@ -98,84 +97,6 @@ class VoiceRecordingBar extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Waveform en vivo: mantiene una ventana deslizante de las últimas amplitudes
-/// y las pinta como barras. Es feedback visual efímero (no es el waveform de 64
-/// muestras que viaja al wire — ese lo computa el grabador).
-class _LiveWaveform extends StatefulWidget {
-  const _LiveWaveform({required this.amplitude});
-
-  final Stream<double> amplitude;
-
-  @override
-  State<_LiveWaveform> createState() => _LiveWaveformState();
-}
-
-class _LiveWaveformState extends State<_LiveWaveform> {
-  static const int _maxBars = 48;
-  final List<double> _bars = <double>[];
-  StreamSubscription<double>? _sub;
-
-  @override
-  void initState() {
-    super.initState();
-    _sub = widget.amplitude.listen((v) {
-      if (!mounted) return;
-      setState(() {
-        _bars.add(v.clamp(0, 100));
-        if (_bars.length > _maxBars) _bars.removeAt(0);
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 28,
-      child: CustomPaint(
-        size: Size.infinite,
-        painter: _WaveformPainter(bars: _bars, color: AppTokens.chatAccent),
-      ),
-    );
-  }
-}
-
-class _WaveformPainter extends CustomPainter {
-  _WaveformPainter({required this.bars, required this.color});
-
-  final List<double> bars;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (bars.isEmpty) return;
-    const gap = 2.0;
-    final barW = (size.width / bars.length - gap).clamp(1.0, 6.0);
-    final paint = Paint()
-      ..color = color
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = barW;
-    final mid = size.height / 2;
-    for (var i = 0; i < bars.length; i++) {
-      final x = i * (size.width / bars.length) + barW / 2;
-      final h = (bars[i] / 100 * size.height).clamp(2.0, size.height);
-      canvas.drawLine(Offset(x, mid - h / 2), Offset(x, mid + h / 2), paint);
-    }
-  }
-
-  // `bars` es la MISMA lista mutable entre rebuilds (se muta in-place en el
-  // listener), así que comparar referencias daría siempre false y el canvas no
-  // se repintaría nunca. El widget sólo se reconstruye al llegar una muestra
-  // nueva de amplitud, así que repintar siempre tiene la cadencia correcta.
-  @override
-  bool shouldRepaint(_WaveformPainter old) => true;
 }
 
 /// Barra del estado MANTENIENDO (dedo abajo, aún sin bloquear), al estilo de
