@@ -47,6 +47,7 @@ class ForgotPasswordBloc
     EmailMismatchFailure() ||
     AlreadyMemberFailure() ||
     NotMemberFailure() ||
+    EmailNotVerifiedFailure() ||
     UnknownAuthFailure() => ForgotPasswordFailureKind.unknown,
   };
 }

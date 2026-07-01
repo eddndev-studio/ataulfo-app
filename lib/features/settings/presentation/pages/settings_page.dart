@@ -220,6 +220,18 @@ class _SectionsCard extends StatelessWidget {
             // todas las filas.
             onTap: () => context.push('/memberships'),
           ),
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          // Visible para todos: cualquiera puede ser invitado a otra org, y la
+          // pantalla de aceptar sólo era alcanzable desde /select-org (usuarios
+          // sin org). Como registrarse autocrea una org personal, sin esta
+          // entrada un usuario con org no tenía forma de aceptar una invitación.
+          AppSectionLink(
+            rowKey: const Key('settings.accept_invite_tile'),
+            icon: Icons.mark_email_read_outlined,
+            title: 'Aceptar invitación',
+            caption: 'Únete a otra organización con un código o enlace',
+            onTap: () => context.push('/accept-invite'),
+          ),
           if (isAdminOrAbove(identity.role)) ...<Widget>[
             const Divider(height: AppTokens.sp5, color: AppTokens.divider),
             AppSectionLink(

@@ -103,6 +103,21 @@ void main() {
     expect(find.text('Tus organizaciones'), findsOneWidget);
   });
 
+  testWidgets(
+    'Authenticated expone tile "Aceptar invitación" (visible a todos)',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('settings.accept_invite_tile')),
+        findsOneWidget,
+      );
+      expect(find.text('Aceptar invitación'), findsOneWidget);
+    },
+  );
+
   testWidgets('tap "Tus organizaciones" apila /memberships (push, no go)', (
     tester,
   ) async {
@@ -442,11 +457,12 @@ void main() {
       final card = find.byKey(const Key('settings.card.sections'));
       expect(card, findsOneWidget);
       expect(tester.widget(card), isA<AppCard>());
-      // OWNER: las 5 áreas como filas (organizaciones, miembros, config de IA,
-      // galería, notificaciones) — muere la pila de cards sueltas sin jerarquía.
+      // OWNER: las 6 áreas como filas (organizaciones, aceptar invitación,
+      // miembros, config de IA, galería, notificaciones) — muere la pila de
+      // cards sueltas sin jerarquía.
       expect(
         find.descendant(of: card, matching: find.byType(AppSectionLink)),
-        findsNWidgets(5),
+        findsNWidgets(6),
       );
       // Captions: cada fila dice qué hay detrás, no solo el título.
       expect(find.text('Bandeja y preferencias de avisos'), findsOneWidget);

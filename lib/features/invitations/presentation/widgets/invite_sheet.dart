@@ -23,8 +23,10 @@ class InviteSheetResult {
 class InviteSheet extends StatefulWidget {
   const InviteSheet({super.key});
 
+  // OWNER se excluye a propósito: aceptar una invitación OWNER mintearía un
+  // segundo propietario saltando el flujo deliberado de transferir propiedad.
+  // La propiedad se pasa desde /members (transferir), no se invita.
   static const List<String> roleOptions = <String>[
-    'OWNER',
     'ADMIN',
     'SUPERVISOR',
     'WORKER',

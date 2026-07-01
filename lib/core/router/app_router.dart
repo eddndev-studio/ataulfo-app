@@ -732,10 +732,13 @@ class AppRouter {
                       MonitorAttentionCubit(_monitorBotActivity)..watch(id),
                 ),
                 // Etiquetas WhatsApp del bot para la bandeja: blobs por chat y
-                // chips de filtro. Carga al montar; degrada a vacío si falla.
+                // chips de filtro. Carga al montar y se queda en vivo (feed
+                // `label.wa.*`) para reflejar etiquetados sin recargar; degrada
+                // a vacío si falla.
                 BlocProvider<InboxLabelsCubit>(
                   create: (_) =>
-                      InboxLabelsCubit(repo: _waLabelsRepo, botId: id)..load(),
+                      InboxLabelsCubit(repo: _waLabelsRepo, botId: id)
+                        ..watchLive(),
                 ),
               ],
               child: Scaffold(

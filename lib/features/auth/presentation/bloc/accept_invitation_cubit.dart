@@ -46,6 +46,8 @@ class AcceptInvitationCubit extends Cubit<AcceptInvitationState> {
     // El backend responde 409 desnudo para "correo distinto" Y "ya miembro"
     // sin discriminar; el mapeo del datasource lo trae como EmailMismatch.
     EmailMismatchFailure() => AcceptInvitationFailureKind.emailMismatch,
+    // 403: aceptar exige el correo verificado. La UI pide verificarlo primero.
+    EmailNotVerifiedFailure() => AcceptInvitationFailureKind.emailNotVerified,
     NetworkFailure() => AcceptInvitationFailureKind.network,
     // Las variantes de otros endpoints del arco de auth no pueden surgir
     // contra `/auth/invitations/accept`; se colapsan a genérico.
@@ -114,6 +116,7 @@ enum AcceptInvitationFailureKind {
   invalidInput,
   invalidToken,
   emailMismatch,
+  emailNotVerified,
   network,
   unknown,
 }

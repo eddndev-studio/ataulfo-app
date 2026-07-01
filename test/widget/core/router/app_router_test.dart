@@ -162,6 +162,20 @@ _MockQuickRepliesRepo _quickRepliesRepo() {
   return r;
 }
 
+// La bandeja monta un InboxLabelsCubit que hace watchLive: carga catálogo +
+// asociaciones y se suscribe al feed en vivo `label.wa.*`. Stubs vacíos
+// (incluido el stream) dejan terminar el pumpAndSettle sin romper por un
+// stream nulo del mock.
+_MockWaLabelsRepo _waLabelsRepo() {
+  final r = _MockWaLabelsRepo();
+  when(() => r.listCatalog(any())).thenAnswer((_) async => <Never>[]);
+  when(() => r.listChatAssocs(any())).thenAnswer((_) async => <Never>[]);
+  when(
+    () => r.liveEvents(any()),
+  ).thenAnswer((_) => const Stream<Never>.empty());
+  return r;
+}
+
 class _MockMembershipsRepo extends Mock implements MembershipsRepository {}
 
 class _MockMembersRepo extends Mock implements MembersRepository {}
@@ -407,7 +421,7 @@ void main() {
       flowsRepository: flowsRepo,
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
-      waLabelsRepository: _MockWaLabelsRepo(),
+      waLabelsRepository: _waLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       chatLabelsRepository: _MockChatLabelsRepo(),
@@ -854,7 +868,7 @@ void main() {
       flowsRepository: flowsRepo,
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
-      waLabelsRepository: _MockWaLabelsRepo(),
+      waLabelsRepository: _waLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       chatLabelsRepository: _MockChatLabelsRepo(),
@@ -949,7 +963,7 @@ void main() {
       flowsRepository: flowsRepo,
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
-      waLabelsRepository: _MockWaLabelsRepo(),
+      waLabelsRepository: _waLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       chatLabelsRepository: _MockChatLabelsRepo(),
@@ -1246,7 +1260,7 @@ void main() {
       flowsRepository: flowsRepo,
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
-      waLabelsRepository: _MockWaLabelsRepo(),
+      waLabelsRepository: _waLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       chatLabelsRepository: _MockChatLabelsRepo(),
@@ -1497,7 +1511,7 @@ void main() {
       flowsRepository: flowsRepo,
       flowRunRepository: flowRunRepo,
       triggersRepository: triggersRepo,
-      waLabelsRepository: _MockWaLabelsRepo(),
+      waLabelsRepository: _waLabelsRepo(),
       quickRepliesRepository: _quickRepliesRepo(),
       labelsRepository: labelsRepo,
       chatLabelsRepository: _MockChatLabelsRepo(),

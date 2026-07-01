@@ -56,6 +56,21 @@ void main() {
     expect(find.byKey(const Key('members.verified_badge')), findsNothing);
   });
 
+  testWidgets('isSelf muestra la pill "Tú"', (tester) async {
+    await tester.pumpWidget(
+      _host(const MemberTile(member: _verified, isSelf: true)),
+    );
+
+    expect(find.byKey(const Key('members.self_badge')), findsOneWidget);
+    expect(find.widgetWithText(AppPill, 'Tú'), findsOneWidget);
+  });
+
+  testWidgets('sin isSelf NO muestra la pill "Tú"', (tester) async {
+    await tester.pumpWidget(_host(const MemberTile(member: _verified)));
+
+    expect(find.byKey(const Key('members.self_badge')), findsNothing);
+  });
+
   testWidgets('con onTap el tile es tappable y dispara el callback', (
     tester,
   ) async {

@@ -57,6 +57,13 @@ final class EmailMismatchFailure extends AuthFailure {
   const EmailMismatchFailure();
 }
 
+/// 403 contra `/auth/invitations/accept`: el correo del caller no está
+/// verificado. Aceptar exige verificarlo (candado que hace seguro compartir
+/// el enlace fuera del correo). La UI pide verificar antes de aceptar.
+final class EmailNotVerifiedFailure extends AuthFailure {
+  const EmailNotVerifiedFailure();
+}
+
 /// 409 contra `/auth/accept-invitation`: el usuario ya es miembro de la org
 /// de la invitación. Aceptar es no-op; el cliente lo trata como informativo.
 final class AlreadyMemberFailure extends AuthFailure {

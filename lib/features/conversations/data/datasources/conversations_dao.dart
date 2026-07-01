@@ -30,4 +30,21 @@ class ConversationsDao {
       await _db.batch((b) => b.insertAll(_db.conversations, rows));
     });
   }
+
+  /// Baja a cero los no-leídos de una fila (contador + marca manual) de forma
+  /// local. Es el write-through optimista de interactuar con un chat (abrirlo
+  /// marca leído): la bandeja observa esta tabla, así el badge desaparece en el
+  /// acto sin esperar el pull. No inserta filas ausentes (`.write` sobre el
+  /// filtro): si la fila aún no está en caché, no hay badge que bajar. El
+  /// snapshot autoritativo del backend reconcilia en el próximo `replaceForBot`.
+  Future<void> clearUnread(String botId, String chatLid) {
+    return (_db.update(
+      _db.conversations,
+    )..where((c) => c.botId.equals(botId) & c.chatLid.equals(chatLid))).write(
+      const ConversationsCompanion(
+        unreadCount: Value(0),
+        isMarkedUnread: Value(false),
+      ),
+    );
+  }
 }

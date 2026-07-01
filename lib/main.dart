@@ -195,9 +195,10 @@ Future<void> main() async {
     datasource: DioBotSessionDatasource(mainDio),
   );
 
+  final conversationsDao = ConversationsDao(db);
   final conversationsRepository = ConversationsRepositoryImpl(
     datasource: DioConversationsDatasource(mainDio),
-    dao: ConversationsDao(db),
+    dao: conversationsDao,
   );
 
   final messagesDao = MessagesDao(db);
@@ -223,6 +224,9 @@ Future<void> main() async {
     dao: messagesDao,
     outbox: outboxDao,
     requestSync: () => unawaited(syncCoordinator.drain()),
+    // Al marcar leído, baja el badge de la fila en la bandeja (write-through
+    // optimista): la bandeja observa la tabla conversations y re-emite ya.
+    markConversationRead: conversationsDao.clearUnread,
   );
 
   unawaited(syncCoordinator.start());

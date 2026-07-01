@@ -24,7 +24,9 @@ void main() {
 
     expect(find.byType(AppAvatar), findsOneWidget);
     expect(find.text('Acme'), findsOneWidget);
-    expect(find.widgetWithText(AppPill, 'OWNER'), findsOneWidget);
+    // El rol se humaniza (roleLabel), como en MemberTile/InvitationTile: antes
+    // esta fila pintaba el código crudo 'OWNER'.
+    expect(find.widgetWithText(AppPill, 'Propietario'), findsOneWidget);
   });
 
   testWidgets('isActive muestra el badge "Activa" con su key contractual', (

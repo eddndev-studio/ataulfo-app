@@ -194,6 +194,8 @@ class _AcceptFormState extends State<_AcceptForm> {
     AcceptInvitationFailureKind.emailMismatch =>
       'Esta invitación es para otro correo, o ya eres miembro de esa '
           'organización',
+    AcceptInvitationFailureKind.emailNotVerified =>
+      'Verifica tu correo antes de aceptar la invitación',
     AcceptInvitationFailureKind.network => 'Sin conexión, reintenta',
     AcceptInvitationFailureKind.unknown =>
       'No pudimos aceptar la invitación, reintenta',

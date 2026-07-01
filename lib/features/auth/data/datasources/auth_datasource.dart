@@ -300,6 +300,7 @@ class DioAuthDatasource implements AuthDatasource {
       // ya miembro) sin discriminador en el body; se mapea al más accionable
       // (re-login con la cuenta correcta de la invitación).
       throw _mapStatus(e, <int, AuthFailure>{
+        403: const EmailNotVerifiedFailure(),
         404: const InvalidTokenFailure(),
         409: const EmailMismatchFailure(),
       });

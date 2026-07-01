@@ -51,6 +51,7 @@ class VerifyEmailBloc extends Bloc<VerifyEmailEvent, VerifyEmailState> {
     EmailMismatchFailure() ||
     AlreadyMemberFailure() ||
     NotMemberFailure() ||
+    EmailNotVerifiedFailure() ||
     UnknownAuthFailure() => VerifyEmailFailureKind.unknown,
   };
 }

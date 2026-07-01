@@ -4,6 +4,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/i18n/role_labels.dart';
 import '../../domain/entities/membership.dart';
 
 /// Fila de una organización del operador: avatar + nombre + pill de rol, con
@@ -44,7 +45,7 @@ class OrgMembershipTile extends StatelessWidget {
                 const SizedBox(height: AppTokens.sp2),
                 Row(
                   children: <Widget>[
-                    AppPill.neutral(label: membership.role),
+                    AppPill.neutral(label: roleLabel(membership.role)),
                     if (isActive) ...<Widget>[
                       const SizedBox(width: AppTokens.sp2),
                       const AppPill.primary(

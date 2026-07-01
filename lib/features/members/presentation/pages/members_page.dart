@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/member.dart';
 import '../../domain/failures/members_failure.dart';
@@ -115,11 +117,24 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+          ),
+          const SizedBox(height: AppTokens.sp3),
+          Text(
+            'Cargando miembros…',
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _LoadedView extends StatelessWidget {
@@ -130,6 +145,8 @@ class _LoadedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return const _EmptyView();
+    final auth = context.read<AuthBloc>().state;
+    final selfUserId = auth is AuthAuthenticated ? auth.identity.userId : null;
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(
@@ -142,12 +159,18 @@ class _LoadedView extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
       itemBuilder: (context, i) {
         final m = items[i];
-        return MemberTile(member: m, onTap: () => _openSheet(context, m));
+        return MemberTile(
+          member: m,
+          isSelf: selfUserId != null && m.userId == selfUserId,
+          onTap: () => _openSheet(context, m),
+        );
       },
     );
   }
 }
 
+/// Estado vacío: card glass que ES el CTA de invitar (antes era una línea de
+/// texto suelta sin salida, la queja de UX #1). Invitar apila `/invitations`.
 class _EmptyView extends StatelessWidget {
   const _EmptyView();
 
@@ -155,13 +178,42 @@ class _EmptyView extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Center(
-      key: const Key('members.empty'),
       child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Text(
-          'Esta organización no tiene miembros',
-          textAlign: TextAlign.center,
-          style: textTheme.bodyLarge,
+        padding: const EdgeInsets.all(AppTokens.sp5),
+        child: AppCard.glass(
+          key: const Key('members.empty'),
+          padding: const EdgeInsets.all(AppTokens.cardPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const AppEntityIcon(
+                icon: Icons.group_outlined,
+                size: 56,
+                highlighted: true,
+              ),
+              const SizedBox(height: AppTokens.sp4),
+              Text(
+                'Aún trabajas en solitario',
+                textAlign: TextAlign.center,
+                style: textTheme.titleMedium,
+              ),
+              const SizedBox(height: AppTokens.sp2),
+              Text(
+                'Invita a tu equipo para que atiendan chats y configuren '
+                'asistentes contigo.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+              ),
+              const SizedBox(height: AppTokens.sp5),
+              AppButton.filled(
+                key: const Key('members.empty.invite'),
+                label: 'Invitar a alguien',
+                icon: Icons.person_add_alt_1,
+                fullWidth: true,
+                onPressed: () => context.push('/invitations'),
+              ),
+            ],
+          ),
         ),
       ),
     );

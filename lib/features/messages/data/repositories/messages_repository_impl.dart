@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../domain/entities/message.dart';
 import '../../domain/entities/outbox_entry.dart';
 import '../../domain/entities/thread_live_event.dart';
@@ -23,11 +25,13 @@ class MessagesRepositoryImpl implements MessagesRepository {
     required MessagesDao dao,
     required OutboxDao outbox,
     required void Function() requestSync,
+    Future<void> Function(String botId, String chatLid)? markConversationRead,
   }) : _ds = datasource,
        _events = events,
        _dao = dao,
        _outbox = outbox,
-       _requestSync = requestSync;
+       _requestSync = requestSync,
+       _markConversationRead = markConversationRead;
 
   final MessagesDatasource _ds;
   final MessagesEventsDatasource _events;
@@ -37,6 +41,12 @@ class MessagesRepositoryImpl implements MessagesRepository {
   /// Dispara un drain del coordinador (fire-and-forget) tras encolar/revivir una
   /// escritura, para que el envío salga ya si hay red.
   final void Function() _requestSync;
+
+  /// Baja los no-leídos de la fila de la bandeja (write-through optimista al
+  /// marcar leído). Inyectado desde la composición para no acoplar la feature
+  /// de mensajes al DAO de conversaciones; nulo ⇒ sin proyección a la bandeja.
+  final Future<void> Function(String botId, String chatLid)?
+  _markConversationRead;
 
   /// Firmas `mediaUrl` vivas por `(botId, externalId)` (clave I-M1; el wamid no
   /// es único entre bots), conservadas en memoria durante la sesión: la DB NO
@@ -212,6 +222,13 @@ class MessagesRepositoryImpl implements MessagesRepository {
       chatLid: chatLid,
       upToMessageId: upToMessageId,
     );
+    // Write-through optimista a la bandeja: baja el badge de no-leídos de la
+    // fila local ya (el backend lo reconcilia en el próximo refresh). Sin
+    // esto, abrir un chat no limpiaba el badge de la bandeja hasta un pull.
+    final markConversationRead = _markConversationRead;
+    if (markConversationRead != null) {
+      unawaited(markConversationRead(botId, chatLid).catchError((Object _) {}));
+    }
     _requestSync();
   }
 

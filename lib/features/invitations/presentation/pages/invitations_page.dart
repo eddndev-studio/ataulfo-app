@@ -6,10 +6,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../domain/entities/invitation.dart';
 import '../../domain/failures/invitations_failure.dart';
 import '../bloc/invitation_mutation_cubit.dart';
 import '../bloc/invitations_bloc.dart';
+import '../widgets/invitation_share_sheet.dart';
 import '../widgets/invitation_tile.dart';
 import '../widgets/invite_sheet.dart';
 
@@ -53,12 +56,24 @@ class InvitationsPage extends StatelessWidget {
   void _onMutationState(BuildContext context, InvitationMutationState state) {
     final messenger = ScaffoldMessenger.of(context);
     switch (state) {
-      case InvitationMutationSuccess(action: final action, email: final email):
+      case InvitationMutationSuccess(action: InvitationMutationAction.created):
         context.read<InvitationsBloc>().add(const InvitationsLoadRequested());
-        final text = action == InvitationMutationAction.created
-            ? 'Invitación enviada por correo a $email'
-            : 'Invitación cancelada';
-        messenger.showSnackBar(SnackBar(content: Text(text)));
+        // La hoja de compartir ES el feedback: muestra el código para pasarlo
+        // por WhatsApp y es honesta sobre si el correo salió (sin el viejo
+        // aviso "enviada por correo" que mentía cuando el envío fallaba).
+        unawaited(
+          InvitationShareSheet.open(
+            context,
+            email: state.email ?? '',
+            token: state.token,
+            emailSent: state.emailSent,
+          ),
+        );
+      case InvitationMutationSuccess():
+        context.read<InvitationsBloc>().add(const InvitationsLoadRequested());
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Invitación cancelada')),
+        );
       case InvitationMutationFailure(failure: final failure):
         // Recargamos cuando el fallo deja la lista local desfasada: 404/410 (la
         // invitación cambió de estado en el servidor) y 5xx (un create puede
@@ -161,13 +176,34 @@ class _LoadedView extends StatelessWidget {
     if (items.isEmpty) {
       final textTheme = Theme.of(context).textTheme;
       return Center(
-        key: const Key('invitations.empty'),
         child: Padding(
-          padding: const EdgeInsets.all(AppTokens.sp6),
-          child: Text(
-            'Todavía no hay invitaciones',
-            textAlign: TextAlign.center,
-            style: textTheme.bodyLarge,
+          padding: const EdgeInsets.all(AppTokens.sp5),
+          child: AppCard.glass(
+            key: const Key('invitations.empty'),
+            padding: const EdgeInsets.all(AppTokens.cardPadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const AppEntityIcon(
+                  icon: Icons.mail_outline,
+                  size: 56,
+                  highlighted: true,
+                ),
+                const SizedBox(height: AppTokens.sp4),
+                Text(
+                  'Todavía no hay invitaciones',
+                  textAlign: TextAlign.center,
+                  style: textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppTokens.sp2),
+                Text(
+                  'Toca "Invitar" para sumar a alguien: le damos un código '
+                  'para compartir por WhatsApp o por correo.',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+                ),
+              ],
+            ),
           ),
         ),
       );

@@ -111,6 +111,21 @@ void main() {
     );
 
     blocTest<AcceptInvitationCubit, AcceptInvitationState>(
+      '403 EmailNotVerified: Accepting → Failed(emailNotVerified)',
+      build: () {
+        when(
+          () => repo.acceptInvitation(any()),
+        ).thenThrow(const EmailNotVerifiedFailure());
+        return AcceptInvitationCubit(repo);
+      },
+      act: (c) => c.accept('tok123'),
+      expect: () => const <AcceptInvitationState>[
+        AcceptInvitationAccepting(),
+        AcceptInvitationFailed(AcceptInvitationFailureKind.emailNotVerified),
+      ],
+    );
+
+    blocTest<AcceptInvitationCubit, AcceptInvitationState>(
       'timeout: Accepting → Failed(network)',
       build: () {
         when(

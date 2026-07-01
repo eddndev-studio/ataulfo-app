@@ -948,6 +948,23 @@ void main() {
         );
       },
     );
+
+    test(
+      '403 → EmailNotVerifiedFailure (aceptar exige correo verificado)',
+      () async {
+        when(
+          () => dio.post<void>(
+            '/auth/invitations/accept',
+            data: any<Object?>(named: 'data'),
+          ),
+        ).thenThrow(badResponse('/auth/invitations/accept', 403));
+
+        await expectLater(
+          ds.acceptInvitation('unverified'),
+          throwsA(isA<EmailNotVerifiedFailure>()),
+        );
+      },
+    );
   });
 
   group('DioAuthDatasource.resendVerification', () {

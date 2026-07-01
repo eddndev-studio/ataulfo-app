@@ -1,5 +1,6 @@
 import 'package:ataulfo/features/invitations/data/datasources/invitations_datasource.dart';
 import 'package:ataulfo/features/invitations/data/repositories/invitations_repository_impl.dart';
+import 'package:ataulfo/features/invitations/domain/entities/created_invitation.dart';
 import 'package:ataulfo/features/invitations/domain/entities/invitation.dart';
 import 'package:ataulfo/features/invitations/domain/failures/invitations_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,11 +34,19 @@ void main() {
     verify(() => ds.list()).called(1);
   });
 
-  test('create delega con email y rol', () async {
-    when(() => ds.create(any(), any())).thenAnswer((_) async {});
+  test('create delega y devuelve el CreatedInvitation', () async {
+    when(() => ds.create(any(), any())).thenAnswer(
+      (_) async => const CreatedInvitation(
+        email: 'a@x.com',
+        token: 'RAW-T',
+        emailSent: true,
+      ),
+    );
 
-    await repo.create('a@x.com', 'ADMIN');
+    final created = await repo.create('a@x.com', 'ADMIN');
 
+    expect(created.token, 'RAW-T');
+    expect(created.emailSent, isTrue);
     verify(() => ds.create('a@x.com', 'ADMIN')).called(1);
   });
 

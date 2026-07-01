@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../domain/entities/created_invitation.dart';
 import '../../domain/entities/invitation.dart';
 import '../../domain/failures/invitations_failure.dart';
 import '../dto/invitation_dto.dart';
@@ -11,8 +12,9 @@ abstract interface class InvitationsDatasource {
   /// `GET /workspace/invitations` — historial. 200 con `[]` legítimo.
   Future<List<Invitation>> list();
 
-  /// `POST /workspace/invitations` con body `{email, role}`. 201 ⇒ completa.
-  Future<void> create(String email, String role);
+  /// `POST /workspace/invitations` con body `{email, role}`. 201 ⇒ devuelve el
+  /// [CreatedInvitation] (token crudo a compartir + si el correo salió).
+  Future<CreatedInvitation> create(String email, String role);
 
   /// `DELETE /workspace/invitations/{id}`. 204 ⇒ completa.
   Future<void> cancel(String id);
@@ -48,14 +50,32 @@ class DioInvitationsDatasource implements InvitationsDatasource {
   }
 
   @override
-  Future<void> create(String email, String role) async {
+  Future<CreatedInvitation> create(String email, String role) async {
     try {
-      await _dio.post<void>(
+      final res = await _dio.post<Map<String, dynamic>>(
         '/workspace/invitations',
         data: <String, dynamic>{'email': email, 'role': role},
       );
+      final body = res.data;
+      if (body == null) {
+        // 201 sin cuerpo (backend previo): la invitación se creó pero no hay
+        // token que compartir — degrada honesto a "revisa el correo".
+        return CreatedInvitation(email: email, token: null, emailSent: true);
+      }
+      final resp = InvitationResp.fromJson(body);
+      return CreatedInvitation(
+        email: resp.email,
+        token: resp.token,
+        emailSent: resp.emailSent,
+      );
+    } on InvitationsFailure {
+      rethrow;
     } on DioException catch (e) {
       throw _mapCreate(e);
+    } on FormatException {
+      throw const UnknownInvitationsFailure();
+    } on TypeError {
+      throw const UnknownInvitationsFailure();
     }
   }
 

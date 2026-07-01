@@ -69,6 +69,7 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
     EmailMismatchFailure() ||
     AlreadyMemberFailure() ||
     NotMemberFailure() ||
+    EmailNotVerifiedFailure() ||
     UnknownAuthFailure() => RegisterFailureKind.unknown,
   };
 }

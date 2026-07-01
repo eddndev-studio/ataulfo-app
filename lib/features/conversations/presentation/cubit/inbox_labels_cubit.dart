@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../wa_labels/domain/entities/wa_label.dart';
+import '../../../wa_labels/domain/entities/wa_label_live_event.dart';
 import '../../../wa_labels/domain/repositories/wa_labels_repository.dart';
 
 /// Etiquetas WhatsApp del bot proyectadas para la bandeja: el catálogo activo
@@ -52,6 +55,70 @@ class InboxLabelsCubit extends Cubit<InboxLabelsState> {
   final WaLabelsRepository _repo;
   final String _botId;
 
+  StreamSubscription<WaLabelLiveEvent>? _liveSub;
+
+  /// Carga inicial + suscripción al feed en vivo `label.wa.*` del bot. Es lo
+  /// que hace la bandeja reflejar en el acto un etiquetado/desetiquetado (de
+  /// esta app o de WhatsApp) sin recargar: el eco del propio cambio del
+  /// operador vuelve por SSE tras persistirse el espejo, el mismo mecanismo del
+  /// que ya dependía el pull-to-refresh. Espeja `MonitorAttentionCubit.watch`.
+  Future<void> watchLive() async {
+    await load();
+    _startLive();
+  }
+
+  void _startLive() {
+    // watchLive hace `await load()` antes de llegar aquí; si el cubit se cerró
+    // durante esa ventana (el operador salió de la bandeja), close() ya corrió
+    // su cancel con `_liveSub` en null y no volverá a correr. Suscribir ahora
+    // fugaría un SSE que reconecta para siempre sobre un cubit muerto.
+    if (isClosed) return;
+    _liveSub?.cancel();
+    _liveSub = _repo.liveEvents(_botId).listen((e) {
+      switch (e) {
+        case WaChatLabelChanged():
+          _applyChatDelta(e);
+        case WaLabelReconnected():
+          // Tras un corte el SSE no reproduce el tramo perdido: reconcilia
+          // catálogo + asociaciones contra el GET. Recarga sólo aquí (no por
+          // cada delta) para no disparar una ráfaga de GETs en el fan-out.
+          unawaited(load());
+        case WaLabelCatalogChanged():
+          // El catálogo cambió (alta/edición/tombstone): afecta chips y blobs;
+          // recarga para reflejar nombres/colores/desapariciones.
+          unawaited(load());
+        case WaMessageLabelChanged():
+          break; // nivel mensaje: no toca la proyección por chat de la bandeja
+      }
+    }, onError: (Object _) {});
+  }
+
+  /// Parchea `byChat` con un cambio de asociación en vivo, resolviendo la
+  /// etiqueta contra el catálogo actual. Una etiqueta aún ausente del catálogo
+  /// se ignora (la reconcilia el próximo load): sin nombre no hay blob que
+  /// pintar, como en el sheet.
+  void _applyChatDelta(WaChatLabelChanged e) {
+    if (isClosed) return;
+    final s = state;
+    WaLabel? label;
+    for (final l in s.catalog) {
+      if (l.waLabelId == e.waLabelId) {
+        label = l;
+        break;
+      }
+    }
+    if (label == null) return;
+    final byChat = <String, List<WaLabel>>{
+      for (final entry in s.byChat.entries)
+        entry.key: List<WaLabel>.of(entry.value),
+    };
+    final current = byChat.putIfAbsent(e.chatLid, () => <WaLabel>[])
+      ..removeWhere((l) => l.waLabelId == e.waLabelId);
+    if (e.labeled) current.add(label);
+    if (current.isEmpty) byChat.remove(e.chatLid);
+    emit(InboxLabelsState(catalog: s.catalog, byChat: byChat));
+  }
+
   Future<void> load() async {
     try {
       final catalogRaw = await _repo.listCatalog(_botId);
@@ -77,5 +144,11 @@ class InboxLabelsCubit extends Cubit<InboxLabelsState> {
       if (isClosed) return;
       emit(const InboxLabelsState());
     }
+  }
+
+  @override
+  Future<void> close() {
+    _liveSub?.cancel();
+    return super.close();
   }
 }

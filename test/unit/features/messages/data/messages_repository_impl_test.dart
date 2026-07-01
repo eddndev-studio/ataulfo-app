@@ -413,6 +413,31 @@ void main() {
     expect(syncCalls, 1);
   });
 
+  test(
+    'markRead proyecta a la bandeja (write-through optimista de no-leídos)',
+    () async {
+      final calls = <List<String>>[];
+      final r = MessagesRepositoryImpl(
+        datasource: ds,
+        events: events,
+        dao: MessagesDao(db),
+        outbox: OutboxDao(db),
+        requestSync: () {},
+        markConversationRead: (botId, chatLid) async =>
+            calls.add(<String>[botId, chatLid]),
+      );
+
+      await r.markRead('b1', 'chat-7');
+      await Future<void>.delayed(
+        Duration.zero,
+      ); // el proyector es fire-and-forget
+
+      expect(calls, <List<String>>[
+        <String>['b1', 'chat-7'],
+      ]);
+    },
+  );
+
   test('react ENCOLA un react durable y dispara requestSync', () async {
     await repo.react('b1', 'chat-1', messageId: 'M', emoji: '👍');
 

@@ -1,3 +1,4 @@
+import '../entities/created_invitation.dart';
 import '../entities/invitation.dart';
 
 /// Puerto del repositorio del feature invitations. La presentación depende de
@@ -8,9 +9,9 @@ abstract interface class InvitationsRepository {
   Future<List<Invitation>> list();
 
   /// Emite una invitación al [email] con el [role] (uppercase del set cerrado).
-  /// El token viaja sólo por correo; nunca vuelve en la respuesta. Completa sin
-  /// valor en 201; lanza `InvitationsFailure` tipada ante el rechazo.
-  Future<void> create(String email, String role);
+  /// Devuelve el [CreatedInvitation] con el token crudo a compartir y si el
+  /// correo salió; lanza `InvitationsFailure` tipada ante el rechazo.
+  Future<CreatedInvitation> create(String email, String role);
 
   /// Cancela (soft) la invitación [id]. Completa sin valor en 204; lanza
   /// `InvitationsFailure` tipada (not-found, gone, etc.).

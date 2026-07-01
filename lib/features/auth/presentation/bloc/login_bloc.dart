@@ -54,6 +54,7 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     EmailMismatchFailure() ||
     AlreadyMemberFailure() ||
     NotMemberFailure() ||
+    EmailNotVerifiedFailure() ||
     UnknownAuthFailure() => LoginFailureKind.unknown,
   };
 }

@@ -113,25 +113,65 @@ void main() {
     });
   });
 
+  Response<Map<String, dynamic>> mapResp(
+    int status, {
+    Map<String, dynamic>? body,
+  }) => Response<Map<String, dynamic>>(
+    requestOptions: RequestOptions(path: '/workspace/invitations'),
+    statusCode: status,
+    data: body,
+  );
+
   group('DioInvitationsDatasource.create', () {
-    test('201 → completa y envía {email, role}', () async {
+    test('201 → devuelve token + email_sent y envía {email, role}', () async {
       when(
-        () => dio.post<void>(any(), data: any(named: 'data')),
-      ).thenAnswer((_) async => voidResp(201));
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer(
+        (_) async => mapResp(
+          201,
+          body: <String, dynamic>{
+            ...invJson(email: 'a@x.com', role: 'ADMIN'),
+            'token': 'RAW-SHARE-TOKEN',
+            'email_sent': true,
+          },
+        ),
+      );
 
-      await ds.create('a@x.com', 'ADMIN');
+      final created = await ds.create('a@x.com', 'ADMIN');
 
+      expect(created.token, 'RAW-SHARE-TOKEN');
+      expect(created.emailSent, isTrue);
+      expect(created.email, 'a@x.com');
       verify(
-        () => dio.post<void>(
+        () => dio.post<Map<String, dynamic>>(
           '/workspace/invitations',
           data: const <String, dynamic>{'email': 'a@x.com', 'role': 'ADMIN'},
         ),
       ).called(1);
     });
 
+    test('201 con email_sent:false → degrada honesto (token igual)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer(
+        (_) async => mapResp(
+          201,
+          body: <String, dynamic>{
+            ...invJson(),
+            'token': 'T',
+            'email_sent': false,
+          },
+        ),
+      );
+
+      final created = await ds.create('a@x.com', 'ADMIN');
+      expect(created.token, 'T');
+      expect(created.emailSent, isFalse);
+    });
+
     test('409 → Duplicate (ya hay una PENDING para ese correo)', () async {
       when(
-        () => dio.post<void>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
       ).thenThrow(badResponse(409));
 
       await expectLater(
@@ -142,7 +182,7 @@ void main() {
 
     test('422 → Validation', () async {
       when(
-        () => dio.post<void>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
       ).thenThrow(badResponse(422));
 
       await expectLater(
@@ -153,7 +193,7 @@ void main() {
 
     test('403 → Forbidden', () async {
       when(
-        () => dio.post<void>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
       ).thenThrow(badResponse(403));
 
       await expectLater(
@@ -166,7 +206,7 @@ void main() {
       '500 → Server (la fila pudo guardarse; el correo pudo fallar)',
       () async {
         when(
-          () => dio.post<void>(any(), data: any(named: 'data')),
+          () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
         ).thenThrow(badResponse(500));
 
         await expectLater(

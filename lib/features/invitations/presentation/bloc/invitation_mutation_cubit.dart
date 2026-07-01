@@ -18,11 +18,13 @@ class InvitationMutationCubit extends Cubit<InvitationMutationState> {
   Future<void> create(String email, String role) async {
     emit(const InvitationMutationInProgress());
     try {
-      await _repo.create(email, role);
+      final created = await _repo.create(email, role);
       emit(
         InvitationMutationSuccess(
           InvitationMutationAction.created,
           email: email,
+          token: created.token,
+          emailSent: created.emailSent,
         ),
       );
     } on InvitationsFailure catch (f) {
@@ -69,20 +71,34 @@ class InvitationMutationInProgress extends InvitationMutationState {
 }
 
 class InvitationMutationSuccess extends InvitationMutationState {
-  const InvitationMutationSuccess(this.action, {this.email});
+  const InvitationMutationSuccess(
+    this.action, {
+    this.email,
+    this.token,
+    this.emailSent = false,
+  });
 
   final InvitationMutationAction action;
 
   /// Correo invitado — sólo presente en `created`, para el copy del aviso.
   final String? email;
 
+  /// Token crudo a compartir — sólo en `created`. Nulo si el backend no lo
+  /// devolvió (degrada a "revisa el correo" sin código copiable).
+  final String? token;
+
+  /// Si el correo de invitación salió — sólo en `created`, para ser honesto.
+  final bool emailSent;
+
   @override
   bool operator ==(Object other) =>
       other is InvitationMutationSuccess &&
       other.action == action &&
-      other.email == email;
+      other.email == email &&
+      other.token == token &&
+      other.emailSent == emailSent;
   @override
-  int get hashCode => Object.hash(action, email);
+  int get hashCode => Object.hash(action, email, token, emailSent);
 }
 
 class InvitationMutationFailure extends InvitationMutationState {

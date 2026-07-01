@@ -154,7 +154,9 @@ void main() {
     expect(find.byKey(const Key('invitation_tile.cancel')), findsNothing);
   });
 
-  testWidgets('Success(created) recarga y avisa con el correo', (tester) async {
+  testWidgets('Success(created) recarga y abre la hoja de compartir', (
+    tester,
+  ) async {
     when(
       () => bloc.state,
     ).thenReturn(const InvitationsLoaded(items: <Invitation>[]));
@@ -166,6 +168,8 @@ void main() {
           InvitationMutationSuccess(
             InvitationMutationAction.created,
             email: 'new@x.com',
+            token: 'RAW-SHARE',
+            emailSent: false,
           ),
         ],
       ),
@@ -173,13 +177,14 @@ void main() {
     );
 
     await tester.pumpWidget(host());
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     verify(() => bloc.add(const InvitationsLoadRequested())).called(1);
-    expect(
-      find.text('Invitación enviada por correo a new@x.com'),
-      findsOneWidget,
-    );
+    // La hoja muestra el código a compartir (feedback honesto, sin el viejo
+    // aviso "enviada por correo" que mentía cuando el envío fallaba).
+    expect(find.text('Invitación creada'), findsOneWidget);
+    expect(find.byKey(const Key('invitation_share.code')), findsOneWidget);
+    expect(find.text('RAW-SHARE'), findsOneWidget);
   });
 
   testWidgets('Success(canceled) recarga y avisa', (tester) async {

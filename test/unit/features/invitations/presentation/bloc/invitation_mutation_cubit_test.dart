@@ -1,3 +1,4 @@
+import 'package:ataulfo/features/invitations/domain/entities/created_invitation.dart';
 import 'package:ataulfo/features/invitations/domain/failures/invitations_failure.dart';
 import 'package:ataulfo/features/invitations/domain/repositories/invitations_repository.dart';
 import 'package:ataulfo/features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
@@ -18,10 +19,16 @@ void main() {
 
     group('create', () {
       blocTest<InvitationMutationCubit, InvitationMutationState>(
-        'ok → [InProgress, Success(created, email)] y delega con email+rol',
+        'ok → [InProgress, Success(created, email, token, emailSent)]',
         build: () {
           final repo = _MockRepo();
-          when(() => repo.create(any(), any())).thenAnswer((_) async {});
+          when(() => repo.create(any(), any())).thenAnswer(
+            (_) async => const CreatedInvitation(
+              email: 'a@x.com',
+              token: 'RAW-T',
+              emailSent: true,
+            ),
+          );
           return InvitationMutationCubit(repo);
         },
         act: (cubit) => cubit.create('a@x.com', 'WORKER'),
@@ -30,6 +37,8 @@ void main() {
           InvitationMutationSuccess(
             InvitationMutationAction.created,
             email: 'a@x.com',
+            token: 'RAW-T',
+            emailSent: true,
           ),
         ],
         verify: (_) {},

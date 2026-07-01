@@ -16,10 +16,19 @@ import '../../domain/entities/member.dart';
 /// Tappable sólo cuando recibe [onTap]: la lista lo cablea para abrir la hoja
 /// de gestión (cambiar rol / quitar); sin él el tile es de solo lectura.
 class MemberTile extends StatelessWidget {
-  const MemberTile({super.key, required this.member, this.onTap});
+  const MemberTile({
+    super.key,
+    required this.member,
+    this.onTap,
+    this.isSelf = false,
+  });
 
   final Member member;
   final VoidCallback? onTap;
+
+  /// Este miembro es el operador de la sesión: se marca con una pill "Tú"
+  /// para orientarse de un vistazo en el listado.
+  final bool isSelf;
 
   @override
   Widget build(BuildContext context) {
@@ -37,17 +46,25 @@ class MemberTile extends StatelessWidget {
               children: <Widget>[
                 Text(member.email, style: textTheme.titleMedium),
                 const SizedBox(height: AppTokens.sp2),
-                Row(
+                Wrap(
+                  spacing: AppTokens.sp2,
+                  runSpacing: AppTokens.sp2,
                   children: <Widget>[
+                    if (isSelf)
+                      const AppPill.primary(
+                        key: Key('members.self_badge'),
+                        label: 'Tú',
+                      ),
                     AppPill.neutral(label: roleLabel(member.role)),
-                    const SizedBox(width: AppTokens.sp2),
                     if (member.emailVerified)
                       const AppPill.outline(
                         key: Key('members.verified_badge'),
                         label: 'Verificado',
                       )
                     else
-                      const AppPill.danger(
+                      // Pendiente de verificación es normal, no un error: pill
+                      // de contorno (sin el rojo alarmante de antes).
+                      const AppPill.outline(
                         key: Key('members.unverified_badge'),
                         label: 'Sin confirmar',
                       ),

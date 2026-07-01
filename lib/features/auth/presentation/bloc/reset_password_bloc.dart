@@ -64,6 +64,7 @@ class ResetPasswordBloc extends Bloc<ResetPasswordEvent, ResetPasswordState> {
     EmailMismatchFailure() ||
     AlreadyMemberFailure() ||
     NotMemberFailure() ||
+    EmailNotVerifiedFailure() ||
     UnknownAuthFailure() => ResetPasswordFailureKind.unknown,
   };
 }

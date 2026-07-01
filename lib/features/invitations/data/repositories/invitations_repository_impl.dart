@@ -1,3 +1,4 @@
+import '../../domain/entities/created_invitation.dart';
 import '../../domain/entities/invitation.dart';
 import '../../domain/repositories/invitations_repository.dart';
 import '../datasources/invitations_datasource.dart';
@@ -13,7 +14,8 @@ class InvitationsRepositoryImpl implements InvitationsRepository {
   Future<List<Invitation>> list() => _ds.list();
 
   @override
-  Future<void> create(String email, String role) => _ds.create(email, role);
+  Future<CreatedInvitation> create(String email, String role) =>
+      _ds.create(email, role);
 
   @override
   Future<void> cancel(String id) => _ds.cancel(id);

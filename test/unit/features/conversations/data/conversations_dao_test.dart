@@ -55,6 +55,79 @@ void main() {
     },
   );
 
+  ConversationsCompanion convUnread(
+    String chatLid, {
+    required int unread,
+    bool markedUnread = false,
+    String bot = 'b1',
+  }) => ConversationsCompanion.insert(
+    botId: bot,
+    chatLid: chatLid,
+    kind: 'dm',
+    syncedAtMs: 0,
+    lastMessageTimestampMs: const Value(100),
+    unreadCount: Value(unread),
+    isMarkedUnread: Value(markedUnread),
+  );
+
+  test('clearUnread baja el badge de la fila (contador + marca)', () async {
+    await dao.replaceForBot('b1', [
+      convUnread('a', unread: 5, markedUnread: true),
+    ]);
+    await dao.clearUnread('b1', 'a');
+    final row = (await dao.watchForBot('b1').first).single;
+    expect(row.unreadCount, 0);
+    expect(row.isMarkedUnread, isFalse);
+  });
+
+  test(
+    'clearUnread no inserta filas ausentes (no hay badge que bajar)',
+    () async {
+      await dao.clearUnread('b1', 'ghost');
+      expect(await dao.watchForBot('b1').first, isEmpty);
+    },
+  );
+
+  test('clearUnread aísla por chat: otras filas quedan intactas', () async {
+    await dao.replaceForBot('b1', [
+      convUnread('a', unread: 5),
+      convUnread('b', unread: 3),
+    ]);
+    await dao.clearUnread('b1', 'a');
+    final rows = await dao.watchForBot('b1').first;
+    final byId = {for (final r in rows) r.chatLid: r};
+    expect(byId['a']!.unreadCount, 0);
+    expect(byId['b']!.unreadCount, 3);
+  });
+
+  test(
+    'un replace posterior del backend reconcilia (el snapshot es autoritativo)',
+    () async {
+      await dao.replaceForBot('b1', [convUnread('a', unread: 5)]);
+      await dao.clearUnread('b1', 'a'); // optimista → 0
+      expect((await dao.watchForBot('b1').first).single.unreadCount, 0);
+      // El backend aún ve no-leídos (outbox sin drenar) y llega un pull:
+      // el snapshot gana. Es el comportamiento correcto (eventual-consistente),
+      // no un badge que resucita para siempre.
+      await dao.replaceForBot('b1', [convUnread('a', unread: 5)]);
+      expect((await dao.watchForBot('b1').first).single.unreadCount, 5);
+    },
+  );
+
+  test('clearUnread hace re-emitir el watch (bandeja reactiva)', () async {
+    await dao.replaceForBot('b1', [convUnread('a', unread: 5)]);
+    final emissions = <int>[];
+    final sub = dao
+        .watchForBot('b1')
+        .listen((rows) => emissions.add(rows.single.unreadCount));
+    await Future<void>.delayed(Duration.zero);
+    await dao.clearUnread('b1', 'a');
+    await Future<void>.delayed(Duration.zero);
+    await sub.cancel();
+    expect(emissions.first, 5);
+    expect(emissions.last, 0);
+  });
+
   test('watch re-emite tras un replace (reactivo)', () async {
     final emissions = <List<String>>[];
     final sub = dao
