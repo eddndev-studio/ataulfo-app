@@ -72,10 +72,13 @@ class ResetPasswordBloc extends Bloc<ResetPasswordEvent, ResetPasswordState> {
     InvalidTokenFailure() => ResetPasswordFailureKind.invalidCode,
     ExpiredTokenFailure() => ResetPasswordFailureKind.expiredCode,
     NetworkFailure() => ResetPasswordFailureKind.network,
+    // 429 por el límite de tasa por-IP del canje: distinto del lockout de
+    // intentos (que ya cae en invalidCode/expiredCode vía el backend), así
+    // que se distingue con su propio copy ("espera un momento").
+    RateLimitedFailure() => ResetPasswordFailureKind.rateLimited,
     // Las variantes de otros endpoints del arco de auth no pueden surgir
     // contra `/auth/reset-password`; se colapsan a genérico.
     InvalidCredentialsFailure() ||
-    RateLimitedFailure() ||
     EmailTakenFailure() ||
     EmailMismatchFailure() ||
     AlreadyMemberFailure() ||
@@ -170,5 +173,6 @@ enum ResetPasswordFailureKind {
   invalidCode,
   expiredCode,
   network,
+  rateLimited,
   unknown,
 }

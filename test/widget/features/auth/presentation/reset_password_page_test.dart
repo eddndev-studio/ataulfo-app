@@ -193,6 +193,24 @@ void main() {
     expect(find.text('El código venció. Reenvía uno nuevo.'), findsOneWidget);
   });
 
+  testWidgets('Failed(rateLimited) muestra el aviso de espera', (tester) async {
+    whenListen(
+      bloc,
+      Stream<ResetPasswordState>.fromIterable(const <ResetPasswordState>[
+        ResetPasswordFailed(ResetPasswordFailureKind.rateLimited),
+      ]),
+      initialState: const ResetPasswordInitial(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(
+      find.text('Demasiados intentos. Espera un momento e inténtalo de nuevo.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Failed(passwordTooShort) muestra mensaje de longitud', (
     tester,
   ) async {

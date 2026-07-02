@@ -174,6 +174,8 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     VerifyEmailFailureKind.expiredCode =>
       'El código venció. Reenvía uno nuevo.',
     VerifyEmailFailureKind.network => 'Sin conexión, reintenta',
+    VerifyEmailFailureKind.rateLimited =>
+      'Demasiados intentos. Espera un momento e inténtalo de nuevo.',
     VerifyEmailFailureKind.unknown => 'Algo salió mal, intenta de nuevo',
   };
 }

@@ -199,6 +199,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     ResetPasswordFailureKind.expiredCode =>
       'El código venció. Reenvía uno nuevo.',
     ResetPasswordFailureKind.network => 'Sin conexión, reintenta',
+    ResetPasswordFailureKind.rateLimited =>
+      'Demasiados intentos. Espera un momento e inténtalo de nuevo.',
     ResetPasswordFailureKind.unknown => 'Algo salió mal, intenta de nuevo',
   };
 }

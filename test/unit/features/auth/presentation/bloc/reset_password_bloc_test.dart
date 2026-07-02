@@ -226,6 +226,25 @@ void main() {
     );
 
     blocTest<ResetPasswordBloc, ResetPasswordState>(
+      '429 RateLimited: Submitting → Failed(rateLimited)',
+      build: () {
+        when(
+          () => repo.resetPassword(
+            email: any(named: 'email'),
+            code: any(named: 'code'),
+            newPassword: any(named: 'newPassword'),
+          ),
+        ).thenThrow(const RateLimitedFailure());
+        return ResetPasswordBloc(repo);
+      },
+      act: (b) => b.add(submit()),
+      expect: () => const <ResetPasswordState>[
+        ResetPasswordSubmitting(),
+        ResetPasswordFailed(ResetPasswordFailureKind.rateLimited),
+      ],
+    );
+
+    blocTest<ResetPasswordBloc, ResetPasswordState>(
       '5xx u otro: Submitting → Failed(unknown)',
       build: () {
         when(

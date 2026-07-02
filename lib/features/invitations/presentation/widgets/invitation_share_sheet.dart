@@ -7,23 +7,28 @@ import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/platform/share_plus_service.dart';
+import '../../../../core/platform/share_service.dart';
 
 /// Hoja que muestra —una sola vez, tras emitir— el código de invitación para
 /// compartirlo por cualquier canal (WhatsApp). Es la vía de entrega
-/// independiente del correo: el ADMIN copia el código o el mensaje completo y
-/// se lo pasa a la persona. Honesta sobre si el correo salió; si el backend no
-/// devolvió token (versión previa), degrada a sólo el aviso de correo.
+/// independiente del correo: el ADMIN copia el código o comparte el mensaje
+/// completo por el selector de apps del sistema. Honesta sobre si el correo
+/// salió; si el backend no devolvió token (versión previa), degrada a sólo el
+/// aviso de correo.
 class InvitationShareSheet extends StatelessWidget {
   const InvitationShareSheet({
     super.key,
     required this.email,
     required this.token,
     required this.emailSent,
-  });
+    ShareService? shareService,
+  }) : _shareService = shareService ?? const SharePlusService();
 
   final String email;
   final String? token;
   final bool emailSent;
+  final ShareService _shareService;
 
   /// Abre la hoja. No devuelve nada: es informativa (compartir el código).
   static Future<void> open(
@@ -31,6 +36,7 @@ class InvitationShareSheet extends StatelessWidget {
     required String email,
     required String? token,
     required bool emailSent,
+    ShareService? shareService,
   }) {
     return showAppBottomSheet<void>(
       context,
@@ -40,6 +46,7 @@ class InvitationShareSheet extends StatelessWidget {
         email: email,
         token: token,
         emailSent: emailSent,
+        shareService: shareService,
       ),
     );
   }
@@ -122,12 +129,11 @@ class InvitationShareSheet extends StatelessWidget {
             ),
             const SizedBox(height: AppTokens.sp2),
             AppButton.tonal(
-              key: const Key('invitation_share.copy_message'),
-              label: 'Copiar mensaje',
+              key: const Key('invitation_share.share_message'),
+              label: 'Compartir mensaje',
               icon: Icons.share_outlined,
               fullWidth: true,
-              onPressed: () =>
-                  _copy(context, _shareMessage, 'Invitación copiada'),
+              onPressed: () => _share(context),
             ),
             const SizedBox(height: AppTokens.sp4),
             Text(
@@ -151,6 +157,23 @@ class InvitationShareSheet extends StatelessWidget {
     // fire-and-forget para no atar el feedback al ida-y-vuelta de plataforma.
     unawaited(Clipboard.setData(ClipboardData(text: text)));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(toast)));
+  }
+
+  void _share(BuildContext context) {
+    // El selector del SO ya trae su propio feedback (incluye "copiar" entre
+    // las opciones), así que en el camino exitoso no hay SnackBar propio.
+    // El messenger se captura ANTES del await: si la plataforma lanza (sin
+    // apps/handler que atiendan el intent — p. ej. Linux sin `mailto:`), el
+    // mensaje completo deja de ser compartible, así que degrada a copiarlo.
+    final messenger = ScaffoldMessenger.of(context);
+    unawaited(
+      _shareService.shareText(_shareMessage).catchError((Object _) {
+        unawaited(Clipboard.setData(ClipboardData(text: _shareMessage)));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Invitación copiada')),
+        );
+      }),
+    );
   }
 }
 

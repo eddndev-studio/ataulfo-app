@@ -613,6 +613,20 @@ void main() {
         throwsA(isA<UnknownAuthFailure>()),
       );
     });
+
+    test('429 → RateLimitedFailure (límite por-IP del canje)', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/verify-email',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse('/auth/verify-email', 429));
+
+      await expectLater(
+        ds.verifyEmail(email: 'op@x.com', code: '123456'),
+        throwsA(isA<RateLimitedFailure>()),
+      );
+    });
   });
 
   group('DioAuthDatasource.forgotPassword', () {
@@ -733,6 +747,20 @@ void main() {
       await expectLater(
         ds.resetPassword(email: 'op@x.com', code: '123456', newPassword: 'sh'),
         throwsA(isA<WeakPasswordFailure>()),
+      );
+    });
+
+    test('429 → RateLimitedFailure (límite por-IP del canje)', () async {
+      when(
+        () => dio.post<void>(
+          '/auth/reset-password',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse('/auth/reset-password', 429));
+
+      await expectLater(
+        ds.resetPassword(email: 'op@x.com', code: '123456', newPassword: 'p'),
+        throwsA(isA<RateLimitedFailure>()),
       );
     });
   });

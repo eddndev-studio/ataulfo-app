@@ -165,6 +165,24 @@ void main() {
     );
 
     blocTest<VerifyEmailBloc, VerifyEmailState>(
+      '429 RateLimited: Submitting → Failed(rateLimited)',
+      build: () {
+        when(
+          () => repo.verifyEmail(
+            email: any(named: 'email'),
+            code: any(named: 'code'),
+          ),
+        ).thenThrow(const RateLimitedFailure());
+        return VerifyEmailBloc(repo);
+      },
+      act: (b) => b.add(submit()),
+      expect: () => const <VerifyEmailState>[
+        VerifyEmailSubmitting(),
+        VerifyEmailFailed(VerifyEmailFailureKind.rateLimited),
+      ],
+    );
+
+    blocTest<VerifyEmailBloc, VerifyEmailState>(
       '5xx u otro: Submitting → Failed(unknown)',
       build: () {
         when(

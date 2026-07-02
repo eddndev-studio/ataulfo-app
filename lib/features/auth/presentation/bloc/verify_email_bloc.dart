@@ -53,10 +53,13 @@ class VerifyEmailBloc extends Bloc<VerifyEmailEvent, VerifyEmailState> {
     InvalidTokenFailure() => VerifyEmailFailureKind.invalidCode,
     ExpiredTokenFailure() => VerifyEmailFailureKind.expiredCode,
     NetworkFailure() => VerifyEmailFailureKind.network,
+    // 429 por el límite de tasa por-IP del canje: distinto del lockout de
+    // intentos (que ya cae en invalidCode/expiredCode vía el backend), así
+    // que se distingue con su propio copy ("espera un momento").
+    RateLimitedFailure() => VerifyEmailFailureKind.rateLimited,
     // Las variantes de otros endpoints del arco de auth no pueden surgir
     // contra `/auth/verify-email`; se colapsan a genérico.
     InvalidCredentialsFailure() ||
-    RateLimitedFailure() ||
     EmailTakenFailure() ||
     WeakPasswordFailure() ||
     EmailMismatchFailure() ||
@@ -149,5 +152,6 @@ enum VerifyEmailFailureKind {
   invalidCode,
   expiredCode,
   network,
+  rateLimited,
   unknown,
 }

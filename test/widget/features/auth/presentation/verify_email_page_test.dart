@@ -154,6 +154,24 @@ void main() {
     expect(find.text('El código venció. Reenvía uno nuevo.'), findsOneWidget);
   });
 
+  testWidgets('Failed(rateLimited) muestra el aviso de espera', (tester) async {
+    whenListen(
+      bloc,
+      Stream<VerifyEmailState>.fromIterable(const <VerifyEmailState>[
+        VerifyEmailFailed(VerifyEmailFailureKind.rateLimited),
+      ]),
+      initialState: const VerifyEmailInitial(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(
+      find.text('Demasiados intentos. Espera un momento e inténtalo de nuevo.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Succeeded(fresca) muestra SnackBar de confirmación', (
     tester,
   ) async {
