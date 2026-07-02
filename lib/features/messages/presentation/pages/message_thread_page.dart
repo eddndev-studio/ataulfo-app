@@ -700,6 +700,16 @@ class _MessageBubble extends StatelessWidget {
     final isOutbound = m.direction == MessageDirection.outbound;
     final isGroupInbound = m.kind == MessageKind.group && !isOutbound;
     final isText = m.type == 'text';
+    // Un sticker LIMPIO (con media, sin cita ni autor de grupo) flota "bare":
+    // sin relleno ni padding de burbuja, como en mensajería. Cuando es respuesta
+    // (quotedId) o de grupo conserva la burbuja: el bloque de cita y el nombre
+    // del autor usan el fondo de la burbuja para leerse sobre el lienzo del hilo,
+    // que es plano y oscuro (sin él, sus fondos translúcidos desaparecen).
+    final isStickerBare =
+        m.type == 'sticker' &&
+        m.mediaRef != null &&
+        m.quotedId == null &&
+        !isGroupInbound;
 
     final caption = textTheme.bodyMedium?.copyWith(
       color: AppTokens.text2,
@@ -718,23 +728,32 @@ class _MessageBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             GestureDetector(
+              // opaque: sin fondo de burbuja (sticker bare) el rect igual captura
+              // el long-press en toda su área, no sólo sobre los hijos pintados.
+              behavior: HitTestBehavior.opaque,
               onLongPress: () => _showMessageActions(context, m),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.sizeOf(context).width * 0.78,
                 ),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppTokens.sp4,
-                    vertical: AppTokens.sp3,
-                  ),
-                  decoration: BoxDecoration(
-                    // El OUTBOUND lleva un matiz sutil del verde de sección
-                    // sobre surface3: distingue los lados sin gritar (el
-                    // verde pleno es de acentos, no de fills).
-                    color: isOutbound ? _outboundFill : AppTokens.surface2,
-                    borderRadius: _bubbleRadius(mine: isOutbound),
-                  ),
+                  padding: isStickerBare
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.symmetric(
+                          horizontal: AppTokens.sp4,
+                          vertical: AppTokens.sp3,
+                        ),
+                  decoration: isStickerBare
+                      ? null
+                      : BoxDecoration(
+                          // El OUTBOUND lleva un matiz sutil del verde de
+                          // sección sobre surface3: distingue los lados sin
+                          // gritar (el verde pleno es de acentos, no de fills).
+                          color: isOutbound
+                              ? _outboundFill
+                              : AppTokens.surface2,
+                          borderRadius: _bubbleRadius(mine: isOutbound),
+                        ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,

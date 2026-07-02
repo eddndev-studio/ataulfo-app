@@ -637,6 +637,215 @@ void main() {
       );
       expect(find.text('Documento'), findsOneWidget);
     });
+
+    testWidgets(
+      'sticker con bytes: cuadro natural (scaleDown) de 140, sin recorte',
+      (tester) async {
+        final cache = fakeMessageMediaCache(downloadResult: pngBytes);
+        final m = ValueNotifier<Message>(
+          msg(
+            externalId: 's1',
+            type: 'sticker',
+            content: '',
+            mediaRef: 'ref-s1',
+            mediaUrl: 'https://cdn/s1.webp',
+          ),
+        );
+        addTearDown(m.dispose);
+        await pumpContent(tester, cache: cache, message: m);
+        await tester.pumpAndSettle();
+
+        final img = find.descendant(
+          of: find.byType(MessageMediaContent),
+          matching: find.byType(Image),
+        );
+        expect(img, findsOneWidget);
+        final image = tester.widget<Image>(img);
+        // Tamaño natural sin agrandar (scaleDown: encoge si excede, jamás
+        // upscalea) dentro de un cuadro fijo de 140.
+        expect(image.fit, BoxFit.scaleDown);
+        expect(image.width, 140);
+        expect(image.height, 140);
+        // Sin ClipRRect: el sticker es transparente, no lleva esquinas de foto.
+        expect(
+          find.descendant(
+            of: find.byType(MessageMediaContent),
+            matching: find.byType(ClipRRect),
+          ),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets('sticker: tocar NO abre el visor fullscreen (no es una foto)', (
+      tester,
+    ) async {
+      final cache = fakeMessageMediaCache(downloadResult: pngBytes);
+      final m = ValueNotifier<Message>(
+        msg(
+          externalId: 's1',
+          type: 'sticker',
+          content: '',
+          mediaRef: 'ref-s1',
+          mediaUrl: 'https://cdn/s1.webp',
+        ),
+      );
+      addTearDown(m.dispose);
+      await pumpContent(tester, cache: cache, message: m);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('message.sticker.s1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('media_viewer')), findsNothing);
+    });
+
+    testWidgets(
+      'sticker limpio (sin cita ni grupo): la burbuja flota sin fondo ni padding',
+      (tester) async {
+        await pumpMsg(
+          tester,
+          msg(
+            externalId: 'sB',
+            type: 'sticker',
+            content: '',
+            mediaRef: 'ref-sB',
+            mediaUrl: 'https://cdn/sB.webp',
+          ),
+          cache: fakeMessageMediaCache(downloadResult: pngBytes),
+        );
+        await tester.pumpAndSettle();
+        // El Container de burbuja que envuelve la media va SIN decoración ni
+        // padding: el sticker flota transparente sobre el lienzo del hilo.
+        final bubble = tester.widget<Container>(
+          find
+              .ancestor(
+                of: find.byType(MessageMediaContent),
+                matching: find.byType(Container),
+              )
+              .first,
+        );
+        expect(bubble.decoration, isNull);
+        expect(bubble.padding, EdgeInsets.zero);
+      },
+    );
+
+    testWidgets(
+      'sticker que es respuesta conserva la burbuja y dibuja la cita',
+      (tester) async {
+        await pumpMsg(
+          tester,
+          msg(
+            externalId: 'sR',
+            type: 'sticker',
+            content: '',
+            mediaRef: 'ref-sR',
+            mediaUrl: 'https://cdn/sR.webp',
+            quotedId: 'q1',
+          ),
+          cache: fakeMessageMediaCache(downloadResult: pngBytes),
+        );
+        await tester.pumpAndSettle();
+        // Con cita, el sticker mantiene el chrome de burbuja (fondo surface2):
+        // el bloque de cita necesita ese backdrop para ser legible.
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('message.sR')),
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is Container &&
+                  w.decoration is BoxDecoration &&
+                  (w.decoration! as BoxDecoration).color == AppTokens.surface2,
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('message.quoted.sR')), findsOneWidget);
+      },
+    );
+
+    testWidgets('sticker de grupo conserva la burbuja y muestra el autor', (
+      tester,
+    ) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'sG',
+          kind: MessageKind.group,
+          type: 'sticker',
+          senderLid: 'bob',
+          content: '',
+          mediaRef: 'ref-sG',
+          mediaUrl: 'https://cdn/sG.webp',
+        ),
+        cache: fakeMessageMediaCache(downloadResult: pngBytes),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('message.sG')),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is Container &&
+                w.decoration is BoxDecoration &&
+                (w.decoration! as BoxDecoration).color == AppTokens.surface2,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('bob'), findsOneWidget);
+    });
+
+    testWidgets('sticker sin bytes (offline) → "Sticker no disponible"', (
+      tester,
+    ) async {
+      await pumpMsg(
+        tester,
+        // Sin mediaUrl ni caché: la resolución da null → tarjeta de fallback.
+        msg(externalId: 'sN', type: 'sticker', content: '', mediaRef: 'ref-sN'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Sticker no disponible'), findsOneWidget);
+    });
+
+    testWidgets('sticker sin bytes en pantalla angosta no desborda', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'sN2',
+          type: 'sticker',
+          content: '',
+          mediaRef: 'ref-sN2',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'control: un texto inbound sí lleva fondo de burbuja surface2',
+      (tester) async {
+        await pumpMsg(
+          tester,
+          msg(externalId: 'tB', type: 'text', content: 'hola'),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('message.tB')),
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is Container &&
+                  w.decoration is BoxDecoration &&
+                  (w.decoration! as BoxDecoration).color == AppTokens.surface2,
+            ),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
   });
 
   testWidgets('Loaded vacío muestra empty state', (tester) async {

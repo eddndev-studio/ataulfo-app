@@ -13,7 +13,10 @@ import 'media_viewer.dart';
 /// Contenido de un mensaje no-texto del hilo, interaccionable como en
 /// mensajería:
 ///
-///   - imagen/sticker: miniatura desde la URL firmada; tap → visor fullscreen.
+///   - imagen: miniatura recortada (servida por `mediaRef` desde la caché en
+///     disco); tap → visor fullscreen.
+///   - sticker: se pinta transparente a tamaño natural, sin burbuja ni tap
+///     (es un glifo del mensaje, no una foto que se amplíe).
 ///   - audio/ptt: burbuja reproducible inline ([ThreadAudioCubit]).
 ///   - video/documento: tarjeta que descarga y abre con una app externa
 ///     ([MediaOpener]).
@@ -120,19 +123,31 @@ Widget _typedCard(BuildContext context, IconData icon, String label) {
       children: <Widget>[
         Icon(icon, size: 20, color: AppTokens.chatAccent),
         const SizedBox(width: AppTokens.sp2),
-        Text(
-          label,
-          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+        // Flexible + elipsis: en un slot angosto (p. ej. el cuadro del sticker)
+        // la etiqueta se recorta en vez de desbordar la fila.
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+          ),
         ),
       ],
     ),
   );
 }
 
+/// Lado de la miniatura de imagen (recorte cuadrado) y cota del sticker (que se
+/// pinta a tamaño natural DENTRO de esta caja, sin recorte).
+const double _photoSide = 220;
+const double _stickerMaxSide = 140;
+
 /// Miniatura de imagen/sticker servida por `mediaRef` desde la caché en disco
 /// ([MessageMediaCache]): se ve offline y sobrevive a la expiración de la firma.
 /// Mientras resuelve muestra un spinner; sin bytes (offline sin caché / firma
-/// caída) cae a la tarjeta "no disponible". Tap → visor fullscreen con los bytes.
+/// caída) cae a la tarjeta "no disponible". La imagen abre un visor fullscreen
+/// al tocarla; el sticker no (es un glifo del mensaje, no una foto).
 class _MessageImage extends StatefulWidget {
   const _MessageImage({
     required this.cache,
@@ -193,28 +208,11 @@ class _MessageImageState extends State<_MessageImage> {
 
   @override
   Widget build(BuildContext context) {
-    final side = widget.sticker ? 120.0 : 220.0;
     final b = _bytes;
     if (b != null) {
-      return GestureDetector(
-        key: Key('message.image.${widget.id}'),
-        onTap: () => showMediaViewer(context, bytes: b, url: widget.mediaUrl),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-          child: Image.memory(
-            b,
-            width: side,
-            height: side,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stack) => _typedCard(
-              context,
-              Icons.broken_image_outlined,
-              widget.sticker ? 'Sticker no disponible' : 'Imagen no disponible',
-            ),
-          ),
-        ),
-      );
+      return widget.sticker ? _stickerImage(b) : _photoImage(context, b);
     }
+    final side = widget.sticker ? _stickerMaxSide : _photoSide;
     if (!_resolved) {
       return SizedBox(
         width: side,
@@ -237,6 +235,46 @@ class _MessageImageState extends State<_MessageImage> {
       widget.sticker ? 'Sticker no disponible' : 'Imagen no disponible',
     );
   }
+
+  /// El sticker se pinta transparente y a tamaño natural dentro de un cuadro
+  /// acotado: sin recorte, sin esquinas redondeadas y sin tap a visor.
+  /// `scaleDown` respeta el tamaño natural y sólo encoge si excede la caja (no
+  /// agranda un sticker chico volviéndolo borroso). La caja lleva medidas
+  /// explícitas (como la miniatura de foto) para no depender del tamaño
+  /// intrínseco, que en un `ListView` no está listo al primer layout.
+  Widget _stickerImage(Uint8List b) => Image.memory(
+    b,
+    key: Key('message.sticker.${widget.id}'),
+    width: _stickerMaxSide,
+    height: _stickerMaxSide,
+    fit: BoxFit.scaleDown,
+    errorBuilder: (context, error, stack) => _typedCard(
+      context,
+      Icons.broken_image_outlined,
+      'Sticker no disponible',
+    ),
+  );
+
+  /// La imagen es una miniatura cuadrada de esquinas redondeadas; al tocarla
+  /// abre el visor fullscreen con los bytes cacheados.
+  Widget _photoImage(BuildContext context, Uint8List b) => GestureDetector(
+    key: Key('message.image.${widget.id}'),
+    onTap: () => showMediaViewer(context, bytes: b, url: widget.mediaUrl),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+      child: Image.memory(
+        b,
+        width: _photoSide,
+        height: _photoSide,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) => _typedCard(
+          context,
+          Icons.broken_image_outlined,
+          'Imagen no disponible',
+        ),
+      ),
+    ),
+  );
 }
 
 /// Tarjeta de video/documento con URL firmada: tap descarga y abre con la
