@@ -18,6 +18,7 @@ import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart'
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_media.dart';
+import 'package:ataulfo/features/messages/presentation/widgets/video_playback.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/thread_audio_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/pages/message_thread_page.dart';
 import 'package:ataulfo/features/monitor/data/datasources/monitor_activity_datasource.dart';
@@ -48,6 +49,17 @@ class _MockThreadAudioCubit extends MockCubit<ThreadAudioState>
     implements ThreadAudioCubit {}
 
 class _MockMediaOpener extends Mock implements MediaOpener {}
+
+/// Fake de reproducción de video: registra las URLs abiertas sin tocar el
+/// plugin de video (BuildContext como argumento no se presta a un mock).
+class _FakeVideoPlayback implements VideoPlayback {
+  final List<String> calls = <String>[];
+
+  @override
+  Future<void> open(BuildContext context, {required String url}) async {
+    calls.add(url);
+  }
+}
 
 class _FakeMonitorDs implements MonitorActivityDatasource {
   @override
@@ -89,6 +101,21 @@ final _pngBytes = Uint8List.fromList(
   ),
 );
 
+/// PNG 4×2 (relación de aspecto 2.0): una imagen "ancha" para verificar que el
+/// hilo la pinta a su relación real y no como recorte cuadrado.
+final _widePngBytes = Uint8List.fromList(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR42mMIqDjxHxkzoAsAAFK1FHkNntrXAAAAAElFTkSuQmCC',
+  ),
+);
+
+/// PNG 2×4 (relación de aspecto 0.5): una imagen "alta".
+final _tallPngBytes = Uint8List.fromList(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAAECAYAAACk7+45AAAAEUlEQVR42mMIqDjxH4QZcDMAZy8UeZKbYFMAAAAASUVORK5CYII=',
+  ),
+);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(const MessagesLoadRequested());
@@ -99,12 +126,14 @@ void main() {
   late _MockMessagesBloc bloc;
   late _MockThreadAudioCubit audio;
   late _MockMediaOpener opener;
+  late _FakeVideoPlayback videoPlayback;
   late _MockAuthBloc authBloc;
 
   setUp(() {
     bloc = _MockMessagesBloc();
     audio = _MockThreadAudioCubit();
     opener = _MockMediaOpener();
+    videoPlayback = _FakeVideoPlayback();
     authBloc = _MockAuthBloc();
     when(() => bloc.state).thenReturn(const MessagesInitial());
     when(
@@ -124,18 +153,21 @@ void main() {
         value: const NoopAudioRecorder(),
         child: RepositoryProvider<MediaOpener>.value(
           value: opener,
-          child: MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<MessagesBloc>.value(value: bloc),
-              BlocProvider<ThreadAudioCubit>.value(value: audio),
-              BlocProvider<AuthBloc>.value(value: authBloc),
-              // El footer de actividad live lo lee del scope; inerte aquí (sin
-              // observar) ⇒ no pinta nada.
-              BlocProvider<MonitorLiveCubit>(
-                create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
-              ),
-            ],
-            child: const Scaffold(body: MessageThreadPage()),
+          child: RepositoryProvider<VideoPlayback>.value(
+            value: videoPlayback,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<MessagesBloc>.value(value: bloc),
+                BlocProvider<ThreadAudioCubit>.value(value: audio),
+                BlocProvider<AuthBloc>.value(value: authBloc),
+                // El footer de actividad live lo lee del scope; inerte aquí (sin
+                // observar) ⇒ no pinta nada.
+                BlocProvider<MonitorLiveCubit>(
+                  create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+                ),
+              ],
+              child: const Scaffold(body: MessageThreadPage()),
+            ),
           ),
         ),
       ),
@@ -349,6 +381,131 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets(
+      'cita de una imagen muestra "Foto" con ícono (no texto crudo)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          MessagesLoaded(
+            items: <Message>[
+              msg(
+                externalId: 'origimg',
+                senderLid: 'bob',
+                type: 'image',
+                content: '',
+                mediaRef: 'r',
+              ),
+              msg(
+                externalId: 'reply',
+                direction: MessageDirection.outbound,
+                content: 'mira',
+                quotedId: 'origimg',
+                ts: 1800,
+              ),
+            ],
+            prevCursor: null,
+            isLoadingOlder: false,
+          ),
+        );
+        await tester.pumpWidget(host());
+        final quote = find.byKey(const Key('message.quoted.reply'));
+        expect(
+          find.descendant(of: quote, matching: find.text('Foto')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: quote,
+            matching: find.byIcon(Icons.image_outlined),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('cita de una nota de voz muestra "Nota de voz"', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(
+              externalId: 'origv',
+              senderLid: 'bob',
+              type: 'ptt',
+              content: '',
+            ),
+            msg(
+              externalId: 'reply',
+              direction: MessageDirection.outbound,
+              content: 'ok',
+              quotedId: 'origv',
+              ts: 1800,
+            ),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      final quote = find.byKey(const Key('message.quoted.reply'));
+      expect(
+        find.descendant(of: quote, matching: find.text('Nota de voz')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('tocar una cita resuelta salta y resalta el mensaje original', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(externalId: 'orig', senderLid: 'bob', content: 'el original'),
+            msg(
+              externalId: 'reply',
+              direction: MessageDirection.outbound,
+              content: 'respondo',
+              quotedId: 'orig',
+              ts: 1800,
+            ),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('message.quoted.reply')));
+      await tester.pumpAndSettle(); // ensureVisible + resalta el original
+      final deco =
+          tester
+                  .widget<DecoratedBox>(
+                    find.byKey(const Key('message.orig.hl')),
+                  )
+                  .decoration
+              as BoxDecoration;
+      expect(deco.color, AppTokens.chatAccent.withValues(alpha: 0.15));
+      // Drena el temporizador de limpieza del destello (no dejar timers vivos).
+      await tester.pump(const Duration(milliseconds: 1500));
+    });
+
+    testWidgets('la cita a un citado fuera de ventana no es interactiva', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(externalId: 'reply', content: 'respondo', quotedId: 'ausente'),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      // La cita fallback no lleva el gesto de salto (no es tocable).
+      expect(find.byKey(const Key('message.quoted.reply.tap')), findsNothing);
+      expect(find.byKey(const Key('message.quoted.reply')), findsOneWidget);
     });
 
     testWidgets('mensaje sin quotedId no muestra bloque de cita', (
@@ -609,20 +766,35 @@ void main() {
       expect(find.text('Imagen no disponible'), findsOneWidget);
     });
 
-    testWidgets('video → tarjeta de tipo (ícono + etiqueta)', (tester) async {
+    testWidgets(
+      'video con URL → burbuja con play, reproduce dentro de la app',
+      (tester) async {
+        await pumpMsg(
+          tester,
+          msg(
+            externalId: 'vid',
+            type: 'video',
+            content: '',
+            mediaUrl: 'https://cdn/x.mp4',
+          ),
+        );
+        expect(find.byKey(const Key('message.video.vid')), findsOneWidget);
+        expect(find.byIcon(Icons.play_circle_fill), findsOneWidget);
+        await tester.tap(find.byKey(const Key('message.video.vid')));
+        await tester.pump();
+        expect(videoPlayback.calls, <String>['https://cdn/x.mp4']);
+      },
+    );
+
+    testWidgets('video sin URL firmada → tarjeta de tipo (no reproducible)', (
+      tester,
+    ) async {
       await pumpMsg(
         tester,
-        msg(
-          externalId: 'vid',
-          type: 'video',
-          content: '',
-          mediaUrl: 'https://cdn/x.mp4',
-        ),
+        msg(externalId: 'vid2', type: 'video', content: ''),
       );
       expect(find.text('Video'), findsOneWidget);
-      expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
-      // v1: el video no se reproduce inline (sin dep de player).
-      expect(find.byType(Image), findsNothing);
+      expect(find.byKey(const Key('message.video.vid2')), findsNothing);
     });
 
     testWidgets('audio → tarjeta "Audio"', (tester) async {
@@ -630,12 +802,110 @@ void main() {
       expect(find.text('Audio'), findsOneWidget);
     });
 
-    testWidgets('documento → tarjeta "Documento"', (tester) async {
+    testWidgets('documento sin nombre → "Documento"', (tester) async {
       await pumpMsg(
         tester,
         msg(externalId: 'doc', type: 'document', content: ''),
       );
       expect(find.text('Documento'), findsOneWidget);
+    });
+
+    AspectRatio imageAspectOf(WidgetTester tester) =>
+        tester.widget<AspectRatio>(
+          find.descendant(
+            of: find.byType(MessageMediaContent),
+            matching: find.byType(AspectRatio),
+          ),
+        );
+
+    testWidgets('imagen ancha se pinta a su relación de aspecto (~2.0)', (
+      tester,
+    ) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'imgw',
+          type: 'image',
+          content: '',
+          mediaRef: 'ref-w',
+          mediaUrl: 'https://cdn/w.png',
+        ),
+        cache: fakeMessageMediaCache(downloadResult: _widePngBytes),
+      );
+      await tester.pumpAndSettle();
+      expect(imageAspectOf(tester).aspectRatio, closeTo(2.0, 0.01));
+    });
+
+    testWidgets('imagen alta se pinta a su relación de aspecto (~0.5)', (
+      tester,
+    ) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'imgt',
+          type: 'image',
+          content: '',
+          mediaRef: 'ref-t',
+          mediaUrl: 'https://cdn/t.png',
+        ),
+        cache: fakeMessageMediaCache(downloadResult: _tallPngBytes),
+      );
+      await tester.pumpAndSettle();
+      expect(imageAspectOf(tester).aspectRatio, closeTo(0.5, 0.01));
+    });
+
+    testWidgets(
+      'imagen a relación de aspecto sigue abriendo el visor al tocar',
+      (tester) async {
+        await pumpMsg(
+          tester,
+          msg(
+            externalId: 'imgv',
+            type: 'image',
+            content: '',
+            mediaRef: 'ref-v',
+            mediaUrl: 'https://cdn/v.png',
+          ),
+          cache: fakeMessageMediaCache(downloadResult: _widePngBytes),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('message.image.imgv')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('media_viewer')), findsOneWidget);
+      },
+    );
+
+    testWidgets('documento con nombre lo muestra y es tocable (abre)', (
+      tester,
+    ) async {
+      when(() => opener.open(url: any(named: 'url'))).thenAnswer((_) async {});
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'doc1',
+          type: 'document',
+          content: 'factura.pdf',
+          mediaUrl: 'https://cdn/factura.pdf',
+        ),
+      );
+      await tester.pump();
+      // El nombre se muestra UNA vez (en la tarjeta), sin duplicarse debajo.
+      expect(find.text('factura.pdf'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('message.doc.doc1')));
+      await tester.pump();
+      verify(() => opener.open(url: 'https://cdn/factura.pdf')).called(1);
+    });
+
+    testWidgets('documento sin URL muestra el nombre pero no es tocable', (
+      tester,
+    ) async {
+      await pumpMsg(
+        tester,
+        msg(externalId: 'doc3', type: 'document', content: 'informe.docx'),
+      );
+      await tester.pump();
+      expect(find.text('informe.docx'), findsOneWidget);
+      expect(find.byKey(const Key('message.doc.doc3')), findsNothing);
     });
 
     testWidgets(
@@ -1225,6 +1495,72 @@ void main() {
       );
     });
 
+    testWidgets(
+      'Responder fija la cita, muestra la barra y enviar lleva quotedId',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          MessagesLoaded(
+            items: <Message>[
+              msg(externalId: 'orig', senderLid: 'bob', content: 'el original'),
+            ],
+            prevCursor: null,
+            isLoadingOlder: false,
+          ),
+        );
+        await tester.pumpWidget(host());
+        await tester.longPress(find.text('el original'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('message.reply.orig')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('composer.reply_bar')), findsOneWidget);
+        expect(find.text('Respondiendo a bob'), findsOneWidget);
+
+        await tester.enterText(
+          find.byKey(const Key('composer.input')),
+          'respondo',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('composer.send')));
+        await tester.pump();
+        verify(
+          () => bloc.add(
+            const MessagesSendRequested(
+              type: 'text',
+              content: 'respondo',
+              quotedId: 'orig',
+            ),
+          ),
+        ).called(1);
+        // Tras enviar, la cita se limpia y la barra desaparece.
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('composer.reply_bar')), findsNothing);
+      },
+    );
+
+    testWidgets('cancelar la respuesta oculta la barra de cita', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(externalId: 'orig', senderLid: 'bob', content: 'hola'),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('hola'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('message.reply.orig')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('composer.reply_bar')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('composer.reply_cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('composer.reply_bar')), findsNothing);
+    });
+
     testWidgets('enviar con sólo espacios no dispatcha', (tester) async {
       when(() => bloc.state).thenReturn(loadedEmpty);
       await tester.pumpWidget(host());
@@ -1659,32 +1995,32 @@ void main() {
       when(() => opener.open(url: any(named: 'url'))).thenAnswer((_) async {});
 
       await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('message.open.d1')));
+      await tester.tap(find.byKey(const Key('message.doc.d1')));
       await tester.pumpAndSettle();
 
       verify(() => opener.open(url: 'https://m/f.pdf')).called(1);
     });
 
-    testWidgets('video con mediaUrl: tap lo abre con la app externa', (
+    testWidgets('video con mediaUrl: tap lo reproduce dentro de la app', (
       tester,
     ) async {
       seed(msg(externalId: 'v1', type: 'video', mediaUrl: 'https://m/v.mp4'));
-      when(() => opener.open(url: any(named: 'url'))).thenAnswer((_) async {});
 
       await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('message.open.v1')));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('message.video.v1')));
+      await tester.pump();
 
-      verify(() => opener.open(url: 'https://m/v.mp4')).called(1);
+      expect(videoPlayback.calls, <String>['https://m/v.mp4']);
     });
 
     testWidgets('documento sin mediaUrl no es tocable (sin URL firmada)', (
       tester,
     ) async {
-      seed(msg(externalId: 'd1', type: 'document'));
+      seed(msg(externalId: 'd1', type: 'document', content: 'contrato.pdf'));
       await tester.pumpWidget(host());
-      expect(find.byKey(const Key('message.open.d1')), findsNothing);
-      expect(find.text('Documento'), findsOneWidget);
+      expect(find.byKey(const Key('message.doc.d1')), findsNothing);
+      // Sin URL firmada la tarjeta informa el nombre pero no es tocable.
+      expect(find.text('contrato.pdf'), findsOneWidget);
     });
 
     testWidgets('fallo al abrir anuncia SnackBar', (tester) async {
@@ -1696,7 +2032,7 @@ void main() {
       ).thenThrow(const MediaOpenException('sin app'));
 
       await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('message.open.d1')));
+      await tester.tap(find.byKey(const Key('message.doc.d1')));
       await tester.pumpAndSettle();
 
       expect(find.text('No se pudo abrir el archivo'), findsOneWidget);

@@ -20,6 +20,7 @@ import '../../domain/entities/message.dart';
 import '../../domain/failures/messages_failure.dart';
 import '../../domain/reactions.dart';
 import '../bloc/messages_bloc.dart';
+import '../bloc/reply_draft_cubit.dart';
 import '../bloc/thread_audio_cubit.dart';
 import '../../../monitor/presentation/widgets/alert_banner.dart';
 import '../../../monitor/presentation/widgets/live_activity.dart';
@@ -41,41 +42,46 @@ class MessageThreadPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _AudioFailuresListener(
-      child: _ReactFailuresListener(
-        child: BlocBuilder<MessagesBloc, MessagesState>(
-          builder: (context, state) => Column(
-            children: <Widget>[
-              Expanded(
-                child: switch (state) {
-                  MessagesInitial() ||
-                  MessagesLoading() => const _LoadingView(),
-                  MessagesLoaded(
-                    items: final items,
-                    prevCursor: final prevCursor,
-                    isLoadingOlder: final isLoadingOlder,
-                    pending: final pending,
-                  ) =>
-                    (items.isEmpty && pending.isEmpty)
-                        ? const _EmptyView()
-                        : _ThreadView(
-                            items: items,
-                            pending: pending,
-                            hasMore: prevCursor != null,
-                            isLoadingOlder: isLoadingOlder,
-                          ),
-                  MessagesFailed(failure: final f) => _FailedView(failure: f),
-                },
-              ),
-              // Alerta crítica del bot (desconexión, etc.) y actividad EN VIVO
-              // entre el hilo y el composer. Inertes para no-admin (cubit sin
-              // observar) ⇒ no pintan.
-              const AlertBanner(),
-              const LiveActivity(),
-              // El composer sólo con hilo cargado: enviar exige una conversación
-              // abierta (en Loading/Failed no hay a dónde escribir).
-              if (state is MessagesLoaded) const MessageComposer(),
-            ],
+    // El borrador de respuesta vive en el scope del hilo: lo fija la hoja de
+    // acciones de un mensaje y lo consume el composer (barra de cita + quotedId).
+    return BlocProvider<ReplyDraftCubit>(
+      create: (_) => ReplyDraftCubit(),
+      child: _AudioFailuresListener(
+        child: _ReactFailuresListener(
+          child: BlocBuilder<MessagesBloc, MessagesState>(
+            builder: (context, state) => Column(
+              children: <Widget>[
+                Expanded(
+                  child: switch (state) {
+                    MessagesInitial() ||
+                    MessagesLoading() => const _LoadingView(),
+                    MessagesLoaded(
+                      items: final items,
+                      prevCursor: final prevCursor,
+                      isLoadingOlder: final isLoadingOlder,
+                      pending: final pending,
+                    ) =>
+                      (items.isEmpty && pending.isEmpty)
+                          ? const _EmptyView()
+                          : _ThreadView(
+                              items: items,
+                              pending: pending,
+                              hasMore: prevCursor != null,
+                              isLoadingOlder: isLoadingOlder,
+                            ),
+                    MessagesFailed(failure: final f) => _FailedView(failure: f),
+                  },
+                ),
+                // Alerta crítica del bot (desconexión, etc.) y actividad EN VIVO
+                // entre el hilo y el composer. Inertes para no-admin (cubit sin
+                // observar) ⇒ no pintan.
+                const AlertBanner(),
+                const LiveActivity(),
+                // El composer sólo con hilo cargado: enviar exige una conversación
+                // abierta (en Loading/Failed no hay a dónde escribir).
+                if (state is MessagesLoaded) const MessageComposer(),
+              ],
+            ),
           ),
         ),
       ),
@@ -218,7 +224,7 @@ class _FailedView extends StatelessWidget {
 /// (abajo): el item 0 (más nuevo) se pinta al fondo y el scroll hacia arriba
 /// recorre lo más viejo. Al acercarse al tope (`maxScrollExtent` en una lista
 /// invertida) y habiendo más tramo, dispara la carga hacia atrás.
-class _ThreadView extends StatelessWidget {
+class _ThreadView extends StatefulWidget {
   const _ThreadView({
     required this.items,
     required this.pending,
@@ -234,21 +240,76 @@ class _ThreadView extends StatelessWidget {
   final bool hasMore;
   final bool isLoadingOlder;
 
-  bool _onScroll(BuildContext context, ScrollNotification n) {
+  @override
+  State<_ThreadView> createState() => _ThreadViewState();
+}
+
+class _ThreadViewState extends State<_ThreadView> {
+  final ScrollController _controller = ScrollController();
+
+  /// Un `GlobalKey` estable por mensaje renderable: permite `ensureVisible` al
+  /// saltar a una cita. Estable (no se recrea por build) para no reparentar los
+  /// elementos de la lista.
+  final Map<String, GlobalKey> _itemKeys = <String, GlobalKey>{};
+
+  /// El mensaje resaltado tras un salto a cita (destello temporal), o `null`.
+  String? _highlightId;
+  Timer? _highlightTimer;
+
+  @override
+  void dispose() {
+    _highlightTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  GlobalKey _keyFor(String id) => _itemKeys.putIfAbsent(id, () => GlobalKey());
+
+  bool _onScroll(ScrollNotification n) {
     if (n is ScrollUpdateNotification &&
-        hasMore &&
-        !isLoadingOlder &&
+        widget.hasMore &&
+        !widget.isLoadingOlder &&
         n.metrics.pixels >= n.metrics.maxScrollExtent - 240) {
       context.read<MessagesBloc>().add(const MessagesOlderRequested());
     }
     return false;
   }
 
+  /// Salta al mensaje citado y lo resalta un instante. Si el original no está
+  /// construido (muy arriba, fuera del tramo materializado) no hay a dónde
+  /// desplazar con precisión: lo avisa en vez de saltar a ciegas.
+  Future<void> _jumpToQuoted(String id) async {
+    final ctx = _itemKeys[id]?.currentContext;
+    final messenger = ScaffoldMessenger.of(context);
+    if (ctx == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'El mensaje original está más arriba en la conversación',
+          ),
+        ),
+      );
+      return;
+    }
+    await Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 300),
+      alignment: 0.5,
+      curve: Curves.easeInOut,
+    );
+    if (!mounted) return;
+    _highlightTimer?.cancel();
+    setState(() => _highlightId = id);
+    _highlightTimer = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _highlightId = null);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Las reacciones (type:'reaction') se doblan sobre su target en vez de
     // pintarse como burbuja; `renderable` son los mensajes que sí se pintan.
-    final folded = foldReactions(items);
+    final folded = foldReactions(widget.items);
     final renderable = folded.renderable;
     // Índice por externalId para resolver las citas (reply→mensaje citado)
     // contra la ventana cargada. Un citado fuera de la ventana queda sin
@@ -267,28 +328,34 @@ class _ThreadView extends StatelessWidget {
         day = mDay;
       }
       rowsAsc.add(
-        _MessageBubble(
-          message: m,
-          quoted: m.quotedId == null ? null : byId[m.quotedId],
-          reactions: folded.byTarget[m.externalId],
+        KeyedSubtree(
+          key: _keyFor(m.externalId),
+          child: _MessageBubble(
+            message: m,
+            quoted: m.quotedId == null ? null : byId[m.quotedId],
+            reactions: folded.byTarget[m.externalId],
+            highlighted: m.externalId == _highlightId,
+            onJumpToQuoted: _jumpToQuoted,
+          ),
         ),
       );
     }
     final rows = rowsAsc.reversed.toList(growable: false);
     // Las pendientes son lo más nuevo: en la lista invertida (índice 0 = fondo)
     // ocupan el tramo inicial, en orden nueva→vieja, BAJO el último mensaje real.
-    final pendingNewestFirst = pending.reversed.toList(growable: false);
+    final pendingNewestFirst = widget.pending.reversed.toList(growable: false);
     final pendingCount = pendingNewestFirst.length;
     final rowCount = rows.length;
     return NotificationListener<ScrollNotification>(
-      onNotification: (n) => _onScroll(context, n),
+      onNotification: _onScroll,
       child: ListView.builder(
+        controller: _controller,
         reverse: true,
         physics: const AlwaysScrollableScrollPhysics(),
         // El padding inferior NO suma el safe-area: el composer (abajo) lo
         // absorbe; sumarlo aquí dejaría un hueco doble sobre el composer.
         padding: const EdgeInsets.all(AppTokens.sp4),
-        itemCount: pendingCount + rowCount + (isLoadingOlder ? 1 : 0),
+        itemCount: pendingCount + rowCount + (widget.isLoadingOlder ? 1 : 0),
         itemBuilder: (context, i) {
           // Tramo inferior (índices [0, pendingCount)): burbujas optimistas.
           if (i < pendingCount) {
@@ -541,6 +608,7 @@ const List<String> _quickReactions = <String>[
 /// ANTES del await del sheet.
 Future<void> _showMessageActions(BuildContext context, Message message) async {
   final bloc = context.read<MessagesBloc>();
+  final replyDraft = context.read<ReplyDraftCubit>();
   final messenger = ScaffoldMessenger.of(context);
   final messageId = message.externalId;
   final isOutbound = message.direction == MessageDirection.outbound;
@@ -593,6 +661,17 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
                       ),
                     ),
                 ],
+              ),
+              const Divider(height: AppTokens.sp6),
+              ListTile(
+                key: Key('message.reply.$messageId'),
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.reply_outlined),
+                title: const Text('Responder'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  replyDraft.setReply(message);
+                },
               ),
               if (isText) ...<Widget>[
                 const Divider(height: AppTokens.sp6),
@@ -680,7 +759,13 @@ Future<void> _showSelectableText(BuildContext context, String content) {
 /// El texto se pinta directo; la media va por `_MediaContent`. El OUTBOUND
 /// muestra su estado de entrega; las reacciones cuelgan bajo la burbuja.
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, this.quoted, this.reactions});
+  const _MessageBubble({
+    required this.message,
+    this.quoted,
+    this.reactions,
+    this.highlighted = false,
+    this.onJumpToQuoted,
+  });
 
   final Message message;
 
@@ -692,6 +777,14 @@ class _MessageBubble extends StatelessWidget {
   /// Reacciones agregadas sobre este mensaje (emoji + conteo), o `null`/vacío
   /// si nadie reaccionó. Las pinta una fila de pills bajo la burbuja.
   final List<ReactionTally>? reactions;
+
+  /// Resalta la burbuja con un destello temporal (tras saltar a ella desde una
+  /// cita).
+  final bool highlighted;
+
+  /// Salta al mensaje citado (por su `externalId`) al tocar el bloque de cita;
+  /// `null` ⇒ la cita no es interactiva.
+  final void Function(String quotedId)? onJumpToQuoted;
 
   @override
   Widget build(BuildContext context) {
@@ -721,83 +814,107 @@ class _MessageBubble extends StatelessWidget {
       alignment: isOutbound ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
-        child: Column(
-          crossAxisAlignment: isOutbound
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            GestureDetector(
-              // opaque: sin fondo de burbuja (sticker bare) el rect igual captura
-              // el long-press en toda su área, no sólo sobre los hijos pintados.
-              behavior: HitTestBehavior.opaque,
-              onLongPress: () => _showMessageActions(context, m),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-                ),
-                child: Container(
-                  padding: isStickerBare
-                      ? EdgeInsets.zero
-                      : const EdgeInsets.symmetric(
-                          horizontal: AppTokens.sp4,
-                          vertical: AppTokens.sp3,
-                        ),
-                  decoration: isStickerBare
-                      ? null
-                      : BoxDecoration(
-                          // El OUTBOUND lleva un matiz sutil del verde de
-                          // sección sobre surface3: distingue los lados sin
-                          // gritar (el verde pleno es de acentos, no de fills).
-                          color: isOutbound
-                              ? _outboundFill
-                              : AppTokens.surface2,
-                          borderRadius: _bubbleRadius(mine: isOutbound),
-                        ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      if (isGroupInbound) ...<Widget>[
-                        Text(
-                          m.senderLid,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: AppTokens.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                      ],
-                      if (m.quotedId != null) ...<Widget>[
-                        _QuotedPreview(parentId: m.externalId, quoted: quoted),
-                        const SizedBox(height: AppTokens.sp1),
-                      ],
-                      if (isText)
-                        Text(m.content, style: textTheme.bodyLarge)
-                      else
-                        MessageMediaContent(message: m),
-                      const SizedBox(height: AppTokens.sp1),
-                      Row(
+        // Destello temporal al saltar a esta burbuja desde una cita. Es un
+        // DecoratedBox (no un Container) para no interferir con el layout ni con
+        // los tests que localizan el Container de la burbuja por su radio.
+        child: DecoratedBox(
+          key: Key('message.${m.externalId}.hl'),
+          decoration: BoxDecoration(
+            color: highlighted
+                ? AppTokens.chatAccent.withValues(alpha: 0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppTokens.sp1),
+            child: Column(
+              crossAxisAlignment: isOutbound
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                GestureDetector(
+                  // opaque: sin fondo de burbuja (sticker bare) el rect igual captura
+                  // el long-press en toda su área, no sólo sobre los hijos pintados.
+                  behavior: HitTestBehavior.opaque,
+                  onLongPress: () => _showMessageActions(context, m),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+                    ),
+                    child: Container(
+                      padding: isStickerBare
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.symmetric(
+                              horizontal: AppTokens.sp4,
+                              vertical: AppTokens.sp3,
+                            ),
+                      decoration: isStickerBare
+                          ? null
+                          : BoxDecoration(
+                              // El OUTBOUND lleva un matiz sutil del verde de
+                              // sección sobre surface3: distingue los lados sin
+                              // gritar (el verde pleno es de acentos, no de fills).
+                              color: isOutbound
+                                  ? _outboundFill
+                                  : AppTokens.surface2,
+                              borderRadius: _bubbleRadius(mine: isOutbound),
+                            ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          Text(smartTimestamp(m.timestampMs), style: caption),
-                          if (isOutbound && m.status != null) ...<Widget>[
-                            const SizedBox(width: AppTokens.sp2),
-                            _statusTick(m.status!),
+                          if (isGroupInbound) ...<Widget>[
+                            Text(
+                              m.senderLid,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: AppTokens.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
                           ],
+                          if (m.quotedId != null) ...<Widget>[
+                            _QuotedPreview(
+                              parentId: m.externalId,
+                              quoted: quoted,
+                              onTap: quoted == null
+                                  ? null
+                                  : () => onJumpToQuoted?.call(m.quotedId!),
+                            ),
+                            const SizedBox(height: AppTokens.sp1),
+                          ],
+                          if (isText)
+                            Text(m.content, style: textTheme.bodyLarge)
+                          else
+                            MessageMediaContent(message: m),
+                          const SizedBox(height: AppTokens.sp1),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Text(
+                                smartTimestamp(m.timestampMs),
+                                style: caption,
+                              ),
+                              if (isOutbound && m.status != null) ...<Widget>[
+                                const SizedBox(width: AppTokens.sp2),
+                                _statusTick(m.status!),
+                              ],
+                            ],
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+                if (reactions != null && reactions!.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: AppTokens.sp1),
+                  _ReactionPills(parentId: m.externalId, reactions: reactions!),
+                ],
+              ],
             ),
-            if (reactions != null && reactions!.isNotEmpty) ...<Widget>[
-              const SizedBox(height: AppTokens.sp1),
-              _ReactionPills(parentId: m.externalId, reactions: reactions!),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -842,15 +959,25 @@ class _ReactionPills extends StatelessWidget {
 }
 
 /// Bloque de cita estilo WhatsApp dentro de una burbuja reply: barra izquierda
-/// en el verde de sección + autor y preview del mensaje citado. Si el citado no
-/// está en la ventana cargada (`quoted == null`) cae a un fallback neutro — la
-/// cita igual se dibuja para que el reply no quede huérfano.
+/// en el verde de sección + autor y preview del mensaje citado. Para media el
+/// preview es un ícono + etiqueta por tipo (Foto/Video/Nota de voz/…), no el
+/// texto crudo. Con [onTap] la cita salta al mensaje original. Si el citado no
+/// está en la ventana cargada (`quoted == null`) cae a un fallback neutro y no
+/// es interactiva — la cita igual se dibuja para que el reply no quede huérfano.
 class _QuotedPreview extends StatelessWidget {
-  const _QuotedPreview({required this.parentId, required this.quoted});
+  const _QuotedPreview({
+    required this.parentId,
+    required this.quoted,
+    this.onTap,
+  });
 
   /// `externalId` del mensaje que contiene esta cita (para el `Key`).
   final String parentId;
   final Message? quoted;
+
+  /// Salta al mensaje citado al tocar; `null` ⇒ cita no interactiva (citado
+  /// fuera de la ventana).
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -859,11 +986,9 @@ class _QuotedPreview extends StatelessWidget {
     final author = q == null
         ? null
         : (q.direction == MessageDirection.outbound ? 'Tú' : q.senderLid);
-    final preview = q == null
-        ? 'Mensaje original no disponible'
-        : (q.type == 'text' ? q.content : '[${q.type}]');
+    final (IconData? icon, String preview) = _quotedGlyph(q);
 
-    return Container(
+    final card = Container(
       key: Key('message.quoted.$parentId'),
       decoration: BoxDecoration(
         color: AppTokens.bgBase.withValues(alpha: 0.25),
@@ -898,14 +1023,25 @@ class _QuotedPreview extends StatelessWidget {
                           color: AppTokens.chatAccent,
                         ),
                       ),
-                    Text(
-                      preview,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: AppTokens.text2,
-                        fontStyle: q == null ? FontStyle.italic : null,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        if (icon != null) ...<Widget>[
+                          Icon(icon, size: 14, color: AppTokens.text2),
+                          const SizedBox(width: 4),
+                        ],
+                        Flexible(
+                          child: Text(
+                            preview,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: AppTokens.text2,
+                              fontStyle: q == null ? FontStyle.italic : null,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -915,7 +1051,34 @@ class _QuotedPreview extends StatelessWidget {
         ),
       ),
     );
+    if (onTap == null) return card;
+    return GestureDetector(
+      key: Key('message.quoted.$parentId.tap'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: card,
+    );
   }
+}
+
+/// Ícono + etiqueta legible del mensaje citado según su tipo. Para texto no
+/// lleva ícono y muestra el contenido; para media, un glifo por tipo. `null` ⇒
+/// fallback (citado fuera de la ventana).
+(IconData?, String) _quotedGlyph(Message? q) {
+  if (q == null) return (null, 'Mensaje original no disponible');
+  return switch (q.type) {
+    'text' => (null, q.content),
+    'image' => (Icons.image_outlined, 'Foto'),
+    'sticker' => (Icons.emoji_emotions_outlined, 'Sticker'),
+    'video' => (Icons.videocam_outlined, 'Video'),
+    'ptt' => (Icons.mic_none_outlined, 'Nota de voz'),
+    'audio' => (Icons.mic_none_outlined, 'Audio'),
+    'document' => (
+      Icons.description_outlined,
+      q.content.trim().isEmpty ? 'Documento' : q.content.trim(),
+    ),
+    _ => (null, '[${q.type}]'),
+  };
 }
 
 /// Tick de entrega estilo mensajería: ✓ enviado, ✓✓ entregado (gris), ✓✓ leído

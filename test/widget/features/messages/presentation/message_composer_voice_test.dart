@@ -9,6 +9,7 @@ import 'package:ataulfo/features/messages/data/cache/message_media_cache.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/repositories/audio_recorder.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
+import 'package:ataulfo/features/messages/presentation/bloc/reply_draft_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
 import 'package:ataulfo/features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -114,24 +115,29 @@ void main() {
     when(() => qrBloc.state).thenReturn(const QuickRepliesLoading());
   });
 
-  Widget host(AudioRecorder recorder) => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: MultiRepositoryProvider(
-      providers: <RepositoryProvider<dynamic>>[
-        RepositoryProvider<MediaFilePicker>.value(value: picker),
-        RepositoryProvider<MediaRepository>.value(value: mediaRepo),
-        RepositoryProvider<MessageMediaCache>.value(value: mediaCache),
-        RepositoryProvider<AudioRecorder>.value(value: recorder),
-      ],
-      child: MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<MessagesBloc>.value(value: msgBloc),
-          BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
-        ],
-        child: Scaffold(body: MessageComposer(now: () => fakeNow)),
-      ),
-    ),
-  );
+  Widget host(AudioRecorder recorder, {ReplyDraftCubit? replyDraft}) =>
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: MultiRepositoryProvider(
+          providers: <RepositoryProvider<dynamic>>[
+            RepositoryProvider<MediaFilePicker>.value(value: picker),
+            RepositoryProvider<MediaRepository>.value(value: mediaRepo),
+            RepositoryProvider<MessageMediaCache>.value(value: mediaCache),
+            RepositoryProvider<AudioRecorder>.value(value: recorder),
+          ],
+          child: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<MessagesBloc>.value(value: msgBloc),
+              BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
+              if (replyDraft != null)
+                BlocProvider<ReplyDraftCubit>.value(value: replyDraft)
+              else
+                BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
+            ],
+            child: Scaffold(body: MessageComposer(now: () => fakeNow)),
+          ),
+        ),
+      );
 
   /// Mantiene el dedo sobre el micrófono y deja que `start()` resuelva. Devuelve
   /// el gesto vivo para deslizar/soltar.
@@ -206,6 +212,41 @@ void main() {
     await g.up();
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+    'con respuesta en curso, la barra de cita se ve TAMBIÉN al grabar',
+    (tester) async {
+      final draft = ReplyDraftCubit()
+        ..setReply(
+          const Message(
+            externalId: 'orig',
+            chatLid: 'c1',
+            senderLid: 'bob',
+            kind: MessageKind.dm,
+            direction: MessageDirection.inbound,
+            type: 'text',
+            content: 'hola',
+            mediaRef: null,
+            mediaUrl: null,
+            quotedId: null,
+            timestampMs: 1700,
+            status: null,
+          ),
+        );
+      addTearDown(draft.close);
+      final recorder = _FakeRecorder();
+      await tester.pumpWidget(host(recorder, replyDraft: draft));
+      await tester.pump();
+      // Barra de cita visible en el composer normal…
+      expect(find.byKey(const Key('composer.reply_bar')), findsOneWidget);
+      final g = await pressMic(tester);
+      // …y sigue visible sobre la barra de grabación (no desaparece).
+      expect(find.byKey(const Key('voice.hold.bar')), findsOneWidget);
+      expect(find.byKey(const Key('composer.reply_bar')), findsOneWidget);
+      await g.up();
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('doble pulsación inicia la grabación una sola vez', (
     tester,

@@ -362,6 +362,25 @@ void main() {
       });
     });
 
+    test('respuesta → body con quotedId', () async {
+      stubPost(postResp(200, body: sentMsg()));
+      await ds.send(
+        'b1',
+        'lid-1',
+        clientToken: 'ct-3',
+        type: 'text',
+        content: 'respondo',
+        quotedId: 'orig-1',
+      );
+      final c = capturedPost();
+      expect(c[1], <String, dynamic>{
+        'clientToken': 'ct-3',
+        'type': 'text',
+        'content': 'respondo',
+        'quotedId': 'orig-1',
+      });
+    });
+
     test('chatLid con `@` → segmento percent-encodeado', () async {
       stubPost(postResp(200, body: sentMsg()));
       await ds.send(

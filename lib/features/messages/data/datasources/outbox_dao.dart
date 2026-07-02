@@ -30,6 +30,7 @@ class OutboxDao {
     required String content,
     String? mediaRef,
     List<int>? waveform,
+    String? quotedId,
   }) {
     final nowMs = _nowMs();
     final payload = jsonEncode(<String, dynamic>{
@@ -37,6 +38,7 @@ class OutboxDao {
       'content': content,
       'mediaRef': ?mediaRef,
       'waveform': ?waveform,
+      'quotedId': ?quotedId,
     });
     return _db
         .into(_db.outbox)

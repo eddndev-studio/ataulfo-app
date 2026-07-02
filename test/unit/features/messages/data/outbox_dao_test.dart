@@ -61,6 +61,22 @@ void main() {
     });
   });
 
+  test('enqueueSend de una respuesta guarda quotedId en el payload', () async {
+    await dao.enqueueSend(
+      botId: 'b1',
+      chatLid: 'c1',
+      clientToken: 't1',
+      type: 'text',
+      content: 'respondo',
+      quotedId: 'orig-1',
+    );
+    expect(jsonDecode((await only()).payload), {
+      'type': 'text',
+      'content': 'respondo',
+      'quotedId': 'orig-1',
+    });
+  });
+
   test('enqueueSend de nota de voz guarda el waveform en el payload', () async {
     await dao.enqueueSend(
       botId: 'b1',

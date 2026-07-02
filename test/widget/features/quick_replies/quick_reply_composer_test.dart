@@ -3,6 +3,7 @@ import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/repositories/audio_recorder.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
+import 'package:ataulfo/features/messages/presentation/bloc/reply_draft_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
 import 'package:ataulfo/features/quick_replies/domain/entities/quick_reply.dart';
 import 'package:ataulfo/features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
@@ -55,6 +56,7 @@ void main() {
         providers: <BlocProvider<dynamic>>[
           BlocProvider<MessagesBloc>.value(value: msgBloc),
           BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
+          BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
         ],
         child: const Scaffold(body: MessageComposer()),
       ),

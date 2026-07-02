@@ -54,6 +54,23 @@ void main() {
     expect(entry.errorKind, 'forbidden');
   });
 
+  test('respuesta → quotedId del payload', () async {
+    final row = await insert(
+      (b) => b.copyWith(
+        payload: const Value(
+          '{"type":"text","content":"respondo","quotedId":"orig-1"}',
+        ),
+      ),
+    );
+    final entry = OutboxEntryMapper.fromRow(row)!;
+    expect(entry.quotedId, 'orig-1');
+  });
+
+  test('envío normal → quotedId null', () async {
+    final row = await insert((b) => b);
+    expect(OutboxEntryMapper.fromRow(row)!.quotedId, isNull);
+  });
+
   test('payload corrupto → null (la fila se filtra)', () async {
     final row = await insert(
       (b) => b.copyWith(payload: const Value('no-json')),

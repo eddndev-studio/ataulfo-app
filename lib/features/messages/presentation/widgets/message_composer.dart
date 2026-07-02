@@ -12,8 +12,10 @@ import '../../../media/domain/repositories/media_repository.dart';
 import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../../quick_replies/presentation/widgets/quick_replies_sheet.dart';
 import '../../data/cache/message_media_cache.dart';
+import '../../domain/entities/message.dart';
 import '../../domain/repositories/audio_recorder.dart';
 import '../bloc/messages_bloc.dart';
+import '../bloc/reply_draft_cubit.dart';
 import 'voice_recording_bar.dart';
 
 /// Acción decidida al soltar el micrófono (o al cancelarse el puntero), por si el
@@ -127,9 +129,15 @@ class _MessageComposerState extends State<MessageComposer> {
   }
 
   void _send(String text) {
+    final replyDraft = context.read<ReplyDraftCubit>();
     context.read<MessagesBloc>().add(
-      MessagesSendRequested(type: 'text', content: text),
+      MessagesSendRequested(
+        type: 'text',
+        content: text,
+        quotedId: replyDraft.state?.externalId,
+      ),
     );
+    replyDraft.clear();
   }
 
   // ── Gesto del micrófono ───────────────────────────────────────────────────
@@ -319,6 +327,11 @@ class _MessageComposerState extends State<MessageComposer> {
   /// Captura bloc/picker/repo y el messenger ANTES del primer await.
   Future<void> _attach() async {
     final bloc = context.read<MessagesBloc>();
+    final replyDraft = context.read<ReplyDraftCubit>();
+    // La cita se captura al INICIAR (no tras el upload): una respuesta que el
+    // operador fije mientras la imagen sube es para su próximo mensaje, no para
+    // este envío en vuelo.
+    final replyingToId = replyDraft.state?.externalId;
     final picker = context.read<MediaFilePicker>();
     final mediaRepo = context.read<MediaRepository>();
     final messenger = ScaffoldMessenger.of(context);
@@ -341,8 +354,10 @@ class _MessageComposerState extends State<MessageComposer> {
           type: 'image',
           content: _ctrl.text.trim(),
           mediaRef: uploaded.ref,
+          quotedId: replyingToId,
         ),
       );
+      if (replyingToId != null) replyDraft.clear();
       _ctrl.clear();
     } on MediaFailure catch (f) {
       messenger.showSnackBar(SnackBar(content: Text(_uploadError(f))));
@@ -367,6 +382,10 @@ class _MessageComposerState extends State<MessageComposer> {
   /// del primer await.
   Future<void> _stopAndSend() async {
     final bloc = context.read<MessagesBloc>();
+    final replyDraft = context.read<ReplyDraftCubit>();
+    // Cita capturada al iniciar el envío (ver _attach): no la altera un borrador
+    // fijado mientras la nota de voz sube.
+    final replyingToId = replyDraft.state?.externalId;
     final mediaRepo = context.read<MediaRepository>();
     final mediaCache = context.read<MessageMediaCache>();
     final messenger = ScaffoldMessenger.of(context);
@@ -412,8 +431,10 @@ class _MessageComposerState extends State<MessageComposer> {
           content: '',
           mediaRef: uploaded.ref,
           waveform: voice.waveform.isEmpty ? null : voice.waveform,
+          quotedId: replyingToId,
         ),
       );
+      if (replyingToId != null) replyDraft.clear();
     } on MediaFailure catch (f) {
       messenger.showSnackBar(SnackBar(content: Text(_voiceUploadError(f))));
     } finally {
@@ -535,8 +556,13 @@ class _MessageComposerState extends State<MessageComposer> {
   }
 
   Widget _buildBody() {
+    // El borrador de respuesta pinta una barra de cita SOBRE el composer y sobre
+    // las barras de grabación: mientras se responde, el operador siempre ve a
+    // quién responde (y puede cancelar), incluso grabando una nota de voz.
+    final replyingTo = context.watch<ReplyDraftCubit>().state;
+    final Widget body;
     if (_recording && _locked) {
-      return VoiceRecordingBar(
+      body = VoiceRecordingBar(
         elapsed: _recorder.elapsed,
         amplitude: _recorder.amplitude,
         onCancel: _cancelRecording,
@@ -545,44 +571,133 @@ class _MessageComposerState extends State<MessageComposer> {
         paused: _paused,
         sending: _sendingVoice,
       );
-    }
-    if (_recording) {
-      return VoiceHoldBar(
+    } else if (_recording) {
+      body = VoiceHoldBar(
         elapsed: _recorder.elapsed,
         cancelArmed: _cancelArmed,
         lockProgress: _lockProgress,
         sending: _sendingVoice,
         trailing: _micButton(active: true),
       );
+    } else {
+      body = AppChatComposer(
+        controller: _ctrl,
+        fieldKey: const Key('composer.input'),
+        sendKey: const Key('composer.send'),
+        onSend: _send,
+        emptyTrailing: _canRecord ? _micButton(active: false) : null,
+        leading: <Widget>[
+          IconButton(
+            key: const Key('composer.attach'),
+            tooltip: 'Adjuntar imagen',
+            color: AppTokens.text2,
+            onPressed: _uploading ? null : _attach,
+            icon: _uploading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.image_outlined),
+          ),
+          IconButton(
+            key: const Key('composer.quickreply'),
+            tooltip: 'Respuestas rápidas',
+            color: AppTokens.text2,
+            onPressed: _quickReply,
+            icon: const Icon(Icons.bolt),
+          ),
+        ],
+      );
     }
-    return AppChatComposer(
-      controller: _ctrl,
-      fieldKey: const Key('composer.input'),
-      sendKey: const Key('composer.send'),
-      onSend: _send,
-      emptyTrailing: _canRecord ? _micButton(active: false) : null,
-      leading: <Widget>[
-        IconButton(
-          key: const Key('composer.attach'),
-          tooltip: 'Adjuntar imagen',
-          color: AppTokens.text2,
-          onPressed: _uploading ? null : _attach,
-          icon: _uploading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.image_outlined),
+    if (replyingTo == null) return body;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        _ReplyPreviewBar(
+          message: replyingTo,
+          onCancel: () => context.read<ReplyDraftCubit>().clear(),
         ),
-        IconButton(
-          key: const Key('composer.quickreply'),
-          tooltip: 'Respuestas rápidas',
-          color: AppTokens.text2,
-          onPressed: _quickReply,
-          icon: const Icon(Icons.bolt),
-        ),
+        body,
       ],
     );
   }
 }
+
+/// Barra de cita sobre el composer mientras se compone una respuesta: autor +
+/// preview del mensaje citado (ícono/etiqueta para media) + botón de cancelar.
+class _ReplyPreviewBar extends StatelessWidget {
+  const _ReplyPreviewBar({required this.message, required this.onCancel});
+
+  final Message message;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final author = message.direction == MessageDirection.outbound
+        ? 'Tú'
+        : message.senderLid;
+    final preview = message.type == 'text'
+        ? message.content
+        : _mediaLabel(message);
+    return Container(
+      key: const Key('composer.reply_bar'),
+      color: AppTokens.surface1,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.sp3,
+        vertical: AppTokens.sp2,
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 3,
+            height: 34,
+            margin: const EdgeInsets.only(right: AppTokens.sp2),
+            color: AppTokens.chatAccent,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  'Respondiendo a $author',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: AppTokens.chatAccent,
+                  ),
+                ),
+                Text(
+                  preview,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const Key('composer.reply_cancel'),
+            tooltip: 'Cancelar respuesta',
+            color: AppTokens.text2,
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: onCancel,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Etiqueta corta del mensaje citado no-texto para la barra de respuesta.
+String _mediaLabel(Message m) => switch (m.type) {
+  'image' => 'Foto',
+  'sticker' => 'Sticker',
+  'video' => 'Video',
+  'ptt' => 'Nota de voz',
+  'audio' => 'Audio',
+  'document' => m.content.trim().isEmpty ? 'Documento' : m.content.trim(),
+  _ => '[${m.type}]',
+};

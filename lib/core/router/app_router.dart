@@ -106,6 +106,7 @@ import '../../features/memberships/presentation/pages/select_org_page.dart';
 import '../../features/messages/domain/repositories/audio_engine.dart';
 import '../../features/messages/domain/repositories/audio_recorder.dart';
 import '../../features/messages/domain/repositories/media_opener.dart';
+import '../../features/messages/presentation/widgets/video_playback.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
 import '../../features/messages/presentation/bloc/messages_bloc.dart';
 import '../../features/messages/presentation/bloc/thread_audio_cubit.dart';
@@ -852,8 +853,12 @@ class AppRouter {
               ),
               RepositoryProvider<FlowRunRepository>.value(value: _flowRunRepo),
               RepositoryProvider<NotesRepository>.value(value: _notesRepo),
-              // Abre documentos/videos del hilo con una app externa.
+              // Abre documentos del hilo con una app externa.
               RepositoryProvider<MediaOpener>.value(value: _mediaOpener),
+              // Reproduce videos del hilo a pantalla completa dentro de la app.
+              RepositoryProvider<VideoPlayback>.value(
+                value: const InAppVideoPlayback(),
+              ),
               // Toma del chat (S25): resolver las etiquetas de silencio del bot
               // exige bot→plantilla; el sheet del app bar las compone.
               RepositoryProvider<BotsRepository>.value(value: _botsRepo),

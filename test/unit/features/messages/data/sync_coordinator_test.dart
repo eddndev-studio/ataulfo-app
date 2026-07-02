@@ -105,6 +105,8 @@ void main() {
         type: any(named: 'type'),
         content: any(named: 'content'),
         mediaRef: any(named: 'mediaRef'),
+        waveform: any(named: 'waveform'),
+        quotedId: any(named: 'quotedId'),
       ),
     ).thenAnswer(answer);
   }
@@ -152,6 +154,32 @@ void main() {
         type: 'text',
         content: 'hola',
         mediaRef: null,
+      ),
+    ).called(1);
+  });
+
+  test('drena una respuesta: pasa quotedId del payload a send', () async {
+    await outbox.enqueueSend(
+      botId: 'b1',
+      chatLid: 'c1',
+      clientToken: 't1',
+      type: 'text',
+      content: 'respondo',
+      quotedId: 'orig-1',
+    );
+    stubSend((_) async => msg('wamid-1'));
+
+    await make().start();
+
+    verify(
+      () => ds.send(
+        'b1',
+        'c1',
+        clientToken: 't1',
+        type: 'text',
+        content: 'respondo',
+        mediaRef: null,
+        quotedId: 'orig-1',
       ),
     ).called(1);
   });

@@ -12,12 +12,17 @@ class OutboxEntry {
     required this.isFailed,
     required this.errorKind,
     required this.createdAtMs,
+    this.quotedId,
   });
 
   final String clientToken;
   final String type;
   final String content;
   final String? mediaRef;
+
+  /// `externalId` del mensaje citado si la escritura es una respuesta; `null`
+  /// en un envío normal.
+  final String? quotedId;
 
   /// `true` sólo si la fila quedó en estado terminal `failed`.
   final bool isFailed;
@@ -34,6 +39,7 @@ class OutboxEntry {
       other.type == type &&
       other.content == content &&
       other.mediaRef == mediaRef &&
+      other.quotedId == quotedId &&
       other.isFailed == isFailed &&
       other.errorKind == errorKind &&
       other.createdAtMs == createdAtMs;
@@ -44,6 +50,7 @@ class OutboxEntry {
     type,
     content,
     mediaRef,
+    quotedId,
     isFailed,
     errorKind,
     createdAtMs,

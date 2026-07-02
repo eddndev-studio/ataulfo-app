@@ -184,6 +184,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
     String content = '',
     String? mediaRef,
     List<int>? waveform,
+    String? quotedId,
   }) async {
     await _outbox.enqueueSend(
       botId: botId,
@@ -193,6 +194,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
       content: content,
       mediaRef: mediaRef,
       waveform: waveform,
+      quotedId: quotedId,
     );
     _requestSync();
   }

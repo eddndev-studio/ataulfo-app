@@ -144,6 +144,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     type: e.type,
     content: e.content,
     mediaRef: e.mediaRef,
+    quotedId: e.quotedId,
     // Sólo un fallo TERMINAL pinta error+reintento; un reintentable sigue
     // "enviando" (el coordinador lo reintenta solo).
     failure: e.isFailed ? _failureFromKind(e.errorKind) : null,
@@ -359,6 +360,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         content: event.content,
         mediaRef: event.mediaRef,
         waveform: event.waveform,
+        quotedId: event.quotedId,
       );
     } on Object {
       // El encolado es local; un fallo aquí es excepcional (DB). Best-effort.
@@ -503,6 +505,7 @@ class MessagesSendRequested extends MessagesEvent {
     required this.content,
     this.mediaRef,
     this.waveform,
+    this.quotedId,
   });
 
   final String type;
@@ -510,18 +513,24 @@ class MessagesSendRequested extends MessagesEvent {
   final String? mediaRef;
   final List<int>? waveform;
 
+  /// `externalId` del mensaje citado si este envío es una respuesta; `null` en
+  /// un envío normal.
+  final String? quotedId;
+
   @override
   bool operator ==(Object other) =>
       other is MessagesSendRequested &&
       other.type == type &&
       other.content == content &&
       other.mediaRef == mediaRef &&
+      other.quotedId == quotedId &&
       _sameWaveform(other.waveform, waveform);
   @override
   int get hashCode => Object.hash(
     type,
     content,
     mediaRef,
+    quotedId,
     Object.hashAll(waveform ?? const <int>[]),
   );
 }
@@ -691,6 +700,7 @@ class PendingSend {
     required this.type,
     required this.content,
     this.mediaRef,
+    this.quotedId,
     this.failure,
   });
 
@@ -698,6 +708,9 @@ class PendingSend {
   final String type;
   final String content;
   final String? mediaRef;
+
+  /// `externalId` del mensaje citado si el envío optimista es una respuesta.
+  final String? quotedId;
 
   /// `null` mientras está en vuelo; no-null si el envío falló (la burbuja ofrece
   /// reintentar/descartar).
@@ -712,11 +725,12 @@ class PendingSend {
       other.type == type &&
       other.content == content &&
       other.mediaRef == mediaRef &&
+      other.quotedId == quotedId &&
       other.failure == failure;
 
   @override
   int get hashCode =>
-      Object.hash(clientToken, type, content, mediaRef, failure);
+      Object.hash(clientToken, type, content, mediaRef, quotedId, failure);
 }
 
 class MessagesFailed extends MessagesState {
