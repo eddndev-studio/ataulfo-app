@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
@@ -25,13 +27,17 @@ void main() {
     when(() => bloc.state).thenReturn(const ForgotPasswordInitial());
   });
 
-  Widget host({VoidCallback? onHaveCode}) => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: BlocProvider<ForgotPasswordBloc>.value(
-      value: bloc,
-      child: ForgotPasswordPage(onHaveCode: onHaveCode),
-    ),
-  );
+  Widget host({ValueChanged<String>? onCodeSent, VoidCallback? onHaveCode}) =>
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: BlocProvider<ForgotPasswordBloc>.value(
+          value: bloc,
+          child: ForgotPasswordPage(
+            onCodeSent: onCodeSent,
+            onHaveCode: onHaveCode,
+          ),
+        ),
+      );
 
   testWidgets('renderiza campo email + AppButton de envío', (tester) async {
     await tester.pumpWidget(host());
@@ -158,4 +164,31 @@ void main() {
 
     expect(tapped, isTrue);
   });
+
+  testWidgets(
+    'al transicionar a Sent invoca onCodeSent con el correo escrito',
+    (tester) async {
+      final controller = StreamController<ForgotPasswordState>();
+      addTearDown(controller.close);
+      whenListen(
+        bloc,
+        controller.stream,
+        initialState: const ForgotPasswordInitial(),
+      );
+
+      String? captured;
+      await tester.pumpWidget(host(onCodeSent: (e) => captured = e));
+
+      await tester.enterText(
+        find.byKey(const Key('forgot.email')),
+        'op@example.com',
+      );
+      await tester.pump();
+
+      controller.add(const ForgotPasswordSent());
+      await tester.pump();
+
+      expect(captured, 'op@example.com');
+    },
+  );
 }

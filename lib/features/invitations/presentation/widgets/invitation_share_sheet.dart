@@ -44,14 +44,18 @@ class InvitationShareSheet extends StatelessWidget {
     );
   }
 
-  /// Mensaje listo para pegar en WhatsApp: instrucciones + código. Incluye el
-  /// paso de verificar el correo porque aceptar lo exige.
+  /// Mensaje listo para pegar en WhatsApp: instrucciones + código. Los pasos
+  /// siguen el flujo real de aceptación (verificar el correo es obligatorio, y
+  /// la invitación aparece sola en "Tus organizaciones" una vez verificado).
   String get _shareMessage =>
-      '🥭 Te invitaron a colaborar en una organización en Ataulfo.\n\n'
+      '🥭 Te invitaron a colaborar en una organización en Ataúlfo.\n\n'
       'Para unirte:\n'
-      '1. Descarga Ataulfo e inicia sesión (o crea tu cuenta) con este correo: $email\n'
-      '2. Verifica tu correo\n'
-      '3. En Ajustes → "Aceptar invitación", pega este código:\n\n'
+      '1. Descarga Ataúlfo\n'
+      '2. Crea tu cuenta con este correo: $email\n'
+      '3. Verifica tu correo con el código que te llegue\n'
+      '4. Tu invitación aparecerá en Ajustes → Tus organizaciones (toca '
+      '"Unirse"). También puedes ingresar este código en Ajustes → Unirse a '
+      'una organización:\n\n'
       '${token ?? ''}';
 
   @override
@@ -173,9 +177,12 @@ class _CodeBox extends StatelessWidget {
       child: SelectableText(
         code,
         key: const Key('invitation_share.code'),
+        textAlign: TextAlign.center,
         style: const TextStyle(
           fontFamily: 'monospace',
-          fontSize: 13,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 2,
           color: AppTokens.text1,
         ),
       ),

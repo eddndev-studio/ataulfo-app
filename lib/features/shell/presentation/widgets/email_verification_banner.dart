@@ -38,7 +38,7 @@ class EmailVerificationBanner extends StatelessWidget {
               context,
             ).showSnackBar(SnackBar(content: Text(message)));
           },
-          child: const _BannerBody(),
+          child: _BannerBody(email: auth.identity.email),
         );
       },
     );
@@ -46,7 +46,9 @@ class EmailVerificationBanner extends StatelessWidget {
 }
 
 class _BannerBody extends StatelessWidget {
-  const _BannerBody();
+  const _BannerBody({required this.email});
+
+  final String email;
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +89,9 @@ class _BannerBody extends StatelessWidget {
           ),
           AppButton.text(
             label: 'Verificar',
-            onPressed: () => context.push('/verify-email'),
+            onPressed: () => context.push(
+              '/verify-email?email=${Uri.encodeQueryComponent(email)}',
+            ),
           ),
         ],
       ),

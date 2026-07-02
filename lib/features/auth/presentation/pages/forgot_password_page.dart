@@ -9,16 +9,21 @@ import '../bloc/forgot_password_bloc.dart';
 /// Página de "olvidé mi contraseña". Es presentación pura: la lógica vive en
 /// `ForgotPasswordBloc`.
 ///
-/// `onHaveCode` es opcional para tests; en la app real lo cabla el router
-/// (empuja la pantalla de reset). El backend responde 202 sin distinguir si la
-/// cuenta existe; por eso el estado `Sent` pinta un copy condicional ("si
-/// existe una cuenta…") que nunca confirma la existencia ni que el correo se
-/// haya enviado.
+/// `onCodeSent` y `onHaveCode` son opcionales para tests; en la app real los
+/// cabla el router. Al aceptar el backend la solicitud (202, incondicional),
+/// `onCodeSent` lleva el correo escrito a la pantalla de reset para escribir
+/// ahí el código; "Ya tengo un código" (`onHaveCode`) va a la misma pantalla
+/// sin arrastrar correo. El backend responde 202 sin distinguir si la cuenta
+/// existe, así que ningún copy confirma la existencia.
 class ForgotPasswordPage extends StatefulWidget {
-  const ForgotPasswordPage({super.key, this.onHaveCode});
+  const ForgotPasswordPage({super.key, this.onCodeSent, this.onHaveCode});
 
-  /// Navegación a la pantalla de reset (pegar el enlace/código). Opcional para
-  /// tests; el router la inyecta para mantener la página sin go_router.
+  /// Navegación a la pantalla de reset llevando el correo escrito. Se invoca al
+  /// transicionar a `Sent` (backend aceptó el envío). El router la cabla a
+  /// `/reset-password?email=…`.
+  final ValueChanged<String>? onCodeSent;
+
+  /// Navegación a la pantalla de reset SIN correo ("ya tengo un código").
   final VoidCallback? onHaveCode;
 
   @override
@@ -60,7 +65,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Restablecer contraseña')),
       body: SafeArea(
-        child: BlocBuilder<ForgotPasswordBloc, ForgotPasswordState>(
+        child: BlocConsumer<ForgotPasswordBloc, ForgotPasswordState>(
+          listener: (context, state) {
+            if (state is ForgotPasswordSent) {
+              widget.onCodeSent?.call(_email.text);
+            }
+          },
           builder: (context, state) {
             final submitting = state is ForgotPasswordSubmitting;
             final sent = state is ForgotPasswordSent;
@@ -71,7 +81,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 children: <Widget>[
                   const SizedBox(height: 16),
                   Text(
-                    'Te enviaremos un enlace para restablecer tu contraseña.',
+                    'Te enviaremos un código para restablecer tu contraseña.',
                     style: textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 24),

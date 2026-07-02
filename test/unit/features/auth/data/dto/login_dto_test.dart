@@ -135,10 +135,13 @@ void main() {
   });
 
   group('VerifyEmailReq', () {
-    test('serializa el token', () {
-      const req = VerifyEmailReq(token: 'verif-tok-32');
+    test('serializa email y code', () {
+      const req = VerifyEmailReq(email: 'op@example.com', code: '123456');
 
-      expect(req.toJson(), <String, dynamic>{'token': 'verif-tok-32'});
+      expect(req.toJson(), <String, dynamic>{
+        'email': 'op@example.com',
+        'code': '123456',
+      });
     });
   });
 
@@ -172,11 +175,16 @@ void main() {
   });
 
   group('ResetPasswordReq', () {
-    test('serializa token y new_password en snake_case del wire', () {
-      const req = ResetPasswordReq(token: 'reset-tok', newPassword: 'n3w-pass');
+    test('serializa email, code y new_password en snake_case del wire', () {
+      const req = ResetPasswordReq(
+        email: 'op@example.com',
+        code: '123456',
+        newPassword: 'n3w-pass',
+      );
 
       expect(req.toJson(), <String, dynamic>{
-        'token': 'reset-tok',
+        'email': 'op@example.com',
+        'code': '123456',
         'new_password': 'n3w-pass',
       });
     });
@@ -195,6 +203,67 @@ void main() {
       const req = AcceptInvitationReq(token: 'invite-tok');
 
       expect(req.toJson(), <String, dynamic>{'token': 'invite-tok'});
+    });
+  });
+
+  group('PendingInvitationResp', () {
+    test('parsea id + org + rol y tolera el expires_at que no lee', () {
+      final resp = PendingInvitationResp.fromJson(<String, dynamic>{
+        'id': 'inv-1',
+        'org_id': 'o-9',
+        'org_name': 'Acme',
+        'role': 'WORKER',
+        'expires_at': '2026-07-15T00:00:00Z',
+      });
+
+      expect(resp.id, 'inv-1');
+      expect(resp.orgId, 'o-9');
+      expect(resp.orgName, 'Acme');
+      expect(resp.role, 'WORKER');
+    });
+
+    test('lanza FormatException si falta una clave obligatoria', () {
+      expect(
+        () => PendingInvitationResp.fromJson(<String, dynamic>{
+          'id': 'inv-1',
+          'org_id': 'o-9',
+          'org_name': 'Acme',
+          // role ausente
+        }),
+        throwsFormatException,
+      );
+    });
+  });
+
+  group('AcceptedInvitationResp', () {
+    test('parsea la membership recién creada', () {
+      final resp = AcceptedInvitationResp.fromJson(<String, dynamic>{
+        'org_id': 'o-9',
+        'org_name': 'Acme',
+        'role': 'WORKER',
+      });
+
+      expect(resp.orgId, 'o-9');
+      expect(resp.orgName, 'Acme');
+      expect(resp.role, 'WORKER');
+    });
+
+    test('lanza FormatException si falta una clave obligatoria', () {
+      expect(
+        () => AcceptedInvitationResp.fromJson(<String, dynamic>{
+          'org_id': 'o-9',
+          'org_name': 'Acme',
+        }),
+        throwsFormatException,
+      );
+    });
+  });
+
+  group('AcceptPendingInvitationReq', () {
+    test('serializa invitation_id en snake_case del wire', () {
+      const req = AcceptPendingInvitationReq(invitationId: 'inv-1');
+
+      expect(req.toJson(), <String, dynamic>{'invitation_id': 'inv-1'});
     });
   });
 }

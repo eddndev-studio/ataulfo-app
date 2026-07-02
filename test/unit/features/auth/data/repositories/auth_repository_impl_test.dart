@@ -2,8 +2,10 @@ import 'package:ataulfo/features/auth/data/datasources/auth_datasource.dart';
 import 'package:ataulfo/features/auth/data/dto/login_dto.dart';
 import 'package:ataulfo/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:ataulfo/features/auth/data/repositories/token_storage.dart';
+import 'package:ataulfo/features/auth/domain/entities/accepted_invitation.dart';
 import 'package:ataulfo/features/auth/domain/entities/auth_tokens.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/domain/entities/pending_invitation.dart';
 import 'package:ataulfo/features/auth/domain/failures/auth_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -223,10 +225,10 @@ void main() {
       'delega al datasource, devuelve alreadyVerified, sin tocar storage',
       () async {
         when(
-          () => ds.verifyEmail('tok'),
+          () => ds.verifyEmail(email: 'op@x.com', code: '123456'),
         ).thenAnswer((_) async => const VerifyEmailResp(alreadyVerified: true));
 
-        final got = await repo.verifyEmail('tok');
+        final got = await repo.verifyEmail(email: 'op@x.com', code: '123456');
 
         expect(got, isTrue);
         expect(storage.saved, isEmpty);
@@ -249,12 +251,26 @@ void main() {
 
       test('resetPassword delega sin tocar storage', () async {
         when(
-          () => ds.resetPassword(token: 't', newPassword: 'n'),
+          () => ds.resetPassword(
+            email: 'op@x.com',
+            code: '123456',
+            newPassword: 'n',
+          ),
         ).thenAnswer((_) async {});
 
-        await repo.resetPassword(token: 't', newPassword: 'n');
+        await repo.resetPassword(
+          email: 'op@x.com',
+          code: '123456',
+          newPassword: 'n',
+        );
 
-        verify(() => ds.resetPassword(token: 't', newPassword: 'n')).called(1);
+        verify(
+          () => ds.resetPassword(
+            email: 'op@x.com',
+            code: '123456',
+            newPassword: 'n',
+          ),
+        ).called(1);
         expect(storage.saved, isEmpty);
       });
 
@@ -273,6 +289,34 @@ void main() {
         await repo.resendVerification();
 
         verify(ds.resendVerification).called(1);
+        expect(storage.saved, isEmpty);
+      });
+
+      test('pendingInvitations delega sin tocar storage', () async {
+        when(
+          ds.pendingInvitations,
+        ).thenAnswer((_) async => const <PendingInvitation>[]);
+
+        await repo.pendingInvitations();
+
+        verify(ds.pendingInvitations).called(1);
+        expect(storage.saved, isEmpty);
+      });
+
+      test('acceptPendingInvitation delega sin tocar storage', () async {
+        const accepted = AcceptedInvitation(
+          orgId: 'o-9',
+          orgName: 'Acme',
+          role: 'WORKER',
+        );
+        when(
+          () => ds.acceptPendingInvitation('inv-1'),
+        ).thenAnswer((_) async => accepted);
+
+        final got = await repo.acceptPendingInvitation('inv-1');
+
+        expect(got, accepted);
+        verify(() => ds.acceptPendingInvitation('inv-1')).called(1);
         expect(storage.saved, isEmpty);
       });
     },

@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 
+import '../../domain/entities/accepted_invitation.dart';
 import '../../domain/entities/auth_tokens.dart';
 import '../../domain/entities/identity.dart';
+import '../../domain/entities/pending_invitation.dart';
 import '../../domain/failures/auth_failure.dart';
 import '../dto/login_dto.dart';
 import '../mappers/auth_mapper.dart';
@@ -38,21 +40,26 @@ abstract interface class AuthDatasource {
     required String password,
   });
 
-  /// Canjea el token de verificación de email (`POST /auth/verify-email`).
-  /// 404 ⇒ token inexistente/consumido; 410 ⇒ expirado. La respuesta indica
-  /// si la cuenta ya estaba verificada (re-canje idempotente del enlace).
-  Future<VerifyEmailResp> verifyEmail(String token);
+  /// Canjea el código de verificación de email (`POST /auth/verify-email`).
+  /// 404 ⇒ código/correo inválido; 410 ⇒ expirado. La respuesta indica si la
+  /// cuenta ya estaba verificada (re-canje idempotente del código).
+  Future<VerifyEmailResp> verifyEmail({
+    required String email,
+    required String code,
+  });
 
   /// Solicita el correo de reset (`POST /auth/forgot-password`). El backend
   /// responde siempre 204 (no revela si el email existe). Público: no exige
   /// Bearer.
   Future<void> forgotPassword(String email);
 
-  /// Canjea el token de reset y fija la nueva contraseña
-  /// (`POST /auth/reset-password`). 404 ⇒ token inexistente; 410 ⇒ expirado
-  /// o ya usado; 400 ⇒ contraseña débil. Público: no exige Bearer.
+  /// Canjea el código de reset y fija la nueva contraseña
+  /// (`POST /auth/reset-password`). 404 ⇒ código/correo inválido (también tras
+  /// el lockout de intentos); 410 ⇒ expirado o ya usado; 400 ⇒ contraseña
+  /// débil. Público: no exige Bearer.
   Future<void> resetPassword({
-    required String token,
+    required String email,
+    required String code,
     required String newPassword,
   });
 
@@ -79,6 +86,22 @@ abstract interface class AuthDatasource {
   /// (`POST /auth/resend-verification`). Requiere Bearer (lo inyecta el
   /// interceptor); sin body. 204 al encolar.
   Future<void> resendVerification();
+
+  /// Lista las invitaciones pendientes dirigidas al correo de la sesión
+  /// (`GET /auth/invitations/pending`). Requiere Bearer. El backend devuelve
+  /// `[]` cuando el correo del caller no está verificado, así que la lista
+  /// vacía es legítima, no un fallo. Vive aquí (no en el feature de
+  /// invitaciones, que es la cara del EMISOR sobre `/workspace/invitations`)
+  /// porque es la cara del RECEPTOR: Bearer, sobre el correo del caller,
+  /// espejo de [acceptInvitation].
+  Future<List<PendingInvitation>> pendingInvitations();
+
+  /// Acepta una invitación pendiente por su id
+  /// (`POST /auth/invitations/accept-pending`). Requiere Bearer. Devuelve la
+  /// membership recién creada (aún no activa). 404 ⇒ no existe o no es tuya;
+  /// 403 ⇒ correo sin verificar; 409 ⇒ ya eres miembro; 410 ⇒ consumida o
+  /// expirada.
+  Future<AcceptedInvitation> acceptPendingInvitation(String invitationId);
 }
 
 /// Implementación contra dio. Se inyecta una instancia ya configurada con
@@ -186,8 +209,11 @@ class DioAuthDatasource implements AuthDatasource {
   }
 
   @override
-  Future<VerifyEmailResp> verifyEmail(String token) async {
-    final req = VerifyEmailReq(token: token);
+  Future<VerifyEmailResp> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    final req = VerifyEmailReq(email: email, code: code);
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '/auth/verify-email',
@@ -220,10 +246,15 @@ class DioAuthDatasource implements AuthDatasource {
 
   @override
   Future<void> resetPassword({
-    required String token,
+    required String email,
+    required String code,
     required String newPassword,
   }) async {
-    final req = ResetPasswordReq(token: token, newPassword: newPassword);
+    final req = ResetPasswordReq(
+      email: email,
+      code: code,
+      newPassword: newPassword,
+    );
     try {
       await _dio.post<void>('/auth/reset-password', data: req.toJson());
     } on DioException catch (e) {
@@ -313,6 +344,59 @@ class DioAuthDatasource implements AuthDatasource {
       await _dio.post<void>('/auth/resend-verification');
     } on DioException catch (e) {
       throw _mapDioException(e);
+    }
+  }
+
+  @override
+  Future<List<PendingInvitation>> pendingInvitations() async {
+    try {
+      final res = await _dio.get<List<dynamic>>('/auth/invitations/pending');
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownAuthFailure();
+      }
+      return body
+          .cast<Map<String, dynamic>>()
+          .map(PendingInvitationResp.fromJson)
+          .map(AuthMapper.pendingInvitationRespToEntity)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException {
+      throw const UnknownAuthFailure();
+    } on TypeError {
+      // `cast<Map<String,dynamic>>` rompe si el wire mete un tipo inesperado;
+      // el contrato dice array de objetos.
+      throw const UnknownAuthFailure();
+    }
+  }
+
+  @override
+  Future<AcceptedInvitation> acceptPendingInvitation(
+    String invitationId,
+  ) async {
+    final req = AcceptPendingInvitationReq(invitationId: invitationId);
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/auth/invitations/accept-pending',
+        data: req.toJson(),
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownAuthFailure();
+      }
+      return AuthMapper.acceptedInvitationRespToEntity(
+        AcceptedInvitationResp.fromJson(body),
+      );
+    } on DioException catch (e) {
+      throw _mapStatus(e, <int, AuthFailure>{
+        403: const EmailNotVerifiedFailure(),
+        404: const InvalidTokenFailure(),
+        409: const AlreadyMemberFailure(),
+        410: const ExpiredTokenFailure(),
+      });
+    } on FormatException {
+      throw const UnknownAuthFailure();
     }
   }
 

@@ -64,8 +64,8 @@ void main() {
         ),
         GoRoute(
           path: '/verify-email',
-          builder: (_, _) {
-            navigated.add('/verify-email');
+          builder: (_, state) {
+            navigated.add(state.uri.toString());
             return const Scaffold(body: SizedBox.shrink());
           },
         ),
@@ -169,13 +169,15 @@ void main() {
     expect(find.text('Te reenviamos el correo'), findsNothing);
   });
 
-  testWidgets('Verificar navega a /verify-email', (tester) async {
+  testWidgets('Verificar navega a /verify-email con el correo de la sesión', (
+    tester,
+  ) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_unverified));
 
     await tester.pumpWidget(host());
     await tester.tap(find.text('Verificar'));
     await tester.pumpAndSettle();
 
-    expect(navigated, <String>['/verify-email']);
+    expect(navigated, <String>['/verify-email?email=op%40example.com']);
   });
 }

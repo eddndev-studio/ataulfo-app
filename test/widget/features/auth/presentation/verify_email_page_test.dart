@@ -1,6 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_code_field.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/verify_email_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/pages/verify_email_page.dart';
@@ -15,7 +16,7 @@ class _MockVerifyBloc extends MockBloc<VerifyEmailEvent, VerifyEmailState>
 
 void main() {
   setUpAll(() {
-    registerFallbackValue(const VerifyEmailSubmitted(''));
+    registerFallbackValue(const VerifyEmailSubmitted(email: '', code: ''));
   });
 
   late _MockVerifyBloc bloc;
@@ -25,40 +26,80 @@ void main() {
     when(() => bloc.state).thenReturn(const VerifyEmailInitial());
   });
 
-  Widget host({void Function({required bool alreadyVerified})? onSucceeded}) =>
-      MaterialApp(
-        theme: AppDesignTheme.dark(),
-        home: BlocProvider<VerifyEmailBloc>.value(
-          value: bloc,
-          child: VerifyEmailPage(onSucceeded: onSucceeded),
-        ),
-      );
+  Widget host({
+    String initialEmail = '',
+    void Function({required bool alreadyVerified})? onSucceeded,
+    VoidCallback? onResend,
+    VoidCallback? onSkip,
+  }) => MaterialApp(
+    theme: AppDesignTheme.dark(),
+    home: BlocProvider<VerifyEmailBloc>.value(
+      value: bloc,
+      child: VerifyEmailPage(
+        initialEmail: initialEmail,
+        onSucceeded: onSucceeded,
+        onResend: onResend,
+        onSkip: onSkip,
+      ),
+    ),
+  );
 
-  testWidgets('renderiza campo de pegado + AppButton', (tester) async {
+  testWidgets('renderiza email + código + botón verificar', (tester) async {
     await tester.pumpWidget(host());
 
-    expect(find.byKey(const Key('verify.token')), findsOneWidget);
-    expect(find.byType(AppTextField), findsOneWidget);
-    expect(find.byType(AppButton), findsOneWidget);
+    expect(find.byKey(const Key('verify.email')), findsOneWidget);
+    expect(find.byKey(const Key('verify.code')), findsOneWidget);
+    expect(find.byKey(const Key('verify.submit')), findsOneWidget);
+    expect(find.byType(AppCodeField), findsOneWidget);
   });
 
-  testWidgets('submit dispara VerifyEmailSubmitted con el pegado', (
+  testWidgets('precarga el correo del initialEmail', (tester) async {
+    await tester.pumpWidget(host(initialEmail: 'op@example.com'));
+
+    final email = tester.widget<AppTextField>(
+      find.byKey(const Key('verify.email')),
+    );
+    expect(email.controller.text, 'op@example.com');
+  });
+
+  testWidgets('submit dispara VerifyEmailSubmitted con email+código', (
     tester,
   ) async {
-    await tester.pumpWidget(host());
+    await tester.pumpWidget(host(initialEmail: 'op@example.com'));
 
-    await tester.enterText(
-      find.byKey(const Key('verify.token')),
-      'https://ataulfo.app/verify?token=tok123',
-    );
-    await tester.tap(find.byType(AppButton));
+    await tester.enterText(find.byKey(const Key('verify.code')), '123456');
+    await tester.tap(find.byKey(const Key('verify.submit')));
     await tester.pump();
 
     verify(
       () => bloc.add(
-        const VerifyEmailSubmitted('https://ataulfo.app/verify?token=tok123'),
+        const VerifyEmailSubmitted(email: 'op@example.com', code: '123456'),
       ),
     ).called(1);
+  });
+
+  testWidgets('sin sesión no pinta reenviar ni omitir', (tester) async {
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('verify.resend')), findsNothing);
+    expect(find.byKey(const Key('verify.skip')), findsNothing);
+  });
+
+  testWidgets('con sesión pinta reenviar y omitir', (tester) async {
+    await tester.pumpWidget(host(onResend: () {}, onSkip: () {}));
+
+    expect(find.byKey(const Key('verify.resend')), findsOneWidget);
+    expect(find.byKey(const Key('verify.skip')), findsOneWidget);
+  });
+
+  testWidgets('"Omitir por ahora" invoca onSkip', (tester) async {
+    var skipped = false;
+    await tester.pumpWidget(host(onSkip: () => skipped = true));
+
+    await tester.tap(find.byKey(const Key('verify.skip')));
+    await tester.pump();
+
+    expect(skipped, isTrue);
   });
 
   testWidgets('estado Submitting muestra el botón en loading', (tester) async {
@@ -72,17 +113,19 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    final button = tester.widget<AppButton>(find.byType(AppButton));
+    final button = tester.widget<AppButton>(
+      find.byKey(const Key('verify.submit')),
+    );
     expect(button.loading, isTrue);
   });
 
-  testWidgets('Failed(invalidLink) muestra mensaje de enlace inválido', (
+  testWidgets('Failed(invalidCode) muestra mensaje de código incorrecto', (
     tester,
   ) async {
     whenListen(
       bloc,
       Stream<VerifyEmailState>.fromIterable(const <VerifyEmailState>[
-        VerifyEmailFailed(VerifyEmailFailureKind.invalidLink),
+        VerifyEmailFailed(VerifyEmailFailureKind.invalidCode),
       ]),
       initialState: const VerifyEmailInitial(),
     );
@@ -91,16 +134,16 @@ void main() {
     await tester.pump();
 
     final t = tester.widget<Text>(
-      find.text('El enlace no es válido. Solicita uno nuevo.'),
+      find.text('Código incorrecto. Revísalo o reenvía uno nuevo.'),
     );
     expect(t.style?.color, AppTokens.danger);
   });
 
-  testWidgets('Failed(expiredLink) pide solicitar uno nuevo', (tester) async {
+  testWidgets('Failed(expiredCode) pide reenviar uno nuevo', (tester) async {
     whenListen(
       bloc,
       Stream<VerifyEmailState>.fromIterable(const <VerifyEmailState>[
-        VerifyEmailFailed(VerifyEmailFailureKind.expiredLink),
+        VerifyEmailFailed(VerifyEmailFailureKind.expiredCode),
       ]),
       initialState: const VerifyEmailInitial(),
     );
@@ -108,30 +151,10 @@ void main() {
     await tester.pumpWidget(host());
     await tester.pump();
 
-    expect(find.text('El enlace caducó. Solicita uno nuevo.'), findsOneWidget);
+    expect(find.text('El código venció. Reenvía uno nuevo.'), findsOneWidget);
   });
 
-  testWidgets('Failed(invalidInput) pide pegar el enlace o código', (
-    tester,
-  ) async {
-    whenListen(
-      bloc,
-      Stream<VerifyEmailState>.fromIterable(const <VerifyEmailState>[
-        VerifyEmailFailed(VerifyEmailFailureKind.invalidInput),
-      ]),
-      initialState: const VerifyEmailInitial(),
-    );
-
-    await tester.pumpWidget(host());
-    await tester.pump();
-
-    expect(
-      find.text('Pega el enlace o el código que recibiste por correo'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Succeeded(alreadyVerified:false) muestra "Correo verificado"', (
+  testWidgets('Succeeded(fresca) muestra SnackBar de confirmación', (
     tester,
   ) async {
     whenListen(
@@ -145,28 +168,23 @@ void main() {
     await tester.pumpWidget(host());
     await tester.pump();
 
-    expect(find.text('Correo verificado'), findsOneWidget);
-    expect(find.text('Tu correo ya estaba verificado'), findsNothing);
+    expect(find.text('Verificación completada'), findsOneWidget);
   });
 
-  testWidgets(
-    'Succeeded(alreadyVerified:true) muestra "Tu correo ya estaba verificado"',
-    (tester) async {
-      whenListen(
-        bloc,
-        Stream<VerifyEmailState>.fromIterable(const <VerifyEmailState>[
-          VerifyEmailSucceeded(alreadyVerified: true),
-        ]),
-        initialState: const VerifyEmailInitial(),
-      );
+  testWidgets('Succeeded(ya verificada) NO muestra SnackBar', (tester) async {
+    whenListen(
+      bloc,
+      Stream<VerifyEmailState>.fromIterable(const <VerifyEmailState>[
+        VerifyEmailSucceeded(alreadyVerified: true),
+      ]),
+      initialState: const VerifyEmailInitial(),
+    );
 
-      await tester.pumpWidget(host());
-      await tester.pump();
+    await tester.pumpWidget(host());
+    await tester.pump();
 
-      expect(find.text('Tu correo ya estaba verificado'), findsOneWidget);
-      expect(find.text('Correo verificado'), findsNothing);
-    },
-  );
+    expect(find.text('Verificación completada'), findsNothing);
+  });
 
   testWidgets(
     'Succeeded notifica al callback onSucceeded con alreadyVerified',

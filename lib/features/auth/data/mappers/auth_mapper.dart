@@ -1,5 +1,7 @@
+import '../../domain/entities/accepted_invitation.dart';
 import '../../domain/entities/auth_tokens.dart';
 import '../../domain/entities/identity.dart';
+import '../../domain/entities/pending_invitation.dart';
 import '../dto/login_dto.dart';
 
 /// Traduce DTOs del wire S02 a entidades de dominio.
@@ -23,5 +25,22 @@ class AuthMapper {
     role: resp.role,
     email: resp.email,
     emailVerified: resp.emailVerified,
+  );
+
+  static PendingInvitation pendingInvitationRespToEntity(
+    PendingInvitationResp resp,
+  ) => PendingInvitation(
+    id: resp.id,
+    orgId: resp.orgId,
+    orgName: resp.orgName,
+    role: resp.role,
+  );
+
+  static AcceptedInvitation acceptedInvitationRespToEntity(
+    AcceptedInvitationResp resp,
+  ) => AcceptedInvitation(
+    orgId: resp.orgId,
+    orgName: resp.orgName,
+    role: resp.role,
   );
 }

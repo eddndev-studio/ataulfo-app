@@ -104,7 +104,7 @@ void main() {
   });
 
   testWidgets(
-    'Authenticated expone tile "Aceptar invitación" (visible a todos)',
+    'Authenticated expone tile "Unirse a una organización" (visible a todos)',
     (tester) async {
       when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
@@ -114,7 +114,7 @@ void main() {
         find.byKey(const Key('settings.accept_invite_tile')),
         findsOneWidget,
       );
-      expect(find.text('Aceptar invitación'), findsOneWidget);
+      expect(find.text('Unirse a una organización'), findsOneWidget);
     },
   );
 

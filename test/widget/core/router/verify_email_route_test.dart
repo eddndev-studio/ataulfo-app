@@ -1,5 +1,4 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
-import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/verify_email_bloc.dart';
@@ -70,11 +69,17 @@ void main() {
   testWidgets(
     'canje exitoso refresca la sesión (AuthCheckRequested) y navega a /home',
     (tester) async {
-      when(() => repo.verifyEmail('tok123')).thenAnswer((_) async => false);
+      when(
+        () => repo.verifyEmail(email: 'op@example.com', code: '123456'),
+      ).thenAnswer((_) async => false);
 
       await tester.pumpWidget(host());
-      await tester.enterText(find.byType(TextField), 'tok123');
-      await tester.tap(find.byType(AppButton));
+      await tester.enterText(
+        find.byKey(const Key('verify.email')),
+        'op@example.com',
+      );
+      await tester.enterText(find.byKey(const Key('verify.code')), '123456');
+      await tester.tap(find.byKey(const Key('verify.submit')));
       await tester.pumpAndSettle();
 
       verify(() => authBloc.add(const AuthCheckRequested())).called(1);

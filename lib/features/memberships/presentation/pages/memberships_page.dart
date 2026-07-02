@@ -15,6 +15,7 @@ import '../../../auth/presentation/bloc/switch_org_cubit.dart';
 import '../../domain/entities/membership.dart';
 import '../bloc/memberships_bloc.dart';
 import '../widgets/org_membership_tile.dart';
+import '../widgets/pending_invitations_section.dart';
 import '../widgets/rename_org_sheet.dart';
 
 /// Listado de orgs del operador con cambio de organización in-app (S02 GET
@@ -44,13 +45,26 @@ class MembershipsPage extends StatelessWidget {
       listener: _onSwitchState,
       child: BlocListener<RenameOrgCubit, RenameOrgState>(
         listener: _onRenameState,
-        child: BlocBuilder<MembershipsBloc, MembershipsState>(
-          builder: (context, state) => switch (state) {
-            MembershipsInitial() ||
-            MembershipsLoading() => const _LoadingView(),
-            MembershipsLoaded(items: final items) => _LoadedView(items: items),
-            MembershipsFailed() => const _FailedView(),
-          },
+        // Las invitaciones pendientes van ARRIBA de la lista y como hermanas
+        // del switch de estado (no dentro de la vista cargada): así siguen
+        // visibles aunque la lista esté vacía o falle — el caso de un usuario
+        // recién creado con una invitación esperando es exactamente ese.
+        child: Column(
+          children: <Widget>[
+            const PendingInvitationsSection(),
+            Expanded(
+              child: BlocBuilder<MembershipsBloc, MembershipsState>(
+                builder: (context, state) => switch (state) {
+                  MembershipsInitial() ||
+                  MembershipsLoading() => const _LoadingView(),
+                  MembershipsLoaded(items: final items) => _LoadedView(
+                    items: items,
+                  ),
+                  MembershipsFailed() => const _FailedView(),
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

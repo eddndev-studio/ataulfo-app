@@ -228,7 +228,7 @@ class _SectionsCard extends StatelessWidget {
           AppSectionLink(
             rowKey: const Key('settings.accept_invite_tile'),
             icon: Icons.mark_email_read_outlined,
-            title: 'Aceptar invitación',
+            title: 'Unirse a una organización',
             caption: 'Únete a otra organización con un código o enlace',
             onTap: () => context.push('/accept-invite'),
           ),

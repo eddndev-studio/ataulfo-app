@@ -15,6 +15,7 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/create_org_cubit.dart';
 import '../../features/auth/presentation/bloc/forgot_password_bloc.dart';
 import '../../features/auth/presentation/bloc/login_bloc.dart';
+import '../../features/auth/presentation/bloc/pending_invitations_cubit.dart';
 import '../../features/auth/presentation/bloc/register_bloc.dart';
 import '../../features/auth/presentation/bloc/resend_verification_cubit.dart';
 import '../../features/auth/presentation/bloc/rename_org_cubit.dart';
@@ -397,11 +398,16 @@ class AppRouter {
         builder: (context, _) => BlocProvider<RegisterBloc>(
           create: (_) => RegisterBloc(_authRepo),
           child: RegisterPage(
-            onSucceeded: (_) {
+            onSucceeded: (email) {
               // El alta persiste el par de tokens (cuenta con su org personal
-              // OWNER); AuthCheckRequested dispara Authenticated y el redirect
-              // navega a /home, igual que el login.
+              // OWNER); AuthCheckRequested dispara Authenticated. En vez de ir
+              // directo al home aterrizamos en la verificación llevando el
+              // correo recién registrado: la ruta se permite con sesión, así
+              // que el rebote Authenticated→/home no se come esta navegación.
               _authBloc.add(const AuthCheckRequested());
+              context.go(
+                '/verify-email?email=${Uri.encodeQueryComponent(email)}',
+              );
             },
             // Vuelve al login. Si la pantalla se empujó desde el login, basta
             // un pop; pero `/register` es ruta pública (deep-linkable), así que
@@ -420,19 +426,33 @@ class AppRouter {
         builder: (context, _) => BlocProvider<ForgotPasswordBloc>(
           create: (_) => ForgotPasswordBloc(_authRepo),
           child: ForgotPasswordPage(
+            // Aceptado el envío (202), pasa a reset llevando el correo escrito
+            // para teclear ahí el código; "Ya tengo un código" va sin correo.
+            onCodeSent: (email) => context.push(
+              '/reset-password?email=${Uri.encodeQueryComponent(email)}',
+            ),
             onHaveCode: () => context.push('/reset-password'),
           ),
         ),
       ),
       GoRoute(
-        // Canjear el token de reset y fijar la nueva contraseña. Ruta pública
+        // Canjear el código de reset y fijar la nueva contraseña. Ruta pública
         // (deep-linkable). En 204 el backend revoca TODAS las familias de
         // refresh; la pantalla cierra la sesión local (AuthLoggedOut,
-        // idempotente si no hay tokens) y rutea al login.
+        // idempotente si no hay tokens) y rutea al login. El `ForgotPasswordBloc`
+        // vive aquí también para el reenvío del código.
         path: '/reset-password',
-        builder: (context, _) => BlocProvider<ResetPasswordBloc>(
-          create: (_) => ResetPasswordBloc(_authRepo),
+        builder: (context, state) => MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<ResetPasswordBloc>(
+              create: (_) => ResetPasswordBloc(_authRepo),
+            ),
+            BlocProvider<ForgotPasswordBloc>(
+              create: (_) => ForgotPasswordBloc(_authRepo),
+            ),
+          ],
           child: ResetPasswordPage(
+            initialEmail: state.uri.queryParameters['email'] ?? '',
             onSucceeded: () {
               _authBloc.add(const AuthLoggedOut());
               context.go('/login?reset=success');
@@ -450,15 +470,63 @@ class AppRouter {
         // se vuelve atrás (pop si hay pila, si no a /home; el redirect corrige a
         // /login cuando no hay sesión).
         path: '/verify-email',
-        builder: (context, _) => BlocProvider<VerifyEmailBloc>(
-          create: (_) => VerifyEmailBloc(_authRepo),
-          child: VerifyEmailPage(
-            onSucceeded: ({required bool alreadyVerified}) {
-              _authBloc.add(const AuthCheckRequested());
-              context.canPop() ? context.pop() : context.go('/home');
-            },
-          ),
-        ),
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<VerifyEmailBloc>(
+                create: (_) => VerifyEmailBloc(_authRepo),
+              ),
+              BlocProvider<ResendVerificationCubit>(
+                create: (_) => ResendVerificationCubit(_authRepo),
+              ),
+            ],
+            // El reenvío y "omitir" sólo aplican con sesión: el reenvío exige
+            // Bearer y omitir lleva al home. La página se rebuilda si la sesión
+            // resuelve (p. ej. tras el AuthCheckRequested del alta).
+            child: BlocBuilder<AuthBloc, AuthState>(
+              bloc: _authBloc,
+              builder: (context, auth) {
+                final hasSession =
+                    auth is AuthAuthenticated || auth is AuthAuthenticatedNoOrg;
+                final page = VerifyEmailPage(
+                  initialEmail: email,
+                  onSucceeded: ({required bool alreadyVerified}) {
+                    _authBloc.add(const AuthCheckRequested());
+                    context.canPop() ? context.pop() : context.go('/home');
+                  },
+                  onResend: hasSession
+                      ? () => context.read<ResendVerificationCubit>().resend()
+                      : null,
+                  onSkip: hasSession ? () => context.go('/home') : null,
+                );
+                // Se envuelve SIEMPRE con el BlocListener (aunque sin sesión el
+                // reenvío no exista y el cubit nunca emita): así el tipo del
+                // subárbol no cambia cuando la sesión resuelve y la página no se
+                // remonta —no se pierde lo tecleado—. Feedback del reenvío igual
+                // que el aviso del shell.
+                return BlocListener<
+                  ResendVerificationCubit,
+                  ResendVerificationState
+                >(
+                  listenWhen: (_, current) =>
+                      current is ResendVerificationSent ||
+                      current is ResendVerificationFailed,
+                  listener: (context, s) {
+                    final msg = s is ResendVerificationFailed
+                        ? 'No pudimos reenviar el correo. Espera un momento '
+                              'para reintentar.'
+                        : 'Te reenviamos el correo';
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(msg)));
+                  },
+                  child: page,
+                );
+              },
+            ),
+          );
+        },
       ),
       GoRoute(
         // Canjear una invitación pendiente. Ruta pública (deep-linkable) y
@@ -1233,6 +1301,11 @@ class AppRouter {
             ),
             BlocProvider<RenameOrgCubit>(
               create: (_) => RenameOrgCubit(_authRepo),
+            ),
+            // Invitaciones pendientes del operador (best-effort, sección extra
+            // arriba de la lista). Carga sola; oculta si no hay o si falla.
+            BlocProvider<PendingInvitationsCubit>(
+              create: (_) => PendingInvitationsCubit(_authRepo)..load(),
             ),
           ],
           child: Scaffold(

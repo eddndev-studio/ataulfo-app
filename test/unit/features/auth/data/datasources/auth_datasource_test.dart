@@ -558,13 +558,16 @@ void main() {
         ),
       );
 
-      final resp = await ds.verifyEmail('verif-tok');
+      final resp = await ds.verifyEmail(
+        email: 'op@example.com',
+        code: '123456',
+      );
 
       expect(resp.alreadyVerified, isFalse);
       verify(
         () => dio.post<Map<String, dynamic>>(
           '/auth/verify-email',
-          data: <String, dynamic>{'token': 'verif-tok'},
+          data: <String, dynamic>{'email': 'op@example.com', 'code': '123456'},
         ),
       ).called(1);
     });
@@ -578,7 +581,7 @@ void main() {
       ).thenThrow(badResponse('/auth/verify-email', 404));
 
       await expectLater(
-        ds.verifyEmail('bad'),
+        ds.verifyEmail(email: 'op@x.com', code: '000000'),
         throwsA(isA<InvalidTokenFailure>()),
       );
     });
@@ -592,7 +595,7 @@ void main() {
       ).thenThrow(badResponse('/auth/verify-email', 410));
 
       await expectLater(
-        ds.verifyEmail('old'),
+        ds.verifyEmail(email: 'op@x.com', code: '123456'),
         throwsA(isA<ExpiredTokenFailure>()),
       );
     });
@@ -606,7 +609,7 @@ void main() {
       ).thenAnswer((_) async => jsonResp('/auth/verify-email', 200));
 
       await expectLater(
-        ds.verifyEmail('t'),
+        ds.verifyEmail(email: 'op@x.com', code: '123456'),
         throwsA(isA<UnknownAuthFailure>()),
       );
     });
@@ -657,7 +660,7 @@ void main() {
   });
 
   group('DioAuthDatasource.resetPassword', () {
-    test('204 → completa y envía token + new_password', () async {
+    test('204 → completa y envía email + code + new_password', () async {
       when(
         () => dio.post<void>(
           '/auth/reset-password',
@@ -670,34 +673,42 @@ void main() {
         ),
       );
 
-      await ds.resetPassword(token: 'reset-tok', newPassword: 'n3w-pass');
+      await ds.resetPassword(
+        email: 'op@example.com',
+        code: '123456',
+        newPassword: 'n3w-pass',
+      );
 
       verify(
         () => dio.post<void>(
           '/auth/reset-password',
           data: <String, dynamic>{
-            'token': 'reset-tok',
+            'email': 'op@example.com',
+            'code': '123456',
             'new_password': 'n3w-pass',
           },
         ),
       ).called(1);
     });
 
-    test('404 → InvalidTokenFailure', () async {
-      when(
-        () => dio.post<void>(
-          '/auth/reset-password',
-          data: any<Object?>(named: 'data'),
-        ),
-      ).thenThrow(badResponse('/auth/reset-password', 404));
+    test(
+      '404 → InvalidTokenFailure (código/correo inválido o lockout)',
+      () async {
+        when(
+          () => dio.post<void>(
+            '/auth/reset-password',
+            data: any<Object?>(named: 'data'),
+          ),
+        ).thenThrow(badResponse('/auth/reset-password', 404));
 
-      await expectLater(
-        ds.resetPassword(token: 'bad', newPassword: 'p'),
-        throwsA(isA<InvalidTokenFailure>()),
-      );
-    });
+        await expectLater(
+          ds.resetPassword(email: 'op@x.com', code: '000000', newPassword: 'p'),
+          throwsA(isA<InvalidTokenFailure>()),
+        );
+      },
+    );
 
-    test('410 → ExpiredTokenFailure (token caducado o ya usado)', () async {
+    test('410 → ExpiredTokenFailure (código caducado o ya usado)', () async {
       when(
         () => dio.post<void>(
           '/auth/reset-password',
@@ -706,7 +717,7 @@ void main() {
       ).thenThrow(badResponse('/auth/reset-password', 410));
 
       await expectLater(
-        ds.resetPassword(token: 'old', newPassword: 'p'),
+        ds.resetPassword(email: 'op@x.com', code: '123456', newPassword: 'p'),
         throwsA(isA<ExpiredTokenFailure>()),
       );
     });
@@ -720,7 +731,7 @@ void main() {
       ).thenThrow(badResponse('/auth/reset-password', 400));
 
       await expectLater(
-        ds.resetPassword(token: 't', newPassword: 'short'),
+        ds.resetPassword(email: 'op@x.com', code: '123456', newPassword: 'sh'),
         throwsA(isA<WeakPasswordFailure>()),
       );
     });
@@ -995,6 +1006,164 @@ void main() {
       await expectLater(
         ds.resendVerification(),
         throwsA(isA<NetworkFailure>()),
+      );
+    });
+  });
+
+  group('DioAuthDatasource.pendingInvitations', () {
+    Response<List<dynamic>> listResp(int status, {List<dynamic>? body}) =>
+        Response<List<dynamic>>(
+          requestOptions: RequestOptions(path: '/auth/invitations/pending'),
+          statusCode: status,
+          data: body,
+        );
+
+    test('200 con filas → lista de PendingInvitation', () async {
+      when(
+        () => dio.get<List<dynamic>>('/auth/invitations/pending'),
+      ).thenAnswer(
+        (_) async => listResp(
+          200,
+          body: <dynamic>[
+            <String, dynamic>{
+              'id': 'inv-1',
+              'org_id': 'o-9',
+              'org_name': 'Acme',
+              'role': 'WORKER',
+              'expires_at': '2026-07-15T00:00:00Z',
+            },
+          ],
+        ),
+      );
+
+      final got = await ds.pendingInvitations();
+
+      expect(got, hasLength(1));
+      expect(got.first.id, 'inv-1');
+      expect(got.first.orgName, 'Acme');
+      expect(got.first.role, 'WORKER');
+    });
+
+    test(
+      '200 con [] (correo sin verificar) → lista vacía, sin fallo',
+      () async {
+        when(
+          () => dio.get<List<dynamic>>('/auth/invitations/pending'),
+        ).thenAnswer((_) async => listResp(200, body: <dynamic>[]));
+
+        expect(await ds.pendingInvitations(), isEmpty);
+      },
+    );
+
+    test('body nulo → UnknownAuthFailure', () async {
+      when(
+        () => dio.get<List<dynamic>>('/auth/invitations/pending'),
+      ).thenAnswer((_) async => listResp(200));
+
+      await expectLater(
+        ds.pendingInvitations(),
+        throwsA(isA<UnknownAuthFailure>()),
+      );
+    });
+
+    test('timeout → NetworkFailure', () async {
+      when(() => dio.get<List<dynamic>>('/auth/invitations/pending')).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/invitations/pending'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+
+      await expectLater(
+        ds.pendingInvitations(),
+        throwsA(isA<NetworkFailure>()),
+      );
+    });
+  });
+
+  group('DioAuthDatasource.acceptPendingInvitation', () {
+    test('200 → AcceptedInvitation y envía invitation_id', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/invitations/accept-pending',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => jsonResp(
+          '/auth/invitations/accept-pending',
+          200,
+          body: <String, dynamic>{
+            'org_id': 'o-9',
+            'org_name': 'Acme',
+            'role': 'WORKER',
+          },
+        ),
+      );
+
+      final got = await ds.acceptPendingInvitation('inv-1');
+
+      expect(got.orgName, 'Acme');
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/invitations/accept-pending',
+          data: <String, dynamic>{'invitation_id': 'inv-1'},
+        ),
+      ).called(1);
+    });
+
+    test('403 → EmailNotVerifiedFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/invitations/accept-pending',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse('/auth/invitations/accept-pending', 403));
+
+      await expectLater(
+        ds.acceptPendingInvitation('inv-1'),
+        throwsA(isA<EmailNotVerifiedFailure>()),
+      );
+    });
+
+    test('404 → InvalidTokenFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/invitations/accept-pending',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse('/auth/invitations/accept-pending', 404));
+
+      await expectLater(
+        ds.acceptPendingInvitation('inv-x'),
+        throwsA(isA<InvalidTokenFailure>()),
+      );
+    });
+
+    test('409 → AlreadyMemberFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/invitations/accept-pending',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse('/auth/invitations/accept-pending', 409));
+
+      await expectLater(
+        ds.acceptPendingInvitation('inv-1'),
+        throwsA(isA<AlreadyMemberFailure>()),
+      );
+    });
+
+    test('410 → ExpiredTokenFailure', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/invitations/accept-pending',
+          data: any<Object?>(named: 'data'),
+        ),
+      ).thenThrow(badResponse('/auth/invitations/accept-pending', 410));
+
+      await expectLater(
+        ds.acceptPendingInvitation('inv-1'),
+        throwsA(isA<ExpiredTokenFailure>()),
       );
     });
   });

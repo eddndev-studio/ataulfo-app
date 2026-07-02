@@ -12,6 +12,7 @@ import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
 import 'package:ataulfo/features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/domain/entities/pending_invitation.dart';
 import 'package:ataulfo/features/auth/domain/repositories/auth_repository.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/rename_org_cubit.dart';
@@ -311,10 +312,17 @@ void main() {
   late _MockOrgAiConfigRepo orgAiConfigRepo;
   late _MockLabelsRepo labelsRepo;
   late _MockNotificationsRepo notificationsRepo;
+  late _MockAuthRepo authRepo;
   late AppRouter router;
 
   setUp(() {
     authBloc = _MockAuthBloc();
+    authRepo = _MockAuthRepo();
+    // /memberships monta un PendingInvitationsCubit que carga al construirse;
+    // sin pendientes la sección se oculta y el pumpAndSettle termina.
+    when(
+      authRepo.pendingInvitations,
+    ).thenAnswer((_) async => const <PendingInvitation>[]);
     botsRepo = _MockBotsRepo();
     botSessionRepo = _MockBotSessionRepo();
     conversationsRepo = _MockConversationsRepo();
@@ -412,7 +420,7 @@ void main() {
     ).thenAnswer((_) async => _profile);
     router = AppRouter(
       authBloc: authBloc,
-      authRepository: _MockAuthRepo(),
+      authRepository: authRepo,
       botsRepository: botsRepo,
       botSessionRepository: botSessionRepo,
       conversationsRepository: conversationsRepo,
@@ -1495,7 +1503,8 @@ void main() {
     final authRepo = _MockAuthRepo();
     when(
       () => authRepo.resetPassword(
-        token: any(named: 'token'),
+        email: any(named: 'email'),
+        code: any(named: 'code'),
         newPassword: any(named: 'newPassword'),
       ),
     ).thenAnswer((_) async {});
@@ -1546,12 +1555,16 @@ void main() {
     localRouter.router.go('/reset-password');
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const Key('reset.token')), 'tok123');
+    await tester.enterText(
+      find.byKey(const Key('reset.email')),
+      'op@example.com',
+    );
+    await tester.enterText(find.byKey(const Key('reset.code')), '123456');
     await tester.enterText(
       find.byKey(const Key('reset.password')),
       'hunter2-secret',
     );
-    await tester.tap(find.byType(AppButton));
+    await tester.tap(find.byKey(const Key('reset.submit')));
     await tester.pumpAndSettle();
 
     verify(() => authBloc.add(const AuthLoggedOut())).called(1);

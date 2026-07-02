@@ -103,11 +103,15 @@ class RegisterReq {
 }
 
 class VerifyEmailReq {
-  const VerifyEmailReq({required this.token});
+  const VerifyEmailReq({required this.email, required this.code});
 
-  final String token;
+  final String email;
+  final String code;
 
-  Map<String, dynamic> toJson() => <String, dynamic>{'token': token};
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'email': email,
+    'code': code,
+  };
 }
 
 class VerifyEmailResp {
@@ -135,13 +139,19 @@ class ForgotPasswordReq {
 }
 
 class ResetPasswordReq {
-  const ResetPasswordReq({required this.token, required this.newPassword});
+  const ResetPasswordReq({
+    required this.email,
+    required this.code,
+    required this.newPassword,
+  });
 
-  final String token;
+  final String email;
+  final String code;
   final String newPassword;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'token': token,
+    'email': email,
+    'code': code,
     'new_password': newPassword,
   };
 }
@@ -160,4 +170,78 @@ class AcceptInvitationReq {
   final String token;
 
   Map<String, dynamic> toJson() => <String, dynamic>{'token': token};
+}
+
+/// Fila de `GET /auth/invitations/pending`: una invitación dirigida al correo
+/// verificado de la sesión. El wire trae `expires_at`, que el cliente no pinta
+/// hoy y por eso no lee — el resto son obligatorias.
+class PendingInvitationResp {
+  const PendingInvitationResp({
+    required this.id,
+    required this.orgId,
+    required this.orgName,
+    required this.role,
+  });
+
+  factory PendingInvitationResp.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    final orgId = json['org_id'];
+    final orgName = json['org_name'];
+    final role = json['role'];
+    if (id is! String ||
+        orgId is! String ||
+        orgName is! String ||
+        role is! String) {
+      throw const FormatException(
+        'pendingInvitationResp: clave obligatoria ausente',
+      );
+    }
+    return PendingInvitationResp(
+      id: id,
+      orgId: orgId,
+      orgName: orgName,
+      role: role,
+    );
+  }
+
+  final String id;
+  final String orgId;
+  final String orgName;
+  final String role;
+}
+
+/// Respuesta de `POST /auth/invitations/accept-pending`: la membership recién
+/// creada (aún no activa).
+class AcceptedInvitationResp {
+  const AcceptedInvitationResp({
+    required this.orgId,
+    required this.orgName,
+    required this.role,
+  });
+
+  factory AcceptedInvitationResp.fromJson(Map<String, dynamic> json) {
+    final orgId = json['org_id'];
+    final orgName = json['org_name'];
+    final role = json['role'];
+    if (orgId is! String || orgName is! String || role is! String) {
+      throw const FormatException(
+        'acceptedInvitationResp: clave obligatoria ausente',
+      );
+    }
+    return AcceptedInvitationResp(orgId: orgId, orgName: orgName, role: role);
+  }
+
+  final String orgId;
+  final String orgName;
+  final String role;
+}
+
+class AcceptPendingInvitationReq {
+  const AcceptPendingInvitationReq({required this.invitationId});
+
+  final String invitationId;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'invitation_id': invitationId,
+  };
 }

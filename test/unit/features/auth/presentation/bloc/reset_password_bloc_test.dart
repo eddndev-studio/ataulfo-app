@@ -16,6 +16,14 @@ void main() {
 
   // 12+ chars: satisface el mínimo de cliente que evita un viaje al backend.
   const validPassword = 'hunter2-secret';
+  const email = 'op@example.com';
+  const code = '123456';
+
+  ResetPasswordSubmitted submit({
+    String e = email,
+    String c = code,
+    String p = validPassword,
+  }) => ResetPasswordSubmitted(email: e, code: c, newPassword: p);
 
   group('ResetPasswordBloc', () {
     test('estado inicial es ResetPasswordInitial', () {
@@ -23,71 +31,73 @@ void main() {
     });
 
     blocTest<ResetPasswordBloc, ResetPasswordState>(
-      'OK con token crudo: Submitting → Succeeded y llama a resetPassword una vez',
+      'OK: Submitting → Succeeded y llama a resetPassword una vez',
       build: () {
         when(
-          () => repo.resetPassword(token: 'tok123', newPassword: validPassword),
+          () => repo.resetPassword(
+            email: email,
+            code: code,
+            newPassword: validPassword,
+          ),
         ).thenAnswer((_) async {});
         return ResetPasswordBloc(repo);
       },
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'tok123',
-          newPassword: validPassword,
-        ),
-      ),
+      act: (b) => b.add(submit()),
       expect: () => const <ResetPasswordState>[
         ResetPasswordSubmitting(),
         ResetPasswordSucceeded(),
       ],
       verify: (_) {
         verify(
-          () => repo.resetPassword(token: 'tok123', newPassword: validPassword),
+          () => repo.resetPassword(
+            email: email,
+            code: code,
+            newPassword: validPassword,
+          ),
         ).called(1);
       },
     );
 
     blocTest<ResetPasswordBloc, ResetPasswordState>(
-      'OK con URL completa: extrae el token del query antes de canjear',
+      'recorta el correo antes de canjear',
       build: () {
         when(
-          () => repo.resetPassword(token: 'tok123', newPassword: validPassword),
+          () => repo.resetPassword(
+            email: email,
+            code: code,
+            newPassword: validPassword,
+          ),
         ).thenAnswer((_) async {});
         return ResetPasswordBloc(repo);
       },
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'https://ataulfo.app/reset?token=tok123',
-          newPassword: validPassword,
-        ),
-      ),
+      act: (b) => b.add(submit(e: '  op@example.com  ')),
       expect: () => const <ResetPasswordState>[
         ResetPasswordSubmitting(),
         ResetPasswordSucceeded(),
       ],
       verify: (_) {
         verify(
-          () => repo.resetPassword(token: 'tok123', newPassword: validPassword),
+          () => repo.resetPassword(
+            email: email,
+            code: code,
+            newPassword: validPassword,
+          ),
         ).called(1);
       },
     );
 
     blocTest<ResetPasswordBloc, ResetPasswordState>(
-      'token en blanco: NO llama al repo, emite Failed(invalidInput)',
+      'correo sin arroba: NO llama al repo, emite Failed(invalidInput)',
       build: () => ResetPasswordBloc(repo),
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: '   ',
-          newPassword: validPassword,
-        ),
-      ),
+      act: (b) => b.add(submit(e: 'no-arroba')),
       expect: () => const <ResetPasswordState>[
         ResetPasswordFailed(ResetPasswordFailureKind.invalidInput),
       ],
       verify: (_) {
         verifyNever(
           () => repo.resetPassword(
-            token: any(named: 'token'),
+            email: any(named: 'email'),
+            code: any(named: 'code'),
             newPassword: any(named: 'newPassword'),
           ),
         );
@@ -95,21 +105,44 @@ void main() {
     );
 
     blocTest<ResetPasswordBloc, ResetPasswordState>(
+      'código != 6 dígitos: NO llama al repo, emite Failed(invalidCode)',
+      build: () => ResetPasswordBloc(repo),
+      act: (b) => b.add(submit(c: '123')),
+      expect: () => const <ResetPasswordState>[
+        ResetPasswordFailed(ResetPasswordFailureKind.invalidCode),
+      ],
+      verify: (_) {
+        verifyNever(
+          () => repo.resetPassword(
+            email: any(named: 'email'),
+            code: any(named: 'code'),
+            newPassword: any(named: 'newPassword'),
+          ),
+        );
+      },
+    );
+
+    blocTest<ResetPasswordBloc, ResetPasswordState>(
+      'código con letras: emite Failed(invalidCode)',
+      build: () => ResetPasswordBloc(repo),
+      act: (b) => b.add(submit(c: '12a456')),
+      expect: () => const <ResetPasswordState>[
+        ResetPasswordFailed(ResetPasswordFailureKind.invalidCode),
+      ],
+    );
+
+    blocTest<ResetPasswordBloc, ResetPasswordState>(
       'password corta (<12): NO llama al repo, emite Failed(passwordTooShort)',
       build: () => ResetPasswordBloc(repo),
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'tok123',
-          newPassword: 'short',
-        ),
-      ),
+      act: (b) => b.add(submit(p: 'short')),
       expect: () => const <ResetPasswordState>[
         ResetPasswordFailed(ResetPasswordFailureKind.passwordTooShort),
       ],
       verify: (_) {
         verifyNever(
           () => repo.resetPassword(
-            token: any(named: 'token'),
+            email: any(named: 'email'),
+            code: any(named: 'code'),
             newPassword: any(named: 'newPassword'),
           ),
         );
@@ -121,18 +154,14 @@ void main() {
       build: () {
         when(
           () => repo.resetPassword(
-            token: any(named: 'token'),
+            email: any(named: 'email'),
+            code: any(named: 'code'),
             newPassword: any(named: 'newPassword'),
           ),
         ).thenThrow(const WeakPasswordFailure());
         return ResetPasswordBloc(repo);
       },
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'tok123',
-          newPassword: validPassword,
-        ),
-      ),
+      act: (b) => b.add(submit()),
       expect: () => const <ResetPasswordState>[
         ResetPasswordSubmitting(),
         ResetPasswordFailed(ResetPasswordFailureKind.passwordTooShort),
@@ -140,48 +169,40 @@ void main() {
     );
 
     blocTest<ResetPasswordBloc, ResetPasswordState>(
-      '404 InvalidToken: Submitting → Failed(invalidLink)',
+      '404 InvalidToken: Submitting → Failed(invalidCode)',
       build: () {
         when(
           () => repo.resetPassword(
-            token: any(named: 'token'),
+            email: any(named: 'email'),
+            code: any(named: 'code'),
             newPassword: any(named: 'newPassword'),
           ),
         ).thenThrow(const InvalidTokenFailure());
         return ResetPasswordBloc(repo);
       },
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'tok123',
-          newPassword: validPassword,
-        ),
-      ),
+      act: (b) => b.add(submit()),
       expect: () => const <ResetPasswordState>[
         ResetPasswordSubmitting(),
-        ResetPasswordFailed(ResetPasswordFailureKind.invalidLink),
+        ResetPasswordFailed(ResetPasswordFailureKind.invalidCode),
       ],
     );
 
     blocTest<ResetPasswordBloc, ResetPasswordState>(
-      '410 ExpiredToken: Submitting → Failed(expiredLink)',
+      '410 ExpiredToken: Submitting → Failed(expiredCode)',
       build: () {
         when(
           () => repo.resetPassword(
-            token: any(named: 'token'),
+            email: any(named: 'email'),
+            code: any(named: 'code'),
             newPassword: any(named: 'newPassword'),
           ),
         ).thenThrow(const ExpiredTokenFailure());
         return ResetPasswordBloc(repo);
       },
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'tok123',
-          newPassword: validPassword,
-        ),
-      ),
+      act: (b) => b.add(submit()),
       expect: () => const <ResetPasswordState>[
         ResetPasswordSubmitting(),
-        ResetPasswordFailed(ResetPasswordFailureKind.expiredLink),
+        ResetPasswordFailed(ResetPasswordFailureKind.expiredCode),
       ],
     );
 
@@ -190,18 +211,14 @@ void main() {
       build: () {
         when(
           () => repo.resetPassword(
-            token: any(named: 'token'),
+            email: any(named: 'email'),
+            code: any(named: 'code'),
             newPassword: any(named: 'newPassword'),
           ),
         ).thenThrow(const NetworkFailure());
         return ResetPasswordBloc(repo);
       },
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'tok123',
-          newPassword: validPassword,
-        ),
-      ),
+      act: (b) => b.add(submit()),
       expect: () => const <ResetPasswordState>[
         ResetPasswordSubmitting(),
         ResetPasswordFailed(ResetPasswordFailureKind.network),
@@ -213,18 +230,14 @@ void main() {
       build: () {
         when(
           () => repo.resetPassword(
-            token: any(named: 'token'),
+            email: any(named: 'email'),
+            code: any(named: 'code'),
             newPassword: any(named: 'newPassword'),
           ),
         ).thenThrow(const UnknownAuthFailure());
         return ResetPasswordBloc(repo);
       },
-      act: (b) => b.add(
-        const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'tok123',
-          newPassword: validPassword,
-        ),
-      ),
+      act: (b) => b.add(submit()),
       expect: () => const <ResetPasswordState>[
         ResetPasswordSubmitting(),
         ResetPasswordFailed(ResetPasswordFailureKind.unknown),

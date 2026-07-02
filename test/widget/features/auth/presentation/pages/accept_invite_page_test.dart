@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/accept_invitation_cubit.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -174,6 +175,20 @@ void main() {
       );
     });
 
+    testWidgets('el campo es de una sola línea (código, no multilínea)', (
+      tester,
+    ) async {
+      when(() => auth.state).thenReturn(const AuthAuthenticated(_withOrg));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<AppTextField>(
+        find.byKey(const Key('accept.token')),
+      );
+      expect(field.maxLines, 1);
+    });
+
     testWidgets('pegar + enviar dispara accept con el texto pegado', (
       tester,
     ) async {
@@ -181,11 +196,49 @@ void main() {
 
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('accept.token')), 'tok123');
+      // Se teclea en minúsculas; el formatter lo sube a mayúsculas antes de
+      // llegar al cubit (el código compartido es mayúsculas).
+      await tester.enterText(
+        find.byKey(const Key('accept.token')),
+        'abcd-efgh',
+      );
       await tester.tap(find.widgetWithText(AppButton, 'Aceptar invitación'));
       await tester.pump();
 
-      verify(() => cubit.accept('tok123')).called(1);
+      verify(() => cubit.accept('ABCD-EFGH')).called(1);
+    });
+
+    testWidgets('un enlace legacy pegado llega EXACTO (sin mayusculear)', (
+      tester,
+    ) async {
+      // El token legacy es base64url case-sensitive; subirlo a mayúsculas lo
+      // corrompería (y volvería la clave query 'TOKEN', ilegible para
+      // extractPastedToken). Sólo el código corto se mayuscula.
+      when(() => auth.state).thenReturn(const AuthAuthenticated(_withOrg));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      const link = 'https://ataulfo.app/accept-invite?token=aBc_-3xY';
+      await tester.enterText(find.byKey(const Key('accept.token')), link);
+      await tester.tap(find.widgetWithText(AppButton, 'Aceptar invitación'));
+      await tester.pump();
+
+      verify(() => cubit.accept(link)).called(1);
+    });
+
+    testWidgets('un token largo legacy pegado llega EXACTO (case-sensitive)', (
+      tester,
+    ) async {
+      when(() => auth.state).thenReturn(const AuthAuthenticated(_withOrg));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      const token = 'aB3xY9kQ2mNpZ7wR4tLvE1sD';
+      await tester.enterText(find.byKey(const Key('accept.token')), token);
+      await tester.tap(find.widgetWithText(AppButton, 'Aceptar invitación'));
+      await tester.pump();
+
+      verify(() => cubit.accept(token)).called(1);
     });
 
     testWidgets('Accepting muestra loading', (tester) async {
@@ -258,10 +311,7 @@ void main() {
 
     testWidgets('invalidInput', (tester) async {
       await pumpFailed(tester, AcceptInvitationFailureKind.invalidInput);
-      expect(
-        find.text('Pega el código o enlace de la invitación'),
-        findsOneWidget,
-      );
+      expect(find.text('Ingresa el código de la invitación'), findsOneWidget);
     });
 
     testWidgets('invalidToken', (tester) async {
@@ -305,7 +355,7 @@ void main() {
       await tester.enterText(find.byKey(const Key('accept.token')), 'retry');
       await tester.tap(find.widgetWithText(AppButton, 'Aceptar invitación'));
       await tester.pump();
-      verify(() => cubit.accept('retry')).called(1);
+      verify(() => cubit.accept('RETRY')).called(1);
     });
   });
 }

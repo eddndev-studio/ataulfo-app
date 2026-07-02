@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
@@ -28,16 +30,17 @@ void main() {
     when(() => bloc.state).thenReturn(const RegisterInitial());
   });
 
-  Widget host({
-    void Function(AuthTokens)? onSucceeded,
-    VoidCallback? onGoToLogin,
-  }) => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: BlocProvider<RegisterBloc>.value(
-      value: bloc,
-      child: RegisterPage(onSucceeded: onSucceeded, onGoToLogin: onGoToLogin),
-    ),
-  );
+  Widget host({ValueChanged<String>? onSucceeded, VoidCallback? onGoToLogin}) =>
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: BlocProvider<RegisterBloc>.value(
+          value: bloc,
+          child: RegisterPage(
+            onSucceeded: onSucceeded,
+            onGoToLogin: onGoToLogin,
+          ),
+        ),
+      );
 
   testWidgets('pantalla baja: el formulario scrollea en vez de desbordar', (
     tester,
@@ -225,29 +228,38 @@ void main() {
     expect(t.style?.color, AppTokens.danger);
   });
 
-  testWidgets('estado Succeeded notifica al callback onSucceeded', (
-    tester,
-  ) async {
-    const tokens = AuthTokens(
-      accessToken: 'a',
-      refreshToken: 'r',
-      tokenType: 'Bearer',
-      expiresInSeconds: 900,
-    );
-    whenListen(
-      bloc,
-      Stream<RegisterState>.fromIterable(const <RegisterState>[
-        RegisterSucceeded(tokens),
-      ]),
-      initialState: const RegisterInitial(),
-    );
+  testWidgets(
+    'estado Succeeded notifica onSucceeded con el correo registrado',
+    (tester) async {
+      const tokens = AuthTokens(
+        accessToken: 'a',
+        refreshToken: 'r',
+        tokenType: 'Bearer',
+        expiresInSeconds: 900,
+      );
+      final controller = StreamController<RegisterState>();
+      addTearDown(controller.close);
+      whenListen(
+        bloc,
+        controller.stream,
+        initialState: const RegisterInitial(),
+      );
 
-    AuthTokens? captured;
-    await tester.pumpWidget(host(onSucceeded: (t) => captured = t));
-    await tester.pump();
+      String? captured;
+      await tester.pumpWidget(host(onSucceeded: (e) => captured = e));
 
-    expect(captured, tokens);
-  });
+      await tester.enterText(
+        find.byKey(const Key('register.email')),
+        'op@example.com',
+      );
+      await tester.pump();
+
+      controller.add(const RegisterSucceeded(tokens));
+      await tester.pump();
+
+      expect(captured, 'op@example.com');
+    },
+  );
 
   testWidgets('"Ya tengo cuenta" invoca onGoToLogin', (tester) async {
     var tapped = false;

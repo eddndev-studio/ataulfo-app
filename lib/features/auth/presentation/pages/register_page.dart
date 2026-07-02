@@ -4,15 +4,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
-import '../../domain/entities/auth_tokens.dart';
 import '../bloc/register_bloc.dart';
 
 /// Página de alta de cuenta. Es presentación pura: la lógica vive en
 /// `RegisterBloc`.
 ///
 /// `onSucceeded` y `onGoToLogin` son opcionales para tests; en la app real los
-/// cabla el router (navegación post-alta y vuelta al login). El BlocListener
-/// garantiza que `onSucceeded` se invoca exactamente una vez por transición a
+/// cabla el router (navegación post-alta y vuelta al login). `onSucceeded`
+/// recibe el correo recién registrado (para aterrizar en la verificación). El
+/// BlocListener garantiza que se invoca exactamente una vez por transición a
 /// `RegisterSucceeded`.
 ///
 /// El botón se habilita sólo cuando los tres campos tienen texto; la
@@ -23,7 +23,7 @@ import '../bloc/register_bloc.dart';
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key, this.onSucceeded, this.onGoToLogin});
 
-  final void Function(AuthTokens tokens)? onSucceeded;
+  final ValueChanged<String>? onSucceeded;
   final VoidCallback? onGoToLogin;
 
   @override
@@ -83,7 +83,7 @@ class _RegisterPageState extends State<RegisterPage> {
         child: BlocConsumer<RegisterBloc, RegisterState>(
           listener: (context, state) {
             if (state is RegisterSucceeded) {
-              widget.onSucceeded?.call(state.tokens);
+              widget.onSucceeded?.call(_email.text);
             }
           },
           builder: (context, state) {

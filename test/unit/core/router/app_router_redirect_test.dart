@@ -139,6 +139,22 @@ void main() {
       );
     });
 
+    test(
+      'aterrizaje del alta: /verify-email?email=… no rebota a /home con sesión',
+      () {
+        // El alta navega a /verify-email?email=… y dispara AuthCheckRequested;
+        // cuando la sesión pasa a Authenticated el redirect NO debe comerse esa
+        // navegación (la ruta se permite con sesión, incluida su query).
+        expect(
+          redirectForState(
+            const AuthAuthenticated(_owner),
+            '/verify-email?email=op%40example.com',
+          ),
+          isNull,
+        );
+      },
+    );
+
     test('rutas normales se permiten', () {
       expect(
         redirectForState(const AuthAuthenticated(_owner), '/home'),

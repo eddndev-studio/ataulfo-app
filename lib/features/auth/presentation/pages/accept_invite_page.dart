@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,6 +9,25 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../bloc/accept_invitation_cubit.dart';
 import '../bloc/auth_bloc.dart';
+
+/// Forma de un código corto de invitación (`ABCD-EFGH`): sólo alfanumérico,
+/// guiones y espacios, hasta 10 caracteres. Un enlace pegado (`https://…`) o un
+/// token largo legacy (base64url, case-sensitive) NO la cumplen.
+final RegExp _shortCodeShape = RegExp(r'^[A-Za-z0-9 -]{1,10}$');
+
+/// Sube a mayúsculas SÓLO lo que parece un código corto (case-insensitive en el
+/// server). Un enlace o un token largo case-sensitive se dejan intactos:
+/// mayuscularlos los corrompería —y en un enlace volvería la clave `token` del
+/// query en `TOKEN`, que `extractPastedToken` ya no reconocería—.
+final TextInputFormatter _upperCaseShortCode = TextInputFormatter.withFunction((
+  _,
+  next,
+) {
+  if (_shortCodeShape.hasMatch(next.text)) {
+    return next.copyWith(text: next.text.toUpperCase());
+  }
+  return next;
+});
 
 /// Pantalla para canjear una invitación pendiente. Página content-only: la
 /// ruta aporta Scaffold + AppBar.
@@ -151,19 +171,18 @@ class _AcceptFormState extends State<_AcceptForm> {
             ),
             children: <Widget>[
               Text(
-                'Pega el enlace o el código de la invitación que recibiste para '
-                'unirte a la organización.',
+                'Ingresa el código que te compartieron. También puedes pegar '
+                'un enlace de invitación.',
                 style: textTheme.bodyMedium,
               ),
               const SizedBox(height: AppTokens.sp6),
               AppTextField(
                 key: const Key('accept.token'),
-                label: 'Enlace o código',
-                hint: 'Pega aquí el enlace o el código',
+                label: 'Código de invitación',
+                hint: 'ABCD-EFGH',
                 controller: _token,
                 autocorrect: false,
-                minLines: 2,
-                maxLines: 4,
+                inputFormatters: <TextInputFormatter>[_upperCaseShortCode],
               ),
               const SizedBox(height: AppTokens.sp6),
               AppButton.filled(
@@ -188,7 +207,7 @@ class _AcceptFormState extends State<_AcceptForm> {
 
   String _messageFor(AcceptInvitationFailureKind kind) => switch (kind) {
     AcceptInvitationFailureKind.invalidInput =>
-      'Pega el código o enlace de la invitación',
+      'Ingresa el código de la invitación',
     AcceptInvitationFailureKind.invalidToken =>
       'La invitación no es válida o ya expiró',
     AcceptInvitationFailureKind.emailMismatch =>

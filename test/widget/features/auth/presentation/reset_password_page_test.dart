@@ -1,7 +1,9 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_code_field.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/forgot_password_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/reset_password_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/pages/reset_password_page.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -13,75 +15,130 @@ import 'package:mocktail/mocktail.dart';
 class _MockResetBloc extends MockBloc<ResetPasswordEvent, ResetPasswordState>
     implements ResetPasswordBloc {}
 
+class _MockForgotBloc extends MockBloc<ForgotPasswordEvent, ForgotPasswordState>
+    implements ForgotPasswordBloc {}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(
-      const ResetPasswordSubmitted(pastedLinkOrToken: '', newPassword: ''),
+      const ResetPasswordSubmitted(email: '', code: '', newPassword: ''),
     );
+    registerFallbackValue(const ForgotPasswordSubmitted(email: ''));
   });
 
   late _MockResetBloc bloc;
+  late _MockForgotBloc forgot;
 
   setUp(() {
     bloc = _MockResetBloc();
+    forgot = _MockForgotBloc();
     when(() => bloc.state).thenReturn(const ResetPasswordInitial());
+    when(() => forgot.state).thenReturn(const ForgotPasswordInitial());
   });
 
-  Widget host({VoidCallback? onSucceeded}) => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: BlocProvider<ResetPasswordBloc>.value(
-      value: bloc,
-      child: ResetPasswordPage(onSucceeded: onSucceeded),
-    ),
-  );
+  Widget host({String initialEmail = '', VoidCallback? onSucceeded}) =>
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<ResetPasswordBloc>.value(value: bloc),
+            BlocProvider<ForgotPasswordBloc>.value(value: forgot),
+          ],
+          child: ResetPasswordPage(
+            initialEmail: initialEmail,
+            onSucceeded: onSucceeded,
+          ),
+        ),
+      );
 
-  testWidgets('renderiza campo de pegado + nueva contraseña + AppButton', (
+  testWidgets('renderiza email + código + contraseña + botón + reenviar', (
     tester,
   ) async {
     await tester.pumpWidget(host());
 
-    expect(find.byKey(const Key('reset.token')), findsOneWidget);
+    expect(find.byKey(const Key('reset.email')), findsOneWidget);
+    expect(find.byKey(const Key('reset.code')), findsOneWidget);
     expect(find.byKey(const Key('reset.password')), findsOneWidget);
-    expect(find.byType(AppTextField), findsNWidgets(2));
-    expect(find.byType(AppButton), findsOneWidget);
+    expect(find.byKey(const Key('reset.resend')), findsOneWidget);
+    expect(find.byType(AppCodeField), findsOneWidget);
   });
 
-  testWidgets('la nueva contraseña lleva obscureText + obscureToggle', (
-    tester,
-  ) async {
-    await tester.pumpWidget(host());
+  testWidgets('precarga el correo del initialEmail (editable)', (tester) async {
+    await tester.pumpWidget(host(initialEmail: 'op@example.com'));
 
-    final pw = tester.widget<AppTextField>(
-      find.byKey(const Key('reset.password')),
+    final email = tester.widget<AppTextField>(
+      find.byKey(const Key('reset.email')),
     );
-    expect(pw.obscureText, isTrue);
-    expect(pw.obscureToggle, isTrue);
+    expect(email.controller.text, 'op@example.com');
   });
 
-  testWidgets('submit dispara ResetPasswordSubmitted con pegado + contraseña', (
+  testWidgets('submit dispara ResetPasswordSubmitted con email+código+pass', (
     tester,
   ) async {
-    await tester.pumpWidget(host());
+    await tester.pumpWidget(host(initialEmail: 'op@example.com'));
 
-    await tester.enterText(
-      find.byKey(const Key('reset.token')),
-      'https://ataulfo.app/reset?token=tok123',
-    );
+    await tester.enterText(find.byKey(const Key('reset.code')), '123456');
     await tester.enterText(
       find.byKey(const Key('reset.password')),
       'hunter2-secret',
     );
-    await tester.tap(find.byType(AppButton));
+    await tester.tap(find.byKey(const Key('reset.submit')));
     await tester.pump();
 
     verify(
       () => bloc.add(
         const ResetPasswordSubmitted(
-          pastedLinkOrToken: 'https://ataulfo.app/reset?token=tok123',
+          email: 'op@example.com',
+          code: '123456',
           newPassword: 'hunter2-secret',
         ),
       ),
     ).called(1);
+  });
+
+  testWidgets('reenviar dispara ForgotPasswordSubmitted con el correo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(initialEmail: 'op@example.com'));
+
+    await tester.tap(find.byKey(const Key('reset.resend')));
+    await tester.pump();
+
+    verify(
+      () => forgot.add(const ForgotPasswordSubmitted(email: 'op@example.com')),
+    ).called(1);
+  });
+
+  testWidgets('reenviar con correo vacío avisa y NO dispara forgot', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    await tester.tap(find.byKey(const Key('reset.resend')));
+    await tester.pump();
+
+    expect(
+      find.text('Escribe tu correo para reenviar el código'),
+      findsOneWidget,
+    );
+    verifyNever(() => forgot.add(any()));
+  });
+
+  testWidgets('ForgotPasswordSent avisa "Te reenviamos el código"', (
+    tester,
+  ) async {
+    whenListen(
+      forgot,
+      Stream<ForgotPasswordState>.fromIterable(const <ForgotPasswordState>[
+        ForgotPasswordSent(),
+      ]),
+      initialState: const ForgotPasswordInitial(),
+    );
+
+    await tester.pumpWidget(host(initialEmail: 'op@example.com'));
+    await tester.pump();
+
+    expect(find.text('Te reenviamos el código'), findsOneWidget);
   });
 
   testWidgets('estado Submitting muestra el botón en loading', (tester) async {
@@ -95,17 +152,19 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    final button = tester.widget<AppButton>(find.byType(AppButton));
+    final button = tester.widget<AppButton>(
+      find.byKey(const Key('reset.submit')),
+    );
     expect(button.loading, isTrue);
   });
 
-  testWidgets('Failed(invalidLink) muestra mensaje de enlace inválido', (
+  testWidgets('Failed(invalidCode) muestra mensaje de código incorrecto', (
     tester,
   ) async {
     whenListen(
       bloc,
       Stream<ResetPasswordState>.fromIterable(const <ResetPasswordState>[
-        ResetPasswordFailed(ResetPasswordFailureKind.invalidLink),
+        ResetPasswordFailed(ResetPasswordFailureKind.invalidCode),
       ]),
       initialState: const ResetPasswordInitial(),
     );
@@ -114,16 +173,16 @@ void main() {
     await tester.pump();
 
     final t = tester.widget<Text>(
-      find.text('El enlace no es válido. Solicita uno nuevo.'),
+      find.text('Código incorrecto. Revísalo o reenvía uno nuevo.'),
     );
     expect(t.style?.color, AppTokens.danger);
   });
 
-  testWidgets('Failed(expiredLink) pide solicitar uno nuevo', (tester) async {
+  testWidgets('Failed(expiredCode) pide reenviar uno nuevo', (tester) async {
     whenListen(
       bloc,
       Stream<ResetPasswordState>.fromIterable(const <ResetPasswordState>[
-        ResetPasswordFailed(ResetPasswordFailureKind.expiredLink),
+        ResetPasswordFailed(ResetPasswordFailureKind.expiredCode),
       ]),
       initialState: const ResetPasswordInitial(),
     );
@@ -131,7 +190,7 @@ void main() {
     await tester.pumpWidget(host());
     await tester.pump();
 
-    expect(find.text('El enlace caducó. Solicita uno nuevo.'), findsOneWidget);
+    expect(find.text('El código venció. Reenvía uno nuevo.'), findsOneWidget);
   });
 
   testWidgets('Failed(passwordTooShort) muestra mensaje de longitud', (
@@ -150,26 +209,6 @@ void main() {
 
     expect(
       find.text('La contraseña debe tener al menos 12 caracteres'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Failed(invalidInput) pide pegar el enlace o código', (
-    tester,
-  ) async {
-    whenListen(
-      bloc,
-      Stream<ResetPasswordState>.fromIterable(const <ResetPasswordState>[
-        ResetPasswordFailed(ResetPasswordFailureKind.invalidInput),
-      ]),
-      initialState: const ResetPasswordInitial(),
-    );
-
-    await tester.pumpWidget(host());
-    await tester.pump();
-
-    expect(
-      find.text('Pega el enlace o el código que recibiste por correo'),
       findsOneWidget,
     );
   });

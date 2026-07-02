@@ -1,5 +1,7 @@
+import '../../domain/entities/accepted_invitation.dart';
 import '../../domain/entities/auth_tokens.dart';
 import '../../domain/entities/identity.dart';
+import '../../domain/entities/pending_invitation.dart';
 import '../../domain/failures/auth_failure.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_datasource.dart';
@@ -52,17 +54,20 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<bool> verifyEmail(String token) async =>
-      (await _ds.verifyEmail(token)).alreadyVerified;
+  Future<bool> verifyEmail({
+    required String email,
+    required String code,
+  }) async => (await _ds.verifyEmail(email: email, code: code)).alreadyVerified;
 
   @override
   Future<void> forgotPassword(String email) => _ds.forgotPassword(email);
 
   @override
   Future<void> resetPassword({
-    required String token,
+    required String email,
+    required String code,
     required String newPassword,
-  }) => _ds.resetPassword(token: token, newPassword: newPassword);
+  }) => _ds.resetPassword(email: email, code: code, newPassword: newPassword);
 
   @override
   Future<AuthTokens> switchOrg(String orgId) async {
@@ -86,6 +91,14 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> resendVerification() => _ds.resendVerification();
+
+  @override
+  Future<List<PendingInvitation>> pendingInvitations() =>
+      _ds.pendingInvitations();
+
+  @override
+  Future<AcceptedInvitation> acceptPendingInvitation(String invitationId) =>
+      _ds.acceptPendingInvitation(invitationId);
 
   @override
   Future<Identity> me() async => _ds.me();

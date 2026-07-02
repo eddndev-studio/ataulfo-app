@@ -6,6 +6,7 @@ import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/domain/failures/auth_failure.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/pending_invitations_cubit.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/rename_org_cubit.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
@@ -31,6 +32,9 @@ class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
 
 class _MockRenameOrgCubit extends MockCubit<RenameOrgState>
     implements RenameOrgCubit {}
+
+class _MockPendingCubit extends MockCubit<PendingInvitationsState>
+    implements PendingInvitationsCubit {}
 
 const _identity = Identity(
   userId: 'u1',
@@ -67,18 +71,23 @@ void main() {
   late _MockSwitchOrgCubit switchOrg;
   late _MockAuthBloc authBloc;
   late _MockRenameOrgCubit renameOrg;
+  late _MockPendingCubit pending;
 
   setUp(() {
     membershipsBloc = _MockMembershipsBloc();
     switchOrg = _MockSwitchOrgCubit();
     authBloc = _MockAuthBloc();
     renameOrg = _MockRenameOrgCubit();
+    pending = _MockPendingCubit();
     when(() => membershipsBloc.state).thenReturn(const MembershipsInitial());
     when(() => switchOrg.state).thenReturn(const SwitchOrgIdle());
     when(() => switchOrg.switchTo(any())).thenAnswer((_) async {});
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
     when(() => renameOrg.state).thenReturn(const RenameOrgIdle());
     when(() => renameOrg.rename(any())).thenAnswer((_) async {});
+    // Por defecto sin pendientes: la sección se oculta y no interfiere con los
+    // tests de la lista de organizaciones.
+    when(() => pending.state).thenReturn(const PendingInvitationsLoading());
   });
 
   Widget host() => MaterialApp(
@@ -89,6 +98,7 @@ void main() {
         BlocProvider<SwitchOrgCubit>.value(value: switchOrg),
         BlocProvider<AuthBloc>.value(value: authBloc),
         BlocProvider<RenameOrgCubit>.value(value: renameOrg),
+        BlocProvider<PendingInvitationsCubit>.value(value: pending),
       ],
       // Página content-only: en aislamiento envolvemos en Scaffold para
       // tener Material upstream y AppBar real cuando la ruta la monte.
@@ -111,6 +121,7 @@ void main() {
               BlocProvider<SwitchOrgCubit>.value(value: switchOrg),
               BlocProvider<AuthBloc>.value(value: authBloc),
               BlocProvider<RenameOrgCubit>.value(value: renameOrg),
+              BlocProvider<PendingInvitationsCubit>.value(value: pending),
             ],
             child: const Scaffold(body: MembershipsPage()),
           ),

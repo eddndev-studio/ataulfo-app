@@ -43,4 +43,38 @@ void main() {
       expect(AuthMapper.meRespToEntity(resp).emailVerified, isFalse);
     });
   });
+
+  group('AuthMapper.pendingInvitationRespToEntity', () {
+    test('traduce la fila del wire a PendingInvitation', () {
+      const resp = PendingInvitationResp(
+        id: 'inv-1',
+        orgId: 'o-9',
+        orgName: 'Acme',
+        role: 'WORKER',
+      );
+
+      final entity = AuthMapper.pendingInvitationRespToEntity(resp);
+
+      expect(entity.id, 'inv-1');
+      expect(entity.orgId, 'o-9');
+      expect(entity.orgName, 'Acme');
+      expect(entity.role, 'WORKER');
+    });
+  });
+
+  group('AuthMapper.acceptedInvitationRespToEntity', () {
+    test('traduce la respuesta a AcceptedInvitation', () {
+      const resp = AcceptedInvitationResp(
+        orgId: 'o-9',
+        orgName: 'Acme',
+        role: 'WORKER',
+      );
+
+      final entity = AuthMapper.acceptedInvitationRespToEntity(resp);
+
+      expect(entity.orgId, 'o-9');
+      expect(entity.orgName, 'Acme');
+      expect(entity.role, 'WORKER');
+    });
+  });
 }
