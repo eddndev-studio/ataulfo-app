@@ -524,7 +524,6 @@ IconData _docIcon(String filename) {
   };
 }
 
-
 /// Tarjeta de encuesta: parsea el JSON persistido `{question, options,
 /// multiple}` y pinta pregunta + opciones con su ícono de selección. La
 /// votación ocurre en el WhatsApp del cliente; aquí es representación.

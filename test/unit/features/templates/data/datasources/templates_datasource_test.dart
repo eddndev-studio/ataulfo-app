@@ -704,9 +704,9 @@ void main() {
             'response_delay_seconds': 0,
             'silence_label_ids': <String>[],
             'disabled_tool_groups': <String>[],
-          'follow_up_enabled': false,
-          'follow_up_delay_minutes': 0,
-          'follow_up_max_attempts': 0,
+            'follow_up_enabled': false,
+            'follow_up_delay_minutes': 0,
+            'follow_up_max_attempts': 0,
           },
         });
       },

@@ -967,7 +967,6 @@ class _FailedView extends StatelessWidget {
   }
 }
 
-
 /// Sheet del seguimiento por inactividad: toggle + espera + intentos. La
 /// espera se elige de un set cerrado (el backend valida 30 min..30 días) y
 /// los intentos 1..3. Devuelve el AIConfig completo ya copiado.

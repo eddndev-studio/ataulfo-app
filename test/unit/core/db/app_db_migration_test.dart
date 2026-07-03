@@ -41,9 +41,7 @@ void main() {
       // Fixture fiel al esquema VIEJO: las columnas que las migraciones
       // posteriores agregan se retiran para que onUpgrade las cree de
       // verdad (un createAll ya nace con el esquema actual).
-      await v1.customStatement(
-        'ALTER TABLE messages DROP COLUMN edited_at_ms',
-      );
+      await v1.customStatement('ALTER TABLE messages DROP COLUMN edited_at_ms');
       await v1.customStatement(
         'ALTER TABLE messages DROP COLUMN revoked_at_ms',
       );

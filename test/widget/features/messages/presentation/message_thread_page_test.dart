@@ -577,7 +577,9 @@ void main() {
   testWidgets('tipo no catalogado cae a placeholder [tipo]', (tester) async {
     when(() => bloc.state).thenReturn(
       MessagesLoaded(
-        items: <Message>[msg(externalId: 'm', type: 'carta_astral', content: '')],
+        items: <Message>[
+          msg(externalId: 'm', type: 'carta_astral', content: ''),
+        ],
         prevCursor: null,
         isLoadingOlder: false,
       ),
