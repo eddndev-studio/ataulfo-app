@@ -654,6 +654,8 @@ String _previewLabel(String? type, String? preview) {
     'sticker' => 'Sticker',
     'location' => 'Ubicación',
     'contact' || 'vcard' => 'Contacto',
+    'poll' => 'Encuesta',
+    'poll_vote' => 'Voto',
     _ => '[$type]',
   };
 }
@@ -668,5 +670,7 @@ IconData? _previewIcon(String? type) => switch (type) {
   'sticker' => Icons.emoji_emotions_outlined,
   'location' => Icons.location_on_outlined,
   'contact' || 'vcard' => Icons.person_outline,
+  'poll' => Icons.poll_outlined,
+  'poll_vote' => Icons.how_to_vote_outlined,
   _ => null,
 };

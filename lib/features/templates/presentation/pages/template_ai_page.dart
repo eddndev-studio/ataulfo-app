@@ -1036,9 +1036,17 @@ class _FollowUpSheetState extends State<_FollowUpSheet> {
               const SizedBox(height: AppTokens.sp2),
               DropdownButtonFormField<int>(
                 key: const Key('template_ai.sheet.follow_up.delay'),
-                initialValue: _delays.containsValue(_delay) ? _delay : 1440,
+                initialValue: _delay,
                 decoration: const InputDecoration(labelText: 'Esperar'),
+                // Un delay guardado fuera del set (p. ej. fijado por el agente
+                // de plataforma) se muestra como entrada propia: el sheet
+                // JAMÁS aparenta un valor distinto del que Guardar persiste.
                 items: <DropdownMenuItem<int>>[
+                  if (!_delays.containsValue(_delay))
+                    DropdownMenuItem<int>(
+                      value: _delay,
+                      child: Text('$_delay min (personalizado)'),
+                    ),
                   for (final e in _delays.entries)
                     DropdownMenuItem<int>(value: e.value, child: Text(e.key)),
                 ],

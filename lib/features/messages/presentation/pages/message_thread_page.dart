@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 // Nota de tamaño (>400 LOC): este archivo concentra el render cohesivo del
 // hilo —burbujas inbound/outbound, citas, reacciones, media por tipo, ticks de
 // entrega y burbujas optimistas pendientes/fallidas—. Son piezas acopladas por
@@ -1093,6 +1095,10 @@ class _QuotedPreview extends StatelessWidget {
 /// fallback (citado fuera de la ventana).
 (IconData?, String) _quotedGlyph(Message? q) {
   if (q == null) return (null, 'Mensaje original no disponible');
+  // Un citado revocado no debe re-exponer su contenido original.
+  if (q.revokedAtMs != null) {
+    return (Icons.block, 'Se eliminó este mensaje');
+  }
   return switch (q.type) {
     'text' => (null, q.content),
     'image' => (Icons.image_outlined, 'Foto'),
@@ -1104,8 +1110,24 @@ class _QuotedPreview extends StatelessWidget {
       Icons.description_outlined,
       q.content.trim().isEmpty ? 'Documento' : q.content.trim(),
     ),
+    'location' => (Icons.place_outlined, 'Ubicación'),
+    'contact' => (Icons.person_outline, 'Contacto'),
+    'poll' => (Icons.poll_outlined, _pollQuestion(q.content)),
+    'poll_vote' => (Icons.how_to_vote_outlined, 'Voto'),
     _ => (null, '[${q.type}]'),
   };
+}
+
+/// Pregunta de una encuesta desde su JSON persistido; blob ilegible degrada
+/// a la etiqueta genérica.
+String _pollQuestion(String rawContent) {
+  try {
+    final map = jsonDecode(rawContent) as Map<String, dynamic>;
+    final q = map['question'] as String? ?? '';
+    return q.isEmpty ? 'Encuesta' : q;
+  } on Object {
+    return 'Encuesta';
+  }
 }
 
 /// Tick de entrega estilo mensajería: ✓ enviado, ✓✓ entregado (gris), ✓✓ leído

@@ -157,6 +157,8 @@ class Message {
     quotedId: quotedId,
     timestampMs: timestampMs,
     status: status,
+    editedAtMs: editedAtMs,
+    revokedAtMs: revokedAtMs,
   );
 
   @override
@@ -174,7 +176,9 @@ class Message {
         other.mediaUrl == mediaUrl &&
         other.quotedId == quotedId &&
         other.timestampMs == timestampMs &&
-        other.status == status;
+        other.status == status &&
+        other.editedAtMs == editedAtMs &&
+        other.revokedAtMs == revokedAtMs;
   }
 
   @override
@@ -191,5 +195,7 @@ class Message {
     quotedId,
     timestampMs,
     status,
+    editedAtMs,
+    revokedAtMs,
   );
 }
