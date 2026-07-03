@@ -106,6 +106,51 @@ void main() {
       },
     );
 
+    test('PUT con los gates de grupos serializa sólo los enviados', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => ok());
+
+      await ds.update(id: 'b1', version: 5, groupChatsAiDisabled: true);
+
+      final captured = verify(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
+      // Sólo el gate enviado + version; el gate de flujos se OMITE (tristate).
+      expect(captured[0], <String, dynamic>{
+        'group_chats_ai_disabled': true,
+        'version': 5,
+      });
+    });
+
+    test('PUT con ambos gates de grupos serializa las dos claves', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => ok());
+
+      await ds.update(
+        id: 'b1',
+        version: 6,
+        groupChatsAiDisabled: false,
+        groupChatsFlowsDisabled: true,
+      );
+
+      final captured = verify(
+        () => dio.put<Map<String, dynamic>>(
+          any(),
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
+      expect(captured[0], <String, dynamic>{
+        'group_chats_ai_disabled': false,
+        'group_chats_flows_disabled': true,
+        'version': 6,
+      });
+    });
+
     test('PUT con variableValues vacío envía {} (jamás null)', () async {
       when(
         () => dio.put<Map<String, dynamic>>(any(), data: any(named: 'data')),

@@ -178,6 +178,89 @@ void main() {
       ).called(1);
     });
 
+    test(
+      'pasa groupChatsAiDisabled al datasource sin cruzarlo con flows',
+      () async {
+        when(
+          () => ds.update(
+            id: 'b1',
+            version: 3,
+            name: null,
+            paused: null,
+            aiDisabled: null,
+            variableValues: null,
+            disabledToolGroups: null,
+            groupChatsAiDisabled: true,
+            groupChatsFlowsDisabled: null,
+          ),
+        ).thenAnswer((_) async => updated);
+
+        final result = await repo.update(
+          id: 'b1',
+          version: 3,
+          groupChatsAiDisabled: true,
+        );
+
+        expect(result, updated);
+        // El repo no puede cruzar los dos gates: ai=true / flows=null viaja tal
+        // cual. Un swap ai↔flows rompe este verify.
+        verify(
+          () => ds.update(
+            id: 'b1',
+            version: 3,
+            name: null,
+            paused: null,
+            aiDisabled: null,
+            variableValues: null,
+            disabledToolGroups: null,
+            groupChatsAiDisabled: true,
+            groupChatsFlowsDisabled: null,
+          ),
+        ).called(1);
+      },
+    );
+
+    test(
+      'pasa groupChatsFlowsDisabled al datasource sin cruzarlo con ai',
+      () async {
+        when(
+          () => ds.update(
+            id: 'b1',
+            version: 3,
+            name: null,
+            paused: null,
+            aiDisabled: null,
+            variableValues: null,
+            disabledToolGroups: null,
+            groupChatsAiDisabled: null,
+            groupChatsFlowsDisabled: true,
+          ),
+        ).thenAnswer((_) async => updated);
+
+        final result = await repo.update(
+          id: 'b1',
+          version: 3,
+          groupChatsFlowsDisabled: true,
+        );
+
+        expect(result, updated);
+        // Espejo del anterior: flows=true / ai=null viaja tal cual.
+        verify(
+          () => ds.update(
+            id: 'b1',
+            version: 3,
+            name: null,
+            paused: null,
+            aiDisabled: null,
+            variableValues: null,
+            disabledToolGroups: null,
+            groupChatsAiDisabled: null,
+            groupChatsFlowsDisabled: true,
+          ),
+        ).called(1);
+      },
+    );
+
     test('propaga BotsConflictFailure sin atraparla', () async {
       when(
         () => ds.update(

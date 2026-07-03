@@ -40,6 +40,8 @@ class BotsRepositoryImpl implements BotsRepository {
     bool? aiDisabled,
     Map<String, String>? variableValues,
     List<String>? disabledToolGroups,
+    bool? groupChatsAiDisabled,
+    bool? groupChatsFlowsDisabled,
   }) => _ds.update(
     id: id,
     version: version,
@@ -48,6 +50,8 @@ class BotsRepositoryImpl implements BotsRepository {
     aiDisabled: aiDisabled,
     variableValues: variableValues,
     disabledToolGroups: disabledToolGroups,
+    groupChatsAiDisabled: groupChatsAiDisabled,
+    groupChatsFlowsDisabled: groupChatsFlowsDisabled,
   );
 
   @override

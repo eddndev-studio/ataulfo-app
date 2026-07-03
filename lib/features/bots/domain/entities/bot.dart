@@ -39,6 +39,8 @@ class Bot {
     required this.paused,
     required this.aiDisabled,
     this.disabledToolGroups = const <String>[],
+    this.groupChatsAiDisabled = false,
+    this.groupChatsFlowsDisabled = false,
   });
 
   final String id;
@@ -60,6 +62,19 @@ class Bot {
   /// futuro), igual que el override del backend.
   final List<String> disabledToolGroups;
 
+  /// Gate plano por-Bot para chats de GRUPO de WhatsApp: `true` apaga la IA de
+  /// este bot en los grupos (no corre el agente al recibir mensajes de grupo).
+  /// Independiente de `aiDisabled` (que aplica a todos los chats) y de los
+  /// grupos de herramientas. Default `false` = comportamiento actual.
+  final bool groupChatsAiDisabled;
+
+  /// Gate plano por-Bot para chats de GRUPO de WhatsApp: `true` impide que los
+  /// flujos disparados por mensaje se activen en grupos. No afecta los flujos
+  /// disparados por etiqueta ni los lanzados a mano (por el operador o por la
+  /// propia IA), ni las respuestas manuales del operador. Default `false` =
+  /// comportamiento actual.
+  final bool groupChatsFlowsDisabled;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -73,6 +88,8 @@ class Bot {
         other.version == version &&
         other.paused == paused &&
         other.aiDisabled == aiDisabled &&
+        other.groupChatsAiDisabled == groupChatsAiDisabled &&
+        other.groupChatsFlowsDisabled == groupChatsFlowsDisabled &&
         _listEquals(other.disabledToolGroups, disabledToolGroups);
   }
 
@@ -87,6 +104,8 @@ class Bot {
     version,
     paused,
     aiDisabled,
+    groupChatsAiDisabled,
+    groupChatsFlowsDisabled,
     Object.hashAll(disabledToolGroups),
   );
 }

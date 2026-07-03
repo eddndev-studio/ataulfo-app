@@ -54,6 +54,8 @@ void main() {
       int version = 1,
       bool paused = false,
       bool aiDisabled = false,
+      bool groupChatsAiDisabled = false,
+      bool groupChatsFlowsDisabled = false,
     }) => Bot(
       id: id,
       orgId: orgID,
@@ -64,6 +66,8 @@ void main() {
       version: version,
       paused: paused,
       aiDisabled: aiDisabled,
+      groupChatsAiDisabled: groupChatsAiDisabled,
+      groupChatsFlowsDisabled: groupChatsFlowsDisabled,
     );
 
     test('expone los campos del wire S04', () {
@@ -77,6 +81,18 @@ void main() {
       expect(b.version, 1);
       expect(b.paused, isFalse);
       expect(b.aiDisabled, isFalse);
+    });
+
+    test('los gates de grupos son planos y por defecto false', () {
+      final b = make();
+      expect(b.groupChatsAiDisabled, isFalse);
+      expect(b.groupChatsFlowsDisabled, isFalse);
+      final on = make(
+        groupChatsAiDisabled: true,
+        groupChatsFlowsDisabled: true,
+      );
+      expect(on.groupChatsAiDisabled, isTrue);
+      expect(on.groupChatsFlowsDisabled, isTrue);
     });
 
     test(
@@ -105,6 +121,8 @@ void main() {
       expect(base, isNot(make(version: 2)));
       expect(base, isNot(make(paused: true)));
       expect(base, isNot(make(aiDisabled: true)));
+      expect(base, isNot(make(groupChatsAiDisabled: true)));
+      expect(base, isNot(make(groupChatsFlowsDisabled: true)));
     });
   });
 }

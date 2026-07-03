@@ -15,6 +15,8 @@ class BotResp {
     required this.paused,
     required this.aiDisabled,
     this.disabledToolGroups = const <String>[],
+    this.groupChatsAiDisabled = false,
+    this.groupChatsFlowsDisabled = false,
   });
 
   factory BotResp.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,15 @@ class BotResp {
     final disabledToolGroups = groupsRaw is List
         ? groupsRaw.whereType<String>().toList(growable: false)
         : const <String>[];
+    // Gates de grupos: snake_case, como el resto del objeto bot del wire.
+    // Aditivas y tolerantes: un server previo al campo, o un valor no-bool,
+    // degradan a `false` (comportamiento actual) sin romper el parseo.
+    final groupChatsAiDisabled = json['group_chats_ai_disabled'] is bool
+        ? json['group_chats_ai_disabled'] as bool
+        : false;
+    final groupChatsFlowsDisabled = json['group_chats_flows_disabled'] is bool
+        ? json['group_chats_flows_disabled'] as bool
+        : false;
     return BotResp(
       id: id,
       orgId: orgId,
@@ -58,6 +69,8 @@ class BotResp {
       paused: paused,
       aiDisabled: aiDisabled,
       disabledToolGroups: disabledToolGroups,
+      groupChatsAiDisabled: groupChatsAiDisabled,
+      groupChatsFlowsDisabled: groupChatsFlowsDisabled,
     );
   }
 
@@ -71,6 +84,8 @@ class BotResp {
   final bool paused;
   final bool aiDisabled;
   final List<String> disabledToolGroups;
+  final bool groupChatsAiDisabled;
+  final bool groupChatsFlowsDisabled;
 }
 
 /// Body de `PUT /bots/:id` (`ataulfo-go/internal/adapters/httpbots/dto.go`
@@ -92,6 +107,8 @@ class BotUpdateReq {
     this.aiDisabled,
     this.variableValues,
     this.disabledToolGroups,
+    this.groupChatsAiDisabled,
+    this.groupChatsFlowsDisabled,
   });
 
   final int version;
@@ -104,12 +121,21 @@ class BotUpdateReq {
   /// set. El bot SUMA grupos apagados sobre los de su plantilla (unión).
   final List<String>? disabledToolGroups;
 
+  /// Gates de grupos (tristate por omisión): null ⇒ se OMITE ("no tocar");
+  /// presente ⇒ se aplica. Claves snake_case, como el resto del objeto bot.
+  final bool? groupChatsAiDisabled;
+  final bool? groupChatsFlowsDisabled;
+
   Map<String, dynamic> toJson() => <String, dynamic>{
     if (name != null) 'name': name,
     if (paused != null) 'paused': paused,
     if (aiDisabled != null) 'ai_disabled': aiDisabled,
     if (variableValues != null) 'variable_values': variableValues,
     if (disabledToolGroups != null) 'disabled_tool_groups': disabledToolGroups,
+    if (groupChatsAiDisabled != null)
+      'group_chats_ai_disabled': groupChatsAiDisabled,
+    if (groupChatsFlowsDisabled != null)
+      'group_chats_flows_disabled': groupChatsFlowsDisabled,
     'version': version,
   };
 }

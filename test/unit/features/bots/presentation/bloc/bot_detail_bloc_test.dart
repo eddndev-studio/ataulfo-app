@@ -47,6 +47,33 @@ const _b1Restricted = Bot(
   disabledToolGroups: <String>['flujos'],
 );
 
+// Resultados del PUT que activa cada gate de grupos: version+1.
+const _b1GroupAiOff = Bot(
+  id: 'b1',
+  orgId: 'o1',
+  templateId: 't1',
+  name: 'Soporte',
+  channel: BotChannel.waUnofficial,
+  identifier: '52155...',
+  version: 4,
+  paused: false,
+  aiDisabled: false,
+  groupChatsAiDisabled: true,
+);
+
+const _b1GroupFlowsOff = Bot(
+  id: 'b1',
+  orgId: 'o1',
+  templateId: 't1',
+  name: 'Soporte',
+  channel: BotChannel.waUnofficial,
+  identifier: '52155...',
+  version: 4,
+  paused: false,
+  aiDisabled: false,
+  groupChatsFlowsDisabled: true,
+);
+
 // Snapshot fresco que devuelve el re-GET tras un 409: otra edición ganó la
 // carrera (version saltó a 6).
 const _b1Fresh = Bot(
@@ -154,6 +181,16 @@ void main() {
             const BotDetailUpdateRequested(name: 'x'),
         isFalse,
       );
+      // Los gates de grupos entran en la igualdad del evento.
+      expect(
+        const BotDetailUpdateRequested(groupChatsAiDisabled: true),
+        const BotDetailUpdateRequested(groupChatsAiDisabled: true),
+      );
+      expect(
+        const BotDetailUpdateRequested(groupChatsAiDisabled: true) ==
+            const BotDetailUpdateRequested(groupChatsFlowsDisabled: true),
+        isFalse,
+      );
     });
   });
 
@@ -224,6 +261,86 @@ void main() {
           aiDisabled: null,
           variableValues: null,
           disabledToolGroups: const <String>['flujos'],
+        ),
+      ).called(1),
+    );
+
+    blocTest<BotDetailBloc, BotDetailState>(
+      'UpdateRequested(groupChatsAiDisabled) OK → PUT con el gate → Loaded',
+      build: () {
+        when(
+          () => repo.update(
+            id: 'b1',
+            version: 3,
+            name: null,
+            paused: null,
+            aiDisabled: null,
+            variableValues: null,
+            disabledToolGroups: null,
+            groupChatsAiDisabled: true,
+            groupChatsFlowsDisabled: null,
+          ),
+        ).thenAnswer((_) async => _b1GroupAiOff);
+        return BotDetailBloc(repo: repo, id: 'b1');
+      },
+      seed: () => const BotDetailLoaded(_b1),
+      act: (b) =>
+          b.add(const BotDetailUpdateRequested(groupChatsAiDisabled: true)),
+      expect: () => const <BotDetailState>[
+        BotDetailMutating(_b1),
+        BotDetailLoaded(_b1GroupAiOff),
+      ],
+      verify: (_) => verify(
+        () => repo.update(
+          id: 'b1',
+          version: 3,
+          name: null,
+          paused: null,
+          aiDisabled: null,
+          variableValues: null,
+          disabledToolGroups: null,
+          groupChatsAiDisabled: true,
+          groupChatsFlowsDisabled: null,
+        ),
+      ).called(1),
+    );
+
+    blocTest<BotDetailBloc, BotDetailState>(
+      'UpdateRequested(groupChatsFlowsDisabled) OK → PUT con el gate → Loaded',
+      build: () {
+        when(
+          () => repo.update(
+            id: 'b1',
+            version: 3,
+            name: null,
+            paused: null,
+            aiDisabled: null,
+            variableValues: null,
+            disabledToolGroups: null,
+            groupChatsAiDisabled: null,
+            groupChatsFlowsDisabled: true,
+          ),
+        ).thenAnswer((_) async => _b1GroupFlowsOff);
+        return BotDetailBloc(repo: repo, id: 'b1');
+      },
+      seed: () => const BotDetailLoaded(_b1),
+      act: (b) =>
+          b.add(const BotDetailUpdateRequested(groupChatsFlowsDisabled: true)),
+      expect: () => const <BotDetailState>[
+        BotDetailMutating(_b1),
+        BotDetailLoaded(_b1GroupFlowsOff),
+      ],
+      verify: (_) => verify(
+        () => repo.update(
+          id: 'b1',
+          version: 3,
+          name: null,
+          paused: null,
+          aiDisabled: null,
+          variableValues: null,
+          disabledToolGroups: null,
+          groupChatsAiDisabled: null,
+          groupChatsFlowsDisabled: true,
         ),
       ).called(1),
     );

@@ -38,6 +38,8 @@ abstract interface class BotsRepository {
     bool? aiDisabled,
     Map<String, String>? variableValues,
     List<String>? disabledToolGroups,
+    bool? groupChatsAiDisabled,
+    bool? groupChatsFlowsDisabled,
   });
 
   /// Lee los `variable_values` guardados de un Bot para el editor

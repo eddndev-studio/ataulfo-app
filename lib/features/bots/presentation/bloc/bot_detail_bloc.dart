@@ -64,6 +64,8 @@ class BotDetailBloc extends Bloc<BotDetailEvent, BotDetailState> {
         paused: event.paused,
         aiDisabled: event.aiDisabled,
         disabledToolGroups: event.disabledToolGroups,
+        groupChatsAiDisabled: event.groupChatsAiDisabled,
+        groupChatsFlowsDisabled: event.groupChatsFlowsDisabled,
       ),
     );
   }
@@ -188,6 +190,8 @@ class BotDetailUpdateRequested extends BotDetailEvent {
     this.paused,
     this.aiDisabled,
     this.disabledToolGroups,
+    this.groupChatsAiDisabled,
+    this.groupChatsFlowsDisabled,
   });
 
   final String? name;
@@ -197,18 +201,26 @@ class BotDetailUpdateRequested extends BotDetailEvent {
   /// Override de permisos del bot (tristate): null ⇒ no tocar; lista ⇒ set/limpiar.
   final List<String>? disabledToolGroups;
 
+  /// Gates de grupos (tristate): null ⇒ no tocar; bool ⇒ aplicar.
+  final bool? groupChatsAiDisabled;
+  final bool? groupChatsFlowsDisabled;
+
   @override
   bool operator ==(Object other) =>
       other is BotDetailUpdateRequested &&
       other.name == name &&
       other.paused == paused &&
       other.aiDisabled == aiDisabled &&
+      other.groupChatsAiDisabled == groupChatsAiDisabled &&
+      other.groupChatsFlowsDisabled == groupChatsFlowsDisabled &&
       _nullableListEquals(other.disabledToolGroups, disabledToolGroups);
   @override
   int get hashCode => Object.hash(
     name,
     paused,
     aiDisabled,
+    groupChatsAiDisabled,
+    groupChatsFlowsDisabled,
     disabledToolGroups == null ? null : Object.hashAll(disabledToolGroups!),
   );
 }

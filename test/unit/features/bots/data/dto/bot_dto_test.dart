@@ -89,6 +89,32 @@ void main() {
       );
       expect(resp.disabledToolGroups, <String>['flujos']);
     });
+
+    test('parsea los gates de grupos (claves snake_case del contrato)', () {
+      final resp = BotResp.fromJson(
+        botJson()
+          ..['group_chats_ai_disabled'] = true
+          ..['group_chats_flows_disabled'] = true,
+      );
+      expect(resp.groupChatsAiDisabled, isTrue);
+      expect(resp.groupChatsFlowsDisabled, isTrue);
+    });
+
+    test('gates de grupos ausentes ⇒ false (clave aditiva)', () {
+      final resp = BotResp.fromJson(botJson());
+      expect(resp.groupChatsAiDisabled, isFalse);
+      expect(resp.groupChatsFlowsDisabled, isFalse);
+    });
+
+    test('gate de grupos con tipo inesperado ⇒ false (tolerante)', () {
+      final resp = BotResp.fromJson(
+        botJson()
+          ..['group_chats_ai_disabled'] = 'sí'
+          ..['group_chats_flows_disabled'] = 1,
+      );
+      expect(resp.groupChatsAiDisabled, isFalse);
+      expect(resp.groupChatsFlowsDisabled, isFalse);
+    });
   });
 
   group('BotUpdateReq.toJson — tristate de disabled_tool_groups', () {
@@ -111,6 +137,33 @@ void main() {
         disabledToolGroups: <String>['flujos', 'documentos'],
       ).toJson();
       expect(json['disabled_tool_groups'], <String>['flujos', 'documentos']);
+    });
+  });
+
+  group('BotUpdateReq.toJson — tristate de los gates de grupos', () {
+    test('null ⇒ se omiten las claves (no tocar)', () {
+      final json = const BotUpdateReq(version: 1).toJson();
+      expect(json.containsKey('group_chats_ai_disabled'), isFalse);
+      expect(json.containsKey('group_chats_flows_disabled'), isFalse);
+    });
+
+    test('presentes ⇒ viajan con las claves snake_case del contrato', () {
+      final json = const BotUpdateReq(
+        version: 2,
+        groupChatsAiDisabled: true,
+        groupChatsFlowsDisabled: false,
+      ).toJson();
+      expect(json['group_chats_ai_disabled'], isTrue);
+      expect(json['group_chats_flows_disabled'], isFalse);
+    });
+
+    test('cada gate viaja de forma independiente', () {
+      final json = const BotUpdateReq(
+        version: 3,
+        groupChatsAiDisabled: true,
+      ).toJson();
+      expect(json['group_chats_ai_disabled'], isTrue);
+      expect(json.containsKey('group_chats_flows_disabled'), isFalse);
     });
   });
 }

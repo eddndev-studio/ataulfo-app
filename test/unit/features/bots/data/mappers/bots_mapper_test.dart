@@ -56,6 +56,27 @@ void main() {
       expect(bot.paused, isTrue);
     });
 
+    test('traslada los gates de grupos del DTO a la entidad', () {
+      const resp = BotResp(
+        id: 'b1',
+        orgId: 'o1',
+        templateId: 't1',
+        name: 'Soporte',
+        channel: 'WA_UNOFFICIAL',
+        identifier: null,
+        version: 1,
+        paused: false,
+        aiDisabled: false,
+        groupChatsAiDisabled: true,
+        groupChatsFlowsDisabled: true,
+      );
+
+      final bot = BotsMapper.botRespToEntity(resp);
+
+      expect(bot.groupChatsAiDisabled, isTrue);
+      expect(bot.groupChatsFlowsDisabled, isTrue);
+    });
+
     test('canal desconocido propaga ArgumentError (fail-loud del enum)', () {
       // El mapper no atrapa: una respuesta con canal nuevo no debe
       // degradarse silenciosa — el bug debe verse en boot, no en la UI.

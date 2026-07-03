@@ -486,6 +486,227 @@ void main() {
     });
   });
 
+  group('gates de grupos (ADMIN+)', () {
+    setUpAll(() {
+      registerFallbackValue(const BotDetailUpdateRequested());
+    });
+
+    const botGroupsOff = Bot(
+      id: 'b1',
+      orgId: 'o1',
+      templateId: 't1',
+      name: 'Soporte',
+      channel: BotChannel.waUnofficial,
+      identifier: '52155...',
+      version: 3,
+      paused: false,
+      aiDisabled: false,
+      groupChatsAiDisabled: true,
+      groupChatsFlowsDisabled: true,
+    );
+
+    testWidgets('ADMIN ve los dos switches con value = flags del bot', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(botGroupsOff));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final ai = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.group_chats_ai')),
+      );
+      final flows = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.group_chats_flows')),
+      );
+      expect(ai.value, isTrue);
+      expect(flows.value, isTrue);
+      expect(ai.onChanged, isNotNull);
+      expect(flows.onChanged, isNotNull);
+    });
+
+    testWidgets('los switches arrancan apagados con el bot por defecto', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final ai = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.group_chats_ai')),
+      );
+      final flows = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.group_chats_flows')),
+      );
+      expect(ai.value, isFalse);
+      expect(flows.value, isFalse);
+    });
+
+    testWidgets(
+      'tap en IA de grupos despacha UpdateRequested(groupChatsAiDisabled)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('bot_detail.group_chats_ai')),
+        );
+        await tester.tap(find.byKey(const Key('bot_detail.group_chats_ai')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const BotDetailUpdateRequested(groupChatsAiDisabled: true),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'tap en flujos de grupos despacha UpdateRequested(groupChatsFlowsDisabled)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('bot_detail.group_chats_flows')),
+        );
+        await tester.tap(find.byKey(const Key('bot_detail.group_chats_flows')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const BotDetailUpdateRequested(groupChatsFlowsDisabled: true),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'tap en IA de grupos ENCENDIDO despacha UpdateRequested(false)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const BotDetailLoaded(botGroupsOff));
+
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('bot_detail.group_chats_ai')),
+        );
+        await tester.tap(find.byKey(const Key('bot_detail.group_chats_ai')));
+        await tester.pump();
+
+        // El flag arranca en true; apagarlo debe despachar el valor nuevo (v),
+        // no un true hardcodeado.
+        verify(
+          () => bloc.add(
+            const BotDetailUpdateRequested(groupChatsAiDisabled: false),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'tap en flujos de grupos ENCENDIDO despacha UpdateRequested(false)',
+      (tester) async {
+        when(() => bloc.state).thenReturn(const BotDetailLoaded(botGroupsOff));
+
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('bot_detail.group_chats_flows')),
+        );
+        await tester.tap(find.byKey(const Key('bot_detail.group_chats_flows')));
+        await tester.pump();
+
+        // El flag arranca en true; apagarlo debe despachar el valor nuevo (v),
+        // no un true hardcodeado.
+        verify(
+          () => bloc.add(
+            const BotDetailUpdateRequested(groupChatsFlowsDisabled: false),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets('Mutating deshabilita ambos switches (onChanged null)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailMutating(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final ai = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.group_chats_ai')),
+      );
+      final flows = tester.widget<AppSwitch>(
+        find.byKey(const Key('bot_detail.group_chats_flows')),
+      );
+      expect(ai.onChanged, isNull);
+      expect(flows.onChanged, isNull);
+    });
+
+    testWidgets('viven dentro de la card de controles ADMIN+', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final card = find.byKey(const Key('bot_detail.card.controls'));
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.byKey(const Key('bot_detail.group_chats_ai')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.byKey(const Key('bot_detail.group_chats_flows')),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('WORKER no ve los switches (gateo ADMIN+)', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host(role: 'WORKER'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bot_detail.group_chats_ai')), findsNothing);
+      expect(
+        find.byKey(const Key('bot_detail.group_chats_flows')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('el copy acota los flujos a los disparados por mensaje', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(botGroupsOff));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      // El gate solo apaga los flujos disparados POR MENSAJE en grupos; el copy
+      // no puede prometer que apaga todos los disparadores.
+      expect(find.textContaining('Los disparadores de flujos'), findsNothing);
+      // La descripción nombra la excepción una sola vez: los flujos por
+      // etiqueta o lanzados a mano siguen corriendo en grupos.
+      expect(find.textContaining('disparados por etiqueta'), findsOneWidget);
+      // Con el flag encendido, la leyenda del switch de flujos acota el alcance.
+      expect(
+        find.textContaining('por mensaje no se activan en grupos'),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('hero de conexión', () {
     testWidgets('Loaded monta la card de conexión (estado vivo + CTA)', (
       tester,
