@@ -87,6 +87,27 @@ abstract interface class MessagesRepository {
     required String emoji,
   });
 
+  /// Corrige el texto de un SALIENTE del negocio (espejo del edit de
+  /// WhatsApp: tipo texto, ≤15 min; el servidor es autoritativo y responde
+  /// 409 si ya no es editable). Camino DIRECTO, sin outbox: encolar una
+  /// corrección offline podría empujarla fuera de la ventana — mejor fallar
+  /// honesto. En éxito aplica write-through el Message devuelto (contenido
+  /// nuevo + `editedAtMs`), así el hilo repinta al instante.
+  Future<void> editMessage(
+    String botId,
+    String chatLid, {
+    required String messageId,
+    required String newText,
+  });
+
+  /// Elimina PARA TODOS un saliente del negocio. Camino directo (como
+  /// [editMessage]); en éxito sella `revokedAtMs` local write-through.
+  Future<void> deleteMessage(
+    String botId,
+    String chatLid, {
+    required String messageId,
+  });
+
   /// Stream de eventos en vivo del bot (SSE S15: `message.inbound` +
   /// `message.outbound`). El filtrado por conversación lo hace el consumidor.
   /// Perdurable: se reconecta solo; emite `LiveMessage` por mensaje,

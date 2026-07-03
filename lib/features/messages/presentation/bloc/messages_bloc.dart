@@ -51,6 +51,8 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     on<MessagesSendRetryRequested>(_onRetry);
     on<MessagesSendDiscarded>(_onDiscard);
     on<MessagesReactRequested>(_onReact);
+    on<MessagesEditRequested>(_onEdit);
+    on<MessagesDeleteRequested>(_onDelete);
     on<_MessagesDbEmitted>(_onDbEmitted);
     on<_MessagesPendingEmitted>(_onPendingEmitted);
     on<_MessagesWatchFailed>(_onWatchFailed);
@@ -78,6 +80,15 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
       StreamController<void>.broadcast();
 
   Stream<void> get reactFailures => _reactFailures.stream;
+
+  /// Side-channel de fallos de corrección (editar/eliminar). El éxito repinta
+  /// solo (write-through del repo sobre la fila local); el fallo llega aquí
+  /// TIPADO para que la UI dé copy honesto (ventana vencida, bot pausado,
+  /// sin conexión) sin tocar el estado del hilo.
+  final StreamController<MessagesFailure> _correctionFailures =
+      StreamController<MessagesFailure>.broadcast();
+
+  Stream<MessagesFailure> get correctionFailures => _correctionFailures.stream;
 
   StreamSubscription<ThreadLiveEvent>? _liveSub;
   StreamSubscription<List<Message>>? _itemsSub;
@@ -415,14 +426,80 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     }
   }
 
+  /// Corrige el texto de un saliente. Camino directo (sin outbox): el éxito
+  /// repinta por el write-through local del repo; el fallo se anuncia tipado.
+  Future<void> _onEdit(
+    MessagesEditRequested event,
+    Emitter<MessagesState> emit,
+  ) async {
+    try {
+      await _repo.editMessage(
+        _botId,
+        _chatLid,
+        messageId: event.messageId,
+        newText: event.newText,
+      );
+    } on MessagesFailure catch (f) {
+      _correctionFailures.add(f);
+    } on Object {
+      _correctionFailures.add(const UnknownMessagesFailure());
+    }
+  }
+
+  /// Elimina para todos un saliente. Mismo contrato que [_onEdit].
+  Future<void> _onDelete(
+    MessagesDeleteRequested event,
+    Emitter<MessagesState> emit,
+  ) async {
+    try {
+      await _repo.deleteMessage(_botId, _chatLid, messageId: event.messageId);
+    } on MessagesFailure catch (f) {
+      _correctionFailures.add(f);
+    } on Object {
+      _correctionFailures.add(const UnknownMessagesFailure());
+    }
+  }
+
   @override
   Future<void> close() {
     _liveSub?.cancel();
     _itemsSub?.cancel();
     _pendingSub?.cancel();
     _reactFailures.close();
+    _correctionFailures.close();
     return super.close();
   }
+}
+
+/// El operador corrige el texto de un SALIENTE del negocio (edit de
+/// WhatsApp). La UI pre-gatea (texto, ≤15 min, no revocado); el servidor es
+/// autoritativo.
+class MessagesEditRequested extends MessagesEvent {
+  const MessagesEditRequested({required this.messageId, required this.newText});
+
+  final String messageId;
+  final String newText;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MessagesEditRequested &&
+      other.messageId == messageId &&
+      other.newText == newText;
+  @override
+  int get hashCode => Object.hash(messageId, newText);
+}
+
+/// El operador elimina PARA TODOS un saliente del negocio.
+class MessagesDeleteRequested extends MessagesEvent {
+  const MessagesDeleteRequested({required this.messageId});
+
+  final String messageId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MessagesDeleteRequested && other.messageId == messageId;
+  @override
+  int get hashCode => messageId.hashCode;
 }
 
 // Events --------------------------------------------------------------------

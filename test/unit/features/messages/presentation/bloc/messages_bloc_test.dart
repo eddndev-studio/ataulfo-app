@@ -676,4 +676,96 @@ void main() {
       await bloc.close();
     },
   );
+
+  // ────────────────────────────────────────────────────────
+  // edit / delete (corrección del operador)
+  // ────────────────────────────────────────────────────────
+
+  test('MessagesEditRequested delega en repo.editMessage', () async {
+    when(
+      () => repo.editMessage(
+        any(),
+        any(),
+        messageId: any(named: 'messageId'),
+        newText: any(named: 'newText'),
+      ),
+    ).thenAnswer((_) async {});
+    final bloc = build();
+
+    bloc.add(
+      const MessagesEditRequested(messageId: 'e1', newText: 'corregido'),
+    );
+    await tick();
+
+    verify(
+      () => repo.editMessage(
+        'b1',
+        'lid-1',
+        messageId: 'e1',
+        newText: 'corregido',
+      ),
+    ).called(1);
+    await bloc.close();
+  });
+
+  test('MessagesDeleteRequested delega en repo.deleteMessage', () async {
+    when(
+      () =>
+          repo.deleteMessage(any(), any(), messageId: any(named: 'messageId')),
+    ).thenAnswer((_) async {});
+    final bloc = build();
+
+    bloc.add(const MessagesDeleteRequested(messageId: 'e1'));
+    await tick();
+
+    verify(() => repo.deleteMessage('b1', 'lid-1', messageId: 'e1')).called(1);
+    await bloc.close();
+  });
+
+  test(
+    'una corrección fallida emite la failure por correctionFailures',
+    () async {
+      when(
+        () => repo.editMessage(
+          any(),
+          any(),
+          messageId: any(named: 'messageId'),
+          newText: any(named: 'newText'),
+        ),
+      ).thenThrow(const MessagesConflictFailure());
+      final bloc = build();
+      final fails = <MessagesFailure>[];
+      final fsub = bloc.correctionFailures.listen(fails.add);
+
+      bloc.add(const MessagesEditRequested(messageId: 'e1', newText: 'x'));
+      await tick();
+
+      expect(fails, [const MessagesConflictFailure()]);
+      await fsub.cancel();
+      await bloc.close();
+    },
+  );
+
+  test(
+    'un error NO tipado de la corrección emite UnknownMessagesFailure',
+    () async {
+      when(
+        () => repo.deleteMessage(
+          any(),
+          any(),
+          messageId: any(named: 'messageId'),
+        ),
+      ).thenThrow(StateError('boom'));
+      final bloc = build();
+      final fails = <MessagesFailure>[];
+      final fsub = bloc.correctionFailures.listen(fails.add);
+
+      bloc.add(const MessagesDeleteRequested(messageId: 'e1'));
+      await tick();
+
+      expect(fails, [const UnknownMessagesFailure()]);
+      await fsub.cancel();
+      await bloc.close();
+    },
+  );
 }

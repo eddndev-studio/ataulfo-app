@@ -53,6 +53,25 @@ abstract interface class MessagesDatasource {
     required String messageId,
     required String emoji,
   });
+
+  /// `POST /sessions/:botId/:chatLid/messages/edit`. Corrige el texto de un
+  /// SALIENTE del negocio (tipo texto, ≤15 min — reglas del servidor; 409 si
+  /// ya no es editable). Devuelve el Message actualizado (contenido nuevo +
+  /// `editedAtMs`) para el write-through local.
+  Future<Message> editMessage(
+    String botId,
+    String chatLid, {
+    required String messageId,
+    required String newText,
+  });
+
+  /// `POST /sessions/:botId/:chatLid/messages/revoke`. Elimina PARA TODOS un
+  /// saliente del negocio. Devuelve el Message con `revokedAtMs` sellado.
+  Future<Message> revokeMessage(
+    String botId,
+    String chatLid, {
+    required String messageId,
+  });
 }
 
 class DioMessagesDatasource implements MessagesDatasource {
@@ -176,6 +195,57 @@ class DioMessagesDatasource implements MessagesDatasource {
       );
     } on DioException catch (e) {
       throw _mapWrite(e);
+    }
+  }
+
+  @override
+  Future<Message> editMessage(
+    String botId,
+    String chatLid, {
+    required String messageId,
+    required String newText,
+  }) => _postCorrection(botId, chatLid, 'edit', <String, dynamic>{
+    'messageId': messageId,
+    'newText': newText,
+  });
+
+  @override
+  Future<Message> revokeMessage(
+    String botId,
+    String chatLid, {
+    required String messageId,
+  }) => _postCorrection(botId, chatLid, 'revoke', <String, dynamic>{
+    'messageId': messageId,
+  });
+
+  /// POST compartido de los verbos de corrección: ambos devuelven el Message
+  /// re-leído por el servidor (la verdad que el próximo pull confirmará).
+  Future<Message> _postCorrection(
+    String botId,
+    String chatLid,
+    String verb,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/sessions/$botId/${Uri.encodeComponent(chatLid)}/messages/$verb',
+        data: body,
+      );
+      final data = res.data;
+      if (data == null) {
+        throw const UnknownMessagesFailure();
+      }
+      return MessagesMapper.respToMessage(MessageResp.fromJson(data));
+    } on MessagesFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapWrite(e);
+    } on FormatException {
+      throw const UnknownMessagesFailure();
+    } on TypeError {
+      throw const UnknownMessagesFailure();
+    } on ArgumentError {
+      throw const UnknownMessagesFailure();
     }
   }
 

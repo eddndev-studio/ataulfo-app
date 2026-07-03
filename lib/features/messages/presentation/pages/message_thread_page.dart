@@ -50,39 +50,43 @@ class MessageThreadPage extends StatelessWidget {
       create: (_) => ReplyDraftCubit(),
       child: _AudioFailuresListener(
         child: _ReactFailuresListener(
-          child: BlocBuilder<MessagesBloc, MessagesState>(
-            builder: (context, state) => Column(
-              children: <Widget>[
-                Expanded(
-                  child: switch (state) {
-                    MessagesInitial() ||
-                    MessagesLoading() => const _LoadingView(),
-                    MessagesLoaded(
-                      items: final items,
-                      prevCursor: final prevCursor,
-                      isLoadingOlder: final isLoadingOlder,
-                      pending: final pending,
-                    ) =>
-                      (items.isEmpty && pending.isEmpty)
-                          ? const _EmptyView()
-                          : _ThreadView(
-                              items: items,
-                              pending: pending,
-                              hasMore: prevCursor != null,
-                              isLoadingOlder: isLoadingOlder,
-                            ),
-                    MessagesFailed(failure: final f) => _FailedView(failure: f),
-                  },
-                ),
-                // Alerta crítica del bot (desconexión, etc.) y actividad EN VIVO
-                // entre el hilo y el composer. Inertes para no-admin (cubit sin
-                // observar) ⇒ no pintan.
-                const AlertBanner(),
-                const LiveActivity(),
-                // El composer sólo con hilo cargado: enviar exige una conversación
-                // abierta (en Loading/Failed no hay a dónde escribir).
-                if (state is MessagesLoaded) const MessageComposer(),
-              ],
+          child: _CorrectionFailuresListener(
+            child: BlocBuilder<MessagesBloc, MessagesState>(
+              builder: (context, state) => Column(
+                children: <Widget>[
+                  Expanded(
+                    child: switch (state) {
+                      MessagesInitial() ||
+                      MessagesLoading() => const _LoadingView(),
+                      MessagesLoaded(
+                        items: final items,
+                        prevCursor: final prevCursor,
+                        isLoadingOlder: final isLoadingOlder,
+                        pending: final pending,
+                      ) =>
+                        (items.isEmpty && pending.isEmpty)
+                            ? const _EmptyView()
+                            : _ThreadView(
+                                items: items,
+                                pending: pending,
+                                hasMore: prevCursor != null,
+                                isLoadingOlder: isLoadingOlder,
+                              ),
+                      MessagesFailed(failure: final f) => _FailedView(
+                        failure: f,
+                      ),
+                    },
+                  ),
+                  // Alerta crítica del bot (desconexión, etc.) y actividad EN VIVO
+                  // entre el hilo y el composer. Inertes para no-admin (cubit sin
+                  // observar) ⇒ no pintan.
+                  const AlertBanner(),
+                  const LiveActivity(),
+                  // El composer sólo con hilo cargado: enviar exige una conversación
+                  // abierta (en Loading/Failed no hay a dónde escribir).
+                  if (state is MessagesLoaded) const MessageComposer(),
+                ],
+              ),
             ),
           ),
         ),
@@ -151,6 +155,60 @@ class _ReactFailuresListenerState extends State<_ReactFailuresListener> {
   @override
   Widget build(BuildContext context) => widget.child;
 }
+
+/// Anuncia los fallos de corrección (editar/eliminar) con copy honesto. El
+/// éxito repinta solo (write-through local del repo); el fallo llega TIPADO
+/// por el side-channel `correctionFailures` y aquí se traduce a un aviso que
+/// el operador entienda (ventana vencida, bot pausado, sin conexión).
+class _CorrectionFailuresListener extends StatefulWidget {
+  const _CorrectionFailuresListener({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_CorrectionFailuresListener> createState() =>
+      _CorrectionFailuresListenerState();
+}
+
+class _CorrectionFailuresListenerState
+    extends State<_CorrectionFailuresListener> {
+  StreamSubscription<MessagesFailure>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = context.read<MessagesBloc>().correctionFailures.listen((f) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_correctionCopy(f))));
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// Copy por tipo de fallo de corrección. El 409 del servidor colapsa las
+/// razones (ventana vencida, no-texto, ya revocado) en Conflict: la UI ya
+/// pre-gatea esas reglas, así que aquí basta el motivo dominante (la ventana).
+String _correctionCopy(MessagesFailure f) => switch (f) {
+  MessagesConflictFailure() => 'WhatsApp ya no permite editar ese mensaje',
+  MessagesBotPausedFailure() =>
+    'El bot está pausado; reactívalo para corregir mensajes',
+  MessagesNotConnectedFailure() => 'El bot no está conectado a WhatsApp',
+  MessagesNetworkFailure() ||
+  MessagesTimeoutFailure() => 'Sin conexión: no se pudo aplicar la corrección',
+  _ => 'No se pudo aplicar la corrección',
+};
 
 class _LoadingView extends StatelessWidget {
   const _LoadingView();
@@ -617,6 +675,17 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
   // Copiar/seleccionar sólo tienen sentido sobre texto con cuerpo; la media
   // y los mensajes vacíos no los ofrecen.
   final isText = message.type == 'text' && message.content.trim().isNotEmpty;
+  // Corrección del operador: solo SALIENTES del negocio no revocados. Editar
+  // exige además texto y la ventana de WhatsApp (~15 min) — el servidor es
+  // autoritativo (409 si la regla cambió entre el gate y el POST).
+  const editWindowMs = 15 * 60 * 1000;
+  final notRevoked = message.revokedAtMs == null;
+  final canDelete = isOutbound && notRevoked;
+  final canEdit =
+      canDelete &&
+      isText &&
+      DateTime.now().millisecondsSinceEpoch - message.timestampMs <
+          editWindowMs;
   // Drill-through inverso: para un OUTBOUND y operador ADMIN+, la hoja ofrece
   // saltar a la corrida de IA que generó el mensaje (el backend igual exige
   // ADMIN+ en la vista; ocultarlo evita la acción rota).
@@ -701,6 +770,35 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
                   },
                 ),
               ],
+              if (canEdit || canDelete) ...<Widget>[
+                const Divider(height: AppTokens.sp6),
+                if (canEdit)
+                  ListTile(
+                    key: Key('message.edit.$messageId'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Editar mensaje'),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _showEditDialog(rootNavigator.context, bloc, message);
+                    },
+                  ),
+                if (canDelete)
+                  ListTile(
+                    key: Key('message.delete.$messageId'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text('Eliminar para todos'),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _showDeleteConfirm(
+                        rootNavigator.context,
+                        bloc,
+                        messageId,
+                      );
+                    },
+                  ),
+              ],
               if (canDrill) ...<Widget>[
                 const Divider(height: AppTokens.sp6),
                 ListTile(
@@ -729,6 +827,111 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
   );
   if (emoji != null) {
     bloc.add(MessagesReactRequested(messageId: messageId, emoji: emoji));
+  }
+}
+
+/// Diálogo de edición de un saliente propio: campo prellenado con el texto
+/// actual; Guardar dispatcha [MessagesEditRequested] (el servidor valida la
+/// ventana; el resultado repinta por write-through o avisa por el listener de
+/// fallos). Guardar sin cambios o vacío no dispatcha nada.
+Future<void> _showEditDialog(
+  BuildContext context,
+  MessagesBloc bloc,
+  Message message,
+) async {
+  final newText = await showDialog<String>(
+    context: context,
+    builder: (_) => _EditMessageDialog(initialText: message.content),
+  );
+  if (newText == null || newText.isEmpty || newText == message.content) {
+    return;
+  }
+  bloc.add(
+    MessagesEditRequested(messageId: message.externalId, newText: newText),
+  );
+}
+
+/// Cuerpo del diálogo de edición: dueño del TextEditingController (su
+/// State lo dispose-a cuando la RUTA termina de desmontarse — dispose-arlo
+/// en el caller tras el await rompería el TextField durante la animación de
+/// salida del diálogo).
+class _EditMessageDialog extends StatefulWidget {
+  const _EditMessageDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_EditMessageDialog> createState() => _EditMessageDialogState();
+}
+
+class _EditMessageDialogState extends State<_EditMessageDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Editar mensaje'),
+    content: TextField(
+      key: const Key('message.edit.field'),
+      controller: _controller,
+      autofocus: true,
+      maxLines: null,
+    ),
+    actions: <Widget>[
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancelar'),
+      ),
+      TextButton(
+        key: const Key('message.edit.save'),
+        onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+        child: const Text('Guardar'),
+      ),
+    ],
+  );
+}
+
+/// Confirmación de "Eliminar para todos": la revocación no se puede deshacer
+/// (el cliente ve "Se eliminó este mensaje").
+Future<void> _showDeleteConfirm(
+  BuildContext context,
+  MessagesBloc bloc,
+  String messageId,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('¿Eliminar para todos?'),
+      content: const Text(
+        'El mensaje se eliminará para ti y para el cliente. '
+        'Esta acción no se puede deshacer.',
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          key: const Key('message.delete.confirm'),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Eliminar'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed ?? false) {
+    bloc.add(MessagesDeleteRequested(messageId: messageId));
   }
 }
 

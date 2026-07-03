@@ -557,4 +557,99 @@ void main() {
       );
     });
   });
+
+  group('DioMessagesDatasource.editMessage', () {
+    test('200 → Message actualizado; path + body', () async {
+      stubPost(
+        postResp(
+          200,
+          body: <String, dynamic>{
+            ...msgJson(externalId: 'm1', direction: 'OUTBOUND', status: 'SENT'),
+            'content': 'precio: \$50',
+            'editedAtMs': 1800,
+          },
+        ),
+      );
+      final m = await ds.editMessage(
+        'b1',
+        'lid-1',
+        messageId: 'm1',
+        newText: 'precio: \$50',
+      );
+      final c = capturedPost();
+      expect(c[0], '/sessions/b1/lid-1/messages/edit');
+      expect(c[1], <String, dynamic>{
+        'messageId': 'm1',
+        'newText': 'precio: \$50',
+      });
+      expect(m.externalId, 'm1');
+      expect(m.content, 'precio: \$50');
+      expect(m.editedAtMs, 1800);
+    });
+
+    test('chatLid con `@` → segmento percent-encodeado', () async {
+      stubPost(
+        postResp(
+          200,
+          body: msgJson(externalId: 'm1', direction: 'OUTBOUND'),
+        ),
+      );
+      await ds.editMessage('b1', '12036@g.us', messageId: 'm1', newText: 'x');
+      expect(capturedPost()[0], '/sessions/b1/12036%40g.us/messages/edit');
+    });
+
+    test(
+      '409 (ventana vencida / no editable) → MessagesConflictFailure',
+      () async {
+        stubPostThrow(postBad(409));
+        await expectLater(
+          ds.editMessage('b1', 'lid-1', messageId: 'm1', newText: 'x'),
+          throwsA(isA<MessagesConflictFailure>()),
+        );
+      },
+    );
+
+    test('423 (bot pausado) → MessagesBotPausedFailure', () async {
+      stubPostThrow(postBad(423));
+      await expectLater(
+        ds.editMessage('b1', 'lid-1', messageId: 'm1', newText: 'x'),
+        throwsA(isA<MessagesBotPausedFailure>()),
+      );
+    });
+  });
+
+  group('DioMessagesDatasource.revokeMessage', () {
+    test('200 → Message revocado; path + body', () async {
+      stubPost(
+        postResp(
+          200,
+          body: <String, dynamic>{
+            ...msgJson(externalId: 'm1', direction: 'OUTBOUND', status: 'SENT'),
+            'revokedAtMs': 1900,
+          },
+        ),
+      );
+      final m = await ds.revokeMessage('b1', 'lid-1', messageId: 'm1');
+      final c = capturedPost();
+      expect(c[0], '/sessions/b1/lid-1/messages/revoke');
+      expect(c[1], <String, dynamic>{'messageId': 'm1'});
+      expect(m.revokedAtMs, 1900);
+    });
+
+    test('404 → MessagesNotFoundFailure', () async {
+      stubPostThrow(postBad(404));
+      await expectLater(
+        ds.revokeMessage('b1', 'lid-1', messageId: 'm1'),
+        throwsA(isA<MessagesNotFoundFailure>()),
+      );
+    });
+
+    test('503 (bot no corriendo) → MessagesNotConnectedFailure', () async {
+      stubPostThrow(postBad(503));
+      await expectLater(
+        ds.revokeMessage('b1', 'lid-1', messageId: 'm1'),
+        throwsA(isA<MessagesNotConnectedFailure>()),
+      );
+    });
+  });
 }

@@ -501,4 +501,92 @@ void main() {
       expect(entries.single.content, 'sobrevive');
     },
   );
+
+  // ────────────────────────────────────────────────────────
+  // editMessage / deleteMessage (corrección del operador)
+  // ────────────────────────────────────────────────────────
+
+  Message out(
+    String ext, {
+    String content = 'precio: \$40',
+    int? editedAtMs,
+    int? revokedAtMs,
+  }) => Message(
+    externalId: ext,
+    chatLid: 'chat-1',
+    senderLid: 'sender-1',
+    kind: MessageKind.dm,
+    direction: MessageDirection.outbound,
+    type: 'text',
+    content: content,
+    mediaRef: null,
+    quotedId: null,
+    timestampMs: 1000,
+    status: MessageStatus.sent,
+    editedAtMs: editedAtMs,
+    revokedAtMs: revokedAtMs,
+  );
+
+  test(
+    'editMessage aplica write-through el DTO devuelto por el servidor',
+    () async {
+      await MessagesDao(db).upsertMessages('bot-1', [out('ext-out')]);
+      when(
+        () => ds.editMessage(
+          'bot-1',
+          'chat-1',
+          messageId: 'ext-out',
+          newText: 'precio: \$50',
+        ),
+      ).thenAnswer(
+        (_) async => out('ext-out', content: 'precio: \$50', editedAtMs: 9000),
+      );
+
+      await repo.editMessage(
+        'bot-1',
+        'chat-1',
+        messageId: 'ext-out',
+        newText: 'precio: \$50',
+      );
+
+      final rows = await repo.watchThread('bot-1', 'chat-1').first;
+      final m = rows.singleWhere((r) => r.externalId == 'ext-out');
+      expect(m.content, 'precio: \$50');
+      expect(m.editedAtMs, 9000);
+    },
+  );
+
+  test('deleteMessage sella revokedAtMs en la fila local', () async {
+    await MessagesDao(db).upsertMessages('bot-1', [out('ext-out')]);
+    when(
+      () => ds.revokeMessage('bot-1', 'chat-1', messageId: 'ext-out'),
+    ).thenAnswer((_) async => out('ext-out', revokedAtMs: 9500));
+
+    await repo.deleteMessage('bot-1', 'chat-1', messageId: 'ext-out');
+
+    final rows = await repo.watchThread('bot-1', 'chat-1').first;
+    expect(rows.single.revokedAtMs, 9500);
+  });
+
+  test(
+    'editMessage propaga la failure del datasource sin tocar la fila',
+    () async {
+      await MessagesDao(db).upsertMessages('bot-1', [out('ext-out')]);
+      when(
+        () => ds.editMessage(
+          any(),
+          any(),
+          messageId: any(named: 'messageId'),
+          newText: any(named: 'newText'),
+        ),
+      ).thenThrow(const MessagesConflictFailure());
+
+      await expectLater(
+        repo.editMessage('bot-1', 'chat-1', messageId: 'ext-out', newText: 'x'),
+        throwsA(isA<MessagesConflictFailure>()),
+      );
+      final rows = await repo.watchThread('bot-1', 'chat-1').first;
+      expect(rows.single.editedAtMs, isNull);
+    },
+  );
 }

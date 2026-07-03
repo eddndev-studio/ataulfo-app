@@ -143,6 +143,9 @@ void main() {
     when(
       () => bloc.reactFailures,
     ).thenAnswer((_) => const Stream<void>.empty());
+    when(
+      () => bloc.correctionFailures,
+    ).thenAnswer((_) => const Stream<MessagesFailure>.empty());
     when(() => audio.state).thenReturn(const ThreadAudioState());
     // Por defecto sin sesión: el drill-through (ADMIN+) queda oculto y la
     // reacción funciona igual; los tests que lo prueban fijan un estado ADMIN.
@@ -2219,6 +2222,168 @@ void main() {
 
       final r = radiusOf(tester, 'e1');
       expect(r.bottomLeft.x, lessThan(r.bottomRight.x));
+    });
+  });
+  group('editar / eliminar (long-press, correcciones del operador)', () {
+    MessagesLoaded loadedWith(Message m) => MessagesLoaded(
+      items: <Message>[m],
+      prevCursor: null,
+      isLoadingOlder: false,
+    );
+
+    testWidgets(
+      'un saliente de texto reciente ofrece Editar y Eliminar; guardar dispatcha',
+      (tester) async {
+        when(() => bloc.state).thenReturn(
+          loadedWith(
+            msg(
+              externalId: 'm1',
+              direction: MessageDirection.outbound,
+              content: 'precio 40',
+              ts: DateTime.now().millisecondsSinceEpoch,
+              status: MessageStatus.sent,
+            ),
+          ),
+        );
+        await tester.pumpWidget(host());
+        await tester.longPress(find.text('precio 40'));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('message.edit.m1')), findsOneWidget);
+        expect(find.byKey(const Key('message.delete.m1')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('message.edit.m1')));
+        await tester.pumpAndSettle();
+
+        // Diálogo prellenado con el texto actual.
+        final field = tester.widget<TextField>(
+          find.byKey(const Key('message.edit.field')),
+        );
+        expect(field.controller!.text, 'precio 40');
+
+        await tester.enterText(
+          find.byKey(const Key('message.edit.field')),
+          'precio 50',
+        );
+        await tester.tap(find.byKey(const Key('message.edit.save')));
+        await tester.pumpAndSettle();
+
+        verify(
+          () => bloc.add(
+            const MessagesEditRequested(messageId: 'm1', newText: 'precio 50'),
+          ),
+        ).called(1);
+      },
+    );
+
+    testWidgets('fuera de la ventana de 15 min: sin Editar, sí Eliminar', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        loadedWith(
+          msg(
+            externalId: 'm1',
+            direction: MessageDirection.outbound,
+            content: 'viejo',
+            ts: 1700, // epoch remoto: fuera de la ventana
+            status: MessageStatus.sent,
+          ),
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('viejo'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('message.edit.m1')), findsNothing);
+      expect(find.byKey(const Key('message.delete.m1')), findsOneWidget);
+    });
+
+    testWidgets('un INBOUND del cliente no ofrece corrección', (tester) async {
+      when(() => bloc.state).thenReturn(
+        loadedWith(
+          msg(
+            externalId: 'm1',
+            content: 'soy el cliente',
+            ts: DateTime.now().millisecondsSinceEpoch,
+          ),
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('soy el cliente'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('message.edit.m1')), findsNothing);
+      expect(find.byKey(const Key('message.delete.m1')), findsNothing);
+    });
+
+    testWidgets('un mensaje ya revocado no ofrece corrección', (tester) async {
+      when(() => bloc.state).thenReturn(
+        loadedWith(
+          msg(
+            externalId: 'm1',
+            direction: MessageDirection.outbound,
+            content: 'borrado',
+            ts: DateTime.now().millisecondsSinceEpoch,
+            status: MessageStatus.sent,
+            revokedAtMs: 999,
+          ),
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('Se eliminó este mensaje'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('message.edit.m1')), findsNothing);
+      expect(find.byKey(const Key('message.delete.m1')), findsNothing);
+    });
+
+    testWidgets('Eliminar pide confirmación y dispatcha al confirmar', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        loadedWith(
+          msg(
+            externalId: 'm1',
+            direction: MessageDirection.outbound,
+            content: 'adiós',
+            ts: DateTime.now().millisecondsSinceEpoch,
+            status: MessageStatus.sent,
+          ),
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('adiós'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('message.delete.m1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('message.delete.confirm')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(const MessagesDeleteRequested(messageId: 'm1')),
+      ).called(1);
+    });
+
+    testWidgets('una corrección fallida anuncia con copy honesto', (
+      tester,
+    ) async {
+      final failures = StreamController<MessagesFailure>.broadcast();
+      addTearDown(failures.close);
+      when(() => bloc.correctionFailures).thenAnswer((_) => failures.stream);
+      when(
+        () => bloc.state,
+      ).thenReturn(loadedWith(msg(externalId: 'm1', content: 'hola')));
+      await tester.pumpWidget(host());
+
+      failures.add(const MessagesConflictFailure());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('WhatsApp ya no permite editar ese mensaje'),
+        findsOneWidget,
+      );
     });
   });
 }

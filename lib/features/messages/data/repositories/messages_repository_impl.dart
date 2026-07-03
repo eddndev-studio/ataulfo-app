@@ -251,5 +251,33 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }
 
   @override
+  Future<void> editMessage(
+    String botId,
+    String chatLid, {
+    required String messageId,
+    required String newText,
+  }) async {
+    final m = await _ds.editMessage(
+      botId,
+      chatLid,
+      messageId: messageId,
+      newText: newText,
+    );
+    // Write-through best-effort: el servidor ya editó; si la escritura local
+    // falla, el próximo pull del hilo trae la fila corregida.
+    await applyLiveMessage(botId, m);
+  }
+
+  @override
+  Future<void> deleteMessage(
+    String botId,
+    String chatLid, {
+    required String messageId,
+  }) async {
+    final m = await _ds.revokeMessage(botId, chatLid, messageId: messageId);
+    await applyLiveMessage(botId, m);
+  }
+
+  @override
   Stream<ThreadLiveEvent> live(String botId) => _events.threadEvents(botId);
 }
