@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -80,6 +82,15 @@ class MessageMediaContent extends StatelessWidget {
         url: url,
         filename: m.content,
       ),
+      // Tipos ricos (S25): la fila declara el tipo; el contenido legible
+      // (nombre del lugar, del contacto, texto del voto) va como caption
+      // debajo por el camino estándar.
+      'location' => _typedCard(context, Icons.place_outlined, 'Ubicación'),
+      'contact' => _typedCard(context, Icons.person_outline, 'Contacto'),
+      'poll_vote' => _typedCard(context, Icons.how_to_vote_outlined, 'Voto'),
+      // La encuesta persiste su JSON completo en content: la tarjeta lo
+      // parsea (pregunta + opciones) y el caption crudo NO se repite.
+      'poll' => _PollCard(id: m.externalId, rawContent: m.content),
       _ => Text(
         '[${m.type}]',
         style: textTheme.bodyLarge?.copyWith(
@@ -89,8 +100,9 @@ class MessageMediaContent extends StatelessWidget {
       ),
     };
     // El documento pinta su nombre DENTRO de la tarjeta (el wire manda el
-    // nombre de archivo en `content`): no lo repitas como caption debajo.
-    if (m.content.isEmpty || m.type == 'document') {
+    // nombre de archivo en `content`), y la encuesta parsea su JSON: en
+    // ambos, repetir `content` como caption sería ruido (o un blob crudo).
+    if (m.content.isEmpty || m.type == 'document' || m.type == 'poll') {
       return media;
     }
     return Column(
@@ -510,4 +522,83 @@ IconData _docIcon(String filename) {
     'zip' || 'rar' || '7z' => Icons.folder_zip_outlined,
     _ => Icons.insert_drive_file_outlined,
   };
+}
+
+
+/// Tarjeta de encuesta: parsea el JSON persistido `{question, options,
+/// multiple}` y pinta pregunta + opciones con su ícono de selección. La
+/// votación ocurre en el WhatsApp del cliente; aquí es representación.
+class _PollCard extends StatelessWidget {
+  const _PollCard({required this.id, required this.rawContent});
+
+  final String id;
+  final String rawContent;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    String question;
+    List<String> options;
+    bool multiple;
+    try {
+      final decoded = jsonDecode(rawContent);
+      final map = decoded as Map<String, dynamic>;
+      question = map['question'] as String? ?? '';
+      options = (map['options'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<String>()
+          .toList(growable: false);
+      multiple = map['multiple'] as bool? ?? false;
+    } on Object {
+      // JSON ilegible (fila vieja o corrupta): degrada al blob crudo en
+      // cursiva, nunca una burbuja vacía muda.
+      return Text(
+        rawContent,
+        style: textTheme.bodyLarge?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: AppTokens.text2,
+        ),
+      );
+    }
+    return Column(
+      key: Key('message.poll.$id'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(Icons.poll_outlined, size: 18, color: AppTokens.primary),
+            const SizedBox(width: AppTokens.sp2),
+            Flexible(
+              child: Text(
+                question,
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTokens.sp2),
+        for (final o in options)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppTokens.sp1),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(
+                  multiple
+                      ? Icons.check_box_outline_blank
+                      : Icons.radio_button_unchecked,
+                  size: 16,
+                  color: AppTokens.text2,
+                ),
+                const SizedBox(width: AppTokens.sp2),
+                Flexible(child: Text(o, style: textTheme.bodyMedium)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
 }

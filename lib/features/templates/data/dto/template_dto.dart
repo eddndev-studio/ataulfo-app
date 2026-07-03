@@ -92,6 +92,9 @@ class AiConfigDto {
     this.responseDelaySeconds = 0,
     this.silenceLabelIds = const <String>[],
     this.disabledToolGroups = const <String>[],
+    this.followUpEnabled = false,
+    this.followUpDelayMinutes = 0,
+    this.followUpMaxAttempts = 0,
   });
 
   factory AiConfigDto.fromJson(Map<String, dynamic> json) {
@@ -128,6 +131,11 @@ class AiConfigDto {
     final disabledToolGroups = groupsRaw is List
         ? groupsRaw.whereType<String>().toList(growable: false)
         : const <String>[];
+    // Claves aditivas del seguimiento por inactividad: un backend previo no
+    // las manda ⇒ apagado con knobs en cero (inerte).
+    final followUpEnabledRaw = json['follow_up_enabled'];
+    final followUpDelayRaw = json['follow_up_delay_minutes'];
+    final followUpAttemptsRaw = json['follow_up_max_attempts'];
     return AiConfigDto(
       enabled: enabled,
       provider: provider,
@@ -141,6 +149,9 @@ class AiConfigDto {
       responseDelaySeconds: delayRaw is int ? delayRaw : 0,
       silenceLabelIds: silenceLabelIds,
       disabledToolGroups: disabledToolGroups,
+      followUpEnabled: followUpEnabledRaw is bool ? followUpEnabledRaw : false,
+      followUpDelayMinutes: followUpDelayRaw is int ? followUpDelayRaw : 0,
+      followUpMaxAttempts: followUpAttemptsRaw is int ? followUpAttemptsRaw : 0,
     );
   }
 
@@ -154,4 +165,7 @@ class AiConfigDto {
   final int responseDelaySeconds;
   final List<String> silenceLabelIds;
   final List<String> disabledToolGroups;
+  final bool followUpEnabled;
+  final int followUpDelayMinutes;
+  final int followUpMaxAttempts;
 }

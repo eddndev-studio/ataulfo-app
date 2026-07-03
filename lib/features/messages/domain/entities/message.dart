@@ -103,6 +103,8 @@ class Message {
     required this.timestampMs,
     required this.status,
     this.mediaUrl,
+    this.editedAtMs,
+    this.revokedAtMs,
   });
 
   final String externalId;
@@ -132,6 +134,12 @@ class Message {
 
   /// Estado de entrega (OUTBOUND). `null` en INBOUND.
   final MessageStatus? status;
+
+  /// Marcadores de corrección (S25): editado (el `content` ya refleja el
+  /// texto nuevo) y revocado ("eliminado para todos" — la UI oculta el
+  /// contenido). `null` = intacto. Epoch ms.
+  final int? editedAtMs;
+  final int? revokedAtMs;
 
   /// Copia con el estado de entrega actualizado; el resto de campos intactos.
   /// La inmutabilidad la garantiza devolver una instancia nueva: el realtime de

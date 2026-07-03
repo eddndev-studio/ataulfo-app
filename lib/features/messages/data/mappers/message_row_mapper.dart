@@ -26,6 +26,8 @@ class MessageRowMapper {
     quotedId: r.quotedId,
     timestampMs: r.timestampMs,
     status: r.status == null ? null : MessageStatus.values.byName(r.status!),
+    editedAtMs: r.editedAtMs,
+    revokedAtMs: r.revokedAtMs,
   );
 
   static MessagesCompanion toCompanion(
@@ -46,5 +48,7 @@ class MessageRowMapper {
     mediaRef: Value(m.mediaRef),
     quotedId: Value(m.quotedId),
     status: Value(m.status?.name),
+    editedAtMs: Value(m.editedAtMs),
+    revokedAtMs: Value(m.revokedAtMs),
   );
 }

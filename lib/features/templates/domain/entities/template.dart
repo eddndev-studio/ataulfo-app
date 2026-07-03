@@ -73,6 +73,9 @@ class AIConfig {
     this.responseDelaySeconds = 0,
     this.silenceLabelIds = const <String>[],
     this.disabledToolGroups = const <String>[],
+    this.followUpEnabled = false,
+    this.followUpDelayMinutes = 0,
+    this.followUpMaxAttempts = 0,
   });
 
   final bool enabled;
@@ -101,6 +104,15 @@ class AIConfig {
   /// como ids crudos (tolerante a un grupo futuro), igual que silenceLabelIds.
   final List<String> disabledToolGroups;
 
+  /// Seguimiento automático por inactividad (S12/S27): con el toggle activo,
+  /// si el cliente no responde en `followUpDelayMinutes` tras una respuesta
+  /// del bot, el motor despierta en modo seguimiento (hasta
+  /// `followUpMaxAttempts` por ciclo). Apagado, los knobs son inertes (cero
+  /// en filas legacy).
+  final bool followUpEnabled;
+  final int followUpDelayMinutes;
+  final int followUpMaxAttempts;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -113,6 +125,9 @@ class AIConfig {
         other.systemPrompt == systemPrompt &&
         other.contextMessages == contextMessages &&
         other.responseDelaySeconds == responseDelaySeconds &&
+        other.followUpEnabled == followUpEnabled &&
+        other.followUpDelayMinutes == followUpDelayMinutes &&
+        other.followUpMaxAttempts == followUpMaxAttempts &&
         _stringListEquals(other.silenceLabelIds, silenceLabelIds) &&
         _stringListEquals(other.disabledToolGroups, disabledToolGroups);
   }
@@ -128,6 +143,9 @@ class AIConfig {
     contextMessages,
     responseDelaySeconds,
     Object.hashAll(silenceLabelIds),
+    followUpEnabled,
+    followUpDelayMinutes,
+    followUpMaxAttempts,
     Object.hashAll(disabledToolGroups),
   );
 
@@ -144,6 +162,9 @@ class AIConfig {
     int? responseDelaySeconds,
     List<String>? silenceLabelIds,
     List<String>? disabledToolGroups,
+    bool? followUpEnabled,
+    int? followUpDelayMinutes,
+    int? followUpMaxAttempts,
   }) => AIConfig(
     enabled: enabled ?? this.enabled,
     provider: provider ?? this.provider,
@@ -155,6 +176,9 @@ class AIConfig {
     responseDelaySeconds: responseDelaySeconds ?? this.responseDelaySeconds,
     silenceLabelIds: silenceLabelIds ?? this.silenceLabelIds,
     disabledToolGroups: disabledToolGroups ?? this.disabledToolGroups,
+    followUpEnabled: followUpEnabled ?? this.followUpEnabled,
+    followUpDelayMinutes: followUpDelayMinutes ?? this.followUpDelayMinutes,
+    followUpMaxAttempts: followUpMaxAttempts ?? this.followUpMaxAttempts,
   );
 }
 

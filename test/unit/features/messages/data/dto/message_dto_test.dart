@@ -2,6 +2,7 @@ import 'package:ataulfo/features/messages/data/dto/message_dto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('correccion', _correccionTests);
   // El wire de httpmessages usa camelCase (externalId/chatLid/timestampMs),
   // a diferencia del snake_case de httpsessions. El DTO espeja ese contrato.
   Map<String, dynamic> msgJson({
@@ -117,5 +118,35 @@ void main() {
         throwsFormatException,
       );
     });
+  });
+}
+
+// Los marcadores de corrección (editedAtMs/revokedAtMs) son claves aditivas
+// omitempty: presentes se parsean, ausentes quedan null.
+void _correccionTests() {
+  Map<String, dynamic> base() => <String, dynamic>{
+    'externalId': 'e1',
+    'chatLid': 'lid-1',
+    'senderLid': 'lid-1',
+    'kind': 'DM',
+    'direction': 'INBOUND',
+    'type': 'text',
+    'content': 'hola',
+    'timestampMs': 1700,
+  };
+
+  test('editedAtMs/revokedAtMs presentes se parsean', () {
+    final j = base()
+      ..['editedAtMs'] = 111
+      ..['revokedAtMs'] = 222;
+    final dto = MessageResp.fromJson(j);
+    expect(dto.editedAtMs, 111);
+    expect(dto.revokedAtMs, 222);
+  });
+
+  test('ausentes quedan null (backend previo al campo)', () {
+    final dto = MessageResp.fromJson(base());
+    expect(dto.editedAtMs, isNull);
+    expect(dto.revokedAtMs, isNull);
   });
 }

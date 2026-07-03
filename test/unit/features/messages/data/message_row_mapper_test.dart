@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('correccion', _correccionRowTests);
   late AppDb db;
 
   setUp(() => db = AppDb.forTesting(NativeDatabase.memory()));
@@ -220,4 +221,28 @@ void main() {
       expect(entity.mediaUrl, isNull);
     },
   );
+}
+
+// Round-trip de los marcadores de corrección por la fila drift.
+void _correccionRowTests() {
+  test('editedAtMs/revokedAtMs sobreviven el round-trip fila↔entidad', () {
+    const m = Message(
+      externalId: 'e1',
+      chatLid: 'lid-1',
+      senderLid: 'lid-1',
+      kind: MessageKind.dm,
+      direction: MessageDirection.outbound,
+      type: 'text',
+      content: 'precio: \$50',
+      mediaRef: null,
+      quotedId: null,
+      timestampMs: 1700,
+      status: MessageStatus.sent,
+      editedAtMs: 111,
+      revokedAtMs: 222,
+    );
+    final companion = MessageRowMapper.toCompanion('bot-1', m, syncedAtMs: 1);
+    expect(companion.editedAtMs.value, 111);
+    expect(companion.revokedAtMs.value, 222);
+  });
 }

@@ -20,6 +20,9 @@ class TemplatesMapper {
     responseDelaySeconds: dto.responseDelaySeconds,
     silenceLabelIds: dto.silenceLabelIds,
     disabledToolGroups: dto.disabledToolGroups,
+    followUpEnabled: dto.followUpEnabled,
+    followUpDelayMinutes: dto.followUpDelayMinutes,
+    followUpMaxAttempts: dto.followUpMaxAttempts,
   );
 
   /// Serializa AIConfig al objeto JSON del wire (claves snake_case). Es la
@@ -37,6 +40,9 @@ class TemplatesMapper {
     'response_delay_seconds': ai.responseDelaySeconds,
     'silence_label_ids': ai.silenceLabelIds,
     'disabled_tool_groups': ai.disabledToolGroups,
+    'follow_up_enabled': ai.followUpEnabled,
+    'follow_up_delay_minutes': ai.followUpDelayMinutes,
+    'follow_up_max_attempts': ai.followUpMaxAttempts,
   };
 
   static Template templateRespToEntity(TemplateResp resp) => Template(

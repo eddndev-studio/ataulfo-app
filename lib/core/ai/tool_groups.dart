@@ -91,6 +91,13 @@ enum ToolGroup {
     'Diseccionar la conversación con un modelo auxiliar (resumen, hechos, '
         'sentimiento). Corre un modelo con costo; apágalo para evitarlo.',
     Icons.insights_outlined,
+  ),
+  programacion(
+    'programacion',
+    'Mensajes programados',
+    'Prometer mensajes futuros: programar, listar y cancelar envíos que se '
+        'disparan solos a la hora acordada (recordatorios, seguimientos).',
+    Icons.schedule_send_outlined,
   );
 
   const ToolGroup(this.wire, this.label, this.description, this.icon);

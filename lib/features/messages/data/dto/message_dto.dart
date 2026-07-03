@@ -23,6 +23,8 @@ class MessageResp {
     required this.quotedId,
     required this.status,
     this.mediaUrl,
+    this.editedAtMs,
+    this.revokedAtMs,
   });
 
   factory MessageResp.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,9 @@ class MessageResp {
     final mediaUrl = json['mediaUrl'];
     final quotedId = json['quotedId'];
     final status = json['status'];
+    // Claves aditivas de corrección (omitempty): ausentes ⇒ null (intacto).
+    final editedAtMs = json['editedAtMs'];
+    final revokedAtMs = json['revokedAtMs'];
     if (externalId is! String ||
         chatLid is! String ||
         senderLid is! String ||
@@ -62,6 +67,12 @@ class MessageResp {
     if (status != null && status is! String) {
       throw const FormatException('messageResp: status no es String ni null');
     }
+    if (editedAtMs != null && editedAtMs is! int) {
+      throw const FormatException('messageResp: editedAtMs no es int ni null');
+    }
+    if (revokedAtMs != null && revokedAtMs is! int) {
+      throw const FormatException('messageResp: revokedAtMs no es int ni null');
+    }
     return MessageResp(
       externalId: externalId,
       chatLid: chatLid,
@@ -75,6 +86,8 @@ class MessageResp {
       mediaUrl: mediaUrl as String?,
       quotedId: quotedId as String?,
       status: status as String?,
+      editedAtMs: editedAtMs as int?,
+      revokedAtMs: revokedAtMs as int?,
     );
   }
 
@@ -92,6 +105,8 @@ class MessageResp {
   final String? mediaUrl;
   final String? quotedId;
   final String? status;
+  final int? editedAtMs;
+  final int? revokedAtMs;
 }
 
 /// Página del hilo: `{messages, prevCursor?}`. `messages` siempre presente

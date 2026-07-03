@@ -30,7 +30,10 @@ String _schemaFingerprint(AppDb db) {
 ///      outbox),
 ///   3. registra aquí la nueva entrada `{nuevaVersión: nuevaHuella}`.
 /// El guard de abajo falla si el esquema cambió sin pasar por estos tres pasos.
-const Map<int, String> _schemaFingerprints = <int, String>{2: '9b5bbf50'};
+const Map<int, String> _schemaFingerprints = <int, String>{
+  2: '9b5bbf50',
+  3: '94e95575',
+};
 
 void main() {
   test('un cambio de esquema obliga a subir schemaVersion + migración', () {

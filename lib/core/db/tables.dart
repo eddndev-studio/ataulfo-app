@@ -73,6 +73,11 @@ class Messages extends Table {
   TextColumn get status => text().nullable()();
   IntColumn get syncedAtMs => integer()();
 
+  /// Marcadores de corrección (S25): editado / revocado. Nullable ⇒ la
+  /// migración es aditiva (los rows previos quedan intactos).
+  IntColumn get editedAtMs => integer().nullable()();
+  IntColumn get revokedAtMs => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {botId, externalId};
 }

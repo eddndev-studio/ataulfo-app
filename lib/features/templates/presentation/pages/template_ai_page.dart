@@ -306,6 +306,13 @@ class _StatGrid extends StatelessWidget {
           value: _toolGroupsValue(ai.disabledToolGroups),
           onTap: isMutating ? null : () => _pickToolGroups(context),
         ),
+        const SizedBox(height: AppTokens.cardGap),
+        _StatTile(
+          tileKey: const Key('template_ai.tile.follow_up'),
+          label: 'Seguimiento por inactividad',
+          value: _followUpValue(ai),
+          onTap: isMutating ? null : () => _pickFollowUp(context),
+        ),
       ],
     );
   }
@@ -380,6 +387,29 @@ class _StatGrid extends StatelessWidget {
     );
     if (picked == null || !context.mounted) return;
     _dispatch(context, ai.copyWith(contextMessages: picked));
+  }
+
+  /// Resumen del tile de seguimiento: apagado, o "cada X · N intentos".
+  static String _followUpValue(AIConfig ai) {
+    if (!ai.followUpEnabled) return 'Apagado';
+    final m = ai.followUpDelayMinutes;
+    final delay = m >= 1440 && m % 1440 == 0
+        ? '${m ~/ 1440} d'
+        : m >= 60 && m % 60 == 0
+        ? '${m ~/ 60} h'
+        : '$m min';
+    return 'cada $delay · ${ai.followUpMaxAttempts} intento(s)';
+  }
+
+  Future<void> _pickFollowUp(BuildContext context) async {
+    final picked = await showAppBottomSheet<AIConfig>(
+      context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => _FollowUpSheet(initial: ai),
+    );
+    if (picked == null || !context.mounted) return;
+    _dispatch(context, picked);
   }
 
   Future<void> _pickDelay(BuildContext context) async {
@@ -928,6 +958,117 @@ class _FailedView extends StatelessWidget {
               label: 'Reintentar',
               onPressed: () => context.read<TemplateDetailBloc>().add(
                 const TemplateDetailLoadRequested(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Sheet del seguimiento por inactividad: toggle + espera + intentos. La
+/// espera se elige de un set cerrado (el backend valida 30 min..30 días) y
+/// los intentos 1..3. Devuelve el AIConfig completo ya copiado.
+class _FollowUpSheet extends StatefulWidget {
+  const _FollowUpSheet({required this.initial});
+
+  final AIConfig initial;
+
+  @override
+  State<_FollowUpSheet> createState() => _FollowUpSheetState();
+}
+
+class _FollowUpSheetState extends State<_FollowUpSheet> {
+  static const Map<String, int> _delays = <String, int>{
+    '30 minutos': 30,
+    '1 hora': 60,
+    '3 horas': 180,
+    '6 horas': 360,
+    '12 horas': 720,
+    '24 horas': 1440,
+    '2 días': 2880,
+    '3 días': 4320,
+    '7 días': 10080,
+  };
+
+  late bool _enabled = widget.initial.followUpEnabled;
+  late int _delay = widget.initial.followUpDelayMinutes > 0
+      ? widget.initial.followUpDelayMinutes
+      : 1440;
+  late int _attempts = widget.initial.followUpMaxAttempts > 0
+      ? widget.initial.followUpMaxAttempts
+      : 1;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppTokens.sp6,
+          AppTokens.sp6,
+          AppTokens.sp6,
+          AppTokens.sp6 + context.sheetBottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Seguimiento por inactividad', style: textTheme.titleLarge),
+            const SizedBox(height: 2),
+            Text(
+              'Si el cliente no responde tras un tiempo, el bot decide si '
+              'enviar UN seguimiento útil (o no enviar nada). Un mensaje del '
+              'cliente reinicia el ciclo.',
+              style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+            ),
+            const SizedBox(height: AppTokens.sp4),
+            SwitchListTile(
+              key: const Key('template_ai.sheet.follow_up.enabled'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Dar seguimiento automático'),
+              value: _enabled,
+              onChanged: (v) => setState(() => _enabled = v),
+            ),
+            if (_enabled) ...<Widget>[
+              const SizedBox(height: AppTokens.sp2),
+              DropdownButtonFormField<int>(
+                key: const Key('template_ai.sheet.follow_up.delay'),
+                initialValue: _delays.containsValue(_delay) ? _delay : 1440,
+                decoration: const InputDecoration(labelText: 'Esperar'),
+                items: <DropdownMenuItem<int>>[
+                  for (final e in _delays.entries)
+                    DropdownMenuItem<int>(value: e.value, child: Text(e.key)),
+                ],
+                onChanged: (v) => setState(() => _delay = v ?? 1440),
+              ),
+              const SizedBox(height: AppTokens.sp4),
+              DropdownButtonFormField<int>(
+                key: const Key('template_ai.sheet.follow_up.attempts'),
+                initialValue: _attempts.clamp(1, 3),
+                decoration: const InputDecoration(
+                  labelText: 'Intentos máximos por ciclo',
+                ),
+                items: const <DropdownMenuItem<int>>[
+                  DropdownMenuItem<int>(value: 1, child: Text('1')),
+                  DropdownMenuItem<int>(value: 2, child: Text('2')),
+                  DropdownMenuItem<int>(value: 3, child: Text('3')),
+                ],
+                onChanged: (v) => setState(() => _attempts = v ?? 1),
+              ),
+            ],
+            const SizedBox(height: AppTokens.sp4),
+            AppButton.filled(
+              key: const Key('template_ai.sheet.follow_up.save'),
+              label: 'Guardar',
+              onPressed: () => Navigator.of(context).pop(
+                widget.initial.copyWith(
+                  followUpEnabled: _enabled,
+                  followUpDelayMinutes: _delay,
+                  followUpMaxAttempts: _attempts,
+                ),
               ),
             ),
           ],

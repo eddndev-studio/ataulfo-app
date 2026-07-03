@@ -20,7 +20,7 @@ class AppDb extends _$AppDb {
   AppDb.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -40,6 +40,13 @@ class AppDb extends _$AppDb {
       // v1→v2: corte de la recreación destructiva a migración incremental. El
       // esquema no cambió, así que este paso no toca datos: conserva la caché y
       // el outbox intactos.
+      //
+      // v2→v3: messages gana los marcadores de corrección (editado/revocado),
+      // nullable ⇒ ADD COLUMN aditivo, sin tocar datos ni outbox.
+      if (from < 3) {
+        await m.addColumn(messages, messages.editedAtMs);
+        await m.addColumn(messages, messages.revokedAtMs);
+      }
     },
   );
 

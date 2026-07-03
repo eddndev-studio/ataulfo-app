@@ -79,6 +79,8 @@ Message msg({
   String? mediaUrl,
   MessageStatus? status,
   int ts = 1700,
+  int? editedAtMs,
+  int? revokedAtMs,
 }) => Message(
   externalId: externalId,
   chatLid: 'lid-1',
@@ -92,6 +94,8 @@ Message msg({
   quotedId: quotedId,
   timestampMs: ts,
   status: status,
+  editedAtMs: editedAtMs,
+  revokedAtMs: revokedAtMs,
 );
 
 /// 1x1 PNG válido: que Image.memory decodifique sin caer al errorBuilder.
@@ -573,13 +577,13 @@ void main() {
   testWidgets('tipo no catalogado cae a placeholder [tipo]', (tester) async {
     when(() => bloc.state).thenReturn(
       MessagesLoaded(
-        items: <Message>[msg(externalId: 'm', type: 'location', content: '')],
+        items: <Message>[msg(externalId: 'm', type: 'carta_astral', content: '')],
         prevCursor: null,
         isLoadingOlder: false,
       ),
     );
     await tester.pumpWidget(host());
-    expect(find.text('[location]'), findsOneWidget);
+    expect(find.text('[carta_astral]'), findsOneWidget);
   });
 
   testWidgets('envío optimista de nota de voz se rotula [nota de voz]', (
@@ -622,6 +626,72 @@ void main() {
       );
       await tester.pumpWidget(host(mediaCache: cache));
     }
+
+    testWidgets('revocado oculta el contenido y muestra el marcador', (
+      tester,
+    ) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'rev',
+          direction: MessageDirection.outbound,
+          content: 'texto que ya no debe verse',
+          revokedAtMs: 999,
+        ),
+      );
+      expect(find.text('Se eliminó este mensaje'), findsOneWidget);
+      expect(find.text('texto que ya no debe verse'), findsNothing);
+    });
+
+    testWidgets('editado muestra el marcador junto a la hora', (tester) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'ed',
+          direction: MessageDirection.outbound,
+          content: 'precio corregido',
+          editedAtMs: 999,
+        ),
+      );
+      expect(find.text('precio corregido'), findsOneWidget);
+      expect(find.text('editada'), findsOneWidget);
+    });
+
+    testWidgets('encuesta pinta pregunta y opciones desde el JSON', (
+      tester,
+    ) async {
+      await pumpMsg(
+        tester,
+        msg(
+          externalId: 'poll',
+          direction: MessageDirection.outbound,
+          type: 'poll',
+          content:
+              '{"question":"¿Qué día te queda?","options":["Lunes","Martes"],"multiple":false}',
+        ),
+      );
+      expect(find.text('¿Qué día te queda?'), findsOneWidget);
+      expect(find.text('Lunes'), findsOneWidget);
+      expect(find.text('Martes'), findsOneWidget);
+    });
+
+    testWidgets('ubicación pinta tarjeta tipada + contenido', (tester) async {
+      await pumpMsg(
+        tester,
+        msg(externalId: 'loc', type: 'location', content: 'Sucursal — Av. 1'),
+      );
+      expect(find.text('Ubicación'), findsOneWidget);
+      expect(find.text('Sucursal — Av. 1'), findsOneWidget);
+    });
+
+    testWidgets('contacto pinta tarjeta tipada + contenido', (tester) async {
+      await pumpMsg(
+        tester,
+        msg(externalId: 'con', type: 'contact', content: 'Asesor Luis'),
+      );
+      expect(find.text('Contacto'), findsOneWidget);
+      expect(find.text('Asesor Luis'), findsOneWidget);
+    });
 
     testWidgets('imagen con bytes en caché renderiza un Image', (tester) async {
       await pumpMsg(
@@ -2150,3 +2220,8 @@ void main() {
     });
   });
 }
+
+// ===========================================================================
+// Corrección y tipos ricos (S25): revocado, editado, encuesta, ubicación,
+// contacto y voto. Se registran desde main() vía _richTypesGroup.
+// ===========================================================================

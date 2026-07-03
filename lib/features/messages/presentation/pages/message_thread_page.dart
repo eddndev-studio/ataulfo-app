@@ -885,7 +885,29 @@ class _MessageBubble extends StatelessWidget {
                             ),
                             const SizedBox(height: AppTokens.sp1),
                           ],
-                          if (isText)
+                          if (m.revokedAtMs != null)
+                            // Revocado ("eliminar para todos"): el contenido
+                            // se oculta — queda solo el marcador, como en
+                            // WhatsApp.
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                const Icon(
+                                  Icons.block,
+                                  size: 16,
+                                  color: AppTokens.text2,
+                                ),
+                                const SizedBox(width: AppTokens.sp2),
+                                Text(
+                                  'Se eliminó este mensaje',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontStyle: FontStyle.italic,
+                                    color: AppTokens.text2,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else if (isText)
                             Text(m.content, style: textTheme.bodyLarge)
                           else
                             MessageMediaContent(message: m),
@@ -893,6 +915,11 @@ class _MessageBubble extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
+                              if (m.editedAtMs != null &&
+                                  m.revokedAtMs == null) ...<Widget>[
+                                Text('editada', style: caption),
+                                const SizedBox(width: AppTokens.sp2),
+                              ],
                               Text(
                                 smartTimestamp(m.timestampMs),
                                 style: caption,
