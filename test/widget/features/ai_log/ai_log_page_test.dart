@@ -19,7 +19,11 @@ AiLogEntry e(
   List<AiToolCall> toolCalls = const <AiToolCall>[],
   String toolName = '',
   String model = '',
+  int promptTokens = 0,
+  int completionTokens = 0,
   int totalTokens = 0,
+  int cachedTokens = 0,
+  int costMicroUsd = 0,
 }) => AiLogEntry(
   id: id,
   runId: runId,
@@ -30,9 +34,11 @@ AiLogEntry e(
   toolCallId: '',
   toolName: toolName,
   model: model,
-  promptTokens: 0,
-  completionTokens: 0,
+  promptTokens: promptTokens,
+  completionTokens: completionTokens,
   totalTokens: totalTokens,
+  cachedTokens: cachedTokens,
+  costMicroUsd: costMicroUsd,
   createdAt: DateTime.utc(2026, 6, 12, 12),
 );
 
@@ -116,6 +122,75 @@ void main() {
     );
     await pump(tester);
     expect(find.byKey(const Key('ai_log.empty')), findsOneWidget);
+  });
+
+  // ── header de tokens/costo de la corrida ─────────────────────────────
+  group('header de tokens de la corrida', () {
+    void load(List<AiLogEntry> entries) {
+      when(() => bloc.state).thenReturn(
+        AiLogLoaded(entries: entries, nextBefore: null, isLoadingMore: false),
+      );
+    }
+
+    testWidgets(
+      'pills de entrada/salida, caché y costo con el split del wire',
+      (tester) async {
+        load(<AiLogEntry>[
+          e(
+            1,
+            content: 'ok',
+            promptTokens: 730,
+            completionTokens: 120,
+            totalTokens: 850,
+            cachedTokens: 100,
+            costMicroUsd: 1250000,
+          ),
+        ]);
+        await pump(tester);
+
+        expect(find.text('↑ 730'), findsOneWidget);
+        expect(find.text('↓ 120'), findsOneWidget);
+        // 100/730 = 13.69…% ⇒ el redondeo debe subir a 14.
+        expect(find.text('caché 14%'), findsOneWidget);
+        expect(find.text(r'$1.25'), findsOneWidget);
+        // Con split presente NO aparece el pill legado de total, aunque el
+        // total venga poblado (la condición del fallback es el split ausente).
+        expect(find.text('850 tokens'), findsNothing);
+        expect(find.textContaining('tokens'), findsNothing);
+      },
+    );
+
+    testWidgets('caché que redondea a 0% no pinta el pill', (tester) async {
+      load(<AiLogEntry>[
+        e(1, promptTokens: 35000, completionTokens: 10, cachedTokens: 30),
+      ]);
+      await pump(tester);
+
+      expect(find.text('↑ 35k'), findsOneWidget);
+      expect(find.textContaining('caché'), findsNothing);
+    });
+
+    testWidgets('sin caché ni costo: solo los pills de entrada/salida', (
+      tester,
+    ) async {
+      load(<AiLogEntry>[e(1, promptTokens: 1200, completionTokens: 35000)]);
+      await pump(tester);
+
+      expect(find.text('↑ 1.2k'), findsOneWidget);
+      expect(find.text('↓ 35k'), findsOneWidget);
+      expect(find.textContaining('caché'), findsNothing);
+      expect(find.textContaining(r'$'), findsNothing);
+    });
+
+    testWidgets('fallback legado: sin split pero con total ⇒ "N tokens"', (
+      tester,
+    ) async {
+      load(<AiLogEntry>[e(1, totalTokens: 15)]);
+      await pump(tester);
+
+      expect(find.text('15 tokens'), findsOneWidget);
+      expect(find.textContaining('↑'), findsNothing);
+    });
   });
 
   // ── dispatch del turno role=tool por toolName ────────────────────────

@@ -48,6 +48,8 @@ class AiLogEntry {
     required this.promptTokens,
     required this.completionTokens,
     required this.totalTokens,
+    this.cachedTokens = 0,
+    this.costMicroUsd = 0,
     required this.createdAt,
   });
 
@@ -68,5 +70,13 @@ class AiLogEntry {
   final int promptTokens;
   final int completionTokens;
   final int totalTokens;
+
+  /// Tokens de prompt servidos desde la caché del proveedor (más baratos). El
+  /// wire los omite en corridas previas al conteo de caché ⇒ 0 (no se pinta).
+  final int cachedTokens;
+
+  /// Costo del turno en micro-USD (1e-6 USD), el entero que emite el wire.
+  /// Ausente o 0 en corridas sin costo estimado ⇒ el header no pinta el pill.
+  final int costMicroUsd;
   final DateTime createdAt;
 }

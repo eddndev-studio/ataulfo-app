@@ -8,6 +8,7 @@ import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/ai_log_runs.dart';
 import '../../domain/entities/ai_log_entry.dart';
 import '../../domain/failures/ai_log_failure.dart';
+import '../ai_log_format.dart';
 import '../bloc/ai_log_bloc.dart';
 import '../widgets/tool_result_view.dart';
 
@@ -90,6 +91,12 @@ class _RunCard extends StatelessWidget {
 
   final AiLogRun run;
 
+  /// Porcentaje redondeado del prompt servido desde caché; 0 sin caché (o con
+  /// una proporción que redondea a cero, que el header omite).
+  int get _cachePct => run.promptTokens > 0
+      ? (run.cachedTokens * 100 / run.promptTokens).round().clamp(0, 100)
+      : 0;
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -112,7 +119,27 @@ class _RunCard extends StatelessWidget {
                 style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
               ),
               if (run.model.isNotEmpty) AppPill.outline(label: run.model),
-              if (run.totalTokens > 0)
+              // Tokens de entrada al modelo (prompt) y generados (completion),
+              // abreviados; las flechas comunican la dirección sin texto extra.
+              if (run.promptTokens > 0)
+                AppPill.neutral(
+                  label: '↑ ${formatTokensCompact(run.promptTokens)}',
+                ),
+              if (run.completionTokens > 0)
+                AppPill.neutral(
+                  label: '↓ ${formatTokensCompact(run.completionTokens)}',
+                ),
+              // Proporción del prompt servida desde caché (más barata). Una
+              // proporción real que redondea a 0% se omite: "caché 0%" leería
+              // como sin-caché.
+              if (_cachePct > 0) AppPill.neutral(label: 'caché $_cachePct%'),
+              if (run.costMicroUsd > 0)
+                AppPill.outline(label: formatMicroUsd(run.costMicroUsd)),
+              // Corridas viejas sin desglose prompt/completion: se conserva el
+              // pill único de total para no perder el dato.
+              if (run.promptTokens == 0 &&
+                  run.completionTokens == 0 &&
+                  run.totalTokens > 0)
                 AppPill.neutral(label: '${run.totalTokens} tokens'),
             ],
           ),

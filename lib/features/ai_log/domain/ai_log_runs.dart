@@ -21,6 +21,17 @@ class AiLogRun {
 
   int get totalTokens => entries.fold(0, (sum, e) => sum + e.totalTokens);
 
+  /// Agregados espejo de [totalTokens] para el header de la corrida: tokens de
+  /// entrada al modelo, generados, servidos desde caché y costo en micro-USD.
+  int get promptTokens => entries.fold(0, (sum, e) => sum + e.promptTokens);
+
+  int get completionTokens =>
+      entries.fold(0, (sum, e) => sum + e.completionTokens);
+
+  int get cachedTokens => entries.fold(0, (sum, e) => sum + e.cachedTokens);
+
+  int get costMicroUsd => entries.fold(0, (sum, e) => sum + e.costMicroUsd);
+
   DateTime get startedAt => entries.first.createdAt;
 }
 

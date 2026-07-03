@@ -7,6 +7,10 @@ AiLogEntry e(
   String runId = '',
   AiLogRole role = AiLogRole.assistant,
   String content = '',
+  int promptTokens = 0,
+  int completionTokens = 0,
+  int cachedTokens = 0,
+  int costMicroUsd = 0,
 }) => AiLogEntry(
   id: id,
   runId: runId,
@@ -17,9 +21,11 @@ AiLogEntry e(
   toolCallId: '',
   toolName: '',
   model: '',
-  promptTokens: 0,
-  completionTokens: 0,
-  totalTokens: 0,
+  promptTokens: promptTokens,
+  completionTokens: completionTokens,
+  totalTokens: promptTokens + completionTokens,
+  cachedTokens: cachedTokens,
+  costMicroUsd: costMicroUsd,
   createdAt: DateTime.utc(2026, 6, 12),
 );
 
@@ -75,6 +81,40 @@ void main() {
 
     test('lista vacía ⇒ sin corridas', () {
       expect(groupIntoRuns(const <AiLogEntry>[]), isEmpty);
+    });
+  });
+
+  group('agregados por corrida', () {
+    test('suma prompt/completion/cache/costo de todos los turnos', () {
+      final desc = <AiLogEntry>[
+        e(
+          3,
+          runId: 'r1',
+          role: AiLogRole.assistant,
+          promptTokens: 900,
+          completionTokens: 40,
+          cachedTokens: 300,
+          costMicroUsd: 800000,
+        ),
+        e(
+          2,
+          runId: 'r1',
+          role: AiLogRole.assistant,
+          promptTokens: 100,
+          completionTokens: 80,
+          cachedTokens: 65,
+          costMicroUsd: 450000,
+        ),
+        e(1, runId: 'r1', role: AiLogRole.user),
+      ];
+
+      final run = groupIntoRuns(desc).single;
+
+      expect(run.promptTokens, 1000);
+      expect(run.completionTokens, 120);
+      expect(run.cachedTokens, 365);
+      expect(run.costMicroUsd, 1250000);
+      expect(run.totalTokens, 1120);
     });
   });
 }

@@ -161,6 +161,8 @@ class DioAiLogDatasource implements AiLogDatasource {
       promptTokens: ((m['promptTokens'] as num?) ?? 0).toInt(),
       completionTokens: ((m['completionTokens'] as num?) ?? 0).toInt(),
       totalTokens: ((m['totalTokens'] as num?) ?? 0).toInt(),
+      cachedTokens: ((m['cachedTokens'] as num?) ?? 0).toInt(),
+      costMicroUsd: ((m['costMicroUsd'] as num?) ?? 0).toInt(),
       createdAt:
           DateTime.tryParse((m['createdAt'] as String?) ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),

@@ -84,8 +84,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # gh sube el asset con el nombre del archivo tal cual y no permite
+          # renombrarlo; se copia con el nombre de descarga (lleva la versión
+          # del tag, p. ej. ataulfo-v0.29.0.apk) antes de crear el release.
+          apk="ataulfo-${GITHUB_REF_NAME}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$apk"
           gh release create "${GITHUB_REF_NAME}" \
-            build/app/outputs/flutter-apk/app-release.apk \
+            "$apk" \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes
 
@@ -96,7 +101,8 @@ jobs:
         run: |
           rm -f "$GITHUB_WORKSPACE/android/app/upload-keystore.jks" \
                 "$GITHUB_WORKSPACE/android/key.properties" \
-                "$GITHUB_WORKSPACE/android/app/google-services.json"
+                "$GITHUB_WORKSPACE/android/app/google-services.json" \
+                "$GITHUB_WORKSPACE"/ataulfo-*.apk
 
   # Build de escritorio Linux (x64), empaquetado y adjuntado AL MISMO release.
   # Depende de release-android: así el GitHub Release ya existe y este job solo

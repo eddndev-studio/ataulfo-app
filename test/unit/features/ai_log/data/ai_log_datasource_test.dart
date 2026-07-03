@@ -56,6 +56,8 @@ void main() {
               'promptTokens': 10,
               'completionTokens': 5,
               'totalTokens': 15,
+              'cachedTokens': 8,
+              'costMicroUsd': 1234,
               'createdAt': '2026-06-12T12:00:00Z',
             },
           ],
@@ -75,7 +77,11 @@ void main() {
       expect(item.toolCalls.single.name, 'read_doc');
       expect(item.toolCalls.single.argumentsJson, contains('horarios'));
       expect(item.model, 'm1');
+      expect(item.promptTokens, 10);
+      expect(item.completionTokens, 5);
       expect(item.totalTokens, 15);
+      expect(item.cachedTokens, 8);
+      expect(item.costMicroUsd, 1234);
 
       // El chatLid viaja ENCODEADO en el path y before/limit en el query.
       final captured = verify(
@@ -108,6 +114,35 @@ void main() {
       ),
     ).captured;
     expect(captured[0], containsPair('before', 41));
+  });
+
+  test('corridas viejas sin cachedTokens/costMicroUsd ⇒ 0', () async {
+    when(
+      () => dio.get<Map<String, dynamic>>(
+        any(),
+        queryParameters: any(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => ok(<String, dynamic>{
+        'items': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'runId': 'run-old',
+            'role': 'assistant',
+            'promptTokens': 10,
+            'completionTokens': 5,
+            'totalTokens': 15,
+            'createdAt': '2026-06-12T12:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    final page = await ds.page(botId: 'b1', chatLid: 'c1');
+    final item = page.items.single;
+    expect(item.cachedTokens, 0);
+    expect(item.costMicroUsd, 0);
   });
 
   test('runForMessage 200 → runId; externalId viaja en el query', () async {
