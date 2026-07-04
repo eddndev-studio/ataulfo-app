@@ -308,6 +308,17 @@ class _StatGrid extends StatelessWidget {
         ),
         const SizedBox(height: AppTokens.cardGap),
         _StatTile(
+          tileKey: const Key('template_ai.tile.subagent'),
+          label: 'Modelo de subagentes',
+          value: ai.subagent?.model ?? 'Heredado',
+          // El picker exige catálogo: sin tabla no hay opciones (igual que
+          // el tile de modelo principal).
+          onTap: isMutating || catalog == null
+              ? null
+              : () => _pickSubagent(context),
+        ),
+        const SizedBox(height: AppTokens.cardGap),
+        _StatTile(
           tileKey: const Key('template_ai.tile.follow_up'),
           label: 'Seguimiento por inactividad',
           value: _followUpValue(ai),
@@ -355,6 +366,24 @@ class _StatGrid extends StatelessWidget {
       TemplateDetailAiUpdateRequested(
         ai.copyWith(provider: picked.provider, model: picked.model),
       ),
+    );
+  }
+
+  Future<void> _pickSubagent(BuildContext context) async {
+    final cat = catalog;
+    if (cat == null) return;
+    final bloc = context.read<TemplateDetailBloc>();
+    // El resultado se envuelve en un record para distinguir "cerrar sin
+    // elegir" (null) de "elegir Heredar" (selection: null).
+    final picked = await showAppBottomSheet<({SubagentModel? selection})>(
+      context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => _SubagentModelSheet(catalog: cat, current: ai.subagent),
+    );
+    if (picked == null) return;
+    bloc.add(
+      TemplateDetailAiUpdateRequested(ai.copyWith(subagent: picked.selection)),
     );
   }
 
@@ -628,6 +657,126 @@ class _ModelSheet extends StatelessWidget {
                       size: 20,
                     ),
                   ),
+              ],
+            ),
+          ),
+        ),
+    ];
+  }
+}
+
+/// Picker del modelo de subagentes, agrupado por proveedor como
+/// [_ModelSheet]. La primera opción es "Heredar (modelo principal)"; el
+/// resto son los modelos del catálogo vivo. Devuelve un record cuyo campo
+/// `selection` es `null` para Heredar o un [SubagentModel] para un modelo
+/// concreto (el record deja al llamador distinguir "elegir Heredar" de
+/// "cerrar sin elegir"). Tap = elegir y cerrar.
+class _SubagentModelSheet extends StatelessWidget {
+  const _SubagentModelSheet({required this.catalog, required this.current});
+
+  final Catalog catalog;
+  final SubagentModel? current;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return SafeArea(
+      child: SingleChildScrollView(
+        key: const Key('template_ai.sheet.subagent'),
+        padding: EdgeInsets.fromLTRB(
+          AppTokens.sp6,
+          AppTokens.sp6,
+          AppTokens.sp6,
+          AppTokens.sp6 + context.sheetBottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Modelo de subagentes', style: textTheme.titleLarge),
+            const SizedBox(height: 2),
+            Text(
+              'El modelo con el que corren los subagentes que el bot delega. '
+              'Heredar usa el mismo modelo principal de la plantilla.',
+              style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+            ),
+            const SizedBox(height: AppTokens.sp4),
+            InkWell(
+              key: const Key('template_ai.subagent.inherit'),
+              onTap: () => Navigator.of(context).pop((selection: null)),
+              borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppTokens.sp3,
+                  horizontal: AppTokens.sp1,
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Heredar (modelo principal)',
+                        style: textTheme.bodyLarge,
+                      ),
+                    ),
+                    if (current == null)
+                      const Icon(
+                        Icons.check,
+                        color: AppTokens.primary,
+                        size: 20,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            for (final entry in catalog.providers)
+              ..._providerSection(context, entry, textTheme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _providerSection(
+    BuildContext context,
+    ProviderEntry entry,
+    TextTheme textTheme,
+  ) {
+    // Un proveedor que este release no reconoce se omite: no podemos
+    // construir el AIProvider del PUT (el backend puede ir adelante).
+    final AIProvider provider;
+    try {
+      provider = AIProvider.fromWire(entry.provider);
+    } on ArgumentError {
+      return const <Widget>[];
+    }
+    return <Widget>[
+      Padding(
+        padding: const EdgeInsets.only(
+          top: AppTokens.sp3,
+          bottom: AppTokens.sp1,
+        ),
+        child: Text(
+          entry.provider,
+          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+        ),
+      ),
+      for (final m in entry.models)
+        InkWell(
+          key: Key('template_ai.subagent.model.${m.id}'),
+          onTap: () => Navigator.of(
+            context,
+          ).pop((selection: SubagentModel(provider: provider, model: m.id))),
+          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: AppTokens.sp3,
+              horizontal: AppTokens.sp1,
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(child: Text(m.id, style: textTheme.bodyLarge)),
+                if (current?.provider == provider && current?.model == m.id)
+                  const Icon(Icons.check, color: AppTokens.primary, size: 20),
               ],
             ),
           ),

@@ -28,6 +28,101 @@ void main() {
     expect(back, original);
   });
 
+  group('modelo de subagentes (subagent_provider/subagent_model)', () {
+    const withSubagent = AIConfig(
+      enabled: true,
+      provider: AIProvider.gemini,
+      model: 'gemini-3.1-pro-preview',
+      temperature: 0.7,
+      thinkingLevel: ThinkingLevel.low,
+      systemPrompt: '',
+      contextMessages: 20,
+      subagent: SubagentModel(
+        provider: AIProvider.nemotron,
+        model: 'nemotron-3-super',
+      ),
+    );
+
+    test('round-trip conserva el modelo de subagentes', () {
+      final wire = TemplatesMapper.aiConfigToWire(withSubagent);
+      final back = TemplatesMapper.aiConfigDtoToEntity(
+        AiConfigDto.fromJson(wire),
+      );
+      expect(back, withSubagent);
+      expect(back.subagent?.provider, AIProvider.nemotron);
+      expect(back.subagent?.model, 'nemotron-3-super');
+    });
+
+    test('con subagente: viajan AMBAS claves snake_case', () {
+      final wire = TemplatesMapper.aiConfigToWire(withSubagent);
+      expect(wire['subagent_provider'], 'NEMOTRON');
+      expect(wire['subagent_model'], 'nemotron-3-super');
+    });
+
+    test('sin subagente: NO viaja ninguna de las dos claves', () {
+      const inherited = AIConfig(
+        enabled: true,
+        provider: AIProvider.gemini,
+        model: 'gemini-3.1-pro-preview',
+        temperature: 0.7,
+        thinkingLevel: ThinkingLevel.low,
+        systemPrompt: '',
+        contextMessages: 20,
+      );
+      final wire = TemplatesMapper.aiConfigToWire(inherited);
+      expect(wire.containsKey('subagent_provider'), isFalse);
+      expect(wire.containsKey('subagent_model'), isFalse);
+    });
+
+    test('wire viejo (sin claves) ⇒ subagent null (heredado), sin crash', () {
+      final dto = AiConfigDto.fromJson(<String, dynamic>{
+        'enabled': true,
+        'provider': 'GEMINI',
+        'model': 'gemini-3.1-pro-preview',
+        'temperature': 0.7,
+        'thinking_level': 'LOW',
+        'system_prompt': '',
+        'context_messages': 20,
+      });
+      expect(dto.subagentProvider, isNull);
+      expect(dto.subagentModel, isNull);
+      expect(TemplatesMapper.aiConfigDtoToEntity(dto).subagent, isNull);
+    });
+
+    test('claves vacías ⇒ heredar (subagent null)', () {
+      final dto = AiConfigDto.fromJson(<String, dynamic>{
+        'enabled': true,
+        'provider': 'GEMINI',
+        'model': 'gemini-3.1-pro-preview',
+        'temperature': 0.7,
+        'thinking_level': 'LOW',
+        'system_prompt': '',
+        'context_messages': 20,
+        'subagent_provider': '',
+        'subagent_model': '',
+      });
+      expect(TemplatesMapper.aiConfigDtoToEntity(dto).subagent, isNull);
+    });
+
+    test('proveedor de subagente desconocido propaga ArgumentError', () {
+      final dto = AiConfigDto.fromJson(<String, dynamic>{
+        'enabled': true,
+        'provider': 'GEMINI',
+        'model': 'gemini-3.1-pro-preview',
+        'temperature': 0.7,
+        'thinking_level': 'LOW',
+        'system_prompt': '',
+        'context_messages': 20,
+        'subagent_provider': 'ANTHROPIC',
+        'subagent_model': 'claude',
+      });
+      expect(
+        () => TemplatesMapper.aiConfigDtoToEntity(dto),
+        throwsArgumentError,
+      );
+    });
+  });
+
   AiConfigDto aiDto({
     bool enabled = false,
     String provider = 'GEMINI',

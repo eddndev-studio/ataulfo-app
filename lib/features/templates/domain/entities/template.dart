@@ -10,7 +10,10 @@ enum AIProvider {
   // GLM (Zhipu) y Kimi (Moonshot): familias open-weight servidas por los
   // hosts occidentales zero-retention del backend.
   glm,
-  kimi;
+  kimi,
+  // Nemotron (NVIDIA): familia open-weight servida por los hosts occidentales
+  // zero-retention del backend, igual que GLM/Kimi.
+  nemotron;
 
   static AIProvider fromWire(String raw) => switch (raw) {
     'OPENAI' => AIProvider.openai,
@@ -19,6 +22,7 @@ enum AIProvider {
     'DEEPSEEK' => AIProvider.deepseek,
     'GLM' => AIProvider.glm,
     'KIMI' => AIProvider.kimi,
+    'NEMOTRON' => AIProvider.nemotron,
     _ => throw ArgumentError.value(raw, 'AIProvider.fromWire'),
   };
 
@@ -32,7 +36,31 @@ enum AIProvider {
     AIProvider.deepseek => 'DEEPSEEK',
     AIProvider.glm => 'GLM',
     AIProvider.kimi => 'KIMI',
+    AIProvider.nemotron => 'NEMOTRON',
   };
+}
+
+/// Modelo con el que corren los subagentes que el bot delega vía
+/// `spawn_agent` (S12). Value object: proveedor + id lógico del modelo,
+/// siempre juntos (el invariante "ambos o ninguno" del wire se codifica
+/// como este objeto nullable en [AIConfig.subagent] — `null` = heredar el
+/// modelo principal).
+class SubagentModel {
+  const SubagentModel({required this.provider, required this.model});
+
+  final AIProvider provider;
+  final String model;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is SubagentModel &&
+        other.provider == provider &&
+        other.model == model;
+  }
+
+  @override
+  int get hashCode => Object.hash(provider, model);
 }
 
 /// Nivel de razonamiento del modelo (S12). Cada proveedor lo mapea a su
@@ -76,6 +104,7 @@ class AIConfig {
     this.followUpEnabled = false,
     this.followUpDelayMinutes = 0,
     this.followUpMaxAttempts = 0,
+    this.subagent,
   });
 
   final bool enabled;
@@ -113,6 +142,10 @@ class AIConfig {
   final int followUpDelayMinutes;
   final int followUpMaxAttempts;
 
+  /// Modelo con el que corren los subagentes delegados vía `spawn_agent`.
+  /// `null` = heredar el modelo principal (proveedor/modelo de esta config).
+  final SubagentModel? subagent;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -128,6 +161,7 @@ class AIConfig {
         other.followUpEnabled == followUpEnabled &&
         other.followUpDelayMinutes == followUpDelayMinutes &&
         other.followUpMaxAttempts == followUpMaxAttempts &&
+        other.subagent == subagent &&
         _stringListEquals(other.silenceLabelIds, silenceLabelIds) &&
         _stringListEquals(other.disabledToolGroups, disabledToolGroups);
   }
@@ -147,10 +181,16 @@ class AIConfig {
     followUpDelayMinutes,
     followUpMaxAttempts,
     Object.hashAll(disabledToolGroups),
+    subagent,
   );
 
   /// Copia con campos reemplazados — base de las ediciones por-campo del
   /// Motor IA (cada control muta UN campo y conserva el resto).
+  ///
+  /// `subagent` es nullable con semántica de tres estados: omitirlo conserva
+  /// el valor previo; pasar `null` lo LIMPIA (vuelve a heredar); pasar un
+  /// [SubagentModel] lo fija. Un `?? this.subagent` no distingue "limpiar"
+  /// de "no tocar", así que se usa un centinela (`_keepSubagent`).
   AIConfig copyWith({
     bool? enabled,
     AIProvider? provider,
@@ -165,6 +205,7 @@ class AIConfig {
     bool? followUpEnabled,
     int? followUpDelayMinutes,
     int? followUpMaxAttempts,
+    Object? subagent = _keepSubagent,
   }) => AIConfig(
     enabled: enabled ?? this.enabled,
     provider: provider ?? this.provider,
@@ -179,8 +220,15 @@ class AIConfig {
     followUpEnabled: followUpEnabled ?? this.followUpEnabled,
     followUpDelayMinutes: followUpDelayMinutes ?? this.followUpDelayMinutes,
     followUpMaxAttempts: followUpMaxAttempts ?? this.followUpMaxAttempts,
+    subagent: identical(subagent, _keepSubagent)
+        ? this.subagent
+        : subagent as SubagentModel?,
   );
 }
+
+/// Centinela del `copyWith` de [AIConfig] para el campo `subagent`: permite
+/// distinguir "no tocar" (default) de "limpiar" (`null` explícito).
+const Object _keepSubagent = Object();
 
 /// Igualdad posicional de dos listas de strings (las etiquetas de silencio):
 /// el dominio se mantiene puro (sin `package:flutter/foundation`), igual que

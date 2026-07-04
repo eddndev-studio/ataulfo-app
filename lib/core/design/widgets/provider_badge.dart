@@ -35,5 +35,6 @@ class ProviderBadge extends StatelessWidget {
     AIProvider.deepseek => 'DeepSeek',
     AIProvider.glm => 'GLM',
     AIProvider.kimi => 'Kimi',
+    AIProvider.nemotron => 'Nemotron',
   };
 }

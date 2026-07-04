@@ -46,6 +46,11 @@ void main() {
       await pump(tester, AIProvider.kimi);
       expect(find.text('Kimi'), findsOneWidget);
     });
+
+    testWidgets('nemotron → "Nemotron"', (tester) async {
+      await pump(tester, AIProvider.nemotron);
+      expect(find.text('Nemotron'), findsOneWidget);
+    });
   });
 
   group('ProviderBadge — estilo', () {

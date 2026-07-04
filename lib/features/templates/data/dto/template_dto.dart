@@ -95,6 +95,8 @@ class AiConfigDto {
     this.followUpEnabled = false,
     this.followUpDelayMinutes = 0,
     this.followUpMaxAttempts = 0,
+    this.subagentProvider,
+    this.subagentModel,
   });
 
   factory AiConfigDto.fromJson(Map<String, dynamic> json) {
@@ -136,6 +138,19 @@ class AiConfigDto {
     final followUpEnabledRaw = json['follow_up_enabled'];
     final followUpDelayRaw = json['follow_up_delay_minutes'];
     final followUpAttemptsRaw = json['follow_up_max_attempts'];
+    // Claves aditivas (modelo de subagentes): un backend previo no las manda
+    // (o las manda vacías) ⇒ null = heredar el modelo principal. Una cadena
+    // vacía se trata igual que ausente; el par viaja junto (ambos o ninguno).
+    final subagentProviderRaw = json['subagent_provider'];
+    final subagentModelRaw = json['subagent_model'];
+    final subagentProvider =
+        subagentProviderRaw is String && subagentProviderRaw.isNotEmpty
+        ? subagentProviderRaw
+        : null;
+    final subagentModel =
+        subagentModelRaw is String && subagentModelRaw.isNotEmpty
+        ? subagentModelRaw
+        : null;
     return AiConfigDto(
       enabled: enabled,
       provider: provider,
@@ -152,6 +167,8 @@ class AiConfigDto {
       followUpEnabled: followUpEnabledRaw is bool ? followUpEnabledRaw : false,
       followUpDelayMinutes: followUpDelayRaw is int ? followUpDelayRaw : 0,
       followUpMaxAttempts: followUpAttemptsRaw is int ? followUpAttemptsRaw : 0,
+      subagentProvider: subagentProvider,
+      subagentModel: subagentModel,
     );
   }
 
@@ -168,4 +185,12 @@ class AiConfigDto {
   final bool followUpEnabled;
   final int followUpDelayMinutes;
   final int followUpMaxAttempts;
+
+  /// Wire crudo del proveedor del modelo de subagentes (`AIProvider` sin
+  /// traducir). null = ausente/vacío ⇒ heredar. Viaja emparejado con
+  /// [subagentModel]: ambos presentes o ambos null.
+  final String? subagentProvider;
+
+  /// Id lógico del modelo de subagentes. null = heredar el modelo principal.
+  final String? subagentModel;
 }

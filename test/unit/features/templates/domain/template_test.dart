@@ -27,6 +27,10 @@ void main() {
       expect(AIProvider.fromWire('KIMI'), AIProvider.kimi);
     });
 
+    test('"NEMOTRON" → nemotron', () {
+      expect(AIProvider.fromWire('NEMOTRON'), AIProvider.nemotron);
+    });
+
     test('round-trip estructural: fromWire(p.toWire()) == p para todo p', () {
       for (final p in AIProvider.values) {
         expect(AIProvider.fromWire(p.toWire()), p);
@@ -127,6 +131,126 @@ void main() {
         );
       },
     );
+  });
+
+  group('SubagentModel', () {
+    test('expone provider y model', () {
+      const s = SubagentModel(
+        provider: AIProvider.nemotron,
+        model: 'nemotron-3-super',
+      );
+      expect(s.provider, AIProvider.nemotron);
+      expect(s.model, 'nemotron-3-super');
+    });
+
+    test('value-type: misma data ⇒ iguales', () {
+      const a = SubagentModel(
+        provider: AIProvider.nemotron,
+        model: 'nemotron-3-super',
+      );
+      const b = SubagentModel(
+        provider: AIProvider.nemotron,
+        model: 'nemotron-3-super',
+      );
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('difiere si cambia provider o model', () {
+      const base = SubagentModel(
+        provider: AIProvider.nemotron,
+        model: 'nemotron-3-super',
+      );
+      expect(
+        base,
+        isNot(
+          const SubagentModel(
+            provider: AIProvider.openai,
+            model: 'nemotron-3-super',
+          ),
+        ),
+      );
+      expect(
+        base,
+        isNot(
+          const SubagentModel(
+            provider: AIProvider.nemotron,
+            model: 'nemotron-3-ultra',
+          ),
+        ),
+      );
+    });
+  });
+
+  group('AIConfig — modelo de subagentes', () {
+    const base = AIConfig(
+      enabled: true,
+      provider: AIProvider.gemini,
+      model: 'gemini-3.1-pro-preview',
+      temperature: 0.7,
+      thinkingLevel: ThinkingLevel.medium,
+      systemPrompt: 'hola',
+      contextMessages: 20,
+    );
+
+    test('subagent arranca en null (heredado)', () {
+      expect(base.subagent, isNull);
+    });
+
+    test('difiere si cambia el modelo de subagentes', () {
+      const withSub = AIConfig(
+        enabled: true,
+        provider: AIProvider.gemini,
+        model: 'gemini-3.1-pro-preview',
+        temperature: 0.7,
+        thinkingLevel: ThinkingLevel.medium,
+        systemPrompt: 'hola',
+        contextMessages: 20,
+        subagent: SubagentModel(
+          provider: AIProvider.nemotron,
+          model: 'nemotron-3-super',
+        ),
+      );
+      expect(base, isNot(withSub));
+      expect(withSub, withSub);
+    });
+
+    test('copyWith fija el modelo de subagentes y conserva el resto', () {
+      final out = base.copyWith(
+        subagent: const SubagentModel(
+          provider: AIProvider.nemotron,
+          model: 'nemotron-3-super',
+        ),
+      );
+      expect(out.subagent?.provider, AIProvider.nemotron);
+      expect(out.subagent?.model, 'nemotron-3-super');
+      expect(out.model, base.model);
+      expect(out.enabled, base.enabled);
+    });
+
+    test('copyWith sin arg conserva el modelo de subagentes previo', () {
+      final withSub = base.copyWith(
+        subagent: const SubagentModel(
+          provider: AIProvider.nemotron,
+          model: 'nemotron-3-super',
+        ),
+      );
+      // Editar OTRO campo no debe borrar el modelo de subagentes.
+      final out = withSub.copyWith(temperature: 1.2);
+      expect(out.temperature, 1.2);
+      expect(out.subagent, withSub.subagent);
+    });
+
+    test('copyWith(subagent: null) limpia (vuelve a heredar)', () {
+      final withSub = base.copyWith(
+        subagent: const SubagentModel(
+          provider: AIProvider.nemotron,
+          model: 'nemotron-3-super',
+        ),
+      );
+      final cleared = withSub.copyWith(subagent: null);
+      expect(cleared.subagent, isNull);
+    });
   });
 
   group('Template', () {

@@ -23,7 +23,19 @@ class TemplatesMapper {
     followUpEnabled: dto.followUpEnabled,
     followUpDelayMinutes: dto.followUpDelayMinutes,
     followUpMaxAttempts: dto.followUpMaxAttempts,
+    subagent: _subagentDtoToEntity(dto),
   );
+
+  /// Modelo de subagentes: presente solo si el par proveedor+modelo viaja
+  /// completo. `AIProvider.fromWire` es fail-loud ante un proveedor que el
+  /// cliente no reconoce (mismo trato que el proveedor principal). Un modelo
+  /// sin proveedor (o viceversa) se ignora — el par es atómico.
+  static SubagentModel? _subagentDtoToEntity(AiConfigDto dto) {
+    final provider = dto.subagentProvider;
+    final model = dto.subagentModel;
+    if (provider == null || model == null) return null;
+    return SubagentModel(provider: AIProvider.fromWire(provider), model: model);
+  }
 
   /// Serializa AIConfig al objeto JSON del wire (claves snake_case). Es la
   /// inversa de `aiConfigDtoToEntity` y la fuente ÚNICA de la serialización:
@@ -43,6 +55,12 @@ class TemplatesMapper {
     'follow_up_enabled': ai.followUpEnabled,
     'follow_up_delay_minutes': ai.followUpDelayMinutes,
     'follow_up_max_attempts': ai.followUpMaxAttempts,
+    // El modelo de subagentes viaja emparejado: ambas claves o ninguna.
+    // Ausente ⇒ el backend hereda el modelo principal.
+    if (ai.subagent != null) ...<String, dynamic>{
+      'subagent_provider': ai.subagent!.provider.toWire(),
+      'subagent_model': ai.subagent!.model,
+    },
   };
 
   static Template templateRespToEntity(TemplateResp resp) => Template(

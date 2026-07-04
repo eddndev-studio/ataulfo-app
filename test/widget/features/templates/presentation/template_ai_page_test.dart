@@ -83,6 +83,22 @@ const _catalog = Catalog(
         ),
       ],
     ),
+    ProviderEntry(
+      provider: 'NEMOTRON',
+      defaultModel: 'nemotron-3-super',
+      models: <AIModel>[
+        AIModel(
+          id: 'nemotron-3-super',
+          supportsTemperature: true,
+          supportsThinking: true,
+        ),
+        AIModel(
+          id: 'nemotron-3-ultra',
+          supportsTemperature: true,
+          supportsThinking: true,
+        ),
+      ],
+    ),
   ],
 );
 
@@ -644,6 +660,132 @@ void main() {
             .onPressed,
         isNull,
       );
+    });
+  });
+
+  group('tile Modelo de subagentes', () {
+    testWidgets('sin subagente configurado se lee como "Heredado"', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+      expect(find.text('Modelo de subagentes'), findsOneWidget);
+      expect(find.text('Heredado'), findsOneWidget);
+    });
+
+    testWidgets('con subagente muestra el id del modelo', (tester) async {
+      const tplSub = Template(
+        id: 't1',
+        orgId: 'o1',
+        name: 'Soporte',
+        version: 3,
+        ai: AIConfig(
+          enabled: true,
+          provider: AIProvider.gemini,
+          model: 'gemini-3.1-pro-preview',
+          temperature: 0.7,
+          thinkingLevel: ThinkingLevel.medium,
+          systemPrompt: '',
+          contextMessages: 20,
+          subagent: SubagentModel(
+            provider: AIProvider.nemotron,
+            model: 'nemotron-3-super',
+          ),
+        ),
+      );
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(tplSub));
+
+      await tester.pumpWidget(host());
+      expect(find.text('nemotron-3-super'), findsOneWidget);
+    });
+
+    testWidgets('abre el sheet; elegir un modelo fija el subagente', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.subagent')),
+      );
+      await tester.tap(find.byKey(const Key('template_ai.tile.subagent')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_ai.sheet.subagent')),
+        findsOneWidget,
+      );
+
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.subagent.model.nemotron-3-super')),
+      );
+      await tester.tap(
+        find.byKey(const Key('template_ai.subagent.model.nemotron-3-super')),
+      );
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          TemplateDetailAiUpdateRequested(
+            _ai.copyWith(
+              subagent: const SubagentModel(
+                provider: AIProvider.nemotron,
+                model: 'nemotron-3-super',
+              ),
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('elegir "Heredar" limpia el subagente (dispatcha null)', (
+      tester,
+    ) async {
+      const tplSub = Template(
+        id: 't1',
+        orgId: 'o1',
+        name: 'Soporte',
+        version: 3,
+        ai: AIConfig(
+          enabled: true,
+          provider: AIProvider.gemini,
+          model: 'gemini-3.1-pro-preview',
+          temperature: 0.7,
+          thinkingLevel: ThinkingLevel.medium,
+          systemPrompt: '',
+          contextMessages: 20,
+          subagent: SubagentModel(
+            provider: AIProvider.nemotron,
+            model: 'nemotron-3-super',
+          ),
+        ),
+      );
+      when(() => bloc.state).thenReturn(const TemplateDetailLoaded(tplSub));
+
+      await tester.pumpWidget(host());
+
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.subagent')),
+      );
+      await tester.tap(find.byKey(const Key('template_ai.tile.subagent')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('template_ai.subagent.inherit')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          TemplateDetailAiUpdateRequested(tplSub.ai.copyWith(subagent: null)),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('sin catálogo cargado el tile no abre sheet', (tester) async {
+      when(() => catalogBloc.state).thenReturn(const CatalogLoading());
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('template_ai.tile.subagent')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('template_ai.sheet.subagent')), findsNothing);
     });
   });
 
