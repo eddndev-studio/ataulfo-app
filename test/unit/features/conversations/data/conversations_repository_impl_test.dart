@@ -24,6 +24,10 @@ class _ThrowingDao implements ConversationsDao {
   @override
   Future<void> clearUnread(String botId, String chatLid) =>
       throw StateError('boom');
+
+  @override
+  Future<void> clearThreadProjection(String botId, String chatLid) =>
+      throw StateError('boom');
 }
 
 const _c1 = Conversation(

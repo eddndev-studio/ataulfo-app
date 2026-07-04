@@ -108,6 +108,12 @@ abstract interface class MessagesRepository {
     required String messageId,
   });
 
+  /// Vacía el historial completo del chat (S07 RF#10). Servidor-primero: el
+  /// DELETE es autoritativo; en éxito la copia local del hilo se borra
+  /// write-through y la bandeja proyecta el chat sin actividad. En fallo, lo
+  /// local queda intacto (el hilo jamás miente un vaciado que no ocurrió).
+  Future<void> clearHistory(String botId, String chatLid);
+
   /// Stream de eventos en vivo del bot (SSE S15: `message.inbound` +
   /// `message.outbound`). El filtrado por conversación lo hace el consumidor.
   /// Perdurable: se reconecta solo; emite `LiveMessage` por mensaje,

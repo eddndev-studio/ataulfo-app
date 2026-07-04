@@ -95,6 +95,21 @@ class MessagesDao {
         );
   }
 
+  /// Borra los mensajes y el cursor de backfill de UN chat (la limpieza local
+  /// tras el 204 del vaciado de historial, S07 RF#10). En una transacción: el
+  /// watch del hilo emite una sola vez, ya vacío. Sin el cursor, el hilo
+  /// arranca fresco y no intenta paginar histórico que ya no existe.
+  Future<void> deleteThread(String botId, String chatLid) {
+    return _db.transaction(() async {
+      await (_db.delete(
+        _db.messages,
+      )..where((m) => m.botId.equals(botId) & m.chatLid.equals(chatLid))).go();
+      await (_db.delete(
+        _db.syncCursors,
+      )..where((c) => c.botId.equals(botId) & c.chatLid.equals(chatLid))).go();
+    });
+  }
+
   Future<MessageRow?> _byId(String botId, String externalId) {
     return (_db.select(_db.messages)..where(
           (t) => t.botId.equals(botId) & t.externalId.equals(externalId),

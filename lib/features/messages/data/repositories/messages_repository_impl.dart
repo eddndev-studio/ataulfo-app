@@ -26,12 +26,15 @@ class MessagesRepositoryImpl implements MessagesRepository {
     required OutboxDao outbox,
     required void Function() requestSync,
     Future<void> Function(String botId, String chatLid)? markConversationRead,
+    Future<void> Function(String botId, String chatLid)?
+    clearConversationProjection,
   }) : _ds = datasource,
        _events = events,
        _dao = dao,
        _outbox = outbox,
        _requestSync = requestSync,
-       _markConversationRead = markConversationRead;
+       _markConversationRead = markConversationRead,
+       _clearConversationProjection = clearConversationProjection;
 
   final MessagesDatasource _ds;
   final MessagesEventsDatasource _events;
@@ -47,6 +50,12 @@ class MessagesRepositoryImpl implements MessagesRepository {
   /// de mensajes al DAO de conversaciones; nulo ⇒ sin proyección a la bandeja.
   final Future<void> Function(String botId, String chatLid)?
   _markConversationRead;
+
+  /// Vacía la proyección de actividad de la fila de la bandeja tras el
+  /// vaciado de historial. Mismo criterio de inyección que
+  /// [_markConversationRead]; nulo ⇒ sin proyección a la bandeja.
+  final Future<void> Function(String botId, String chatLid)?
+  _clearConversationProjection;
 
   /// Firmas `mediaUrl` vivas por `(botId, externalId)` (clave I-M1; el wamid no
   /// es único entre bots), conservadas en memoria durante la sesión: la DB NO
@@ -276,6 +285,17 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }) async {
     final m = await _ds.revokeMessage(botId, chatLid, messageId: messageId);
     await applyLiveMessage(botId, m);
+  }
+
+  @override
+  Future<void> clearHistory(String botId, String chatLid) async {
+    // Servidor-primero: si el DELETE falla, lo local queda intacto — el hilo
+    // jamás miente un vaciado que no ocurrió. Tras el 204, la limpieza local
+    // es la verdad (el watch re-emite el hilo vacío) y la bandeja proyecta el
+    // chat sin actividad; el próximo snapshot del backend reconcilia igual.
+    await _ds.clearHistory(botId, chatLid);
+    await _dao.deleteThread(botId, chatLid);
+    await _clearConversationProjection?.call(botId, chatLid);
   }
 
   @override

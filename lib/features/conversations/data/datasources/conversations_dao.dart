@@ -47,4 +47,24 @@ class ConversationsDao {
       ),
     );
   }
+
+  /// Vacía la proyección de actividad de una fila tras el vaciado de
+  /// historial (S07 RF#10): la bandeja no debe previsualizar un mensaje que
+  /// ya no existe. Write-through optimista con el mismo contrato que
+  /// [clearUnread]: no inserta filas ausentes y el snapshot autoritativo del
+  /// backend reconcilia en el próximo `replaceForBot`.
+  Future<void> clearThreadProjection(String botId, String chatLid) {
+    return (_db.update(
+      _db.conversations,
+    )..where((c) => c.botId.equals(botId) & c.chatLid.equals(chatLid))).write(
+      const ConversationsCompanion(
+        unreadCount: Value(0),
+        isMarkedUnread: Value(false),
+        lastMessagePreview: Value(null),
+        lastMessageType: Value(null),
+        lastMessageDirection: Value(null),
+        lastMessageTimestampMs: Value(null),
+      ),
+    );
+  }
 }

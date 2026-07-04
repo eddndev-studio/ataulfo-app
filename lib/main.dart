@@ -227,6 +227,9 @@ Future<void> main() async {
     // Al marcar leído, baja el badge de la fila en la bandeja (write-through
     // optimista): la bandeja observa la tabla conversations y re-emite ya.
     markConversationRead: conversationsDao.clearUnread,
+    // Al vaciar el historial, la fila de la bandeja pierde preview y badge:
+    // esos mensajes ya no existen.
+    clearConversationProjection: conversationsDao.clearThreadProjection,
   );
 
   unawaited(syncCoordinator.start());

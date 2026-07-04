@@ -50,6 +50,10 @@ class _ThrowingDao implements MessagesDao {
     required String? oldestCursor,
     required bool reachedStart,
   }) async {}
+
+  @override
+  Future<void> deleteThread(String botId, String chatLid) =>
+      throw StateError('boom');
 }
 
 // Mensajes de prueba sin mediaUrl (no se persiste) para que la igualdad

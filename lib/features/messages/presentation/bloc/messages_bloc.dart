@@ -53,6 +53,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     on<MessagesReactRequested>(_onReact);
     on<MessagesEditRequested>(_onEdit);
     on<MessagesDeleteRequested>(_onDelete);
+    on<MessagesClearHistoryRequested>(_onClearHistory);
     on<_MessagesDbEmitted>(_onDbEmitted);
     on<_MessagesPendingEmitted>(_onPendingEmitted);
     on<_MessagesWatchFailed>(_onWatchFailed);
@@ -460,6 +461,22 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     }
   }
 
+  /// Vacía el historial del chat (S07 RF#10). El repo limpia la verdad local
+  /// write-through, así el watch re-emite el hilo vacío sin estado extra
+  /// aquí; un fallo se anuncia tipado, mismo contrato que [_onEdit].
+  Future<void> _onClearHistory(
+    MessagesClearHistoryRequested event,
+    Emitter<MessagesState> emit,
+  ) async {
+    try {
+      await _repo.clearHistory(_botId, _chatLid);
+    } on MessagesFailure catch (f) {
+      _correctionFailures.add(f);
+    } on Object {
+      _correctionFailures.add(const UnknownMessagesFailure());
+    }
+  }
+
   @override
   Future<void> close() {
     _liveSub?.cancel();
@@ -500,6 +517,16 @@ class MessagesDeleteRequested extends MessagesEvent {
       other is MessagesDeleteRequested && other.messageId == messageId;
   @override
   int get hashCode => messageId.hashCode;
+}
+
+/// El operador vacía el historial completo del chat (S07 RF#10). El bot y la
+/// sesión sobreviven; el hilo queda en cero.
+class MessagesClearHistoryRequested extends MessagesEvent {
+  const MessagesClearHistoryRequested();
+  @override
+  bool operator ==(Object other) => other is MessagesClearHistoryRequested;
+  @override
+  int get hashCode => (MessagesClearHistoryRequested).hashCode;
 }
 
 // Events --------------------------------------------------------------------

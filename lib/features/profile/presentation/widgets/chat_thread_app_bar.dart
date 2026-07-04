@@ -9,6 +9,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../conversations/domain/entities/conversation.dart';
 import '../../../conversations/presentation/widgets/chat_labels_sheet.dart';
 import '../../../flow_run/presentation/widgets/flow_run_sheet.dart';
+import '../../../messages/presentation/bloc/messages_bloc.dart';
 import '../../../monitor/presentation/widgets/bot_state_pill.dart';
 import '../../../notes/presentation/widgets/notes_sheet.dart';
 import '../../../takeover/presentation/widgets/ai_takeover_sheet.dart';
@@ -61,6 +62,42 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
         context.push(
           '/bots/$botId/sessions/${Uri.encodeComponent(chatLid)}/executions',
         );
+      case _ThreadAction.clearHistory:
+        _confirmClearHistory(context);
+    }
+  }
+
+  /// Confirmación explícita del vaciado (destructivo, irreversible): solo el
+  /// "Vaciar" del diálogo despacha; cancelar o descartar no toca nada.
+  Future<void> _confirmClearHistory(BuildContext context) async {
+    final bloc = context.read<MessagesBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Vaciar historial?'),
+        content: const Text(
+          'Se eliminarán los mensajes de esta conversación y la memoria del '
+          'bot sobre ella. El contacto y sus etiquetas se conservan. '
+          'No se puede deshacer.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('thread.clear_history.confirm'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Vaciar',
+              style: TextStyle(color: AppTokens.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) {
+      bloc.add(const MessagesClearHistoryRequested());
     }
   }
 
@@ -158,6 +195,17 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                           label: 'Ejecuciones del chat',
                         ),
                       ),
+                      const PopupMenuDivider(),
+                      // Destructiva e irreversible (S07 RF#10): al final del
+                      // menú, tras su propio divisor, y con confirmación.
+                      const PopupMenuItem<_ThreadAction>(
+                        key: Key('thread.clear_history'),
+                        value: _ThreadAction.clearHistory,
+                        child: _MenuItem(
+                          icon: Icons.delete_sweep_outlined,
+                          label: 'Vaciar historial',
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -229,8 +277,16 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 /// Acción seleccionable del menú "⋮" del hilo. Cada valor mapea a un sheet del
-/// chat o a una pantalla de observabilidad.
-enum _ThreadAction { runFlow, notes, reasoning, ledger, executions }
+/// chat, a una pantalla de observabilidad, o al vaciado del historial (con
+/// confirmación previa).
+enum _ThreadAction {
+  runFlow,
+  notes,
+  reasoning,
+  ledger,
+  executions,
+  clearHistory,
+}
 
 /// Contenido de una entrada del menú: ícono + etiqueta de texto. El texto es
 /// justo lo que los íconos sueltos del app bar no comunicaban.

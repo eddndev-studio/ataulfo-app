@@ -72,6 +72,12 @@ abstract interface class MessagesDatasource {
     String chatLid, {
     required String messageId,
   });
+
+  /// `DELETE /sessions/:botId/:chatLid/history` (S07 RF#10). Vacía el
+  /// historial del chat en el servidor: mensajes, memoria del motor IA y
+  /// ejecuciones; la sesión (contacto, flags, etiquetas) sobrevive. ADMIN+
+  /// (403 con rol menor). 204 sin cuerpo; idempotente sobre un chat vacío.
+  Future<void> clearHistory(String botId, String chatLid);
 }
 
 class DioMessagesDatasource implements MessagesDatasource {
@@ -246,6 +252,17 @@ class DioMessagesDatasource implements MessagesDatasource {
       throw const UnknownMessagesFailure();
     } on ArgumentError {
       throw const UnknownMessagesFailure();
+    }
+  }
+
+  @override
+  Future<void> clearHistory(String botId, String chatLid) async {
+    try {
+      await _dio.delete<void>(
+        '/sessions/$botId/${Uri.encodeComponent(chatLid)}/history',
+      );
+    } on DioException catch (e) {
+      throw _mapWrite(e);
     }
   }
 
