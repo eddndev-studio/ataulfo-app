@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_attachment.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_conversation.dart';
@@ -158,6 +160,56 @@ void main() {
       await tester.tap(find.byKey(const Key('trainer.attach')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('trainer.modality_warning')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'mientras un adjunto sube, Enviar queda deshabilitado (no pierde el lote)',
+    (tester) async {
+      final gate = Completer<TrainerAttachment>();
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+        ],
+      );
+      when(
+        () => repo.uploadAttachment(
+          templateId: 't1',
+          bytes: any(named: 'bytes'),
+          filename: 'catalogo.png',
+        ),
+      ).thenAnswer((_) => gate.future);
+
+      await pump(tester, <TrainerMessage>[]);
+
+      // Escribe ANTES de adjuntar (con el composer aún habilitado).
+      await tester.enterText(
+        find.byKey(const Key('trainer.composer.field')),
+        'mira',
+      );
+      await tester.pump();
+
+      // Adjunta: la subida queda retenida en el gate ⇒ attaching=true.
+      await tester.tap(find.byKey(const Key('trainer.attach')));
+      await tester.pump();
+      await tester.pump();
+
+      // Con el lote a medio subir, tocar Enviar no despacha el turno.
+      await tester.tap(find.byKey(const Key('trainer.composer.send')));
+      await tester.pump();
+      verifyNever(
+        () => repo.sendMessage(
+          templateId: any(named: 'templateId'),
+          conversationId: any(named: 'conversationId'),
+          content: any(named: 'content'),
+          model: any(named: 'model'),
+          attachments: any(named: 'attachments'),
+        ),
+      );
+
+      // Cierra el gate para no dejar el future colgado.
+      gate.complete(_att);
+      await tester.pumpAndSettle();
     },
   );
 

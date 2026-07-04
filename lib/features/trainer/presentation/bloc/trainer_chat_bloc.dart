@@ -427,7 +427,13 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     Emitter<TrainerChatState> emit,
   ) async {
     final current = state;
-    if (current is! TrainerChatLoaded || current.sending) return;
+    // El envío se rechaza mientras un lote de adjuntos sube: capturar el estado
+    // a mitad de subida enviaría un subconjunto y, al limpiar los pendientes con
+    // ese estado stale, dejaría los archivos que aún subían huérfanos en storage
+    // (perdidos sin aviso). El operador reenvía cuando la subida cierra.
+    if (current is! TrainerChatLoaded || current.sending || current.attaching) {
+      return;
+    }
     _cancelRequested = false;
     _drafts.remove(current.conversation.id);
     final optimistic = TrainerMessage(

@@ -259,7 +259,10 @@ class _ChatViewState extends State<_ChatView> {
   }
 
   void _send(String text) {
-    if (widget.state.sending) return;
+    // No enviar con un lote de adjuntos a medio subir: cerraría el turno con
+    // un subconjunto y perdería en silencio los que aún suben. Cubre también
+    // los chips de arranque, que llaman aquí sin pasar por el composer.
+    if (widget.state.sending || widget.state.attaching) return;
     context.read<TrainerChatBloc>().add(TrainerChatMessageSent(text));
   }
 
@@ -421,7 +424,9 @@ class _ChatViewState extends State<_ChatView> {
           fieldKey: const Key('trainer.composer.field'),
           sendKey: const Key('trainer.composer.send'),
           hint: 'Cuéntale de tu negocio…',
-          enabled: !s.sending,
+          // El envío se atenúa durante la subida de adjuntos además del turno
+          // en vuelo: evita la carrera adjuntar-mientras-envía.
+          enabled: !s.sending && !s.attaching,
           onSend: _send,
           leading: <Widget>[
             IconButton(
