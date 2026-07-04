@@ -157,6 +157,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     content: e.content,
     mediaRef: e.mediaRef,
     quotedId: e.quotedId,
+    fileName: e.fileName,
     // Sólo un fallo TERMINAL pinta error+reintento; un reintentable sigue
     // "enviando" (el coordinador lo reintenta solo).
     failure: e.isFailed ? _failureFromKind(e.errorKind) : null,
@@ -373,6 +374,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         mediaRef: event.mediaRef,
         waveform: event.waveform,
         quotedId: event.quotedId,
+        fileName: event.fileName,
       );
     } on Object {
       // El encolado es local; un fallo aquí es excepcional (DB). Best-effort.
@@ -610,6 +612,7 @@ class MessagesSendRequested extends MessagesEvent {
     this.mediaRef,
     this.waveform,
     this.quotedId,
+    this.fileName,
   });
 
   final String type;
@@ -621,6 +624,10 @@ class MessagesSendRequested extends MessagesEvent {
   /// un envío normal.
   final String? quotedId;
 
+  /// Nombre del archivo para envíos `document` (alimenta `MediaFileName` en el
+  /// wire); `null` en el resto.
+  final String? fileName;
+
   @override
   bool operator ==(Object other) =>
       other is MessagesSendRequested &&
@@ -628,6 +635,7 @@ class MessagesSendRequested extends MessagesEvent {
       other.content == content &&
       other.mediaRef == mediaRef &&
       other.quotedId == quotedId &&
+      other.fileName == fileName &&
       _sameWaveform(other.waveform, waveform);
   @override
   int get hashCode => Object.hash(
@@ -635,6 +643,7 @@ class MessagesSendRequested extends MessagesEvent {
     content,
     mediaRef,
     quotedId,
+    fileName,
     Object.hashAll(waveform ?? const <int>[]),
   );
 }
@@ -805,6 +814,7 @@ class PendingSend {
     required this.content,
     this.mediaRef,
     this.quotedId,
+    this.fileName,
     this.failure,
   });
 
@@ -815,6 +825,9 @@ class PendingSend {
 
   /// `externalId` del mensaje citado si el envío optimista es una respuesta.
   final String? quotedId;
+
+  /// Nombre del archivo para envíos `document`; `null` en el resto.
+  final String? fileName;
 
   /// `null` mientras está en vuelo; no-null si el envío falló (la burbuja ofrece
   /// reintentar/descartar).
@@ -830,11 +843,19 @@ class PendingSend {
       other.content == content &&
       other.mediaRef == mediaRef &&
       other.quotedId == quotedId &&
+      other.fileName == fileName &&
       other.failure == failure;
 
   @override
-  int get hashCode =>
-      Object.hash(clientToken, type, content, mediaRef, quotedId, failure);
+  int get hashCode => Object.hash(
+    clientToken,
+    type,
+    content,
+    mediaRef,
+    quotedId,
+    fileName,
+    failure,
+  );
 }
 
 class MessagesFailed extends MessagesState {

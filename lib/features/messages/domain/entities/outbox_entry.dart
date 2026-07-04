@@ -13,6 +13,7 @@ class OutboxEntry {
     required this.errorKind,
     required this.createdAtMs,
     this.quotedId,
+    this.fileName,
   });
 
   final String clientToken;
@@ -23,6 +24,10 @@ class OutboxEntry {
   /// `externalId` del mensaje citado si la escritura es una respuesta; `null`
   /// en un envío normal.
   final String? quotedId;
+
+  /// Nombre del archivo para envíos `document` (lo consume `MediaFileName` en el
+  /// wire); `null` en el resto de tipos.
+  final String? fileName;
 
   /// `true` sólo si la fila quedó en estado terminal `failed`.
   final bool isFailed;
@@ -40,6 +45,7 @@ class OutboxEntry {
       other.content == content &&
       other.mediaRef == mediaRef &&
       other.quotedId == quotedId &&
+      other.fileName == fileName &&
       other.isFailed == isFailed &&
       other.errorKind == errorKind &&
       other.createdAtMs == createdAtMs;
@@ -51,6 +57,7 @@ class OutboxEntry {
     content,
     mediaRef,
     quotedId,
+    fileName,
     isFailed,
     errorKind,
     createdAtMs,

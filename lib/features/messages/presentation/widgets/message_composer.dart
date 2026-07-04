@@ -12,10 +12,13 @@ import '../../../media/domain/repositories/media_repository.dart';
 import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../../quick_replies/presentation/widgets/quick_replies_sheet.dart';
 import '../../data/cache/message_media_cache.dart';
+import '../../domain/attachment_intake.dart';
+import '../../domain/attachment_type.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/repositories/audio_recorder.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/reply_draft_cubit.dart';
+import 'attachment_tray.dart';
 import 'voice_recording_bar.dart';
 
 /// Acción decidida al soltar el micrófono (o al cancelarse el puntero), por si el
@@ -24,10 +27,15 @@ import 'voice_recording_bar.dart';
 enum _Release { send, discard, cancel }
 
 /// Caja de redacción del hilo: el [AppChatComposer] del kit con las acciones
-/// propias de esta superficie (adjuntar imagen y respuestas rápidas ⚡ como
+/// propias de esta superficie (adjuntar archivos y respuestas rápidas ⚡ como
 /// leading; grabar nota de voz 🎤 en el slot final mientras el campo está vacío).
 /// Despacha `MessagesSendRequested` con el texto recortado; el bloc pinta la
 /// burbuja optimista.
+///
+/// Los adjuntos se eligen en lote (`pickMultiple`) y se acumulan en una bandeja
+/// sobre el composer; al enviar, cada archivo sube en secuencia y despacha su
+/// propio `MessagesSendRequested` (tipo inferido por extensión, `fileName` en
+/// documentos). El texto del campo es el caption del PRIMER mensaje del lote.
 ///
 /// La nota de voz sigue el gesto de WhatsApp: MANTENER el micrófono graba;
 /// deslizar ARRIBA bloquea (manos libres, con botones); deslizar a la IZQUIERDA
@@ -37,9 +45,10 @@ enum _Release { send, discard, cancel }
 /// `GlobalKey` al tocar.
 ///
 /// Excede el tope de 400 LOC del repo a propósito: concentra todo el estado del
-/// composer del hilo (texto + adjunto + ⚡ + máquina de gesto de voz) en un solo
-/// dueño; partirlo obligaría a cablear el ciclo de grabación a través de un
-/// controlador externo sin ganancia real de claridad.
+/// composer del hilo (texto + lote de adjuntos + ⚡ + máquina de gesto de voz)
+/// en un solo dueño; partirlo obligaría a cablear el ciclo de grabación y la
+/// subida del lote a través de controladores externos sin ganancia real de
+/// claridad. La bandeja y los helpers puros (tipo/topes) ya viven aparte.
 class MessageComposer extends StatefulWidget {
   const MessageComposer({super.key, this.now});
 
@@ -54,8 +63,16 @@ class MessageComposer extends StatefulWidget {
 class _MessageComposerState extends State<MessageComposer> {
   final TextEditingController _ctrl = TextEditingController();
 
-  /// Subida de imagen en vuelo: deshabilita el adjuntar y muestra un spinner.
+  /// Subida del lote en vuelo: deshabilita el adjuntar/enviar y muestra
+  /// progreso en la bandeja.
   bool _uploading = false;
+
+  /// Adjuntos elegidos pendientes de enviar (la bandeja sobre el composer). El
+  /// texto del campo será el caption del PRIMER mensaje del lote.
+  final List<PendingAttachment> _attachments = <PendingAttachment>[];
+
+  /// Cuántos del lote ya se subieron (progreso `n/total` en la bandeja).
+  int _uploadedCount = 0;
 
   /// Grabador de voz (singleton de la app; Noop fuera de Android). El composer
   /// NO lo dispone: lo comparte toda la app.
@@ -321,59 +338,132 @@ class _MessageComposerState extends State<MessageComposer> {
     }
   }
 
-  /// Adjunta una imagen: elige un archivo, lo sube (`/upload` → ref BARE) y
-  /// despacha el envío `type:image` con el texto actual como caption. La burbuja
-  /// optimista la pinta el bloc; un fallo de subida se avisa con un SnackBar.
-  /// Captura bloc/picker/repo y el messenger ANTES del primer await.
-  Future<void> _attach() async {
-    final bloc = context.read<MessagesBloc>();
-    final replyDraft = context.read<ReplyDraftCubit>();
-    // La cita se captura al INICIAR (no tras el upload): una respuesta que el
-    // operador fije mientras la imagen sube es para su próximo mensaje, no para
-    // este envío en vuelo.
-    final replyingToId = replyDraft.state?.externalId;
+  /// Abre el selector múltiple y suma lo elegido a la bandeja aplicando los
+  /// topes client-side (≤10 por lote, ≤64 MB por archivo) con copy específica.
+  /// Captura picker/messenger ANTES del primer await y verifica `mounted`
+  /// después.
+  Future<void> _pickAttachments() async {
     final picker = context.read<MediaFilePicker>();
-    final mediaRepo = context.read<MediaRepository>();
     final messenger = ScaffoldMessenger.of(context);
+    final picked = await picker.pickMultiple();
+    if (!mounted || picked.isEmpty) return;
 
-    final picked = await picker.pick();
-    if (picked == null) {
-      return; // el usuario canceló
+    final plan = planAttachmentBatch(
+      picked: <({String filename, int sizeBytes})>[
+        for (final p in picked)
+          (filename: p.filename, sizeBytes: p.bytes.length),
+      ],
+      currentCount: _attachments.length,
+    );
+    setState(() {
+      for (final i in plan.acceptedIndexes) {
+        final p = picked[i];
+        _attachments.add(
+          PendingAttachment(
+            bytes: p.bytes,
+            filename: p.filename,
+            type: messageTypeForFilename(p.filename),
+          ),
+        );
+      }
+    });
+    if (plan.tooLarge.isNotEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(_tooLargeCopy(plan.tooLarge))),
+      );
     }
-    setState(() => _uploading = true);
-    try {
-      final uploaded = await mediaRepo.upload(
-        bytes: picked.bytes,
-        filename: picked.filename,
+    if (plan.overflow) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Máximo 10 archivos por envío')),
       );
-      if (!mounted) {
-        return;
-      }
-      bloc.add(
-        MessagesSendRequested(
-          type: 'image',
-          content: _ctrl.text.trim(),
-          mediaRef: uploaded.ref,
-          quotedId: replyingToId,
-        ),
-      );
-      if (replyingToId != null) replyDraft.clear();
-      _ctrl.clear();
-    } on MediaFailure catch (f) {
-      messenger.showSnackBar(SnackBar(content: Text(_uploadError(f))));
-    } finally {
-      if (mounted) {
-        setState(() => _uploading = false);
-      }
     }
   }
 
-  String _uploadError(MediaFailure f) => switch (f) {
-    MediaTooLargeFailure() => 'La imagen es demasiado grande',
-    MediaUnsupportedTypeFailure() => 'Tipo de archivo no soportado',
+  static String _tooLargeCopy(List<String> names) => names.length == 1
+      ? '«${names.first}» supera el límite de 64 MB'
+      : '${names.length} archivos superan el límite de 64 MB';
+
+  void _removeAttachment(int index) {
+    if (_uploading || index < 0 || index >= _attachments.length) return;
+    setState(() => _attachments.removeAt(index));
+  }
+
+  /// Sube los adjuntos de la bandeja de a uno (secuencial) y despacha un
+  /// `MessagesSendRequested` por archivo, en orden. El [caption] (texto del
+  /// campo) y la cita en curso van SÓLO en el primer mensaje despachado; los
+  /// documentos llevan `fileName`. Un fallo de subida se avisa por archivo y no
+  /// aborta el resto del lote. Captura bloc/repo/messenger ANTES del primer
+  /// await y verifica `mounted` tras cada uno (un cierre a media subida no
+  /// despacha sobre un bloc muerto).
+  Future<void> _sendBatch(String caption) async {
+    if (_attachments.isEmpty || _uploading) return;
+    final bloc = context.read<MessagesBloc>();
+    final replyDraft = context.read<ReplyDraftCubit>();
+    // La cita se captura al INICIAR (no durante el lote): una respuesta fijada
+    // mientras el lote sube es para el próximo mensaje, no para éste.
+    final replyingToId = replyDraft.state?.externalId;
+    final mediaRepo = context.read<MediaRepository>();
+    final messenger = ScaffoldMessenger.of(context);
+    final batch = List<PendingAttachment>.of(_attachments);
+
+    setState(() {
+      _uploading = true;
+      _uploadedCount = 0;
+    });
+    var firstDispatched = false;
+    var captionConsumed = false;
+    for (final att in batch) {
+      try {
+        final uploaded = await mediaRepo.upload(
+          bytes: att.bytes,
+          filename: att.filename,
+        );
+        if (!mounted) return;
+        // El caption viaja SÓLO en el primer adjunto que lo admite: audio/ptt
+        // exigen contenido vacío en el wire, así que un audio al frente del lote
+        // no se queda con la leyenda (pasa al siguiente que sí la acepta).
+        final acceptsCaption = _acceptsCaption(att.type);
+        final content = (!captionConsumed && acceptsCaption) ? caption : '';
+        if (acceptsCaption) captionConsumed = true;
+        bloc.add(
+          MessagesSendRequested(
+            type: att.type,
+            content: content,
+            mediaRef: uploaded.ref,
+            fileName: att.type == 'document' ? att.filename : null,
+            quotedId: firstDispatched ? null : replyingToId,
+          ),
+        );
+        firstDispatched = true;
+        setState(() => _uploadedCount++);
+      } on MediaFailure catch (f) {
+        if (!mounted) return;
+        messenger.showSnackBar(
+          SnackBar(content: Text(_attachmentError(f, att.filename))),
+        );
+      }
+    }
+    if (!mounted) return;
+    if (firstDispatched && replyingToId != null) replyDraft.clear();
+    setState(() {
+      _uploading = false;
+      _uploadedCount = 0;
+      _attachments.clear();
+    });
+    _ctrl.clear();
+  }
+
+  /// El wire admite leyenda (caption) en imagen/video/documento; audio y ptt
+  /// exigen contenido vacío.
+  static bool _acceptsCaption(String type) =>
+      type == 'image' || type == 'video' || type == 'document';
+
+  String _attachmentError(MediaFailure f, String name) => switch (f) {
+    MediaTooLargeFailure() => '«$name» es demasiado grande',
+    MediaUnsupportedTypeFailure() => '«$name»: tipo de archivo no soportado',
     MediaForbiddenFailure() => 'No tienes permiso para subir',
     MediaNetworkFailure() || MediaTimeoutFailure() => 'Sin conexión',
-    _ => 'No se pudo subir la imagen',
+    _ => 'No se pudo subir «$name»',
   };
 
   /// Detiene la grabación, sube el clip Opus (`/upload` → ref BARE) y despacha
@@ -580,25 +670,26 @@ class _MessageComposerState extends State<MessageComposer> {
         trailing: _micButton(active: true),
       );
     } else {
+      // Con adjuntos pendientes, el slot final vacío es el botón de enviar el
+      // lote (el campo vacío no habilita el envío del kit); si no hay adjuntos,
+      // vuelve al micrófono de nota de voz.
+      final Widget? emptyTrailing = _attachments.isNotEmpty
+          ? _batchSendButton()
+          : (_canRecord ? _micButton(active: false) : null);
       body = AppChatComposer(
         controller: _ctrl,
         fieldKey: const Key('composer.input'),
         sendKey: const Key('composer.send'),
-        onSend: _send,
-        emptyTrailing: _canRecord ? _micButton(active: false) : null,
+        enabled: !_uploading,
+        onSend: _onComposerSend,
+        emptyTrailing: emptyTrailing,
         leading: <Widget>[
           IconButton(
             key: const Key('composer.attach'),
-            tooltip: 'Adjuntar imagen',
+            tooltip: 'Adjuntar archivos',
             color: AppTokens.text2,
-            onPressed: _uploading ? null : _attach,
-            icon: _uploading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.image_outlined),
+            onPressed: _uploading ? null : _pickAttachments,
+            icon: const Icon(Icons.attach_file),
           ),
           IconButton(
             key: const Key('composer.quickreply'),
@@ -610,18 +701,59 @@ class _MessageComposerState extends State<MessageComposer> {
         ],
       );
     }
-    if (replyingTo == null) return body;
+    final showTray = _attachments.isNotEmpty && !_recording;
+    if (replyingTo == null && !showTray) return body;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        _ReplyPreviewBar(
-          message: replyingTo,
-          onCancel: () => context.read<ReplyDraftCubit>().clear(),
-        ),
+        if (replyingTo != null)
+          _ReplyPreviewBar(
+            message: replyingTo,
+            onCancel: () => context.read<ReplyDraftCubit>().clear(),
+          ),
+        if (showTray)
+          AttachmentTray(
+            items: _attachments,
+            onRemove: _removeAttachment,
+            uploading: _uploading,
+            uploadedCount: _uploadedCount,
+          ),
         body,
       ],
     );
   }
+
+  /// Enruta el envío del composer: con adjuntos pendientes, despacha el lote con
+  /// el texto como caption del primero; si no, un envío de texto normal.
+  void _onComposerSend(String text) {
+    if (_attachments.isNotEmpty) {
+      unawaited(_sendBatch(text));
+    } else {
+      _send(text);
+    }
+  }
+
+  /// Botón de enviar el lote de adjuntos (slot final del composer con el campo
+  /// vacío). Deshabilitado mientras el lote sube.
+  Widget _batchSendButton() => SizedBox(
+    width: 48,
+    height: 48,
+    child: Material(
+      color: _uploading ? AppTokens.surface3 : AppTokens.primary,
+      shape: const CircleBorder(),
+      child: InkWell(
+        key: const Key('composer.attach_send'),
+        customBorder: const CircleBorder(),
+        onTap: _uploading ? null : () => _sendBatch(_ctrl.text.trim()),
+        child: Icon(
+          Icons.send_rounded,
+          size: 22,
+          color: _uploading ? AppTokens.text2 : AppTokens.onPrimary,
+          semanticLabel: 'Enviar',
+        ),
+      ),
+    ),
+  );
 }
 
 /// Barra de cita sobre el composer mientras se compone una respuesta: autor +

@@ -61,6 +61,39 @@ void main() {
     });
   });
 
+  test('enqueueSend de documento guarda fileName en el payload', () async {
+    await dao.enqueueSend(
+      botId: 'b1',
+      chatLid: 'c1',
+      clientToken: 't1',
+      type: 'document',
+      content: '',
+      mediaRef: 'ref-7',
+      fileName: 'contrato.pdf',
+    );
+    expect(jsonDecode((await only()).payload), {
+      'type': 'document',
+      'content': '',
+      'mediaRef': 'ref-7',
+      'fileName': 'contrato.pdf',
+    });
+  });
+
+  test('enqueueSend sin fileName no lo escribe en el payload', () async {
+    await dao.enqueueSend(
+      botId: 'b1',
+      chatLid: 'c1',
+      clientToken: 't1',
+      type: 'image',
+      content: '',
+      mediaRef: 'ref-9',
+    );
+    expect(
+      (jsonDecode((await only()).payload) as Map).containsKey('fileName'),
+      isFalse,
+    );
+  });
+
   test('enqueueSend de una respuesta guarda quotedId en el payload', () async {
     await dao.enqueueSend(
       botId: 'b1',

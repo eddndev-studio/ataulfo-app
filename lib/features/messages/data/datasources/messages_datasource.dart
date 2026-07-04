@@ -37,6 +37,7 @@ abstract interface class MessagesDatasource {
     String? mediaRef,
     List<int>? waveform,
     String? quotedId,
+    String? fileName,
   });
 
   /// `POST /sessions/:botId/:chatLid/mark-read`. Marca como leídos los INBOUND
@@ -131,8 +132,15 @@ class DioMessagesDatasource implements MessagesDatasource {
     String? mediaRef,
     List<int>? waveform,
     String? quotedId,
+    String? fileName,
   }) async {
     try {
+      // `fileName` sólo viaja cuando trae valor (documentos): un vacío/null se
+      // omite para que el `contentHash` de idempotencia del servidor no cambie
+      // en los envíos que no lo llevan.
+      final sendFileName = (fileName != null && fileName.isNotEmpty)
+          ? fileName
+          : null;
       final res = await _dio.post<Map<String, dynamic>>(
         '/sessions/$botId/${Uri.encodeComponent(chatLid)}/messages/send',
         data: <String, dynamic>{
@@ -142,6 +150,7 @@ class DioMessagesDatasource implements MessagesDatasource {
           'mediaRef': ?mediaRef,
           'waveform': ?waveform,
           'quotedId': ?quotedId,
+          'fileName': ?sendFileName,
         },
       );
       final body = res.data;

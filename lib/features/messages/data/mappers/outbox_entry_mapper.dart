@@ -20,6 +20,7 @@ class OutboxEntryMapper {
         content: (payload['content'] as String?) ?? '',
         mediaRef: payload['mediaRef'] as String?,
         quotedId: payload['quotedId'] as String?,
+        fileName: payload['fileName'] as String?,
         isFailed: row.state == 'failed',
         errorKind: row.errorKind,
         createdAtMs: row.createdAtMs,

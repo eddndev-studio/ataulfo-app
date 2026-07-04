@@ -30,7 +30,10 @@ class _MockFilePicker extends Mock implements MediaFilePicker {}
 class _MockMediaRepo extends Mock implements MediaRepository {}
 
 void main() {
-  setUpAll(() => registerFallbackValue(Uint8List(0)));
+  setUpAll(() {
+    registerFallbackValue(Uint8List(0));
+    registerFallbackValue(const MessagesLoadRequested());
+  });
 
   late _MockMessagesBloc msgBloc;
   late _MockQuickRepliesBloc qrBloc;
@@ -80,12 +83,14 @@ void main() {
   );
 
   testWidgets(
-    'desmontar el composer durante la subida no lanza (guarda mounted tras el '
-    'await de upload)',
+    'desmontar el composer durante la subida no lanza ni despacha (guarda '
+    'mounted tras el await de upload)',
     (tester) async {
       final upload = Completer<UploadedMedia>();
-      when(picker.pick).thenAnswer(
-        (_) async => PickedMedia(bytes: Uint8List(0), filename: 'a.png'),
+      when(picker.pickMultiple).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(0), filename: 'a.png'),
+        ],
       );
       when(
         () => mediaRepo.upload(
@@ -96,19 +101,24 @@ void main() {
 
       await tester.pumpWidget(host(show: true));
       await tester.tap(find.byKey(const Key('composer.attach')));
-      await tester
-          .pump(); // resuelve pick() y entra al await de upload (en vuelo)
+      await tester.pump(); // resuelve pickMultiple() y llena la bandeja
+      // Con la bandeja llena y el campo vacío, el slot final es el botón de
+      // enviar el lote; al tocarlo la subida entra en vuelo.
+      await tester.tap(find.byKey(const Key('composer.attach_send')));
+      await tester.pump();
 
       // Desmonta el composer con la subida AÚN en vuelo: dispone _ctrl.
       await tester.pumpWidget(host(show: false));
       await tester.pump();
 
-      // La subida resuelve DESPUÉS del dispose: la continuación de _attach corre
-      // sobre un widget desmontado. Con la guarda mounted no debe tocar _ctrl.
+      // La subida resuelve DESPUÉS del dispose: la continuación de _sendBatch
+      // corre sobre un widget desmontado. Con la guarda mounted no toca _ctrl
+      // ni despacha sobre el bloc.
       upload.complete(const UploadedMedia(ref: 'ref-abc', previewUrl: null));
       await tester.pump();
 
       expect(tester.takeException(), isNull);
+      verifyNever(() => msgBloc.add(any()));
     },
   );
 }

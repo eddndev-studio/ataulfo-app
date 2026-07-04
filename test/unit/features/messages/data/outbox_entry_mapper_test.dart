@@ -71,6 +71,23 @@ void main() {
     expect(OutboxEntryMapper.fromRow(row)!.quotedId, isNull);
   });
 
+  test('documento → fileName del payload', () async {
+    final row = await insert(
+      (b) => b.copyWith(
+        payload: const Value(
+          '{"type":"document","content":"","mediaRef":"ref-7",'
+          '"fileName":"contrato.pdf"}',
+        ),
+      ),
+    );
+    expect(OutboxEntryMapper.fromRow(row)!.fileName, 'contrato.pdf');
+  });
+
+  test('envío sin fileName → fileName null', () async {
+    final row = await insert((b) => b);
+    expect(OutboxEntryMapper.fromRow(row)!.fileName, isNull);
+  });
+
   test('payload corrupto → null (la fila se filtra)', () async {
     final row = await insert(
       (b) => b.copyWith(payload: const Value('no-json')),

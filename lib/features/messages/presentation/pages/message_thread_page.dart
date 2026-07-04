@@ -613,6 +613,7 @@ String _mediaPlaceholder(String type) => switch (type) {
   'ptt' => '[nota de voz]',
   'image' => '[imagen]',
   'video' => '[video]',
+  'audio' => '[audio]',
   'document' => '[documento]',
   _ => '[$type]',
 };

@@ -107,6 +107,7 @@ void main() {
         mediaRef: any(named: 'mediaRef'),
         waveform: any(named: 'waveform'),
         quotedId: any(named: 'quotedId'),
+        fileName: any(named: 'fileName'),
       ),
     ).thenAnswer(answer);
   }
@@ -180,6 +181,33 @@ void main() {
         content: 'respondo',
         mediaRef: null,
         quotedId: 'orig-1',
+      ),
+    ).called(1);
+  });
+
+  test('drena un documento: pasa fileName del payload a send', () async {
+    await outbox.enqueueSend(
+      botId: 'b1',
+      chatLid: 'c1',
+      clientToken: 't1',
+      type: 'document',
+      content: '',
+      mediaRef: 'ref-7',
+      fileName: 'contrato.pdf',
+    );
+    stubSend((_) async => msg('wamid-1'));
+
+    await make().start();
+
+    verify(
+      () => ds.send(
+        'b1',
+        'c1',
+        clientToken: 't1',
+        type: 'document',
+        content: '',
+        mediaRef: 'ref-7',
+        fileName: 'contrato.pdf',
       ),
     ).called(1);
   });

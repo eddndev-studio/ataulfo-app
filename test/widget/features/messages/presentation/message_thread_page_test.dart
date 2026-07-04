@@ -1771,11 +1771,13 @@ void main() {
     testWidgets('pick + upload → envía type:image con ref y caption', (
       tester,
     ) async {
-      when(() => picker.pick()).thenAnswer(
-        (_) async => PickedMedia(
-          bytes: Uint8List.fromList(<int>[1, 2, 3]),
-          filename: 'foto.jpg',
-        ),
+      when(picker.pickMultiple).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(
+            bytes: Uint8List.fromList(<int>[1, 2, 3]),
+            filename: 'foto.jpg',
+          ),
+        ],
       );
       when(
         () => mediaRepo.upload(
@@ -1786,12 +1788,14 @@ void main() {
         (_) async => const UploadedMedia(ref: 'ref-abc', previewUrl: null),
       );
       await tester.pumpWidget(hostMedia());
+      await tester.tap(find.byKey(const Key('composer.attach')));
+      await tester.pump(); // pickMultiple resuelve, la bandeja se llena
       await tester.enterText(
         find.byKey(const Key('composer.input')),
         'mira esto',
       );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('composer.attach')));
+      await tester.tap(find.byKey(const Key('composer.send')));
       await tester.pumpAndSettle();
       verify(
         () => bloc.add(
@@ -1805,7 +1809,7 @@ void main() {
     });
 
     testWidgets('cancelar el picker no sube ni envía', (tester) async {
-      when(() => picker.pick()).thenAnswer((_) async => null);
+      when(picker.pickMultiple).thenAnswer((_) async => <PickedMedia>[]);
       await tester.pumpWidget(hostMedia());
       await tester.tap(find.byKey(const Key('composer.attach')));
       await tester.pumpAndSettle();

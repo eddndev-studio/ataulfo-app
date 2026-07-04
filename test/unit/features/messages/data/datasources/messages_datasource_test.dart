@@ -381,6 +381,42 @@ void main() {
       });
     });
 
+    test('documento → body con fileName', () async {
+      stubPost(postResp(200, body: sentMsg()..['type'] = 'document'));
+      await ds.send(
+        'b1',
+        'lid-1',
+        clientToken: 'ct-4',
+        type: 'document',
+        content: '',
+        mediaRef: 'ref-7',
+        fileName: 'contrato.pdf',
+      );
+      final c = capturedPost();
+      expect(c[1], <String, dynamic>{
+        'clientToken': 'ct-4',
+        'type': 'document',
+        'content': '',
+        'mediaRef': 'ref-7',
+        'fileName': 'contrato.pdf',
+      });
+    });
+
+    test('fileName vacío no viaja al wire', () async {
+      stubPost(postResp(200, body: sentMsg()..['type'] = 'image'));
+      await ds.send(
+        'b1',
+        'lid-1',
+        clientToken: 'ct-5',
+        type: 'image',
+        content: '',
+        mediaRef: 'ref-8',
+        fileName: '',
+      );
+      final c = capturedPost();
+      expect((c[1] as Map).containsKey('fileName'), isFalse);
+    });
+
     test('chatLid con `@` → segmento percent-encodeado', () async {
       stubPost(postResp(200, body: sentMsg()));
       await ds.send(
