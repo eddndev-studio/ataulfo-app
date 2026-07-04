@@ -96,6 +96,34 @@ void main() {
     expect(find.text('consulto el doc de horarios'), findsOneWidget);
   });
 
+  testWidgets('el aviso del motor (rol system) se rotula Sistema, no Cliente', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      AiLogLoaded(
+        entries: <AiLogEntry>[
+          e(
+            2,
+            role: AiLogRole.system,
+            content:
+                '[AVISO DEL SISTEMA — esto NO es un mensaje de la persona]',
+          ),
+          e(1, role: AiLogRole.user, content: 'hola'),
+        ],
+        nextBefore: null,
+        isLoadingMore: false,
+      ),
+    );
+    await pump(tester);
+
+    expect(find.text('Sistema'), findsOneWidget);
+    expect(find.textContaining('AVISO DEL SISTEMA'), findsOneWidget);
+    // El único "Cliente" es el turno user real — el aviso ya no usurpa su voz.
+    expect(find.text('Cliente'), findsOneWidget);
+    // Y no cae al fallback de turno no soportado.
+    expect(find.textContaining('Turno no soportado'), findsNothing);
+  });
+
   testWidgets('cursor presente → botón "Cargar anteriores" dispara more', (
     tester,
   ) async {

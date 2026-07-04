@@ -200,6 +200,17 @@ class _EntryTile extends StatelessWidget {
           ),
         ),
         AiLogRole.tool => ToolResultView(entry: entry),
+        // La voz del MOTOR (p.ej. el nudge de disciplina): rotulada Sistema y
+        // atenuada, para que el operador no la lea como palabras del cliente.
+        AiLogRole.system => _bubble(
+          context,
+          icon: Icons.settings_outlined,
+          title: 'Sistema',
+          child: Text(
+            entry.content,
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+          ),
+        ),
         AiLogRole.unknown => Text(
           'Turno no soportado — actualiza la app.',
           style: textTheme.bodySmall?.copyWith(

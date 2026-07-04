@@ -1,16 +1,20 @@
-/// Rol de un turno del ConversationLog del motor IA (S12). `unknown`
-/// degrada tokens futuros del wire sin romper la carga (misma política que
-/// StepType.unsupported).
+/// Rol de un turno del ConversationLog del motor IA (S12). `system` es la voz
+/// del MOTOR (p.ej. el nudge de disciplina de tools), nunca la del cliente: la
+/// vista la rotula "Sistema" para que el operador no lea un aviso interno como
+/// palabras de la persona. `unknown` degrada tokens futuros del wire sin
+/// romper la carga (misma política que StepType.unsupported).
 enum AiLogRole {
   user,
   assistant,
   tool,
+  system,
   unknown;
 
   static AiLogRole fromWire(String raw) => switch (raw) {
     'user' => AiLogRole.user,
     'assistant' => AiLogRole.assistant,
     'tool' => AiLogRole.tool,
+    'system' => AiLogRole.system,
     _ => AiLogRole.unknown,
   };
 }
