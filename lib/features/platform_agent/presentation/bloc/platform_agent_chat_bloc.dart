@@ -1014,7 +1014,13 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     Emitter<PaChatState> emit,
   ) async {
     final current = state;
-    if (current is! PaChatLoaded || current.sending || current.attaching) {
+    // Sin grabación en curso no hay clip que enviar: un VoiceSent espurio (sin
+    // el VoiceStarted previo) no debe correr un turno de audio. Espeja la guarda
+    // de _onVoiceStarted (que ignora arrancar sobre una grabación ya activa).
+    if (current is! PaChatLoaded ||
+        current.sending ||
+        current.attaching ||
+        !current.recordingVoice) {
       return;
     }
     final convId = current.activeConversation.id;

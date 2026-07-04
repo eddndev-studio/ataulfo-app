@@ -196,6 +196,95 @@ void main() {
     },
   );
 
+  testWidgets(
+    'lote 100% audio con texto: el texto viaja como su propio mensaje ANTES '
+    'del audio (no se pierde al limpiar el campo)',
+    (tester) async {
+      // Cita en curso: debe consumirse con el TEXTO, no con el audio.
+      replyDraft.setReply(
+        const Message(
+          externalId: 'orig-1',
+          chatLid: 'c1',
+          senderLid: 's1',
+          kind: MessageKind.dm,
+          direction: MessageDirection.inbound,
+          type: 'text',
+          content: 'hola',
+          mediaRef: null,
+          quotedId: null,
+          timestampMs: 1000,
+          status: null,
+        ),
+      );
+      when(
+        picker.pickMultiple,
+      ).thenAnswer((_) async => <PickedMedia>[pm('nota.mp3'), pm('otra.ogg')]);
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('composer.attach')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('composer.input')),
+        'escúchame',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('composer.send')));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      final events = sentEvents();
+      expect(events.length, 3);
+      // El texto va PRIMERO, con la cita del lote.
+      expect(events[0].type, 'text');
+      expect(events[0].content, 'escúchame');
+      expect(events[0].mediaRef, isNull);
+      expect(events[0].quotedId, 'orig-1');
+      // Los audios van DESPUÉS: sin caption y sin cita (ya consumida).
+      expect(events[1].type, 'audio');
+      expect(events[1].content, '');
+      expect(events[1].quotedId, isNull);
+      expect(events[2].type, 'audio');
+      expect(events[2].content, '');
+      expect(events[2].quotedId, isNull);
+      // La cita se consumió; la bandeja se vació.
+      expect(replyDraft.state, isNull);
+      expect(find.byKey(const Key('composer.attachment_tray')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'un throw NO-MediaFailure en la subida no deja el composer atascado',
+    (tester) async {
+      when(
+        picker.pickMultiple,
+      ).thenAnswer((_) async => <PickedMedia>[pm('a.png')]);
+      when(
+        () => mediaRepo.upload(
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+        ),
+      ).thenThrow(StateError('boom'));
+
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('composer.attach')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('composer.attach_send')));
+
+      // El error genérico (no MediaFailure) se reporta a FlutterError al
+      // despacharse el gesto (no se pierde en silencio). Consúmelo AQUÍ —antes
+      // de más pumps— para que no marque el test.
+      expect(tester.takeException(), isA<StateError>());
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // El campo volvió a habilitarse: _uploading no quedó atascado en true.
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('composer.input')),
+      );
+      expect(field.enabled, isTrue);
+    },
+  );
+
   testWidgets('sin caption ni texto: el botón de la bandeja despacha el lote', (
     tester,
   ) async {

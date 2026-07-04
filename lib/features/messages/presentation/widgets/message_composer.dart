@@ -395,6 +395,17 @@ class _MessageComposerState extends State<MessageComposer> {
   /// aborta el resto del lote. Captura bloc/repo/messenger ANTES del primer
   /// await y verifica `mounted` tras cada uno (un cierre a media subida no
   /// despacha sobre un bloc muerto).
+  ///
+  /// Si NINGÚN adjunto admite leyenda (p.ej. un lote 100% audio, que exige
+  /// contenido vacío en el wire) y hay texto, ese texto no cabe en ningún
+  /// mensaje del lote: viaja como su PROPIO `type:text` despachado PRIMERO —con
+  /// la cita en curso—, para que no se pierda al limpiar el campo.
+  ///
+  /// La reposición de `_uploading` (y el vaciado de la bandeja/campo) va en un
+  /// `finally`: una subida que lanza algo NO mapeado a [MediaFailure] no debe
+  /// dejar el composer bloqueado para siempre. Ese fallo inesperado tampoco se
+  /// pierde en silencio: el `catch` lo reporta a `FlutterError` (para el crash
+  /// reporting) en vez de dejarlo escapar como error asíncrono huérfano.
   Future<void> _sendBatch(String caption) async {
     if (_attachments.isEmpty || _uploading) return;
     final bloc = context.read<MessagesBloc>();
@@ -410,47 +421,79 @@ class _MessageComposerState extends State<MessageComposer> {
       _uploading = true;
       _uploadedCount = 0;
     });
-    var firstDispatched = false;
-    var captionConsumed = false;
-    for (final att in batch) {
-      try {
-        final uploaded = await mediaRepo.upload(
-          bytes: att.bytes,
-          filename: att.filename,
-        );
-        if (!mounted) return;
-        // El caption viaja SÓLO en el primer adjunto que lo admite: audio/ptt
-        // exigen contenido vacío en el wire, así que un audio al frente del lote
-        // no se queda con la leyenda (pasa al siguiente que sí la acepta).
-        final acceptsCaption = _acceptsCaption(att.type);
-        final content = (!captionConsumed && acceptsCaption) ? caption : '';
-        if (acceptsCaption) captionConsumed = true;
+    try {
+      // La cita se consume UNA vez: por el texto suelto si lo hay, o por el
+      // primer adjunto despachado. Lo que la lleva marca `quoteConsumed`.
+      var quoteConsumed = false;
+      final noneAcceptsCaption = !batch.any((a) => _acceptsCaption(a.type));
+      if (caption.isNotEmpty && noneAcceptsCaption) {
         bloc.add(
           MessagesSendRequested(
-            type: att.type,
-            content: content,
-            mediaRef: uploaded.ref,
-            fileName: att.type == 'document' ? att.filename : null,
-            quotedId: firstDispatched ? null : replyingToId,
+            type: 'text',
+            content: caption,
+            quotedId: replyingToId,
           ),
         );
-        firstDispatched = true;
-        setState(() => _uploadedCount++);
-      } on MediaFailure catch (f) {
-        if (!mounted) return;
-        messenger.showSnackBar(
-          SnackBar(content: Text(_attachmentError(f, att.filename))),
-        );
+        quoteConsumed = true;
+      }
+      var captionConsumed = false;
+      for (final att in batch) {
+        try {
+          final uploaded = await mediaRepo.upload(
+            bytes: att.bytes,
+            filename: att.filename,
+          );
+          if (!mounted) return;
+          // El caption viaja SÓLO en el primer adjunto que lo admite: audio/ptt
+          // exigen contenido vacío en el wire, así que un audio al frente del
+          // lote no se queda con la leyenda (pasa al siguiente que sí la acepta,
+          // o ya salió como texto suelto si ninguno la admite).
+          final acceptsCaption = _acceptsCaption(att.type);
+          final content = (!captionConsumed && acceptsCaption) ? caption : '';
+          if (acceptsCaption) captionConsumed = true;
+          bloc.add(
+            MessagesSendRequested(
+              type: att.type,
+              content: content,
+              mediaRef: uploaded.ref,
+              fileName: att.type == 'document' ? att.filename : null,
+              quotedId: quoteConsumed ? null : replyingToId,
+            ),
+          );
+          quoteConsumed = true;
+          setState(() => _uploadedCount++);
+        } on MediaFailure catch (f) {
+          if (!mounted) return;
+          messenger.showSnackBar(
+            SnackBar(content: Text(_attachmentError(f, att.filename))),
+          );
+        }
+      }
+      if (!mounted) return;
+      if (quoteConsumed && replyingToId != null) replyDraft.clear();
+    } catch (error, stack) {
+      // Un fallo NO mapeado a MediaFailure (un bug o algo inesperado del repo):
+      // se reporta al manejador de errores de Flutter para que el crash
+      // reporting lo vea; el finally garantiza que el composer no quede
+      // bloqueado por un `_uploading` colgado en true.
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'message composer',
+          context: ErrorDescription('subiendo un lote de adjuntos'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploading = false;
+          _uploadedCount = 0;
+          _attachments.clear();
+        });
+        _ctrl.clear();
       }
     }
-    if (!mounted) return;
-    if (firstDispatched && replyingToId != null) replyDraft.clear();
-    setState(() {
-      _uploading = false;
-      _uploadedCount = 0;
-      _attachments.clear();
-    });
-    _ctrl.clear();
   }
 
   /// El wire admite leyenda (caption) en imagen/video/documento; audio y ptt

@@ -851,6 +851,23 @@ void main() {
     );
 
     blocTest<PlatformAgentChatBloc, PaChatState>(
+      'VoiceSent sin grabación previa se ignora (no corre turno espurio)',
+      build: build,
+      seed: loaded, // recordingVoice: false por defecto
+      act: (b) => b.add(PaChatVoiceSent(bytes)),
+      expect: () => <dynamic>[],
+      verify: (_) {
+        verifyNever(
+          () => repo.sendAudio(
+            conversationId: any(named: 'conversationId'),
+            bytes: any(named: 'bytes'),
+            filename: any(named: 'filename'),
+          ),
+        );
+      },
+    );
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
       'VoiceSent corre el turno vía sendAudio y cierra con el assistant',
       build: build,
       seed: () => loaded().copyWith(recordingVoice: true),
