@@ -49,7 +49,15 @@ void main() {
     );
   });
 
-  Future<void> pump(WidgetTester tester, List<TrainerMessage> msgs) async {
+  Future<void> pump(
+    WidgetTester tester,
+    List<TrainerMessage> msgs, {
+    List<TrainerModelOption> models = const <TrainerModelOption>[],
+    String defaultModelId = '',
+  }) async {
+    when(() => repo.listModels(templateId: 't1')).thenAnswer(
+      (_) async => TrainerModels(options: models, defaultId: defaultModelId),
+    );
     when(
       () => repo.listMessages(
         templateId: 't1',
@@ -73,40 +81,85 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('el clip sube el archivo y pinta el chip pendiente con su ✕', (
-    tester,
-  ) async {
-    when(() => picker.pick()).thenAnswer(
-      (_) async => PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
-    );
-    when(
-      () => repo.uploadAttachment(
-        templateId: 't1',
-        bytes: any(named: 'bytes'),
-        filename: 'catalogo.png',
-      ),
-    ).thenAnswer((_) async => _att);
+  testWidgets(
+    'el clip sube el archivo y pinta el chip pendiente con miniatura y su ✕',
+    (tester) async {
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+        ],
+      );
+      when(
+        () => repo.uploadAttachment(
+          templateId: 't1',
+          bytes: any(named: 'bytes'),
+          filename: 'catalogo.png',
+        ),
+      ).thenAnswer((_) async => _att);
 
-    await pump(tester, <TrainerMessage>[]);
-    expect(find.byKey(const Key('trainer.attach')), findsOneWidget);
+      await pump(tester, <TrainerMessage>[]);
+      expect(find.byKey(const Key('trainer.attach')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('trainer.attach')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('trainer.attach')));
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('trainer.pending_att.tenant/org/media/a1.png')),
-      findsOneWidget,
-    );
-    expect(find.text('catalogo.png'), findsOneWidget);
+      expect(
+        find.byKey(const Key('trainer.pending_att.tenant/org/media/a1.png')),
+        findsOneWidget,
+      );
+      expect(find.text('catalogo.png'), findsOneWidget);
+      // Miniatura real del pendiente (bytes locales, sin red).
+      expect(
+        find.byKey(const Key('trainer.pending_thumb.tenant/org/media/a1.png')),
+        findsOneWidget,
+      );
 
-    // El ✕ del chip lo quita.
-    await tester.tap(find.byIcon(Icons.close).first);
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('trainer.pending_att.tenant/org/media/a1.png')),
-      findsNothing,
-    );
-  });
+      // El ✕ del chip lo quita.
+      await tester.tap(find.byIcon(Icons.close).first);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('trainer.pending_att.tenant/org/media/a1.png')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'un modelo sin visión con imagen pendiente muestra el aviso de modalidad',
+    (tester) async {
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+        ],
+      );
+      when(
+        () => repo.uploadAttachment(
+          templateId: 't1',
+          bytes: any(named: 'bytes'),
+          filename: 'catalogo.png',
+        ),
+      ).thenAnswer((_) async => _att);
+
+      await pump(
+        tester,
+        <TrainerMessage>[],
+        models: const <TrainerModelOption>[
+          TrainerModelOption(
+            id: 'm3',
+            label: 'MiniMax M3',
+            imageInput: false,
+            pdfInput: false,
+          ),
+        ],
+        defaultModelId: 'm3',
+      );
+
+      expect(find.byKey(const Key('trainer.modality_warning')), findsNothing);
+      await tester.tap(find.byKey(const Key('trainer.attach')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('trainer.modality_warning')), findsOneWidget);
+    },
+  );
 
   testWidgets('una burbuja user con adjuntos pinta sus chips', (tester) async {
     await pump(tester, <TrainerMessage>[

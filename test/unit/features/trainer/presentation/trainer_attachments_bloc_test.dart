@@ -3,6 +3,7 @@ import 'package:ataulfo/features/trainer/domain/entities/trainer_attachment.dart
 import 'package:ataulfo/features/trainer/domain/entities/trainer_conversation.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_message.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_models.dart';
+import 'package:ataulfo/features/trainer/domain/failures/trainer_failure.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
 import 'package:ataulfo/features/trainer/presentation/bloc/trainer_chat_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -76,8 +77,10 @@ void main() {
     'adjuntar: pick → upload → pendingAttachments crece',
     build: build,
     setUp: () {
-      when(() => picker.pick()).thenAnswer(
-        (_) async => PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+        ],
       );
       when(
         () => repo.uploadAttachment(
@@ -97,6 +100,8 @@ void main() {
       final s = b.state as TrainerChatLoaded;
       expect(s.pendingAttachments, <TrainerAttachment>[_att]);
       expect(s.attaching, isFalse);
+      // Miniatura local conservada por ref para el chip (imagen).
+      expect(s.pendingThumbnails[_att.ref], isNotNull);
     },
   );
 
@@ -104,7 +109,9 @@ void main() {
     'cancelar el picker no toca el estado',
     build: build,
     setUp: () {
-      when(() => picker.pick()).thenAnswer((_) async => null);
+      when(
+        () => picker.pickMultiple(),
+      ).thenAnswer((_) async => <PickedMedia>[]);
     },
     act: (b) async {
       b.add(const TrainerChatStarted());
@@ -129,8 +136,10 @@ void main() {
     'quitar un adjunto pendiente lo saca de la lista',
     build: build,
     setUp: () {
-      when(() => picker.pick()).thenAnswer(
-        (_) async => PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+        ],
       );
       when(
         () => repo.uploadAttachment(
@@ -157,8 +166,10 @@ void main() {
     'enviar manda las refs y limpia los pendientes; el optimista pinta chips',
     build: build,
     setUp: () {
-      when(() => picker.pick()).thenAnswer(
-        (_) async => PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+        ],
       );
       when(
         () => repo.uploadAttachment(
@@ -213,6 +224,7 @@ void main() {
     verify: (b) {
       final s = b.state as TrainerChatLoaded;
       expect(s.pendingAttachments, isEmpty);
+      expect(s.pendingThumbnails, isEmpty);
       verify(
         () => repo.sendMessage(
           templateId: 't1',
@@ -225,4 +237,208 @@ void main() {
       expect(user.attachments, <TrainerAttachment>[_att]);
     },
   );
+
+  TrainerAttachment imgFor(String name) => TrainerAttachment(
+    ref: 'ref/$name',
+    mime: 'image/png',
+    name: name,
+    sizeBytes: 4,
+  );
+
+  void stubUploadEcho() {
+    when(
+      () => repo.uploadAttachment(
+        templateId: 't1',
+        bytes: any(named: 'bytes'),
+        filename: any(named: 'filename'),
+      ),
+    ).thenAnswer(
+      (inv) async => imgFor(inv.namedArguments[#filename] as String),
+    );
+  }
+
+  blocTest<TrainerChatBloc, TrainerChatState>(
+    'multi-pick sube secuencial todos los del lote dentro del cupo',
+    build: build,
+    setUp: () {
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(4), filename: 'a.png'),
+          PickedMedia(bytes: Uint8List(4), filename: 'b.png'),
+          PickedMedia(bytes: Uint8List(4), filename: 'c.png'),
+        ],
+      );
+      stubUploadEcho();
+    },
+    act: (b) async {
+      b.add(const TrainerChatStarted());
+      await Future<void>.delayed(Duration.zero);
+      b.add(const TrainerChatAttachRequested());
+    },
+    wait: const Duration(milliseconds: 20),
+    verify: (b) {
+      final s = b.state as TrainerChatLoaded;
+      expect(s.pendingAttachments.map((a) => a.name), <String>[
+        'a.png',
+        'b.png',
+        'c.png',
+      ]);
+      expect(s.sendFailure, isNull);
+      verify(
+        () => repo.uploadAttachment(
+          templateId: 't1',
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+        ),
+      ).called(3);
+    },
+  );
+
+  blocTest<TrainerChatBloc, TrainerChatState>(
+    'lote que excede el tope de 5 sube hasta llenar y avisa',
+    build: build,
+    setUp: () {
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          for (var i = 0; i < 7; i++)
+            PickedMedia(bytes: Uint8List(4), filename: 'f$i.png'),
+        ],
+      );
+      stubUploadEcho();
+    },
+    act: (b) async {
+      b.add(const TrainerChatStarted());
+      await Future<void>.delayed(Duration.zero);
+      b.add(const TrainerChatAttachRequested());
+    },
+    wait: const Duration(milliseconds: 30),
+    verify: (b) {
+      final s = b.state as TrainerChatLoaded;
+      expect(s.pendingAttachments, hasLength(5));
+      expect(s.sendFailure, isA<TrainerAttachmentLimitFailure>());
+      verify(
+        () => repo.uploadAttachment(
+          templateId: 't1',
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+        ),
+      ).called(5);
+    },
+  );
+
+  blocTest<TrainerChatBloc, TrainerChatState>(
+    'archivo sobre 25MB se descarta ANTES de subir y avisa; el resto sube',
+    build: build,
+    setUp: () {
+      when(() => picker.pickMultiple()).thenAnswer(
+        (_) async => <PickedMedia>[
+          PickedMedia(bytes: Uint8List(26 * 1024 * 1024), filename: 'big.png'),
+          PickedMedia(bytes: Uint8List(4), filename: 'ok.png'),
+        ],
+      );
+      stubUploadEcho();
+    },
+    act: (b) async {
+      b.add(const TrainerChatStarted());
+      await Future<void>.delayed(Duration.zero);
+      b.add(const TrainerChatAttachRequested());
+    },
+    wait: const Duration(milliseconds: 20),
+    verify: (b) {
+      final s = b.state as TrainerChatLoaded;
+      expect(s.pendingAttachments.map((a) => a.name), <String>['ok.png']);
+      expect(s.sendFailure, isA<TrainerAttachmentTooLargeFailure>());
+      verify(
+        () => repo.uploadAttachment(
+          templateId: 't1',
+          bytes: any(named: 'bytes'),
+          filename: 'ok.png',
+        ),
+      ).called(1);
+      verifyNever(
+        () => repo.uploadAttachment(
+          templateId: 't1',
+          bytes: any(named: 'bytes'),
+          filename: 'big.png',
+        ),
+      );
+    },
+  );
+
+  group('modalityWarning', () {
+    TrainerChatLoaded loaded({
+      required List<TrainerModelOption> models,
+      required String selectedModelId,
+      required List<TrainerAttachment> pending,
+      String defaultModelId = '',
+    }) => TrainerChatLoaded(
+      conversation: _conv,
+      messages: const <TrainerMessage>[],
+      sending: false,
+      models: models,
+      defaultModelId: defaultModelId,
+      selectedModelId: selectedModelId,
+      pendingAttachments: pending,
+    );
+
+    test('modelo sin visión + imagen pendiente ⇒ aviso', () {
+      final s = loaded(
+        models: const <TrainerModelOption>[
+          TrainerModelOption(
+            id: 'm3',
+            label: 'MiniMax M3',
+            imageInput: false,
+            pdfInput: false,
+          ),
+        ],
+        selectedModelId: 'm3',
+        pending: const <TrainerAttachment>[_att],
+      );
+      expect(s.modalityWarning, isNotEmpty);
+      expect(s.modalityWarning.toLowerCase(), contains('imágenes'));
+    });
+
+    test('flags null (wire viejo) ⇒ sin aviso', () {
+      final s = loaded(
+        models: const <TrainerModelOption>[
+          TrainerModelOption(id: 'm3', label: 'MiniMax M3'),
+        ],
+        selectedModelId: 'm3',
+        pending: const <TrainerAttachment>[_att],
+      );
+      expect(s.modalityWarning, isEmpty);
+    });
+
+    test('modelo con visión ⇒ sin aviso', () {
+      final s = loaded(
+        models: const <TrainerModelOption>[
+          TrainerModelOption(
+            id: 'g',
+            label: 'Gemini',
+            imageInput: true,
+            pdfInput: true,
+          ),
+        ],
+        selectedModelId: 'g',
+        pending: const <TrainerAttachment>[_att],
+      );
+      expect(s.modalityWarning, isEmpty);
+    });
+
+    test('sin pendientes ⇒ sin aviso', () {
+      final s = loaded(
+        models: const <TrainerModelOption>[
+          TrainerModelOption(
+            id: 'm3',
+            label: 'MiniMax M3',
+            imageInput: false,
+            pdfInput: false,
+          ),
+        ],
+        selectedModelId: 'm3',
+        pending: const <TrainerAttachment>[],
+      );
+      expect(s.modalityWarning, isEmpty);
+    });
+  });
 }

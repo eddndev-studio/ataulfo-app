@@ -152,6 +152,7 @@ final class TrainerChatLoaded extends TrainerChatState {
     this.defaultModelId = '',
     this.selectedModelId = '',
     this.pendingAttachments = const <TrainerAttachment>[],
+    this.pendingThumbnails = const <String, Uint8List>{},
     this.attaching = false,
     this.lastAttemptedContent = '',
     this.draft = '',
@@ -189,8 +190,45 @@ final class TrainerChatLoaded extends TrainerChatState {
   /// Adjuntos YA subidos esperando el próximo send (chips en el composer).
   final List<TrainerAttachment> pendingAttachments;
 
+  /// Bytes locales de los adjuntos-imagen pendientes, por ref: alimentan la
+  /// miniatura del chip sin pedirla a la red. Solo viven para los pendientes
+  /// (se descartan al enviar o quitar); NUNCA se persisten en drafts.
+  final Map<String, Uint8List> pendingThumbnails;
+
   /// true mientras un adjunto sube (el clip muestra spinner).
   final bool attaching;
+
+  /// Aviso de modalidad: si el modelo efectivo (elegido o, en su defecto, el
+  /// default) declara NO ver imágenes/PDF y hay un pendiente de ese tipo,
+  /// una línea honesta advierte que viajará como texto sustituto. Flags
+  /// ausentes (wire viejo) ⇒ '' (degradación limpia, sin aviso).
+  String get modalityWarning {
+    if (pendingAttachments.isEmpty) return '';
+    final effId = selectedModelId.isNotEmpty ? selectedModelId : defaultModelId;
+    if (effId.isEmpty) return '';
+    TrainerModelOption? opt;
+    for (final m in models) {
+      if (m.id == effId) {
+        opt = m;
+        break;
+      }
+    }
+    if (opt == null) return '';
+    final hasImage = pendingAttachments.any((a) => a.mime.startsWith('image/'));
+    final hasPdf = pendingAttachments.any((a) => a.mime == 'application/pdf');
+    final warnImage = hasImage && opt.imageInput == false;
+    final warnPdf = hasPdf && opt.pdfInput == false;
+    if (warnImage && warnPdf) {
+      return 'Este modelo no ve imágenes ni PDF; viajarán como texto sustituto.';
+    }
+    if (warnImage) {
+      return 'Este modelo no ve imágenes; viajarán como texto sustituto.';
+    }
+    if (warnPdf) {
+      return 'Este modelo no ve PDF; viajará como texto sustituto.';
+    }
+    return '';
+  }
 
   /// Texto del último turno enviado, conservado al fallar para que "Reintentar"
   /// lo re-despache y el composer lo recupere. '' si no hay nada que reintentar.
@@ -210,6 +248,7 @@ final class TrainerChatLoaded extends TrainerChatState {
     bool clearSendFailure = false,
     String? selectedModelId,
     List<TrainerAttachment>? pendingAttachments,
+    Map<String, Uint8List>? pendingThumbnails,
     bool? attaching,
     String? lastAttemptedContent,
     String? draft,
@@ -224,6 +263,7 @@ final class TrainerChatLoaded extends TrainerChatState {
     defaultModelId: defaultModelId,
     selectedModelId: selectedModelId ?? this.selectedModelId,
     pendingAttachments: pendingAttachments ?? this.pendingAttachments,
+    pendingThumbnails: pendingThumbnails ?? this.pendingThumbnails,
     attaching: attaching ?? this.attaching,
     lastAttemptedContent: lastAttemptedContent ?? this.lastAttemptedContent,
     draft: draft ?? this.draft,
@@ -242,6 +282,7 @@ final class TrainerChatLoaded extends TrainerChatState {
       other.defaultModelId == defaultModelId &&
       other.selectedModelId == selectedModelId &&
       listEquals(other.pendingAttachments, pendingAttachments) &&
+      mapEquals(other.pendingThumbnails, pendingThumbnails) &&
       other.attaching == attaching &&
       other.lastAttemptedContent == lastAttemptedContent &&
       other.draft == draft;
@@ -258,6 +299,7 @@ final class TrainerChatLoaded extends TrainerChatState {
     defaultModelId,
     selectedModelId,
     Object.hashAll(pendingAttachments),
+    Object.hashAll(pendingThumbnails.keys),
     attaching,
     lastAttemptedContent,
     draft,
@@ -440,6 +482,7 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
           liveProgress: '',
           clearSendFailure: true,
           pendingAttachments: const <TrainerAttachment>[],
+          pendingThumbnails: const <String, Uint8List>{},
           lastAttemptedContent: '',
         ),
       );
@@ -493,6 +536,11 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     emit(s.copyWith(messages: reloaded));
   }
 
+  /// Máximo de adjuntos por turno (server-side) y peso por archivo. Se aplican
+  /// client-side ANTES de subir para no gastar red en lo que el server rechaza.
+  static const int _maxAttachments = 5;
+  static const int _maxAttachmentBytes = 25 * 1024 * 1024;
+
   Future<void> _onAttachRequested(
     TrainerChatAttachRequested event,
     Emitter<TrainerChatState> emit,
@@ -502,33 +550,86 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     if (current is! TrainerChatLoaded || picker == null || current.attaching) {
       return;
     }
-    final picked = await picker.pick();
-    if (picked == null) return; // canceló: ni estado ni red.
+    final picked = await picker.pickMultiple();
+    if (picked.isEmpty) return; // canceló o nada con bytes.
     final afterPick = state;
     if (afterPick is! TrainerChatLoaded) return;
-    emit(afterPick.copyWith(attaching: true));
-    try {
-      final att = await _repo.uploadAttachment(
-        templateId: _templateId,
-        bytes: picked.bytes,
-        filename: picked.filename,
-      );
-      final cur = state;
-      if (cur is! TrainerChatLoaded) return;
+
+    // Partición client-side: descartar sobre-peso, luego acotar al cupo
+    // restante (5 CONTANDO los pendientes ya subidos).
+    final withinSize = <PickedMedia>[];
+    var anyTooLarge = false;
+    for (final p in picked) {
+      if (p.bytes.length > _maxAttachmentBytes) {
+        anyTooLarge = true;
+      } else {
+        withinSize.add(p);
+      }
+    }
+    final remaining = _maxAttachments - afterPick.pendingAttachments.length;
+    final toUpload = remaining > 0
+        ? withinSize.take(remaining).toList(growable: false)
+        : const <PickedMedia>[];
+    final anyOverLimit = withinSize.length > toUpload.length;
+
+    if (toUpload.isEmpty) {
+      // Nada subible: informar el motivo dominante (peso pesa más que cupo).
       emit(
-        cur.copyWith(
-          attaching: false,
-          pendingAttachments: <TrainerAttachment>[
-            ...cur.pendingAttachments,
-            att,
-          ],
+        afterPick.copyWith(
+          sendFailure: anyTooLarge
+              ? const TrainerAttachmentTooLargeFailure()
+              : const TrainerAttachmentLimitFailure(),
         ),
       );
-    } on TrainerFailure catch (f) {
-      final cur = state;
-      if (cur is! TrainerChatLoaded) return;
-      emit(cur.copyWith(attaching: false, sendFailure: f));
+      return;
     }
+
+    emit(afterPick.copyWith(attaching: true, clearSendFailure: true));
+    for (final p in toUpload) {
+      try {
+        final att = await _repo.uploadAttachment(
+          templateId: _templateId,
+          bytes: p.bytes,
+          filename: p.filename,
+        );
+        final cur = state;
+        if (cur is! TrainerChatLoaded) return;
+        // La miniatura local solo aplica a imágenes; el resto usa ícono.
+        final thumbs = att.mime.startsWith('image/')
+            ? <String, Uint8List>{...cur.pendingThumbnails, att.ref: p.bytes}
+            : null;
+        emit(
+          cur.copyWith(
+            pendingAttachments: <TrainerAttachment>[
+              ...cur.pendingAttachments,
+              att,
+            ],
+            pendingThumbnails: thumbs,
+          ),
+        );
+      } on TrainerFailure catch (f) {
+        final cur = state;
+        if (cur is! TrainerChatLoaded) return;
+        // Corta el lote en la primera falla de red/servidor y la muestra.
+        emit(cur.copyWith(attaching: false, sendFailure: f));
+        return;
+      }
+    }
+
+    final cur = state;
+    if (cur is! TrainerChatLoaded) return;
+    // Cierre del lote: si algo se descartó client-side, informarlo (peso >
+    // cupo); si todo entró, limpiar cualquier aviso previo.
+    final notice = anyTooLarge
+        ? const TrainerAttachmentTooLargeFailure()
+        : (anyOverLimit ? const TrainerAttachmentLimitFailure() : null);
+    emit(
+      cur.copyWith(
+        attaching: false,
+        sendFailure: notice,
+        clearSendFailure: notice == null,
+      ),
+    );
   }
 
   void _onAttachmentRemoved(
@@ -542,6 +643,8 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         pendingAttachments: current.pendingAttachments
             .where((a) => a.ref != event.ref)
             .toList(growable: false),
+        pendingThumbnails: <String, Uint8List>{...current.pendingThumbnails}
+          ..remove(event.ref),
       ),
     );
   }

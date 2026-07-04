@@ -185,7 +185,18 @@ class TrainerModelsDto {
         final id = e['id'];
         final label = e['label'];
         if (id is String && id.isNotEmpty && label is String) {
-          options.add(TrainerModelOption(id: id, label: label));
+          // Flags de modalidad DEFENSIVOS: solo se adoptan si el wire los trae
+          // como bool. Ausentes ⇒ null (desconocido) y la UI no muestra aviso.
+          final img = e['imageInput'];
+          final pdf = e['pdfInput'];
+          options.add(
+            TrainerModelOption(
+              id: id,
+              label: label,
+              imageInput: img is bool ? img : null,
+              pdfInput: pdf is bool ? pdf : null,
+            ),
+          );
         }
       }
     }

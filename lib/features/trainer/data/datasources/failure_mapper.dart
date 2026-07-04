@@ -18,6 +18,8 @@ TrainerFailure mapTrainerDioException(DioException e) {
       if (status == 403) return const TrainerForbiddenFailure();
       if (status == 404) return const TrainerNotFoundFailure();
       if (status == 409) return const TrainerConflictFailure();
+      if (status == 413) return const TrainerAttachmentTooLargeFailure();
+      if (status == 415) return const TrainerAttachmentUnsupportedFailure();
       if (status == 422) return const TrainerValidationFailure();
       if (status == 502) return const TrainerEngineFailure();
       if (status == 503) return const TrainerUnavailableFailure();

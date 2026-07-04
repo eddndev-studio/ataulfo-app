@@ -174,6 +174,12 @@ String trainerFailureCopy(TrainerFailure f) => switch (f) {
     'Otro editor (el panel o el entrenador) cambió esto al mismo tiempo. Recarga e intenta de nuevo.',
   TrainerValidationFailure() =>
     'El contenido no pasó las reglas (revisa nombre/tamaño).',
+  TrainerAttachmentTooLargeFailure() =>
+    'El archivo pesa demasiado (máx 25 MB).',
+  TrainerAttachmentUnsupportedFailure() =>
+    'Tipo no soportado (imagen JPG/PNG/WebP o PDF).',
+  TrainerAttachmentLimitFailure() =>
+    'Puedes adjuntar hasta 5 archivos por turno.',
   TrainerNotFoundFailure() => 'Eso ya no existe.',
   TrainerForbiddenFailure() => 'Necesitas rol ADMIN para esto.',
   TrainerNetworkFailure() => 'Sin conexión con el servidor.',
@@ -341,6 +347,33 @@ class _ChatViewState extends State<_ChatView> {
               ),
             ),
           ),
+        if (s.modalityWarning.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp3,
+              vertical: AppTokens.sp1,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: AppTokens.text2,
+                ),
+                const SizedBox(width: AppTokens.sp1),
+                Flexible(
+                  child: Text(
+                    s.modalityWarning,
+                    key: const Key('trainer.modality_warning'),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (s.pendingAttachments.isNotEmpty)
           SizedBox(
             height: 40,
@@ -352,9 +385,28 @@ class _ChatViewState extends State<_ChatView> {
               separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
               itemBuilder: (context, i) {
                 final att = s.pendingAttachments[i];
+                final thumb = s.pendingThumbnails[att.ref];
                 return InputChip(
                   key: Key('trainer.pending_att.${att.ref}'),
-                  avatar: Icon(attachmentIcon(att.mime), size: 16),
+                  avatar: thumb != null
+                      // Miniatura real desde los bytes locales del pendiente.
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppTokens.radiusSm,
+                          ),
+                          child: Image.memory(
+                            thumb,
+                            key: Key('trainer.pending_thumb.${att.ref}'),
+                            width: 20,
+                            height: 20,
+                            fit: BoxFit.cover,
+                            // Bytes que no decodifican (archivo corrupto) caen
+                            // al ícono en vez de tumbar la fila.
+                            errorBuilder: (_, _, _) =>
+                                Icon(attachmentIcon(att.mime), size: 16),
+                          ),
+                        )
+                      : Icon(attachmentIcon(att.mime), size: 16),
                   deleteIcon: const Icon(Icons.close, size: 16),
                   label: Text(att.name, overflow: TextOverflow.ellipsis),
                   onDeleted: () => context.read<TrainerChatBloc>().add(

@@ -16,6 +16,23 @@ final class TrainerValidationFailure extends TrainerFailure {
   const TrainerValidationFailure();
 }
 
+/// 413 (o rechazo client-side previo a subir): el adjunto excede el tope de
+/// tamaño por archivo.
+final class TrainerAttachmentTooLargeFailure extends TrainerFailure {
+  const TrainerAttachmentTooLargeFailure();
+}
+
+/// 415 — el server rechazó el tipo del adjunto (fuera de la allowlist
+/// imagen/PDF).
+final class TrainerAttachmentUnsupportedFailure extends TrainerFailure {
+  const TrainerAttachmentUnsupportedFailure();
+}
+
+/// Rechazo client-side: el lote superaría el máximo de adjuntos por turno.
+final class TrainerAttachmentLimitFailure extends TrainerFailure {
+  const TrainerAttachmentLimitFailure();
+}
+
 /// 404 — plantilla/doc/hilo fuera de la org o inexistente.
 final class TrainerNotFoundFailure extends TrainerFailure {
   const TrainerNotFoundFailure();

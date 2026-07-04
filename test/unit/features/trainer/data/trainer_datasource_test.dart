@@ -359,5 +359,41 @@ void main() {
       expect(models.options, isEmpty);
       expect(models.defaultId, '');
     });
+
+    test('flags de modalidad se parsean por ítem cuando el wire los trae', () {
+      final dto = TrainerModelsDto.fromJson(<String, dynamic>{
+        'items': <dynamic>[
+          <String, dynamic>{
+            'id': 'gemini-3.1-pro-preview',
+            'label': 'Gemini 3.1 Pro',
+            'imageInput': true,
+            'pdfInput': true,
+          },
+          <String, dynamic>{
+            'id': 'MiniMax-M3',
+            'label': 'MiniMax M3',
+            'imageInput': false,
+            'pdfInput': false,
+          },
+        ],
+        'default': 'gemini-3.1-pro-preview',
+      });
+      final opts = dto.toEntity().options;
+      expect(opts[0].imageInput, isTrue);
+      expect(opts[0].pdfInput, isTrue);
+      expect(opts[1].imageInput, isFalse);
+      expect(opts[1].pdfInput, isFalse);
+    });
+
+    test('sin flags en el wire ⇒ null (desconocido, sin aviso)', () {
+      final dto = TrainerModelsDto.fromJson(<String, dynamic>{
+        'items': <dynamic>[
+          <String, dynamic>{'id': 'gpt-5.5', 'label': 'ChatGPT 5.5'},
+        ],
+      });
+      final opt = dto.toEntity().options.single;
+      expect(opt.imageInput, isNull);
+      expect(opt.pdfInput, isNull);
+    });
   });
 }
