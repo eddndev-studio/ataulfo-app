@@ -782,6 +782,9 @@ void main() {
       when(() => catalogBloc.state).thenReturn(const CatalogLoading());
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.subagent')),
+      );
       await tester.tap(find.byKey(const Key('template_ai.tile.subagent')));
       await tester.pumpAndSettle();
 
