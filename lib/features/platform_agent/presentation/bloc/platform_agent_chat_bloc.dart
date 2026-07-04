@@ -493,8 +493,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     // a mitad de subida enviaría un subconjunto y, al limpiar los pendientes con
     // ese estado stale, dejaría los archivos que aún subían huérfanos en storage.
     // El operador reenvía cuando la subida cierra.
-    if (current is! PaChatLoaded || current.sending || current.attaching)
+    if (current is! PaChatLoaded || current.sending || current.attaching) {
       return;
+    }
     final convId = current.activeConversation.id;
     _cancelRequested = false;
     _drafts.remove(convId);
