@@ -18,6 +18,8 @@ PaFailure mapPlatformAgentDioException(DioException e) {
       if (status == 403) return const PaForbiddenFailure();
       if (status == 404) return const PaNotFoundFailure();
       if (status == 409) return const PaConflictFailure();
+      if (status == 413) return const PaAttachmentTooLargeFailure();
+      if (status == 415) return const PaAttachmentUnsupportedFailure();
       if (status == 422) return const PaValidationFailure();
       if (status == 502) return const PaEngineFailure();
       if (status == 503) return const PaUnavailableFailure();

@@ -606,6 +606,7 @@ class AppRouter {
                         create: (_) => PlatformAgentChatBloc(
                           repo: _platformAgentRepo,
                           events: _platformAgentEvents,
+                          picker: FilePickerMediaFilePicker(),
                         ),
                       ),
                     ],

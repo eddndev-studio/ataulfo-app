@@ -4,17 +4,33 @@ import 'package:flutter/foundation.dart';
 /// elige SOLO el modelo; el resto de la config (razonamiento, temperatura) la
 /// fija la plataforma server-side.
 class PaModelOption {
-  const PaModelOption({required this.id, required this.label});
+  const PaModelOption({
+    required this.id,
+    required this.label,
+    this.imageInput,
+    this.pdfInput,
+  });
 
   final String id;
   final String label;
 
-  @override
-  bool operator ==(Object other) =>
-      other is PaModelOption && other.id == id && other.label == label;
+  /// Modalidad declarada por el server: ¿el modelo VE la imagen nativamente?
+  /// `null` = el wire no lo declara (contrato viejo) — sin aviso de modalidad.
+  final bool? imageInput;
+
+  /// ¿El modelo lee el PDF nativamente? `null` = desconocido (sin aviso).
+  final bool? pdfInput;
 
   @override
-  int get hashCode => Object.hash(id, label);
+  bool operator ==(Object other) =>
+      other is PaModelOption &&
+      other.id == id &&
+      other.label == label &&
+      other.imageInput == imageInput &&
+      other.pdfInput == pdfInput;
+
+  @override
+  int get hashCode => Object.hash(id, label, imageInput, pdfInput);
 }
 
 /// Allowlist completa + el modelo default de la plataforma (informativo: el

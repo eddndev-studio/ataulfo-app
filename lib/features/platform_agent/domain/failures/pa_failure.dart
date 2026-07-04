@@ -14,6 +14,23 @@ final class PaValidationFailure extends PaFailure {
   const PaValidationFailure();
 }
 
+/// 413 (o rechazo client-side previo a subir): el adjunto excede el tope de
+/// tamaño por archivo.
+final class PaAttachmentTooLargeFailure extends PaFailure {
+  const PaAttachmentTooLargeFailure();
+}
+
+/// 415 — el server rechazó el tipo del adjunto (fuera de la allowlist
+/// imagen/PDF).
+final class PaAttachmentUnsupportedFailure extends PaFailure {
+  const PaAttachmentUnsupportedFailure();
+}
+
+/// Rechazo client-side: el lote superaría el máximo de adjuntos por turno.
+final class PaAttachmentLimitFailure extends PaFailure {
+  const PaAttachmentLimitFailure();
+}
+
 /// 404 — hilo fuera de la org / de otro operador / inexistente.
 final class PaNotFoundFailure extends PaFailure {
   const PaNotFoundFailure();

@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
+import '../../domain/entities/pa_attachment.dart';
 import '../../domain/entities/pa_conversation.dart';
 import '../../domain/entities/pa_message.dart';
 import '../../domain/entities/pa_models.dart';
@@ -31,11 +33,20 @@ abstract interface class PlatformAgentDatasource {
 
   /// Corre un turno: persiste el user message y devuelve el assistant final.
   /// 502 ⇒ PaEngineFailure (el motor no produjo turno). `model` null ⇒ se
-  /// omite del body y el server corre con su default.
+  /// omite del body y el server corre con su default. `attachments` son refs
+  /// ya subidas (máx 5); vacío omite la clave del body.
   Future<PaMessage> sendMessage({
     required String conversationId,
     required String content,
     String? model,
+    List<String> attachments = const <String>[],
+  });
+
+  /// Sube un adjunto del hilo (multipart). La ref devuelta es la moneda que el
+  /// POST de mensaje manda; el server valida pertenencia. 413/415 tipados.
+  Future<PaAttachment> uploadAttachment({
+    required Uint8List bytes,
+    required String filename,
   });
 
   /// Allowlist de modelos del agente + default de la plataforma. El caller la
@@ -177,13 +188,18 @@ class DioPlatformAgentDatasource implements PlatformAgentDatasource {
     required String conversationId,
     required String content,
     String? model,
+    List<String> attachments = const <String>[],
   }) async {
     final token = CancelToken();
     _inFlight = token;
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '$_base/$conversationId/messages',
-        data: <String, dynamic>{'content': content, 'model': ?model},
+        data: <String, dynamic>{
+          'content': content,
+          'model': ?model,
+          if (attachments.isNotEmpty) 'attachments': attachments,
+        },
         options: Options(receiveTimeout: paTurnReceiveTimeout),
         cancelToken: token,
       );
@@ -205,6 +221,32 @@ class DioPlatformAgentDatasource implements PlatformAgentDatasource {
 
   @override
   void cancelInFlight() => _inFlight?.cancel();
+
+  @override
+  Future<PaAttachment> uploadAttachment({
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/platform-agent/attachments',
+        data: FormData.fromMap(<String, dynamic>{
+          'file': MultipartFile.fromBytes(bytes, filename: filename),
+        }),
+      );
+      final body = res.data;
+      if (body == null) throw const PaUnknownFailure();
+      return PaAttachmentDto.fromJson(body).toEntity();
+    } on PaFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw mapPlatformAgentDioException(e);
+    } on FormatException {
+      throw const PaUnknownFailure();
+    } on TypeError {
+      throw const PaUnknownFailure();
+    }
+  }
 
   @override
   Future<PaModels> listModels() async {

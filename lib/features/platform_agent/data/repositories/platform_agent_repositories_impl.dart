@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+
+import '../../domain/entities/pa_attachment.dart';
 import '../../domain/entities/pa_conversation.dart';
 import '../../domain/entities/pa_message.dart';
 import '../../domain/entities/pa_models.dart';
@@ -44,11 +47,19 @@ class PlatformAgentRepositoryImpl implements PlatformAgentRepository {
     required String conversationId,
     required String content,
     String? model,
+    List<String> attachments = const <String>[],
   }) => _ds.sendMessage(
     conversationId: conversationId,
     content: content,
     model: model,
+    attachments: attachments,
   );
+
+  @override
+  Future<PaAttachment> uploadAttachment({
+    required Uint8List bytes,
+    required String filename,
+  }) => _ds.uploadAttachment(bytes: bytes, filename: filename);
 
   @override
   Future<PaModels> listModels() => _ds.listModels();

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../domain/entities/pa_attachment.dart';
 import '../../domain/entities/pa_conversation.dart';
 import '../../domain/entities/pa_message.dart';
 import '../../domain/entities/pa_models.dart';
@@ -54,6 +55,7 @@ class PaMessageDto {
     this.toolCallsRaw,
     this.toolResultsRaw,
     this.thinking = '',
+    this.attachments = const <PaAttachmentDto>[],
   });
 
   factory PaMessageDto.fromJson(Map<String, dynamic> json) {
@@ -71,6 +73,16 @@ class PaMessageDto {
     // a String para que la presentación los resuma sin que la capa de datos
     // fije su shape.
     String? raw(Object? v) => v == null ? null : jsonEncode(v);
+    // attachments es aditivo y TOLERANTE: entradas malformadas se omiten
+    // (el hilo no se cae por un adjunto raro del wire).
+    final atts = <PaAttachmentDto>[];
+    if (json['attachments'] is List<dynamic>) {
+      for (final e in json['attachments'] as List<dynamic>) {
+        if (e is! Map<String, dynamic>) continue;
+        final att = PaAttachmentDto.tryParse(e);
+        if (att != null) atts.add(att);
+      }
+    }
     return PaMessageDto(
       id: id,
       conversationId: conversationId,
@@ -79,6 +91,7 @@ class PaMessageDto {
       toolCallsRaw: raw(json['tool_calls']),
       toolResultsRaw: raw(json['tool_results']),
       thinking: json['thinking'] is String ? json['thinking'] as String : '',
+      attachments: atts,
       createdAt: DateTime.parse(createdAt).toUtc(),
     );
   }
@@ -90,6 +103,7 @@ class PaMessageDto {
   final String? toolCallsRaw;
   final String? toolResultsRaw;
   final String thinking;
+  final List<PaAttachmentDto> attachments;
   final DateTime createdAt;
 
   PaMessage toEntity() => PaMessage(
@@ -100,8 +114,53 @@ class PaMessageDto {
     toolCallsRaw: toolCallsRaw,
     toolResultsRaw: toolResultsRaw,
     thinking: thinking,
+    attachments: attachments.map((a) => a.toEntity()).toList(growable: false),
     createdAt: createdAt,
   );
+}
+
+/// DTO de un adjunto del hilo (mismo shape en la subida y en el mensaje).
+class PaAttachmentDto {
+  const PaAttachmentDto({
+    required this.ref,
+    required this.mime,
+    required this.name,
+    required this.sizeBytes,
+  });
+
+  /// Canónico para la respuesta de la SUBIDA (shape garantizado).
+  factory PaAttachmentDto.fromJson(Map<String, dynamic> json) {
+    final att = tryParse(json);
+    if (att == null) {
+      throw const FormatException('pa attachment: shape inválido');
+    }
+    return att;
+  }
+
+  /// Tolerante para las listas del hilo (malformado ⇒ null, se omite).
+  static PaAttachmentDto? tryParse(Map<String, dynamic> json) {
+    final ref = json['ref'];
+    final mime = json['mime'];
+    final name = json['name'];
+    final size = json['sizeBytes'];
+    if (ref is! String || mime is! String || name is! String || size is! num) {
+      return null;
+    }
+    return PaAttachmentDto(
+      ref: ref,
+      mime: mime,
+      name: name,
+      sizeBytes: size.toInt(),
+    );
+  }
+
+  final String ref;
+  final String mime;
+  final String name;
+  final int sizeBytes;
+
+  PaAttachment toEntity() =>
+      PaAttachment(ref: ref, mime: mime, name: name, sizeBytes: sizeBytes);
 }
 
 /// DTO del `paWire` del SSE (camelCase — el adapter SSE emite ese shape).
@@ -180,7 +239,18 @@ class PaModelsDto {
         final id = e['id'];
         final label = e['label'];
         if (id is String && id.isNotEmpty && label is String) {
-          options.add(PaModelOption(id: id, label: label));
+          // Flags de modalidad DEFENSIVOS: solo se adoptan si el wire los trae
+          // como bool. Ausentes ⇒ null (desconocido) y la UI no muestra aviso.
+          final img = e['imageInput'];
+          final pdf = e['pdfInput'];
+          options.add(
+            PaModelOption(
+              id: id,
+              label: label,
+              imageInput: img is bool ? img : null,
+              pdfInput: pdf is bool ? pdf : null,
+            ),
+          );
         }
       }
     }

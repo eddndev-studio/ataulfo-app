@@ -203,6 +203,7 @@ void main() {
         () => repo.sendMessage(
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) async => _msg('m9', 'assistant', 'tienes 3 bots'));
       when(
@@ -263,6 +264,7 @@ void main() {
         () => repo.sendMessage(
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) async => _msg('m9', 'assistant', 'tienes 3 bots'));
       when(
@@ -307,6 +309,7 @@ void main() {
         () => repo.sendMessage(
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) async => _msg('m9', 'assistant', 'tienes 3 bots'));
       // Carrera read-after-write: la recarga aún no ve el turno recién escrito.
@@ -347,6 +350,7 @@ void main() {
         () => repo.sendMessage(
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) async => _msg('m9', 'assistant', 'tienes 3 bots'));
       when(
@@ -379,6 +383,7 @@ void main() {
         () => repo.sendMessage(
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenThrow(const PaEngineFailure());
     },
@@ -515,6 +520,7 @@ void main() {
           conversationId: any(named: 'conversationId'),
           content: any(named: 'content'),
           model: any(named: 'model'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) async => _msg('m9', 'assistant', 'ok'));
       when(
@@ -534,6 +540,7 @@ void main() {
           conversationId: 'c1',
           content: 'hola',
           model: 'gpt-5.5',
+          attachments: any(named: 'attachments'),
         ),
       ).called(1);
     },
@@ -687,6 +694,7 @@ void main() {
         () => repo.sendMessage(
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenThrow(const PaServerFailure());
     },
@@ -712,6 +720,7 @@ void main() {
         () => repo.sendMessage(
           conversationId: 'c1',
           content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
         ),
       ).thenAnswer((_) => hang.future);
       when(() => repo.cancelSend()).thenAnswer((_) {

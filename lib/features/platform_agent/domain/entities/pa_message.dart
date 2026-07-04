@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart';
+
+import 'pa_attachment.dart';
+
 /// Turno persistido del hilo del asistente de plataforma.
 /// `toolCallsRaw`/`toolResultsRaw` conservan el jsonb CRUDO del wire: la
 /// presentación los resume (chip "usó {tool}") sin que la capa de datos fije
@@ -12,6 +16,7 @@ class PaMessage {
     this.toolCallsRaw,
     this.toolResultsRaw,
     this.thinking = '',
+    this.attachments = const <PaAttachment>[],
   });
 
   final String id;
@@ -21,6 +26,7 @@ class PaMessage {
   final String? toolCallsRaw;
   final String? toolResultsRaw;
   final String thinking;
+  final List<PaAttachment> attachments;
   final DateTime createdAt;
 
   bool get isUser => role == 'user';
@@ -37,6 +43,7 @@ class PaMessage {
       other.toolCallsRaw == toolCallsRaw &&
       other.toolResultsRaw == toolResultsRaw &&
       other.thinking == thinking &&
+      listEquals(other.attachments, attachments) &&
       other.createdAt == createdAt;
 
   @override
@@ -48,6 +55,7 @@ class PaMessage {
     toolCallsRaw,
     toolResultsRaw,
     thinking,
+    Object.hashAll(attachments),
     createdAt,
   );
 }

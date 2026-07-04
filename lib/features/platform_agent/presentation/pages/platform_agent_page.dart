@@ -41,7 +41,9 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
   void _send(String text) {
     final bloc = context.read<PlatformAgentChatBloc>();
     final s = bloc.state;
-    if (s is PaChatLoaded && s.sending) return;
+    // No despachar con un lote de adjuntos a medio subir: cerraría el turno con
+    // un subconjunto y perdería en silencio los que aún suben.
+    if (s is PaChatLoaded && (s.sending || s.attaching)) return;
     bloc.add(PaChatMessageSent(text));
   }
 
@@ -525,13 +527,102 @@ class _ChatViewState extends State<_ChatView> {
               ),
             ),
           ),
+        if (s.modalityWarning.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp3,
+              vertical: AppTokens.sp1,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: AppTokens.text2,
+                ),
+                const SizedBox(width: AppTokens.sp1),
+                Flexible(
+                  child: Text(
+                    s.modalityWarning,
+                    key: const Key('pa.modality_warning'),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (s.pendingAttachments.isNotEmpty)
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              key: const Key('pa.pending_attachments'),
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
+              itemCount: s.pendingAttachments.length,
+              separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
+              itemBuilder: (context, i) {
+                final att = s.pendingAttachments[i];
+                final thumb = s.pendingThumbnails[att.ref];
+                return InputChip(
+                  key: Key('pa.pending_att.${att.ref}'),
+                  avatar: thumb != null
+                      // Miniatura real desde los bytes locales del pendiente.
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppTokens.radiusSm,
+                          ),
+                          child: Image.memory(
+                            thumb,
+                            key: Key('pa.pending_thumb.${att.ref}'),
+                            width: 20,
+                            height: 20,
+                            fit: BoxFit.cover,
+                            // Bytes que no decodifican caen al ícono en vez de
+                            // tumbar la fila.
+                            errorBuilder: (_, _, _) =>
+                                Icon(paAttachmentIcon(att.mime), size: 16),
+                          ),
+                        )
+                      : Icon(paAttachmentIcon(att.mime), size: 16),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  label: Text(att.name, overflow: TextOverflow.ellipsis),
+                  onDeleted: () => context.read<PlatformAgentChatBloc>().add(
+                    PaChatAttachmentRemoved(att.ref),
+                  ),
+                );
+              },
+            ),
+          ),
         AppChatComposer(
           controller: _composer,
           fieldKey: const Key('pa.composer.field'),
           sendKey: const Key('pa.composer.send'),
           hint: 'Pídele algo a tu asistente…',
-          enabled: !s.sending,
+          // El envío se atenúa durante la subida de adjuntos además del turno
+          // en vuelo: evita la carrera adjuntar-mientras-envía.
+          enabled: !s.sending && !s.attaching,
           onSend: onSend,
+          leading: <Widget>[
+            IconButton(
+              key: const Key('pa.attach'),
+              tooltip: 'Adjuntar imagen o PDF',
+              icon: s.attaching
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.attach_file, color: AppTokens.text2),
+              onPressed: s.attaching || s.sending
+                  ? null
+                  : () => context.read<PlatformAgentChatBloc>().add(
+                      const PaChatAttachRequested(),
+                    ),
+            ),
+          ],
         ),
       ],
     );

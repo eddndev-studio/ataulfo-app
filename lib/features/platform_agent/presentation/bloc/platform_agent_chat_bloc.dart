@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../media/domain/repositories/media_file_picker.dart';
+import '../../domain/entities/pa_attachment.dart';
 import '../../domain/entities/pa_conversation.dart';
 import '../../domain/entities/pa_message.dart';
 import '../../domain/entities/pa_models.dart';
@@ -90,6 +92,26 @@ final class PaChatConversationSelected extends PaChatEvent {
   int get hashCode => id.hashCode;
 }
 
+/// El operador quiere adjuntar un archivo al turno: abre el picker y, si elige,
+/// lo sube al hilo (la ref queda PENDIENTE hasta el send).
+final class PaChatAttachRequested extends PaChatEvent {
+  const PaChatAttachRequested();
+}
+
+/// Quita un adjunto pendiente (por ref) antes de enviar.
+final class PaChatAttachmentRemoved extends PaChatEvent {
+  const PaChatAttachmentRemoved(this.ref);
+
+  final String ref;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PaChatAttachmentRemoved && other.ref == ref;
+
+  @override
+  int get hashCode => ref.hashCode;
+}
+
 /// El operador elige el modelo para los próximos turnos. id vacío ⇒ vuelve al
 /// default de la plataforma (el turno viaja sin model).
 final class PaChatModelSelected extends PaChatEvent {
@@ -175,6 +197,9 @@ final class PaChatLoaded extends PaChatState {
     this.loadingMore = false,
     this.lastAttemptedContent = '',
     this.draft = '',
+    this.pendingAttachments = const <PaAttachment>[],
+    this.pendingThumbnails = const <String, Uint8List>{},
+    this.attaching = false,
   });
 
   /// Hilos del operador, DESC por updatedAt (para el selector de historial).
@@ -220,6 +245,49 @@ final class PaChatLoaded extends PaChatState {
   /// cancelar (la persistencia por-hilo vive en el bloc, en memoria).
   final String draft;
 
+  /// Adjuntos YA subidos esperando el próximo send (chips en el composer).
+  final List<PaAttachment> pendingAttachments;
+
+  /// Bytes locales de los adjuntos-imagen pendientes, por ref: alimentan la
+  /// miniatura del chip sin pedirla a la red. Solo viven para los pendientes
+  /// (se descartan al enviar o quitar); NUNCA se persisten en drafts.
+  final Map<String, Uint8List> pendingThumbnails;
+
+  /// true mientras un adjunto sube (el clip muestra spinner).
+  final bool attaching;
+
+  /// Aviso de modalidad: si el modelo efectivo (elegido o, en su defecto, el
+  /// default) declara NO ver imágenes/PDF y hay un pendiente de ese tipo, una
+  /// línea honesta advierte que viajará como texto sustituto. Flags ausentes
+  /// (wire viejo) ⇒ '' (degradación limpia, sin aviso).
+  String get modalityWarning {
+    if (pendingAttachments.isEmpty) return '';
+    final effId = selectedModelId.isNotEmpty ? selectedModelId : defaultModelId;
+    if (effId.isEmpty) return '';
+    PaModelOption? opt;
+    for (final m in models) {
+      if (m.id == effId) {
+        opt = m;
+        break;
+      }
+    }
+    if (opt == null) return '';
+    final hasImage = pendingAttachments.any((a) => a.mime.startsWith('image/'));
+    final hasPdf = pendingAttachments.any((a) => a.mime == 'application/pdf');
+    final warnImage = hasImage && opt.imageInput == false;
+    final warnPdf = hasPdf && opt.pdfInput == false;
+    if (warnImage && warnPdf) {
+      return 'Este modelo no ve imágenes ni PDF; viajarán como texto sustituto.';
+    }
+    if (warnImage) {
+      return 'Este modelo no ve imágenes; viajarán como texto sustituto.';
+    }
+    if (warnPdf) {
+      return 'Este modelo no ve PDF; viajará como texto sustituto.';
+    }
+    return '';
+  }
+
   PaChatLoaded copyWith({
     List<PaConversation>? conversations,
     PaConversation? activeConversation,
@@ -233,6 +301,9 @@ final class PaChatLoaded extends PaChatState {
     bool? loadingMore,
     String? lastAttemptedContent,
     String? draft,
+    List<PaAttachment>? pendingAttachments,
+    Map<String, Uint8List>? pendingThumbnails,
+    bool? attaching,
   }) => PaChatLoaded(
     conversations: conversations ?? this.conversations,
     activeConversation: activeConversation ?? this.activeConversation,
@@ -247,6 +318,9 @@ final class PaChatLoaded extends PaChatState {
     loadingMore: loadingMore ?? this.loadingMore,
     lastAttemptedContent: lastAttemptedContent ?? this.lastAttemptedContent,
     draft: draft ?? this.draft,
+    pendingAttachments: pendingAttachments ?? this.pendingAttachments,
+    pendingThumbnails: pendingThumbnails ?? this.pendingThumbnails,
+    attaching: attaching ?? this.attaching,
   );
 
   @override
@@ -264,7 +338,10 @@ final class PaChatLoaded extends PaChatState {
       other.nextCursor == nextCursor &&
       other.loadingMore == loadingMore &&
       other.lastAttemptedContent == lastAttemptedContent &&
-      other.draft == draft;
+      other.draft == draft &&
+      listEquals(other.pendingAttachments, pendingAttachments) &&
+      mapEquals(other.pendingThumbnails, pendingThumbnails) &&
+      other.attaching == attaching;
 
   @override
   int get hashCode => Object.hash(
@@ -281,6 +358,9 @@ final class PaChatLoaded extends PaChatState {
     loadingMore,
     lastAttemptedContent,
     draft,
+    Object.hashAll(pendingAttachments),
+    Object.hashAll(pendingThumbnails.keys),
+    attaching,
   );
 }
 
@@ -288,11 +368,15 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
   PlatformAgentChatBloc({
     required PlatformAgentRepository repo,
     required PlatformAgentEvents events,
+    MediaFilePicker? picker,
   }) : _repo = repo,
        _events = events,
+       _picker = picker,
        super(const PaChatLoading()) {
     on<PaChatStarted>(_onStarted);
     on<PaChatMessageSent>(_onMessageSent);
+    on<PaChatAttachRequested>(_onAttachRequested);
+    on<PaChatAttachmentRemoved>(_onAttachmentRemoved);
     on<PaChatNewConversationRequested>(_onNewConversation);
     on<PaChatLoadMore>(_onLoadMore);
     on<PaChatConversationRenamed>(_onConversationRenamed);
@@ -306,6 +390,14 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
 
   final PlatformAgentRepository _repo;
   final PlatformAgentEvents _events;
+
+  /// Picker de archivos (nil ⇒ el composer oculta el clip — DX/tests).
+  final MediaFilePicker? _picker;
+
+  /// Máximo de adjuntos por turno (server-side) y peso por archivo. Se aplican
+  /// client-side ANTES de subir para no gastar red en lo que el server rechaza.
+  static const int _maxAttachments = 5;
+  static const int _maxAttachmentBytes = 25 * 1024 * 1024;
 
   /// Borradores del composer por conversationId (en memoria): sobreviven el
   /// cambio de pestaña del shell, que destruye el estado del composer.
@@ -397,7 +489,12 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     Emitter<PaChatState> emit,
   ) async {
     final current = state;
-    if (current is! PaChatLoaded || current.sending) return;
+    // El envío se rechaza mientras un lote de adjuntos sube: capturar el estado
+    // a mitad de subida enviaría un subconjunto y, al limpiar los pendientes con
+    // ese estado stale, dejaría los archivos que aún subían huérfanos en storage.
+    // El operador reenvía cuando la subida cierra.
+    if (current is! PaChatLoaded || current.sending || current.attaching)
+      return;
     final convId = current.activeConversation.id;
     _cancelRequested = false;
     _drafts.remove(convId);
@@ -406,6 +503,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       conversationId: convId,
       role: 'user',
       content: event.content,
+      attachments: current.pendingAttachments,
       createdAt: DateTime.now().toUtc(),
     );
     emit(
@@ -432,6 +530,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         conversationId: convId,
         content: event.content,
         model: current.selectedModelId.isEmpty ? null : current.selectedModelId,
+        attachments: current.pendingAttachments
+            .map((a) => a.ref)
+            .toList(growable: false),
       );
       unawaited(_progressSub?.cancel());
       _progressSub = null;
@@ -446,6 +547,8 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           liveProgress: '',
           clearSendFailure: true,
           lastAttemptedContent: '',
+          pendingAttachments: const <PaAttachment>[],
+          pendingThumbnails: const <String, Uint8List>{},
         ),
       );
       // Recarga best-effort (follow-up, ya con el turno cerrado): trae el hilo
@@ -578,6 +681,8 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     if (target == null) return;
     try {
       final page = await _loadMessages(target.id);
+      // Los adjuntos pendientes son del hilo que se abandona: cambiar de hilo
+      // los descarta (no se arrastran a otra conversación).
       emit(
         current.copyWith(
           activeConversation: target,
@@ -586,6 +691,8 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           liveProgress: '',
           clearSendFailure: true,
           draft: _drafts[target.id] ?? '',
+          pendingAttachments: const <PaAttachment>[],
+          pendingThumbnails: const <String, Uint8List>{},
         ),
       );
     } on PaFailure catch (f) {
@@ -679,6 +786,8 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
             nextCursor: '',
             liveProgress: '',
             clearSendFailure: true,
+            pendingAttachments: const <PaAttachment>[],
+            pendingThumbnails: const <String, Uint8List>{},
           ),
         );
         return;
@@ -693,11 +802,115 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           nextCursor: page.nextCursor,
           liveProgress: '',
           clearSendFailure: true,
+          pendingAttachments: const <PaAttachment>[],
+          pendingThumbnails: const <String, Uint8List>{},
         ),
       );
     } on PaFailure catch (f) {
       emit(current.copyWith(sendFailure: f));
     }
+  }
+
+  Future<void> _onAttachRequested(
+    PaChatAttachRequested event,
+    Emitter<PaChatState> emit,
+  ) async {
+    final current = state;
+    final picker = _picker;
+    if (current is! PaChatLoaded || picker == null || current.attaching) return;
+    final picked = await picker.pickMultiple();
+    if (picked.isEmpty) return; // canceló o nada con bytes.
+    final afterPick = state;
+    if (afterPick is! PaChatLoaded) return;
+
+    // Partición client-side: descartar sobre-peso, luego acotar al cupo
+    // restante (5 CONTANDO los pendientes ya subidos).
+    final withinSize = <PickedMedia>[];
+    var anyTooLarge = false;
+    for (final p in picked) {
+      if (p.bytes.length > _maxAttachmentBytes) {
+        anyTooLarge = true;
+      } else {
+        withinSize.add(p);
+      }
+    }
+    final remaining = _maxAttachments - afterPick.pendingAttachments.length;
+    final toUpload = remaining > 0
+        ? withinSize.take(remaining).toList(growable: false)
+        : const <PickedMedia>[];
+    final anyOverLimit = withinSize.length > toUpload.length;
+
+    if (toUpload.isEmpty) {
+      // Nada subible: informar el motivo dominante (peso pesa más que cupo).
+      emit(
+        afterPick.copyWith(
+          sendFailure: anyTooLarge
+              ? const PaAttachmentTooLargeFailure()
+              : const PaAttachmentLimitFailure(),
+        ),
+      );
+      return;
+    }
+
+    emit(afterPick.copyWith(attaching: true, clearSendFailure: true));
+    for (final p in toUpload) {
+      try {
+        final att = await _repo.uploadAttachment(
+          bytes: p.bytes,
+          filename: p.filename,
+        );
+        final cur = state;
+        if (cur is! PaChatLoaded) return;
+        // La miniatura local solo aplica a imágenes; el resto usa ícono.
+        final thumbs = att.mime.startsWith('image/')
+            ? <String, Uint8List>{...cur.pendingThumbnails, att.ref: p.bytes}
+            : null;
+        emit(
+          cur.copyWith(
+            pendingAttachments: <PaAttachment>[...cur.pendingAttachments, att],
+            pendingThumbnails: thumbs,
+          ),
+        );
+      } on PaFailure catch (f) {
+        final cur = state;
+        if (cur is! PaChatLoaded) return;
+        // Corta el lote en la primera falla de red/servidor y la muestra.
+        emit(cur.copyWith(attaching: false, sendFailure: f));
+        return;
+      }
+    }
+
+    final cur = state;
+    if (cur is! PaChatLoaded) return;
+    // Cierre del lote: si algo se descartó client-side, informarlo (peso >
+    // cupo); si todo entró, limpiar cualquier aviso previo.
+    final notice = anyTooLarge
+        ? const PaAttachmentTooLargeFailure()
+        : (anyOverLimit ? const PaAttachmentLimitFailure() : null);
+    emit(
+      cur.copyWith(
+        attaching: false,
+        sendFailure: notice,
+        clearSendFailure: notice == null,
+      ),
+    );
+  }
+
+  void _onAttachmentRemoved(
+    PaChatAttachmentRemoved event,
+    Emitter<PaChatState> emit,
+  ) {
+    final current = state;
+    if (current is! PaChatLoaded) return;
+    emit(
+      current.copyWith(
+        pendingAttachments: current.pendingAttachments
+            .where((a) => a.ref != event.ref)
+            .toList(growable: false),
+        pendingThumbnails: <String, Uint8List>{...current.pendingThumbnails}
+          ..remove(event.ref),
+      ),
+    );
   }
 
   void _onModelSelected(PaChatModelSelected event, Emitter<PaChatState> emit) {

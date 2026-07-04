@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+
+import '../entities/pa_attachment.dart';
 import '../entities/pa_conversation.dart';
 import '../entities/pa_message.dart';
 import '../entities/pa_models.dart';
@@ -27,10 +30,18 @@ abstract interface class PlatformAgentRepository {
 
   /// Corre un turno: persiste el user message y devuelve el assistant final.
   /// `model` null/vacío ⇒ el turno corre con el modelo default de la plataforma.
+  /// `attachments` son refs ya subidas que viajan con el turno.
   Future<PaMessage> sendMessage({
     required String conversationId,
     required String content,
     String? model,
+    List<String> attachments,
+  });
+
+  /// Sube un adjunto del hilo; la ref devuelta viaja en sendMessage.
+  Future<PaAttachment> uploadAttachment({
+    required Uint8List bytes,
+    required String filename,
   });
 
   /// Allowlist de modelos + default de la plataforma (best-effort: el caller

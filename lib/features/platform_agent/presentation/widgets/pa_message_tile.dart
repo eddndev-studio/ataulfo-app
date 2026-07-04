@@ -69,11 +69,41 @@ class PaMessageTile extends StatelessWidget {
           keyId: 'pa.${message.id}',
           child: ChatBubble(
             mine: message.isUser,
-            child: Text(
-              message.content,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                for (final att in message.attachments)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppTokens.sp1),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Icon(
+                          paAttachmentIcon(att.mime),
+                          size: 16,
+                          color: AppTokens.text2,
+                        ),
+                        const SizedBox(width: AppTokens.sp1),
+                        Flexible(
+                          child: Text(
+                            att.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(color: AppTokens.text2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (message.content.isNotEmpty)
+                  Text(
+                    message.content,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+                  ),
+              ],
             ),
           ),
         ),
@@ -81,6 +111,13 @@ class PaMessageTile extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Ícono por MIME del adjunto (imagen/PDF; resto genérico).
+IconData paAttachmentIcon(String mime) {
+  if (mime.startsWith('image/')) return Icons.image_outlined;
+  if (mime == 'application/pdf') return Icons.description_outlined;
+  return Icons.attach_file;
 }
 
 /// Un campo que cambió en una escritura: ruta, valor previo y nuevo (ya como
