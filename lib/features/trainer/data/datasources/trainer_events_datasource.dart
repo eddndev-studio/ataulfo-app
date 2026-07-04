@@ -8,7 +8,7 @@ import '../../domain/entities/trainer_progress.dart';
 import '../../domain/repositories/trainer_repositories.dart';
 
 /// Implementación del puerto `TrainerEvents` sobre el stream SSE
-/// `GET /trainer/templates/{templateId}/conversations/{id}/stream`, filtrado y
+/// `GET /templates/{templateId}/trainer/conversations/{id}/stream`, filtrado y
 /// mapeado a `TrainerProgressEvent`. Solo progreso cosmético
 /// (pensando/tool/completed/failed); el contenido del mensaje llega por el
 /// POST/recarga, no por aquí.
@@ -44,7 +44,7 @@ class DioTrainerEventsDatasource implements TrainerEvents {
     final cancel = CancelToken();
     try {
       final res = await _dio.get<ResponseBody>(
-        '/trainer/templates/$templateId/conversations/$conversationId/stream',
+        '/templates/$templateId/trainer/conversations/$conversationId/stream',
         cancelToken: cancel,
         options: Options(
           responseType: ResponseType.stream,
