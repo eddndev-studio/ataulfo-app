@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart' as rec;
 
-import '../../domain/repositories/audio_recorder.dart';
+import '../../../../core/audio/audio_recorder.dart';
 import 'waveform.dart';
 
 /// Grabador real de notas de voz: Opus-en-Ogg vía el plugin `record`. WhatsApp

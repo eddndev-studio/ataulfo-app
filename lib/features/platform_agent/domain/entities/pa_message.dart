@@ -17,6 +17,9 @@ class PaMessage {
     this.toolResultsRaw,
     this.thinking = '',
     this.attachments = const <PaAttachment>[],
+    this.audioRef = '',
+    this.transcriptStatus = '',
+    this.transcript = '',
   });
 
   final String id;
@@ -27,11 +30,25 @@ class PaMessage {
   final String? toolResultsRaw;
   final String thinking;
   final List<PaAttachment> attachments;
+
+  /// Ref del audio de una nota de voz del operador (vacío = no es de voz).
+  final String audioRef;
+
+  /// Estado de la transcripción del audio: `done` | `pending` | `unavailable`
+  /// (vacío cuando no aplica). Solo con `done` viaja [transcript].
+  final String transcriptStatus;
+
+  /// Texto transcrito del audio (vacío si no se transcribió).
+  final String transcript;
+
   final DateTime createdAt;
 
   bool get isUser => role == 'user';
   bool get isAssistant => role == 'assistant';
   bool get isTool => role == 'tool';
+
+  /// El turno es una nota de voz del operador (trae un audio adjunto).
+  bool get isVoiceNote => audioRef.isNotEmpty;
 
   @override
   bool operator ==(Object other) =>
@@ -44,6 +61,9 @@ class PaMessage {
       other.toolResultsRaw == toolResultsRaw &&
       other.thinking == thinking &&
       listEquals(other.attachments, attachments) &&
+      other.audioRef == audioRef &&
+      other.transcriptStatus == transcriptStatus &&
+      other.transcript == transcript &&
       other.createdAt == createdAt;
 
   @override
@@ -56,6 +76,9 @@ class PaMessage {
     toolResultsRaw,
     thinking,
     Object.hashAll(attachments),
+    audioRef,
+    transcriptStatus,
+    transcript,
     createdAt,
   );
 }

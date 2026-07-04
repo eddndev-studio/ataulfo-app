@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/design/safe_bottom.dart';
-import '../../../../core/design/tokens.dart';
+import '../safe_bottom.dart';
+import '../tokens.dart';
 import 'live_waveform.dart';
 
 /// `mm:ss` del tiempo de grabación (compartido por las barras de voz).

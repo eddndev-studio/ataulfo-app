@@ -1,6 +1,6 @@
 import '../data/media/noop_audio_recorder.dart';
 import '../data/media/record_audio_recorder.dart';
-import '../domain/repositories/audio_recorder.dart';
+import '../../../core/audio/audio_recorder.dart';
 
 /// Elige el [AudioRecorder] según la plataforma: sólo Android usa el grabador
 /// real (Opus vía `record`); el resto (escritorio/Linux del dev box, web) usa

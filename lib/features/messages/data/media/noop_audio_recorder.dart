@@ -1,4 +1,4 @@
-import '../../domain/repositories/audio_recorder.dart';
+import '../../../../core/audio/audio_recorder.dart';
 
 /// Grabador inerte para plataformas sin micrófono nativo (el dev box es Linux;
 /// también web). Se anuncia como NO soportado, así la UI no ofrece grabar, y

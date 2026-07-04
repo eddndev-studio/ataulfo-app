@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_conversation.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_message.dart';
@@ -92,6 +93,10 @@ PaProgressEvent _prog(String kind, {String tool = '', String conv = 'c1'}) =>
 void main() {
   late _MockRepo repo;
   late _MockEvents events;
+
+  setUpAll(() {
+    registerFallbackValue(Uint8List(0));
+  });
 
   setUp(() {
     repo = _MockRepo();
@@ -804,4 +809,127 @@ void main() {
     expect: () => <dynamic>[],
     verify: (b) => expect(b.activeDraft, 'texto sin enviar'),
   );
+
+  group('nota de voz', () {
+    final bytes = Uint8List.fromList(<int>[1, 2, 3, 4]);
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
+      'VoiceStarted marca recordingVoice',
+      build: build,
+      seed: loaded,
+      act: (b) => b.add(const PaChatVoiceStarted()),
+      expect: () => <dynamic>[
+        isA<PaChatLoaded>().having((s) => s.recordingVoice, 'recording', true),
+      ],
+    );
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
+      'grabando bloquea el envío de texto (una cosa a la vez)',
+      build: build,
+      seed: () => loaded().copyWith(recordingVoice: true),
+      act: (b) => b.add(const PaChatMessageSent('hola')),
+      expect: () => <dynamic>[],
+      verify: (_) {
+        verifyNever(
+          () => repo.sendMessage(
+            conversationId: any(named: 'conversationId'),
+            content: any(named: 'content'),
+            attachments: any(named: 'attachments'),
+          ),
+        );
+      },
+    );
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
+      'VoiceCancelled limpia recordingVoice',
+      build: build,
+      seed: () => loaded().copyWith(recordingVoice: true),
+      act: (b) => b.add(const PaChatVoiceCancelled()),
+      expect: () => <dynamic>[
+        isA<PaChatLoaded>().having((s) => s.recordingVoice, 'recording', false),
+      ],
+    );
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
+      'VoiceSent corre el turno vía sendAudio y cierra con el assistant',
+      build: build,
+      seed: () => loaded().copyWith(recordingVoice: true),
+      setUp: () {
+        when(
+          () => repo.sendAudio(
+            conversationId: 'c1',
+            bytes: any(named: 'bytes'),
+            filename: any(named: 'filename'),
+          ),
+        ).thenAnswer((_) async => _msg('a1', 'assistant', 'te escuché'));
+        when(
+          () => repo.listMessages(
+            conversationId: 'c1',
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => PaMessagesPage(
+            messages: <PaMessage>[
+              _msg('a1', 'assistant', 'te escuché'),
+              _msg('u1', 'user', 'nota de voz'),
+            ],
+            nextCursor: '',
+          ),
+        );
+      },
+      act: (b) => b.add(PaChatVoiceSent(bytes)),
+      expect: () => <dynamic>[
+        // Arranca el turno: recording cae, sending sube, Pensando…
+        isA<PaChatLoaded>()
+            .having((s) => s.recordingVoice, 'recording', false)
+            .having((s) => s.sending, 'sending', true)
+            .having((s) => s.liveProgress, 'progress', 'Pensando…'),
+        // Cierra con el assistant que devolvió el POST.
+        isA<PaChatLoaded>()
+            .having((s) => s.sending, 'sending', false)
+            .having(
+              (s) => s.messages.any((m) => m.id == 'a1'),
+              'assistant',
+              true,
+            ),
+        // Recarga best-effort del hilo completo.
+        isA<PaChatLoaded>().having(
+          (s) => s.messages.any((m) => m.id == 'u1'),
+          'user recargado',
+          true,
+        ),
+      ],
+      verify: (_) {
+        verify(
+          () => repo.sendAudio(
+            conversationId: 'c1',
+            bytes: any(named: 'bytes'),
+            filename: any(named: 'filename'),
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
+      'VoiceSent con fallo del motor revierte a un fallo mostrable',
+      build: build,
+      seed: () => loaded().copyWith(recordingVoice: true),
+      setUp: () {
+        when(
+          () => repo.sendAudio(
+            conversationId: 'c1',
+            bytes: any(named: 'bytes'),
+            filename: any(named: 'filename'),
+          ),
+        ).thenThrow(const PaEngineFailure());
+      },
+      act: (b) => b.add(PaChatVoiceSent(bytes)),
+      expect: () => <dynamic>[
+        isA<PaChatLoaded>().having((s) => s.sending, 'sending', true),
+        isA<PaChatLoaded>()
+            .having((s) => s.sending, 'sending', false)
+            .having((s) => s.sendFailure, 'fallo', isA<PaEngineFailure>()),
+      ],
+    );
+  });
 }

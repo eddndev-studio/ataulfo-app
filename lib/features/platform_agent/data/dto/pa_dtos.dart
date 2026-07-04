@@ -56,6 +56,9 @@ class PaMessageDto {
     this.toolResultsRaw,
     this.thinking = '',
     this.attachments = const <PaAttachmentDto>[],
+    this.audioRef = '',
+    this.transcriptStatus = '',
+    this.transcript = '',
   });
 
   factory PaMessageDto.fromJson(Map<String, dynamic> json) {
@@ -83,6 +86,8 @@ class PaMessageDto {
         if (att != null) atts.add(att);
       }
     }
+    // Campos de nota de voz: aditivos y DEFENSIVOS (tipo inesperado ⇒ vacío).
+    String str(Object? v) => v is String ? v : '';
     return PaMessageDto(
       id: id,
       conversationId: conversationId,
@@ -92,6 +97,9 @@ class PaMessageDto {
       toolResultsRaw: raw(json['tool_results']),
       thinking: json['thinking'] is String ? json['thinking'] as String : '',
       attachments: atts,
+      audioRef: str(json['audio_ref']),
+      transcriptStatus: str(json['transcript_status']),
+      transcript: str(json['transcript']),
       createdAt: DateTime.parse(createdAt).toUtc(),
     );
   }
@@ -104,6 +112,9 @@ class PaMessageDto {
   final String? toolResultsRaw;
   final String thinking;
   final List<PaAttachmentDto> attachments;
+  final String audioRef;
+  final String transcriptStatus;
+  final String transcript;
   final DateTime createdAt;
 
   PaMessage toEntity() => PaMessage(
@@ -115,6 +126,9 @@ class PaMessageDto {
     toolResultsRaw: toolResultsRaw,
     thinking: thinking,
     attachments: attachments.map((a) => a.toEntity()).toList(growable: false),
+    audioRef: audioRef,
+    transcriptStatus: transcriptStatus,
+    transcript: transcript,
     createdAt: createdAt,
   );
 }

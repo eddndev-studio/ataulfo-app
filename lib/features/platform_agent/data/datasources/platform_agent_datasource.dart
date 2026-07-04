@@ -49,6 +49,16 @@ abstract interface class PlatformAgentDatasource {
     required String filename,
   });
 
+  /// Sube una nota de voz (multipart, part `audio`) y corre el turno: el server
+  /// persiste el user con el audio (y su transcript si pudo) y devuelve el
+  /// assistant final. Mismo presupuesto de tiempo y token de cancelación que
+  /// `sendMessage`. 413/415 tipados.
+  Future<PaMessage> sendAudio({
+    required String conversationId,
+    required Uint8List bytes,
+    String filename,
+  });
+
   /// Allowlist de modelos del agente + default de la plataforma. El caller la
   /// trata como best-effort: cualquier fallo oculta el selector.
   Future<PaModels> listModels();
@@ -200,6 +210,39 @@ class DioPlatformAgentDatasource implements PlatformAgentDatasource {
           'model': ?model,
           if (attachments.isNotEmpty) 'attachments': attachments,
         },
+        options: Options(receiveTimeout: paTurnReceiveTimeout),
+        cancelToken: token,
+      );
+      final body = res.data;
+      if (body == null) throw const PaUnknownFailure();
+      return PaMessageDto.fromJson(body).toEntity();
+    } on PaFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw mapPlatformAgentDioException(e);
+    } on FormatException {
+      throw const PaUnknownFailure();
+    } on TypeError {
+      throw const PaUnknownFailure();
+    } finally {
+      if (identical(_inFlight, token)) _inFlight = null;
+    }
+  }
+
+  @override
+  Future<PaMessage> sendAudio({
+    required String conversationId,
+    required Uint8List bytes,
+    String filename = 'voice.ogg',
+  }) async {
+    final token = CancelToken();
+    _inFlight = token;
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '$_base/$conversationId/audio',
+        data: FormData.fromMap(<String, dynamic>{
+          'audio': MultipartFile.fromBytes(bytes, filename: filename),
+        }),
         options: Options(receiveTimeout: paTurnReceiveTimeout),
         cancelToken: token,
       );

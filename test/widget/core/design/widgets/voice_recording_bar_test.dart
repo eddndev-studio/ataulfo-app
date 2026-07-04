@@ -1,5 +1,5 @@
 import 'package:ataulfo/core/design/tokens.dart';
-import 'package:ataulfo/features/messages/presentation/widgets/voice_recording_bar.dart';
+import 'package:ataulfo/core/design/widgets/voice_recording_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

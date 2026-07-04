@@ -96,7 +96,12 @@ class PaMessageTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                if (message.content.isNotEmpty)
+                // Una nota de voz se rotula honestamente: chip "Nota de voz" y,
+                // si el server la transcribió, el texto abajo. El `content` crudo
+                // no se pinta (es el marcador "[audio…]" o duplica el transcrito).
+                if (message.isVoiceNote)
+                  _VoiceNote(message: message)
+                else if (message.content.isNotEmpty)
                   Text(
                     message.content,
                     style: Theme.of(
@@ -108,6 +113,51 @@ class PaMessageTile extends StatelessWidget {
           ),
         ),
         MessageTimestamp(at: message.createdAt),
+      ],
+    );
+  }
+}
+
+/// Render honesto de una nota de voz del operador: rótulo "Nota de voz" con
+/// ícono de micrófono y, cuando el server la transcribió (`transcriptStatus`
+/// done y texto no vacío), el transcrito debajo. Nunca pinta el `content`
+/// crudo, que es el marcador de audio o una copia del transcrito.
+class _VoiceNote extends StatelessWidget {
+  const _VoiceNote({required this.message});
+
+  final PaMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final hasTranscript =
+        message.transcriptStatus == 'done' && message.transcript.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.mic_none_outlined,
+              size: 16,
+              color: AppTokens.text2,
+            ),
+            const SizedBox(width: AppTokens.sp1),
+            Text(
+              'Nota de voz',
+              style: textTheme.labelMedium?.copyWith(color: AppTokens.text2),
+            ),
+          ],
+        ),
+        if (hasTranscript) ...<Widget>[
+          const SizedBox(height: AppTokens.sp1),
+          Text(
+            message.transcript,
+            style: textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+          ),
+        ],
       ],
     );
   }

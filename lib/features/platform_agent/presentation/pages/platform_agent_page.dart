@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/audio/audio_recorder.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/typing_bubble.dart';
+import '../../../../core/design/widgets/voice_recording_bar.dart';
 import '../../domain/entities/pa_conversation.dart';
 import '../../domain/failures/pa_failure.dart';
 import '../bloc/platform_agent_chat_bloc.dart';
@@ -385,14 +389,50 @@ class _ChatViewState extends State<_ChatView> {
   /// origen del borrador, que el bloc persiste por hilo.
   final TextEditingController _composer = TextEditingController();
 
+  /// Bloc capturado al montar: lo usa el ciclo de la nota de voz (incluida la
+  /// limpieza en dispose, cuando el context ya no es fiable).
+  late final PlatformAgentChatBloc _bloc;
+
+  /// Grabador compartido (Noop/ausente fuera de Android): NO se dispone aquí.
+  /// null ⇒ la superficie no ofrece el micrófono.
+  AudioRecorder? _recorder;
+
+  /// La plataforma puede grabar (Opus soportado). Falso ⇒ sin micrófono.
+  bool _canRecord = false;
+
+  /// Grabando localmente: guía la limpieza en dispose (aborta el clip huérfano
+  /// si el composer se destruye a media grabación, p. ej. al cambiar de tab).
+  bool _recording = false;
+
+  /// Grabación pausada (manos libres): congela tiempo+waveform sin descartar.
+  bool _paused = false;
+
+  /// Subiendo el clip tras detener: deshabilita enviar/pausar en la barra.
+  bool _sendingVoice = false;
+
   @override
   void initState() {
     super.initState();
+    _bloc = context.read<PlatformAgentChatBloc>();
     // Al (re)montar —incl. al volver a la pestaña del shell, que destruyó el
     // composer— resembrar desde el borrador VIVO del bloc, no desde state.draft
     // (que está rancio: DraftChanged no emite). Así el texto sin enviar persiste.
-    _composer.text = context.read<PlatformAgentChatBloc>().activeDraft;
+    _composer.text = _bloc.activeDraft;
     _composer.addListener(_onComposerChanged);
+    _recorder = _readRecorder(context);
+    _recorder?.isSupported().then((ok) {
+      if (mounted) setState(() => _canRecord = ok);
+    });
+  }
+
+  /// Lee el grabador del scope de forma tolerante: superficies sin él cableado
+  /// (tests, plataforma sin micrófono) simplemente no ofrecen la nota de voz.
+  AudioRecorder? _readRecorder(BuildContext context) {
+    try {
+      return context.read<AudioRecorder>();
+    } on Object {
+      return null;
+    }
   }
 
   @override
@@ -431,9 +471,114 @@ class _ChatViewState extends State<_ChatView> {
 
   @override
   void dispose() {
+    // Grabación viva al destruirse el composer (p. ej. cambio de tab): aborta
+    // el clip huérfano y revierte el estado del bloc para no volver a una barra
+    // de grabación sin grabador detrás.
+    if (_recording) {
+      unawaited(_recorder?.cancel());
+      if (!_bloc.isClosed) _bloc.add(const PaChatVoiceCancelled());
+    }
     _composer.removeListener(_onComposerChanged);
     _composer.dispose();
     super.dispose();
+  }
+
+  // ── Nota de voz ──────────────────────────────────────────────────────────
+
+  /// Tap del micrófono: pide permiso y arranca la grabación en modo bloqueado
+  /// (sin gesto de mantener). Sin permiso o ante un fallo del arranque, avisa y
+  /// no entra a grabar.
+  Future<void> _startVoice() async {
+    final rec = _recorder;
+    if (rec == null || _recording) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final granted = await rec.hasPermission();
+    if (!mounted) return;
+    if (!granted) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Permite el micrófono para grabar notas de voz'),
+        ),
+      );
+      return;
+    }
+    try {
+      await rec.start();
+    } on Object {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('No se pudo iniciar la grabación')),
+        );
+      }
+      return;
+    }
+    if (!mounted) {
+      unawaited(rec.cancel());
+      return;
+    }
+    setState(() => _recording = true);
+    _bloc.add(const PaChatVoiceStarted());
+  }
+
+  /// Descarta la grabación en curso sin enviarla.
+  Future<void> _cancelVoice() async {
+    await _recorder?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _recording = false;
+      _paused = false;
+      _sendingVoice = false;
+    });
+    _bloc.add(const PaChatVoiceCancelled());
+  }
+
+  /// Detiene la grabación y despacha el clip: el bloc corre el turno vía audio.
+  /// Un clip vacío se descarta con aviso.
+  Future<void> _sendVoice() async {
+    final rec = _recorder;
+    if (rec == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _sendingVoice = true);
+    RecordedVoice? voice;
+    try {
+      voice = await rec.stop();
+    } on Object {
+      voice = null;
+    }
+    if (!mounted) return;
+    if (voice == null || voice.bytes.isEmpty) {
+      setState(() {
+        _recording = false;
+        _paused = false;
+        _sendingVoice = false;
+      });
+      _bloc.add(const PaChatVoiceCancelled());
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No se grabó audio')),
+      );
+      return;
+    }
+    _bloc.add(PaChatVoiceSent(voice.bytes));
+    if (mounted) {
+      setState(() {
+        _recording = false;
+        _paused = false;
+        _sendingVoice = false;
+      });
+    }
+  }
+
+  /// Pausa/reanuda la grabación (manos libres). No aplica durante la subida.
+  Future<void> _togglePauseVoice() async {
+    final rec = _recorder;
+    if (rec == null || _sendingVoice) return;
+    if (_paused) {
+      await rec.resume();
+      if (mounted) setState(() => _paused = false);
+    } else {
+      await rec.pause();
+      if (mounted) setState(() => _paused = true);
+    }
   }
 
   void _prefill(String text) {
@@ -596,34 +741,61 @@ class _ChatViewState extends State<_ChatView> {
               },
             ),
           ),
-        AppChatComposer(
-          controller: _composer,
-          fieldKey: const Key('pa.composer.field'),
-          sendKey: const Key('pa.composer.send'),
-          hint: 'Pídele algo a tu asistente…',
-          // El envío se atenúa durante la subida de adjuntos además del turno
-          // en vuelo: evita la carrera adjuntar-mientras-envía.
-          enabled: !s.sending && !s.attaching,
-          onSend: onSend,
-          leading: <Widget>[
-            IconButton(
-              key: const Key('pa.attach'),
-              tooltip: 'Adjuntar imagen o PDF',
-              icon: s.attaching
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.attach_file, color: AppTokens.text2),
-              onPressed: s.attaching || s.sending
-                  ? null
-                  : () => context.read<PlatformAgentChatBloc>().add(
-                      const PaChatAttachRequested(),
+        // Grabando: la barra de nota de voz reemplaza al composer (una cosa a la
+        // vez). Si no, el composer con el micrófono en el slot final vacío.
+        if (s.recordingVoice && _recorder != null)
+          VoiceRecordingBar(
+            elapsed: _recorder!.elapsed,
+            amplitude: _recorder!.amplitude,
+            onCancel: _cancelVoice,
+            onSend: _sendVoice,
+            onPauseResume: _togglePauseVoice,
+            paused: _paused,
+            sending: _sendingVoice,
+          )
+        else
+          AppChatComposer(
+            controller: _composer,
+            fieldKey: const Key('pa.composer.field'),
+            sendKey: const Key('pa.composer.send'),
+            hint: 'Pídele algo a tu asistente…',
+            // El envío se atenúa durante la subida de adjuntos además del turno
+            // en vuelo: evita la carrera adjuntar-mientras-envía.
+            enabled: !s.sending && !s.attaching,
+            onSend: onSend,
+            // Micrófono en el slot final mientras el campo está vacío: solo si el
+            // grabador está soportado y no hay adjuntos pendientes (esos se envían
+            // por el flujo de texto).
+            emptyTrailing: (_canRecord && s.pendingAttachments.isEmpty)
+                ? IconButton(
+                    key: const Key('pa.voice.mic'),
+                    tooltip: 'Grabar nota de voz',
+                    icon: const Icon(
+                      Icons.mic_none_outlined,
+                      color: AppTokens.text2,
                     ),
-            ),
-          ],
-        ),
+                    onPressed: _startVoice,
+                  )
+                : null,
+            leading: <Widget>[
+              IconButton(
+                key: const Key('pa.attach'),
+                tooltip: 'Adjuntar imagen o PDF',
+                icon: s.attaching
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.attach_file, color: AppTokens.text2),
+                onPressed: s.attaching || s.sending
+                    ? null
+                    : () => context.read<PlatformAgentChatBloc>().add(
+                        const PaChatAttachRequested(),
+                      ),
+              ),
+            ],
+          ),
       ],
     );
   }

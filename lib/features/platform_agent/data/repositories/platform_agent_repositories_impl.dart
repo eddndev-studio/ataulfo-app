@@ -62,6 +62,17 @@ class PlatformAgentRepositoryImpl implements PlatformAgentRepository {
   }) => _ds.uploadAttachment(bytes: bytes, filename: filename);
 
   @override
+  Future<PaMessage> sendAudio({
+    required String conversationId,
+    required Uint8List bytes,
+    String filename = 'voice.ogg',
+  }) => _ds.sendAudio(
+    conversationId: conversationId,
+    bytes: bytes,
+    filename: filename,
+  );
+
+  @override
   Future<PaModels> listModels() => _ds.listModels();
 
   @override

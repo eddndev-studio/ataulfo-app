@@ -15,11 +15,11 @@ import '../../data/cache/message_media_cache.dart';
 import '../../domain/attachment_intake.dart';
 import '../../domain/attachment_type.dart';
 import '../../domain/entities/message.dart';
-import '../../domain/repositories/audio_recorder.dart';
+import '../../../../core/audio/audio_recorder.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/reply_draft_cubit.dart';
 import 'attachment_tray.dart';
-import 'voice_recording_bar.dart';
+import '../../../../core/design/widgets/voice_recording_bar.dart';
 
 /// Acción decidida al soltar el micrófono (o al cancelarse el puntero), por si el
 /// dedo se levanta ANTES de que `start()` resuelva: se guarda y se aplica en

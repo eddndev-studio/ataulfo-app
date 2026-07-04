@@ -219,4 +219,40 @@ void main() {
     expect(find.byType(AssistantMarkdown), findsNothing);
     expect(find.text('**negrita**'), findsOneWidget);
   });
+
+  testWidgets('nota de voz con transcripción: "Nota de voz" + el transcrito, '
+      'sin filtrar el marcador crudo', (tester) async {
+    const marker = '[audio recibido, sin transcripción]';
+    final voice = PaMessage(
+      id: 'v1',
+      conversationId: 'c1',
+      role: 'user',
+      content: 'agenda una demo para el martes',
+      audioRef: 'tenant/org/media/v1.ogg',
+      transcriptStatus: 'done',
+      transcript: 'agenda una demo para el martes',
+      createdAt: DateTime.utc(2026, 6, 10),
+    );
+    await tester.pumpWidget(_wrap(PaMessageTile(message: voice)));
+    expect(find.text('Nota de voz'), findsOneWidget);
+    expect(find.text('agenda una demo para el martes'), findsOneWidget);
+    expect(find.text(marker), findsNothing);
+  });
+
+  testWidgets('nota de voz sin transcripción: solo "Nota de voz", nunca el '
+      'marcador crudo', (tester) async {
+    const marker = '[audio recibido, sin transcripción]';
+    final voice = PaMessage(
+      id: 'v2',
+      conversationId: 'c1',
+      role: 'user',
+      content: marker,
+      audioRef: 'tenant/org/media/v2.ogg',
+      transcriptStatus: 'unavailable',
+      createdAt: DateTime.utc(2026, 6, 10),
+    );
+    await tester.pumpWidget(_wrap(PaMessageTile(message: voice)));
+    expect(find.text('Nota de voz'), findsOneWidget);
+    expect(find.text(marker), findsNothing);
+  });
 }

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../../core/design/tokens.dart';
+import '../tokens.dart';
 
 /// Una barra del waveform en vivo lista para pintar: a qué muestra del buffer
 /// corresponde y dónde va su centro en X. La altura la resuelve el pintor con

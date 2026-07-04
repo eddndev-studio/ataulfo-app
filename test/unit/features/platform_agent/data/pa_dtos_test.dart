@@ -118,4 +118,53 @@ void main() {
       expect(() => PaProgressEventDto.fromJson(json), throwsFormatException);
     });
   });
+
+  group('PaMessageDto nota de voz', () {
+    test('parsea audio_ref/transcript_status/transcript del user de voz', () {
+      final m = PaMessageDto.fromJson(<String, dynamic>{
+        'id': 'm1',
+        'conversation_id': 'c1',
+        'role': 'user',
+        'content': 'hola asistente',
+        'created_at': '2026-06-10T10:00:00.000Z',
+        'audio_ref': 'tenant/org/media/v1.ogg',
+        'transcript_status': 'done',
+        'transcript': 'hola asistente',
+      }).toEntity();
+      expect(m.audioRef, 'tenant/org/media/v1.ogg');
+      expect(m.transcriptStatus, 'done');
+      expect(m.transcript, 'hola asistente');
+      expect(m.isVoiceNote, isTrue);
+    });
+
+    test('sin campos de audio (wire viejo/turno normal) degradan a vacío', () {
+      final m = PaMessageDto.fromJson(<String, dynamic>{
+        'id': 'm2',
+        'conversation_id': 'c1',
+        'role': 'assistant',
+        'content': 'listo',
+        'created_at': '2026-06-10T10:00:00.000Z',
+      }).toEntity();
+      expect(m.audioRef, '');
+      expect(m.transcriptStatus, '');
+      expect(m.transcript, '');
+      expect(m.isVoiceNote, isFalse);
+    });
+
+    test('campos de audio con tipo inesperado se ignoran (defensivo)', () {
+      final m = PaMessageDto.fromJson(<String, dynamic>{
+        'id': 'm3',
+        'conversation_id': 'c1',
+        'role': 'user',
+        'content': '',
+        'created_at': '2026-06-10T10:00:00.000Z',
+        'audio_ref': 42,
+        'transcript_status': <String, dynamic>{},
+        'transcript': true,
+      }).toEntity();
+      expect(m.audioRef, '');
+      expect(m.transcriptStatus, '');
+      expect(m.transcript, '');
+    });
+  });
 }

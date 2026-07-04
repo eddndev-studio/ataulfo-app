@@ -1,6 +1,6 @@
 import 'package:ataulfo/features/messages/application/audio_recorder_resolver.dart';
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
-import 'package:ataulfo/features/messages/domain/repositories/audio_recorder.dart';
+import 'package:ataulfo/core/audio/audio_recorder.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Grabador de prueba: marca que la factory de Android se invocó sin construir

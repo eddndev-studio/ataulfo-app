@@ -132,6 +132,25 @@ final class PaChatTurnCancelRequested extends PaChatEvent {
   const PaChatTurnCancelRequested();
 }
 
+/// Empieza a grabar una nota de voz (bloquea el envío de texto: una a la vez).
+final class PaChatVoiceStarted extends PaChatEvent {
+  const PaChatVoiceStarted();
+}
+
+/// Descarta la grabación en curso sin enviarla.
+final class PaChatVoiceCancelled extends PaChatEvent {
+  const PaChatVoiceCancelled();
+}
+
+/// Envía la nota de voz grabada: corre el turno vía sendAudio (mismo manejo
+/// que un mensaje de texto: sending/typing/SSE/cancel/fallos).
+final class PaChatVoiceSent extends PaChatEvent {
+  const PaChatVoiceSent(this.bytes, {this.filename = 'voice.ogg'});
+
+  final Uint8List bytes;
+  final String filename;
+}
+
 /// El composer cambió: persiste el borrador del hilo activo (sin re-emitir por
 /// tecla; el borrador se siembra al cambiar de hilo).
 final class PaChatDraftChanged extends PaChatEvent {
@@ -200,6 +219,7 @@ final class PaChatLoaded extends PaChatState {
     this.pendingAttachments = const <PaAttachment>[],
     this.pendingThumbnails = const <String, Uint8List>{},
     this.attaching = false,
+    this.recordingVoice = false,
   });
 
   /// Hilos del operador, DESC por updatedAt (para el selector de historial).
@@ -256,6 +276,10 @@ final class PaChatLoaded extends PaChatState {
   /// true mientras un adjunto sube (el clip muestra spinner).
   final bool attaching;
 
+  /// true mientras se graba una nota de voz: reemplaza el composer por la barra
+  /// de grabación y bloquea el envío de texto (una cosa a la vez).
+  final bool recordingVoice;
+
   /// Aviso de modalidad: si el modelo efectivo (elegido o, en su defecto, el
   /// default) declara NO ver imágenes/PDF y hay un pendiente de ese tipo, una
   /// línea honesta advierte que viajará como texto sustituto. Flags ausentes
@@ -304,6 +328,7 @@ final class PaChatLoaded extends PaChatState {
     List<PaAttachment>? pendingAttachments,
     Map<String, Uint8List>? pendingThumbnails,
     bool? attaching,
+    bool? recordingVoice,
   }) => PaChatLoaded(
     conversations: conversations ?? this.conversations,
     activeConversation: activeConversation ?? this.activeConversation,
@@ -321,6 +346,7 @@ final class PaChatLoaded extends PaChatState {
     pendingAttachments: pendingAttachments ?? this.pendingAttachments,
     pendingThumbnails: pendingThumbnails ?? this.pendingThumbnails,
     attaching: attaching ?? this.attaching,
+    recordingVoice: recordingVoice ?? this.recordingVoice,
   );
 
   @override
@@ -341,7 +367,8 @@ final class PaChatLoaded extends PaChatState {
       other.draft == draft &&
       listEquals(other.pendingAttachments, pendingAttachments) &&
       mapEquals(other.pendingThumbnails, pendingThumbnails) &&
-      other.attaching == attaching;
+      other.attaching == attaching &&
+      other.recordingVoice == recordingVoice;
 
   @override
   int get hashCode => Object.hash(
@@ -361,6 +388,7 @@ final class PaChatLoaded extends PaChatState {
     Object.hashAll(pendingAttachments),
     Object.hashAll(pendingThumbnails.keys),
     attaching,
+    recordingVoice,
   );
 }
 
@@ -386,6 +414,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     on<PaChatModelSelected>(_onModelSelected);
     on<PaChatTurnCancelRequested>(_onTurnCancelRequested);
     on<PaChatDraftChanged>(_onDraftChanged);
+    on<PaChatVoiceStarted>(_onVoiceStarted);
+    on<PaChatVoiceCancelled>(_onVoiceCancelled);
+    on<PaChatVoiceSent>(_onVoiceSent);
   }
 
   final PlatformAgentRepository _repo;
@@ -493,7 +524,10 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     // a mitad de subida enviaría un subconjunto y, al limpiar los pendientes con
     // ese estado stale, dejaría los archivos que aún subían huérfanos en storage.
     // El operador reenvía cuando la subida cierra.
-    if (current is! PaChatLoaded || current.sending || current.attaching) {
+    if (current is! PaChatLoaded ||
+        current.sending ||
+        current.attaching ||
+        current.recordingVoice) {
       return;
     }
     final convId = current.activeConversation.id;
@@ -946,6 +980,95 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         draft: cancelled,
       ),
     );
+  }
+
+  void _onVoiceStarted(PaChatVoiceStarted event, Emitter<PaChatState> emit) {
+    final current = state;
+    // No arrancar sobre un turno en vuelo, una subida de adjuntos, ni una
+    // grabación ya activa (una cosa a la vez).
+    if (current is! PaChatLoaded ||
+        current.sending ||
+        current.attaching ||
+        current.recordingVoice) {
+      return;
+    }
+    emit(current.copyWith(recordingVoice: true, clearSendFailure: true));
+  }
+
+  void _onVoiceCancelled(
+    PaChatVoiceCancelled event,
+    Emitter<PaChatState> emit,
+  ) {
+    final current = state;
+    if (current is! PaChatLoaded || !current.recordingVoice) return;
+    emit(current.copyWith(recordingVoice: false));
+  }
+
+  /// Corre el turno de una nota de voz: sube el clip vía sendAudio y cierra con
+  /// el assistant final, reusando la máquina del turno de texto (sending/typing/
+  /// SSE/recarga). No hay burbuja optimista del user (el audio aún no tiene ref;
+  /// el user con su transcript llega en la recarga) ni reintento (el clip ya no
+  /// está en mano tras enviarlo).
+  Future<void> _onVoiceSent(
+    PaChatVoiceSent event,
+    Emitter<PaChatState> emit,
+  ) async {
+    final current = state;
+    if (current is! PaChatLoaded || current.sending || current.attaching) {
+      return;
+    }
+    final convId = current.activeConversation.id;
+    _cancelRequested = false;
+    emit(
+      current.copyWith(
+        recordingVoice: false,
+        sending: true,
+        liveProgress: 'Pensando…',
+        clearSendFailure: true,
+        lastAttemptedContent: '',
+      ),
+    );
+    unawaited(_progressSub?.cancel());
+    _progressSub = _events.progress(convId).listen((e) {
+      if (!isClosed) add(PaChatProgressReceived(e));
+    }, onError: (Object _) {});
+    try {
+      final assistant = await _repo.sendAudio(
+        conversationId: convId,
+        bytes: event.bytes,
+        filename: event.filename,
+      );
+      unawaited(_progressSub?.cancel());
+      _progressSub = null;
+      emit(
+        current.copyWith(
+          messages: <PaMessage>[...current.messages, assistant],
+          recordingVoice: false,
+          sending: false,
+          liveProgress: '',
+          clearSendFailure: true,
+        ),
+      );
+      // Recarga best-effort: trae el user de voz (con su transcript) y los
+      // mensajes de tool que el POST no devuelve.
+      await _reloadThread(emit, convId, assistant.id);
+    } on PaFailure catch (f) {
+      unawaited(_progressSub?.cancel());
+      _progressSub = null;
+      // El turno se canceló: el handler de cancelación ya dejó el estado limpio.
+      if (_cancelRequested) {
+        _cancelRequested = false;
+        return;
+      }
+      emit(
+        current.copyWith(
+          recordingVoice: false,
+          sending: false,
+          liveProgress: '',
+          sendFailure: f,
+        ),
+      );
+    }
   }
 
   void _onDraftChanged(PaChatDraftChanged event, Emitter<PaChatState> emit) {

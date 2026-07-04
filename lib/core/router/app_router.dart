@@ -104,7 +104,7 @@ import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
 import '../../features/memberships/presentation/pages/select_org_page.dart';
 import '../../features/messages/domain/repositories/audio_engine.dart';
-import '../../features/messages/domain/repositories/audio_recorder.dart';
+import '../audio/audio_recorder.dart';
 import '../../features/messages/domain/repositories/media_opener.dart';
 import '../../features/messages/presentation/widgets/video_playback.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
@@ -568,54 +568,62 @@ class AppRouter {
             value: _templatesRepo,
             child: RepositoryProvider<BotsRepository>.value(
               value: _botsRepo,
-              child: KeyedSubtree(
-                key: ValueKey<String>(orgId),
-                // El borrador del wizard de creación de bot es estado de la org
-                // activa: vive DENTRO del subárbol keyeado por orgId, así un
-                // switch-org lo descarta (un borrador con la plantilla de la org
-                // A no debe asomar en la org B).
-                child: RepositoryProvider<BotCreateDraftStore>(
-                  create: (_) => BotCreateDraftStore(),
-                  child: MultiBlocProvider(
-                    providers: <BlocProvider<dynamic>>[
-                      BlocProvider<BotsBloc>(
-                        create: (_) =>
-                            BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
-                      ),
-                      BlocProvider<TemplatesBloc>(
-                        create: (_) =>
-                            TemplatesBloc(_templatesRepo)
-                              ..add(const TemplatesLoadRequested()),
-                      ),
-                      BlocProvider<LabelsAdminBloc>(
-                        create: (_) =>
-                            LabelsAdminBloc(repo: _labelsRepo)
-                              ..add(const LabelsAdminLoadRequested()),
-                      ),
-                      // Cubit del reenvío de verificación, scoped al shell para que el
-                      // aviso "verifica tu correo" lo dispare y reaccione a su
-                      // SnackBar.
-                      BlocProvider<ResendVerificationCubit>(
-                        create: (_) => ResendVerificationCubit(_authRepo),
-                      ),
-                      // Asistente de plataforma, scoped al shell: el dock vive
-                      // sobre las 4 tabs. La carga se difiere hasta la 1ª
-                      // apertura (el dock dispara PaChatStarted), sin coste en
-                      // el arranque si el operador nunca lo abre.
-                      BlocProvider<PlatformAgentChatBloc>(
-                        create: (_) => PlatformAgentChatBloc(
-                          repo: _platformAgentRepo,
-                          events: _platformAgentEvents,
-                          picker: FilePickerMediaFilePicker(),
+              // Grabador de voz compartido para el composer del asistente (Noop
+              // fuera de Android: el micrófono no se ofrece si no está
+              // soportado). Vive sobre el subárbol keyeado por orgId: es
+              // singleton de la app, independiente de la org.
+              child: RepositoryProvider<AudioRecorder>.value(
+                value: _audioRecorder,
+                child: KeyedSubtree(
+                  key: ValueKey<String>(orgId),
+                  // El borrador del wizard de creación de bot es estado de la org
+                  // activa: vive DENTRO del subárbol keyeado por orgId, así un
+                  // switch-org lo descarta (un borrador con la plantilla de la org
+                  // A no debe asomar en la org B).
+                  child: RepositoryProvider<BotCreateDraftStore>(
+                    create: (_) => BotCreateDraftStore(),
+                    child: MultiBlocProvider(
+                      providers: <BlocProvider<dynamic>>[
+                        BlocProvider<BotsBloc>(
+                          create: (_) =>
+                              BotsBloc(_botsRepo)
+                                ..add(const BotsLoadRequested()),
                         ),
-                      ),
-                    ],
-                    // Blocs page-scoped a nivel del shell: cambiar de tab no
-                    // rebuildea los providers y cada lista preserva estado
-                    // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
-                    // El routeObserver se atraviesa al shell para que ambos list
-                    // pages disparen su refresh al volver de una sub-ruta.
-                    child: ShellPage(routeObserver: _routeObserver),
+                        BlocProvider<TemplatesBloc>(
+                          create: (_) =>
+                              TemplatesBloc(_templatesRepo)
+                                ..add(const TemplatesLoadRequested()),
+                        ),
+                        BlocProvider<LabelsAdminBloc>(
+                          create: (_) =>
+                              LabelsAdminBloc(repo: _labelsRepo)
+                                ..add(const LabelsAdminLoadRequested()),
+                        ),
+                        // Cubit del reenvío de verificación, scoped al shell para que el
+                        // aviso "verifica tu correo" lo dispare y reaccione a su
+                        // SnackBar.
+                        BlocProvider<ResendVerificationCubit>(
+                          create: (_) => ResendVerificationCubit(_authRepo),
+                        ),
+                        // Asistente de plataforma, scoped al shell: el dock vive
+                        // sobre las 4 tabs. La carga se difiere hasta la 1ª
+                        // apertura (el dock dispara PaChatStarted), sin coste en
+                        // el arranque si el operador nunca lo abre.
+                        BlocProvider<PlatformAgentChatBloc>(
+                          create: (_) => PlatformAgentChatBloc(
+                            repo: _platformAgentRepo,
+                            events: _platformAgentEvents,
+                            picker: FilePickerMediaFilePicker(),
+                          ),
+                        ),
+                      ],
+                      // Blocs page-scoped a nivel del shell: cambiar de tab no
+                      // rebuildea los providers y cada lista preserva estado
+                      // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
+                      // El routeObserver se atraviesa al shell para que ambos list
+                      // pages disparen su refresh al volver de una sub-ruta.
+                      child: ShellPage(routeObserver: _routeObserver),
+                    ),
                   ),
                 ),
               ),

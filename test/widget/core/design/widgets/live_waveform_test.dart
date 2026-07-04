@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:ataulfo/features/messages/presentation/widgets/live_waveform.dart';
+import 'package:ataulfo/core/design/widgets/live_waveform.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

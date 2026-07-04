@@ -44,6 +44,14 @@ abstract interface class PlatformAgentRepository {
     required String filename,
   });
 
+  /// Envía una nota de voz (multipart) y corre el turno: persiste el user con
+  /// el audio y devuelve el assistant final (mismo manejo que sendMessage).
+  Future<PaMessage> sendAudio({
+    required String conversationId,
+    required Uint8List bytes,
+    String filename,
+  });
+
   /// Allowlist de modelos + default de la plataforma (best-effort: el caller
   /// oculta el selector ante cualquier fallo).
   Future<PaModels> listModels();
