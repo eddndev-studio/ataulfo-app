@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_danger_zone.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/connect_link.dart';
 import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
@@ -198,6 +199,26 @@ void main() {
       await tester.pumpWidget(host(channel: BotChannel.waba));
 
       expect(find.byKey(const Key('bot_connect.wipe')), findsNothing);
+      expect(find.byType(AppDangerZone), findsNothing);
+    });
+
+    testWidgets('la sección wipe es la Zona peligrosa canónica del kit', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(BotConnectReady(_link));
+
+      await tester.pumpWidget(host());
+
+      final zone = find.byType(AppDangerZone);
+      expect(zone, findsOneWidget);
+      expect(
+        find.descendant(
+          of: zone,
+          matching: find.byKey(const Key('bot_connect.wipe')),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Zona peligrosa'), findsOneWidget);
     });
   });
 

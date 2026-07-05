@@ -7,6 +7,7 @@ import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_danger_zone.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/entities/connect_link.dart';
 import '../../domain/entities/session_status.dart';
@@ -120,22 +121,19 @@ class _ReadyView extends StatelessWidget {
           // paused; siempre disponible tras confirmación fuerte.
           if (channel == BotChannel.waUnofficial) ...<Widget>[
             const SizedBox(height: AppTokens.sp7),
-            const Divider(color: AppTokens.divider, height: 1),
-            const SizedBox(height: AppTokens.sp6),
-            Text('Zona peligrosa', style: textTheme.titleMedium),
-            const SizedBox(height: AppTokens.sp2),
-            Text(
-              'Borrar las credenciales del dispositivo desvincula el bot: '
-              're-parea desde cero (nuevo QR). Úsalo si la sesión quedó '
-              'corrupta o quieres mover el bot a otro número.',
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-            ),
-            const SizedBox(height: AppTokens.sp4),
-            AppButton.danger(
-              key: const Key('bot_connect.wipe'),
-              label: 'Borrar credenciales del dispositivo',
-              fullWidth: true,
-              onPressed: () => _confirmWipe(context),
+            AppDangerZone(
+              caption:
+                  'Borrar las credenciales del dispositivo desvincula el bot: '
+                  're-parea desde cero (nuevo QR). Úsalo si la sesión quedó '
+                  'corrupta o quieres mover el bot a otro número.',
+              actions: <Widget>[
+                AppButton.danger(
+                  key: const Key('bot_connect.wipe'),
+                  label: 'Borrar credenciales del dispositivo',
+                  fullWidth: true,
+                  onPressed: () => _confirmWipe(context),
+                ),
+              ],
             ),
           ],
         ],

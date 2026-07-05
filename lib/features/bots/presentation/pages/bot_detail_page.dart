@@ -8,6 +8,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_danger_zone.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -199,23 +200,22 @@ class _LoadedView extends StatelessWidget {
                                 ),
                         ),
                         const Divider(
-                          height: AppTokens.sp6,
+                          height: AppTokens.sp5,
                           color: AppTokens.divider,
                         ),
                         BotAiToggle(bot: bot, isMutating: isMutating),
                         const Divider(
-                          height: AppTokens.sp6,
-                          color: AppTokens.divider,
-                        ),
-                        BotGroupGates(bot: bot, isMutating: isMutating),
-                        const Divider(
-                          height: AppTokens.sp6,
+                          height: AppTokens.sp5,
                           color: AppTokens.divider,
                         ),
                         BotToolPermissions(bot: bot, isMutating: isMutating),
                       ],
                     ),
                   ),
+                  const SizedBox(height: AppTokens.sp6),
+                  // Subsección con contexto propio: card aparte, no una fila
+                  // más de la lista plana de controles.
+                  BotGroupGates(bot: bot, isMutating: isMutating),
                 ],
                 if (f != null) ...<Widget>[
                   const SizedBox(height: AppTokens.sp4),
@@ -229,32 +229,34 @@ class _LoadedView extends StatelessWidget {
                 ],
                 if (isAdmin) ...<Widget>[
                   const SizedBox(height: AppTokens.sp7),
-                  // Gestión del ciclo de vida: compacta en una fila — son
-                  // acciones raras; no compiten con la operación diaria.
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: AppButton.tonal(
-                          key: const Key('bot_detail.clone'),
-                          label: 'Clonar bot',
-                          onPressed: isMutating
-                              ? null
-                              : () => BotCloneSheet.open(
-                                  context,
-                                  onCloned: (newId) =>
-                                      context.push('/bots/$newId'),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: AppTokens.sp3),
-                      Expanded(
-                        child: AppButton.danger(
-                          key: const Key('bot_detail.delete'),
-                          label: 'Eliminar bot',
-                          onPressed: isMutating
-                              ? null
-                              : () => _confirmDelete(context, bot),
-                        ),
+                  // Clonar crea un bot nuevo sin tocar el actual: es gestión
+                  // de ciclo de vida, no una acción destructiva, así que va
+                  // FUERA de la zona peligrosa.
+                  AppButton.tonal(
+                    key: const Key('bot_detail.clone'),
+                    label: 'Clonar bot',
+                    fullWidth: true,
+                    onPressed: isMutating
+                        ? null
+                        : () => BotCloneSheet.open(
+                            context,
+                            onCloned: (newId) => context.push('/bots/$newId'),
+                          ),
+                  ),
+                  const SizedBox(height: AppTokens.sp7),
+                  AppDangerZone(
+                    caption:
+                        'Eliminar el bot es permanente: sus conversaciones, '
+                        'mensajes y ejecuciones quedan huérfanos. Si quieres '
+                        'limpiarlos, usa Mantenimiento antes.',
+                    actions: <Widget>[
+                      AppButton.danger(
+                        key: const Key('bot_detail.delete'),
+                        label: 'Eliminar bot',
+                        fullWidth: true,
+                        onPressed: isMutating
+                            ? null
+                            : () => _confirmDelete(context, bot),
                       ),
                     ],
                   ),

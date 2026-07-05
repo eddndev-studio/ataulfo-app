@@ -60,6 +60,7 @@ class _NotificationInboxTileState extends State<NotificationInboxTile> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return AppCard(
       key: Key('notifications.item.${_item.id}'),
       onTap: _onTap,
@@ -81,10 +82,7 @@ class _NotificationInboxTileState extends State<NotificationInboxTile> {
                         Expanded(
                           child: Text(
                             _item.title,
-                            style: const TextStyle(
-                              color: AppTokens.text1,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: textTheme.titleMedium,
                           ),
                         ),
                         const SizedBox(width: AppTokens.sp3),
@@ -92,10 +90,8 @@ class _NotificationInboxTileState extends State<NotificationInboxTile> {
                           smartTimestamp(
                             _item.updatedAt.millisecondsSinceEpoch,
                           ),
-                          style: const TextStyle(
+                          style: textTheme.labelSmall?.copyWith(
                             color: AppTokens.textDisabled,
-                            fontSize: AppTokens.captionSize,
-                            fontWeight: AppTokens.captionWeight,
                           ),
                         ),
                       ],

@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
-import '../../../../core/design/widgets/app_switch.dart';
+import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../domain/entities/notification_preference.dart';
 import '../bloc/notification_preferences_bloc.dart';
 
@@ -77,64 +77,56 @@ class _PreferencesList extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
+    // Anatomía canónica de ajustes: UNA card para la sección, con una fila de
+    // toggle por preferencia separada por hairlines. Sin glifo leading: en una
+    // fila de toggle el ícono no aporta acción ni identidad.
+    return ListView(
       padding: const EdgeInsets.all(AppTokens.sp6),
-      itemBuilder: (context, index) {
-        final pref = preferences[index];
-        return AppCard(
-          key: Key('notification_preferences.item.${pref.eventType.wire}'),
-          child: Row(
+      children: <Widget>[
+        AppCard(
+          key: const Key('notification_preferences.card'),
+          child: Column(
             children: <Widget>[
-              Icon(_iconFor(pref.eventType), color: AppTokens.primary),
-              const SizedBox(width: AppTokens.sp4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      _labelFor(pref.eventType),
-                      style: const TextStyle(
-                        color: AppTokens.text1,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: AppTokens.sp2),
-                    Text(
-                      _descriptionFor(pref),
-                      style: const TextStyle(color: AppTokens.text2),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppTokens.sp4),
-              AppSwitch(
-                value: pref.enabled,
-                onChanged: saving
-                    ? null
-                    : (enabled) =>
-                          context.read<NotificationPreferencesBloc>().add(
-                            NotificationPreferenceToggled(
-                              pref.eventType,
-                              enabled,
-                            ),
-                          ),
-              ),
+              for (var i = 0; i < preferences.length; i++) ...<Widget>[
+                if (i > 0)
+                  const Divider(
+                    height: AppTokens.sp5,
+                    color: AppTokens.divider,
+                  ),
+                _PreferenceRow(preference: preferences[i], saving: saving),
+              ],
             ],
           ),
-        );
-      },
-      separatorBuilder: (_, _) => const SizedBox(height: AppTokens.cardGap),
-      itemCount: preferences.length,
+        ),
+      ],
     );
   }
+}
 
-  static IconData _iconFor(NotificationEventType type) {
-    return switch (type) {
-      NotificationEventType.messageInboundNew => Icons.chat_bubble_outline,
-      NotificationEventType.botDisconnected => Icons.link_off_outlined,
-      NotificationEventType.flowFailed => Icons.error_outline,
-      NotificationEventType.agentAlert => Icons.support_agent_outlined,
-    };
+/// Toggle de una preferencia sobre [AppToggleRow] del kit; la mutación se
+/// despacha al bloc y `saving` inhabilita el switch mientras hay un PUT en
+/// vuelo.
+class _PreferenceRow extends StatelessWidget {
+  const _PreferenceRow({required this.preference, required this.saving});
+
+  final NotificationPreference preference;
+  final bool saving;
+
+  @override
+  Widget build(BuildContext context) {
+    final wire = preference.eventType.wire;
+    return AppToggleRow(
+      key: Key('notification_preferences.item.$wire'),
+      switchKey: Key('notification_preferences.switch.$wire'),
+      label: _labelFor(preference.eventType),
+      caption: _descriptionFor(preference),
+      value: preference.enabled,
+      onChanged: saving
+          ? null
+          : (enabled) => context.read<NotificationPreferencesBloc>().add(
+              NotificationPreferenceToggled(preference.eventType, enabled),
+            ),
+    );
   }
 
   static String _labelFor(NotificationEventType type) {

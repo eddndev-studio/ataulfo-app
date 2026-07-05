@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/ai/tool_groups_sheet.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/domain/repositories/templates_repository.dart';
 import '../../domain/entities/bot.dart';
@@ -96,8 +97,8 @@ class _BotToolPermissionsState extends State<BotToolPermissions> {
   }
 }
 
-/// Fila tappable consistente con la tarjeta de controles del detalle: ícono +
-/// label + caption + chevron. onTap nulo ⇒ inerte (gris).
+/// Fila launcher del kit con la identidad fija de esta sección. onTap nulo ⇒
+/// inerte (título atenuado), resuelto por el propio [AppSectionLink].
 class _Row extends StatelessWidget {
   const _Row({required this.caption, required this.onTap});
 
@@ -106,46 +107,12 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final enabled = onTap != null;
-    return InkWell(
-      key: const Key('bot_detail.tool_permissions'),
+    return AppSectionLink(
+      rowKey: const Key('bot_detail.tool_permissions'),
+      icon: Icons.build_circle_outlined,
+      title: 'Permisos de herramientas',
+      caption: caption,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp2),
-        child: Row(
-          children: <Widget>[
-            Icon(
-              Icons.build_circle_outlined,
-              color: enabled ? AppTokens.text1 : AppTokens.text2,
-              size: 24,
-            ),
-            const SizedBox(width: AppTokens.sp3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Permisos de herramientas',
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: enabled ? AppTokens.text1 : AppTokens.text2,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    caption,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: AppTokens.text2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: AppTokens.text2, size: 22),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_danger_zone.dart';
 import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
@@ -156,42 +157,50 @@ class _Body extends StatelessWidget {
             ),
           ],
           const SizedBox(height: AppTokens.sp7),
-          AppButton.danger(
-            key: const Key('bot_maint.clear'),
-            label: 'Borrar conversaciones',
-            fullWidth: true,
-            onPressed: canRun
-                ? () => _confirm(
-                    context,
-                    title: '¿Borrar conversaciones?',
-                    body:
-                        'Se eliminarán mensajes, sesiones, ejecuciones y '
-                        'etiquetas de chat de este bot. No se puede deshacer.',
-                    confirmKey: const Key('bot_maint.clear_confirm'),
-                    onConfirm: () => context.read<BotMaintenanceBloc>().add(
-                      const BotMaintenanceClearRequested(),
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          AppButton.danger(
-            key: const Key('bot_maint.reset'),
-            label: 'Reiniciar sesiones de cifrado',
-            fullWidth: true,
-            onPressed: canRun
-                ? () => _confirm(
-                    context,
-                    title: '¿Reiniciar sesiones de cifrado?',
-                    body:
-                        'Invalida el handshake Signal de las conversaciones '
-                        '(útil tras errores "Bad MAC"). El pareado se conserva.',
-                    confirmKey: const Key('bot_maint.reset_confirm'),
-                    onConfirm: () => context.read<BotMaintenanceBloc>().add(
-                      const BotMaintenanceResetRequested(),
-                    ),
-                  )
-                : null,
+          AppDangerZone(
+            caption:
+                'Estas operaciones alteran datos reales del bot y no se '
+                'pueden deshacer. Exigen el bot pausado.',
+            actions: <Widget>[
+              AppButton.danger(
+                key: const Key('bot_maint.clear'),
+                label: 'Borrar conversaciones',
+                fullWidth: true,
+                onPressed: canRun
+                    ? () => _confirm(
+                        context,
+                        title: '¿Borrar conversaciones?',
+                        body:
+                            'Se eliminarán mensajes, sesiones, ejecuciones y '
+                            'etiquetas de chat de este bot. No se puede '
+                            'deshacer.',
+                        confirmKey: const Key('bot_maint.clear_confirm'),
+                        onConfirm: () => context.read<BotMaintenanceBloc>().add(
+                          const BotMaintenanceClearRequested(),
+                        ),
+                      )
+                    : null,
+              ),
+              AppButton.danger(
+                key: const Key('bot_maint.reset'),
+                label: 'Reiniciar sesiones de cifrado',
+                fullWidth: true,
+                onPressed: canRun
+                    ? () => _confirm(
+                        context,
+                        title: '¿Reiniciar sesiones de cifrado?',
+                        body:
+                            'Invalida el handshake Signal de las '
+                            'conversaciones (útil tras errores "Bad MAC"). '
+                            'El pareado se conserva.',
+                        confirmKey: const Key('bot_maint.reset_confirm'),
+                        onConfirm: () => context.read<BotMaintenanceBloc>().add(
+                          const BotMaintenanceResetRequested(),
+                        ),
+                      )
+                    : null,
+              ),
+            ],
           ),
         ],
       ),

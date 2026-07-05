@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_section_link.dart';
@@ -75,6 +76,56 @@ void main() {
     // ceder espacio (ellipsis) y dejar la pill de count visible.
     expect(tester.takeException(), isNull);
     expect(find.widgetWithText(AppPill, '12'), findsOneWidget);
+
+    // La caption resume estado (counts, degradaciones) y su final es lo
+    // informativo: a una línea en ancho de teléfono se pierde justo eso.
+    // Dos líneas antes de ellipsar.
+    final caption = tester.widget<Text>(
+      find.text('Una caption igualmente larga que debe ellipsar bien'),
+    );
+    expect(caption.maxLines, 2);
+  });
+
+  testWidgets('onTap null deja la fila inerte con el título atenuado', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const AppSectionLink(
+          rowKey: Key('x.link'),
+          icon: Icons.build_circle_outlined,
+          title: 'Permisos',
+          caption: 'Comprobando…',
+          onTap: null,
+        ),
+      ),
+    );
+
+    // Sin handler el InkWell no reacciona (no lanza) y el título baja a text2
+    // para señalar la inercia; el resto de la fila no cambia.
+    await tester.tap(find.byKey(const Key('x.link')));
+    final title = tester.widget<Text>(find.text('Permisos'));
+    expect(title.style?.color, AppTokens.text2);
+    expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+  });
+
+  testWidgets('con onTap el título va en el titleMedium del theme', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        AppSectionLink(
+          rowKey: const Key('x.link'),
+          icon: Icons.chat_outlined,
+          title: 'Conversaciones',
+          onTap: () {},
+        ),
+      ),
+    );
+
+    final context = tester.element(find.byType(AppSectionLink));
+    final title = tester.widget<Text>(find.text('Conversaciones'));
+    expect(title.style, Theme.of(context).textTheme.titleMedium);
   });
 
   testWidgets('count 0 o null van sin pill (no repetir el vacío)', (

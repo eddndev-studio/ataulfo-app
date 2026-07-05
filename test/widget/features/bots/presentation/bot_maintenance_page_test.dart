@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_danger_zone.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_maintenance_bloc.dart';
@@ -126,5 +127,31 @@ void main() {
   ) async {
     await tester.pumpWidget(host(const BotMaintenanceLoaded(_paused)));
     expect(find.textContaining('se reanuda solo'), findsOneWidget);
+  });
+
+  testWidgets('clear y reset viven en la Zona peligrosa canónica', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(const BotMaintenanceLoaded(_paused)));
+
+    // Las dos operaciones destructivas cierran la página bajo el heading y
+    // la advertencia canónicos del kit, como en conectar y en el detalle.
+    final zone = find.byType(AppDangerZone);
+    expect(zone, findsOneWidget);
+    expect(find.text('Zona peligrosa'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: zone,
+        matching: find.byKey(const Key('bot_maint.clear')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: zone,
+        matching: find.byKey(const Key('bot_maint.reset')),
+      ),
+      findsOneWidget,
+    );
   });
 }

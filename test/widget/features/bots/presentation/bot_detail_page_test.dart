@@ -9,6 +9,7 @@ import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_danger_zone.dart';
 import 'package:ataulfo/core/design/widgets/app_section_link.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
@@ -649,13 +650,19 @@ void main() {
       expect(flows.onChanged, isNull);
     });
 
-    testWidgets('viven dentro de la card de controles ADMIN+', (tester) async {
+    testWidgets('viven en su PROPIA card, con su heading dentro', (
+      tester,
+    ) async {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
 
-      final card = find.byKey(const Key('bot_detail.card.controls'));
+      // La subsección "En grupos" deja de vivir incrustada en la card de
+      // controles (que es una lista plana): tiene su card propia con heading,
+      // como la card de conexión.
+      final card = find.byKey(const Key('bot_detail.card.group_gates'));
+      expect(tester.widget(card), isA<AppCard>());
       expect(
         find.descendant(
           of: card,
@@ -669,6 +676,22 @@ void main() {
           matching: find.byKey(const Key('bot_detail.group_chats_flows')),
         ),
         findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text('En grupos')),
+        findsOneWidget,
+      );
+      final controls = find.byKey(const Key('bot_detail.card.controls'));
+      expect(
+        find.descendant(of: controls, matching: find.text('En grupos')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: controls,
+          matching: find.byKey(const Key('bot_detail.group_chats_ai')),
+        ),
+        findsNothing,
       );
     });
 
@@ -766,7 +789,13 @@ void main() {
           find.widgetWithText(AppButton, 'Etiquetas de WhatsApp'),
           findsNothing,
         );
-        expect(find.byType(AppSectionLink), findsNWidgets(2));
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('bot_detail.card.sections')),
+            matching: find.byType(AppSectionLink),
+          ),
+          findsNWidgets(2),
+        );
       },
     );
 
@@ -784,7 +813,15 @@ void main() {
         find.byKey(const Key('bot_detail.link.maintenance')),
         findsOneWidget,
       );
-      expect(find.byType(AppSectionLink), findsNWidgets(4));
+      // Contadas DENTRO de la card del hub: el resto de la página también usa
+      // AppSectionLink (p.ej. permisos de herramientas en controles).
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('bot_detail.card.sections')),
+          matching: find.byType(AppSectionLink),
+        ),
+        findsNWidgets(4),
+      );
     });
 
     testWidgets('WORKER no ve Variables ni Mantenimiento', (tester) async {
@@ -836,6 +873,27 @@ void main() {
 
       expect(find.byKey(const Key('bot_detail.card.controls')), findsNothing);
     });
+
+    testWidgets('los hairlines de la card van al sp5 canónico', (tester) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      // Misma separación que _SectionsCard de Ajustes y el launcher del hub:
+      // Divider(color: divider, height: sp5) entre filas apiladas.
+      final dividers = tester.widgetList<Divider>(
+        find.descendant(
+          of: find.byKey(const Key('bot_detail.card.controls')),
+          matching: find.byType(Divider),
+        ),
+      );
+      expect(dividers, isNotEmpty);
+      for (final d in dividers) {
+        expect(d.height, AppTokens.sp5);
+        expect(d.color, AppTokens.divider);
+      }
+    });
   });
 
   group('clonar (S7, ADMIN+)', () {
@@ -880,8 +938,15 @@ void main() {
       await tester.tap(del);
       await tester.pumpAndSettle();
 
-      // Diálogo de confirmación fuerte: avisa de huérfanos.
-      expect(find.textContaining('huérfan'), findsOneWidget);
+      // Diálogo de confirmación fuerte: avisa de huérfanos (acotado al
+      // diálogo — la Zona peligrosa de la página también los menciona).
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining('huérfan'),
+        ),
+        findsOneWidget,
+      );
       // Sin confirmar aún → no despacha.
       verifyNever(() => bloc.add(const BotDetailDeleteRequested()));
 
@@ -902,6 +967,35 @@ void main() {
       await tester.pump();
 
       verifyNever(() => bloc.add(const BotDetailDeleteRequested()));
+    });
+
+    testWidgets('Eliminar vive en la Zona peligrosa; Clonar queda fuera', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      // Borrar es destructivo → sección canónica con advertencia. Clonar no
+      // destruye nada: es gestión de ciclo de vida y va fuera de la zona.
+      final zone = find.byType(AppDangerZone);
+      expect(zone, findsOneWidget);
+      expect(
+        find.descendant(
+          of: zone,
+          matching: find.byKey(const Key('bot_detail.delete')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: zone,
+          matching: find.byKey(const Key('bot_detail.clone')),
+        ),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('bot_detail.clone')), findsOneWidget);
     });
 
     testWidgets('WORKER no ve Eliminar bot', (tester) async {

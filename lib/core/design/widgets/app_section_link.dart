@@ -24,7 +24,10 @@ class AppSectionLink extends StatelessWidget {
   final Key rowKey;
   final IconData icon;
   final String title;
-  final VoidCallback onTap;
+
+  /// Nulo ⇒ fila inerte (p.ej. mientras carga el dato que resume o hay una
+  /// mutación en vuelo): el InkWell no reacciona y el título baja a `text2`.
+  final VoidCallback? onTap;
 
   /// Items del área. Con valor > 0 acompaña al título como pill; null (sin
   /// snapshot) o 0 (vacío) van sin pill — un "0" solo repetiría el caption.
@@ -35,6 +38,9 @@ class AppSectionLink extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final c = count;
+    final titleStyle = onTap != null
+        ? textTheme.titleMedium
+        : textTheme.titleMedium?.copyWith(color: AppTokens.text2);
     return InkWell(
       key: rowKey,
       onTap: onTap,
@@ -59,7 +65,7 @@ class AppSectionLink extends StatelessWidget {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: textTheme.titleMedium,
+                          style: titleStyle,
                         ),
                       ),
                       if (c != null && c > 0) ...<Widget>[
@@ -73,7 +79,10 @@ class AppSectionLink extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
                         caption!,
-                        maxLines: 1,
+                        // Dos líneas: el final de la caption suele cargar la
+                        // información (counts, degradaciones) y a una línea en
+                        // ancho de teléfono se truncaría justo eso.
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.bodySmall?.copyWith(
                           color: AppTokens.text2,

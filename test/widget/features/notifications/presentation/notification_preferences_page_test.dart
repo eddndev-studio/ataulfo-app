@@ -1,6 +1,9 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
+import 'package:ataulfo/core/design/widgets/app_toggle_row.dart';
 import 'package:ataulfo/features/notifications/domain/entities/notification_preference.dart';
 import 'package:ataulfo/features/notifications/domain/failures/notifications_failure.dart';
 import 'package:ataulfo/features/notifications/presentation/bloc/notification_preferences_bloc.dart';
@@ -132,6 +135,42 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(tester.widget<AppSwitch>(find.byType(AppSwitch)).onChanged, isNull);
+  });
+
+  testWidgets('las preferencias viven en UNA card como toggle rows', (
+    tester,
+  ) async {
+    const other = NotificationPreference(
+      eventType: NotificationEventType.botDisconnected,
+      enabled: false,
+      botFilter: NotificationBotFilter(all: true),
+      labelFilter: <String>[],
+      priority: NotificationPriority.high,
+    );
+    when(() => bloc.state).thenReturn(
+      const NotificationPreferencesLoaded(
+        preferences: <NotificationPreference>[_pref, other],
+      ),
+    );
+
+    await tester.pumpWidget(host());
+
+    // Anatomía canónica de ajustes: una sola card por sección, con una fila
+    // de toggle por preferencia separada por hairlines sp5 — no una card por
+    // preferencia (eso es patrón de lista de entidades).
+    expect(find.byType(AppCard), findsOneWidget);
+    expect(find.byType(AppToggleRow), findsNWidgets(2));
+    final divider = tester.widget<Divider>(find.byType(Divider));
+    expect(divider.height, AppTokens.sp5);
+    expect(divider.color, AppTokens.divider);
+    // El label de la fila lo pone AppToggleRow con el titleMedium del theme.
+    final context = tester.element(find.byType(AppCard));
+    final label = tester.widget<Text>(find.text('Mensajes nuevos'));
+    expect(label.style, Theme.of(context).textTheme.titleMedium);
+    // Sin glifo leading: en una fila de toggle el ícono no aporta acción ni
+    // identidad (como en la card de controles del detalle del bot).
+    expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
+    expect(find.byIcon(Icons.link_off_outlined), findsNothing);
   });
 
   testWidgets('failed muestra retry', (tester) async {
