@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
+import '../../../media/domain/entities/media_asset.dart';
 import '../../../media/domain/failures/media_failure.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../../media/domain/repositories/media_repository.dart';
@@ -18,6 +20,7 @@ import '../../domain/entities/message.dart';
 import '../../../../core/audio/audio_recorder.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/reply_draft_cubit.dart';
+import 'attach_menu_sheet.dart';
 import 'attachment_tray.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
 
@@ -338,6 +341,48 @@ class _MessageComposerState extends State<MessageComposer> {
     }
   }
 
+  /// Abre el menú de adjuntar (el sheet sólo DECIDE el destino) y ejecuta el
+  /// flujo elegido: "Documento" es el picker múltiple de siempre; "Medios" es
+  /// la galería de la organización en modo picker.
+  Future<void> _openAttachMenu() async {
+    final action = await AttachMenuSheet.open(context);
+    if (!mounted || action == null) return;
+    switch (action) {
+      case AttachMenuAction.document:
+        await _pickAttachments();
+      case AttachMenuAction.media:
+        await _pickFromMediaLibrary();
+    }
+  }
+
+  /// Abre la galería de la organización (`/media/pick`) y suma el asset
+  /// elegido a la bandeja como adjunto YA SUBIDO: sin bytes locales, con su
+  /// ref BARE (el envío lo reusa sin volver a subir), la miniatura firmada y
+  /// el peso reportado por el servidor. Respeta el tope del lote; el tope de
+  /// peso no aplica (el archivo ya vive en el servidor).
+  Future<void> _pickFromMediaLibrary() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final asset = await context.push<MediaAsset>('/media/pick');
+    if (!mounted || asset == null) return;
+    if (_attachments.length >= kMaxAttachmentsPerBatch) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Máximo 10 archivos por envío')),
+      );
+      return;
+    }
+    setState(() {
+      _attachments.add(
+        PendingAttachment(
+          filename: asset.filename,
+          type: messageTypeForFilename(asset.filename),
+          existingRef: asset.ref,
+          previewUrl: asset.thumbnailSourceUrl,
+          sizeBytesOverride: asset.size,
+        ),
+      );
+    });
+  }
+
   /// Abre el selector múltiple y suma lo elegido a la bandeja aplicando los
   /// topes client-side (≤10 por lote, ≤64 MB por archivo) con copy específica.
   /// Captura picker/messenger ANTES del primer await y verifica `mounted`
@@ -439,11 +484,20 @@ class _MessageComposerState extends State<MessageComposer> {
       var captionConsumed = false;
       for (final att in batch) {
         try {
-          final uploaded = await mediaRepo.upload(
-            bytes: att.bytes,
-            filename: att.filename,
-          );
-          if (!mounted) return;
+          // Un adjunto del catálogo ya vive en el servidor: se reusa su ref
+          // BARE tal cual, sin red. Sólo lo local pasa por upload.
+          final String ref;
+          final existingRef = att.existingRef;
+          if (existingRef != null) {
+            ref = existingRef;
+          } else {
+            final uploaded = await mediaRepo.upload(
+              bytes: att.bytes!,
+              filename: att.filename,
+            );
+            if (!mounted) return;
+            ref = uploaded.ref;
+          }
           // El caption viaja SÓLO en el primer adjunto que lo admite: audio/ptt
           // exigen contenido vacío en el wire, así que un audio al frente del
           // lote no se queda con la leyenda (pasa al siguiente que sí la acepta,
@@ -455,7 +509,7 @@ class _MessageComposerState extends State<MessageComposer> {
             MessagesSendRequested(
               type: att.type,
               content: content,
-              mediaRef: uploaded.ref,
+              mediaRef: ref,
               fileName: att.type == 'document' ? att.filename : null,
               quotedId: quoteConsumed ? null : replyingToId,
             ),
@@ -729,9 +783,9 @@ class _MessageComposerState extends State<MessageComposer> {
         leading: <Widget>[
           IconButton(
             key: const Key('composer.attach'),
-            tooltip: 'Adjuntar archivos',
+            tooltip: 'Adjuntar',
             color: AppTokens.text2,
-            onPressed: _uploading ? null : _pickAttachments,
+            onPressed: _uploading ? null : _openAttachMenu,
             icon: const Icon(Icons.attach_file),
           ),
           IconButton(

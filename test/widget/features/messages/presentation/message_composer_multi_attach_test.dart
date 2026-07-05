@@ -91,6 +91,15 @@ void main() {
   PickedMedia pm(String name, {int size = 8}) =>
       PickedMedia(bytes: Uint8List(size), filename: name);
 
+  // El clip abre el menú de adjuntar; "Documento" dispara pickMultiple y
+  // llena la bandeja (el flujo de siempre, ahora detrás del menú).
+  Future<void> pickDocuments(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('composer.attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach_menu.document')));
+    await tester.pumpAndSettle();
+  }
+
   List<MessagesSendRequested> sentEvents() => verify(
     () => msgBloc.add(captureAny()),
   ).captured.cast<MessagesSendRequested>();
@@ -101,8 +110,7 @@ void main() {
     ).thenAnswer((_) async => <PickedMedia>[pm('a.png'), pm('b.pdf')]);
 
     await tester.pumpWidget(host());
-    await tester.tap(find.byKey(const Key('composer.attach')));
-    await tester.pump();
+    await pickDocuments(tester);
 
     verify(picker.pickMultiple).called(1);
     expect(find.byKey(const Key('composer.attachment_tray')), findsOneWidget);
@@ -134,8 +142,7 @@ void main() {
       );
 
       await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('composer.attach')));
-      await tester.pump();
+      await pickDocuments(tester);
 
       await tester.enterText(find.byKey(const Key('composer.input')), 'mira');
       await tester.pump();
@@ -179,8 +186,7 @@ void main() {
       ).thenAnswer((_) async => <PickedMedia>[pm('nota.mp3'), pm('foto.png')]);
 
       await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('composer.attach')));
-      await tester.pump();
+      await pickDocuments(tester);
       await tester.enterText(find.byKey(const Key('composer.input')), 'hola');
       await tester.pump();
       await tester.tap(find.byKey(const Key('composer.send')));
@@ -221,8 +227,7 @@ void main() {
       ).thenAnswer((_) async => <PickedMedia>[pm('nota.mp3'), pm('otra.ogg')]);
 
       await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('composer.attach')));
-      await tester.pump();
+      await pickDocuments(tester);
       await tester.enterText(
         find.byKey(const Key('composer.input')),
         'escúchame',
@@ -266,8 +271,7 @@ void main() {
       ).thenThrow(StateError('boom'));
 
       await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('composer.attach')));
-      await tester.pump();
+      await pickDocuments(tester);
       await tester.tap(find.byKey(const Key('composer.attach_send')));
 
       // El error genérico (no MediaFailure) se reporta a FlutterError al
@@ -293,8 +297,7 @@ void main() {
     ).thenAnswer((_) async => <PickedMedia>[pm('a.png')]);
 
     await tester.pumpWidget(host());
-    await tester.tap(find.byKey(const Key('composer.attach')));
-    await tester.pump();
+    await pickDocuments(tester);
 
     await tester.tap(find.byKey(const Key('composer.attach_send')));
     await tester.pump();
@@ -312,8 +315,7 @@ void main() {
     );
 
     await tester.pumpWidget(host());
-    await tester.tap(find.byKey(const Key('composer.attach')));
-    await tester.pump();
+    await pickDocuments(tester);
 
     expect(find.textContaining('Máximo 10'), findsOneWidget);
     // La bandeja quedó con 10 (contador exacto '10 archivos').
@@ -334,8 +336,7 @@ void main() {
     ).thenThrow(const MediaTooLargeFailure());
 
     await tester.pumpWidget(host());
-    await tester.tap(find.byKey(const Key('composer.attach')));
-    await tester.pump();
+    await pickDocuments(tester);
     await tester.tap(find.byKey(const Key('composer.attach_send')));
     await tester.pump();
     await tester.pumpAndSettle();

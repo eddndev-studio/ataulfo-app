@@ -100,8 +100,11 @@ void main() {
       ).thenAnswer((_) => upload.future);
 
       await tester.pumpWidget(host(show: true));
+      // El clip abre el menú de adjuntar; "Documento" dispara pickMultiple.
       await tester.tap(find.byKey(const Key('composer.attach')));
-      await tester.pump(); // resuelve pickMultiple() y llena la bandeja
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('attach_menu.document')));
+      await tester.pumpAndSettle(); // cierra el sheet y llena la bandeja
       // Con la bandeja llena y el campo vacío, el slot final es el botón de
       // enviar el lote; al tocarlo la subida entra en vuelo.
       await tester.tap(find.byKey(const Key('composer.attach_send')));

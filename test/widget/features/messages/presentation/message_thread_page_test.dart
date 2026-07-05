@@ -1788,8 +1788,11 @@ void main() {
         (_) async => const UploadedMedia(ref: 'ref-abc', previewUrl: null),
       );
       await tester.pumpWidget(hostMedia());
+      // El clip abre el menú de adjuntar; "Documento" dispara pickMultiple.
       await tester.tap(find.byKey(const Key('composer.attach')));
-      await tester.pump(); // pickMultiple resuelve, la bandeja se llena
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('attach_menu.document')));
+      await tester.pumpAndSettle(); // cierra el sheet y llena la bandeja
       await tester.enterText(
         find.byKey(const Key('composer.input')),
         'mira esto',

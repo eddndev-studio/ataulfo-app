@@ -115,4 +115,118 @@ void main() {
       findsNothing,
     );
   });
+
+  group('PendingAttachment ya subido (existingRef, sin bytes locales)', () {
+    test('sizeBytes usa el override del servidor cuando no hay bytes', () {
+      const att = PendingAttachment(
+        filename: 'contrato.pdf',
+        type: 'document',
+        existingRef: 'tenant/org/media/abc.pdf',
+        sizeBytesOverride: 2048,
+      );
+      expect(att.sizeBytes, 2048);
+      expect(att.isAlreadyUploaded, isTrue);
+      expect(att.isImage, isFalse);
+    });
+
+    test('sizeBytes cae a bytes.length cuando no hay override', () {
+      final att = PendingAttachment(
+        bytes: Uint8List(7),
+        filename: 'a.png',
+        type: 'image',
+      );
+      expect(att.sizeBytes, 7);
+      expect(att.isAlreadyUploaded, isFalse);
+    });
+
+    test('sin bytes ni override, sizeBytes es 0', () {
+      const att = PendingAttachment(filename: 'x.bin', type: 'document');
+      expect(att.sizeBytes, 0);
+    });
+
+    test('isImage sigue saliendo del type, sin bytes', () {
+      const att = PendingAttachment(
+        filename: 'foto.png',
+        type: 'image',
+        existingRef: 'tenant/org/media/foto.png',
+        previewUrl: 'https://signed.test/foto.png',
+        sizeBytesOverride: 99,
+      );
+      expect(att.isImage, isTrue);
+      expect(att.isAlreadyUploaded, isTrue);
+    });
+  });
+
+  group('tarjeta de imagen sin bytes locales', () {
+    testWidgets('con previewUrl intenta pintar la red (NetworkImage)', (
+      tester,
+    ) async {
+      const url = 'https://signed.test/miniatura.png';
+      await tester.pumpWidget(
+        host(<PendingAttachment>[
+          const PendingAttachment(
+            filename: 'foto.png',
+            type: 'image',
+            existingRef: 'tenant/org/media/foto.png',
+            previewUrl: url,
+            sizeBytesOverride: 42,
+          ),
+        ]),
+      );
+      await tester.pump();
+      final image = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(const Key('composer.attachment_tray.item.0')),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(image.image, isA<NetworkImage>());
+      expect((image.image as NetworkImage).url, url);
+    });
+
+    testWidgets('si la URL falla, cae a la cara de archivo (errorBuilder)', (
+      tester,
+    ) async {
+      // En tests Image.network falla siempre (sin red real): el fallback debe
+      // ser la cara de archivo con nombre, no un hueco ni una excepción.
+      await tester.pumpWidget(
+        host(<PendingAttachment>[
+          const PendingAttachment(
+            filename: 'foto.png',
+            type: 'image',
+            existingRef: 'tenant/org/media/foto.png',
+            previewUrl: 'https://invalid.test/falla.png',
+            sizeBytesOverride: 42,
+          ),
+        ]),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('foto.png'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('sin previewUrl ni bytes, pinta la cara de archivo directo', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(<PendingAttachment>[
+          const PendingAttachment(
+            filename: 'foto.png',
+            type: 'image',
+            existingRef: 'tenant/org/media/foto.png',
+            sizeBytesOverride: 42,
+          ),
+        ]),
+      );
+      await tester.pump();
+      expect(find.text('foto.png'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('composer.attachment_tray.item.0')),
+          matching: find.byType(Image),
+        ),
+        findsNothing,
+      );
+    });
+  });
 }

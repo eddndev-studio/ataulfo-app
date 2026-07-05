@@ -4,23 +4,47 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
 
-/// Un adjunto elegido y aún NO enviado: los bytes locales (para la miniatura y
-/// la subida), el nombre original y el `type` de envío ya inferido
-/// (`image`/`video`/`audio`/`document`). Vive en la bandeja del composer hasta
-/// que el lote se despacha.
+/// Un adjunto elegido y aún NO enviado. Vive en la bandeja del composer hasta
+/// que el lote se despacha, en uno de dos modos:
+///
+/// - **Local**: [bytes] presentes (para la miniatura y la subida), nombre
+///   original y `type` de envío ya inferido (`image`/`video`/`audio`/
+///   `document`).
+/// - **Ya subido**: un asset del catálogo de la organización. [bytes] es
+///   `null`; [existingRef] lleva el ref BARE que el envío despacha DIRECTO
+///   (sin volver a subir), [previewUrl] la URL efímera para la miniatura y
+///   [sizeBytesOverride] el tamaño reportado por el servidor.
 class PendingAttachment {
   const PendingAttachment({
-    required this.bytes,
+    this.bytes,
     required this.filename,
     required this.type,
+    this.existingRef,
+    this.previewUrl,
+    this.sizeBytesOverride,
   });
 
-  final Uint8List bytes;
+  /// Bytes locales del archivo; `null` cuando el adjunto ya vive en el
+  /// servidor ([existingRef] no-nulo).
+  final Uint8List? bytes;
   final String filename;
   final String type;
 
+  /// Ref BARE de un asset YA subido: este adjunto no vuelve a subirse; el
+  /// envío usa este ref tal cual.
+  final String? existingRef;
+
+  /// URL remota efímera para la miniatura cuando no hay [bytes] locales.
+  /// NUNCA identidad (esa es [existingRef]); expira.
+  final String? previewUrl;
+
+  /// Tamaño reportado por el servidor cuando no hay [bytes] locales con los
+  /// que calcularlo.
+  final int? sizeBytesOverride;
+
   bool get isImage => type == 'image';
-  int get sizeBytes => bytes.length;
+  bool get isAlreadyUploaded => existingRef != null;
+  int get sizeBytes => sizeBytesOverride ?? bytes?.length ?? 0;
 }
 
 /// Bandeja de adjuntos pendientes sobre el composer del hilo: una tira
@@ -122,17 +146,7 @@ class _AttachmentCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppTokens.radiusChip),
               child: attachment.isImage
-                  ? Image.memory(
-                      attachment.bytes,
-                      width: size,
-                      height: size,
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                      // Bytes no decodificables (formato exótico/corrupto): cae
-                      // a la cara de archivo en vez de tumbar el composer.
-                      errorBuilder: (_, _, _) =>
-                          _FileFace(attachment: attachment),
-                    )
+                  ? _imageFace()
                   : _FileFace(attachment: attachment),
             ),
           ),
@@ -161,6 +175,34 @@ class _AttachmentCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+
+  /// Miniatura de una imagen: los bytes locales si existen; si no, la URL
+  /// remota efímera ([PendingAttachment.previewUrl]). Cualquier fallo (bytes
+  /// no decodificables, URL rota o ausente) cae a la cara de archivo en vez
+  /// de tumbar el composer.
+  Widget _imageFace() {
+    final bytes = attachment.bytes;
+    if (bytes != null) {
+      return Image.memory(
+        bytes,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => _FileFace(attachment: attachment),
+      );
+    }
+    final url = attachment.previewUrl;
+    if (url == null) return _FileFace(attachment: attachment);
+    return Image.network(
+      url,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => _FileFace(attachment: attachment),
     );
   }
 }
