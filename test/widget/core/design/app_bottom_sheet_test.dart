@@ -106,4 +106,135 @@ void main() {
     expect(sheet.showDragHandle, isTrue);
     expect(sheet.enableDrag, isTrue);
   });
+
+  group('showAppBottomSheet — guard de descarte (confirmDiscard)', () {
+    /// Abre una hoja guardada y devuelve su Future de resultado.
+    Future<Future<String?>> openGuarded(
+      WidgetTester tester, {
+      required bool Function() confirmDiscard,
+      bool showDragHandle = true,
+    }) async {
+      setTopInset(tester, 0);
+      late Future<String?> result;
+      await tester.pumpWidget(
+        host(
+          (context) => result = showAppBottomSheet<String>(
+            context,
+            isScrollControlled: true,
+            confirmDiscard: confirmDiscard,
+            showDragHandle: showDragHandle,
+            builder: (sheetContext) => SizedBox(
+              key: const Key('sheet'),
+              height: 300,
+              child: Center(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(sheetContext).pop('guardado'),
+                  child: const Text('guardar'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+      return result;
+    }
+
+    testWidgets('sin cambios (callback false): el scrim cierra directo', (
+      tester,
+    ) async {
+      final result = await openGuarded(tester, confirmDiscard: () => false);
+      await tester.tapAt(const Offset(200, 40));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('sheet')), findsNothing);
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(await result, isNull);
+    });
+
+    testWidgets('con cambios: el scrim pide confirmación y cancelar conserva '
+        'la hoja', (tester) async {
+      await openGuarded(tester, confirmDiscard: () => true);
+      await tester.tapAt(const Offset(200, 40));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+      await tester.tap(find.byKey(appSheetDiscardCancelKey));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.byKey(const Key('sheet')), findsOneWidget);
+    });
+
+    testWidgets('con cambios: confirmar el descarte cierra con null', (
+      tester,
+    ) async {
+      final result = await openGuarded(tester, confirmDiscard: () => true);
+      await tester.tapAt(const Offset(200, 40));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(appSheetDiscardConfirmKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('sheet')), findsNothing);
+      expect(await result, isNull);
+    });
+
+    testWidgets('el back físico también pasa por el guard', (tester) async {
+      await openGuarded(tester, confirmDiscard: () => true);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      expect(find.byKey(const Key('sheet')), findsOneWidget);
+    });
+
+    testWidgets('arrastrar el handle hacia abajo pasa por el guard', (
+      tester,
+    ) async {
+      await openGuarded(tester, confirmDiscard: () => true);
+      expect(find.byKey(appSheetDragHandleKey), findsOneWidget);
+
+      await tester.drag(
+        find.byKey(appSheetDragHandleKey),
+        const Offset(0, 120),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      expect(find.byKey(const Key('sheet')), findsOneWidget);
+    });
+
+    testWidgets('arrastrar el handle sin cambios cierra directo', (
+      tester,
+    ) async {
+      final result = await openGuarded(tester, confirmDiscard: () => false);
+      await tester.drag(
+        find.byKey(appSheetDragHandleKey),
+        const Offset(0, 120),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('sheet')), findsNothing);
+      expect(await result, isNull);
+    });
+
+    testWidgets('showDragHandle false: la hoja guardada no pinta handle', (
+      tester,
+    ) async {
+      await openGuarded(
+        tester,
+        confirmDiscard: () => true,
+        showDragHandle: false,
+      );
+      expect(find.byKey(appSheetDragHandleKey), findsNothing);
+    });
+
+    testWidgets('el cierre programático (guardar) NO pasa por el guard', (
+      tester,
+    ) async {
+      // El guard intercepta DESCARTES; un pop explícito con resultado es el
+      // camino feliz del formulario y debe entregar su valor sin diálogo.
+      final result = await openGuarded(tester, confirmDiscard: () => true);
+      await tester.tap(find.text('guardar'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(await result, 'guardado');
+    });
+  });
 }
