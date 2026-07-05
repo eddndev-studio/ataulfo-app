@@ -98,6 +98,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('el clip anuncia imagen, video o PDF en su tooltip', (
+    tester,
+  ) async {
+    await pump(tester, <PaMessage>[]);
+    expect(find.byTooltip('Adjuntar imagen, video o PDF'), findsOneWidget);
+  });
+
   testWidgets(
     'el clip sube el archivo y pinta el chip pendiente con miniatura y su ✕',
     (tester) async {

@@ -20,8 +20,8 @@ final class PaAttachmentTooLargeFailure extends PaFailure {
   const PaAttachmentTooLargeFailure();
 }
 
-/// 415 — el server rechazó el tipo del adjunto (fuera de la allowlist
-/// imagen/PDF).
+/// Tipo de adjunto fuera de la allowlist (imagen/PDF/video MP4): 415 del
+/// server o gate client-side previo a la subida.
 final class PaAttachmentUnsupportedFailure extends PaFailure {
   const PaAttachmentUnsupportedFailure();
 }

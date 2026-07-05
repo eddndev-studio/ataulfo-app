@@ -116,7 +116,7 @@ String trainerFailureCopy(TrainerFailure f) => switch (f) {
   TrainerAttachmentTooLargeFailure() =>
     'El archivo pesa demasiado (máx 25 MB).',
   TrainerAttachmentUnsupportedFailure() =>
-    'Tipo no soportado (imagen JPG/PNG/WebP o PDF).',
+    'Tipo no soportado (imagen JPG/PNG/WebP, video MP4 o PDF).',
   TrainerAttachmentLimitFailure() =>
     'Puedes adjuntar hasta 5 archivos por turno.',
   TrainerNotFoundFailure() => 'Eso ya no existe.',
@@ -376,7 +376,7 @@ class _ChatViewState extends State<_ChatView> {
           leading: <Widget>[
             IconButton(
               key: const Key('trainer.attach'),
-              tooltip: 'Adjuntar imagen o PDF',
+              tooltip: 'Adjuntar imagen, video o PDF',
               icon: s.attaching
                   ? const SizedBox(
                       width: 18,

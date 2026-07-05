@@ -556,6 +556,29 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
   static const int _maxAttachments = 5;
   static const int _maxAttachmentBytes = 25 * 1024 * 1024;
 
+  /// Espejo client-side de la allowlist de content-types del servidor
+  /// (imagen JPG/PNG/WebP, PDF y video MP4), expresada como extensiones porque
+  /// el picker solo entrega bytes + filename. Gate rápido para no subir lo que
+  /// el server contestaría 415; el server sigue siendo la autoridad (sniffea
+  /// los bytes reales).
+  static const Set<String> _allowedAttachmentExtensions = <String>{
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'pdf',
+    'mp4',
+  };
+
+  static bool _isSupportedAttachment(PickedMedia p) {
+    final name = p.filename;
+    final dot = name.lastIndexOf('.');
+    if (dot < 0 || dot == name.length - 1) return false;
+    return _allowedAttachmentExtensions.contains(
+      name.substring(dot + 1).toLowerCase(),
+    );
+  }
+
   Future<void> _onAttachRequested(
     TrainerChatAttachRequested event,
     Emitter<TrainerChatState> emit,
@@ -570,12 +593,16 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     final afterPick = state;
     if (afterPick is! TrainerChatLoaded) return;
 
-    // Partición client-side: descartar sobre-peso, luego acotar al cupo
-    // restante (5 CONTANDO los pendientes ya subidos).
+    // Partición client-side: descartar tipos fuera de la allowlist, luego
+    // sobre-peso, luego acotar al cupo restante (5 CONTANDO los pendientes
+    // ya subidos).
     final withinSize = <PickedMedia>[];
+    var anyUnsupported = false;
     var anyTooLarge = false;
     for (final p in picked) {
-      if (p.bytes.length > _maxAttachmentBytes) {
+      if (!_isSupportedAttachment(p)) {
+        anyUnsupported = true;
+      } else if (p.bytes.length > _maxAttachmentBytes) {
         anyTooLarge = true;
       } else {
         withinSize.add(p);
@@ -588,10 +615,12 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     final anyOverLimit = withinSize.length > toUpload.length;
 
     if (toUpload.isEmpty) {
-      // Nada subible: informar el motivo dominante (peso pesa más que cupo).
+      // Nada subible: informar el motivo dominante (tipo > peso > cupo).
       emit(
         afterPick.copyWith(
-          sendFailure: anyTooLarge
+          sendFailure: anyUnsupported
+              ? const TrainerAttachmentUnsupportedFailure()
+              : anyTooLarge
               ? const TrainerAttachmentTooLargeFailure()
               : const TrainerAttachmentLimitFailure(),
         ),
@@ -638,9 +667,11 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
 
     final cur = state;
     if (cur is! TrainerChatLoaded) return;
-    // Cierre del lote: si algo se descartó client-side, informarlo (peso >
-    // cupo); si todo entró, limpiar cualquier aviso previo.
-    final notice = anyTooLarge
+    // Cierre del lote: si algo se descartó client-side, informarlo (tipo >
+    // peso > cupo); si todo entró, limpiar cualquier aviso previo.
+    final notice = anyUnsupported
+        ? const TrainerAttachmentUnsupportedFailure()
+        : anyTooLarge
         ? const TrainerAttachmentTooLargeFailure()
         : (anyOverLimit ? const TrainerAttachmentLimitFailure() : null);
     emit(

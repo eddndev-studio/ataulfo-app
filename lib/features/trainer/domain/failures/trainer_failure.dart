@@ -22,8 +22,8 @@ final class TrainerAttachmentTooLargeFailure extends TrainerFailure {
   const TrainerAttachmentTooLargeFailure();
 }
 
-/// 415 — el server rechazó el tipo del adjunto (fuera de la allowlist
-/// imagen/PDF).
+/// Tipo de adjunto fuera de la allowlist (imagen/PDF/video MP4): 415 del
+/// server o gate client-side previo a la subida.
 final class TrainerAttachmentUnsupportedFailure extends TrainerFailure {
   const TrainerAttachmentUnsupportedFailure();
 }

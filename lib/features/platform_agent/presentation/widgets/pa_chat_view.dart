@@ -302,7 +302,7 @@ class _PaChatViewState extends State<PaChatView>
               leading: <Widget>[
                 IconButton(
                   key: const Key('pa.attach'),
-                  tooltip: 'Adjuntar imagen o PDF',
+                  tooltip: 'Adjuntar imagen, video o PDF',
                   icon: s.attaching
                       ? const SizedBox(
                           width: 18,
