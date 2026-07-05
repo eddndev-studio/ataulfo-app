@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
@@ -53,7 +54,12 @@ class _LedgerView extends StatelessWidget {
       );
     }
     return ListView(
-      padding: const EdgeInsets.all(AppTokens.sp4),
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp4,
+        AppTokens.sp4,
+        AppTokens.sp4,
+        AppTokens.sp4 + context.safeBottomInset,
+      ),
       children: <Widget>[
         for (final a in state.items) ...<Widget>[
           _ActionRow(action: a),

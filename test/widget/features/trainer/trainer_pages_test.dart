@@ -1,3 +1,4 @@
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_chat_composer.dart';
 import 'package:ataulfo/core/design/widgets/message_timestamp.dart';
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
@@ -315,6 +316,51 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Tacos \$25'), findsOneWidget);
     });
+
+    testWidgets(
+      'la lista de documentos reserva el inset inferior del sistema',
+      (tester) async {
+        final repo = _MockWorkspaceRepo();
+        when(() => repo.listDocs(templateId: 't1')).thenAnswer(
+          (_) async => <WorkspaceDoc>[
+            WorkspaceDoc(
+              name: 'menu-precios',
+              content: '',
+              sizeBytes: 120,
+              updatedByKind: 'operator',
+              version: 1,
+              createdAt: DateTime.utc(2026, 6, 10),
+              updatedAt: DateTime.utc(2026, 6, 10),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+                child: RepositoryProvider<WorkspaceRepository>.value(
+                  value: repo,
+                  child: BlocProvider<WorkspaceBloc>(
+                    create: (_) =>
+                        WorkspaceBloc(repo: repo, templateId: 't1')
+                          ..add(const WorkspaceLoadRequested()),
+                    child: const WorkspacePage(templateId: 't1'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final list = tester.widget<ListView>(find.byType(ListView));
+        expect(list.padding?.resolve(TextDirection.ltr).bottom, 34);
+      },
+    );
   });
 
   group('PreviewPage', () {
@@ -491,5 +537,49 @@ void main() {
       expect(find.textContaining('La corrida del motor falló'), findsOneWidget);
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
+
+    testWidgets(
+      'el inset inferior del sistema lo reserva el composer, no la lista',
+      (tester) async {
+        final repo = _MockPreviewRepo();
+        when(() => repo.transcript(templateId: 't1')).thenAnswer(
+          (_) async => PreviewTranscript(
+            items: <PreviewItem>[
+              PreviewItem(kind: 'user', text: 'hola', at: DateTime.utc(2026)),
+            ],
+          ),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+                child: BlocProvider<PreviewBloc>(
+                  create: (_) =>
+                      PreviewBloc(repo: repo, templateId: 't1')
+                        ..add(const PreviewStarted()),
+                  child: const PreviewPage(templateId: 't1'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // La barra de redacción es el pie de la superficie de chat: es ella
+        // quien empuja su contenido por encima de la gesture-nav. El scroll del
+        // hilo vive por encima del composer, así que no vuelve a sumar el inset.
+        final bar = tester.widget<Container>(
+          find.byKey(const Key('app_chat_composer.bar')),
+        );
+        expect(
+          bar.padding?.resolve(TextDirection.ltr).bottom,
+          AppTokens.sp2 + 34,
+        );
+      },
+    );
   });
 }

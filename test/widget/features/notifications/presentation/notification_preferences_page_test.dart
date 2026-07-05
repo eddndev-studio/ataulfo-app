@@ -226,4 +226,36 @@ void main() {
       () => bloc.add(const NotificationPreferencesLoadRequested()),
     ).called(1);
   });
+
+  testWidgets('la lista reserva el inset inferior del sistema en su padding', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const NotificationPreferencesLoaded(
+        preferences: <NotificationPreference>[_pref],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+              child: BlocProvider<NotificationPreferencesBloc>.value(
+                value: bloc,
+                child: const NotificationPreferencesPage(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(list.padding?.resolve(TextDirection.ltr).bottom, AppTokens.sp6 + 34);
+  });
 }

@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/assistant_markdown.dart';
 import 'package:ataulfo/core/design/widgets/chat_bubble.dart';
@@ -418,5 +419,39 @@ void main() {
       await pump(tester);
       expect(find.byIcon(Icons.build_circle_outlined), findsOneWidget);
     });
+  });
+
+  testWidgets('la lista reserva el inset inferior del sistema en su padding', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      AiLogLoaded(
+        entries: <AiLogEntry>[e(1, role: AiLogRole.user, content: 'hola')],
+        nextBefore: null,
+        isLoadingMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+              child: BlocProvider<AiLogBloc>.value(
+                value: bloc,
+                child: const AiLogPage(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(list.padding?.resolve(TextDirection.ltr).bottom, AppTokens.sp4 + 34);
   });
 }

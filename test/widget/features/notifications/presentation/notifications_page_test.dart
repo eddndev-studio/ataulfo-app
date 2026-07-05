@@ -376,4 +376,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(pushed, '/bots/b1/sessions/5215550000001');
   });
+
+  testWidgets('la lista reserva el inset inferior del sistema en su padding', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(NotificationsLoaded(items: <NotificationInboxItem>[_item]));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+              child: BlocProvider<NotificationsBloc>.value(
+                value: bloc,
+                child: const NotificationsPage(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(list.padding?.resolve(TextDirection.ltr).bottom, AppTokens.sp6 + 34);
+  });
 }

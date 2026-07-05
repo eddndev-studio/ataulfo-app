@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_danger_zone.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/connect_link.dart';
@@ -274,5 +275,38 @@ void main() {
       expect(find.textContaining('expiró'), findsOneWidget);
       expect(find.text('Iniciar emparejamiento'), findsOneWidget);
     });
+  });
+
+  testWidgets('el scroll reserva el inset inferior del sistema en su padding', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(BotConnectReady(_link));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+              child: BlocProvider<BotConnectBloc>.value(
+                value: bloc,
+                child: const BotConnectPage(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final scroll = tester.widget<SingleChildScrollView>(
+      find.byType(SingleChildScrollView),
+    );
+    expect(
+      scroll.padding?.resolve(TextDirection.ltr).bottom,
+      AppTokens.sp6 + 34,
+    );
   });
 }

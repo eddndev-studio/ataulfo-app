@@ -396,6 +396,35 @@ void main() {
     expect(find.text('Reproducir'), findsNothing);
     expect(find.text('Abrir'), findsNothing);
   });
+
+  testWidgets('el scroll reserva el inset inferior del sistema en su padding', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+            child: BlocProvider<MediaDetailCubit>(
+              create: (_) =>
+                  MediaDetailCubit(repo: _MockRepo(), asset: _asset()),
+              child: MediaDetailPage(
+                loader: _FakeLoader(Future<Uint8List?>.value(null)),
+                launcher: _FakeLauncher(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(list.padding?.resolve(TextDirection.ltr).bottom, AppTokens.sp4 + 34);
+  });
 }
 
 /// Empuja el detalle sobre una pila de navegación (para observar el pop) y

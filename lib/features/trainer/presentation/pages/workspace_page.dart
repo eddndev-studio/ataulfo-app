@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/workspace_doc.dart';
 import '../bloc/workspace_bloc.dart';
@@ -83,6 +84,7 @@ class WorkspacePage extends StatelessWidget {
                     ),
                   )
                 : ListView.builder(
+                    padding: EdgeInsets.only(bottom: context.safeBottomInset),
                     itemCount: docs.length,
                     itemBuilder: (context, i) => _DocTile(doc: docs[i]),
                   ),

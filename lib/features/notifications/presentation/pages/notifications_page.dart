@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
@@ -58,7 +59,12 @@ class _NotificationsList extends StatelessWidget {
       },
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(AppTokens.sp6),
+        padding: EdgeInsets.fromLTRB(
+          AppTokens.sp6,
+          AppTokens.sp6,
+          AppTokens.sp6,
+          AppTokens.sp6 + context.safeBottomInset,
+        ),
         itemBuilder: (context, index) {
           if (index == 0) {
             return Wrap(

@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
@@ -183,5 +184,33 @@ void main() {
     );
     await tester.pumpWidget(host());
     expect(find.widgetWithText(AppPill, 'Silenciado'), findsNothing);
+  });
+
+  testWidgets('el scroll reserva el inset inferior del sistema en su padding', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(const ProfileLoaded(_dm));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+              child: BlocProvider<ProfileBloc>.value(
+                value: bloc,
+                child: const ProfilePage(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(list.padding?.resolve(TextDirection.ltr).bottom, AppTokens.sp6 + 34);
   });
 }

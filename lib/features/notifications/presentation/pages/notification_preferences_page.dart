@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
@@ -83,7 +84,12 @@ class _PreferencesList extends StatelessWidget {
     // toggle por preferencia separada por hairlines. Sin glifo leading: en una
     // fila de toggle el ícono no aporta acción ni identidad.
     return ListView(
-      padding: const EdgeInsets.all(AppTokens.sp6),
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp6,
+        AppTokens.sp6,
+        AppTokens.sp6,
+        AppTokens.sp6 + context.safeBottomInset,
+      ),
       children: <Widget>[
         AppCard(
           key: const Key('notification_preferences.card'),

@@ -269,4 +269,39 @@ void main() {
 
     verify(() => cubit.load()).called(1);
   });
+
+  testWidgets('la lista reserva el inset inferior del sistema en su padding', (
+    tester,
+  ) async {
+    when(() => cubit.state).thenReturn(
+      ExecutionsLoaded(
+        executions: <Execution>[
+          _exe('exe-1', ExecutionStatus.completed, 'flw-1'),
+        ],
+        flowNames: const <String, String>{'flw-1': 'Bienvenida'},
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+              child: BlocProvider<ExecutionsCubit>.value(
+                value: cubit,
+                child: const ExecutionsPage(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(list.padding?.resolve(TextDirection.ltr).bottom, AppTokens.sp4 + 34);
+  });
 }
