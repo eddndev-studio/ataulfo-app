@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flows_bloc.dart';
@@ -103,9 +105,8 @@ void main() {
     expect(find.byKey(const Key('template_flows.search')), findsNothing);
   });
 
-  testWidgets('Loaded con flujos muestra una tarjeta por flow + status pills', (
-    tester,
-  ) async {
+  testWidgets('Loaded con flujos: UNA card con las filas y divider entre '
+      'ellas', (tester) async {
     when(() => flowsBloc.state).thenReturn(
       FlowsLoaded(<flows.Flow>[
         _flow(id: 'f1', name: 'Bienvenida'),
@@ -119,8 +120,65 @@ void main() {
     expect(find.byKey(const Key('flows.row.f2')), findsOneWidget);
     expect(find.text('Bienvenida'), findsOneWidget);
     expect(find.text('Despedida'), findsOneWidget);
-    expect(find.text('Activo'), findsOneWidget);
-    expect(find.text('Pausado'), findsOneWidget);
+
+    // Ambas filas viven dentro de la MISMA card, separadas por un divider
+    // hairline — no una card suelta por flujo.
+    final cardWithRow = find.ancestor(
+      of: find.byKey(const Key('flows.row.f1')),
+      matching: find.byType(AppCard),
+    );
+    expect(cardWithRow, findsOneWidget);
+    expect(
+      find.descendant(
+        of: cardWithRow,
+        matching: find.byKey(const Key('flows.row.f2')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: cardWithRow, matching: find.byType(Divider)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('estado con dos voces: el flujo activo calla y el pausado '
+      'habla como pill', (tester) async {
+    when(() => flowsBloc.state).thenReturn(
+      FlowsLoaded(<flows.Flow>[
+        _flow(id: 'f1', name: 'Bienvenida'),
+        _flow(id: 'f2', name: 'Despedida', isActive: false),
+      ]),
+    );
+
+    await tester.pumpWidget(host());
+
+    // Activo es el default: no pinta pill ni texto — repetirlo por fila
+    // sana sería ruido.
+    expect(find.byKey(const Key('flows.row.f1.status_pill')), findsNothing);
+    expect(find.text('Activo'), findsNothing);
+
+    // Pausado es el estado excepcional: sí merece la cápsula.
+    final pausedPill = find.byKey(const Key('flows.row.f2.status_pill'));
+    expect(pausedPill, findsOneWidget);
+    expect(tester.widget(pausedPill), isA<AppPill>());
+    expect(
+      find.descendant(of: pausedPill, matching: find.text('Pausado')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('el scroll despeja el FAB de crear al fondo', (tester) async {
+    when(() => flowsBloc.state).thenReturn(
+      FlowsLoaded(<flows.Flow>[_flow(id: 'f1', name: 'Bienvenida')]),
+    );
+
+    await tester.pumpWidget(host());
+
+    final scroll = tester.widget<SingleChildScrollView>(
+      find.byKey(const Key('template_flows.content')),
+    );
+    final resolved = scroll.padding!.resolve(TextDirection.ltr);
+    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   group('tarjetas ricas', () {

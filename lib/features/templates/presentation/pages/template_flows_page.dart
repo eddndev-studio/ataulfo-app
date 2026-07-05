@@ -15,7 +15,8 @@ import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../../triggers/presentation/bloc/triggers_bloc.dart';
 
 /// Lista de flujos de una plantilla (`/templates/:id/flows`), con buscador
-/// local y tarjetas ricas: cada flujo resume sus disparadores y gates
+/// local y lista densa: UNA card apila las filas (una por flujo) separadas
+/// por divider hairline, y cada fila resume sus disparadores y gates
 /// (enfriamiento, límite de uso) sin entrar al editor. Posee su Scaffold —
 /// AppBar y FAB [+] de crear — como las páginas del entrenador; la ruta
 /// solo provee blocs (FlowsBloc + TriggersBloc del template).
@@ -102,12 +103,14 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
               .where((f) => f.name.toLowerCase().contains(q))
               .toList(growable: false);
     return SingleChildScrollView(
+      key: const Key('template_flows.content'),
       padding: EdgeInsets.fromLTRB(
         AppTokens.sp6,
         AppTokens.sp4,
         AppTokens.sp6,
-        // Espacio extra al fondo para que el FAB no tape la última tarjeta.
-        AppTokens.sp9 + context.safeBottomInset,
+        // fabClearance: la última fila debe poder quedar por encima del FAB
+        // de crear que flota sobre esta página.
+        AppTokens.fabClearance + context.safeBottomInset,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,27 +146,12 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
             )
           else
             // El count de disparadores por flujo sale del TriggersBloc del
-            // template (un solo GET); cada tarjeta lo consume del mapa.
+            // template (un solo GET); cada fila lo consume del mapa.
             BlocBuilder<TriggersBloc, TriggersState>(
-              builder: (context, tState) {
-                final counts = _triggerCounts(tState);
-                return Column(
-                  children: <Widget>[
-                    for (final f in filtered)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: AppTokens.cardGap,
-                        ),
-                        child: _FlowCard(
-                          flow: f,
-                          triggerCount: counts == null
-                              ? null
-                              : (counts[f.id] ?? 0),
-                        ),
-                      ),
-                  ],
-                );
-              },
+              builder: (context, tState) => _FlowsCard(
+                flows: filtered,
+                triggerCounts: _triggerCounts(tState),
+              ),
             ),
         ],
       ),
@@ -171,7 +159,7 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
   }
 
   /// Counts por flowId; null mientras el bloc de triggers no tiene snapshot
-  /// (la tarjeta omite esa parte del resumen en vez de mentir un 0).
+  /// (la fila omite esa parte del resumen en vez de mentir un 0).
   static Map<String, int>? _triggerCounts(TriggersState state) {
     if (state is! TriggersLoaded) return null;
     final counts = <String, int>{};
@@ -182,10 +170,54 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
   }
 }
 
-/// Tarjeta rica de un flujo: glifo + nombre + resumen (disparadores ·
-/// enfriamiento · límite) + pill de estado + borrar. Tap → editor del flujo.
-class _FlowCard extends StatelessWidget {
-  const _FlowCard({required this.flow, required this.triggerCount});
+/// El listado como UNA card que apila las filas de flujos separadas por
+/// divider hairline (idioma de los hubs y de las listas de bots/plantillas),
+/// en lugar de una card suelta por item.
+class _FlowsCard extends StatelessWidget {
+  const _FlowsCard({required this.flows, required this.triggerCounts});
+
+  final List<fdom.Flow> flows;
+
+  /// Counts por flowId; null = aún sin snapshot (la fila omite el resumen).
+  final Map<String, int>? triggerCounts;
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = triggerCounts;
+    final rows = <Widget>[];
+    for (var i = 0; i < flows.length; i++) {
+      if (i > 0) {
+        rows.add(
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+        );
+      }
+      final f = flows[i];
+      rows.add(
+        _FlowTile(
+          flow: f,
+          triggerCount: counts == null ? null : (counts[f.id] ?? 0),
+        ),
+      );
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: rows,
+      ),
+    );
+  }
+}
+
+/// Fila de un flujo dentro de la card del listado: glifo + nombre con el
+/// resumen (disparadores · enfriamiento · límite) como caption + borrar.
+/// El estado habla solo cuando es excepcional: "Pausado" como pill; un flujo
+/// activo no pinta nada — el default repetido por fila sería ruido.
+///
+/// Toda la fila es tap-target hacia el editor; el InkWell propio da el
+/// ripple (la card contenedora no es tappable).
+class _FlowTile extends StatelessWidget {
+  const _FlowTile({required this.flow, required this.triggerCount});
 
   final fdom.Flow flow;
 
@@ -196,68 +228,60 @@ class _FlowCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final meta = _meta();
-    return AppCard(
+    return InkWell(
       key: Key('flows.row.${flow.id}'),
       // push apila el editor del flow; el back físico vuelve a la lista.
       onTap: () => context.push('/flows/${flow.id}'),
-      child: Row(
-        children: <Widget>[
-          const AppEntityIcon(icon: Icons.account_tree_outlined),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
+      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        child: Row(
+          children: <Widget>[
+            const AppEntityIcon(icon: Icons.account_tree_outlined),
+            const SizedBox(width: AppTokens.sp4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    flow.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium,
+                  ),
+                  if (meta.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
                       child: Text(
-                        flow.name,
+                        meta,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppTokens.text2,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: AppTokens.sp2),
-                    if (flow.isActive)
-                      AppPill.neutral(
-                        key: Key('flows.row.${flow.id}.status_pill'),
-                        label: 'Activo',
-                        dot: AppPillDot.active,
-                      )
-                    else
-                      AppPill.outline(
-                        key: Key('flows.row.${flow.id}.status_pill'),
-                        label: 'Pausado',
-                        dot: AppPillDot.paused,
-                      ),
-                  ],
-                ),
-                if (meta.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      meta,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppTokens.text2,
-                      ),
-                    ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // Trash icon como acción destructiva. Su propio gesture detector
-          // absorbe el tap y no compite con el onTap de la tarjeta.
-          IconButton(
-            key: Key('flows.row.${flow.id}.delete'),
-            icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
-            tooltip: 'Eliminar flujo',
-            onPressed: () => _confirmDeleteFlow(context, flow),
-          ),
-        ],
+            const SizedBox(width: AppTokens.sp2),
+            if (!flow.isActive)
+              AppPill.outline(
+                key: Key('flows.row.${flow.id}.status_pill'),
+                label: 'Pausado',
+                dot: AppPillDot.paused,
+              ),
+            // Trash icon como acción destructiva. Su propio gesture detector
+            // absorbe el tap y no compite con el onTap de la fila.
+            IconButton(
+              key: Key('flows.row.${flow.id}.delete'),
+              icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
+              tooltip: 'Eliminar flujo',
+              onPressed: () => _confirmDeleteFlow(context, flow),
+            ),
+          ],
+        ),
       ),
     );
   }
