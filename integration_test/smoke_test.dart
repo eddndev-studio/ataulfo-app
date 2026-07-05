@@ -341,7 +341,7 @@ void main() {
   );
 
   testWidgets(
-    'flujo: tab Configuración → toggle usageLimit → save → rehidratación',
+    'flujo: Configuración → toggle usageLimit → save → rehidratación',
     (tester) async {
       await app.main();
 
@@ -382,7 +382,7 @@ void main() {
         // ignore: avoid_print
         print(
           'SMOKE FLOW SETTINGS: org sin templates — tramo saltado. '
-          'Crear al menos un template con un flow para cubrir la tab.',
+          'Crear al menos un template con un flow para cubrir la página.',
         );
         return;
       }
@@ -424,7 +424,7 @@ void main() {
         // ignore: avoid_print
         print(
           'SMOKE FLOW SETTINGS: template sin flows — tramo saltado. '
-          'Crear al menos un flow en el primer template para cubrir la tab.',
+          'Crear al menos un flow en el primer template para cubrir la página.',
         );
         return;
       }

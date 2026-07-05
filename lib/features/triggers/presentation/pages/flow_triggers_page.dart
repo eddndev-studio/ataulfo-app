@@ -21,8 +21,8 @@ import '../bloc/triggers_bloc.dart';
 import '../widgets/trigger_edit_sheet.dart';
 
 /// Página de disparadores de un flujo (`/flows/:id/triggers`). Los blocs
-/// viven a nivel de ruta: el listado se pide UNA vez por visita, en vez
-/// de refetchear en cada montaje como cuando era un tab.
+/// viven a nivel de ruta: el listado se pide UNA vez por visita, no en
+/// cada rebuild del árbol que la hospeda.
 ///
 /// La ruta solo conoce el id del flujo, pero el endpoint de triggers es
 /// template-scoped y el sheet necesita el Flow entero (`scopedFlow`):

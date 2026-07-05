@@ -16,8 +16,8 @@ import '../widgets/flow_settings_fields.dart';
 /// días), `usageLimit` (number field, 0 = sin límite) y `excludesFlows[]`
 /// (multi-select de chips con los otros flujos de la Template).
 ///
-/// El bloc vive a nivel de ruta: el form ya no muere por cambio de tab —
-/// solo se descarta al salir de la página. Su modelo de guardado es
+/// El bloc vive a nivel de ruta: el form dirty sobrevive mientras la
+/// página esté en el stack y solo se descarta al salir de ella. Su modelo de guardado es
 /// explícito (form dirty + Guardar + CAS por `version`), a diferencia del
 /// apply-inmediato del resto del editor; la caption al tope lo hace
 /// legible.

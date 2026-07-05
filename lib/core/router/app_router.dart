@@ -1354,8 +1354,8 @@ class AppRouter {
       ),
       GoRoute(
         // Configuración del flujo (gates + allowlist IA). Sub-ruta de
-        // `/flows/:id`. El FlowDetailBloc es de la ruta: el form dirty ya
-        // no muere por cambio de tab — solo al salir de la página.
+        // `/flows/:id`. El FlowDetailBloc es de la ruta: el form dirty
+        // sobrevive mientras la página esté en el stack.
         path: '/flows/:id/settings',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
