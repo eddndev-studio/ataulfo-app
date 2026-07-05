@@ -4,19 +4,21 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/variable_def.dart';
 import '../bloc/var_defs_bloc.dart';
 import '../widgets/var_def_form_sheet.dart';
 
 /// Variables (var-defs) de una plantilla (`/templates/:id/variables`), con
-/// buscador local y tarjetas ricas ({{name}} + default + descripción).
-/// Posee su Scaffold — AppBar y FAB [+] de crear — como las páginas del
-/// entrenador; la ruta solo provee el VarDefsBloc. El FAB se oculta durante
-/// una mutación (el sheet abierto ya tiene su propio submit).
+/// buscador local y lista densa: UNA card apila las filas (una por variable,
+/// {{name}} + default + descripción) separadas por divider hairline. Posee su
+/// Scaffold — AppBar y FAB [+] de crear — como las páginas del entrenador; la
+/// ruta solo provee el VarDefsBloc. El FAB se oculta durante una mutación (el
+/// sheet abierto ya tiene su propio submit).
 class TemplateVariablesPage extends StatefulWidget {
   const TemplateVariablesPage({super.key});
 
@@ -80,11 +82,8 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
                     child: const Icon(Icons.add),
                   ),
             body: switch (state) {
-              VarDefsLoading() => const Center(
+              VarDefsLoading() => const AppLoadingIndicator(
                 key: Key('var_defs.loading'),
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-                ),
               ),
               VarDefsLoaded(defs: final defs) => _content(context, defs),
               VarDefsMutating(defs: final defs) => _content(context, defs),
@@ -108,16 +107,20 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
               .where((d) => d.name.toLowerCase().contains(q))
               .toList(growable: false);
     return SingleChildScrollView(
+      key: const Key('template_variables.content'),
       padding: EdgeInsets.fromLTRB(
         AppTokens.sp6,
         AppTokens.sp4,
         AppTokens.sp6,
-        // Espacio extra al fondo para que el FAB no tape la última tarjeta.
-        AppTokens.sp9 + context.safeBottomInset,
+        // fabClearance: la última fila debe poder quedar por encima del FAB
+        // de crear que flota sobre esta página.
+        AppTokens.fabClearance + context.safeBottomInset,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          // Sin variables no hay nada que filtrar: el buscador solo aparece
+          // cuando existe una lista que recortar.
           if (all.isNotEmpty) ...<Widget>[
             AppTextField(
               key: const Key('template_variables.search'),
@@ -146,14 +149,13 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
               ),
             )
           else
-            for (final d in filtered)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppTokens.cardGap),
-                child: _VarDefCard(
-                  def: d,
-                  onTap: () => _openSheet(context, all, editing: d),
-                ),
-              ),
+            _VarDefsCard(
+              defs: filtered,
+              // El sheet valida contra TODOS los nombres, no solo los
+              // filtrados: renombrar hacia un duplicado oculto por el
+              // buscador debe seguir bloqueado.
+              onEdit: (d) => _openSheet(context, all, editing: d),
+            ),
         ],
       ),
     );
@@ -174,10 +176,44 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
   }
 }
 
-/// Tarjeta rica de una variable: glifo + `{{name}}` + default + descripción
-/// + borrar. Tap → sheet de edición.
-class _VarDefCard extends StatelessWidget {
-  const _VarDefCard({required this.def, required this.onTap});
+/// El listado como UNA card que apila las filas de variables separadas por
+/// divider hairline (idioma de los hubs y de las listas de bots/plantillas),
+/// en lugar de una card suelta por item.
+class _VarDefsCard extends StatelessWidget {
+  const _VarDefsCard({required this.defs, required this.onEdit});
+
+  final List<VariableDef> defs;
+  final ValueChanged<VariableDef> onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < defs.length; i++) {
+      if (i > 0) {
+        rows.add(
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+        );
+      }
+      final d = defs[i];
+      rows.add(_VarDefTile(def: d, onTap: () => onEdit(d)));
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: rows,
+      ),
+    );
+  }
+}
+
+/// Fila de una variable dentro de la card del listado: glifo + `{{name}}` +
+/// default + descripción + borrar. Tap → sheet de edición.
+///
+/// Toda la fila es tap-target hacia el sheet; el InkWell propio da el ripple
+/// (la card contenedora no es tappable).
+class _VarDefTile extends StatelessWidget {
+  const _VarDefTile({required this.def, required this.onTap});
 
   final VariableDef def;
   final VoidCallback onTap;
@@ -185,53 +221,59 @@ class _VarDefCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return AppCard(
+    return InkWell(
       key: Key('var_defs.row.${def.id}'),
       onTap: onTap,
-      child: Row(
-        children: <Widget>[
-          const AppEntityIcon(icon: Icons.data_object),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                // El placeholder `{{name}}` es como el operador referencia
-                // la variable desde el prompt; más útil que el name pelado.
-                Text(
-                  '{{${def.name}}}',
-                  style: t.titleMedium?.copyWith(fontFamily: 'monospace'),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  def.defaultValue.isEmpty ? '—' : def.defaultValue,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: t.bodyMedium?.copyWith(
-                    color: def.defaultValue.isEmpty ? AppTokens.text2 : null,
+      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        child: Row(
+          children: <Widget>[
+            const AppEntityIcon(icon: Icons.data_object),
+            const SizedBox(width: AppTokens.sp4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  // El placeholder `{{name}}` es como el operador referencia
+                  // la variable desde el prompt; más útil que el name pelado.
+                  Text(
+                    '{{${def.name}}}',
+                    style: t.titleMedium?.copyWith(fontFamily: 'monospace'),
                   ),
-                ),
-                if (def.description.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      def.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: t.bodySmall?.copyWith(color: AppTokens.text2),
+                  const SizedBox(height: 2),
+                  Text(
+                    def.defaultValue.isEmpty ? '—' : def.defaultValue,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.bodyMedium?.copyWith(
+                      color: def.defaultValue.isEmpty ? AppTokens.text2 : null,
                     ),
                   ),
-              ],
+                  if (def.description.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        def.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.bodySmall?.copyWith(color: AppTokens.text2),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            key: Key('var_defs.row.${def.id}.delete'),
-            icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
-            tooltip: 'Eliminar variable',
-            onPressed: () => _confirmDelete(context, def),
-          ),
-        ],
+            // Trash icon como acción destructiva. Su propio gesture detector
+            // absorbe el tap y no compite con el onTap de la fila.
+            IconButton(
+              key: Key('var_defs.row.${def.id}.delete'),
+              icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
+              tooltip: 'Eliminar variable',
+              onPressed: () => _confirmDelete(context, def),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -253,6 +295,8 @@ class _VarDefCard extends StatelessWidget {
   }
 }
 
+/// Fallo de carga como estado canónico del kit: card sobria con la copy del
+/// problema y reintento que re-dispatcha el load.
 class _FailedView extends StatelessWidget {
   const _FailedView();
 
@@ -260,23 +304,11 @@ class _FailedView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(AppTokens.sp6),
-      child: Row(
+      child: AppErrorState(
         key: const Key('var_defs.failed'),
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              'No pudimos cargar las variables.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
-            ),
-          ),
-          AppButton.text(
-            label: 'Reintentar',
-            onPressed: () =>
-                context.read<VarDefsBloc>().add(const VarDefsLoadRequested()),
-          ),
-        ],
+        message: 'No pudimos cargar las variables.',
+        onRetry: () =>
+            context.read<VarDefsBloc>().add(const VarDefsLoadRequested()),
       ),
     );
   }

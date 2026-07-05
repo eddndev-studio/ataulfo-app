@@ -1,7 +1,11 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/var_defs_bloc.dart';
@@ -51,12 +55,14 @@ void main() {
     ),
   );
 
-  testWidgets('Loading muestra spinner', (tester) async {
+  testWidgets('Loading monta el indicador canónico del kit', (tester) async {
     when(() => varDefsBloc.state).thenReturn(const VarDefsLoading());
 
     await tester.pumpWidget(host());
 
-    expect(find.byKey(const Key('var_defs.loading')), findsOneWidget);
+    final loading = find.byKey(const Key('var_defs.loading'));
+    expect(loading, findsOneWidget);
+    expect(tester.widget(loading), isA<AppLoadingIndicator>());
   });
 
   testWidgets('Loaded([]) muestra empty state y oculta el buscador', (
@@ -87,6 +93,51 @@ void main() {
     expect(find.text('cliente'), findsOneWidget);
     expect(find.text('Saludo personalizado'), findsOneWidget);
     expect(find.text('{{edad}}'), findsOneWidget);
+  });
+
+  testWidgets('Loaded con defs: UNA card con las filas y divider entre '
+      'ellas', (tester) async {
+    when(() => varDefsBloc.state).thenReturn(
+      VarDefsLoaded(<VariableDef>[
+        _def(id: 'v1', name: 'nombre'),
+        _def(id: 'v2', name: 'edad'),
+      ], 2),
+    );
+
+    await tester.pumpWidget(host());
+
+    // Ambas filas viven dentro de la MISMA card, separadas por un divider
+    // hairline — no una card suelta por variable.
+    final cardWithRow = find.ancestor(
+      of: find.byKey(const Key('var_defs.row.v1')),
+      matching: find.byType(AppCard),
+    );
+    expect(cardWithRow, findsOneWidget);
+    expect(
+      find.descendant(
+        of: cardWithRow,
+        matching: find.byKey(const Key('var_defs.row.v2')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: cardWithRow, matching: find.byType(Divider)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('el scroll despeja el FAB de crear al fondo', (tester) async {
+    when(() => varDefsBloc.state).thenReturn(
+      VarDefsLoaded(<VariableDef>[_def(id: 'v1', name: 'nombre')], 2),
+    );
+
+    await tester.pumpWidget(host());
+
+    final scroll = tester.widget<SingleChildScrollView>(
+      find.byKey(const Key('template_variables.content')),
+    );
+    final resolved = scroll.padding!.resolve(TextDirection.ltr);
+    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   group('buscador', () {
@@ -132,16 +183,19 @@ void main() {
     });
   });
 
-  testWidgets('VarDefsFailed muestra error + Reintentar dispatcha load', (
-    tester,
-  ) async {
+  testWidgets('VarDefsFailed monta AppErrorState con la copy y Reintentar '
+      'dispatcha load', (tester) async {
     when(
       () => varDefsBloc.state,
     ).thenReturn(const VarDefsFailed(TemplatesServerFailure()));
 
     await tester.pumpWidget(host());
 
-    expect(find.byKey(const Key('var_defs.failed')), findsOneWidget);
+    final failed = find.byKey(const Key('var_defs.failed'));
+    expect(failed, findsOneWidget);
+    expect(tester.widget(failed), isA<AppErrorState>());
+    expect(find.text('No pudimos cargar las variables.'), findsOneWidget);
+
     await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
     verify(() => varDefsBloc.add(const VarDefsLoadRequested())).called(1);
