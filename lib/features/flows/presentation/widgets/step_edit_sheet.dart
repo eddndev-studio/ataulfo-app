@@ -99,6 +99,11 @@ class StepEditSheetState extends State<StepEditSheet> {
   /// form inválido localmente (días vacíos, from>=to, sin destinos).
   String? _ctMetadataJson;
 
+  /// True desde que el operador TOCÓ algo del form CT (señal `onTouched`),
+  /// aunque el resultado siga inválido: el guard de descarte distingue así
+  /// un form intocado de uno a medias que emite null.
+  bool _ctDirty = false;
+
   /// Config inicial del form CT en edición (ver [hydrateCtInitial]).
   ConditionalTimeMetadata? _ctInitial;
 
@@ -246,34 +251,20 @@ class StepEditSheetState extends State<StepEditSheet> {
         : null,
   );
 
-  /// True cuando descartar perdería trabajo del operador: en creación,
-  /// cualquier campo tocado respecto del arranque (el tipo llegó decidido
-  /// del selector: elegirlo no es trabajo que proteger); en edición, el
-  /// diff only-changed contra el original. Tras un submit en vuelo o
-  /// persistido no hay nada que perder (el auto-pop pasa por maybePop y
-  /// debe salir directo); un fallo de mutación revierte el flag.
-  bool get shouldGuardDiscard => !_didSubmit && _hasUnsavedChanges;
-
-  bool get _hasUnsavedChanges {
-    final ed = widget.editing;
-    if (ed == null) {
-      // Los metadata de CT/LABEL emitidos por sus forms solo son no-null
-      // cuando el operador completó una configuración válida — eso ya es
-      // trabajo suyo aunque los demás campos sigan en default.
-      return _contentCtrl.text.trim().isNotEmpty ||
-          _mediaCtrl.text.trim().isNotEmpty ||
-          _delayMs != _initialDelayMs ||
-          _jitterPct != 0 ||
-          _mode != StepMode.always ||
-          (_isConditionalTime && _ctMetadataJson != null) ||
-          (_isLabel && _labelMetadataJson != null);
-    }
-    return !buildStepEditPatch(
-      _draft,
-      ed,
-      delayBaseline: _initialDelayMs,
-    ).isEmpty;
-  }
+  /// True cuando descartar perdería trabajo del operador (la regla vive en
+  /// [stepDraftHasUnsavedWork]; la señal de tocado del form CT le permite
+  /// proteger también un condicional a medias que aún emite null). Tras un
+  /// submit en vuelo o persistido no hay nada que perder (el auto-pop pasa
+  /// por maybePop y debe salir directo); un fallo de mutación revierte el
+  /// flag.
+  bool get shouldGuardDiscard =>
+      !_didSubmit &&
+      stepDraftHasUnsavedWork(
+        _draft,
+        widget.editing,
+        delayBaseline: _initialDelayMs,
+        ctTouched: _ctDirty,
+      );
 
   void _submit() {
     if (!_isSubmittable) return;
@@ -350,6 +341,7 @@ class StepEditSheetState extends State<StepEditSheet> {
                     ctTargets: ctTargetsFromState(state, widget.editing),
                     onCtChanged: (json) =>
                         setState(() => _ctMetadataJson = json),
+                    onCtTouched: () => _ctDirty = true,
                     labelInitial: _labelInitial,
                     onLabelChanged: (json) =>
                         setState(() => _labelMetadataJson = json),

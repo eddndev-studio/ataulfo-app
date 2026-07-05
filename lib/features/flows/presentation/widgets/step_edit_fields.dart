@@ -136,6 +136,7 @@ class StepMainField extends StatelessWidget {
     required this.ctRecovered,
     required this.ctTargets,
     required this.onCtChanged,
+    this.onCtTouched,
     required this.labelInitial,
     required this.onLabelChanged,
   });
@@ -150,6 +151,11 @@ class StepMainField extends StatelessWidget {
   final bool ctRecovered;
   final List<CtTargetOption> ctTargets;
   final ValueChanged<String?> onCtChanged;
+
+  /// Interacción real del operador con el form CT (aunque siga inválido):
+  /// la señal fina del guard de descarte.
+  final VoidCallback? onCtTouched;
+
   final LabelStepMetadata? labelInitial;
   final ValueChanged<String?> onLabelChanged;
 
@@ -166,6 +172,7 @@ class StepMainField extends StatelessWidget {
         enabled: enabled,
         showRecoveredWarning: ctRecovered,
         onChanged: onCtChanged,
+        onTouched: onCtTouched,
       );
     }
     if (type == fdom.StepType.end) {

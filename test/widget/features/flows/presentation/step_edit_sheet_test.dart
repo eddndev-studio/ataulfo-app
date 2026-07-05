@@ -1198,6 +1198,33 @@ void main() {
       },
     );
 
+    testWidgets('con destinos elegidos, el caption vivo anuncia la posición de '
+        'inserción antes de guardar', (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[_tHola, _tCerrados]));
+      await pumpHost(tester, createType: fdom.StepType.conditionalTime);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('ct_form.insert_position')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('ct_form.on_match_dropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('1. Hola').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ct_form.on_else_dropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('2. Cerrados').last);
+      await tester.pumpAndSettle();
+
+      // El destino más temprano es t-hola (posición 1): el caption dice
+      // exactamente dónde aparecerá el paso al guardar.
+      expect(
+        find.text('Este condicional se insertará antes del paso 1.'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('MutationFailed con InvalidStepFailure en modo CT muestra copy '
         'específico de horario/destinos', (tester) async {
       when(() => bloc.state).thenReturn(
@@ -1966,6 +1993,64 @@ void main() {
 
         expect(find.text('¿Descartar los cambios?'), findsNothing);
         expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'un condicional a medias (aún inválido) también protege el trabajo: '
+      'tocar un día basta para pedir confirmación',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[_tHola, _tCerrados]));
+        await pumpGuardHost(tester, createType: fdom.StepType.conditionalTime);
+        await tester.pumpAndSettle();
+
+        // Sin destinos elegidos el form emite null (inválido), pero el día
+        // alternado YA es trabajo del operador.
+        await tester.tap(find.byKey(const Key('ct_form.window.0.day.0')));
+        await tester.pump();
+
+        await tapScrim(tester);
+        expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'romper la config de un CT en edición (el form vuelve a emitir null) '
+      'sigue protegido por el guard',
+      (tester) async {
+        const ctStep = fdom.Step(
+          id: 's-ct',
+          flowId: 'f1',
+          type: fdom.StepType.conditionalTime,
+          order: 0,
+          content: '',
+          mediaRef: '',
+          metadataJson:
+              '{"tz":"UTC","windows":[{"days":[1,2],"from":"08:00",'
+              '"to":"12:00"}],"on_match_step_id":"t-hola",'
+              '"on_else_step_id":"t-cerrados"}',
+          delayMs: 1000,
+          jitterPct: 0,
+          aiOnly: false,
+        );
+        when(() => bloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[ctStep, _tHolaAt1, _tCerradosAt2]),
+        );
+        await pumpGuardHost(tester, editing: ctStep);
+        await tester.pumpAndSettle();
+
+        // Destildar TODOS los días deja la ventana inválida: el form emite
+        // null y el diff only-changed ya no ve la metadata — pero el estado
+        // a medias es distinto del original y descartar lo perdería.
+        await tester.tap(find.byKey(const Key('ct_form.window.0.day.0')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ct_form.window.0.day.1')));
+        await tester.pump();
+
+        await tapScrim(tester);
+        expect(find.text('¿Descartar los cambios?'), findsOneWidget);
       },
     );
 

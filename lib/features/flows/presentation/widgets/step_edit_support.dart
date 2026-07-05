@@ -165,6 +165,42 @@ StepPatch buildStepEditPatch(
   );
 }
 
+/// Reporta si descartar el sheet perdería trabajo del operador.
+///
+/// - Un CT tocado cuyo form emite null (config a medias: días vacíos,
+///   destinos sin re-elegir) SIEMPRE cuenta como trabajo vivo — el diff
+///   only-changed no puede verlo porque no hay metadata que comparar.
+/// - En creación, cualquier campo distinto del arranque (el tipo llegó
+///   decidido del selector: elegirlo no es trabajo que proteger); los
+///   metadata de CT/LABEL solo son no-null con una configuración válida
+///   completa — eso ya es trabajo aunque el resto siga en default.
+/// - En edición, el diff only-changed contra el original decide.
+///
+/// [delayBaseline] es el delay ya curado con que el sheet abrió: la
+/// curación del legacy 0 no es trabajo del operador y no debe pedir
+/// confirmación (el submit sí compara contra el original para persistirla).
+bool stepDraftHasUnsavedWork(
+  StepDraft d,
+  fdom.Step? editing, {
+  required int delayBaseline,
+  required bool ctTouched,
+}) {
+  if (d.isConditionalTime && ctTouched && d.ctMetadataJson == null) {
+    return true;
+  }
+  if (editing == null) {
+    return d.content.isNotEmpty ||
+        d.mediaRef.isNotEmpty ||
+        d.delayMs != delayBaseline ||
+        d.jitterPct != 0 ||
+        d.aiOnly ||
+        d.manualOnly ||
+        (d.isConditionalTime && d.ctMetadataJson != null) ||
+        (d.isLabel && d.labelMetadataJson != null);
+  }
+  return !buildStepEditPatch(d, editing, delayBaseline: delayBaseline).isEmpty;
+}
+
 /// Evento de ALTA construido del draft: zeroing por tipo (LABEL y END no
 /// envían al wire, así que el piso de 1 s no aplica), metadata por familia
 /// y la inserción posicional del condicional — se INSERTA antes de su
@@ -291,17 +327,20 @@ List<CtTargetOption> ctTargetsFromState(FlowStepsState s, fdom.Step? editing) {
   return <CtTargetOption>[
     for (final st in steps)
       if (st.id != editing?.id && (editing == null || st.order > editing.order))
-        CtTargetOption(id: st.id, order: st.order, label: _ctTargetLabel(st)),
+        CtTargetOption(
+          id: st.id,
+          order: st.order,
+          label: _ctTargetLabel(st),
+          type: st.type,
+        ),
   ];
 }
 
-/// Etiqueta corta de un step candidato a destino: el contenido para TEXT,
-/// el tipo humanizado para el resto (el operador reconoce el paso sin
-/// salir del sheet).
+/// Preview de una línea de un step candidato a destino: su contenido
+/// (mensaje o caption) cuando existe, el tipo humanizado como respaldo —
+/// el glifo del selector ya comunica el tipo.
 String _ctTargetLabel(fdom.Step st) {
-  if (st.type == fdom.StepType.text && st.content.isNotEmpty) {
-    return st.content;
-  }
+  if (st.content.isNotEmpty) return st.content;
   return stepTypeLabel(st.type);
 }
 

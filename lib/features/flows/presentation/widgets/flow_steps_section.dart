@@ -16,6 +16,7 @@ import '../bloc/flow_steps_bloc.dart';
 import '../bloc/media_names_cubit.dart';
 import 'step_card.dart';
 import 'step_editor_launcher.dart';
+import 'step_reorder_rules.dart';
 
 /// Cuerpo principal del hub del editor: la lista de pasos atada al
 /// `FlowStepsBloc`, con [header] (identidad excepcional del flujo) por
@@ -43,8 +44,7 @@ class FlowStepsSection extends StatelessWidget {
         if (state is FlowStepsMutationFailed &&
             (ModalRoute.of(context)?.isCurrent ?? true)) {
           final copy = state.failure is FlowsInvalidReorderFailure
-              ? 'Ese orden dejaría un condicional apuntando hacia atrás. '
-                    'Sus destinos deben quedar después del condicional.'
+              ? forwardOnlyReorderCopy
               : 'No se pudo guardar el nuevo orden. Se revirtieron los '
                     'cambios.';
           ScaffoldMessenger.of(context)
@@ -289,12 +289,22 @@ class _StepsListView extends StatelessWidget {
         );
       },
       onReorderItem: (oldIdx, newIdx) {
-        // onReorderItem entrega el newIdx ya ajustado a la lista sin el
-        // elemento movido, así que se inserta directo (sin normalizar).
-        final ids = <String>[for (final s in steps) s.id];
-        final moved = ids.removeAt(oldIdx);
-        ids.insert(newIdx, moved);
-        bloc.add(FlowStepsReorderRequested(ids));
+        // onReorderItem entrega newIdx ya ajustado sin el elemento movido.
+        final reordered = List<sdom.Step>.of(steps);
+        reordered.insert(newIdx, reordered.removeAt(oldIdx));
+        // Forward-only se previene ANTES del request: el drop inválido no
+        // se dispatcha (estado igual ⇒ la lista rebota); backend = red final.
+        if (!conditionalTargetsStayForward(reordered)) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(content: Text(forwardOnlyReorderCopy)),
+            );
+          return;
+        }
+        bloc.add(
+          FlowStepsReorderRequested(<String>[for (final s in reordered) s.id]),
+        );
       },
     );
   }

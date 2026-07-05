@@ -1,34 +1,31 @@
-// Archivo > 400 LOC justificado: el form CT es un solo widget cohesivo
-// con tres bloques (tz selector, lista de ventanas día/hora, dropdowns
-// de destino por id) que comparten estado mutable (`_EditableWindow`) y
-// callback canónico (`_emit` → `onChanged(metadataJson?)`). Separar los
-// sub-widgets (`_WindowBlock`, `_TimeButton`, `_TargetDropdown`) a otros
-// archivos los desacoplaría del estado del padre — duplicaría callbacks
-// y constructors sin mejorar cohesión.
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_choice_chip.dart';
-import '../../../../core/design/widgets/app_select_field.dart';
+import '../../../../core/design/widgets/app_time_range_field.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
+import '../../domain/entities/step.dart' as fdom;
 import 'conditional_time_day_mapping.dart';
+import 'conditional_time_fields.dart';
+import 'conditional_time_zones.dart';
 
 /// Candidato a destino de una rama del condicional: el step con su
-/// posición vigente y una etiqueta legible ("3. Hola, ¿en qué te ayudo?").
-/// El caller (sheet) decide qué steps son candidatos válidos — al editar,
-/// solo los posteriores al propio CT; al crear, todos (el CT se inserta
-/// antes de sus destinos).
+/// posición vigente, una etiqueta legible ("3. Hola, ¿en qué te ayudo?")
+/// y su tipo (para el glifo del selector). El caller (sheet) decide qué
+/// steps son candidatos válidos — al editar, solo los posteriores al
+/// propio CT; al crear, todos (el CT se inserta antes de sus destinos).
 class CtTargetOption {
   const CtTargetOption({
     required this.id,
     required this.order,
     required this.label,
+    required this.type,
   });
 
   final String id;
   final int order;
   final String label;
+  final fdom.StepType type;
 }
 
 /// Form del step CONDITIONAL_TIME. Edita timezone + ventanas día/hora +
@@ -49,6 +46,11 @@ class CtTargetOption {
 /// `showRecoveredWarning` pinta un aviso de que la configuración
 /// original no se pudo leer (metadata corrupta o destinos irresueltos):
 /// guardar REEMPLAZA la configuración anterior.
+///
+/// `onTouched` reporta cada interacción REAL del operador con el form —
+/// también cuando el resultado sigue siendo inválido (onChanged null). Es
+/// la señal que le permite al guard de descarte distinguir un form
+/// intocado de uno a medias; la emisión inicial post-frame no cuenta.
 class ConditionalTimeForm extends StatefulWidget {
   const ConditionalTimeForm({
     super.key,
@@ -57,6 +59,7 @@ class ConditionalTimeForm extends StatefulWidget {
     this.initial,
     this.enabled = true,
     this.showRecoveredWarning = false,
+    this.onTouched,
   });
 
   final ValueChanged<String?> onChanged;
@@ -64,60 +67,47 @@ class ConditionalTimeForm extends StatefulWidget {
   final ConditionalTimeMetadata? initial;
   final bool enabled;
   final bool showRecoveredWarning;
+  final VoidCallback? onTouched;
 
   @override
   State<ConditionalTimeForm> createState() => _ConditionalTimeFormState();
 }
 
-/// Set v1 de timezones que el operador puede elegir. Curada y corta:
-/// cubre LATAM principales + US este/oeste + España + UTC. Ampliar la
-/// lista (o sustituirla por una autocomplete contra IANA) es trabajo
-/// fuera de este arco — el backend acepta cualquier zona que
-/// `time.LoadLocation` resuelva.
-const List<String> _availableTimezones = <String>[
-  'America/Mexico_City',
-  'America/New_York',
-  'America/Los_Angeles',
-  'America/Bogota',
-  'America/Buenos_Aires',
-  'Europe/Madrid',
-  'UTC',
-];
-
 /// Modelo mutable de una ventana mientras el operador la edita —
-/// `Set<int>` de días UI (0..6, L→D), TimeOfDay para from/to. Al
+/// `Set<int>` de días UI (0..6, L→D) y el rango horario del kit. Al
 /// validar se serializa a `TimeWindow` con días wire ordenados.
 class _EditableWindow {
-  _EditableWindow({required this.daysUi, required this.from, required this.to});
+  _EditableWindow({required this.daysUi, required this.range});
 
   factory _EditableWindow.fromWire(TimeWindow w) => _EditableWindow(
     daysUi: w.days.map(wireDayToUi).toSet(),
-    from: _parseTimeOfDay(w.from),
-    to: _parseTimeOfDay(w.to),
+    range: AppTimeRange(
+      start: _parseTimeOfDay(w.from),
+      end: _parseTimeOfDay(w.to),
+    ),
   );
 
   factory _EditableWindow.businessHours() => _EditableWindow(
     daysUi: <int>{0, 1, 2, 3, 4},
-    from: const TimeOfDay(hour: 9, minute: 0),
-    to: const TimeOfDay(hour: 18, minute: 0),
+    range: const AppTimeRange(
+      start: TimeOfDay(hour: 9, minute: 0),
+      end: TimeOfDay(hour: 18, minute: 0),
+    ),
   );
 
   Set<int> daysUi;
-  TimeOfDay from;
-  TimeOfDay to;
+  AppTimeRange range;
 
   /// Intenta construir la `TimeWindow` wire. Devuelve null si la
-  /// ventana es inválida (sin días o from>=to).
+  /// ventana es inválida (sin días o inicio ≥ fin).
   TimeWindow? toWireOrNull() {
     if (daysUi.isEmpty) return null;
-    final fromMin = from.hour * 60 + from.minute;
-    final toMin = to.hour * 60 + to.minute;
-    if (fromMin >= toMin) return null;
+    if (!range.startBeforeEnd) return null;
     final wireDays = daysUi.map(uiDayToWire).toList()..sort();
     return TimeWindow(
       days: wireDays,
-      from: _formatTimeOfDay(from),
-      to: _formatTimeOfDay(to),
+      from: _formatTimeOfDay(range.start),
+      to: _formatTimeOfDay(range.end),
     );
   }
 }
@@ -178,36 +168,85 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
     widget.onChanged(md.toJsonString());
   }
 
-  void _toggleDay(int windowIdx, int uiDay) {
+  /// Marca la interacción del operador. Solo la llaman los handlers de
+  /// gestos/teclado (nunca la hidratación ni la emisión inicial), y solo
+  /// cuando el gesto cambió algo de verdad — reabrir un selector y elegir
+  /// lo mismo no es trabajo que proteger.
+  void _touch() => widget.onTouched?.call();
+
+  Future<void> _pickTz() async {
+    final picked = await showCtTimezonePicker(context, current: _tz);
+    if (picked == null || picked == _tz) return;
+    _touch();
+    setState(() => _tz = picked);
+    _emit();
+  }
+
+  Future<void> _pickTarget({required bool isMatch}) async {
+    final current = isMatch ? _onMatchId : _onElseId;
+    final picked = await showCtTargetPicker(
+      context,
+      title: isMatch ? 'Si cumple → paso' : 'Si NO cumple → paso',
+      targets: widget.targets,
+      selected: current,
+    );
+    if (picked == null || picked == current) return;
+    _touch();
     setState(() {
-      final w = _windows[windowIdx];
-      if (w.daysUi.contains(uiDay)) {
-        w.daysUi.remove(uiDay);
+      if (isMatch) {
+        _onMatchId = picked;
       } else {
-        w.daysUi.add(uiDay);
+        _onElseId = picked;
       }
     });
     _emit();
   }
 
-  Future<void> _pickTime(int windowIdx, bool isFrom) async {
-    final w = _windows[windowIdx];
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: isFrom ? w.from : w.to,
-    );
-    if (picked == null) return;
-    setState(() {
-      if (isFrom) {
-        w.from = picked;
-      } else {
-        w.to = picked;
-      }
-    });
+  /// Etiqueta legible del destino elegido ("3. Estamos cerrados"), o null
+  /// si no hay selección o el destino dejó de ser candidato.
+  String? _targetLabelOf(String? id) {
+    if (id == null) return null;
+    for (final t in widget.targets) {
+      if (t.id == id) return '${t.order + 1}. ${t.label}';
+    }
+    return null;
+  }
+
+  /// Posición 1-based ante la que se insertará el CT nuevo (su destino más
+  /// temprano), o null cuando el caption no aplica. Solo al CREAR: el alta
+  /// inserta el condicional antes de sus destinos (espeja la posición que
+  /// viaja en el evento de alta); al editar no hay re-inserción. El form
+  /// distingue creación porque solo ahí llega sin config inicial NI aviso
+  /// de recuperación.
+  int? get _insertBeforePosition {
+    final isCreate = widget.initial == null && !widget.showRecoveredWarning;
+    if (!isCreate) return null;
+    final m = _onMatchId;
+    final e = _onElseId;
+    if (m == null || e == null) return null;
+    int? min;
+    for (final t in widget.targets) {
+      if (t.id != m && t.id != e) continue;
+      if (min == null || t.order < min) min = t.order;
+    }
+    return min == null ? null : min + 1;
+  }
+
+  void _setDays(int windowIdx, Set<int> daysUi) {
+    _touch();
+    setState(() => _windows[windowIdx].daysUi = daysUi);
+    _emit();
+  }
+
+  void _setRange(int windowIdx, AppTimeRange range) {
+    if (range == _windows[windowIdx].range) return;
+    _touch();
+    setState(() => _windows[windowIdx].range = range);
     _emit();
   }
 
   void _addWindow() {
+    _touch();
     setState(() {
       _windows = List<_EditableWindow>.from(_windows)
         ..add(_EditableWindow.businessHours());
@@ -217,6 +256,7 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
 
   void _removeWindow(int idx) {
     if (_windows.length <= 1) return;
+    _touch();
     setState(() {
       _windows = List<_EditableWindow>.from(_windows)..removeAt(idx);
     });
@@ -245,21 +285,15 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
           ),
           const SizedBox(height: AppTokens.sp4),
         ],
-        AppSelectField<String>(
+        CtSheetField(
           key: const Key('ct_form.tz_dropdown'),
           label: 'Zona horaria',
-          // Una tz fuera del set curado (escrita por otro cliente) aparece
-          // sin selección; elegir del set la reemplaza.
-          value: _availableTimezones.contains(_tz) ? _tz : null,
-          options: <AppSelectOption<String>>[
-            for (final z in _availableTimezones) AppSelectOption<String>(z, z),
-          ],
+          // Nombre humano para el set curado; una tz válida fuera del set
+          // (escrita por otro cliente) se muestra con su id IANA crudo —
+          // nunca un campo vacío que aparenta no tener configuración.
+          value: ctTimezoneLabel(_tz),
           enabled: widget.enabled,
-          onChanged: (v) {
-            if (v == null) return;
-            setState(() => _tz = v);
-            _emit();
-          },
+          onTap: _pickTz,
         ),
         const SizedBox(height: AppTokens.sp5),
         Text(
@@ -268,14 +302,14 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
         ),
         const SizedBox(height: AppTokens.sp2),
         for (var i = 0; i < _windows.length; i++) ...<Widget>[
-          _WindowBlock(
+          CtWindowBlock(
             index: i,
-            window: _windows[i],
+            daysUi: _windows[i].daysUi,
+            range: _windows[i].range,
             enabled: widget.enabled,
             removable: _windows.length > 1,
-            onDayToggled: (uiDay) => _toggleDay(i, uiDay),
-            onPickFrom: () => _pickTime(i, true),
-            onPickTo: () => _pickTime(i, false),
+            onDaysChanged: (days) => _setDays(i, days),
+            onRangeChanged: (range) => _setRange(i, range),
             onRemove: () => _removeWindow(i),
           ),
           const SizedBox(height: AppTokens.sp3),
@@ -299,212 +333,9 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
           style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
         ),
         const SizedBox(height: AppTokens.sp2),
-        _TargetDropdown(
-          dropdownKey: const Key('ct_form.on_match_dropdown'),
-          label: 'Si cumple → paso',
-          targets: widget.targets,
-          value: _onMatchId,
-          enabled: widget.enabled,
-          onChanged: (v) {
-            setState(() => _onMatchId = v);
-            _emit();
-          },
-        ),
-        const SizedBox(height: AppTokens.sp3),
-        _TargetDropdown(
-          dropdownKey: const Key('ct_form.on_else_dropdown'),
-          label: 'Si NO cumple → paso',
-          targets: widget.targets,
-          value: _onElseId,
-          enabled: widget.enabled,
-          onChanged: (v) {
-            setState(() => _onElseId = v);
-            _emit();
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _WindowBlock extends StatelessWidget {
-  const _WindowBlock({
-    required this.index,
-    required this.window,
-    required this.enabled,
-    required this.removable,
-    required this.onDayToggled,
-    required this.onPickFrom,
-    required this.onPickTo,
-    required this.onRemove,
-  });
-
-  final int index;
-  final _EditableWindow window;
-  final bool enabled;
-  final bool removable;
-  final ValueChanged<int> onDayToggled;
-  final VoidCallback onPickFrom;
-  final VoidCallback onPickTo;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp3),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppTokens.divider),
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  'Ventana ${index + 1}',
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-              ),
-              if (removable)
-                IconButton(
-                  key: Key('ct_form.window.$index.remove'),
-                  tooltip: 'Eliminar ventana',
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    color: AppTokens.danger,
-                  ),
-                  onPressed: enabled ? onRemove : null,
-                ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp2),
-          Wrap(
-            spacing: AppTokens.sp1,
-            children: <Widget>[
-              for (var uiDay = 0; uiDay <= 6; uiDay++)
-                AppChoiceChip(
-                  key: Key('ct_form.window.$index.day.$uiDay'),
-                  label: uiDayLabel(uiDay),
-                  selected: window.daysUi.contains(uiDay),
-                  onSelected: enabled ? (_) => onDayToggled(uiDay) : null,
-                ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp2),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: _TimeButton(
-                  buttonKey: Key('ct_form.window.$index.from'),
-                  label: 'Desde',
-                  value: window.from,
-                  enabled: enabled,
-                  onPressed: onPickFrom,
-                ),
-              ),
-              const SizedBox(width: AppTokens.sp2),
-              Expanded(
-                child: _TimeButton(
-                  buttonKey: Key('ct_form.window.$index.to'),
-                  label: 'Hasta',
-                  value: window.to,
-                  enabled: enabled,
-                  onPressed: onPickTo,
-                ),
-              ),
-            ],
-          ),
-          // Una ventana inválida anula el guardado (toWireOrNull = null): el
-          // motivo se explica aquí mismo, junto a los controles que lo causan.
-          if (_invalidReason != null)
-            Padding(
-              padding: const EdgeInsets.only(top: AppTokens.sp2),
-              child: Text(
-                _invalidReason!,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: AppTokens.danger),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// Motivo por el que la ventana no es guardable, o null si es válida.
-  /// Espeja las reglas de `_EditableWindow.toWireOrNull`.
-  String? get _invalidReason {
-    if (window.daysUi.isEmpty) {
-      return 'Selecciona al menos un día';
-    }
-    final fromMin = window.from.hour * 60 + window.from.minute;
-    final toMin = window.to.hour * 60 + window.to.minute;
-    if (fromMin >= toMin) {
-      return 'La hora de inicio debe ser anterior al final';
-    }
-    return null;
-  }
-}
-
-class _TimeButton extends StatelessWidget {
-  const _TimeButton({
-    required this.buttonKey,
-    required this.label,
-    required this.value,
-    required this.enabled,
-    required this.onPressed,
-  });
-
-  final Key buttonKey;
-  final String label;
-  final TimeOfDay value;
-  final bool enabled;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppButton.tonal(
-      key: buttonKey,
-      label: '$label  ${_formatTimeOfDay(value)}',
-      onPressed: enabled ? onPressed : null,
-      fullWidth: true,
-    );
-  }
-}
-
-class _TargetDropdown extends StatelessWidget {
-  const _TargetDropdown({
-    required this.dropdownKey,
-    required this.label,
-    required this.targets,
-    required this.value,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final Key dropdownKey;
-  final String label;
-  final List<CtTargetOption> targets;
-  final String? value;
-  final bool enabled;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    // Sin candidatos (flow sin pasos que puedan ser destino): explicar el
-    // bloqueo en lugar de un select vacío que confunde.
-    if (targets.isEmpty) {
-      final textTheme = Theme.of(context).textTheme;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            label,
-            style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
-          ),
-          const SizedBox(height: AppTokens.sp1),
+        // Sin candidatos (flow sin pasos que puedan ser destino): explicar
+        // el bloqueo en lugar de un selector vacío que confunde.
+        if (widget.targets.isEmpty)
           Text(
             'Agrega primero los pasos de cada rama; después configura el '
             'condicional.',
@@ -512,21 +343,38 @@ class _TargetDropdown extends StatelessWidget {
               color: AppTokens.text2,
               fontStyle: FontStyle.italic,
             ),
+          )
+        else ...<Widget>[
+          CtSheetField(
+            key: const Key('ct_form.on_match_dropdown'),
+            label: 'Si cumple → paso',
+            value: _targetLabelOf(_onMatchId),
+            hint: 'Elige un paso',
+            enabled: widget.enabled,
+            onTap: () => _pickTarget(isMatch: true),
           ),
+          const SizedBox(height: AppTokens.sp3),
+          CtSheetField(
+            key: const Key('ct_form.on_else_dropdown'),
+            label: 'Si NO cumple → paso',
+            value: _targetLabelOf(_onElseId),
+            hint: 'Elige un paso',
+            enabled: widget.enabled,
+            onTap: () => _pickTarget(isMatch: false),
+          ),
+          // El caption vivo mata la auto-inserción sorpresa: la posición
+          // donde aparecerá el condicional se anuncia ANTES de guardar.
+          if (_insertBeforePosition != null) ...<Widget>[
+            const SizedBox(height: AppTokens.sp2),
+            Text(
+              'Este condicional se insertará antes del paso '
+              '$_insertBeforePosition.',
+              key: const Key('ct_form.insert_position'),
+              style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+            ),
+          ],
         ],
-      );
-    }
-    return AppSelectField<String>(
-      key: dropdownKey,
-      label: label,
-      hint: 'Elige un paso',
-      value: value,
-      options: <AppSelectOption<String>>[
-        for (final t in targets)
-          AppSelectOption<String>(t.id, '${t.order + 1}. ${t.label}'),
       ],
-      enabled: enabled,
-      onChanged: onChanged,
     );
   }
 }
