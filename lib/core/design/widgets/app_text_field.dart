@@ -35,6 +35,9 @@ class AppTextField extends StatefulWidget {
     this.obscureText = false,
     this.obscureToggle = false,
     this.autocorrect = true,
+    this.prefixIcon,
+    this.suffix,
+    this.onChanged,
   });
 
   final String label;
@@ -90,6 +93,22 @@ class AppTextField extends StatefulWidget {
   /// Autocorrección del teclado. Se desactiva en campos donde el corrector
   /// estorba (email, identificadores) para que no altere lo tecleado.
   final bool autocorrect;
+
+  /// Ícono líder dentro de la píldora (p. ej. la lupa de un buscador). Se
+  /// pinta con el idioma discreto del kit (20px, `text2`): acompaña al hint,
+  /// no compite con el contenido.
+  final IconData? prefixIcon;
+
+  /// Widget libre al final de la píldora (p. ej. el botón de limpiar de un
+  /// buscador). Es un slot: la visibilidad y el comportamiento los gobierna
+  /// el call site. Cuando [obscureToggle] aplica, el botón de ojo gana este
+  /// slot (un campo de contraseña no es un buscador).
+  final Widget? suffix;
+
+  /// Notificación por edición del texto (pass-through a `TextField.onChanged`).
+  /// Útil cuando el caller reacciona tecla a tecla (debounce de búsqueda) en
+  /// vez de escuchar el controller.
+  final ValueChanged<String>? onChanged;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -151,29 +170,36 @@ class _AppTextFieldState extends State<AppTextField> {
   // el estado interno (alternable); sin toggle, el flag crudo del widget.
   bool get _effectiveObscure => _hasToggle ? _obscured : widget.obscureText;
 
-  // Envuelve el campo con el botón de ojo al final cuando el toggle aplica.
-  // Sin toggle devuelve el campo intacto — los call sites no enmascarados o
-  // sin `obscureToggle` mantienen el layout previo (un único hijo en la
-  // píldora, sin Row ni IconButton).
-  Widget _withToggle(Widget field) {
-    if (!_hasToggle) return field;
+  // Botón de ojo del toggle de visibilidad. Mostrar/ocultar es un toggle del
+  // estado interno; rebuild inmediato.
+  Widget _eyeButton() => IconButton(
+    padding: EdgeInsets.zero,
+    constraints: const BoxConstraints(),
+    visualDensity: VisualDensity.compact,
+    icon: Icon(
+      _obscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+      color: AppTokens.text2,
+      size: 20,
+    ),
+    onPressed: () => setState(() => _obscured = !_obscured),
+  );
+
+  // Adorna el campo con los extras de la píldora: ícono líder ([prefixIcon])
+  // y/o widget final (el botón de ojo cuando el toggle aplica; si no, el
+  // [suffix] del caller). Sin adornos devuelve el campo intacto — esos call
+  // sites conservan el layout previo (un único hijo en la píldora, sin Row).
+  Widget _withAdornments(Widget field) {
+    final prefix = widget.prefixIcon;
+    final Widget? suffix = _hasToggle ? _eyeButton() : widget.suffix;
+    if (prefix == null && suffix == null) return field;
     return Row(
       children: <Widget>[
+        if (prefix != null) ...<Widget>[
+          Icon(prefix, size: 20, color: AppTokens.text2),
+          const SizedBox(width: AppTokens.sp2),
+        ],
         Expanded(child: field),
-        IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          visualDensity: VisualDensity.compact,
-          icon: Icon(
-            _obscured
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
-            color: AppTokens.text2,
-            size: 20,
-          ),
-          // Mostrar/ocultar es un toggle del estado interno; rebuild inmediato.
-          onPressed: () => setState(() => _obscured = !_obscured),
-        ),
+        ?suffix,
       ],
     );
   }
@@ -264,7 +290,7 @@ class _AppTextFieldState extends State<AppTextField> {
               horizontal: AppTokens.sp4,
               vertical: isMultiline ? AppTokens.sp3 : AppTokens.sp1,
             ),
-            child: _withToggle(
+            child: _withAdornments(
               TextField(
                 controller: widget.controller,
                 focusNode: _focusNode,
@@ -272,6 +298,7 @@ class _AppTextFieldState extends State<AppTextField> {
                 autofocus: widget.autofocus,
                 textInputAction: widget.textInputAction,
                 onSubmitted: widget.onSubmitted,
+                onChanged: widget.onChanged,
                 minLines: widget.minLines,
                 maxLines: widget.maxLines,
                 keyboardType: widget.keyboardType,

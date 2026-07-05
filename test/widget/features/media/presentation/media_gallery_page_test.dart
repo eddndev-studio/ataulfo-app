@@ -4,6 +4,10 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_thumbnail_loader.dart';
 import 'package:ataulfo/features/media/domain/failures/media_failure.dart';
@@ -82,6 +86,29 @@ void main() {
       find.byType(CircularProgressIndicator),
     );
     expect(spinner.valueColor?.value, AppTokens.primary);
+    // El spinner de página es el primitivo canónico del kit.
+    expect(find.byType(AppLoadingIndicator), findsOneWidget);
+  });
+
+  testWidgets('el buscador es el AppTextField del kit con lupa', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const MediaGalleryLoaded(items: <MediaAsset>[], nextCursor: ''),
+    );
+    await tester.pumpWidget(host());
+
+    // Mismo primitivo que los buscadores de bots/plantillas/conversaciones,
+    // con el ícono líder de búsqueda dentro de la píldora.
+    expect(find.byKey(const Key('media_gallery.search_field')), findsOneWidget);
+    expect(find.byType(AppTextField), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AppTextField),
+        matching: find.byIcon(Icons.search),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Loaded con N assets renderiza N miniaturas', (tester) async {
@@ -126,6 +153,9 @@ void main() {
     await tester.pumpWidget(host());
     expect(find.byType(MediaThumbnail), findsNothing);
     expect(find.byKey(const Key('media_gallery.empty')), findsOneWidget);
+    // La galería virgen usa el vacío rico canónico del kit (sin CTA: el FAB
+    // de subida ya está en pantalla).
+    expect(find.byType(AppEmptyState), findsOneWidget);
   });
 
   testWidgets('Failed → mensaje + Reintentar dispara LoadRequested', (
@@ -136,6 +166,8 @@ void main() {
     ).thenReturn(const MediaGalleryFailed(MediaNetworkFailure()));
     await tester.pumpWidget(host());
     expect(find.byKey(const Key('media_gallery.error')), findsOneWidget);
+    // La card de error es el primitivo canónico del kit.
+    expect(find.byType(AppErrorState), findsOneWidget);
     await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
     verify(() => bloc.add(const MediaGalleryLoadRequested())).called(1);

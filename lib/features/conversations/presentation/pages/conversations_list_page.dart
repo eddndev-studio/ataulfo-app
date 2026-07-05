@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_empty_state.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/smart_timestamp.dart';
@@ -58,11 +60,7 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) => const AppLoadingIndicator();
 }
 
 /// Vista del filtro de la bandeja. `all` esconde las archivadas (viven bajo
@@ -298,26 +296,26 @@ String _titleOf(Conversation c) {
   return c.displayName ?? (isGroup ? 'Grupo' : (c.phone ?? c.chatLid));
 }
 
+/// Vacío informativo (sin CTA): una bandeja no ofrece crear conversaciones.
+/// El scroll propio conserva el pull-to-refresh del RefreshIndicator padre.
 class _EmptyView extends StatelessWidget {
   const _EmptyView();
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return LayoutBuilder(
       builder: (context, c) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: <Widget>[
           ConstrainedBox(
             constraints: BoxConstraints(minHeight: c.maxHeight),
-            child: Center(
-              key: const Key('conversations.empty'),
+            child: const Center(
               child: Padding(
-                padding: const EdgeInsets.all(AppTokens.sp6),
-                child: Text(
-                  'Este bot todavía no tiene conversaciones',
-                  textAlign: TextAlign.center,
-                  style: textTheme.bodyLarge,
+                padding: EdgeInsets.all(AppTokens.sp5),
+                child: AppEmptyState(
+                  key: Key('conversations.empty'),
+                  icon: Icons.forum_outlined,
+                  title: 'Este bot todavía no tiene conversaciones',
                 ),
               ),
             ),
@@ -336,31 +334,19 @@ class _FailedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isNotFound = failure is ConversationsNotFoundFailure;
-    final textTheme = Theme.of(context).textTheme;
     return Center(
-      key: isNotFound
-          ? const Key('conversations.error.not_found')
-          : const Key('conversations.error.generic'),
       child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              isNotFound
-                  ? 'Este bot ya no existe en tu organización'
-                  : 'No pudimos cargar las conversaciones',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyLarge,
-            ),
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.tonal(
-              label: 'Reintentar',
-              onPressed: () => context.read<ConversationsBloc>().add(
-                const ConversationsLoadRequested(),
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.all(AppTokens.sp5),
+        child: AppErrorState(
+          key: isNotFound
+              ? const Key('conversations.error.not_found')
+              : const Key('conversations.error.generic'),
+          message: isNotFound
+              ? 'Este bot ya no existe en tu organización'
+              : 'No pudimos cargar las conversaciones',
+          onRetry: () => context.read<ConversationsBloc>().add(
+            const ConversationsLoadRequested(),
+          ),
         ),
       ),
     );

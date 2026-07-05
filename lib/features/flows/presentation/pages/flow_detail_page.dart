@@ -13,6 +13,8 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../labels/domain/repositories/labels_repository.dart';
 import '../../../labels/presentation/bloc/labels_bloc.dart';
@@ -91,11 +93,7 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) => const AppLoadingIndicator();
 }
 
 /// Shell del Loaded: TabBar fijo arriba + TabBarView con las 3 secciones
@@ -908,33 +906,22 @@ class _FailedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isNotFound = failure is FlowsNotFoundFailure;
-    final textTheme = Theme.of(context).textTheme;
+    // NotFound es terminal: recargar no lo revive, así que no hay reintento.
     return Center(
-      key: isNotFound
-          ? const Key('flow_detail.error.not_found')
-          : const Key('flow_detail.error.generic'),
       child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              isNotFound
-                  ? 'Este flujo ya no existe en tu organización'
-                  : 'No pudimos cargar el detalle del flujo',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyLarge,
-            ),
-            if (!isNotFound) ...<Widget>[
-              const SizedBox(height: AppTokens.sp3),
-              AppButton.tonal(
-                label: 'Reintentar',
-                onPressed: () => context.read<FlowDetailBloc>().add(
+        padding: const EdgeInsets.all(AppTokens.sp5),
+        child: AppErrorState(
+          key: isNotFound
+              ? const Key('flow_detail.error.not_found')
+              : const Key('flow_detail.error.generic'),
+          message: isNotFound
+              ? 'Este flujo ya no existe en tu organización'
+              : 'No pudimos cargar el detalle del flujo',
+          onRetry: isNotFound
+              ? null
+              : () => context.read<FlowDetailBloc>().add(
                   const FlowDetailLoadRequested(),
                 ),
-              ),
-            ],
-          ],
         ),
       ),
     );

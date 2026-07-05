@@ -650,6 +650,95 @@ void main() {
     });
   });
 
+  group('AppTextField — buscador (prefixIcon / suffix / onChanged)', () {
+    testWidgets('prefixIcon pinta el ícono líder dentro de la píldora', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Buscar',
+          hint: 'Nombre',
+          controller: TextEditingController(),
+          prefixIcon: Icons.search,
+        ),
+      );
+      final icon = tester.widget<Icon>(find.byIcon(Icons.search));
+      // Ícono discreto del kit: pequeño y en text2 (acompaña, no compite).
+      expect(icon.size, 20);
+      expect(icon.color, AppTokens.text2);
+    });
+
+    testWidgets('sin prefixIcon no se pinta ningún ícono líder', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'X',
+          hint: 'h',
+          controller: TextEditingController(),
+        ),
+      );
+      expect(find.byType(Icon), findsNothing);
+    });
+
+    testWidgets('suffix renderiza el widget al final y responde al tap', (
+      tester,
+    ) async {
+      var tapped = false;
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Buscar',
+          hint: 'Nombre',
+          controller: TextEditingController(),
+          suffix: IconButton(
+            key: const Key('kit.suffix'),
+            icon: const Icon(Icons.close),
+            onPressed: () => tapped = true,
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('kit.suffix')));
+      expect(tapped, isTrue);
+    });
+
+    testWidgets('onChanged propaga cada edición del texto', (tester) async {
+      String? changed;
+      await pump(
+        tester,
+        AppTextField(
+          label: 'Buscar',
+          hint: 'Nombre',
+          controller: TextEditingController(),
+          onChanged: (v) => changed = v,
+        ),
+      );
+      await tester.enterText(find.byType(TextField), 'logo');
+      expect(changed, 'logo');
+    });
+
+    testWidgets(
+      'obscureToggle gana el slot final sobre suffix (contraseña no es buscador)',
+      (tester) async {
+        await pump(
+          tester,
+          AppTextField(
+            label: 'Contraseña',
+            hint: 'h',
+            controller: TextEditingController(),
+            obscureText: true,
+            obscureToggle: true,
+            suffix: const Icon(Icons.close, key: Key('kit.suffix.perdedor')),
+          ),
+        );
+        expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+        expect(find.byKey(const Key('kit.suffix.perdedor')), findsNothing);
+      },
+    );
+  });
+
   group('AppTextField — multilínea (text area)', () {
     testWidgets(
       'maxLines > 1: radio = mitad del alto de una línea (24), no pill',

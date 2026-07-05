@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
 import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
@@ -116,6 +118,8 @@ void main() {
       find.byType(CircularProgressIndicator),
     );
     expect(spinner.valueColor?.value, AppTokens.primary);
+    // El spinner de página es el primitivo canónico del kit.
+    expect(find.byType(AppLoadingIndicator), findsOneWidget);
   });
 
   testWidgets('Loaded muestra header con nombre + pill version + pill status', (
@@ -574,6 +578,8 @@ void main() {
         find.byKey(const Key('flow_detail.error.generic')),
         findsOneWidget,
       );
+      // La card de error es el primitivo canónico del kit.
+      expect(find.byType(AppErrorState), findsOneWidget);
       await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
       await tester.pump();
       verify(() => detailBloc.add(const FlowDetailLoadRequested())).called(1);

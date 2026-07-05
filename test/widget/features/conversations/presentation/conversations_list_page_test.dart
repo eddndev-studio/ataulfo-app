@@ -2,6 +2,9 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/domain/failures/conversations_failure.dart';
@@ -89,6 +92,8 @@ void main() {
       find.byType(CircularProgressIndicator),
     );
     expect(spinner.valueColor?.value, AppTokens.primary);
+    // El spinner de página es el primitivo canónico del kit.
+    expect(find.byType(AppLoadingIndicator), findsOneWidget);
   });
 
   testWidgets('Loaded con N conversaciones renderiza una fila por cada una', (
@@ -181,6 +186,9 @@ void main() {
     await tester.pumpWidget(host());
     expect(find.byType(AppAvatar), findsNothing);
     expect(find.byKey(const Key('conversations.empty')), findsOneWidget);
+    // El vacío rico canónico del kit, en su variante informativa (sin CTA).
+    expect(find.byType(AppEmptyState), findsOneWidget);
+    expect(find.byType(AppButton), findsNothing);
   });
 
   testWidgets('Failed genérico → mensaje genérico + Reintentar', (
@@ -195,6 +203,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
+    // La card de error es el primitivo canónico del kit.
+    expect(find.byType(AppErrorState), findsOneWidget);
   });
 
   testWidgets('Failed NotFound → copy específico "este bot ya no existe"', (

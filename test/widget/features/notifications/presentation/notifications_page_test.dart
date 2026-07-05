@@ -1,7 +1,11 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/core/util/smart_timestamp.dart';
 import 'package:ataulfo/features/notifications/domain/entities/notification_inbox_item.dart';
 import 'package:ataulfo/features/notifications/domain/entities/notification_preference.dart';
@@ -109,6 +113,13 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('notifications.loading')), findsOneWidget);
+    // El spinner de página es el primitivo canónico del kit, con el tinte de
+    // marca (no el azul default de Material).
+    expect(find.byType(AppLoadingIndicator), findsOneWidget);
+    final spinner = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.valueColor?.value, AppTokens.primary);
   });
 
   testWidgets('loaded renderiza item y mark-all', (tester) async {
@@ -261,6 +272,25 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('notifications.empty')), findsOneWidget);
+    // El vacío rico canónico del kit; Preferencias sigue disponible debajo.
+    expect(find.byType(AppEmptyState), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Preferencias'), findsOneWidget);
+  });
+
+  testWidgets('el vacío ofrece pull-to-refresh que recarga', (tester) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const NotificationsLoaded(items: <NotificationInboxItem>[]));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byType(RefreshIndicator), findsOneWidget);
+    await tester.fling(find.byType(ListView), const Offset(0, 300), 1000);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+
+    verify(() => bloc.add(const NotificationsLoadRequested())).called(1);
   });
 
   testWidgets('failed muestra retry', (tester) async {
@@ -271,6 +301,8 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('notifications.error')), findsOneWidget);
+    // La card de error es el primitivo canónico del kit.
+    expect(find.byType(AppErrorState), findsOneWidget);
     await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     verify(() => bloc.add(const NotificationsLoadRequested())).called(1);
   });

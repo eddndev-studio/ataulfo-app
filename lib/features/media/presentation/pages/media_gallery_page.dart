@@ -8,6 +8,10 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_empty_state.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../../domain/entities/media_asset.dart';
 import '../bloc/media_gallery_bloc.dart';
@@ -138,23 +142,24 @@ class _SearchFieldState extends State<_SearchField> {
         AppTokens.sp4,
         0,
       ),
-      child: TextField(
+      child: AppTextField(
         key: const Key('media_gallery.search_field'),
+        label: 'Buscar archivo',
+        hint: 'Buscar por nombre',
         controller: _controller,
         onChanged: _onChanged,
         textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: 'Buscar por nombre',
-          prefixIcon: const Icon(Icons.search, size: 20),
-          suffixIcon: _controller.text.isEmpty
-              ? null
-              : IconButton(
-                  key: const Key('media_gallery.search_clear'),
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: _clear,
-                ),
-        ),
+        prefixIcon: Icons.search,
+        suffix: _controller.text.isEmpty
+            ? null
+            : IconButton(
+                key: const Key('media_gallery.search_clear'),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.close, size: 18, color: AppTokens.text2),
+                onPressed: _clear,
+              ),
       ),
     );
   }
@@ -164,11 +169,7 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) => const AppLoadingIndicator();
 }
 
 class _FailedView extends StatelessWidget {
@@ -176,27 +177,15 @@ class _FailedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Center(
-      key: const Key('media_gallery.error'),
       child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              'No pudimos cargar la galería',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyLarge,
-            ),
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.tonal(
-              label: 'Reintentar',
-              onPressed: () => context.read<MediaGalleryBloc>().add(
-                const MediaGalleryLoadRequested(),
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.all(AppTokens.sp5),
+        child: AppErrorState(
+          key: const Key('media_gallery.error'),
+          message: 'No pudimos cargar la galería',
+          onRetry: () => context.read<MediaGalleryBloc>().add(
+            const MediaGalleryLoadRequested(),
+          ),
         ),
       ),
     );
@@ -613,6 +602,9 @@ class _EmptyView extends StatelessWidget {
               key: const Key('media_gallery.empty'),
               child: Padding(
                 padding: const EdgeInsets.all(AppTokens.sp6),
+                // Filtrado = "sin resultados" (texto plano + limpiar, como los
+                // no-results de bots/plantillas). Virgen = vacío rico del kit,
+                // sin CTA: el FAB de subida ya está en pantalla.
                 child: isFiltered
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
@@ -633,10 +625,9 @@ class _EmptyView extends StatelessWidget {
                           ),
                         ],
                       )
-                    : Text(
-                        'Todavía no hay archivos en la galería',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyLarge,
+                    : const AppEmptyState(
+                        icon: Icons.perm_media_outlined,
+                        title: 'Todavía no hay archivos en la galería',
                       ),
               ),
             ),

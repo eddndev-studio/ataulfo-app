@@ -4,8 +4,11 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_header_card.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -114,6 +117,8 @@ void main() {
       find.byType(CircularProgressIndicator),
     );
     expect(spinner.valueColor?.value, AppTokens.primary);
+    // El spinner de página es el primitivo canónico del kit.
+    expect(find.byType(AppLoadingIndicator), findsOneWidget);
   });
 
   testWidgets('Loaded monta el header rico full-bleed con título "Agentes"', (
@@ -256,6 +261,8 @@ void main() {
     expect(find.text('Soporte'), findsNothing);
     expect(find.byKey(const Key('bots.empty')), findsOneWidget);
     expect(find.widgetWithText(AppButton, 'Crear bot'), findsOneWidget);
+    // El vacío rico es el primitivo canónico del kit (misma anatomía).
+    expect(find.byType(AppEmptyState), findsOneWidget);
   });
 
   testWidgets('empty: CTA "Crear bot" abre la hoja de creación', (
@@ -307,6 +314,8 @@ void main() {
     expect(find.byKey(const Key('bots.error')), findsOneWidget);
     expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
     expect(find.byType(FilledButton), findsNothing);
+    // La card de error es el primitivo canónico del kit (misma anatomía).
+    expect(find.byType(AppErrorState), findsOneWidget);
   });
 
   testWidgets('tap Reintentar dispara BotsLoadRequested', (tester) async {

@@ -12,11 +12,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_header_card.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/user_greeting.dart';
@@ -332,24 +334,8 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          Text(
-            'Cargando bots…',
-            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      const AppLoadingIndicator(label: 'Cargando bots…');
 }
 
 /// Estado vacío (cero bots): card glass centrada que ES el CTA de creación.
@@ -361,7 +347,6 @@ class _EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: LayoutBuilder(
@@ -372,47 +357,21 @@ class _EmptyView extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(AppTokens.sp5),
               child: Center(
-                child: AppCard.glass(
+                child: AppEmptyState(
                   key: const Key('bots.empty'),
-                  padding: const EdgeInsets.all(AppTokens.cardPadding),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: <Widget>[
-                      const AppEntityIcon(
-                        icon: Icons.smart_toy_outlined,
-                        size: 56,
-                        highlighted: true,
-                      ),
-                      const SizedBox(height: AppTokens.sp4),
-                      Text(
-                        'Aún no tienes bots',
-                        textAlign: TextAlign.center,
-                        style: textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: AppTokens.sp2),
-                      Text(
-                        'Crea tu primer bot para automatizar una conversación '
-                        'o tarea recurrente.',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: AppTokens.text2,
-                        ),
-                      ),
-                      const SizedBox(height: AppTokens.sp5),
-                      AppButton.filled(
-                        label: 'Crear bot',
-                        icon: Icons.add,
-                        fullWidth: true,
-                        onPressed: () async {
-                          final bot = await BotCreateSheet.open(context);
-                          if (bot != null && context.mounted) {
-                            unawaited(context.push('/bots/${bot.id}'));
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+                  icon: Icons.smart_toy_outlined,
+                  title: 'Aún no tienes bots',
+                  description:
+                      'Crea tu primer bot para automatizar una conversación '
+                      'o tarea recurrente.',
+                  ctaLabel: 'Crear bot',
+                  ctaIcon: Icons.add,
+                  onCta: () async {
+                    final bot = await BotCreateSheet.open(context);
+                    if (bot != null && context.mounted) {
+                      unawaited(context.push('/bots/${bot.id}'));
+                    }
+                  },
                 ),
               ),
             ),
@@ -429,33 +388,15 @@ class _FailedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppTokens.sp5),
-        child: AppCard(
+        child: AppErrorState(
           key: const Key('bots.error'),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'No se pudieron cargar los bots',
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: AppTokens.sp2),
-              Text(
-                'Revisa tu conexión o intenta nuevamente.',
-                style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-              ),
-              const SizedBox(height: AppTokens.sp4),
-              AppButton.tonal(
-                label: 'Reintentar',
-                onPressed: () =>
-                    context.read<BotsBloc>().add(const BotsLoadRequested()),
-              ),
-            ],
-          ),
+          message: 'No se pudieron cargar los bots',
+          description: 'Revisa tu conexión o intenta nuevamente.',
+          onRetry: () =>
+              context.read<BotsBloc>().add(const BotsLoadRequested()),
         ),
       ),
     );

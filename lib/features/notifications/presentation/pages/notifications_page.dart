@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_empty_state.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../domain/entities/notification_inbox_item.dart';
 import '../bloc/notifications_bloc.dart';
 import '../widgets/notification_inbox_tile.dart';
@@ -34,10 +37,7 @@ class _NotificationsLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      key: Key('notifications.loading'),
-      child: CircularProgressIndicator(),
-    );
+    return const AppLoadingIndicator(key: Key('notifications.loading'));
   }
 }
 
@@ -95,18 +95,41 @@ class _NotificationsEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      key: Key('notifications.empty'),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text(
-            'Sin notificaciones pendientes',
-            style: TextStyle(color: AppTokens.text2),
-          ),
-          SizedBox(height: AppTokens.sp4),
-          _PreferencesButton(),
-        ],
+    // El vacío también se refresca: el gesto necesita un scrollable vivo
+    // aunque no haya lista (AppEmptyState no aporta scroll). Preferencias no
+    // es un CTA del vacío (vive fuera de la card, como acción secundaria).
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<NotificationsBloc>().add(
+          const NotificationsLoadRequested(),
+        );
+      },
+      child: LayoutBuilder(
+        builder: (context, c) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: <Widget>[
+            ConstrainedBox(
+              constraints: BoxConstraints(minHeight: c.maxHeight),
+              child: const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(AppTokens.sp5),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      AppEmptyState(
+                        key: Key('notifications.empty'),
+                        icon: Icons.notifications_none,
+                        title: 'Sin notificaciones pendientes',
+                      ),
+                      SizedBox(height: AppTokens.sp4),
+                      _PreferencesButton(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -131,26 +154,14 @@ class _NotificationsError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      key: const Key('notifications.error'),
       child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Text(
-              'No se pudieron cargar las notificaciones',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppTokens.text2),
-            ),
-            const SizedBox(height: AppTokens.sp4),
-            AppButton.tonal(
-              label: 'Reintentar',
-              icon: Icons.refresh,
-              onPressed: () => context.read<NotificationsBloc>().add(
-                const NotificationsLoadRequested(),
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.all(AppTokens.sp5),
+        child: AppErrorState(
+          key: const Key('notifications.error'),
+          message: 'No se pudieron cargar las notificaciones',
+          onRetry: () => context.read<NotificationsBloc>().add(
+            const NotificationsLoadRequested(),
+          ),
         ),
       ),
     );
