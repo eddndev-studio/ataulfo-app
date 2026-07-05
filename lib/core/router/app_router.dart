@@ -1127,8 +1127,10 @@ class AppRouter {
         },
       ),
       GoRoute(
-        // Motor IA de la plantilla: stats + prompt completo + CTA al
-        // entrenador. Saca la config del fondo del detalle a su escenario.
+        // Motor IA de la plantilla: stats + prompt (card colapsada) + CTA al
+        // entrenador. Saca la config del fondo del detalle a su escenario. El
+        // Scaffold + AppBar planos los monta aquí el router (content-only en la
+        // página), la misma anatomía que la config de IA de la org.
         path: '/templates/:id/ai',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
@@ -1154,7 +1156,10 @@ class AppRouter {
                       ..add(const LabelsLoadRequested()),
               ),
             ],
-            child: const TemplateAiPage(),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Motor IA')),
+              body: const TemplateAiPage(),
+            ),
           );
         },
       ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
@@ -126,6 +127,52 @@ void main() {
     // gpt-5.5 es single-host ⇒ fila bloqueada, sin chips.
     expect(find.byKey(const Key('org_ai.host.gpt-5.5.OPENAI')), findsNothing);
     expect(find.text('Corre en OpenAI'), findsOneWidget);
+  });
+
+  testWidgets('una caption hace legible que el guardado es explícito', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+
+    await tester.pumpWidget(host());
+
+    expect(
+      find.text('Los cambios se aplican al tocar Guardar.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('el ListView reserva el inset inferior de la gesture-nav', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(viewPadding: const EdgeInsets.only(bottom: 34)),
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<OrgAiConfigBloc>.value(value: bloc),
+                BlocProvider<CatalogBloc>.value(value: catalogBloc),
+              ],
+              child: const Scaffold(body: OrgAiConfigPage()),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final listView = tester.widget<ListView>(find.byType(ListView));
+    expect((listView.padding! as EdgeInsets).bottom, AppTokens.sp4 + 34);
   });
 
   testWidgets('tocar un chip de host dispatcha OrgAiConfigHostChanged', (

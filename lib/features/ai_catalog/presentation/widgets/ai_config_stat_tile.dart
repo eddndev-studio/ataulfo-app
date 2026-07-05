@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
 
-/// Tile información+control del editor de AIConfig: label + valor + lápiz
-/// cuando es editable, o nota "Fija del modelo" cuando el modelo no soporta
-/// el campo. `onTap` nulo lo deja como solo-lectura (sin lápiz).
+/// Tile información+control del editor de AIConfig: label + valor. Cuando es
+/// editable, tocar el tile abre un selector en una hoja, así que el trailing es
+/// el mismo chevron (`expand_more`, atenuado) que muestra un campo de selección
+/// cerrado — el idioma de "esto despliega opciones". `onTap` nulo lo deja como
+/// solo-lectura (sin chevron), con la nota "Fija del modelo" cuando el modelo no
+/// soporta el campo.
 class AiConfigStatTile extends StatelessWidget {
   const AiConfigStatTile({
     super.key,
@@ -43,8 +46,8 @@ class AiConfigStatTile extends StatelessWidget {
                 Expanded(child: Text(label, style: textTheme.labelSmall)),
                 if (onTap != null)
                   const Icon(
-                    Icons.edit_outlined,
-                    size: 14,
+                    Icons.expand_more,
+                    size: 20,
                     color: AppTokens.text2,
                   ),
               ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_section_header.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
 import '../../../ai_catalog/presentation/widgets/ai_config_editor.dart';
 import '../../../templates/domain/entities/template.dart';
@@ -40,16 +41,14 @@ class OrgDefaultsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Valores por defecto', style: textTheme.titleMedium),
-        const SizedBox(height: AppTokens.sp1),
-        Text(
-          'Lo que heredan las plantillas nuevas de la organización al crearse. '
-          'No afecta a las plantillas existentes.',
-          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+        const AppSectionHeader(
+          title: 'Valores por defecto',
+          caption:
+              'Lo que heredan las plantillas nuevas de la organización al '
+              'crearse. No afecta a las plantillas existentes.',
         ),
         const SizedBox(height: AppTokens.sp4),
         AiConfigEditor(

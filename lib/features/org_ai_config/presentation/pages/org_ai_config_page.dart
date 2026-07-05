@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
@@ -84,6 +85,7 @@ class _LoadedBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     // Las dos secciones necesitan el catálogo (hosts seleccionables + picker de
     // modelo de los defaults). Mientras el catálogo carga/falla, su estado manda.
     return BlocBuilder<CatalogBloc, CatalogState>(
@@ -91,8 +93,20 @@ class _LoadedBody extends StatelessWidget {
         CatalogInitial() || CatalogLoading() => const AppLoadingIndicator(),
         CatalogFailed() => const _CatalogError(),
         CatalogLoaded(:final catalog) => ListView(
-          padding: const EdgeInsets.all(AppTokens.sp4),
+          padding: EdgeInsets.fromLTRB(
+            AppTokens.sp4,
+            AppTokens.sp4,
+            AppTokens.sp4,
+            AppTokens.sp4 + context.safeBottomInset,
+          ),
           children: <Widget>[
+            // El guardado es explícito (a diferencia del apply-inmediato del
+            // resto de la app): la línea lo hace legible antes de las cards.
+            Text(
+              'Los cambios se aplican al tocar Guardar.',
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            ),
+            const SizedBox(height: AppTokens.sp4),
             AppCard(
               child: HostSelectionSection(
                 catalog: catalog,

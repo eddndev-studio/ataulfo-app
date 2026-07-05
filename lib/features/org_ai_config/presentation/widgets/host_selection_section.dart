@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_section_header.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
 import '../../domain/entities/org_ai_config.dart';
 
@@ -45,7 +46,6 @@ class HostSelectionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final rows = <Widget>[];
     for (final p in catalog.providers) {
       for (final m in p.models) {
@@ -63,12 +63,11 @@ class HostSelectionSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Proveedor por modelo', style: textTheme.titleMedium),
-        const SizedBox(height: AppTokens.sp1),
-        Text(
-          'Elige en qué proveedor corre cada modelo. Los de un solo proveedor '
-          'quedan fijos.',
-          style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+        const AppSectionHeader(
+          title: 'Proveedor por modelo',
+          caption:
+              'Elige en qué proveedor corre cada modelo. Los de un solo '
+              'proveedor quedan fijos.',
         ),
         const SizedBox(height: AppTokens.sp3),
         ...rows,

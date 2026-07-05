@@ -125,7 +125,8 @@ void main() {
     when(() => labelsBloc.state).thenReturn(const LabelsLoaded(_labels));
   });
 
-  // La página posee su Scaffold; el host solo provee blocs.
+  // La página es content-only: el host replica el montaje del router
+  // (Scaffold + AppBar planos con el título 'Motor IA').
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: MultiBlocProvider(
@@ -134,7 +135,10 @@ void main() {
         BlocProvider<CatalogBloc>.value(value: catalogBloc),
         BlocProvider<LabelsBloc>.value(value: labelsBloc),
       ],
-      child: const TemplateAiPage(),
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Motor IA')),
+        body: const TemplateAiPage(),
+      ),
     ),
   );
 
@@ -146,7 +150,9 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  testWidgets('posee AppBar "Motor IA" y muestra los 4 stats', (tester) async {
+  testWidgets('bajo el AppBar "Motor IA" del router, muestra los 4 stats', (
+    tester,
+  ) async {
     await tester.pumpWidget(host());
 
     expect(find.widgetWithText(AppBar, 'Motor IA'), findsOneWidget);
@@ -158,6 +164,15 @@ void main() {
     expect(find.text('Medio'), findsOneWidget);
     expect(find.text('Mensajes de contexto'), findsOneWidget);
     expect(find.text('20'), findsOneWidget);
+  });
+
+  testWidgets('el editor va en una card con encabezado de sección', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    expect(find.text('Parámetros del motor'), findsOneWidget);
+    expect(find.text('Cada cambio se guarda al momento.'), findsOneWidget);
   });
 
   group('switch IA habilitada', () {
@@ -837,35 +852,44 @@ void main() {
     expect(find.byType(SnackBar), findsOneWidget);
   });
 
-  testWidgets('Loaded muestra el prompt COMPLETO y seleccionable, sin toggle', (
-    tester,
-  ) async {
-    final longPrompt = List<String>.generate(
-      40,
-      (i) => 'Línea $i del prompt.',
-    ).join('\n');
-    final tplLong = Template(
-      id: 't1',
-      orgId: 'o1',
-      name: 'Soporte',
-      version: 3,
-      ai: AIConfig(
-        enabled: true,
-        provider: AIProvider.gemini,
-        model: 'gemini-3.1-pro-preview',
-        temperature: 0.7,
-        thinkingLevel: ThinkingLevel.medium,
-        systemPrompt: longPrompt,
-        contextMessages: 20,
-      ),
-    );
-    when(() => bloc.state).thenReturn(TemplateDetailLoaded(tplLong));
+  testWidgets(
+    'Loaded: el prompt va en card colapsada; el completo vive en un sheet',
+    (tester) async {
+      final longPrompt = List<String>.generate(
+        40,
+        (i) => 'Línea $i del prompt.',
+      ).join('\n');
+      final tplLong = Template(
+        id: 't1',
+        orgId: 'o1',
+        name: 'Soporte',
+        version: 3,
+        ai: AIConfig(
+          enabled: true,
+          provider: AIProvider.gemini,
+          model: 'gemini-3.1-pro-preview',
+          temperature: 0.7,
+          thinkingLevel: ThinkingLevel.medium,
+          systemPrompt: longPrompt,
+          contextMessages: 20,
+        ),
+      );
+      when(() => bloc.state).thenReturn(TemplateDetailLoaded(tplLong));
 
-    await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
 
-    expect(find.byType(SelectableText), findsOneWidget);
-    expect(find.text('Ver completo'), findsNothing);
-  });
+      // Colapsado: encabezado + acción, sin volcar el prompt entero inline.
+      expect(find.text('Prompt del sistema'), findsOneWidget);
+      expect(find.text('Ver completo'), findsOneWidget);
+      expect(find.byType(SelectableText), findsNothing);
+
+      // "Ver completo" abre el sheet con el texto completo seleccionable.
+      await tester.ensureVisible(find.text('Ver completo'));
+      await tester.tap(find.text('Ver completo'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectableText), findsOneWidget);
+    },
+  );
 
   testWidgets('prompt vacío muestra placeholder', (tester) async {
     const tplEmpty = Template(
@@ -904,7 +928,7 @@ void main() {
               BlocProvider<TemplateDetailBloc>.value(value: bloc),
               BlocProvider<CatalogBloc>.value(value: catalogBloc),
             ],
-            child: const TemplateAiPage(),
+            child: const Scaffold(body: TemplateAiPage()),
           ),
         ),
         GoRoute(
