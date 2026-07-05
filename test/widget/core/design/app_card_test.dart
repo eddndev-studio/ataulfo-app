@@ -164,6 +164,62 @@ void main() {
     });
   });
 
+  group('AppCard.outline — card con borde', () {
+    testWidgets('fill transparente + borde divider, sin gradiente', (
+      tester,
+    ) async {
+      // La variante contorno no rellena: solo un hairline divider delimita la
+      // card sobre el fondo. Un BoxDecoration con color transparente + border.
+      await pumpCard(
+        tester,
+        const AppCard.outline(child: SizedBox(width: 100, height: 100)),
+      );
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Container),
+        ),
+      );
+      final decoration = container.decoration as BoxDecoration;
+      expect(decoration.color, Colors.transparent);
+      expect(decoration.gradient, isNull);
+      expect(decoration.border?.top.color, AppTokens.divider);
+    });
+
+    testWidgets('conserva radio card y padding default', (tester) async {
+      await pumpCard(tester, const AppCard.outline(child: SizedBox.shrink()));
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Container),
+        ),
+      );
+      final decoration = container.decoration as BoxDecoration;
+      expect(
+        decoration.borderRadius,
+        BorderRadius.circular(AppTokens.radiusCard),
+      );
+      expect(container.padding, const EdgeInsets.all(AppTokens.cardPadding));
+    });
+
+    testWidgets('padding override por prop (EdgeInsets)', (tester) async {
+      await pumpCard(
+        tester,
+        const AppCard.outline(
+          padding: EdgeInsets.zero,
+          child: SizedBox.shrink(),
+        ),
+      );
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Container),
+        ),
+      );
+      expect(container.padding, EdgeInsets.zero);
+    });
+  });
+
   group('AppCard — interacción', () {
     testWidgets('sin onTap: no es tappable (no hay InkWell ancestro)', (
       tester,

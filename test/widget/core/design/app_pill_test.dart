@@ -161,6 +161,53 @@ void main() {
     });
   });
 
+  group('AppPill — icon opcional', () {
+    Finder iconFinder() =>
+        find.descendant(of: find.byType(AppPill), matching: find.byType(Icon));
+
+    testWidgets('sin icon: no se renderiza', (tester) async {
+      await pumpPill(tester, const AppPill.neutral(label: 'sin icon'));
+      expect(iconFinder(), findsNothing);
+    });
+
+    testWidgets('con icon: se renderiza antes del label, color del texto', (
+      tester,
+    ) async {
+      await pumpPill(
+        tester,
+        const AppPill.neutral(label: 'v1.2', icon: Icons.tag),
+      );
+      final icon = tester.widget<Icon>(iconFinder());
+      expect(icon.icon, Icons.tag);
+      // El ícono espeja el color del label de la variante (neutral → text2).
+      expect(icon.color, AppTokens.text2);
+    });
+
+    testWidgets('icon en primary hereda onPrimary (sobre fill cálido)', (
+      tester,
+    ) async {
+      await pumpPill(
+        tester,
+        const AppPill.primary(label: 'Nuevo', icon: Icons.star),
+      );
+      final icon = tester.widget<Icon>(iconFinder());
+      expect(icon.color, AppTokens.onPrimary);
+    });
+
+    testWidgets('icon y dot son mutuamente excluyentes (assert)', (
+      tester,
+    ) async {
+      expect(
+        () => AppPill.neutral(
+          label: 'x',
+          icon: Icons.tag,
+          dot: AppPillDot.active,
+        ),
+        throwsAssertionError,
+      );
+    });
+  });
+
   group('AppPill — a11y (estado verbalizado)', () {
     testWidgets('con dot active anuncia el estado "Activo"', (tester) async {
       final handle = tester.ensureSemantics();

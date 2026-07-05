@@ -9,8 +9,8 @@ import '../../../../core/ai/tool_groups_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
 import '../../../ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../../labels/presentation/bloc/labels_bloc.dart';
@@ -104,7 +104,18 @@ class _LoadedView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _EnabledRow(ai: ai, isMutating: isMutating),
+          // Switch de IA habilitada: muta directo (un campo, un PUT).
+          AppToggleRow(
+            switchKey: const Key('template_ai.enabled'),
+            label: 'IA habilitada',
+            caption: 'Apagada, los bots de esta plantilla no responden con IA.',
+            value: ai.enabled,
+            onChanged: isMutating
+                ? null
+                : (v) => context.read<TemplateDetailBloc>().add(
+                    TemplateDetailAiUpdateRequested(ai.copyWith(enabled: v)),
+                  ),
+          ),
           const SizedBox(height: AppTokens.sp5),
           BlocBuilder<CatalogBloc, CatalogState>(
             builder: (context, catState) {
@@ -147,46 +158,6 @@ class _LoadedView extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Switch de IA habilitada: muta directo (un campo, un PUT).
-class _EnabledRow extends StatelessWidget {
-  const _EnabledRow({required this.ai, required this.isMutating});
-
-  final AIConfig ai;
-  final bool isMutating;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text('IA habilitada', style: textTheme.titleMedium),
-              const SizedBox(height: 2),
-              Text(
-                'Apagada, los bots de esta plantilla no responden con IA.',
-                style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: AppTokens.sp3),
-        AppSwitch(
-          key: const Key('template_ai.enabled'),
-          value: ai.enabled,
-          onChanged: isMutating
-              ? null
-              : (v) => context.read<TemplateDetailBloc>().add(
-                  TemplateDetailAiUpdateRequested(ai.copyWith(enabled: v)),
-                ),
-        ),
-      ],
     );
   }
 }

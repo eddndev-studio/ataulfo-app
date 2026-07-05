@@ -34,6 +34,13 @@ void main() {
       expect(AppTokens.glass, const Color(0x99131A1F));
       expect(AppTokens.glass, AppTokens.input);
     });
+
+    test(
+      'scrim es negro al 40% (#000000 @ 0x66) para velos sobre contenido',
+      () {
+        expect(AppTokens.scrim, const Color(0x66000000));
+      },
+    );
   });
 
   group('AppTokens — brand', () {
@@ -178,6 +185,17 @@ void main() {
       expect(AppTokens.captionSize, 12.0);
       expect(AppTokens.captionLineHeight, 16.0);
       expect(AppTokens.captionWeight, FontWeight.w500);
+    });
+
+    test('heroTitle: 34 · height 1.15 · w700 · SIN color', () {
+      // El color lo pone el consumidor (onPrimary sobre el gradiente); el
+      // token solo fija forma para que las cuatro cabeceras converjan.
+      const s = AppTokens.heroTitle;
+      expect(s.fontFamily, AppTokens.fontSans);
+      expect(s.fontSize, 34.0);
+      expect(s.height, 1.15);
+      expect(s.fontWeight, FontWeight.w700);
+      expect(s.color, isNull);
     });
   });
 

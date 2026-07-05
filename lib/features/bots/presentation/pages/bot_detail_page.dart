@@ -3,11 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/role_privilege.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
+import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
@@ -19,7 +21,6 @@ import '../widgets/bot_detail_header.dart';
 import '../widgets/bot_edit_sheet.dart';
 import '../widgets/bot_group_gates.dart';
 import '../widgets/bot_tool_permissions.dart';
-import '../widgets/bot_toggle_row.dart';
 
 /// Detalle de un Bot (S04): el HUB del bot. Identidad en el header de
 /// gradiente, la conexión del canal como card hero (estado vivo — lo
@@ -184,7 +185,7 @@ class _LoadedView extends StatelessWidget {
                     key: const Key('bot_detail.card.controls'),
                     child: Column(
                       children: <Widget>[
-                        BotToggleRow(
+                        AppToggleRow(
                           switchKey: const Key('bot_detail.paused'),
                           label: 'Pausar bot',
                           caption:
@@ -270,33 +271,18 @@ class _LoadedView extends StatelessWidget {
   /// (sessions/messages/executions sin FK) y sugiere limpiar conversaciones
   /// antes. Sólo tras confirmar despacha el borrado.
   Future<void> _confirmDelete(BuildContext context, Bot bot) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar este bot?'),
-        content: Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '¿Eliminar este bot?',
+      message:
           'Se borrará "${bot.name}" de forma permanente. Sus conversaciones, '
           'mensajes y ejecuciones quedarán huérfanos; si quieres limpiarlos, '
           'usa "Borrar conversaciones" en Mantenimiento antes de eliminar. '
           'Esta acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: const Key('bot_detail.delete_confirm'),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: AppTokens.danger),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      confirmKey: const Key('bot_detail.delete_confirm'),
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
     context.read<BotDetailBloc>().add(const BotDetailDeleteRequested());
   }
 

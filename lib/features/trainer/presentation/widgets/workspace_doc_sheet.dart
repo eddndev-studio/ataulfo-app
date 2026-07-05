@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../domain/entities/workspace_doc.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../../domain/repositories/trainer_repositories.dart';
@@ -152,27 +153,16 @@ class _DocFormState extends State<_DocForm> {
     final doc = widget.doc;
     if (doc == null) return;
     final bloc = context.read<WorkspaceBloc>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('¿Borrar documento?'),
-        content: Text(
-          'El bot dejará de poder consultar "${doc.name}". Esta acción es definitiva.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            key: const Key('workspace_doc.delete_confirm'),
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text('Borrar'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '¿Borrar documento?',
+      message:
+          'El bot dejará de poder consultar "${doc.name}". Esta acción es '
+          'definitiva.',
+      confirmLabel: 'Borrar',
+      confirmKey: const Key('workspace_doc.delete_confirm'),
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     bloc.add(WorkspaceDocDeleted(name: doc.name, version: doc.version));
     Navigator.of(context).pop();
   }

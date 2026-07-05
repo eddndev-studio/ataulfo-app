@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -111,31 +112,16 @@ class _LabelEditSheetState extends State<LabelEditSheet> {
   Future<void> _confirmDelete() async {
     final ed = widget.editing;
     if (ed == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar etiqueta?'),
-        content: const Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '¿Eliminar etiqueta?',
+      message:
           'Se quitará de todas las conversaciones que la tengan y de los '
           'disparadores que la usen. Esta acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: const Key('label_edit.delete_confirm'),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: AppTokens.danger),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      confirmKey: const Key('label_edit.delete_confirm'),
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     _didSubmit = true;
     context.read<LabelsAdminBloc>().add(LabelsAdminDeleteRequested(id: ed.id));
   }

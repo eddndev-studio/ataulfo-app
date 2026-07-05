@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/i18n/role_labels.dart';
@@ -108,61 +109,31 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
   }
 
   Future<void> _confirmRemove() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Quitar a este miembro?'),
-        content: Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '¿Quitar a este miembro?',
+      message:
           'Perderá el acceso a "${widget.member.email}" en esta organización y '
           'su sesión se cerrará al instante. Esta acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: const Key('member_edit.remove_confirm'),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Quitar',
-              style: TextStyle(color: AppTokens.danger),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Quitar',
+      confirmKey: const Key('member_edit.remove_confirm'),
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     Navigator.of(context).pop(const MemberSheetRemove());
   }
 
   Future<void> _confirmTransfer() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Transferir la propiedad?'),
-        content: Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '¿Transferir la propiedad?',
+      message:
           '"${widget.member.email}" pasará a ser OWNER de la organización y tú '
           'quedarás como ADMIN. Sólo el nuevo OWNER podrá revertirlo. Esta '
           'acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: const Key('member_edit.transfer_confirm'),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Transferir',
-              style: TextStyle(color: AppTokens.danger),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Transferir',
+      confirmKey: const Key('member_edit.transfer_confirm'),
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     Navigator.of(context).pop(const MemberSheetTransfer());
   }
 

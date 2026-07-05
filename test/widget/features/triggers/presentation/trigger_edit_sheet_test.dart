@@ -635,8 +635,10 @@ void main() {
       await tester.tap(find.byKey(const Key('trigger_edit.delete')));
       await tester.pumpAndSettle();
 
+      // El diálogo se ancla por su botón de confirmar: el helper canónico
+      // (showAppConfirmDialog) no expone key en el AlertDialog mismo.
       expect(
-        find.byKey(const Key('trigger_edit.delete_confirm')),
+        find.byKey(const Key('trigger_edit.delete_confirm.ok')),
         findsOneWidget,
       );
 

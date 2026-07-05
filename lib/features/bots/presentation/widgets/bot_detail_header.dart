@@ -111,11 +111,7 @@ class BotDetailHeader extends StatelessWidget {
                           // Mismo estilo que el título de sección
                           // (AppHeaderCard) en Bots/Plantillas, para
                           // congruencia entre pantallas.
-                          style: const TextStyle(
-                            fontFamily: AppTokens.fontSans,
-                            fontSize: 34,
-                            height: 1.15,
-                            fontWeight: FontWeight.w700,
+                          style: AppTokens.heroTitle.copyWith(
                             color: AppTokens.onPrimary,
                           ),
                         ),

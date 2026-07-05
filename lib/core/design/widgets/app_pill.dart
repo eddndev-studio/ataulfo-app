@@ -18,28 +18,45 @@ enum _AppPillVariant { primary, neutral, danger, outline, glass }
 /// dot opcional sirve como indicador de estado al lado del label sin
 /// necesidad de iconos extra.
 class AppPill extends StatelessWidget {
-  const AppPill.primary({super.key, required this.label, this.dot})
-    : _variant = _AppPillVariant.primary;
+  const AppPill.primary({super.key, required this.label, this.icon, this.dot})
+    : _variant = _AppPillVariant.primary,
+      assert(icon == null || dot == null, _iconDotExclusive);
 
-  const AppPill.neutral({super.key, required this.label, this.dot})
-    : _variant = _AppPillVariant.neutral;
+  const AppPill.neutral({super.key, required this.label, this.icon, this.dot})
+    : _variant = _AppPillVariant.neutral,
+      assert(icon == null || dot == null, _iconDotExclusive);
 
-  const AppPill.danger({super.key, required this.label, this.dot})
-    : _variant = _AppPillVariant.danger;
+  const AppPill.danger({super.key, required this.label, this.icon, this.dot})
+    : _variant = _AppPillVariant.danger,
+      assert(icon == null || dot == null, _iconDotExclusive);
 
-  const AppPill.outline({super.key, required this.label, this.dot})
-    : _variant = _AppPillVariant.outline;
+  const AppPill.outline({super.key, required this.label, this.icon, this.dot})
+    : _variant = _AppPillVariant.outline,
+      assert(icon == null || dot == null, _iconDotExclusive);
 
   /// Cápsula de vidrio para fondos vivos (el gradiente de marca): velo oscuro
   /// translúcido con label `onPrimary`. Hermana de `AppCard.glass`; reemplaza a
   /// las demás variantes cuando el pill va SOBRE el gradiente (donde el fill
   /// amarillo de `.primary` o el surface oscuro de `.neutral` no leerían).
-  const AppPill.glass({super.key, required this.label, this.dot})
-    : _variant = _AppPillVariant.glass;
+  const AppPill.glass({super.key, required this.label, this.icon, this.dot})
+    : _variant = _AppPillVariant.glass,
+      assert(icon == null || dot == null, _iconDotExclusive);
 
   final String label;
   final _AppPillVariant _variant;
+
+  /// Glifo opcional a la izquierda del label, del mismo color que el texto y a
+  /// escala de la tipografía caption. Excluyente con [dot]: ambos ocupan el
+  /// mismo lugar y comunicarían dos cosas a la vez.
+  final IconData? icon;
   final AppPillDot? dot;
+
+  /// Tamaño del glifo: dos pasos sobre el caption (12) para leerse junto al
+  /// texto sin dominar la cápsula.
+  static const double _iconSize = 14.0;
+
+  static const String _iconDotExclusive =
+      'AppPill: icon y dot son mutuamente excluyentes';
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +84,10 @@ class AppPill extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
+          ],
+          if (icon != null) ...<Widget>[
+            Icon(icon, size: _iconSize, color: colors.foreground),
+            const SizedBox(width: 4),
           ],
           Text(
             label,

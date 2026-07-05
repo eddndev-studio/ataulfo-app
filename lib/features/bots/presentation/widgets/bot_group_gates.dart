@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../domain/entities/bot.dart';
 import '../bloc/bot_detail_bloc.dart';
-import 'bot_toggle_row.dart';
 
 /// Sección "En grupos" del detalle de un Bot: dos gates planos para los chats
 /// de GRUPO de WhatsApp — apagar la IA y apagar los flujos disparados por
@@ -39,7 +39,7 @@ class BotGroupGates extends StatelessWidget {
           style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
         ),
         const SizedBox(height: AppTokens.sp4),
-        BotToggleRow(
+        AppToggleRow(
           switchKey: const Key('bot_detail.group_chats_ai'),
           label: 'Desactivar IA en grupos',
           caption: bot.groupChatsAiDisabled
@@ -52,7 +52,7 @@ class BotGroupGates extends StatelessWidget {
                     bloc.add(BotDetailUpdateRequested(groupChatsAiDisabled: v)),
         ),
         const SizedBox(height: AppTokens.sp4),
-        BotToggleRow(
+        AppToggleRow(
           switchKey: const Key('bot_detail.group_chats_flows'),
           label: 'Desactivar flujos en grupos',
           caption: bot.groupChatsFlowsDisabled

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -246,28 +247,16 @@ class _VarDefCard extends StatelessWidget {
 
   Future<void> _confirmDelete(BuildContext context, VariableDef def) async {
     final bloc = context.read<VarDefsBloc>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        key: const Key('var_defs.delete_confirm'),
-        title: const Text('Eliminar variable'),
-        content: Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Eliminar variable',
+      message:
           '¿Eliminar la variable {{${def.name}}}? '
           'Los bots que ya tengan un valor asignado bloquearán esta acción.',
-        ),
-        actions: <Widget>[
-          AppButton.text(
-            label: 'Cancelar',
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-          ),
-          AppButton.danger(
-            label: 'Eliminar',
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      confirmKey: const Key('var_defs.delete_confirm'),
     );
-    if (confirmed == true) {
+    if (confirmed) {
       bloc.add(VarDefsDeleteRequested(varDefId: def.id));
     }
   }

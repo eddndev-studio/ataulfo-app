@@ -707,9 +707,10 @@ void main() {
         await tester.tap(find.byKey(const Key('step_edit.delete')));
         await tester.pumpAndSettle();
 
-        // El dialog de confirmación aparece.
+        // El dialog de confirmación aparece — anclado por su botón de
+        // confirmar: el helper canónico no expone key en el AlertDialog.
         expect(
-          find.byKey(const Key('step_edit.delete_confirm')),
+          find.byKey(const Key('step_edit.delete_confirm.ok')),
           findsOneWidget,
         );
         // Tap en confirmar.

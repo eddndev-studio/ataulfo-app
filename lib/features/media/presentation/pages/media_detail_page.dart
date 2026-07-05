@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../domain/entities/media_asset.dart';
@@ -102,7 +103,7 @@ class MediaDetailPage extends StatelessWidget {
                 if (state.busy)
                   const Positioned.fill(
                     child: ColoredBox(
-                      color: Color(0x66000000),
+                      color: AppTokens.scrim,
                       child: Center(
                         child: CircularProgressIndicator(
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -162,27 +163,15 @@ class MediaDetailPage extends StatelessWidget {
   /// Confirma antes de borrar (acción irreversible) y delega al cubit.
   Future<void> _confirmDelete(BuildContext context) async {
     final cubit = context.read<MediaDetailCubit>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Borrar archivo'),
-        content: const Text(
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'Borrar archivo',
+      message:
           'Se quitará de la galería y de cualquier flujo que lo use. Esta '
           'acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          AppButton.text(
-            label: 'Cancelar',
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-          ),
-          AppButton.danger(
-            label: 'Borrar',
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-          ),
-        ],
-      ),
+      confirmLabel: 'Borrar',
     );
-    if (ok == true) await cubit.deleteAsset();
+    if (ok) await cubit.deleteAsset();
   }
 }
 

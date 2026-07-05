@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -289,28 +290,16 @@ class _FlowCard extends StatelessWidget {
 
   Future<void> _confirmDeleteFlow(BuildContext context, fdom.Flow flow) async {
     final bloc = context.read<FlowsBloc>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        key: const Key('flows.delete_confirm'),
-        title: const Text('Eliminar flujo'),
-        content: Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Eliminar flujo',
+      message:
           '¿Eliminar el flujo "${flow.name}"? Se borrarán también sus pasos '
           'y disparadores. Esta acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          AppButton.text(
-            label: 'Cancelar',
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-          ),
-          AppButton.danger(
-            label: 'Eliminar',
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      confirmKey: const Key('flows.delete_confirm'),
     );
-    if (confirmed == true) {
+    if (confirmed) {
       bloc.add(FlowsDeleteRequested(flow.id));
     }
   }

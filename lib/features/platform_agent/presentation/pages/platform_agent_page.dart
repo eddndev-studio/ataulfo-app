@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/audio/audio_recorder.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
@@ -349,27 +350,14 @@ class _HistoryList extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context, PaConversation c) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Eliminar conversación'),
-        content: const Text(
-          'Se borrará el hilo y sus mensajes. No se puede deshacer.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: const Key('pa.history.delete.confirm'),
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'Eliminar conversación',
+      message: 'Se borrará el hilo y sus mensajes. No se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      confirmKey: const Key('pa.history.delete.confirm'),
     );
-    if (ok ?? false) onDelete(c.id);
+    if (ok) onDelete(c.id);
   }
 }
 

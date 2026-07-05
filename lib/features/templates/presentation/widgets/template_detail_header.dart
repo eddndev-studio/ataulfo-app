@@ -91,11 +91,7 @@ class TemplateDetailHeader extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           // Mismo estilo que los títulos de AppHeaderCard y
                           // BotDetailHeader, para congruencia entre pantallas.
-                          style: const TextStyle(
-                            fontFamily: AppTokens.fontSans,
-                            fontSize: 34,
-                            height: 1.15,
-                            fontWeight: FontWeight.w700,
+                          style: AppTokens.heroTitle.copyWith(
                             color: AppTokens.onPrimary,
                           ),
                         ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -360,7 +361,7 @@ class _LoadedViewState extends State<_LoadedView> {
               if (state.isDeleting)
                 Positioned.fill(
                   child: ColoredBox(
-                    color: const Color(0x66000000),
+                    color: AppTokens.scrim,
                     child: Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -482,27 +483,15 @@ class _SelectionBar extends StatelessWidget {
     MediaGalleryBloc bloc,
     int count,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Borrar $count archivo${count == 1 ? '' : 's'}'),
-        content: const Text(
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'Borrar $count archivo${count == 1 ? '' : 's'}',
+      message:
           'Se quitarán de la galería y de cualquier flujo que los use. Esta '
           'acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          AppButton.text(
-            label: 'Cancelar',
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-          ),
-          AppButton.danger(
-            label: 'Borrar',
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-          ),
-        ],
-      ),
+      confirmLabel: 'Borrar',
     );
-    if (ok == true) bloc.add(const MediaGalleryDeleteSelectedRequested());
+    if (ok) bloc.add(const MediaGalleryDeleteSelectedRequested());
   }
 }
 

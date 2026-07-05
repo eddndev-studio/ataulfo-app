@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_switch.dart';
+import '../tokens.dart';
+import 'app_switch.dart';
 
-/// Fila de un toggle de configuración del bot: etiqueta + descripción a la
-/// izquierda, [AppSwitch] a la derecha. La comparten el toggle de pausa y el
-/// de IA del detalle. `onChanged` nulo lo deja inhabilitado (mutación en vuelo
-/// o toggle inerte por contexto).
-class BotToggleRow extends StatelessWidget {
-  const BotToggleRow({
+/// Fila de un toggle de configuración: etiqueta + descripción a la izquierda,
+/// [AppSwitch] a la derecha. La comparten los toggles de detalle (pausa, IA) y
+/// las fichas de configuración. `onChanged` nulo la deja inhabilitada (mutación
+/// en vuelo o toggle inerte por contexto).
+class AppToggleRow extends StatelessWidget {
+  const AppToggleRow({
     super.key,
     required this.switchKey,
     required this.label,

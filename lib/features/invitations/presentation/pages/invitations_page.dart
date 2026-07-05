@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -102,31 +103,17 @@ Future<void> _openInviteSheet(BuildContext context) async {
 
 Future<void> _confirmCancel(BuildContext context, Invitation invitation) async {
   final cubit = context.read<InvitationMutationCubit>();
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('¿Cancelar invitación?'),
-      content: Text(
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: '¿Cancelar invitación?',
+    message:
         'Se anulará la invitación a "${invitation.email}". El enlace que recibió '
         'dejará de funcionar. Esta acción no se puede deshacer.',
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Volver'),
-        ),
-        TextButton(
-          key: const Key('invitations.cancel_confirm'),
-          onPressed: () => Navigator.of(ctx).pop(true),
-          child: const Text(
-            'Cancelar invitación',
-            style: TextStyle(color: AppTokens.danger),
-          ),
-        ),
-      ],
-    ),
+    confirmLabel: 'Cancelar invitación',
+    cancelLabel: 'Volver',
+    confirmKey: const Key('invitations.cancel_confirm'),
   );
-  if (confirmed != true) return;
+  if (!confirmed) return;
   unawaited(cubit.cancel(invitation.id));
 }
 

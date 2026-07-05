@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -121,29 +122,15 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
   Future<void> _confirmDelete() async {
     final ed = widget.editing;
     if (ed == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        key: const Key('trigger_edit.delete_confirm'),
-        title: const Text('Eliminar disparador'),
-        content: const Text(
-          '¿Eliminar este disparador? La acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          AppButton.text(
-            key: const Key('trigger_edit.delete_confirm.cancel'),
-            label: 'Cancelar',
-            onPressed: () => Navigator.of(dialogCtx).pop(false),
-          ),
-          AppButton.danger(
-            key: const Key('trigger_edit.delete_confirm.ok'),
-            label: 'Eliminar',
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Eliminar disparador',
+      message: '¿Eliminar este disparador? La acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      confirmKey: const Key('trigger_edit.delete_confirm.ok'),
+      cancelKey: const Key('trigger_edit.delete_confirm.cancel'),
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     if (!mounted) return;
     _didSubmit = true;
     context.read<TriggersBloc>().add(TriggersDeleteRequested(triggerId: ed.id));

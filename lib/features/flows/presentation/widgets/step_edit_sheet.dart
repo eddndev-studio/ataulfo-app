@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -271,32 +272,18 @@ class _StepEditSheetState extends State<StepEditSheet> {
       ed.id,
       _stepsFromState(context.read<FlowStepsBloc>().state),
     );
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        key: const Key('step_edit.delete_confirm'),
-        title: const Text('Eliminar paso'),
-        content: Text(
-          referenced
-              ? 'Este paso es destino de un condicional del flujo. Para '
-                    'eliminarlo, primero cambia ese destino en el condicional.'
-              : '¿Eliminar este paso? La acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          AppButton.text(
-            key: const Key('step_edit.delete_confirm.cancel'),
-            label: 'Cancelar',
-            onPressed: () => Navigator.of(dialogCtx).pop(false),
-          ),
-          AppButton.danger(
-            key: const Key('step_edit.delete_confirm.ok'),
-            label: 'Eliminar',
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Eliminar paso',
+      message: referenced
+          ? 'Este paso es destino de un condicional del flujo. Para '
+                'eliminarlo, primero cambia ese destino en el condicional.'
+          : '¿Eliminar este paso? La acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      confirmKey: const Key('step_edit.delete_confirm.ok'),
+      cancelKey: const Key('step_edit.delete_confirm.cancel'),
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     if (!mounted) return;
     _didSubmit = true;
     context.read<FlowStepsBloc>().add(FlowStepsDeleteRequested(ed.id));

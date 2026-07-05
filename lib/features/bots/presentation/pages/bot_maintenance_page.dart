@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_maintenance_bloc.dart';
-import '../widgets/bot_toggle_row.dart';
 
 /// Zona Peligrosa Tier A de un Bot (S04), sub-página `/bots/:id/maintenance`.
 /// Aloja las dos ops de runtime que EXIGEN `paused=true`: borrar conversaciones
@@ -134,7 +135,7 @@ class _Body extends StatelessWidget {
               ),
             ),
           const SizedBox(height: AppTokens.sp5),
-          BotToggleRow(
+          AppToggleRow(
             switchKey: const Key('bot_maint.pause'),
             label: bot.paused ? 'Reanudar bot' : 'Pausar bot',
             caption: bot.paused
@@ -204,28 +205,14 @@ class _Body extends StatelessWidget {
     required Key confirmKey,
     required VoidCallback onConfirm,
   }) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: confirmKey,
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Continuar',
-              style: TextStyle(color: AppTokens.danger),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: title,
+      message: body,
+      confirmLabel: 'Continuar',
+      confirmKey: confirmKey,
     );
-    if (confirmed == true) onConfirm();
+    if (confirmed) onConfirm();
   }
 
   static String _failureMessage(BotsFailure f) => switch (f) {

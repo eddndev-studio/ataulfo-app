@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../../core/auth/role_privilege.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
@@ -34,27 +35,15 @@ class SettingsPage extends StatelessWidget {
   Future<void> _confirmLogout(BuildContext context) async {
     // Capturado antes del await: el dialog desmonta/remonta contextos.
     final authBloc = context.read<AuthBloc>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('¿Cerrar sesión?'),
-        content: const Text(
-          'Tendrás que volver a iniciar sesión para acceder.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: const Key('settings.logout_confirm'),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Cerrar sesión'),
-          ),
-        ],
-      ),
+    final ok = await showAppConfirmDialog(
+      context,
+      title: '¿Cerrar sesión?',
+      message: 'Tendrás que volver a iniciar sesión para acceder.',
+      confirmLabel: 'Cerrar sesión',
+      destructive: false,
+      confirmKey: const Key('settings.logout_confirm'),
     );
-    if (ok == true) {
+    if (ok) {
       authBloc.add(const AuthLoggedOut());
     }
   }
@@ -145,15 +134,9 @@ class _ProfileHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Text(
+              Text(
                 'Ajustes',
-                style: TextStyle(
-                  fontFamily: AppTokens.fontSans,
-                  fontSize: 34,
-                  height: 1.15,
-                  fontWeight: FontWeight.w700,
-                  color: AppTokens.onPrimary,
-                ),
+                style: AppTokens.heroTitle.copyWith(color: AppTokens.onPrimary),
               ),
               const SizedBox(height: AppTokens.sp5),
               Row(

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
@@ -145,31 +146,16 @@ class _ReadyView extends StatelessWidget {
   Future<void> _confirmWipe(BuildContext context) async {
     // Capturado antes del await: el diálogo desmonta/remonta contextos.
     final messenger = ScaffoldMessenger.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Borrar credenciales del dispositivo?'),
-        content: const Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '¿Borrar credenciales del dispositivo?',
+      message:
           'El bot perderá su vínculo con WhatsApp y deberá re-parearse desde '
           'cero (nuevo QR). Esta acción no se puede deshacer.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: const Key('bot_connect.wipe_confirm'),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Borrar',
-              style: TextStyle(color: AppTokens.danger),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Borrar',
+      confirmKey: const Key('bot_connect.wipe_confirm'),
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
     context.read<BotConnectBloc>().add(const BotConnectWipeRequested());
     // El bloc trata el wipe como siempre-éxito (idempotente, sin estado
     // propio): este aviso es el único feedback de que la acción se registró.

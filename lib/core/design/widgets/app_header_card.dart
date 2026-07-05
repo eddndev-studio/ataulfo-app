@@ -114,7 +114,12 @@ class AppHeaderCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppTokens.sp6),
-                  Text(title, style: _t(34, FontWeight.w700)),
+                  Text(
+                    title,
+                    style: AppTokens.heroTitle.copyWith(
+                      color: AppTokens.onPrimary,
+                    ),
+                  ),
                 ],
               ),
             ),

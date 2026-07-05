@@ -97,6 +97,10 @@ class AppTokens {
   /// mismo valor que [input], distinto rol semántico.
   static const Color glass = _Gray.s800a60;
 
+  /// Velo oscuro sobre contenido vivo (overlay de carga, backdrop de medios):
+  /// negro al 40%. Atenúa lo que hay detrás sin ocultarlo del todo.
+  static const Color scrim = Color(0x66000000);
+
   // ── Brand ───────────────────────────────────────────────────────────────
   static const Color primary = _Yellow.s700;
   static const Color primaryHover = _Yellow.s500;
@@ -212,6 +216,17 @@ class AppTokens {
   static const double captionSize = 12.0;
   static const double captionLineHeight = 16.0;
   static const FontWeight captionWeight = FontWeight.w500;
+
+  /// Título hero de las cabeceras sobre el gradiente de marca (detalle de bot,
+  /// de plantilla, ajustes, [app_header_card]). Deja el `color` sin fijar: cada
+  /// consumidor lo tiñe (habitualmente [onPrimary] sobre el fill cálido). Existe
+  /// para que las cuatro cabeceras compartan la misma forma en un solo lugar.
+  static const TextStyle heroTitle = TextStyle(
+    fontFamily: fontSans,
+    fontSize: 34.0,
+    height: 1.15,
+    fontWeight: FontWeight.w700,
+  );
 
   // ── Motion ──────────────────────────────────────────────────────────────
   static const Duration durationFast = Duration(milliseconds: 120);

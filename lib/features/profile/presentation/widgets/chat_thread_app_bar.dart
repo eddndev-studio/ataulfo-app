@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/role_privilege.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -71,32 +72,17 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// "Vaciar" del diálogo despacha; cancelar o descartar no toca nada.
   Future<void> _confirmClearHistory(BuildContext context) async {
     final bloc = context.read<MessagesBloc>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Vaciar historial?'),
-        content: const Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '¿Vaciar historial?',
+      message:
           'Se eliminarán los mensajes de esta conversación y la memoria del '
           'bot sobre ella. El contacto y sus etiquetas se conservan. '
           'No se puede deshacer.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            key: const Key('thread.clear_history.confirm'),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Vaciar',
-              style: TextStyle(color: AppTokens.danger),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Vaciar',
+      confirmKey: const Key('thread.clear_history.confirm'),
     );
-    if (confirmed ?? false) {
+    if (confirmed) {
       bloc.add(const MessagesClearHistoryRequested());
     }
   }

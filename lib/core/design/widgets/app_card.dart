@@ -5,7 +5,7 @@ import '../tokens.dart';
 /// Variantes visuales del [AppCard]. Privada al primitivo; los callsites usan
 /// el constructor default o los nombrados (`.gradient`, `.glass`) — el enum
 /// existe para forzar un switch exhaustivo al resolver la decoración.
-enum _AppCardVariant { surface, gradient, glass }
+enum _AppCardVariant { surface, gradient, glass, outline }
 
 /// Primitivo Card del design system.
 ///
@@ -19,6 +19,8 @@ enum _AppCardVariant { surface, gradient, glass }
 /// - `.gradient`: fill de marca (`brandGradient`) para la card destacada del
 ///   home; el gradiente vive en `gradient` y deja `color` nulo.
 /// - `.glass`: fondo translúcido `glass` para cards sobre fondos vivos.
+/// - `.outline`: sin relleno (transparente) con un hairline `divider`; delimita
+///   la card sin competir con el fondo cuando el énfasis lo lleva otro elemento.
 ///
 /// El constructor default recibe `padding` como `double` —la card de contenido
 /// usa un padding uniforme—, mientras que los nombrados lo reciben como
@@ -52,6 +54,15 @@ class AppCard extends StatelessWidget {
   }) : _paddingValue = null,
        _paddingGeometry = padding,
        _variant = _AppCardVariant.glass;
+
+  const AppCard.outline({
+    super.key,
+    required this.child,
+    this.onTap,
+    EdgeInsetsGeometry? padding,
+  }) : _paddingValue = null,
+       _paddingGeometry = padding,
+       _variant = _AppCardVariant.outline;
 
   final Widget child;
   final VoidCallback? onTap;
@@ -98,6 +109,12 @@ class AppCard extends StatelessWidget {
         );
       case _AppCardVariant.glass:
         return BoxDecoration(color: AppTokens.glass, borderRadius: radius);
+      case _AppCardVariant.outline:
+        return BoxDecoration(
+          color: Colors.transparent,
+          border: Border.all(color: AppTokens.divider),
+          borderRadius: radius,
+        );
     }
   }
 }

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/domain/repositories/templates_repository.dart';
 import '../../domain/entities/bot.dart';
 import '../bloc/bot_detail_bloc.dart';
-import 'bot_toggle_row.dart';
 
 /// Toggle "Deshabilitar IA" del detalle de un Bot (S04). El interruptor sólo
 /// controla `bot.ai_disabled`; la IA EFECTIVA es `template.ai.enabled &&
@@ -55,7 +55,7 @@ class _BotAiToggleState extends State<BotAiToggle> {
         const label = 'Deshabilitar IA';
 
         if (snap.connectionState != ConnectionState.done) {
-          return const BotToggleRow(
+          return const AppToggleRow(
             switchKey: switchKey,
             label: label,
             caption: 'Comprobando la IA de la plantilla…',
@@ -66,7 +66,7 @@ class _BotAiToggleState extends State<BotAiToggle> {
 
         if (snap.hasError) {
           // No sabemos si la plantilla habilita IA; el flag del bot sí es real.
-          return BotToggleRow(
+          return AppToggleRow(
             switchKey: switchKey,
             label: label,
             caption:
@@ -80,7 +80,7 @@ class _BotAiToggleState extends State<BotAiToggle> {
         final templateAiEnabled = snap.data!.ai.enabled;
         if (!templateAiEnabled) {
           // La plantilla apaga la IA: deshabilitarla aquí no cambia nada.
-          return BotToggleRow(
+          return AppToggleRow(
             switchKey: switchKey,
             label: label,
             caption:
@@ -92,7 +92,7 @@ class _BotAiToggleState extends State<BotAiToggle> {
         }
 
         final effective = !aiDisabled;
-        return BotToggleRow(
+        return AppToggleRow(
           switchKey: switchKey,
           label: label,
           caption: effective
