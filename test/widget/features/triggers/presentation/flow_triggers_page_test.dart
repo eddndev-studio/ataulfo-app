@@ -1,5 +1,13 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
+import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
+import 'package:ataulfo/features/flows/presentation/bloc/flow_detail_bloc.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
@@ -7,12 +15,15 @@ import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/triggers/domain/failures/triggers_failure.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/triggers/presentation/bloc/triggers_bloc.dart';
-import 'package:ataulfo/features/triggers/presentation/widgets/flow_triggers_tab.dart';
+import 'package:ataulfo/features/triggers/presentation/pages/flow_triggers_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+
+class _MockDetailBloc extends MockBloc<FlowDetailEvent, FlowDetailState>
+    implements FlowDetailBloc {}
 
 class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
     implements TriggersBloc {}
@@ -78,14 +89,9 @@ Trigger _label({
 );
 
 /// `FlowTriggersBody` es la unidad bajo prueba: consumer-only, espera
-/// el `TriggersBloc` en el árbol. El wrapper `FlowTriggersTab` que
-/// construye el bloc se cubre por separado en el cycle de cableado del
-/// FlowDetailPage.
-/// El `FlowTriggersBody` consume `TriggersBloc`; el `_openSheet` que abre
-/// desde el body también lee el `LabelsBloc` del scope para re-proveerlo
-/// al sheet — por eso el harness inyecta ambos. Un `LabelsBloc` mockeado
-/// con catálogo poblado por default basta para estos tests (el selector
-/// se ejercita a fondo en `trigger_edit_sheet_test.dart`).
+/// el `TriggersBloc` en el árbol. El wrapper que construye los blocs se
+/// cubre en el grupo de cableado; la página que resuelve el flujo desde
+/// el `FlowDetailBloc`, en el grupo de la página.
 Widget _harness({
   required _MockTriggersBloc triggers,
   required fdom.Flow flow,
@@ -115,37 +121,59 @@ void main() {
     triggers = _MockTriggersBloc();
   });
 
-  testWidgets('Loading muestra spinner con key flow_triggers.loading', (
-    tester,
-  ) async {
+  testWidgets('Loading muestra el indicador canónico', (tester) async {
     when(() => triggers.state).thenReturn(const TriggersLoading());
 
     await tester.pumpWidget(_harness(triggers: triggers, flow: _flow()));
 
     expect(find.byKey(const Key('flow_triggers.loading')), findsOneWidget);
+    expect(find.byType(AppLoadingIndicator), findsOneWidget);
   });
 
-  testWidgets('Loaded con lista vacía muestra empty state flow-scope', (
-    tester,
-  ) async {
+  testWidgets('Loaded con lista vacía muestra el empty canónico con CTA que '
+      'abre el sheet', (tester) async {
     when(() => triggers.state).thenReturn(const TriggersLoaded(<Trigger>[]));
 
     await tester.pumpWidget(_harness(triggers: triggers, flow: _flow()));
 
-    expect(find.byKey(const Key('flow_triggers.empty')), findsOneWidget);
+    final empty = find.byKey(const Key('flow_triggers.empty'));
+    expect(empty, findsOneWidget);
+    expect(tester.widget(empty), isA<AppEmptyState>());
+    // El alta vive en la CTA del vacío; el botón de texto no se duplica.
+    expect(find.byKey(const Key('flow_triggers.add_button')), findsNothing);
+
+    await tester.tap(find.text('Crear disparador'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nuevo disparador'), findsOneWidget);
+    expect(find.byKey(const Key('trigger_edit.flow_fixed')), findsOneWidget);
+  });
+
+  testWidgets('Loaded con filas: UNA card las apila con divider (dialecto '
+      'denso)', (tester) async {
+    when(() => triggers.state).thenReturn(
+      TriggersLoaded(<Trigger>[
+        _text(id: 'a', keyword: 'hola'),
+        _text(id: 'b', keyword: 'menu'),
+      ]),
+    );
+
+    await tester.pumpWidget(_harness(triggers: triggers, flow: _flow()));
+
+    expect(find.byType(AppCard), findsOneWidget);
     expect(
-      find.textContaining('Este flujo aún no tiene disparadores'),
+      find.descendant(of: find.byType(AppCard), matching: find.byType(Divider)),
       findsOneWidget,
     );
-    // El add button SÍ está presente aunque la lista esté vacía.
-    expect(find.byKey(const Key('flow_triggers.add_button')), findsOneWidget);
+    expect(find.byKey(const Key('flow_triggers.row.a')), findsOneWidget);
+    expect(find.byKey(const Key('flow_triggers.row.b')), findsOneWidget);
   });
 
   testWidgets(
     'Loaded filtra los triggers: solo los que matchean flow.id se renderizan',
     (tester) async {
       // Mezcla deliberada: el endpoint /templates/:id/triggers devuelve
-      // todos los triggers de la template; el tab debe ocultar los que
+      // todos los triggers de la template; la página debe ocultar los que
       // no pertenezcan al flow del scope.
       when(() => triggers.state).thenReturn(
         TriggersLoaded(<Trigger>[
@@ -170,14 +198,21 @@ void main() {
     },
   );
 
-  testWidgets('Failed muestra copy flow-scope + retry', (tester) async {
+  testWidgets('Failed muestra el error canónico + retry que dispatcha load', (
+    tester,
+  ) async {
     when(
       () => triggers.state,
     ).thenReturn(const TriggersFailed(TriggersNetworkFailure()));
 
     await tester.pumpWidget(_harness(triggers: triggers, flow: _flow()));
 
-    expect(find.byKey(const Key('flow_triggers.failed')), findsOneWidget);
+    final failed = find.byKey(const Key('flow_triggers.failed'));
+    expect(failed, findsOneWidget);
+    expect(tester.widget(failed), isA<AppErrorState>());
+    await tester.tap(find.text('Reintentar'));
+    await tester.pump();
+    verify(() => triggers.add(const TriggersLoadRequested())).called(1);
   });
 
   testWidgets(
@@ -213,7 +248,9 @@ void main() {
   testWidgets('tap en add_button abre el TriggerEditSheet con scopedFlow', (
     tester,
   ) async {
-    when(() => triggers.state).thenReturn(const TriggersLoaded(<Trigger>[]));
+    when(
+      () => triggers.state,
+    ).thenReturn(TriggersLoaded(<Trigger>[_text(id: 'a', flowId: 'f1')]));
 
     await tester.pumpWidget(
       _harness(
@@ -257,11 +294,9 @@ void main() {
     testWidgets('catálogo cargado y presente: muestra el nombre, no el id', (
       tester,
     ) async {
-      when(() => triggers.state).thenReturn(
-        TriggersLoaded(<Trigger>[
-          _label(id: 'lt', labelId: 'vip', flowId: 'f1'),
-        ]),
-      );
+      when(
+        () => triggers.state,
+      ).thenReturn(TriggersLoaded(<Trigger>[_label(id: 'lt', labelId: 'vip')]));
 
       await tester.pumpWidget(
         _harness(
@@ -280,9 +315,7 @@ void main() {
       tester,
     ) async {
       when(() => triggers.state).thenReturn(
-        TriggersLoaded(<Trigger>[
-          _label(id: 'lt', labelId: 'ghost', flowId: 'f1'),
-        ]),
+        TriggersLoaded(<Trigger>[_label(id: 'lt', labelId: 'ghost')]),
       );
 
       await tester.pumpWidget(
@@ -300,11 +333,9 @@ void main() {
     testWidgets('catálogo cargando: NO muestra "eliminada" (evita flash)', (
       tester,
     ) async {
-      when(() => triggers.state).thenReturn(
-        TriggersLoaded(<Trigger>[
-          _label(id: 'lt', labelId: 'vip', flowId: 'f1'),
-        ]),
-      );
+      when(
+        () => triggers.state,
+      ).thenReturn(TriggersLoaded(<Trigger>[_label(id: 'lt', labelId: 'vip')]));
 
       await tester.pumpWidget(
         _harness(
@@ -321,7 +352,71 @@ void main() {
     });
   });
 
-  group('FlowTriggersTab · cableado del catálogo al sheet', () {
+  group('FlowTriggersPage · resuelve el flujo desde el FlowDetailBloc', () {
+    late _MockDetailBloc detail;
+    late _MockTriggersRepo triggersRepo;
+    late _MockLabelsRepo labelsRepo;
+
+    setUp(() {
+      detail = _MockDetailBloc();
+      triggersRepo = _MockTriggersRepo();
+      labelsRepo = _MockLabelsRepo();
+      when(
+        () => triggersRepo.listTriggers(any()),
+      ).thenAnswer((_) => Completer<List<Trigger>>().future);
+      when(() => labelsRepo.listLabels()).thenAnswer((_) async => <Label>[]);
+    });
+
+    Widget pageHost() => MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: MultiRepositoryProvider(
+        providers: <RepositoryProvider<dynamic>>[
+          RepositoryProvider<TriggersRepository>.value(value: triggersRepo),
+          RepositoryProvider<LabelsRepository>.value(value: labelsRepo),
+        ],
+        child: BlocProvider<FlowDetailBloc>.value(
+          value: detail,
+          child: const Scaffold(body: FlowTriggersPage()),
+        ),
+      ),
+    );
+
+    testWidgets('cabecera cargando → indicador canónico', (tester) async {
+      when(() => detail.state).thenReturn(const FlowDetailLoading());
+
+      await tester.pumpWidget(pageHost());
+
+      expect(find.byType(AppLoadingIndicator), findsOneWidget);
+    });
+
+    testWidgets('cabecera fallida → error canónico con retry', (tester) async {
+      when(
+        () => detail.state,
+      ).thenReturn(const FlowDetailFailed(FlowsServerFailure()));
+
+      await tester.pumpWidget(pageHost());
+
+      expect(find.byType(AppErrorState), findsOneWidget);
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      verify(() => detail.add(const FlowDetailLoadRequested())).called(1);
+    });
+
+    testWidgets('cabecera cargada → monta el scope con su TriggersBloc '
+        'propio (carga en vuelo visible)', (tester) async {
+      when(() => detail.state).thenReturn(
+        FlowDetailLoaded(_flow(), const <fdom.Flow>[], siblingsFailed: false),
+      );
+
+      await tester.pumpWidget(pageHost());
+      await tester.pump();
+
+      expect(find.byKey(const Key('flow_triggers.loading')), findsOneWidget);
+      verify(() => triggersRepo.listTriggers('tpl1')).called(1);
+    });
+  });
+
+  group('cableado del catálogo al sheet', () {
     testWidgets(
       'el selector del sheet ve los labels del LabelsRepository del scope',
       (tester) async {
@@ -353,13 +448,13 @@ void main() {
                 ),
                 RepositoryProvider<LabelsRepository>.value(value: labelsRepo),
               ],
-              child: Scaffold(body: FlowTriggersTab(flow: _flow())),
+              child: Scaffold(body: FlowTriggersScope(flow: _flow())),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        await tester.tap(find.byKey(const Key('flow_triggers.add_button')));
+        await tester.tap(find.text('Crear disparador'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Etiqueta'));
         await tester.pumpAndSettle();

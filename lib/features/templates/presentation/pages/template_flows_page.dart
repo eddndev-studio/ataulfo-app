@@ -1,10 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -59,48 +56,35 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
         key: const Key('template_flows.fab'),
         tooltip: 'Nuevo flujo',
         // El alta vive en un form-sheet sobre esta lista; al crear se apila
-        // el editor del flujo nuevo (back físico vuelve aquí).
+        // el editor del flujo nuevo (back físico vuelve aquí y la lista se
+        // refresca para mostrarlo con lo que el editor haya cambiado).
         onPressed: () async {
           final flow = await FlowCreateSheet.open(
             context,
             templateId: widget.templateId,
           );
-          if (flow != null && context.mounted) {
-            unawaited(context.push('/flows/${flow.id}'));
-          }
+          if (flow == null || !context.mounted) return;
+          final flowsBloc = context.read<FlowsBloc>();
+          final triggersBloc = context.read<TriggersBloc>();
+          await context.push('/flows/${flow.id}');
+          flowsBloc.add(const FlowsLoadRequested());
+          triggersBloc.add(const TriggersLoadRequested());
         },
         child: const Icon(Icons.add),
       ),
-      body: BlocListener<FlowsBloc, FlowsState>(
-        // Feedback del borrado fallido: la lista sigue visible, sólo la
-        // mutación falló (403 sin rol, red, etc.). Operador reintenta.
-        listener: (context, state) {
-          if (state is FlowsMutationFailed) {
-            ScaffoldMessenger.of(context)
-              ..clearSnackBars()
-              ..showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'No pudimos eliminar el flujo. Intenta de nuevo.',
-                  ),
-                ),
-              );
-          }
-        },
-        child: BlocBuilder<FlowsBloc, FlowsState>(
-          builder: (context, state) => switch (state) {
-            FlowsLoading() => const Center(
-              key: Key('flows.loading'),
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-              ),
+      body: BlocBuilder<FlowsBloc, FlowsState>(
+        builder: (context, state) => switch (state) {
+          FlowsLoading() => const Center(
+            key: Key('flows.loading'),
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
             ),
-            FlowsLoaded(flows: final fs) => _content(context, fs),
-            FlowsMutating(flows: final fs) => _content(context, fs),
-            FlowsMutationFailed(flows: final fs) => _content(context, fs),
-            FlowsFailed() => const _FailedView(),
-          },
-        ),
+          ),
+          FlowsLoaded(flows: final fs) => _content(context, fs),
+          FlowsMutating(flows: final fs) => _content(context, fs),
+          FlowsMutationFailed(flows: final fs) => _content(context, fs),
+          FlowsFailed() => const _FailedView(),
+        },
       ),
     );
   }
@@ -220,9 +204,10 @@ class _FlowsCard extends StatelessWidget {
 }
 
 /// Fila de un flujo dentro de la card del listado: glifo + nombre con el
-/// resumen (disparadores · enfriamiento · límite) como caption + borrar.
-/// El estado habla solo cuando es excepcional: "Pausado" como pill; un flujo
-/// activo no pinta nada — el default repetido por fila sería ruido.
+/// resumen (disparadores · enfriamiento · límite) como caption. El estado
+/// habla solo cuando es excepcional: "Pausado" como pill; un flujo activo
+/// no pinta nada — el default repetido por fila sería ruido. Las acciones
+/// sobre el flujo (renombrar, pausar, eliminar) viven en su editor.
 ///
 /// Toda la fila es tap-target hacia el editor; el InkWell propio da el
 /// ripple (la card contenedora no es tappable).
@@ -234,6 +219,16 @@ class _FlowTile extends StatelessWidget {
   /// Disparadores del flujo; null = aún sin snapshot (se omite del resumen).
   final int? triggerCount;
 
+  /// Apila el editor y, al volver, refresca lista y counts: el editor
+  /// pudo renombrar, pausar o eliminar el flujo y sus disparadores.
+  Future<void> _openEditor(BuildContext context) async {
+    final flowsBloc = context.read<FlowsBloc>();
+    final triggersBloc = context.read<TriggersBloc>();
+    await context.push('/flows/${flow.id}');
+    flowsBloc.add(const FlowsLoadRequested());
+    triggersBloc.add(const TriggersLoadRequested());
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -241,7 +236,7 @@ class _FlowTile extends StatelessWidget {
     return InkWell(
       key: Key('flows.row.${flow.id}'),
       // push apila el editor del flow; el back físico vuelve a la lista.
-      onTap: () => context.push('/flows/${flow.id}'),
+      onTap: () => _openEditor(context),
       borderRadius: BorderRadius.circular(AppTokens.radiusSm),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
@@ -282,14 +277,7 @@ class _FlowTile extends StatelessWidget {
                 label: 'Pausado',
                 dot: AppPillDot.paused,
               ),
-            // Trash icon como acción destructiva. Su propio gesture detector
-            // absorbe el tap y no compite con el onTap de la fila.
-            IconButton(
-              key: Key('flows.row.${flow.id}.delete'),
-              icon: const Icon(Icons.delete_outline, color: AppTokens.danger),
-              tooltip: 'Eliminar flujo',
-              onPressed: () => _confirmDeleteFlow(context, flow),
-            ),
+            const Icon(Icons.chevron_right, color: AppTokens.text2),
           ],
         ),
       ),
@@ -320,22 +308,6 @@ class _FlowTile extends StatelessWidget {
     final h = m ~/ 60;
     if (h < 24) return '$h h';
     return '${h ~/ 24} d';
-  }
-
-  Future<void> _confirmDeleteFlow(BuildContext context, fdom.Flow flow) async {
-    final bloc = context.read<FlowsBloc>();
-    final confirmed = await showAppConfirmDialog(
-      context,
-      title: 'Eliminar flujo',
-      message:
-          '¿Eliminar el flujo "${flow.name}"? Se borrarán también sus pasos '
-          'y disparadores. Esta acción no se puede deshacer.',
-      confirmLabel: 'Eliminar',
-      confirmKey: const Key('flows.delete_confirm'),
-    );
-    if (confirmed) {
-      bloc.add(FlowsDeleteRequested(flow.id));
-    }
   }
 }
 

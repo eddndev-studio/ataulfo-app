@@ -218,9 +218,7 @@ void main() {
         ),
       ),
       expect: () => const <FlowDetailState>[
-        FlowDetailSettingsSaving(_flow, <Flow>[
-          _sibling1,
-        ], siblingsFailed: false),
+        FlowDetailMutating(_flow, <Flow>[_sibling1], siblingsFailed: false),
         FlowDetailLoading(),
         FlowDetailLoaded(flowV4, <Flow>[_sibling1], siblingsFailed: false),
       ],
@@ -289,7 +287,7 @@ void main() {
     );
 
     blocTest<FlowDetailBloc, FlowDetailState>(
-      '409 → SettingsSaveFailed(snapshot, Conflict) — preserva flow + siblings',
+      '409 → MutationFailed(snapshot, Conflict) — preserva flow + siblings',
       build: () {
         when(
           () => repo.updateFlow(
@@ -318,11 +316,11 @@ void main() {
         ),
       ),
       expect: () => const <FlowDetailState>[
-        FlowDetailSettingsSaving(_flow, <Flow>[
+        FlowDetailMutating(_flow, <Flow>[
           _sibling1,
           _sibling2,
         ], siblingsFailed: false),
-        FlowDetailSettingsSaveFailed(
+        FlowDetailMutationFailed(
           _flow,
           <Flow>[_sibling1, _sibling2],
           FlowsConflictFailure(),
@@ -332,7 +330,7 @@ void main() {
     );
 
     blocTest<FlowDetailBloc, FlowDetailState>(
-      '422 → SettingsSaveFailed(snapshot, InvalidSettings)',
+      '422 → MutationFailed(snapshot, InvalidSettings)',
       build: () {
         when(
           () => repo.updateFlow(
@@ -359,8 +357,8 @@ void main() {
         ),
       ),
       expect: () => const <FlowDetailState>[
-        FlowDetailSettingsSaving(_flow, <Flow>[], siblingsFailed: false),
-        FlowDetailSettingsSaveFailed(
+        FlowDetailMutating(_flow, <Flow>[], siblingsFailed: false),
+        FlowDetailMutationFailed(
           _flow,
           <Flow>[],
           FlowsInvalidSettingsFailure(),
@@ -398,7 +396,7 @@ void main() {
     );
 
     blocTest<FlowDetailBloc, FlowDetailState>(
-      'UpdateSettings desde SettingsSaveFailed reusa el snapshot (segundo intento)',
+      'UpdateSettings desde MutationFailed reusa el snapshot (segundo intento)',
       build: () {
         when(() => repo.flowById('f1')).thenAnswer((_) async => flowV4);
         when(
@@ -418,7 +416,7 @@ void main() {
         ).thenAnswer((_) async => flowV4);
         return FlowDetailBloc(repo: repo, id: 'f1');
       },
-      seed: () => const FlowDetailSettingsSaveFailed(
+      seed: () => const FlowDetailMutationFailed(
         _flow,
         <Flow>[],
         FlowsInvalidSettingsFailure(),
@@ -433,7 +431,7 @@ void main() {
         ),
       ),
       expect: () => const <FlowDetailState>[
-        FlowDetailSettingsSaving(_flow, <Flow>[], siblingsFailed: false),
+        FlowDetailMutating(_flow, <Flow>[], siblingsFailed: false),
         FlowDetailLoading(),
         FlowDetailLoaded(flowV4, <Flow>[], siblingsFailed: false),
       ],

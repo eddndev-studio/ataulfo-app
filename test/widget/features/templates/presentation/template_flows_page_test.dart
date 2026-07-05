@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
@@ -341,43 +339,16 @@ void main() {
     expect(copy.style, textTheme.bodyMedium?.copyWith(color: AppTokens.danger));
   });
 
-  testWidgets('tap borrar abre confirm; Eliminar dispatcha DeleteRequested', (
-    tester,
-  ) async {
+  testWidgets('la fila ya no ofrece basurero: el flujo se elimina desde su '
+      'editor', (tester) async {
     when(() => flowsBloc.state).thenReturn(
       FlowsLoaded(<flows.Flow>[_flow(id: 'f1', name: 'Bienvenida')]),
     );
 
     await tester.pumpWidget(host());
-    await tester.tap(find.byKey(const Key('flows.row.f1.delete')));
-    await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('flows.delete_confirm')), findsOneWidget);
-    verifyNever(() => flowsBloc.add(any()));
-
-    await tester.tap(find.text('Eliminar'));
-    await tester.pumpAndSettle();
-
-    verify(() => flowsBloc.add(const FlowsDeleteRequested('f1'))).called(1);
-  });
-
-  testWidgets('FlowsMutationFailed muestra SnackBar de feedback', (
-    tester,
-  ) async {
-    final controller = StreamController<FlowsState>.broadcast();
-    addTearDown(controller.close);
-    final seeded = <flows.Flow>[_flow(id: 'f1', name: 'Bienvenida')];
-    whenListen<FlowsState>(
-      flowsBloc,
-      controller.stream,
-      initialState: FlowsLoaded(seeded),
-    );
-
-    await tester.pumpWidget(host());
-    controller.add(FlowsMutationFailed(seeded, const FlowsForbiddenFailure()));
-    await tester.pump();
-
-    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.byKey(const Key('flows.row.f1.delete')), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
   });
 
   testWidgets('la página posee AppBar "Flujos" y FAB [+]; muere el botón '
@@ -482,6 +453,49 @@ void main() {
         findsNothing,
         reason: 'el sheet cerró antes de navegar al editor',
       );
+    });
+
+    testWidgets('al volver del editor la lista se refresca', (tester) async {
+      when(() => flowsBloc.state).thenReturn(
+        FlowsLoaded(<flows.Flow>[_flow(id: 'f1', name: 'Bienvenida')]),
+      );
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                BlocProvider<TriggersBloc>.value(value: triggersBloc),
+              ],
+              child: const TemplateFlowsPage(templateId: 't1'),
+            ),
+          ),
+          GoRoute(
+            path: '/flows/:id',
+            builder: (_, _) => Scaffold(
+              appBar: AppBar(),
+              body: const Text('editor del flujo'),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppDesignTheme.dark(), routerConfig: router),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('flows.row.f1')));
+      await tester.pumpAndSettle();
+      verifyNever(() => flowsBloc.add(const FlowsLoadRequested()));
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      verify(() => flowsBloc.add(const FlowsLoadRequested())).called(1);
+      // El count de disparadores por fila tambien puede haber cambiado.
+      verify(() => triggersBloc.add(const TriggersLoadRequested())).called(1);
     });
 
     testWidgets('tap del row apila /flows/:id', (tester) async {

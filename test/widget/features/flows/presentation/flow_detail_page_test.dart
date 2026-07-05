@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
-import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_danger_zone.dart';
+import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
@@ -18,11 +19,11 @@ import 'package:ataulfo/features/labels/domain/repositories/labels_repository.da
 import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
-import 'package:ataulfo/features/triggers/presentation/widgets/flow_triggers_tab.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockDetailBloc extends MockBloc<FlowDetailEvent, FlowDetailState>
@@ -50,6 +51,21 @@ const _flow = flows.Flow(
   cooldownMs: 0,
   usageLimit: 0,
   excludesFlows: <String>[],
+);
+
+Trigger _trigger({required String id, String flowId = 'f1'}) => Trigger(
+  id: id,
+  templateId: 't1',
+  flowId: flowId,
+  triggerType: TriggerType.text,
+  matchType: MatchType.contains,
+  keyword: 'hola',
+  labelId: '',
+  labelAction: null,
+  scope: TriggerScope.incoming,
+  isActive: true,
+  createdAt: DateTime.utc(2026, 6, 10),
+  updatedAt: DateTime.utc(2026, 6, 10),
 );
 
 void main() {
@@ -80,7 +96,7 @@ void main() {
     // Resolutor de nombres por default vacío (sin cargar): los pasos
     // multimedia caen a su respaldo (media_filename / cola corta del ref).
     when(() => mediaNamesCubit.state).thenReturn(const MediaNamesState());
-    // Mantiene el TriggersBloc (creado lazy por FlowTriggersTab) en
+    // Mantiene el TriggersBloc del hub (count de la fila launcher) en
     // Loading sin timers vivos al cerrar el test.
     when(
       () => triggersRepo.listTriggers(any()),
@@ -90,58 +106,162 @@ void main() {
     when(() => labelsRepo.listLabels()).thenAnswer((_) async => <Label>[]);
   });
 
-  Widget host() => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: MultiRepositoryProvider(
-      providers: <RepositoryProvider<dynamic>>[
-        RepositoryProvider<TriggersRepository>.value(value: triggersRepo),
-        RepositoryProvider<LabelsRepository>.value(value: labelsRepo),
+  Widget providers(Widget child) => MultiRepositoryProvider(
+    providers: <RepositoryProvider<dynamic>>[
+      RepositoryProvider<TriggersRepository>.value(value: triggersRepo),
+      RepositoryProvider<LabelsRepository>.value(value: labelsRepo),
+    ],
+    child: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<FlowDetailBloc>.value(value: detailBloc),
+        BlocProvider<FlowStepsBloc>.value(value: stepsBloc),
+        BlocProvider<MediaNamesCubit>.value(value: mediaNamesCubit),
+        BlocProvider<LabelsBloc>.value(value: labelsBloc),
       ],
-      child: MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<FlowDetailBloc>.value(value: detailBloc),
-          BlocProvider<FlowStepsBloc>.value(value: stepsBloc),
-          BlocProvider<MediaNamesCubit>.value(value: mediaNamesCubit),
-          BlocProvider<LabelsBloc>.value(value: labelsBloc),
-        ],
-        child: const Scaffold(body: FlowDetailPage()),
-      ),
+      child: child,
     ),
   );
 
-  testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
+  Widget host() => MaterialApp(
+    theme: AppDesignTheme.dark(),
+    home: providers(const Scaffold(body: FlowDetailPage())),
+  );
 
-    await tester.pumpWidget(host());
-
-    final spinner = tester.widget<CircularProgressIndicator>(
-      find.byType(CircularProgressIndicator),
+  /// Host ruteado para las pruebas de navegación del hub: la lista en `/`,
+  /// el hub en `/flows/:id` y las dos subpáginas como markers que graban
+  /// la uri visitada.
+  Widget routedHost({required void Function(String uri) onSubpage}) {
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => Scaffold(
+            body: Center(
+              child: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => context.push('/flows/f1'),
+                  child: const Text('abrir editor'),
+                ),
+              ),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/flows/:id',
+          builder: (_, _) => providers(const Scaffold(body: FlowDetailPage())),
+        ),
+        GoRoute(
+          path: '/flows/:id/triggers',
+          builder: (_, st) {
+            onSubpage(st.uri.toString());
+            return Scaffold(
+              appBar: AppBar(),
+              body: const Text('subpágina disparadores'),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/flows/:id/settings',
+          builder: (_, st) {
+            onSubpage(st.uri.toString());
+            return Scaffold(
+              appBar: AppBar(),
+              body: const Text('subpágina configuración'),
+            );
+          },
+        ),
+      ],
     );
-    expect(spinner.valueColor?.value, AppTokens.primary);
-    // El spinner de página es el primitivo canónico del kit.
-    expect(find.byType(AppLoadingIndicator), findsOneWidget);
-  });
-
-  testWidgets('Loaded muestra header con nombre + pill version + pill status', (
-    tester,
-  ) async {
-    when(() => detailBloc.state).thenReturn(
-      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+    return MaterialApp.router(
+      theme: AppDesignTheme.dark(),
+      routerConfig: router,
     );
-    when(
-      () => stepsBloc.state,
-    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+  }
 
-    await tester.pumpWidget(host());
+  fdom.Step textStep({
+    String id = 's1',
+    int order = 0,
+    String content = 'Hola',
+  }) => fdom.Step(
+    id: id,
+    flowId: 'f1',
+    type: fdom.StepType.text,
+    order: order,
+    content: content,
+    mediaRef: '',
+    metadataJson: '{}',
+    delayMs: 0,
+    jitterPct: 0,
+    aiOnly: false,
+  );
 
-    expect(find.text('Bienvenida'), findsOneWidget);
-    expect(find.widgetWithText(AppPill, 'v3'), findsOneWidget);
-    expect(find.widgetWithText(AppPill, 'Activo'), findsOneWidget);
-  });
+  group('estados del hub', () {
+    testWidgets('Loading muestra el indicador canónico', (tester) async {
+      when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
 
-  testWidgets(
-    'Loaded(isActive=false) muestra pill Pausado en lugar de Activo',
-    (tester) async {
+      await tester.pumpWidget(host());
+
+      expect(find.byType(AppLoadingIndicator), findsOneWidget);
+    });
+
+    testWidgets(
+      'FlowDetailFailed(NotFound) muestra mensaje terminal sin Reintentar',
+      (tester) async {
+        when(
+          () => detailBloc.state,
+        ).thenReturn(const FlowDetailFailed(FlowsNotFoundFailure()));
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('flow_detail.error.not_found')),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(AppButton, 'Reintentar'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'FlowDetailFailed(no NotFound) muestra error canónico + Reintentar '
+      'dispatcha LoadRequested',
+      (tester) async {
+        when(
+          () => detailBloc.state,
+        ).thenReturn(const FlowDetailFailed(FlowsServerFailure()));
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('flow_detail.error.generic')),
+          findsOneWidget,
+        );
+        expect(find.byType(AppErrorState), findsOneWidget);
+        await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
+        await tester.pump();
+        verify(() => detailBloc.add(const FlowDetailLoadRequested())).called(1);
+      },
+    );
+
+    testWidgets('flujo activo: sin pills en el header (el default calla) y '
+        'sin la pill v del contador CAS', (tester) async {
+      when(() => detailBloc.state).thenReturn(
+        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      );
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(FlowStepsLoaded(<fdom.Step>[textStep()]));
+
+      await tester.pumpWidget(host());
+
+      expect(find.widgetWithText(AppPill, 'v3'), findsNothing);
+      expect(find.widgetWithText(AppPill, 'Activo'), findsNothing);
+      expect(find.widgetWithText(AppPill, 'Pausado'), findsNothing);
+    });
+
+    testWidgets('flujo pausado: pill Pausado (lo excepcional sí habla)', (
+      tester,
+    ) async {
       const paused = flows.Flow(
         id: 'f1',
         templateId: 't1',
@@ -157,261 +277,458 @@ void main() {
       );
       when(
         () => stepsBloc.state,
-      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+      ).thenReturn(FlowStepsLoaded(<fdom.Step>[textStep()]));
 
       await tester.pumpWidget(host());
 
       expect(find.widgetWithText(AppPill, 'Pausado'), findsOneWidget);
-      expect(find.widgetWithText(AppPill, 'Activo'), findsNothing);
-    },
-  );
+    });
 
-  testWidgets('FlowStepsLoaded vacío muestra empty state', (tester) async {
-    when(() => detailBloc.state).thenReturn(
-      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-    );
-    when(
-      () => stepsBloc.state,
-    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+    testWidgets('un MutationFailed con el hub al frente avisa con SnackBar', (
+      tester,
+    ) async {
+      final states = StreamController<FlowDetailState>.broadcast();
+      addTearDown(states.close);
+      whenListen(
+        detailBloc,
+        states.stream,
+        initialState: const FlowDetailLoaded(
+          _flow,
+          <flows.Flow>[],
+          siblingsFailed: false,
+        ),
+      );
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
-    await tester.pumpWidget(host());
+      await tester.pumpWidget(host());
+      states.add(
+        const FlowDetailMutationFailed(
+          _flow,
+          <flows.Flow>[],
+          FlowsServerFailure(),
+          siblingsFailed: false,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.byKey(const Key('flow_detail.steps.empty')), findsOneWidget);
+      expect(find.byType(SnackBar), findsOneWidget);
+    });
   });
 
-  testWidgets(
-    'FlowStepsLoaded con items muestra una card por step con humanización del type',
-    (tester) async {
+  group('anatomía del hub', () {
+    setUp(() {
       when(() => detailBloc.state).thenReturn(
         const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
       );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's1',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 0,
-            content: 'Hola {{name}}',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-          fdom.Step(
-            id: 's2',
-            flowId: 'f1',
-            type: fdom.StepType.image,
-            order: 1,
-            content: 'caption',
-            mediaRef: 'https://example.com/x.png',
-            metadataJson: '{}',
-            delayMs: 500,
-            jitterPct: 10,
-            aiOnly: true,
-          ),
-        ]),
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+    });
+
+    testWidgets('no queda TabBar: el hub es content-only', (tester) async {
+      await tester.pumpWidget(host());
+
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.byType(TabBarView), findsNothing);
+    });
+
+    testWidgets('monta las filas launcher a Disparadores y Configuración', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      expect(
+        find.byKey(const Key('flow_detail.link.triggers')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('flow_detail.link.settings')),
+        findsOneWidget,
+      );
+      expect(find.text('Disparadores'), findsOneWidget);
+      expect(find.text('Configuración'), findsOneWidget);
+    });
+
+    testWidgets('la fila de Disparadores muestra el count del flujo '
+        '(filtrado por flowId)', (tester) async {
+      when(() => triggersRepo.listTriggers('t1')).thenAnswer(
+        (_) async => <Trigger>[
+          _trigger(id: 'tr1'),
+          _trigger(id: 'tr2'),
+          _trigger(id: 'tr3', flowId: 'OTRO'),
+        ],
       );
 
       await tester.pumpWidget(host());
+      await tester.pump();
 
-      expect(find.byKey(const Key('flow_detail.step_card.s1')), findsOneWidget);
-      expect(find.byKey(const Key('flow_detail.step_card.s2')), findsOneWidget);
-      expect(find.text('Texto'), findsOneWidget);
-      expect(find.text('Imagen'), findsOneWidget);
-      expect(find.text('Hola {{name}}'), findsOneWidget);
-      // Sin media_filename guardado, el paso multimedia cae a la cola corta del
-      // ref (último segmento), nunca el ref/URL completo.
-      expect(find.text('x.png'), findsOneWidget);
-      expect(find.textContaining('example.com'), findsNothing);
-      expect(find.widgetWithText(AppPill, 'Solo IA'), findsOneWidget);
-    },
-  );
+      final link = find.byKey(const Key('flow_detail.link.triggers'));
+      expect(
+        find.descendant(of: link, matching: find.widgetWithText(AppPill, '2')),
+        findsOneWidget,
+      );
+    });
 
-  testWidgets(
-    'StepCard de un paso manualOnly muestra pill "Solo disparadores"',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+    testWidgets('cierra con la zona peligrosa: Eliminar flujo → confirm → '
+        'dispatcha DeleteRequested', (tester) async {
+      await tester.pumpWidget(host());
+
+      expect(find.byType(AppDangerZone), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const Key('flow_detail.danger.delete')),
       );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's1',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 0,
-            content: 'Solo por disparador',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-            manualOnly: true,
-          ),
-        ]),
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('flow_detail.danger.delete')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('flow_detail.delete_confirm')),
+        findsOneWidget,
       );
+      verifyNever(() => detailBloc.add(const FlowDetailDeleteRequested()));
+
+      await tester.tap(find.byKey(const Key('flow_detail.delete_confirm')));
+      await tester.pumpAndSettle();
+
+      verify(() => detailBloc.add(const FlowDetailDeleteRequested())).called(1);
+    });
+
+    testWidgets('cancelar el confirm no dispatcha nada', (tester) async {
+      await tester.pumpWidget(host());
+      await tester.ensureVisible(
+        find.byKey(const Key('flow_detail.danger.delete')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('flow_detail.danger.delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => detailBloc.add(const FlowDetailDeleteRequested()));
+    });
+
+    testWidgets('los links y la zona peligrosa siguen visibles aunque los '
+        'pasos fallen', (tester) async {
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsFailed(FlowsServerFailure()));
 
       await tester.pumpWidget(host());
 
-      expect(find.widgetWithText(AppPill, 'Solo disparadores'), findsOneWidget);
-      expect(find.widgetWithText(AppPill, 'Solo IA'), findsNothing);
-    },
-  );
+      expect(
+        find.byKey(const Key('flow_detail.steps.error.generic')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('flow_detail.link.triggers')),
+        findsOneWidget,
+      );
+      expect(find.byType(AppDangerZone), findsOneWidget);
+    });
+  });
 
-  testWidgets(
-    'StepCard multimedia muestra el nombre del archivo (media_filename) cuando '
-    'está guardado; sin él, la cola corta del ref — nunca el ref completo',
-    (tester) async {
+  group('navegación del hub', () {
+    setUp(() {
       when(() => detailBloc.state).thenReturn(
         const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
       );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's-doc',
-            flowId: 'f1',
-            type: fdom.StepType.document,
-            order: 0,
-            content: '',
-            mediaRef: 'tenant/org1/media/abc123.pdf',
-            metadataJson: '{"media_filename":"Contrato 2026.pdf"}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-          fdom.Step(
-            id: 's-img',
-            flowId: 'f1',
-            type: fdom.StepType.image,
-            order: 1,
-            content: '',
-            mediaRef: 'tenant/org1/media/zzz999.png',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-        ]),
-      );
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
+    });
 
-      await tester.pumpWidget(host());
+    testWidgets('tap en Disparadores apila /flows/f1/triggers y al volver '
+        'refresca cabecera y count', (tester) async {
+      String? visited;
+      await tester.pumpWidget(routedHost(onSubpage: (uri) => visited = uri));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('abrir editor'));
+      await tester.pumpAndSettle();
 
-      // DOCUMENT con media_filename → nombre legible, NUNCA el id/ref del path.
-      expect(find.text('Contrato 2026.pdf'), findsOneWidget);
-      expect(find.textContaining('abc123'), findsNothing);
-      // IMAGE sin media_filename → cola corta del ref BARE, nunca el path del
-      // tenant completo.
-      expect(find.text('zzz999.png'), findsOneWidget);
-      expect(find.textContaining('tenant/org1/media'), findsNothing);
-    },
-  );
+      await tester.tap(find.byKey(const Key('flow_detail.link.triggers')));
+      await tester.pumpAndSettle();
 
-  testWidgets(
-    'StepCard multimedia muestra el alias EN VIVO del catálogo (resuelto por '
-    'ref), por encima del ref y del media_filename guardado',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's-audio',
-            flowId: 'f1',
-            type: fdom.StepType.ptt,
-            order: 0,
-            content: '',
-            mediaRef: 'tenant/org1/media/9y1gq8fq8f68g69696wv.ogg',
-            // Aunque hubiera un filename guardado, el alias en vivo manda.
-            metadataJson: '{"media_filename":"grabacion.ogg"}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-        ]),
-      );
-      // El catálogo resolvió ese ref al alias que el usuario editó en la galería.
-      when(() => mediaNamesCubit.state).thenReturn(
-        const MediaNamesState(
-          namesByRef: <String, String>{
-            'tenant/org1/media/9y1gq8fq8f68g69696wv.ogg':
-                'Saludo de bienvenida',
-          },
-          loaded: true,
+      expect(visited, '/flows/f1/triggers');
+
+      // Al volver, el hub refresca la cabecera (version CAS) y el count.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      verify(
+        () => detailBloc.add(const FlowDetailRefreshRequested()),
+      ).called(1);
+      verify(() => triggersRepo.listTriggers('t1')).called(2);
+    });
+
+    testWidgets('tap en Configuración apila /flows/f1/settings', (
+      tester,
+    ) async {
+      String? visited;
+      await tester.pumpWidget(routedHost(onSubpage: (uri) => visited = uri));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('abrir editor'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('flow_detail.link.settings')));
+      await tester.pumpAndSettle();
+
+      expect(visited, '/flows/f1/settings');
+    });
+
+    testWidgets('FlowDetailDeleted hace pop de regreso a la lista', (
+      tester,
+    ) async {
+      final states = StreamController<FlowDetailState>.broadcast();
+      addTearDown(states.close);
+      whenListen(
+        detailBloc,
+        states.stream,
+        initialState: const FlowDetailLoaded(
+          _flow,
+          <flows.Flow>[],
+          siblingsFailed: false,
         ),
       );
 
-      await tester.pumpWidget(host());
+      await tester.pumpWidget(routedHost(onSubpage: (_) {}));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('abrir editor'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppDangerZone), findsOneWidget);
 
-      expect(find.text('Saludo de bienvenida'), findsOneWidget);
-      expect(find.textContaining('9y1gq8fq8f68g69696wv'), findsNothing);
-      expect(find.textContaining('grabacion.ogg'), findsNothing);
-    },
-  );
+      states.add(const FlowDetailDeleted());
+      await tester.pumpAndSettle();
 
-  testWidgets(
-    'cada StepCard muestra un AppPill con el label humanizado del tipo',
-    (tester) async {
+      expect(find.text('abrir editor'), findsOneWidget);
+      expect(find.byType(AppDangerZone), findsNothing);
+    });
+  });
+
+  group('listado de pasos', () {
+    setUp(() {
       when(() => detailBloc.state).thenReturn(
         const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
       );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's1',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 0,
-            content: 'Hola',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-          fdom.Step(
-            id: 's2',
-            flowId: 'f1',
-            type: fdom.StepType.image,
-            order: 1,
-            content: '',
-            mediaRef: 'https://x/y.png',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-          fdom.Step(
-            id: 's3',
-            flowId: 'f1',
-            type: fdom.StepType.ptt,
-            order: 2,
-            content: '',
-            mediaRef: 'https://x/y.ogg',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-        ]),
-      );
+    });
+
+    testWidgets('vacío: AppEmptyState con CTA "Crear el primer paso" que '
+        'abre el sheet; el botón Nuevo paso no se duplica', (tester) async {
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
       await tester.pumpWidget(host());
 
-      expect(find.widgetWithText(AppPill, 'Texto'), findsOneWidget);
-      expect(find.widgetWithText(AppPill, 'Imagen'), findsOneWidget);
-      expect(find.widgetWithText(AppPill, 'PTT'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'CONDITIONAL_TIME card muestra TZ, días/horario, y destinos onMatch/onElse',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+      final empty = find.byKey(const Key('flow_detail.steps.empty'));
+      expect(empty, findsOneWidget);
+      expect(
+        tester.widget(empty),
+        isA<AppEmptyState>(),
+        reason: 'el vacío es el primitivo canónico del kit',
       );
+      expect(
+        find.byKey(const Key('flow_detail.steps.add_button')),
+        findsNothing,
+      );
+
+      await tester.tap(find.text('Crear el primer paso'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
+    });
+
+    testWidgets('con pasos muestra el botón "Nuevo paso" que abre el sheet', (
+      tester,
+    ) async {
+      when(
+        () => stepsBloc.state,
+      ).thenReturn(FlowStepsLoaded(<fdom.Step>[textStep()]));
+
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
+      expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
+    });
+
+    testWidgets('FlowStepsLoading muestra spinner inline; los launchers '
+        'siguen operables', (tester) async {
+      when(() => stepsBloc.state).thenReturn(const FlowStepsLoading());
+
+      await tester.pumpWidget(host());
+
+      expect(find.byType(AppLoadingIndicator), findsOneWidget);
+      expect(
+        find.byKey(const Key('flow_detail.link.settings')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'FlowStepsFailed(no NotFound) muestra error canónico + Reintentar '
+      'dispatcha LoadRequested',
+      (tester) async {
+        when(
+          () => stepsBloc.state,
+        ).thenReturn(const FlowStepsFailed(FlowsServerFailure()));
+
+        await tester.pumpWidget(host());
+
+        final error = find.byKey(const Key('flow_detail.steps.error.generic'));
+        expect(error, findsOneWidget);
+        expect(tester.widget(error), isA<AppErrorState>());
+        await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
+        await tester.pump();
+        verify(() => stepsBloc.add(const FlowStepsLoadRequested())).called(1);
+      },
+    );
+
+    testWidgets(
+      'FlowStepsFailed(NotFound) muestra mensaje terminal sin Reintentar',
+      (tester) async {
+        when(
+          () => stepsBloc.state,
+        ).thenReturn(const FlowStepsFailed(FlowsNotFoundFailure()));
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('flow_detail.steps.error.not_found')),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(AppButton, 'Reintentar'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'FlowStepsLoaded con items muestra una card por step con humanización '
+      'del type',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[
+            fdom.Step(
+              id: 's1',
+              flowId: 'f1',
+              type: fdom.StepType.text,
+              order: 0,
+              content: 'Hola {{name}}',
+              mediaRef: '',
+              metadataJson: '{}',
+              delayMs: 0,
+              jitterPct: 0,
+              aiOnly: false,
+            ),
+            fdom.Step(
+              id: 's2',
+              flowId: 'f1',
+              type: fdom.StepType.image,
+              order: 1,
+              content: 'caption',
+              mediaRef: 'https://example.com/x.png',
+              metadataJson: '{}',
+              delayMs: 500,
+              jitterPct: 10,
+              aiOnly: true,
+            ),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('flow_detail.step_card.s1')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('flow_detail.step_card.s2')),
+          findsOneWidget,
+        );
+        expect(find.text('Texto'), findsOneWidget);
+        expect(find.text('Imagen'), findsOneWidget);
+        expect(find.text('Hola {{name}}'), findsOneWidget);
+        // Sin media_filename guardado, el paso multimedia cae a la cola corta
+        // del ref (último segmento), nunca el ref/URL completo.
+        expect(find.text('x.png'), findsOneWidget);
+        expect(find.textContaining('example.com'), findsNothing);
+        expect(find.widgetWithText(AppPill, 'Solo IA'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'StepCard de un paso manualOnly muestra pill "Solo disparadores"',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[
+            fdom.Step(
+              id: 's1',
+              flowId: 'f1',
+              type: fdom.StepType.text,
+              order: 0,
+              content: 'Solo por disparador',
+              mediaRef: '',
+              metadataJson: '{}',
+              delayMs: 0,
+              jitterPct: 0,
+              aiOnly: false,
+              manualOnly: true,
+            ),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.widgetWithText(AppPill, 'Solo disparadores'),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(AppPill, 'Solo IA'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'StepCard multimedia muestra el alias EN VIVO del catálogo (resuelto '
+      'por ref), por encima del ref y del media_filename guardado',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[
+            fdom.Step(
+              id: 's-audio',
+              flowId: 'f1',
+              type: fdom.StepType.ptt,
+              order: 0,
+              content: '',
+              mediaRef: 'tenant/org1/media/9y1gq8fq8f68g69696wv.ogg',
+              metadataJson: '{"media_filename":"grabacion.ogg"}',
+              delayMs: 0,
+              jitterPct: 0,
+              aiOnly: false,
+            ),
+          ]),
+        );
+        when(() => mediaNamesCubit.state).thenReturn(
+          const MediaNamesState(
+            namesByRef: <String, String>{
+              'tenant/org1/media/9y1gq8fq8f68g69696wv.ogg':
+                  'Saludo de bienvenida',
+            },
+            loaded: true,
+          ),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(find.text('Saludo de bienvenida'), findsOneWidget);
+        expect(find.textContaining('9y1gq8fq8f68g69696wv'), findsNothing);
+        expect(find.textContaining('grabacion.ogg'), findsNothing);
+      },
+    );
+
+    testWidgets('CONDITIONAL_TIME card muestra TZ, días/horario, y destinos '
+        'onMatch/onElse', (tester) async {
       when(() => stepsBloc.state).thenReturn(
         const FlowStepsLoaded(<fdom.Step>[
           fdom.Step(
@@ -446,504 +763,173 @@ void main() {
 
       await tester.pumpWidget(host());
 
-      // TZ visible.
       expect(find.textContaining('America/Mexico_City'), findsOneWidget);
-      // Ventana visible — días L-V (uiIndex 0..4) + 09:00-18:00.
       expect(find.textContaining('09:00'), findsOneWidget);
       expect(find.textContaining('18:00'), findsOneWidget);
-      // Destinos: "Paso #3" y "Paso #4" (order+1 humanizado).
       expect(find.textContaining('Paso #3'), findsOneWidget);
       expect(find.textContaining('Paso #4'), findsOneWidget);
-    },
-  );
+    });
 
-  testWidgets(
-    'CONDITIONAL_TIME con metadataJson corrupto cae al fallback honesto',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 'ct-bad',
-            flowId: 'f1',
-            type: fdom.StepType.conditionalTime,
-            order: 0,
-            content: '',
-            mediaRef: '',
-            metadataJson: '{"tz":"","windows":[]}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
+    testWidgets(
+      'CONDITIONAL_TIME con metadataJson corrupto cae al fallback honesto',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[
+            fdom.Step(
+              id: 'ct-bad',
+              flowId: 'f1',
+              type: fdom.StepType.conditionalTime,
+              order: 0,
+              content: '',
+              mediaRef: '',
+              metadataJson: '{"tz":"","windows":[]}',
+              delayMs: 0,
+              jitterPct: 0,
+              aiOnly: false,
+            ),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(
+          find.byKey(const Key('flow_detail.step.ct_corrupt')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'Loaded con N≥2 steps monta ReorderableListView con drag handle por '
+      'card',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          FlowStepsLoaded(<fdom.Step>[
+            textStep(id: 's1', content: 'A'),
+            textStep(id: 's2', order: 1, content: 'B'),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+
+        expect(find.byType(ReorderableListView), findsOneWidget);
+        expect(
+          find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('flow_detail.step_card.drag_handle.s2')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'Drag de un step dispatcha FlowStepsReorderRequested con ids en orden '
+      'nuevo',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          FlowStepsLoaded(<fdom.Step>[
+            textStep(id: 's1', content: 'A'),
+            textStep(id: 's2', order: 1, content: 'B'),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+
+        await tester.timedDrag(
+          find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
+          const Offset(0, 200),
+          const Duration(milliseconds: 500),
+        );
+        await tester.pumpAndSettle();
+
+        verify(
+          () => stepsBloc.add(
+            const FlowStepsReorderRequested(<String>['s2', 's1']),
           ),
-        ]),
-      );
-
-      await tester.pumpWidget(host());
-
-      expect(
-        find.byKey(const Key('flow_detail.step.ct_corrupt')),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets(
-    'FlowStepsLoading muestra spinner inline en el tab Pasos (header sigue visible)',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(() => stepsBloc.state).thenReturn(const FlowStepsLoading());
-
-      await tester.pumpWidget(host());
-
-      // Header sigue visible.
-      expect(find.text('Bienvenida'), findsOneWidget);
-      // Y aparece un spinner en el tab Pasos.
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'FlowStepsFailed(no NotFound) muestra mensaje genérico + tap Reintentar dispatcha LoadRequested',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(
-        () => stepsBloc.state,
-      ).thenReturn(const FlowStepsFailed(FlowsServerFailure()));
-
-      await tester.pumpWidget(host());
-
-      expect(
-        find.byKey(const Key('flow_detail.steps.error.generic')),
-        findsOneWidget,
-      );
-      await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
-      await tester.pump();
-      verify(() => stepsBloc.add(const FlowStepsLoadRequested())).called(1);
-    },
-  );
-
-  testWidgets(
-    'FlowStepsFailed(NotFound) muestra mensaje terminal sin Reintentar',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(
-        () => stepsBloc.state,
-      ).thenReturn(const FlowStepsFailed(FlowsNotFoundFailure()));
-
-      await tester.pumpWidget(host());
-
-      expect(
-        find.byKey(const Key('flow_detail.steps.error.not_found')),
-        findsOneWidget,
-      );
-      expect(find.widgetWithText(AppButton, 'Reintentar'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'FlowDetailFailed(NotFound) muestra mensaje terminal sin Reintentar',
-    (tester) async {
-      when(
-        () => detailBloc.state,
-      ).thenReturn(const FlowDetailFailed(FlowsNotFoundFailure()));
-
-      await tester.pumpWidget(host());
-
-      expect(
-        find.byKey(const Key('flow_detail.error.not_found')),
-        findsOneWidget,
-      );
-      expect(find.widgetWithText(AppButton, 'Reintentar'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'FlowDetailFailed(no NotFound) muestra mensaje genérico + Reintentar dispatcha LoadRequested al FlowDetailBloc',
-    (tester) async {
-      when(
-        () => detailBloc.state,
-      ).thenReturn(const FlowDetailFailed(FlowsServerFailure()));
-
-      await tester.pumpWidget(host());
-
-      expect(
-        find.byKey(const Key('flow_detail.error.generic')),
-        findsOneWidget,
-      );
-      // La card de error es el primitivo canónico del kit.
-      expect(find.byType(AppErrorState), findsOneWidget);
-      await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
-      await tester.pump();
-      verify(() => detailBloc.add(const FlowDetailLoadRequested())).called(1);
-    },
-  );
-
-  testWidgets(
-    'Loaded monta TabBar con 3 tabs: Pasos / Disparadores / Configuración',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(
-        () => stepsBloc.state,
-      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
-
-      await tester.pumpWidget(host());
-
-      expect(find.byType(TabBar), findsOneWidget);
-      final tabBar = find.byType(TabBar);
-      expect(
-        find.descendant(of: tabBar, matching: find.text('Pasos')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: tabBar, matching: find.text('Disparadores')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: tabBar, matching: find.text('Configuración')),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets('Tap en tab Disparadores monta FlowTriggersTab', (tester) async {
-    when(() => detailBloc.state).thenReturn(
-      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
+        ).called(1);
+      },
     );
-    when(
-      () => stepsBloc.state,
-    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
 
-    await tester.pumpWidget(host());
-    // Sanity: el shell Loaded rendea el header del flow.
-    expect(find.text('Bienvenida'), findsOneWidget);
+    testWidgets(
+      'Loaded con 1 step NO monta ReorderableListView (1 item no tiene '
+      'reorder)',
+      (tester) async {
+        when(
+          () => stepsBloc.state,
+        ).thenReturn(FlowStepsLoaded(<fdom.Step>[textStep(content: 'Solo')]));
 
-    await tester.tap(
-      find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Disparadores'),
-      ),
+        await tester.pumpWidget(host());
+
+        expect(find.byType(ReorderableListView), findsNothing);
+        expect(
+          find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('flow_detail.step_card.s1')),
+          findsOneWidget,
+        );
+      },
     );
-    // Avanza la animación del TabController por frames cortos sin
-    // entrar al loop infinito de pumpAndSettle (el spinner del body
-    // nunca se detiene). 100ms × 5 = 500ms cubre la transición
-    // estándar de TabBarView (~300ms).
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
 
-    // El tab está montado: el FlowTriggersTab es child del TabBarView
-    // y el body construye su TriggersBloc; la mock-repo nunca completa
-    // ⇒ estado Loading + spinner con key flow_triggers.loading.
-    expect(find.byType(FlowTriggersTab), findsOneWidget);
-    expect(find.byKey(const Key('flow_triggers.loading')), findsOneWidget);
-    expect(
-      find.byKey(const Key('flow_detail.tab.triggers.coming_soon')),
-      findsNothing,
+    testWidgets(
+      'Tap en StepCard abre el StepEditSheet en modo Edit (prefilled)',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          FlowStepsLoaded(<fdom.Step>[textStep(content: 'Hola original')]),
+        );
+
+        await tester.pumpWidget(host());
+        await tester.tap(find.byKey(const Key('flow_detail.step_card.s1')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Editar paso'), findsOneWidget);
+        final tf = tester.widget<TextField>(
+          find.descendant(
+            of: find.byKey(const Key('step_edit.content')),
+            matching: find.byType(TextField),
+          ),
+        );
+        expect(tf.controller?.text, 'Hola original');
+      },
+    );
+
+    testWidgets(
+      'Tap en StepCard multimedia abre el sheet con "Cambiar" interactivo '
+      '(el host de producción cablea el picker también al editar)',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[
+            fdom.Step(
+              id: 's1',
+              flowId: 'f1',
+              type: fdom.StepType.image,
+              order: 0,
+              content: 'caption',
+              mediaRef: 'tenant/org1/media/orig.png',
+              metadataJson: '{}',
+              delayMs: 0,
+              jitterPct: 0,
+              aiOnly: false,
+            ),
+          ]),
+        );
+
+        await tester.pumpWidget(host());
+        await tester.tap(find.byKey(const Key('flow_detail.step_card.s1')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Editar paso'), findsOneWidget);
+        expect(
+          find.byKey(const Key('step_edit.media_selected')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('step_edit.media_change')), findsOneWidget);
+      },
     );
   });
-
-  testWidgets('Tap en tab Configuración monta FlowSettingsTab', (tester) async {
-    when(() => detailBloc.state).thenReturn(
-      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-    );
-    when(
-      () => stepsBloc.state,
-    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
-
-    await tester.pumpWidget(host());
-    await tester.tap(
-      find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Configuración'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('flow_detail.tab.settings')), findsOneWidget);
-    // El form del settings tab debe estar renderizado.
-    expect(
-      find.byKey(const Key('flow_settings.cooldown.slider')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Loading no monta TabBar', (tester) async {
-    when(() => detailBloc.state).thenReturn(const FlowDetailLoading());
-
-    await tester.pumpWidget(host());
-
-    expect(find.byType(TabBar), findsNothing);
-  });
-
-  testWidgets('Failed no monta TabBar', (tester) async {
-    when(
-      () => detailBloc.state,
-    ).thenReturn(const FlowDetailFailed(FlowsServerFailure()));
-
-    await tester.pumpWidget(host());
-
-    expect(find.byType(TabBar), findsNothing);
-  });
-
-  testWidgets('Tab Pasos muestra botón "Nuevo paso"', (tester) async {
-    when(() => detailBloc.state).thenReturn(
-      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-    );
-    when(
-      () => stepsBloc.state,
-    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
-
-    await tester.pumpWidget(host());
-
-    expect(
-      find.byKey(const Key('flow_detail.steps.add_button')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Tap del botón "Nuevo paso" abre el StepEditSheet (modal)', (
-    tester,
-  ) async {
-    when(() => detailBloc.state).thenReturn(
-      const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-    );
-    when(
-      () => stepsBloc.state,
-    ).thenReturn(const FlowStepsLoaded(<fdom.Step>[]));
-
-    await tester.pumpWidget(host());
-    await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
-    await tester.pumpAndSettle();
-
-    // El sheet del paso aparece (campo content confirma su presencia;
-    // el título "Nuevo paso" choca con el label del botón).
-    expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
-    expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
-  });
-
-  testWidgets(
-    'Loaded con N≥2 steps monta ReorderableListView con drag handle por card',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's1',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 0,
-            content: 'A',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-          fdom.Step(
-            id: 's2',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 1,
-            content: 'B',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-        ]),
-      );
-
-      await tester.pumpWidget(host());
-
-      expect(find.byType(ReorderableListView), findsOneWidget);
-      expect(
-        find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('flow_detail.step_card.drag_handle.s2')),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets(
-    'Drag de un step dispatcha FlowStepsReorderRequested con ids en orden nuevo',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's1',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 0,
-            content: 'A',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-          fdom.Step(
-            id: 's2',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 1,
-            content: 'B',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-        ]),
-      );
-
-      await tester.pumpWidget(host());
-
-      await tester.timedDrag(
-        find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
-        const Offset(0, 200),
-        const Duration(milliseconds: 500),
-      );
-      await tester.pumpAndSettle();
-
-      verify(
-        () => stepsBloc.add(
-          const FlowStepsReorderRequested(<String>['s2', 's1']),
-        ),
-      ).called(1);
-    },
-  );
-
-  testWidgets(
-    'Loaded con 1 step NO monta ReorderableListView (1 item no tiene reorder)',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's1',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 0,
-            content: 'Solo',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-        ]),
-      );
-
-      await tester.pumpWidget(host());
-
-      expect(find.byType(ReorderableListView), findsNothing);
-      expect(
-        find.byKey(const Key('flow_detail.step_card.drag_handle.s1')),
-        findsNothing,
-      );
-      // El card sigue visible para tap → editar.
-      expect(find.byKey(const Key('flow_detail.step_card.s1')), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'Tap en StepCard abre el StepEditSheet en modo Edit (prefilled)',
-    (tester) async {
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's1',
-            flowId: 'f1',
-            type: fdom.StepType.text,
-            order: 0,
-            content: 'Hola original',
-            mediaRef: '',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-        ]),
-      );
-
-      await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('flow_detail.step_card.s1')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Editar paso'), findsOneWidget);
-      // Prefilling: el TextField del content tiene el valor del step.
-      final tf = tester.widget<TextField>(
-        find.descendant(
-          of: find.byKey(const Key('step_edit.content')),
-          matching: find.byType(TextField),
-        ),
-      );
-      expect(tf.controller?.text, 'Hola original');
-    },
-  );
-
-  testWidgets(
-    'Tap en StepCard multimedia abre el sheet con "Cambiar" interactivo '
-    '(el host de producción cablea el picker también al editar)',
-    (tester) async {
-      // Pinea el callsite real: _openStepSheet pasa pickMediaRef sin gatear
-      // por modo. Los tests del sheet inyectan el callback a mano, así que
-      // sólo aquí se verifica que la edición de multimedia nace interactiva
-      // en producción. Si alguien volviera a anular el picker al editar, el
-      // botón "Cambiar" desaparecería y este expect caería.
-      when(() => detailBloc.state).thenReturn(
-        const FlowDetailLoaded(_flow, <flows.Flow>[], siblingsFailed: false),
-      );
-      when(() => stepsBloc.state).thenReturn(
-        const FlowStepsLoaded(<fdom.Step>[
-          fdom.Step(
-            id: 's1',
-            flowId: 'f1',
-            type: fdom.StepType.image,
-            order: 0,
-            content: 'caption',
-            mediaRef: 'tenant/org1/media/orig.png',
-            metadataJson: '{}',
-            delayMs: 0,
-            jitterPct: 0,
-            aiOnly: false,
-          ),
-        ]),
-      );
-
-      await tester.pumpWidget(host());
-      await tester.tap(find.byKey(const Key('flow_detail.step_card.s1')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Editar paso'), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.media_selected')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.media_change')), findsOneWidget);
-    },
-  );
 
   group('UX del listado de pasos (barrido)', () {
     fdom.Step labelStep({String id = 's1', int order = 0}) => fdom.Step(
@@ -954,19 +940,6 @@ void main() {
       content: '',
       mediaRef: '',
       metadataJson: '{"label_id":"L1","action":"ADD"}',
-      delayMs: 0,
-      jitterPct: 0,
-      aiOnly: false,
-    );
-
-    fdom.Step textStep({String id = 's0', int order = 0}) => fdom.Step(
-      id: id,
-      flowId: 'f1',
-      type: fdom.StepType.text,
-      order: order,
-      content: 'Hola',
-      mediaRef: '',
-      metadataJson: '{}',
       delayMs: 0,
       jitterPct: 0,
       aiOnly: false,
@@ -1011,7 +984,7 @@ void main() {
       tester,
     ) async {
       final seed = FlowStepsLoaded(<fdom.Step>[
-        textStep(),
+        textStep(id: 's0'),
         labelStep(id: 's1', order: 1),
       ]);
       whenListen(
@@ -1040,7 +1013,7 @@ void main() {
     ) async {
       when(() => stepsBloc.state).thenReturn(
         FlowStepsRefreshing(<fdom.Step>[
-          textStep(),
+          textStep(id: 's0'),
           labelStep(id: 's1', order: 1),
         ]),
       );
@@ -1063,14 +1036,13 @@ void main() {
       (tester) async {
         when(() => stepsBloc.state).thenReturn(
           FlowStepsRefreshFailed(<fdom.Step>[
-            textStep(),
+            textStep(id: 's0'),
             labelStep(id: 's1', order: 1),
           ], const FlowsServerFailure()),
         );
 
         await tester.pumpWidget(host());
 
-        // La lista sigue en pantalla…
         expect(
           find.byKey(const Key('flow_detail.step_card.s0')),
           findsOneWidget,
@@ -1079,7 +1051,6 @@ void main() {
           find.byKey(const Key('flow_detail.step_card.s1')),
           findsOneWidget,
         );
-        // …con el aviso honesto (el cambio se guardó, el listado no cargó).
         expect(
           find.byKey(const Key('flow_detail.steps.refresh_failed')),
           findsOneWidget,
@@ -1126,7 +1097,6 @@ void main() {
             .pixels;
         expect(before, greaterThan(0));
 
-        // El ciclo entero de una mutación exitosa, con la lista visible.
         states.add(FlowStepsMutating(many));
         await tester.pump();
         states.add(FlowStepsRefreshing(many));
@@ -1146,7 +1116,10 @@ void main() {
       tester,
     ) async {
       when(() => stepsBloc.state).thenReturn(
-        FlowStepsLoaded(<fdom.Step>[textStep(), labelStep(id: 's1', order: 1)]),
+        FlowStepsLoaded(<fdom.Step>[
+          textStep(id: 's0'),
+          labelStep(id: 's1', order: 1),
+        ]),
       );
 
       await tester.pumpWidget(host());
@@ -1155,8 +1128,6 @@ void main() {
         const Key('flow_detail.step_card.drag_handle.s1'),
       );
       expect(handle, findsOneWidget);
-      // El área de agarre real (el listener de drag) debe dar el mínimo
-      // táctil; el ícono de 24px a secas es demasiado fino para el pulgar.
       final listener = find.ancestor(
         of: handle,
         matching: find.byType(ReorderableDragStartListener),

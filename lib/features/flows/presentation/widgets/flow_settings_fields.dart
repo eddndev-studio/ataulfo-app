@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
@@ -14,253 +13,17 @@ import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
 
 /// Milisegundos por hora: el cooldown se expone en horas pero el wire es ms.
-const int _kMsPerHour = 60 * 60 * 1000;
+const int kFlowSettingsMsPerHour = 60 * 60 * 1000;
 
 /// Tope del cooldown en horas (5 días). Espeja FlowMaxCooldownMs del backend.
-const int _kMaxCooldownHours = 120;
-
-/// Tab "Configuración" del editor de flujo (S11). Edita los tres gates
-/// del flow: `cooldownMs` (slider en horas, 0–120h = hasta 5 días),
-/// `usageLimit` (number field, 0 = sin límite) y `excludesFlows[]`
-/// (multi-select de chips con los otros flujos de la Template).
-///
-/// Lee el snapshot del `FlowDetailBloc` (Loaded / SettingsSaving /
-/// SettingsSaveFailed) y delega el guardado al mismo bloc vía
-/// `FlowDetailUpdateSettingsRequested`. Tras un save exitoso el bloc
-/// emite Loaded con la version incrementada; el form re-hidrata
-/// automáticamente porque el sub-tree usa `ValueKey<int>(flow.version)`
-/// como llave de identidad.
-///
-/// Estados de fallo cubiertos por copy inline (sin SnackBar):
-/// `Conflict` ⇒ "version stale" + botón Recargar (re-load del detail);
-/// `InvalidSettings` ⇒ "revisa cooldown/límite";
-/// `NotFound / Forbidden / Network / Server` ⇒ copy específico.
-class FlowSettingsTab extends StatelessWidget {
-  const FlowSettingsTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<FlowDetailBloc, FlowDetailState>(
-      builder: (context, state) {
-        final (
-          fdom.Flow? flow,
-          List<fdom.Flow> siblings,
-          bool siblingsFailed,
-          bool isSaving,
-          FlowsFailure? failure,
-        ) = switch (state) {
-          FlowDetailLoaded(
-            :final flow,
-            :final siblings,
-            :final siblingsFailed,
-          ) =>
-            (flow, siblings, siblingsFailed, false, null),
-          FlowDetailSettingsSaving(
-            :final flow,
-            :final siblings,
-            :final siblingsFailed,
-          ) =>
-            (flow, siblings, siblingsFailed, true, null),
-          FlowDetailSettingsSaveFailed(
-            :final flow,
-            :final siblings,
-            :final siblingsFailed,
-            :final failure,
-          ) =>
-            (flow, siblings, siblingsFailed, false, failure),
-          FlowDetailLoading() ||
-          FlowDetailFailed() => (null, const <fdom.Flow>[], false, false, null),
-        };
-
-        if (flow == null) {
-          return const SizedBox.shrink();
-        }
-
-        return _SettingsForm(
-          key: ValueKey<int>(flow.version),
-          flow: flow,
-          siblings: siblings,
-          siblingsFailed: siblingsFailed,
-          isSaving: isSaving,
-          failure: failure,
-        );
-      },
-    );
-  }
-}
-
-class _SettingsForm extends StatefulWidget {
-  const _SettingsForm({
-    super.key,
-    required this.flow,
-    required this.siblings,
-    required this.siblingsFailed,
-    required this.isSaving,
-    required this.failure,
-  });
-
-  final fdom.Flow flow;
-  final List<fdom.Flow> siblings;
-  final bool siblingsFailed;
-  final bool isSaving;
-  final FlowsFailure? failure;
-
-  @override
-  State<_SettingsForm> createState() => _SettingsFormState();
-}
-
-class _SettingsFormState extends State<_SettingsForm> {
-  // El slider expone el cooldown en HORAS (0–120 = hasta 5 días) para
-  // legibilidad humana; al guardar lo convertimos a ms. Lectura inicial: ms
-  // del wire ÷ 1h redondeado. El valor inicial en horas se guarda aparte para
-  // (a) el dirty-check por horas y (b) preservar el ms original EXACTO cuando
-  // el operador no toca el slider — un cooldown legacy sub-hora redondea a 0h
-  // pero no debe zerarse al guardar otro campo.
-  late double _cooldownHours;
-  late final int _initialCooldownHours;
-
-  late final TextEditingController _usageLimitCtrl;
-  late Set<String> _excludes;
-  late bool _aiInvocable;
-
-  @override
-  void initState() {
-    super.initState();
-    _initialCooldownHours = (widget.flow.cooldownMs / _kMsPerHour)
-        .round()
-        .clamp(0, _kMaxCooldownHours);
-    _cooldownHours = _initialCooldownHours.toDouble();
-    _usageLimitCtrl = TextEditingController(
-      // 0 ⇒ campo vacío para que el placeholder "Sin límite" sea visible.
-      text: widget.flow.usageLimit > 0 ? widget.flow.usageLimit.toString() : '',
-    );
-    _usageLimitCtrl.addListener(_onUsageLimitChanged);
-    _excludes = <String>{...widget.flow.excludesFlows};
-    _aiInvocable = widget.flow.aiInvocable;
-  }
-
-  void _onUsageLimitChanged() {
-    // El dirty-check depende del texto del field; un setState vacío basta
-    // para que el botón Guardar se rebaja/habilita en cada keystroke.
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    _usageLimitCtrl
-      ..removeListener(_onUsageLimitChanged)
-      ..dispose();
-    super.dispose();
-  }
-
-  // Si el operador no tocó el slider (mismas horas que al cargar), preserva el
-  // ms original EXACTO (no zera un cooldown legacy sub-hora). Tocado ⇒ el valor
-  // en horas manda.
-  int get _cooldownMs => _cooldownHours.round() == _initialCooldownHours
-      ? widget.flow.cooldownMs
-      : _cooldownHours.round() * _kMsPerHour;
-
-  int get _usageLimit => int.tryParse(_usageLimitCtrl.text.trim()) ?? 0;
-
-  /// excludesFlows ordenado ASC por id antes de comparar / despachar.
-  /// El orden no es semántico del dominio: ordenarlo evita PUTs no-op
-  /// cuando el operador selecciona los mismos flujos en otro orden.
-  List<String> get _excludesSorted {
-    final out = _excludes.toList()..sort();
-    return out;
-  }
-
-  bool get _isDirty {
-    if (_aiInvocable != widget.flow.aiInvocable) return true;
-    if (_cooldownHours.round() != _initialCooldownHours) return true;
-    if (_usageLimit != widget.flow.usageLimit) return true;
-    final snapshot = <String>[...widget.flow.excludesFlows]..sort();
-    final local = _excludesSorted;
-    if (local.length != snapshot.length) return true;
-    for (var i = 0; i < local.length; i++) {
-      if (local[i] != snapshot[i]) return true;
-    }
-    return false;
-  }
-
-  void _submit() {
-    context.read<FlowDetailBloc>().add(
-      FlowDetailUpdateSettingsRequested(
-        aiInvocable: _aiInvocable,
-        cooldownMs: _cooldownMs,
-        usageLimit: _usageLimit,
-        excludesFlows: _excludesSorted,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final canSave = _isDirty && !widget.isSaving;
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6 + context.safeBottomInset,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          _AIInvocableField(
-            value: _aiInvocable,
-            onChanged: (v) => setState(() => _aiInvocable = v),
-            textTheme: textTheme,
-          ),
-          const SizedBox(height: AppTokens.sp6),
-          _CooldownField(
-            hours: _cooldownHours,
-            onChanged: (v) => setState(() => _cooldownHours = v),
-            textTheme: textTheme,
-          ),
-          const SizedBox(height: AppTokens.sp6),
-          _UsageLimitField(controller: _usageLimitCtrl, textTheme: textTheme),
-          const SizedBox(height: AppTokens.sp6),
-          _ExcludesPicker(
-            siblings: widget.siblings,
-            siblingsFailed: widget.siblingsFailed,
-            selected: _excludes,
-            onToggle: (id) => setState(() {
-              if (_excludes.contains(id)) {
-                _excludes.remove(id);
-              } else {
-                _excludes.add(id);
-              }
-            }),
-            textTheme: textTheme,
-          ),
-          const SizedBox(height: AppTokens.sp6),
-          if (widget.failure != null) ...<Widget>[
-            _FailureCopy(failure: widget.failure!),
-            const SizedBox(height: AppTokens.sp4),
-          ],
-          if (widget.isSaving) ...<Widget>[
-            const _SavingInlineSpinner(),
-            const SizedBox(height: AppTokens.sp3),
-          ],
-          AppButton.filled(
-            key: const Key('flow_settings.save_button'),
-            label: 'Guardar',
-            onPressed: canSave ? _submit : null,
-            fullWidth: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
+const int kFlowSettingsMaxCooldownHours = 120;
 
 /// Toggle "Invocable por IA" (allowlist S11 RF#17): autoriza al agente IA
 /// conversacional a listar y ejecutar este flujo. Apagado por defecto — que
 /// un LLM dispare una automatización es opt-in explícito del operador.
-class _AIInvocableField extends StatelessWidget {
-  const _AIInvocableField({
+class FlowSettingsAiInvocableField extends StatelessWidget {
+  const FlowSettingsAiInvocableField({
+    super.key,
     required this.value,
     required this.onChanged,
     required this.textTheme,
@@ -301,8 +64,9 @@ class _AIInvocableField extends StatelessWidget {
   }
 }
 
-class _CooldownField extends StatelessWidget {
-  const _CooldownField({
+class FlowSettingsCooldownField extends StatelessWidget {
+  const FlowSettingsCooldownField({
+    super.key,
     required this.hours,
     required this.onChanged,
     required this.textTheme,
@@ -326,9 +90,9 @@ class _CooldownField extends StatelessWidget {
           key: const Key('flow_settings.cooldown.slider'),
           value: hours,
           min: 0,
-          max: _kMaxCooldownHours.toDouble(),
+          max: kFlowSettingsMaxCooldownHours.toDouble(),
           // Granularidad de 1 hora en todo el rango [0, 5 días].
-          divisions: _kMaxCooldownHours,
+          divisions: kFlowSettingsMaxCooldownHours,
           onChanged: onChanged,
         ),
       ],
@@ -347,8 +111,12 @@ class _CooldownField extends StatelessWidget {
   }
 }
 
-class _UsageLimitField extends StatelessWidget {
-  const _UsageLimitField({required this.controller, required this.textTheme});
+class FlowSettingsUsageLimitField extends StatelessWidget {
+  const FlowSettingsUsageLimitField({
+    super.key,
+    required this.controller,
+    required this.textTheme,
+  });
 
   final TextEditingController controller;
   final TextTheme textTheme;
@@ -396,8 +164,9 @@ class _UsageLimitField extends StatelessWidget {
   }
 }
 
-class _ExcludesPicker extends StatelessWidget {
-  const _ExcludesPicker({
+class FlowSettingsExcludesPicker extends StatelessWidget {
+  const FlowSettingsExcludesPicker({
+    super.key,
     required this.siblings,
     required this.siblingsFailed,
     required this.selected,
@@ -458,8 +227,8 @@ class _ExcludesPicker extends StatelessWidget {
   }
 }
 
-class _SavingInlineSpinner extends StatelessWidget {
-  const _SavingInlineSpinner();
+class FlowSettingsSavingIndicator extends StatelessWidget {
+  const FlowSettingsSavingIndicator({super.key});
 
   @override
   Widget build(BuildContext context) => const SizedBox(
@@ -471,8 +240,8 @@ class _SavingInlineSpinner extends StatelessWidget {
   );
 }
 
-class _FailureCopy extends StatelessWidget {
-  const _FailureCopy({required this.failure});
+class FlowSettingsFailureCopy extends StatelessWidget {
+  const FlowSettingsFailureCopy({super.key, required this.failure});
 
   final FlowsFailure failure;
 

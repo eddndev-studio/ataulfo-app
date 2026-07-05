@@ -55,6 +55,8 @@ import '../../features/flows/presentation/bloc/flow_steps_bloc.dart';
 import '../../features/flows/presentation/bloc/flows_bloc.dart';
 import '../../features/flows/presentation/bloc/media_names_cubit.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
+import '../../features/flows/presentation/pages/flow_settings_page.dart';
+import '../../features/flows/presentation/widgets/flow_detail_app_bar.dart';
 import '../../features/labels/domain/repositories/chat_labels_repository.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/trainer/domain/repositories/trainer_repositories.dart';
@@ -140,6 +142,7 @@ import '../../features/templates/presentation/pages/template_flows_page.dart';
 import '../../features/templates/presentation/pages/template_variables_page.dart';
 import '../../features/triggers/domain/repositories/triggers_repository.dart';
 import '../../features/triggers/presentation/bloc/triggers_bloc.dart';
+import '../../features/triggers/presentation/pages/flow_triggers_page.dart';
 import '../../features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import '../../features/wa_labels/presentation/bloc/wa_label_mapping_bloc.dart';
 import '../../features/wa_labels/presentation/bloc/wa_labels_bloc.dart';
@@ -1261,20 +1264,19 @@ class AppRouter {
         },
       ),
       GoRoute(
-        // Detalle de un flow (S11 F2) — read-only. Page-scoped:
-        // `FlowDetailBloc` carga cabecera + steps en paralelo (Future.wait)
-        // y emite Loaded/Failed. La ruta es de primer nivel, deep-linkable
-        // (consistente con /templates/:id, /bots/:id). El back físico
-        // vuelve al detalle de plantilla si se llegó vía tap del row de
-        // Flujos, o al destino previo cuando entre por deep-link.
+        // Editor de un flow (S11): hub content-only — el cuerpo es la
+        // lista de pasos; Disparadores y Configuración viven en subrutas.
+        // La ruta es de primer nivel, deep-linkable (consistente con
+        // /templates/:id, /bots/:id). El back físico vuelve al listado de
+        // flujos si se llegó por ahí, o al destino previo en deep-link.
+        // El AppBar muestra el NOMBRE del flujo y el menú ⋮ (renombrar,
+        // pausar/activar) — ambos leen el FlowDetailBloc del scope.
         path: '/flows/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          // El tab de Disparadores consume `TriggersRepository` (CRUD de
-          // triggers) y `LabelsRepository` (catálogo que alimenta el
-          // selector de etiqueta del trigger LABEL). Ambos cuelgan del
-          // scope de la página para que el `_openSheet` los lleve al
-          // subtree del sheet.
+          // `TriggersRepository` alimenta el count de la fila launcher de
+          // Disparadores; `LabelsRepository`, el LabelsBloc del listado y
+          // el selector del paso LABEL en el sheet de pasos.
           return MultiRepositoryProvider(
             providers: <RepositoryProvider<dynamic>>[
               RepositoryProvider<TriggersRepository>.value(
@@ -1311,9 +1313,59 @@ class AppRouter {
                 ),
               ],
               child: Scaffold(
-                appBar: AppBar(title: const Text('Detalle de flujo')),
+                appBar: AppBar(
+                  title: const FlowDetailTitle(),
+                  actions: const <Widget>[FlowDetailMenuAction()],
+                ),
                 body: const FlowDetailPage(),
               ),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Disparadores del flujo. Sub-ruta de `/flows/:id` con un segmento
+        // más, así no compite con el hub por orden de match. Blocs a nivel
+        // de ruta: el listado se pide una vez por visita (adiós refetch
+        // por tab). La página resuelve la cabecera con su FlowDetailBloc
+        // propio (el endpoint de triggers es template-scoped y el sheet
+        // exige el Flow entero).
+        path: '/flows/:id/triggers',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return MultiRepositoryProvider(
+            providers: <RepositoryProvider<dynamic>>[
+              RepositoryProvider<TriggersRepository>.value(
+                value: _triggersRepo,
+              ),
+              RepositoryProvider<LabelsRepository>.value(value: _labelsRepo),
+            ],
+            child: BlocProvider<FlowDetailBloc>(
+              create: (_) =>
+                  FlowDetailBloc(repo: _flowsRepo, id: id)
+                    ..add(const FlowDetailLoadRequested()),
+              child: Scaffold(
+                appBar: AppBar(title: const Text('Disparadores')),
+                body: const FlowTriggersPage(),
+              ),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Configuración del flujo (gates + allowlist IA). Sub-ruta de
+        // `/flows/:id`. El FlowDetailBloc es de la ruta: el form dirty ya
+        // no muere por cambio de tab — solo al salir de la página.
+        path: '/flows/:id/settings',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<FlowDetailBloc>(
+            create: (_) =>
+                FlowDetailBloc(repo: _flowsRepo, id: id)
+                  ..add(const FlowDetailLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Configuración')),
+              body: const FlowSettingsPage(),
             ),
           );
         },

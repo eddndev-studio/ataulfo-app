@@ -4,7 +4,9 @@ import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_detail_bloc.dart';
-import 'package:ataulfo/features/flows/presentation/widgets/flow_settings_tab.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/features/flows/presentation/pages/flow_settings_page.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -78,11 +80,49 @@ void main() {
     theme: AppDesignTheme.dark(),
     home: BlocProvider<FlowDetailBloc>.value(
       value: bloc,
-      child: const Scaffold(body: FlowSettingsTab()),
+      child: const Scaffold(body: FlowSettingsPage()),
     ),
   );
 
-  group('FlowSettingsTab — render inicial', () {
+  group('FlowSettingsPage — estados de página', () {
+    testWidgets('Loading muestra el indicador canónico', (tester) async {
+      when(() => bloc.state).thenReturn(const FlowDetailLoading());
+
+      await tester.pumpWidget(host());
+
+      expect(find.byType(AppLoadingIndicator), findsOneWidget);
+    });
+
+    testWidgets('Failed muestra el error canónico con retry', (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const FlowDetailFailed(FlowsServerFailure()));
+
+      await tester.pumpWidget(host());
+
+      expect(find.byType(AppErrorState), findsOneWidget);
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      verify(() => bloc.add(const FlowDetailLoadRequested())).called(1);
+    });
+
+    testWidgets('Loaded explica el modelo de guardado con una caption', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        FlowDetailLoaded(_flow(), const <fdom.Flow>[], siblingsFailed: false),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(
+        find.text('Los cambios se aplican al tocar Guardar.'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('FlowSettingsPage — render inicial', () {
     testWidgets(
       'Loaded: muestra slider cooldown, number field usageLimit, multi-select de siblings',
       (tester) async {
@@ -214,7 +254,7 @@ void main() {
     });
   });
 
-  group('FlowSettingsTab — dirty + save', () {
+  group('FlowSettingsPage — dirty + save', () {
     testWidgets('cambiar usageLimit habilita el botón Guardar', (tester) async {
       when(() => bloc.state).thenReturn(
         FlowDetailLoaded(
@@ -282,6 +322,9 @@ void main() {
         );
         await tester.pump();
 
+        await tester.ensureVisible(
+          find.byKey(const Key('flow_settings.save_button')),
+        );
         await tester.tap(find.byKey(const Key('flow_settings.save_button')));
         await tester.pump();
 
@@ -326,6 +369,9 @@ void main() {
         );
         expect(saveBtnAfter.onPressed, isNotNull);
 
+        await tester.ensureVisible(
+          find.byKey(const Key('flow_settings.save_button')),
+        );
         await tester.tap(find.byKey(const Key('flow_settings.save_button')));
         await tester.pump();
 
@@ -346,11 +392,7 @@ void main() {
       tester,
     ) async {
       when(() => bloc.state).thenReturn(
-        FlowDetailSettingsSaving(
-          _flow(),
-          const <fdom.Flow>[],
-          siblingsFailed: false,
-        ),
+        FlowDetailMutating(_flow(), const <fdom.Flow>[], siblingsFailed: false),
       );
 
       await tester.pumpWidget(host());
@@ -363,12 +405,12 @@ void main() {
     });
   });
 
-  group('FlowSettingsTab — failure copy', () {
+  group('FlowSettingsPage — failure copy', () {
     testWidgets(
       'SaveFailed(Conflict): muestra copy de version stale + botón Recargar',
       (tester) async {
         when(() => bloc.state).thenReturn(
-          FlowDetailSettingsSaveFailed(
+          FlowDetailMutationFailed(
             _flow(),
             const <fdom.Flow>[],
             const FlowsConflictFailure(),
@@ -400,7 +442,7 @@ void main() {
       'SaveFailed(InvalidSettings): muestra copy de invalid + sin botón recargar',
       (tester) async {
         when(() => bloc.state).thenReturn(
-          FlowDetailSettingsSaveFailed(
+          FlowDetailMutationFailed(
             _flow(),
             const <fdom.Flow>[],
             const FlowsInvalidSettingsFailure(),
@@ -423,7 +465,7 @@ void main() {
 
     testWidgets('SaveFailed(NotFound): copy de flow no existe', (tester) async {
       when(() => bloc.state).thenReturn(
-        FlowDetailSettingsSaveFailed(
+        FlowDetailMutationFailed(
           _flow(),
           const <fdom.Flow>[],
           const FlowsNotFoundFailure(),
@@ -443,7 +485,7 @@ void main() {
       tester,
     ) async {
       when(() => bloc.state).thenReturn(
-        FlowDetailSettingsSaveFailed(
+        FlowDetailMutationFailed(
           _flow(),
           const <fdom.Flow>[],
           const FlowsForbiddenFailure(),
@@ -461,7 +503,7 @@ void main() {
 
     testWidgets('SaveFailed(Network): copy genérico de red', (tester) async {
       when(() => bloc.state).thenReturn(
-        FlowDetailSettingsSaveFailed(
+        FlowDetailMutationFailed(
           _flow(),
           const <fdom.Flow>[],
           const FlowsNetworkFailure(),
@@ -479,7 +521,7 @@ void main() {
 
     testWidgets('SaveFailed(Server): copy genérico server', (tester) async {
       when(() => bloc.state).thenReturn(
-        FlowDetailSettingsSaveFailed(
+        FlowDetailMutationFailed(
           _flow(),
           const <fdom.Flow>[],
           const FlowsServerFailure(),
@@ -496,7 +538,7 @@ void main() {
     });
   });
 
-  group('FlowSettingsTab — re-hidratación', () {
+  group('FlowSettingsPage — re-hidratación', () {
     testWidgets('cambio de version del flow re-hidrata el form (ValueKey)', (
       tester,
     ) async {
@@ -534,7 +576,7 @@ void main() {
     });
   });
 
-  group('FlowSettingsTab — cooldown en horas (hasta 5 días)', () {
+  group('FlowSettingsPage — cooldown en horas (hasta 5 días)', () {
     testWidgets('cooldown de 5 días muestra label "5d"', (tester) async {
       when(() => bloc.state).thenReturn(
         FlowDetailLoaded(
@@ -590,6 +632,9 @@ void main() {
         );
         await tester.pump();
 
+        await tester.ensureVisible(
+          find.byKey(const Key('flow_settings.save_button')),
+        );
         await tester.tap(find.byKey(const Key('flow_settings.save_button')));
         await tester.pump();
 
@@ -626,6 +671,9 @@ void main() {
           '5',
         );
         await tester.pump();
+        await tester.ensureVisible(
+          find.byKey(const Key('flow_settings.save_button')),
+        );
         await tester.tap(find.byKey(const Key('flow_settings.save_button')));
         await tester.pump();
 

@@ -4,41 +4,96 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_empty_state.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
+import '../../../flows/domain/failures/flows_failure.dart';
+import '../../../flows/presentation/bloc/flow_detail_bloc.dart';
 import '../../../labels/domain/repositories/labels_repository.dart';
 import '../../../labels/presentation/bloc/labels_bloc.dart';
 import '../../domain/entities/trigger.dart';
 import '../../domain/failures/triggers_failure.dart';
 import '../../domain/repositories/triggers_repository.dart';
 import '../bloc/triggers_bloc.dart';
-import 'trigger_edit_sheet.dart';
+import '../widgets/trigger_edit_sheet.dart';
 
-/// Tab "Disparadores" del editor de flujo (S11). El flow destino es el
-/// flow del editor — fijo, no elegible — y las rows ocultan la pill
-/// "→ flow" porque es redundante en este scope.
+/// Página de disparadores de un flujo (`/flows/:id/triggers`). Los blocs
+/// viven a nivel de ruta: el listado se pide UNA vez por visita, en vez
+/// de refetchear en cada montaje como cuando era un tab.
 ///
-/// Construye su propio `TriggersBloc` (lee la repo del scope) usando
-/// el `templateId` del flow del editor. El endpoint sigue siendo
-/// template-scoped (`GET /templates/:templateId/triggers`) — el filtro
-/// por `flowId` lo aplica el body al renderizar. Ownership real:
-/// `Trigger ∈ Flow ∈ Template`; el endpoint template-scoped es un
-/// atajo de query, no una afirmación de pertenencia.
+/// La ruta solo conoce el id del flujo, pero el endpoint de triggers es
+/// template-scoped y el sheet necesita el Flow entero (`scopedFlow`):
+/// la página resuelve la cabecera desde su `FlowDetailBloc` propio y
+/// recién entonces monta el scope de triggers.
+class FlowTriggersPage extends StatelessWidget {
+  const FlowTriggersPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<FlowDetailBloc, FlowDetailState>(
+      builder: (context, state) => switch (state) {
+        FlowDetailLoading() => const AppLoadingIndicator(),
+        FlowDetailLoaded(flow: final f) => FlowTriggersScope(flow: f),
+        FlowDetailMutating(flow: final f) => FlowTriggersScope(flow: f),
+        FlowDetailMutationFailed(flow: final f) => FlowTriggersScope(flow: f),
+        FlowDetailDeleted() => const SizedBox.shrink(),
+        FlowDetailFailed(failure: final f) => _HeaderFailedView(failure: f),
+      },
+    );
+  }
+}
+
+/// La cabecera del flujo no cargó: sin ella no hay templateId para pedir
+/// los disparadores. NotFound es terminal (sin retry).
+class _HeaderFailedView extends StatelessWidget {
+  const _HeaderFailedView({required this.failure});
+
+  final FlowsFailure failure;
+
+  @override
+  Widget build(BuildContext context) {
+    final isNotFound = failure is FlowsNotFoundFailure;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.sp5),
+        child: AppErrorState(
+          message: isNotFound
+              ? 'Este flujo ya no existe en tu organización'
+              : 'No pudimos cargar el flujo',
+          onRetry: isNotFound
+              ? null
+              : () => context.read<FlowDetailBloc>().add(
+                  const FlowDetailLoadRequested(),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Scope de blocs del listado. Construye su propio `TriggersBloc` (lee la
+/// repo del scope) usando el `templateId` del flow — el endpoint sigue
+/// siendo template-scoped (`GET /templates/:templateId/triggers`); el
+/// filtro por `flowId` lo aplica el body al renderizar. Ownership real:
+/// `Trigger ∈ Flow ∈ Template`; el endpoint template-scoped es un atajo
+/// de query, no una afirmación de pertenencia.
 ///
 /// También construye un `LabelsBloc` (carga única del catálogo
 /// org-scoped) que alimenta el selector de etiqueta del sheet en modo
-/// LABEL. Vive a nivel del tab para reusar la carga entre aperturas del
+/// LABEL. Vive a nivel de página para reusar la carga entre aperturas del
 /// sheet; el `_openSheet` lo re-provee al subtree del modal (el sheet
 /// monta en una ruta nueva del Navigator y no hereda los providers).
 ///
 /// Limitación aceptada de la carga única: si el operador crea o renombra
-/// una etiqueta en otra sección y vuelve a este tab sin remontarlo, el
-/// selector muestra el catálogo previo hasta que se recargue (reabrir el
-/// detalle del flujo, o el botón de reintento del propio selector). Un id
+/// una etiqueta en otra sección y vuelve sin remontar la ruta, el
+/// selector muestra el catálogo previo hasta que se recargue. Un id
 /// borrado no se pierde: el selector lo muestra como "etiqueta
 /// desconocida" con su id crudo.
-class FlowTriggersTab extends StatelessWidget {
-  const FlowTriggersTab({super.key, required this.flow});
+class FlowTriggersScope extends StatelessWidget {
+  const FlowTriggersScope({super.key, required this.flow});
 
   final fdom.Flow flow;
 
@@ -82,18 +137,12 @@ class FlowTriggersBody extends StatelessWidget {
       builder: (context, state) => switch (state) {
         TriggersLoading() => const Padding(
           key: Key('flow_triggers.loading'),
-          padding: EdgeInsets.symmetric(vertical: AppTokens.sp4),
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
+          padding: EdgeInsets.symmetric(vertical: AppTokens.sp6),
+          child: AppLoadingIndicator(),
         ),
         TriggersLoaded(triggers: final ts) => _List(items: ts, flow: flow),
         // Mutating y MutationFailed preservan la lista visible — el
-        // sheet abierto muestra spinner/copy propio; el tab no
+        // sheet abierto muestra spinner/copy propio; la página no
         // ensombrece su propia render mientras tanto.
         TriggersMutating(triggers: final ts) => _List(items: ts, flow: flow),
         TriggersMutationFailed(triggers: final ts) => _List(
@@ -124,14 +173,6 @@ class _List extends StatelessWidget {
     final mine = items
         .where((t) => t.flowId == flow.id)
         .toList(growable: false);
-    final addButton = Align(
-      alignment: Alignment.centerLeft,
-      child: AppButton.text(
-        key: const Key('flow_triggers.add_button'),
-        label: '+ Disparador',
-        onPressed: () => _openSheet(context, flow),
-      ),
-    );
     final padding = EdgeInsets.fromLTRB(
       AppTokens.sp6,
       AppTokens.sp4,
@@ -142,20 +183,35 @@ class _List extends StatelessWidget {
     if (mine.isEmpty) {
       return SingleChildScrollView(
         padding: padding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'Este flujo aún no tiene disparadores.',
-              key: const Key('flow_triggers.empty'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            ),
-            const SizedBox(height: AppTokens.sp2),
-            addButton,
-          ],
+        child: AppEmptyState(
+          key: const Key('flow_triggers.empty'),
+          icon: Icons.bolt_outlined,
+          title: 'Este flujo aún no tiene disparadores',
+          description:
+              'Un disparador lanza el flujo cuando un mensaje o una '
+              'etiqueta coinciden. Sin disparadores, el flujo no corre solo.',
+          ctaLabel: 'Crear disparador',
+          ctaIcon: Icons.add,
+          onCta: () => _openSheet(context, flow),
+        ),
+      );
+    }
+    // Dialecto denso de listas: UNA card apila las filas separadas por
+    // divider hairline; el alta queda como acción de texto al pie.
+    final rows = <Widget>[];
+    for (var i = 0; i < mine.length; i++) {
+      if (i > 0) {
+        rows.add(
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+        );
+      }
+      final t = mine[i];
+      rows.add(
+        InkWell(
+          key: Key('flow_triggers.row.${t.id}.tap'),
+          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+          onTap: () => _openSheet(context, flow, editing: t),
+          child: _Row(trigger: t),
         ),
       );
     }
@@ -164,14 +220,19 @@ class _List extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          for (final t in mine)
-            InkWell(
-              key: Key('flow_triggers.row.${t.id}.tap'),
-              onTap: () => _openSheet(context, flow, editing: t),
-              child: _Row(trigger: t),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: rows,
             ),
-          const SizedBox(height: AppTokens.sp2),
-          addButton,
+          ),
+          const SizedBox(height: AppTokens.sp3),
+          AppButton.text(
+            key: const Key('flow_triggers.add_button'),
+            label: '+ Disparador',
+            onPressed: () => _openSheet(context, flow),
+          ),
         ],
       ),
     );
@@ -262,44 +323,22 @@ class _FailedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     // NotFound del template padre es terminal — reintentar el mismo id
     // volverá a fallar; no se ofrece botón de retry.
-    if (failure is TriggersNotFoundFailure) {
-      return Padding(
-        key: const Key('flow_triggers.failed'),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.sp6,
-          vertical: AppTokens.sp4,
-        ),
-        child: Text(
-          'Este flujo ya no existe en tu organización; no hay disparadores que cargar.',
-          style: textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
-        ),
-      );
-    }
+    final isNotFound = failure is TriggersNotFoundFailure;
     return Padding(
-      key: const Key('flow_triggers.failed'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.sp6,
-        vertical: AppTokens.sp4,
-      ),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              'No pudimos cargar los disparadores de este flujo.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
-            ),
-          ),
-          AppButton.text(
-            label: 'Reintentar',
-            onPressed: () =>
-                context.read<TriggersBloc>().add(const TriggersLoadRequested()),
-          ),
-        ],
+      padding: const EdgeInsets.all(AppTokens.sp6),
+      child: AppErrorState(
+        key: const Key('flow_triggers.failed'),
+        message: isNotFound
+            ? 'Este flujo ya no existe en tu organización; no hay '
+                  'disparadores que cargar.'
+            : 'No pudimos cargar los disparadores de este flujo',
+        onRetry: isNotFound
+            ? null
+            : () => context.read<TriggersBloc>().add(
+                const TriggersLoadRequested(),
+              ),
       ),
     );
   }

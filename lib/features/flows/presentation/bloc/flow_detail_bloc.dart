@@ -4,6 +4,9 @@ import '../../domain/entities/flow.dart';
 import '../../domain/failures/flows_failure.dart';
 import '../../domain/repositories/flows_repository.dart';
 
+part 'flow_detail_event.dart';
+part 'flow_detail_state.dart';
+
 /// Bloc del detalle de un flow (S11). Vida atada a la ruta `/flows/:id`:
 /// se construye con el id y arranca en `Loading` para no flashear
 /// Initial.
@@ -23,11 +26,33 @@ class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
       _id = id,
       super(const FlowDetailLoading()) {
     on<FlowDetailLoadRequested>(_onLoad);
+    on<FlowDetailRefreshRequested>(_onRefresh);
     on<FlowDetailUpdateSettingsRequested>(_onUpdateSettings);
+    on<FlowDetailRenameRequested>(_onRename);
+    on<FlowDetailSetActiveRequested>(_onSetActive);
+    on<FlowDetailDeleteRequested>(_onDelete);
   }
 
   final FlowsRepository _repo;
   final String _id;
+
+  /// Snapshot vigente de la cabecera, o `null` cuando el estado no lo
+  /// tiene (Loading / Failed / Deleted). Las acciones de cabecera lo
+  /// exigen: sin snapshot no hay `version` fiable para el CAS.
+  (Flow, List<Flow>, bool)? get _snapshot => switch (state) {
+    FlowDetailLoaded(:final flow, :final siblings, :final siblingsFailed) => (
+      flow,
+      siblings,
+      siblingsFailed,
+    ),
+    FlowDetailMutationFailed(
+      :final flow,
+      :final siblings,
+      :final siblingsFailed,
+    ) =>
+      (flow, siblings, siblingsFailed),
+    _ => null,
+  };
 
   Future<void> _onLoad(
     FlowDetailLoadRequested event,
@@ -62,6 +87,99 @@ class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
     }
   }
 
+  /// Refetch de cabecera + siblings conservando el snapshot visible: no
+  /// pasa por Loading, así la página no parpadea al volver de una
+  /// subpágina que pudo mutar el flujo (la `version` del CAS se
+  /// refresca). Best-effort: un fallo deja el estado como estaba — el
+  /// snapshot vigente sigue siendo utilizable aunque pueda estar viejo.
+  Future<void> _onRefresh(
+    FlowDetailRefreshRequested event,
+    Emitter<FlowDetailState> emit,
+  ) async {
+    if (_snapshot == null) return;
+    try {
+      final flow = await _repo.flowById(_id);
+      final (siblings, siblingsFailed) = await _loadSiblings(flow);
+      emit(FlowDetailLoaded(flow, siblings, siblingsFailed: siblingsFailed));
+    } on FlowsFailure {
+      // Silencio deliberado: refresco oportunista, no una carga que el
+      // operador pidió — no se le interrumpe con un error.
+    }
+  }
+
+  Future<void> _onRename(
+    FlowDetailRenameRequested event,
+    Emitter<FlowDetailState> emit,
+  ) => _putHeader(emit, name: event.name);
+
+  Future<void> _onSetActive(
+    FlowDetailSetActiveRequested event,
+    Emitter<FlowDetailState> emit,
+  ) => _putHeader(emit, isActive: event.isActive);
+
+  /// PUT replace-completo de la cabecera con SOLO el campo pedido
+  /// cambiado; el resto viaja intacto desde el snapshot (omitir un campo
+  /// reaplicaría su default). El Flow que devuelve el backend es la
+  /// verdad fresca — `version` ya incrementada — así que no hay refetch:
+  /// se emite Loaded con él y los siblings vigentes.
+  Future<void> _putHeader(
+    Emitter<FlowDetailState> emit, {
+    String? name,
+    bool? isActive,
+  }) async {
+    final snap = _snapshot;
+    if (snap == null) return;
+    final (flow, siblings, siblingsFailed) = snap;
+    emit(FlowDetailMutating(flow, siblings, siblingsFailed: siblingsFailed));
+    try {
+      final updatedFlow = await _repo.updateFlow(
+        flowId: flow.id,
+        version: flow.version,
+        name: name ?? flow.name,
+        isActive: isActive ?? flow.isActive,
+        aiInvocable: flow.aiInvocable,
+        cooldownMs: flow.cooldownMs,
+        usageLimit: flow.usageLimit,
+        excludesFlows: flow.excludesFlows,
+      );
+      emit(
+        FlowDetailLoaded(updatedFlow, siblings, siblingsFailed: siblingsFailed),
+      );
+    } on FlowsFailure catch (f) {
+      emit(
+        FlowDetailMutationFailed(
+          flow,
+          siblings,
+          f,
+          siblingsFailed: siblingsFailed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onDelete(
+    FlowDetailDeleteRequested event,
+    Emitter<FlowDetailState> emit,
+  ) async {
+    final snap = _snapshot;
+    if (snap == null) return;
+    final (flow, siblings, siblingsFailed) = snap;
+    emit(FlowDetailMutating(flow, siblings, siblingsFailed: siblingsFailed));
+    try {
+      await _repo.deleteFlow(flow.id);
+      emit(const FlowDetailDeleted());
+    } on FlowsFailure catch (f) {
+      emit(
+        FlowDetailMutationFailed(
+          flow,
+          siblings,
+          f,
+          siblingsFailed: siblingsFailed,
+        ),
+      );
+    }
+  }
+
   Future<void> _onUpdateSettings(
     FlowDetailUpdateSettingsRequested event,
     Emitter<FlowDetailState> emit,
@@ -74,7 +192,7 @@ class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
       snapshot = current.flow;
       siblings = current.siblings;
       siblingsFailed = current.siblingsFailed;
-    } else if (current is FlowDetailSettingsSaveFailed) {
+    } else if (current is FlowDetailMutationFailed) {
       snapshot = current.flow;
       siblings = current.siblings;
       siblingsFailed = current.siblingsFailed;
@@ -84,11 +202,7 @@ class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
     }
 
     emit(
-      FlowDetailSettingsSaving(
-        snapshot,
-        siblings,
-        siblingsFailed: siblingsFailed,
-      ),
+      FlowDetailMutating(snapshot, siblings, siblingsFailed: siblingsFailed),
     );
     try {
       // PUT replace-completo: name/isActive viajan tal como están en
@@ -106,7 +220,7 @@ class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
       );
     } on FlowsFailure catch (f) {
       emit(
-        FlowDetailSettingsSaveFailed(
+        FlowDetailMutationFailed(
           snapshot,
           siblings,
           f,
@@ -129,194 +243,4 @@ class FlowDetailBloc extends Bloc<FlowDetailEvent, FlowDetailState> {
       emit(FlowDetailFailed(f));
     }
   }
-}
-
-// Events --------------------------------------------------------------------
-
-sealed class FlowDetailEvent {
-  const FlowDetailEvent();
-}
-
-class FlowDetailLoadRequested extends FlowDetailEvent {
-  const FlowDetailLoadRequested();
-  @override
-  bool operator ==(Object other) => other is FlowDetailLoadRequested;
-  @override
-  int get hashCode => (FlowDetailLoadRequested).hashCode;
-}
-
-/// Pide guardar la configuración del flow (gates + allowlist de IA).
-/// `name` e `isActive` no viajan: el bloc los toma del snapshot Loaded
-/// y los reenvía intactos en el PUT replace-completo. La version del
-/// CAS también sale del snapshot. `aiInvocable` SÍ viaja: es parte del
-/// form de configuración (el toggle del editor).
-class FlowDetailUpdateSettingsRequested extends FlowDetailEvent {
-  const FlowDetailUpdateSettingsRequested({
-    required this.aiInvocable,
-    required this.cooldownMs,
-    required this.usageLimit,
-    required this.excludesFlows,
-  });
-
-  final bool aiInvocable;
-  final int cooldownMs;
-  final int usageLimit;
-  final List<String> excludesFlows;
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! FlowDetailUpdateSettingsRequested) return false;
-    if (other.aiInvocable != aiInvocable ||
-        other.cooldownMs != cooldownMs ||
-        other.usageLimit != usageLimit) {
-      return false;
-    }
-    if (other.excludesFlows.length != excludesFlows.length) return false;
-    for (var i = 0; i < excludesFlows.length; i++) {
-      if (other.excludesFlows[i] != excludesFlows[i]) return false;
-    }
-    return true;
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    aiInvocable,
-    cooldownMs,
-    usageLimit,
-    Object.hashAll(excludesFlows),
-  );
-}
-
-// States --------------------------------------------------------------------
-
-sealed class FlowDetailState {
-  const FlowDetailState();
-}
-
-class FlowDetailLoading extends FlowDetailState {
-  const FlowDetailLoading();
-  @override
-  bool operator ==(Object other) => other is FlowDetailLoading;
-  @override
-  int get hashCode => (FlowDetailLoading).hashCode;
-}
-
-class FlowDetailLoaded extends FlowDetailState {
-  const FlowDetailLoaded(
-    this.flow,
-    this.siblings, {
-    required this.siblingsFailed,
-  });
-
-  final Flow flow;
-  final List<Flow> siblings;
-
-  /// `true` ⇒ siblings está vacío porque listFlows falló (no porque
-  /// no haya otros flujos). La UI lo usa para mostrar un aviso "no
-  /// pudimos cargar otros flujos" sin tirar la página.
-  final bool siblingsFailed;
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! FlowDetailLoaded) return false;
-    if (other.flow != flow || other.siblingsFailed != siblingsFailed) {
-      return false;
-    }
-    if (other.siblings.length != siblings.length) return false;
-    for (var i = 0; i < siblings.length; i++) {
-      if (other.siblings[i] != siblings[i]) return false;
-    }
-    return true;
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(flow, siblingsFailed, Object.hashAll(siblings));
-}
-
-class FlowDetailFailed extends FlowDetailState {
-  const FlowDetailFailed(this.failure);
-
-  final FlowsFailure failure;
-
-  @override
-  bool operator ==(Object other) =>
-      other is FlowDetailFailed && other.failure == failure;
-
-  @override
-  int get hashCode => failure.hashCode;
-}
-
-/// Mutación de gates en vuelo. Preserva el snapshot anterior para que
-/// la UI siga mostrando los valores actuales mientras dibuja un
-/// indicador de progreso. Mismo trío de campos que `Loaded` para que
-/// el sheet pueda renderizar igual.
-class FlowDetailSettingsSaving extends FlowDetailState {
-  const FlowDetailSettingsSaving(
-    this.flow,
-    this.siblings, {
-    required this.siblingsFailed,
-  });
-
-  final Flow flow;
-  final List<Flow> siblings;
-  final bool siblingsFailed;
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! FlowDetailSettingsSaving) return false;
-    if (other.flow != flow || other.siblingsFailed != siblingsFailed) {
-      return false;
-    }
-    if (other.siblings.length != siblings.length) return false;
-    for (var i = 0; i < siblings.length; i++) {
-      if (other.siblings[i] != siblings[i]) return false;
-    }
-    return true;
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(flow, siblingsFailed, Object.hashAll(siblings));
-}
-
-/// La mutación de gates falló pero el snapshot anterior sigue
-/// intacto. El editor muestra el failure (Conflict ⇒ "recarga",
-/// InvalidSettings ⇒ "revisa cooldown / límite") sin perder el
-/// estado del form.
-class FlowDetailSettingsSaveFailed extends FlowDetailState {
-  const FlowDetailSettingsSaveFailed(
-    this.flow,
-    this.siblings,
-    this.failure, {
-    required this.siblingsFailed,
-  });
-
-  final Flow flow;
-  final List<Flow> siblings;
-  final FlowsFailure failure;
-  final bool siblingsFailed;
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! FlowDetailSettingsSaveFailed) return false;
-    if (other.flow != flow ||
-        other.failure != failure ||
-        other.siblingsFailed != siblingsFailed) {
-      return false;
-    }
-    if (other.siblings.length != siblings.length) return false;
-    for (var i = 0; i < siblings.length; i++) {
-      if (other.siblings[i] != siblings[i]) return false;
-    }
-    return true;
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(flow, failure, siblingsFailed, Object.hashAll(siblings));
 }

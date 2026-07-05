@@ -1,928 +1,203 @@
-// Pesa >400 LOC porque agrupa el shell del editor + helpers cohesivos
-// del tab Pasos (lista, drag&drop, StepCard, body por tipo). Cualquier
-// split implicaría compartir varias estructuras privadas entre archivos
-// hermanos sin ganancia real de reutilización — los widgets viven solo
-// aquí. Si el shell crece más con los tabs Triggers/Settings, extraer
-// _StepCard + _StepBody a `widgets/step_card.dart` será el primer corte.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design/safe_bottom.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_danger_zone.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
-import '../../../labels/presentation/bloc/labels_bloc.dart';
-import '../../../media/domain/entities/media_asset.dart';
-import '../../../triggers/presentation/widgets/flow_triggers_tab.dart';
-import '../../domain/entities/conditional_time_metadata.dart';
+import '../../../../core/design/widgets/app_section_link.dart';
+import '../../../triggers/domain/repositories/triggers_repository.dart';
+import '../../../triggers/presentation/bloc/triggers_bloc.dart';
 import '../../domain/entities/flow.dart' as fdom;
-import '../../domain/entities/label_step_metadata.dart';
-import '../../domain/entities/step.dart' as sdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_detail_bloc.dart';
-import '../bloc/flow_steps_bloc.dart';
-import '../bloc/media_names_cubit.dart';
-import '../media_step_name.dart';
-import '../widgets/conditional_time_day_mapping.dart';
-import '../widgets/flow_settings_tab.dart';
-import '../widgets/step_edit_sheet.dart';
-import '../widgets/step_type_label.dart';
+import '../widgets/flow_steps_section.dart';
 
-/// Detalle de un Flow (S11). Stateful para sostener el TabController de
-/// las 3 secciones del editor: Pasos / Disparadores / Configuración. El
-/// cableado del Scaffold y el AppBar los aporta la ruta `/flows/:id`; el
-/// page entrega el shell del TabBar más el contenido por tab.
+/// Hub del editor de un Flow (S11): página content-only cuyo cuerpo
+/// principal ES la lista de pasos, con las áreas satélite (Disparadores,
+/// Configuración) como filas launcher hacia sus subpáginas y la zona
+/// peligrosa (eliminar) al fondo — la anatomía canónica de los hubs de
+/// detalle (plantilla, bot). El AppBar lo aporta la ruta con el NOMBRE
+/// del flujo y el menú ⋮ (renombrar, pausar/activar).
 ///
-/// El TabBar solo aparece en Loaded — en Loading/Failed no tiene sentido
-/// porque el operador todavía no puede operar el flow. El TabController
-/// vive en _State y se reusa entre rebuilds del bloc.
-class FlowDetailPage extends StatefulWidget {
+/// El header del cuerpo solo habla cuando algo es excepcional: la pill
+/// "Pausado". Un flujo activo no pinta nada — el default calla.
+class FlowDetailPage extends StatelessWidget {
   const FlowDetailPage({super.key});
 
   @override
-  State<FlowDetailPage> createState() => _FlowDetailPageState();
-}
-
-class _FlowDetailPageState extends State<FlowDetailPage>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tab;
-
-  @override
-  void initState() {
-    super.initState();
-    _tab = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tab.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return BlocBuilder<FlowDetailBloc, FlowDetailState>(
+    return BlocConsumer<FlowDetailBloc, FlowDetailState>(
+      listener: (context, state) {
+        if (state is FlowDetailDeleted) {
+          // El flujo ya no existe: de regreso a la lista. El fallback
+          // cubre el deep-link sin pila debajo.
+          context.canPop() ? context.pop() : context.go('/home');
+          return;
+        }
+        // Fallo de una mutación de cabecera disparada desde el hub
+        // (pausar/activar, eliminar). Con un sheet encima (renombrar) el
+        // fallo se reporta inline ahí; el gate `isCurrent` evita duplicar.
+        if (state is FlowDetailMutationFailed &&
+            (ModalRoute.of(context)?.isCurrent ?? true)) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'No pudimos aplicar el cambio al flujo. Inténtalo de nuevo.',
+                ),
+              ),
+            );
+        }
+      },
       builder: (context, state) => switch (state) {
-        FlowDetailLoading() => const _LoadingView(),
-        FlowDetailLoaded(flow: final f) => _LoadedShell(tab: _tab, flow: f),
-        // Mientras la mutación de Settings está en vuelo o falló, el
-        // shell sigue visible con el flow del snapshot: el tab Pasos
-        // y Triggers ven la misma cabecera; el tab Configuración lee
-        // el estado directamente y actualiza su UX.
-        FlowDetailSettingsSaving(flow: final f) => _LoadedShell(
-          tab: _tab,
-          flow: f,
-        ),
-        FlowDetailSettingsSaveFailed(flow: final f) => _LoadedShell(
-          tab: _tab,
-          flow: f,
-        ),
+        FlowDetailLoading() => const AppLoadingIndicator(),
+        FlowDetailLoaded(flow: final f) => _LoadedHub(flow: f),
+        // Mientras una mutación de cabecera está en vuelo o falló, el hub
+        // sigue visible con el flow del snapshot.
+        FlowDetailMutating(flow: final f) => _LoadedHub(flow: f),
+        FlowDetailMutationFailed(flow: final f) => _LoadedHub(flow: f),
+        // Borrado consumado: no queda nada que editar; la vista se vacía
+        // mientras el listener navega de regreso.
+        FlowDetailDeleted() => const SizedBox.shrink(),
         FlowDetailFailed(failure: final f) => _FailedView(failure: f),
       },
     );
   }
 }
 
-class _LoadingView extends StatelessWidget {
-  const _LoadingView();
-
-  @override
-  Widget build(BuildContext context) => const AppLoadingIndicator();
-}
-
-/// Shell del Loaded: TabBar fijo arriba + TabBarView con las 3 secciones
-/// del editor. El TabController lo aporta el _State del page para que
-/// sobreviva a los rebuilds del bloc; los tabs son fijos (3 secciones
-/// estables del editor).
-class _LoadedShell extends StatelessWidget {
-  const _LoadedShell({required this.tab, required this.flow});
-
-  final TabController tab;
-  final fdom.Flow flow;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        Material(
-          color: AppTokens.surface1,
-          child: TabBar(
-            controller: tab,
-            tabs: const <Widget>[
-              Tab(text: 'Pasos'),
-              Tab(text: 'Disparadores'),
-              Tab(text: 'Configuración'),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: tab,
-            children: <Widget>[
-              _StepsTab(flow: flow),
-              FlowTriggersTab(
-                key: const Key('flow_detail.tab.triggers'),
-                flow: flow,
-              ),
-              const FlowSettingsTab(key: Key('flow_detail.tab.settings')),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Tab de Pasos. El header del flow (nombre + pills v/status) se renderiza
-/// siempre — viene de `FlowDetailBloc.Loaded`, que ya está resuelto cuando
-/// el shell se monta. La lista de StepCards depende del `FlowStepsBloc`
-/// propio del tab, con sus tres estados (Loading/Loaded/Failed).
+/// Cuerpo Loaded del hub: los pasos como superficie principal, con la
+/// identidad excepcional arriba y el footer de navegación + zona
+/// peligrosa al fondo, todo en un solo scroll (lo arma FlowStepsSection).
 ///
-/// Header fijo en la parte superior + lista expandible abajo: para que
-/// el `ReorderableListView` (cuando hay ≥2 steps) tenga el viewport
-/// bounded que necesita para el drag&drop. Que el header viva fuera
-/// del listado permite render progresivo: el operador ve qué flujo
-/// está editando aunque `/flows/:id/steps` siga en vuelo o falle.
-class _StepsTab extends StatelessWidget {
-  const _StepsTab({required this.flow});
+/// Monta el `TriggersBloc` del count de la fila "Disparadores": un GET
+/// template-scoped que se refresca al volver de la subpágina.
+class _LoadedHub extends StatelessWidget {
+  const _LoadedHub({required this.flow});
 
   final fdom.Flow flow;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppTokens.sp6,
-            AppTokens.sp6,
-            AppTokens.sp6,
-            0,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(flow.name, style: textTheme.titleLarge),
-              const SizedBox(height: AppTokens.sp3),
-              Wrap(
-                spacing: AppTokens.sp2,
-                runSpacing: AppTokens.sp2,
-                children: <Widget>[
-                  AppPill.outline(label: 'v${flow.version}'),
-                  if (flow.isActive)
-                    const AppPill.primary(
-                      label: 'Activo',
-                      dot: AppPillDot.active,
-                    )
-                  else
-                    const AppPill.neutral(
-                      label: 'Pausado',
-                      dot: AppPillDot.paused,
-                    ),
-                ],
-              ),
-              const SizedBox(height: AppTokens.sp6),
-              Align(
+    return BlocProvider<TriggersBloc>(
+      create: (ctx) => TriggersBloc(
+        repo: ctx.read<TriggersRepository>(),
+        templateId: flow.templateId,
+      )..add(const TriggersLoadRequested()),
+      child: FlowStepsSection(
+        header: flow.isActive
+            ? null
+            : const Align(
                 alignment: Alignment.centerLeft,
-                child: AppButton.text(
-                  key: const Key('flow_detail.steps.add_button'),
-                  label: 'Nuevo paso',
-                  icon: Icons.add,
-                  onPressed: () => _openStepSheet(context, null),
+                child: AppPill.neutral(
+                  label: 'Pausado',
+                  dot: AppPillDot.paused,
                 ),
               ),
-              const SizedBox(height: AppTokens.sp3),
+        footer: _HubFooter(flow: flow),
+      ),
+    );
+  }
+}
+
+/// Footer del hub: la card de launchers hacia las subpáginas y la zona
+/// peligrosa. Al volver de una subpágina se refrescan la cabecera (la
+/// configuración sube la `version` del CAS) y el count de disparadores —
+/// conservando los snapshots visibles (nunca Loading).
+class _HubFooter extends StatelessWidget {
+  const _HubFooter({required this.flow});
+
+  final fdom.Flow flow;
+
+  Future<void> _openSubpage(BuildContext context, String segment) async {
+    final detail = context.read<FlowDetailBloc>();
+    final triggers = context.read<TriggersBloc>();
+    await context.push('/flows/${flow.id}/$segment');
+    detail.add(const FlowDetailRefreshRequested());
+    triggers.add(const TriggersLoadRequested());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        AppCard(
+          child: Column(
+            children: <Widget>[
+              BlocBuilder<TriggersBloc, TriggersState>(
+                builder: (context, state) => AppSectionLink(
+                  rowKey: const Key('flow_detail.link.triggers'),
+                  icon: Icons.bolt_outlined,
+                  title: 'Disparadores',
+                  count: _triggersCount(state),
+                  caption: 'Palabras clave y etiquetas que lanzan este flujo',
+                  onTap: () => _openSubpage(context, 'triggers'),
+                ),
+              ),
+              const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+              AppSectionLink(
+                rowKey: const Key('flow_detail.link.settings'),
+                icon: Icons.tune,
+                title: 'Configuración',
+                caption: 'Enfriamiento, límite de usos y exclusiones',
+                onTap: () => _openSubpage(context, 'settings'),
+              ),
             ],
           ),
         ),
-        const Expanded(child: _StepsList()),
+        const SizedBox(height: AppTokens.sp6),
+        AppDangerZone(
+          caption:
+              'Eliminar el flujo borra también sus pasos y disparadores. '
+              'Esta acción no se puede deshacer.',
+          actions: <Widget>[
+            AppButton.danger(
+              key: const Key('flow_detail.danger.delete'),
+              label: 'Eliminar flujo',
+              fullWidth: true,
+              onPressed: () => _confirmDelete(context),
+            ),
+          ],
+        ),
       ],
     );
   }
-}
 
-/// Lista de StepCards atada al `FlowStepsBloc`. Loading muestra spinner
-/// inline (no centrado en pantalla, ya que el header vive arriba).
-/// Failed muestra mensaje + retry; NotFound se trata como mensaje
-/// terminal sin botón.
-class _StepsList extends StatelessWidget {
-  const _StepsList();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return BlocConsumer<FlowStepsBloc, FlowStepsState>(
-      // Sólo el reorder muta sin un sheet delante: add/edit/delete reportan
-      // su fallo inline dentro del sheet abierto. El gate `isCurrent` evita
-      // duplicar el aviso cuando el fallo ocurre con un modal encima.
-      listener: (context, state) {
-        if (state is FlowStepsMutationFailed &&
-            (ModalRoute.of(context)?.isCurrent ?? true)) {
-          final copy = state.failure is FlowsInvalidReorderFailure
-              ? 'Ese orden dejaría un condicional apuntando hacia atrás. '
-                    'Sus destinos deben quedar después del condicional.'
-              : 'No se pudo guardar el nuevo orden. Se revirtieron los '
-                    'cambios.';
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text(copy)));
-        }
-      },
-      builder: (context, state) => switch (state) {
-        // Solo la carga inicial (o el retry de un Failed terminal) muestra
-        // spinner puro: todavía no hay lista que conservar.
-        FlowStepsLoading() => const Padding(
-          padding: EdgeInsets.symmetric(vertical: AppTokens.sp4),
-          child: Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-            ),
-          ),
-        ),
-        FlowStepsLoaded(steps: final ss) => _StepsListView(
-          steps: ss,
-          textTheme: textTheme,
-        ),
-        // Todo estado con lista la mantiene en pantalla — la mutación en
-        // vuelo y el refetch posterior solo agregan el progreso inline;
-        // el operador nunca pierde contexto ni scroll.
-        FlowStepsMutating(steps: final ss) => _StepsListView(
-          steps: ss,
-          textTheme: textTheme,
-          notice: const _MutatingInlineSpinner(),
-        ),
-        FlowStepsRefreshing(steps: final ss) => _StepsListView(
-          steps: ss,
-          textTheme: textTheme,
-          notice: const _MutatingInlineSpinner(),
-        ),
-        // La mutación persistió pero el listado no se pudo refrescar: la
-        // lista visible puede estar desactualizada; el aviso lo dice y
-        // ofrece reintentar el refetch conservándola.
-        FlowStepsRefreshFailed(steps: final ss) => _StepsListView(
-          steps: ss,
-          textTheme: textTheme,
-          notice: const _RefreshFailedNotice(),
-        ),
-        FlowStepsMutationFailed(steps: final ss) => _StepsListView(
-          steps: ss,
-          textTheme: textTheme,
-        ),
-        FlowStepsFailed(failure: final f) => _StepsFailedView(failure: f),
-      },
-    );
-  }
-}
-
-/// Renderiza la lista de StepCards o el empty state. `notice` es el aviso
-/// inline que el estado del bloc quiera anteponer (progreso de mutación,
-/// refetch fallido) SIN tapar la lista existente — nunca un overlay.
-///
-/// Con ≥2 steps usa `ReorderableListView.builder` para soportar drag&drop.
-/// Con 0 o 1 step usa un layout simple — no tiene sentido pagar el costo
-/// del scroll de reorder cuando no hay nada que reordenar.
-class _StepsListView extends StatelessWidget {
-  const _StepsListView({
-    required this.steps,
-    required this.textTheme,
-    this.notice,
-  });
-
-  final List<sdom.Step> steps;
-  final TextTheme textTheme;
-  final Widget? notice;
-
-  @override
-  Widget build(BuildContext context) {
-    final listPadding = EdgeInsets.fromLTRB(
-      AppTokens.sp6,
-      0,
-      AppTokens.sp6,
-      AppTokens.sp6 + context.safeBottomInset,
-    );
-    final bloc = context.read<FlowStepsBloc>();
-    // Resuelve los nombres EN VIVO del catálogo UNA vez, POR ENCIMA del
-    // ReorderableListView, y se los pasa a cada tarjeta como dato plano. Si el
-    // lookup del cubit viviera dentro del item reordenable, al arrastrarlo el
-    // item se eleva al overlay del Navigator (fuera del scope del provider) y
-    // el lookup lanzaría ProviderNotFound → RenderErrorBox gris estirado.
-    final namesState = context.watch<MediaNamesCubit>().state;
-    // Mismo patrón para el catálogo de labels: mapa plano id→nombre para que
-    // el paso LABEL muestre el nombre y no el UUID.
-    final labelsState = context.watch<LabelsBloc>().state;
-    final labelNames = labelsState is LabelsLoaded
-        ? <String, String>{for (final l in labelsState.labels) l.id: l.name}
-        : const <String, String>{};
-    // Índice id → (posición, etiqueta) de los steps vigentes, para que la
-    // tarjeta del condicional resuelva sus destinos por NOMBRE y marque
-    // colgantes/hacia-atrás. Plano y calculado aquí arriba por el mismo
-    // motivo overlay-safe que labelNames/mediaNames.
-    final stepRefs = <String, ({int order, String label})>{
-      for (final s in steps) s.id: (order: s.order, label: _stepRefLabel(s)),
+  /// Disparadores DE ESTE flujo (el GET es template-scoped); null mientras
+  /// no hay snapshot — la fila va sin pill en vez de mentir un 0.
+  int? _triggersCount(TriggersState state) {
+    final triggers = switch (state) {
+      TriggersLoaded(triggers: final ts) => ts,
+      TriggersMutating(triggers: final ts) => ts,
+      TriggersMutationFailed(triggers: final ts) => ts,
+      _ => null,
     };
-
-    final topNotice = notice;
-    if (steps.isEmpty) {
-      return SingleChildScrollView(
-        padding: listPadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (topNotice != null) ...<Widget>[
-              topNotice,
-              const SizedBox(height: AppTokens.sp3),
-            ],
-            Text(
-              'Este flujo aún no tiene pasos.',
-              key: const Key('flow_detail.steps.empty'),
-              style: textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (steps.length == 1) {
-      return SingleChildScrollView(
-        padding: listPadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (topNotice != null) ...<Widget>[
-              topNotice,
-              const SizedBox(height: AppTokens.sp3),
-            ],
-            _StepCard(
-              step: steps.first,
-              resolvedMediaName: namesState.nameFor(steps.first.mediaRef),
-              labelNames: labelNames,
-              stepRefs: stepRefs,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        if (topNotice != null) ...<Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp6),
-            child: topNotice,
-          ),
-          const SizedBox(height: AppTokens.sp3),
-        ],
-        Expanded(
-          child: ReorderableListView.builder(
-            padding: listPadding,
-            itemCount: steps.length,
-            buildDefaultDragHandles: false,
-            itemBuilder: (_, i) {
-              final s = steps[i];
-              return Padding(
-                key: ValueKey<String>('flow_detail.step_card.row.${s.id}'),
-                padding: const EdgeInsets.only(bottom: AppTokens.sp3),
-                child: _StepCard(
-                  step: s,
-                  dragIndex: i,
-                  resolvedMediaName: namesState.nameFor(s.mediaRef),
-                  labelNames: labelNames,
-                  stepRefs: stepRefs,
-                ),
-              );
-            },
-            onReorderItem: (oldIdx, newIdx) {
-              // onReorderItem entrega el newIdx ya ajustado a la lista sin el
-              // elemento movido, así que se inserta directo (sin normalizar).
-              final ids = <String>[for (final s in steps) s.id];
-              final moved = ids.removeAt(oldIdx);
-              ids.insert(newIdx, moved);
-              bloc.add(FlowStepsReorderRequested(ids));
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MutatingInlineSpinner extends StatelessWidget {
-  const _MutatingInlineSpinner();
-
-  @override
-  Widget build(BuildContext context) => const SizedBox(
-    key: Key('flow_detail.steps.mutating'),
-    height: 2,
-    child: LinearProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
-}
-
-/// Aviso inline de refetch fallido tras una mutación que SÍ persistió:
-/// la lista en pantalla puede estar desactualizada, y Reintentar vuelve
-/// a pedir el listado conservándola (RefreshRequested — nunca Loading).
-class _RefreshFailedNotice extends StatelessWidget {
-  const _RefreshFailedNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      key: const Key('flow_detail.steps.refresh_failed'),
-      children: <Widget>[
-        Expanded(
-          child: Text(
-            'El cambio se guardó, pero no pudimos actualizar la lista.',
-            style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-          ),
-        ),
-        const SizedBox(width: AppTokens.sp3),
-        AppButton.tonal(
-          key: const Key('flow_detail.steps.refresh_retry'),
-          label: 'Reintentar',
-          onPressed: () => context.read<FlowStepsBloc>().add(
-            const FlowStepsRefreshRequested(),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StepsFailedView extends StatelessWidget {
-  const _StepsFailedView({required this.failure});
-
-  final FlowsFailure failure;
-
-  @override
-  Widget build(BuildContext context) {
-    final isNotFound = failure is FlowsNotFoundFailure;
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      key: isNotFound
-          ? const Key('flow_detail.steps.error.not_found')
-          : const Key('flow_detail.steps.error.generic'),
-      padding: const EdgeInsets.symmetric(vertical: AppTokens.sp4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            isNotFound
-                ? 'No pudimos encontrar los pasos de este flujo.'
-                : 'No pudimos cargar los pasos.',
-            style: textTheme.bodyMedium,
-          ),
-          if (!isNotFound) ...<Widget>[
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.tonal(
-              label: 'Reintentar',
-              onPressed: () => context.read<FlowStepsBloc>().add(
-                const FlowStepsLoadRequested(),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Card read-only por step. Muestra index (order+1), label humanizado del
-/// type, contenido (`content` para TEXT, `mediaRef` para multimedia,
-/// resumen de metadata para CONDITIONAL_TIME), y pills laterales (delay,
-/// modo de ejecución si está acotado: "Solo IA" / "Solo disparadores").
-///
-/// `dragIndex != null` ⇒ se renderiza con drag handle a la derecha,
-/// listo para reordenar dentro del `ReorderableListView` padre. El handle
-/// captura el gesto antes del InkWell (se monta como sibling del área
-/// tappable), así que long-press/drag sobre el handle no abre el sheet.
-class _StepCard extends StatelessWidget {
-  const _StepCard({
-    required this.step,
-    this.dragIndex,
-    this.resolvedMediaName,
-    this.labelNames = const <String, String>{},
-    this.stepRefs = const <String, ({int order, String label})>{},
-  });
-
-  final sdom.Step step;
-  final int? dragIndex;
-
-  /// Nombre EN VIVO del recurso multimedia ya resuelto por el caller (lee el
-  /// `MediaNamesCubit` por encima del listado). Plano a propósito: ver
-  /// [_StepBody.resolvedMediaName].
-  final String? resolvedMediaName;
-
-  /// Catálogo id→nombre de labels, resuelto por el caller por encima del
-  /// listado (mismo motivo de planitud que [resolvedMediaName]).
-  final Map<String, String> labelNames;
-
-  /// Índice id → (posición, etiqueta) de los steps del flow, para que el
-  /// resumen del condicional resuelva sus destinos por nombre (mismo
-  /// motivo de planitud que los otros catálogos).
-  final Map<String, ({int order, String label})> stepRefs;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Text(
-              '${step.order + 1}.',
-              style: textTheme.titleMedium?.copyWith(color: AppTokens.text2),
-            ),
-            const SizedBox(width: AppTokens.sp2),
-            AppPill.outline(label: stepTypeLabel(step.type)),
-          ],
-        ),
-        const SizedBox(height: AppTokens.sp2),
-        _StepBody(
-          step: step,
-          textTheme: textTheme,
-          resolvedMediaName: resolvedMediaName,
-          labelNames: labelNames,
-          stepRefs: stepRefs,
-        ),
-        const SizedBox(height: AppTokens.sp3),
-        Wrap(
-          spacing: AppTokens.sp2,
-          runSpacing: AppTokens.sp2,
-          children: <Widget>[
-            AppPill.neutral(label: _delayLabel(step)),
-            if (step.aiOnly) const AppPill.primary(label: 'Solo IA'),
-            if (step.manualOnly)
-              const AppPill.outline(label: 'Solo disparadores'),
-          ],
-        ),
-      ],
-    );
-    final dragIdx = dragIndex;
-    return AppCard(
-      padding: AppTokens.sp4,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: InkWell(
-              key: Key('flow_detail.step_card.${step.id}'),
-              borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-              onTap: () => _openStepSheet(context, step),
-              child: content,
-            ),
-          ),
-          if (dragIdx != null)
-            ReorderableDragStartListener(
-              index: dragIdx,
-              // 48x48: área de agarre táctil mínima (el ícono solo mide 24 y
-              // es demasiado fino para el pulgar). ExcludeSemantics colapsa el
-              // nodo del ícono en uno solo con la etiqueta de acción.
-              child: Semantics(
-                label: 'Mover paso',
-                child: ExcludeSemantics(
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Icon(
-                      Icons.drag_handle,
-                      key: Key('flow_detail.step_card.drag_handle.${step.id}'),
-                      color: AppTokens.text2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Abre el sheet de edición y, si `step` viene, el step a editar. La función
-/// vive a nivel de archivo porque la usan tanto _StepsTab (botón "Nuevo
-/// paso") como _StepCard (tap del card). `StepEditSheet.open` re-provee los
-/// blocs del scope y aplica el fondo canónico.
-///
-/// Al crear o reemplazar el recurso de un step multimedia, el selector abre
-/// la galería en modo picker (`/media/pick?type=<familia>`, filtrada por el
-/// tipo del paso) que devuelve el MediaAsset completo vía pop.
-void _openStepSheet(BuildContext context, sdom.Step? step) {
-  StepEditSheet.open(
-    context,
-    editing: step,
-    pickMediaRef: (ctx, family) => ctx.push<MediaAsset>(
-      family == null ? '/media/pick' : '/media/pick?type=$family',
-    ),
-  );
-}
-
-/// Cuerpo del step según tipo. TEXT muestra content; multimedia muestra
-/// mediaRef truncado; CONDITIONAL_TIME interpreta `metadataJson` y
-/// muestra TZ + ventanas formateadas + destinos onMatch/onElse. Si el
-/// metadata no parsea (corrupto/legacy), cae a un fallback honesto.
-class _StepBody extends StatelessWidget {
-  const _StepBody({
-    required this.step,
-    required this.textTheme,
-    this.resolvedMediaName,
-    this.labelNames = const <String, String>{},
-    this.stepRefs = const <String, ({int order, String label})>{},
-  });
-
-  final sdom.Step step;
-  final TextTheme textTheme;
-
-  /// Catálogo id→nombre de labels, plano por el mismo motivo que
-  /// [resolvedMediaName].
-  final Map<String, String> labelNames;
-
-  /// Índice id → (posición, etiqueta) de los steps del flow, para el
-  /// resumen del condicional.
-  final Map<String, ({int order, String label})> stepRefs;
-
-  /// Nombre EN VIVO del recurso (alias/filename del catálogo) ya resuelto por
-  /// el caller, que lee el `MediaNamesCubit` POR ENCIMA del `ReorderableListView`.
-  /// Se recibe como dato plano —no se hace lookup del cubit aquí— para que el
-  /// subárbol de la tarjeta sea autocontenido: al reordenar, el item se eleva al
-  /// overlay del Navigator (fuera del scope del provider) y un lookup ahí
-  /// lanzaría ProviderNotFound (RenderErrorBox gris estirado). null ⇒ aún
-  /// cargando o asset borrado (el respaldo por paso decide el texto).
-  final String? resolvedMediaName;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = step.type;
-    if (t == sdom.StepType.text) {
-      final content = step.content.isEmpty ? '—' : step.content;
-      return Text(
-        content,
-        style: textTheme.bodyMedium?.copyWith(
-          color: step.content.isEmpty ? AppTokens.text2 : null,
-        ),
-      );
-    }
-    if (t == sdom.StepType.conditionalTime) {
-      return _ConditionalTimeSummary(
-        step: step,
-        textTheme: textTheme,
-        stepRefs: stepRefs,
-      );
-    }
-    if (t == sdom.StepType.end) {
-      return Text(
-        'Termina el flujo aquí.',
-        key: const Key('flow_detail.step.end'),
-        style: textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.text2,
-        ),
-      );
-    }
-    if (t == sdom.StepType.label) {
-      return _LabelStepSummary(
-        step: step,
-        textTheme: textTheme,
-        labelNames: labelNames,
-      );
-    }
-    if (t == sdom.StepType.unsupported) {
-      return Text(
-        'Paso no soportado — actualiza la app para verlo.',
-        style: textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.text2,
-        ),
-      );
-    }
-    // Multimedia: IMAGE / VIDEO / DOCUMENT / AUDIO / PTT / STICKER.
-    if (step.mediaRef.isEmpty) {
-      return Text(
-        'Sin media asignada',
-        style: textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.text2,
-        ),
-      );
-    }
-    // Nombre legible del recurso. Prioridad: el alias EN VIVO del catálogo
-    // (resuelto por ref vía MediaNamesCubit, leído por el caller) → el
-    // `media_filename` guardado al elegirlo → la cola corta del ref BARE en
-    // monospace (señal de id, no nombre). El ref completo con el path del
-    // tenant nunca se muestra.
-    final (mediaText, mono) = mediaStepDisplay(
-      mediaRef: step.mediaRef,
-      metadataJson: step.metadataJson,
-      resolvedName: resolvedMediaName,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          mediaText,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: mono
-              ? textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  color: AppTokens.text2,
-                )
-              : textTheme.bodyMedium,
-        ),
-        if (step.content.isNotEmpty) ...<Widget>[
-          const SizedBox(height: AppTokens.sp1),
-          Text(step.content, style: textTheme.bodyMedium),
-        ],
-      ],
-    );
-  }
-}
-
-/// Resumen read-only de un paso LABEL en la StepCard: la acción
-/// (Etiquetar / Quitar etiqueta) + el NOMBRE de la etiqueta resuelto del
-/// catálogo ([labelNames]); el id crudo queda sólo como respaldo honesto
-/// (catálogo cargando, fallo o label borrada) y distingue pasos. Metadata
-/// inválida ⇒ fallback "sin configurar".
-class _LabelStepSummary extends StatelessWidget {
-  const _LabelStepSummary({
-    required this.step,
-    required this.textTheme,
-    this.labelNames = const <String, String>{},
-  });
-
-  final sdom.Step step;
-  final TextTheme textTheme;
-  final Map<String, String> labelNames;
-
-  @override
-  Widget build(BuildContext context) {
-    final LabelStepMetadata md;
-    try {
-      md = LabelStepMetadata.fromJsonString(step.metadataJson);
-    } on FormatException {
-      return Text(
-        'Etiqueta sin configurar',
-        style: textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.text2,
-        ),
-      );
-    }
-    final isAdd = md.action == LabelStepAction.add;
-    final resolvedName = labelNames[md.labelId];
-    return Row(
-      children: <Widget>[
-        Icon(
-          isAdd ? Icons.label_outline : Icons.label_off_outlined,
-          size: 16,
-          color: AppTokens.text2,
-        ),
-        const SizedBox(width: AppTokens.sp2),
-        Expanded(
-          child: Text.rich(
-            TextSpan(
-              children: <TextSpan>[
-                TextSpan(
-                  text: isAdd ? 'Etiquetar · ' : 'Quitar etiqueta · ',
-                  style: textTheme.bodyMedium,
-                ),
-                if (resolvedName != null)
-                  TextSpan(text: resolvedName, style: textTheme.bodyMedium)
-                else
-                  TextSpan(
-                    text: md.labelId,
-                    style: textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      color: AppTokens.text2,
-                    ),
-                  ),
-              ],
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Resumen read-only del shape CONDITIONAL_TIME en la StepCard. Parsea
-/// el metadataJson y formatea: TZ + cada ventana ("L M X J V · 09:00–18:00")
-/// + las dos ramas con su paso destino RESUELTO POR ID contra [stepRefs]
-/// ("Si cumple → 3. Hola…"). Un destino colgante (paso borrado fuera de
-/// banda) o hacia atrás se marca en rojo — antes la tarjeta pintaba
-/// "Paso #4" impasible aunque el 4 no existiera. Metadata ilegible ⇒
-/// fallback honesto; filas legacy posicionales (no migradas) caen al
-/// "Paso #N" clásico.
-class _ConditionalTimeSummary extends StatelessWidget {
-  const _ConditionalTimeSummary({
-    required this.step,
-    required this.textTheme,
-    this.stepRefs = const <String, ({int order, String label})>{},
-  });
-
-  final sdom.Step step;
-  final TextTheme textTheme;
-  final Map<String, ({int order, String label})> stepRefs;
-
-  @override
-  Widget build(BuildContext context) {
-    final ConditionalTimeMetadata md;
-    try {
-      md = ConditionalTimeMetadata.fromJsonString(step.metadataJson);
-    } on FormatException {
-      return Text(
-        'Condicional con configuración inválida — reabre el paso para corregir.',
-        key: const Key('flow_detail.step.ct_corrupt'),
-        style: textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: AppTokens.danger,
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          'Zona ${md.tz}',
-          style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-        ),
-        const SizedBox(height: AppTokens.sp1),
-        for (final w in md.windows)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppTokens.sp1),
-            child: Text(
-              '${_formatDays(w.days)} · ${w.from}–${w.to}',
-              style: textTheme.bodyMedium,
-            ),
-          ),
-        const SizedBox(height: AppTokens.sp1),
-        _branchLine('Si cumple', md.onMatchStepId, md.onMatchOrder),
-        _branchLine('Si no', md.onElseStepId, md.onElseOrder),
-      ],
-    );
+    if (triggers == null) return null;
+    return triggers.where((t) => t.flowId == flow.id).length;
   }
 
-  Widget _branchLine(String prefix, String? targetId, int? legacyOrder) {
-    final normal = textTheme.bodySmall?.copyWith(color: AppTokens.text2);
-    final danger = textTheme.bodySmall?.copyWith(color: AppTokens.danger);
-    if (targetId == null) {
-      // Fila legacy posicional: sin id que resolver, posición cruda.
-      final n = legacyOrder == null ? '?' : '${legacyOrder + 1}';
-      return Text('$prefix → Paso #$n', style: normal);
-    }
-    final ref = stepRefs[targetId];
-    if (ref == null) {
-      return Text(
-        '$prefix → (paso eliminado)',
-        key: Key('flow_detail.step.ct_dangling.${step.id}'),
-        style: danger,
-      );
-    }
-    if (ref.order <= step.order) {
-      return Text(
-        '$prefix → ${ref.order + 1}. ${ref.label} (hacia atrás — '
-        'mueve el condicional antes de su destino)',
-        key: Key('flow_detail.step.ct_backward.${step.id}'),
-        style: danger,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      );
-    }
-    return Text(
-      '$prefix → ${ref.order + 1}. ${ref.label}',
-      style: normal,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+  Future<void> _confirmDelete(BuildContext context) async {
+    final bloc = context.read<FlowDetailBloc>();
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Eliminar flujo',
+      message:
+          '¿Eliminar el flujo "${flow.name}"? Se borrarán también sus pasos '
+          'y disparadores. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      confirmKey: const Key('flow_detail.delete_confirm'),
     );
+    if (confirmed) {
+      bloc.add(const FlowDetailDeleteRequested());
+    }
   }
-
-  String _formatDays(List<int> wireDays) {
-    final uiSorted = wireDays.map(wireDayToUi).toList()..sort();
-    return uiSorted.map(uiDayLabel).join(' ');
-  }
-}
-
-/// Etiqueta corta de un step para el índice [stepRefs]: el contenido para
-/// TEXT, el tipo humanizado para el resto.
-String _stepRefLabel(sdom.Step st) {
-  if (st.type == sdom.StepType.text && st.content.isNotEmpty) {
-    return st.content;
-  }
-  return stepTypeLabel(st.type);
 }
 
 class _FailedView extends StatelessWidget {
@@ -953,15 +228,4 @@ class _FailedView extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Etiqueta legible del delay. Convierte ms a segundos con un decimal y
-/// agrega el jitter si > 0. Ejemplos: "0s" / "1.5s" / "2s ± 10%".
-String _delayLabel(sdom.Step s) {
-  final secs = s.delayMs / 1000;
-  final base = secs == secs.truncate()
-      ? '${secs.toInt()}s'
-      : '${secs.toStringAsFixed(1)}s';
-  if (s.jitterPct <= 0) return base;
-  return '$base ± ${s.jitterPct}%';
 }

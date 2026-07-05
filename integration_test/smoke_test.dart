@@ -432,16 +432,20 @@ void main() {
       await tester.ensureVisible(flowRowFinder.first);
       await tester.tap(flowRowFinder.first);
 
-      // El editor de flow monta el TabBar con tres tabs. El tab por defecto
-      // es "Pasos"; aquí queremos "Configuración".
+      // El editor de flow es un hub content-only: la fila launcher
+      // "Configuración" empuja la subpágina. Vive al fondo del scroll
+      // (debajo de la lista de pasos), así que hay que traerla a vista.
+      final settingsLink = find.byKey(const Key('flow_detail.link.settings'));
       await _pumpUntil(
         tester,
-        find.text('Configuración'),
+        settingsLink,
         timeout: const Duration(seconds: 15),
       );
-      await tester.tap(find.text('Configuración'));
+      await tester.ensureVisible(settingsLink);
+      await tester.pump();
+      await tester.tap(settingsLink);
 
-      // Loaded del FlowSettingsTab: el save_button aparece dentro del form.
+      // Loaded del FlowSettingsPage: el save_button aparece dentro del form.
       await _pumpUntil(
         tester,
         find.byKey(const Key('flow_settings.save_button')),
