@@ -1,3 +1,4 @@
+import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/monitor/domain/entities/monitor_event.dart';
 import 'package:ataulfo/features/monitor/presentation/cubit/monitor_live_cubit.dart';
 import 'package:ataulfo/features/monitor/presentation/widgets/bot_state_pill.dart';
@@ -65,6 +66,19 @@ void main() {
   testWidgets('sin eventos ⇒ sin píldora', (tester) async {
     await _pump(tester, cubit, <MonitorEvent>[]);
     expect(find.byKey(const Key('monitor.bot_state_pill')), findsNothing);
+  });
+
+  testWidgets('la píldora es un AppPill del kit con dot de estado', (
+    tester,
+  ) async {
+    await _pump(tester, cubit, <MonitorEvent>[_ev(MonitorEventKind.aiTool)]);
+    // Anatomía del kit, no una cápsula a mano: mismo padding/tipografía que
+    // cualquier otra pill de la app, con el dot como indicador de estado.
+    expect(
+      tester.widget(find.byKey(const Key('monitor.bot_state_pill'))),
+      isA<AppPill>(),
+    );
+    expect(find.byKey(const ValueKey<String>('app_pill.dot')), findsOneWidget);
   });
 
   testWidgets(

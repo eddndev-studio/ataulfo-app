@@ -121,7 +121,7 @@ void main() {
     expect(find.byType(AppLoadingIndicator), findsOneWidget);
   });
 
-  testWidgets('Loaded monta el header rico full-bleed con título "Agentes"', (
+  testWidgets('Loaded monta el header rico full-bleed con título "Bots"', (
     tester,
   ) async {
     tall(tester);
@@ -131,12 +131,14 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    // El AppHeaderCard reemplaza al AppBar del shell para esta sección.
+    // El AppHeaderCard reemplaza al AppBar del shell para esta sección. El
+    // título coincide con la etiqueta de la tab del shell: "Bots" es el
+    // término interno consistente en toda la app.
     expect(find.byType(AppHeaderCard), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(AppHeaderCard),
-        matching: find.text('Agentes'),
+        matching: find.text('Bots'),
       ),
       findsOneWidget,
     );

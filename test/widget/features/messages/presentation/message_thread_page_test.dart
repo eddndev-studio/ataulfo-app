@@ -2383,6 +2383,58 @@ void main() {
       ).called(1);
     });
 
+    testWidgets('la confirmación de Eliminar es el diálogo del kit', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        loadedWith(
+          msg(
+            externalId: 'm1',
+            direction: MessageDirection.outbound,
+            content: 'adiós',
+            ts: DateTime.now().millisecondsSinceEpoch,
+            status: MessageStatus.sent,
+          ),
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('adiós'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('message.delete.m1')));
+      await tester.pumpAndSettle();
+
+      // Acciones del design system, no TextButton de Material: confirmar es
+      // destructivo (danger) y cancelar es texto, como en todo confirm del kit.
+      expect(find.widgetWithText(AppButton, 'Eliminar'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Cancelar'), findsOneWidget);
+      expect(find.byType(TextButton), findsNothing);
+    });
+
+    testWidgets('las acciones del diálogo de edición son botones del kit', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        loadedWith(
+          msg(
+            externalId: 'm1',
+            direction: MessageDirection.outbound,
+            content: 'precio 40',
+            ts: DateTime.now().millisecondsSinceEpoch,
+            status: MessageStatus.sent,
+          ),
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.longPress(find.text('precio 40'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('message.edit.m1')));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(AppButton, 'Guardar'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Cancelar'), findsOneWidget);
+      expect(find.byType(TextButton), findsNothing);
+    });
+
     testWidgets('una corrección fallida anuncia con copy honesto', (
       tester,
     ) async {

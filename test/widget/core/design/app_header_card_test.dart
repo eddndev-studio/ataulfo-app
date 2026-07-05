@@ -93,4 +93,32 @@ void main() {
     expect(brand.begin, Alignment.topCenter);
     expect(brand.end, Alignment.bottomCenter);
   });
+
+  group('variante solo-título con slot de contenido', () {
+    Widget minimalHost({Widget? content}) => MaterialApp(
+      home: Scaffold(
+        body: AppHeaderCard(title: 'Ajustes', content: content),
+      ),
+    );
+
+    testWidgets('sin saludo/avatar/marca de agua: solo pinta el título', (
+      tester,
+    ) async {
+      await tester.pumpWidget(minimalHost());
+
+      expect(find.text('Ajustes'), findsOneWidget);
+      expect(find.byKey(const Key('header.avatar')), findsNothing);
+      expect(find.byType(Icon), findsNothing);
+    });
+
+    testWidgets('el slot content se pinta debajo del título', (tester) async {
+      await tester.pumpWidget(minimalHost(content: const Text('identidad')));
+
+      expect(find.text('identidad'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('identidad')).dy,
+        greaterThan(tester.getBottomLeft(find.text('Ajustes')).dy),
+      );
+    });
+  });
 }

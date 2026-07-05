@@ -160,7 +160,9 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
           children: <Widget>[
             AppHeaderCard(
               greeting: user.greeting,
-              title: 'Agentes',
+              // Mismo término que la etiqueta de la tab del shell: "Bots" es
+              // el nombre interno consistente de la entidad en toda la app.
+              title: 'Bots',
               avatarInitial: user.initial,
               onAvatarTap: widget.onOpenSettings ?? () {},
               watermark: Icons.smart_toy,

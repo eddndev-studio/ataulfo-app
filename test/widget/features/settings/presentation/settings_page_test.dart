@@ -2,6 +2,7 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_header_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_section_link.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
@@ -426,6 +427,11 @@ void main() {
       await tester.pumpWidget(host());
 
       expect(find.byKey(const Key('settings.header')), findsOneWidget);
+      // El header es EL widget del kit, no una réplica a mano del gradiente.
+      expect(
+        tester.widget(find.byKey(const Key('settings.header'))),
+        isA<AppHeaderCard>(),
+      );
       expect(find.text('Ajustes'), findsOneWidget);
       // La identidad vive EN el header: avatar con inicial + email + rol.
       expect(find.byType(AppAvatar), findsOneWidget);

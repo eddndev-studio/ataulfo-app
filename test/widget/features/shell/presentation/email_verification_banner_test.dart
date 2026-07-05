@@ -59,7 +59,9 @@ void main() {
               BlocProvider<AuthBloc>.value(value: authBloc),
               BlocProvider<ResendVerificationCubit>.value(value: resendCubit),
             ],
-            child: const Scaffold(body: EmailVerificationBanner()),
+            child: const Scaffold(
+              body: EmailVerificationBanner(child: SizedBox.shrink()),
+            ),
           ),
         ),
         GoRoute(
@@ -167,6 +169,40 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Te reenviamos el correo'), findsNothing);
+  });
+
+  testWidgets('el aviso consume el inset del status bar (no queda debajo)', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_unverified));
+
+    const inset = 24.0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: MediaQuery(
+          data: const MediaQueryData(padding: EdgeInsets.only(top: inset)),
+          child: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<AuthBloc>.value(value: authBloc),
+              BlocProvider<ResendVerificationCubit>.value(value: resendCubit),
+            ],
+            child: const Scaffold(
+              body: EmailVerificationBanner(child: SizedBox.shrink()),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getTopLeft(find.text('Verifica tu correo')).dy,
+      greaterThanOrEqualTo(inset),
+      reason:
+          'con la sesión online el aviso es lo primero de la pantalla: '
+          'debe reservar el inset, no pintarse bajo el status bar',
+    );
   });
 
   testWidgets('Verificar navega a /verify-email con el correo de la sesión', (

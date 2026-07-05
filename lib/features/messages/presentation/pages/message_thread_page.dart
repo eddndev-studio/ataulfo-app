@@ -13,6 +13,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -908,6 +909,9 @@ class _EditMessageDialogState extends State<_EditMessageDialog> {
     super.dispose();
   }
 
+  // Es un prompt de texto (devuelve el nuevo contenido), no un confirm sí/no:
+  // por eso no puede ser showAppConfirmDialog, pero sus acciones sí hablan la
+  // misma anatomía del kit (cancelar en texto, la acción principal rellena).
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Editar mensaje'),
@@ -918,14 +922,14 @@ class _EditMessageDialogState extends State<_EditMessageDialog> {
       maxLines: null,
     ),
     actions: <Widget>[
-      TextButton(
+      AppButton.text(
+        label: 'Cancelar',
         onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Cancelar'),
       ),
-      TextButton(
+      AppButton.filled(
         key: const Key('message.edit.save'),
+        label: 'Guardar',
         onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-        child: const Text('Guardar'),
       ),
     ],
   );
@@ -938,28 +942,16 @@ Future<void> _showDeleteConfirm(
   MessagesBloc bloc,
   String messageId,
 ) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('¿Eliminar para todos?'),
-      content: const Text(
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: '¿Eliminar para todos?',
+    message:
         'El mensaje se eliminará para ti y para el cliente. '
         'Esta acción no se puede deshacer.',
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        TextButton(
-          key: const Key('message.delete.confirm'),
-          onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Eliminar'),
-        ),
-      ],
-    ),
+    confirmLabel: 'Eliminar',
+    confirmKey: const Key('message.delete.confirm'),
   );
-  if (confirmed ?? false) {
+  if (confirmed) {
     bloc.add(MessagesDeleteRequested(messageId: messageId));
   }
 }

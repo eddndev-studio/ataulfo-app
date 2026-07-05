@@ -3,8 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/typing_bubble.dart';
-import '../../domain/entities/monitor_event.dart';
 import '../cubit/monitor_live_cubit.dart';
+import '../live_turn_status.dart';
 
 /// Footer de actividad EN VIVO del bot en un hilo: mientras el runtime está en
 /// un turno (último evento no-terminal) muestra una burbuja "pensando" + qué
@@ -34,7 +34,9 @@ class LiveActivity extends StatelessWidget {
     }
     // Turno presunto colgado: ocultar el footer en vez de seguir "pensando".
     if (state.stalled) return const SizedBox.shrink();
-    final label = _activeLabel(state.events);
+    // La clasificación del feed (qué mantiene un turno vivo) es compartida
+    // con BotStatePill: vive en live_turn_status.
+    final label = liveTurnActivityLabel(state.events);
     if (label == null) return const SizedBox.shrink();
     return _row(
       context,
@@ -86,33 +88,5 @@ class LiveActivity extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  /// Etiqueta del turno en curso, o null si no hay turno activo. Se mira el
-  /// ÚLTIMO evento: un terminal (completed/failed) cierra el turno; los
-  /// no-terminales (turn/tool/flow) lo mantienen vivo.
-  static String? _activeLabel(List<MonitorEvent> events) {
-    if (events.isEmpty) return null;
-    final last = events.last;
-    switch (last.kind) {
-      case MonitorEventKind.aiTool:
-        return last.toolName.isNotEmpty
-            ? 'Usando ${last.toolName}…'
-            : 'Trabajando…';
-      case MonitorEventKind.aiTurn:
-        return 'Pensando…';
-      case MonitorEventKind.flowStarted:
-      case MonitorEventKind.flowStep:
-        return 'Ejecutando un flujo…';
-      case MonitorEventKind.aiCompleted:
-      case MonitorEventKind.aiFailed:
-      case MonitorEventKind.flowCompleted:
-      case MonitorEventKind.flowFailed:
-      case MonitorEventKind.alert:
-      case MonitorEventKind.unknown:
-      case MonitorEventKind.reconnect:
-      case MonitorEventKind.connected:
-        return null;
-    }
   }
 }

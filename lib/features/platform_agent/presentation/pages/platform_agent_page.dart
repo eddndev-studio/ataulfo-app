@@ -112,8 +112,15 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
 }
 
 /// Header full-bleed de la pestaña: reserva el inset del status bar (como las
-/// demás tabs del shell, que van sin AppBar). Marca mango + acciones de
+/// demás tabs del shell, que van sin AppBar). Marca + acciones de modelo,
 /// historial y nuevo hilo.
+///
+/// Deliberadamente NO es la tarjeta-header gradiente de las secciones: esta
+/// tab es un chat (hilo + composer fijos, sin scroll que se lleve el header),
+/// así que el chrome compacto tipo app bar — como el del hilo de mensajes —
+/// preserva la altura del hilo con el teclado abierto; además sus acciones
+/// comunican estado por color (modelo elegido, historial abierto), lenguaje
+/// que no lee sobre el gradiente de marca.
 class _Header extends StatelessWidget {
   const _Header({
     required this.showHistory,

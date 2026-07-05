@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/role_privilege.dart';
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
@@ -41,6 +42,96 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
         ? state.profile.isGroup
         : chatLid.contains('@g.us');
     return isGroup ? ConversationKind.group : ConversationKind.dm;
+  }
+
+  /// Abre el menú "⋮" como hoja inferior canónica (la misma superficie que
+  /// las acciones sobre un mensaje): cada fila devuelve su acción al cerrarse
+  /// la hoja y se despacha con el context del app bar, que sí tiene los
+  /// repos/blocs del scope del hilo.
+  Future<void> _openActionsSheet(BuildContext context, bool isAdmin) async {
+    final action = await showAppBottomSheet<_ThreadAction>(
+      context,
+      backgroundColor: AppTokens.surface1,
+      // Con las entradas ADMIN+ la lista puede superar el tope de una hoja no
+      // controlada en pantallas chicas; con scroll controlado la hoja crece al
+      // contenido y ninguna acción queda inalcanzable.
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp4,
+            vertical: AppTokens.sp2,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                ListTile(
+                  key: const Key('thread.run_flow'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.play_circle_outline),
+                  title: const Text('Correr un flujo'),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(_ThreadAction.runFlow),
+                ),
+                ListTile(
+                  key: const Key('thread.notes'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.sticky_note_2_outlined),
+                  title: const Text('Notas del chat'),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(_ThreadAction.notes),
+                ),
+                if (isAdmin) ...<Widget>[
+                  const Divider(height: AppTokens.sp6),
+                  ListTile(
+                    key: const Key('thread.ai_log'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.psychology_outlined),
+                    title: const Text('Razonamiento del bot'),
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(_ThreadAction.reasoning),
+                  ),
+                  ListTile(
+                    key: const Key('thread.ai_ledger'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: const Text('Bitácora de acciones'),
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(_ThreadAction.ledger),
+                  ),
+                  ListTile(
+                    key: const Key('thread.executions'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.history_outlined),
+                    title: const Text('Ejecuciones del chat'),
+                    onTap: () => Navigator.of(
+                      sheetContext,
+                    ).pop(_ThreadAction.executions),
+                  ),
+                  const Divider(height: AppTokens.sp6),
+                  // Destructiva e irreversible: al final de la hoja, tras su
+                  // propio divisor, y con confirmación antes de despachar.
+                  ListTile(
+                    key: const Key('thread.clear_history'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.delete_sweep_outlined),
+                    title: const Text('Vaciar historial'),
+                    onTap: () => Navigator.of(
+                      sheetContext,
+                    ).pop(_ThreadAction.clearHistory),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    // El await cruzó el cierre de la hoja: el app bar sigue montado salvo que
+    // el hilo entero se haya ido (back físico durante la hoja).
+    if (action == null || !context.mounted) return;
+    _onMenuAction(context, action);
   }
 
   /// Despacha la acción elegida en el menú "⋮": las cotidianas abren un sheet
@@ -133,67 +224,11 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                       chatLid: chatLid,
                     ),
                   ),
-                PopupMenuButton<_ThreadAction>(
+                IconButton(
                   key: const Key('thread.more'),
                   tooltip: 'Más acciones',
                   icon: const Icon(Icons.more_vert),
-                  onSelected: (action) => _onMenuAction(context, action),
-                  itemBuilder: (context) => <PopupMenuEntry<_ThreadAction>>[
-                    const PopupMenuItem<_ThreadAction>(
-                      key: Key('thread.run_flow'),
-                      value: _ThreadAction.runFlow,
-                      child: _MenuItem(
-                        icon: Icons.play_circle_outline,
-                        label: 'Correr un flujo',
-                      ),
-                    ),
-                    const PopupMenuItem<_ThreadAction>(
-                      key: Key('thread.notes'),
-                      value: _ThreadAction.notes,
-                      child: _MenuItem(
-                        icon: Icons.sticky_note_2_outlined,
-                        label: 'Notas del chat',
-                      ),
-                    ),
-                    if (isAdmin) ...<PopupMenuEntry<_ThreadAction>>[
-                      const PopupMenuDivider(),
-                      const PopupMenuItem<_ThreadAction>(
-                        key: Key('thread.ai_log'),
-                        value: _ThreadAction.reasoning,
-                        child: _MenuItem(
-                          icon: Icons.psychology_outlined,
-                          label: 'Razonamiento del bot',
-                        ),
-                      ),
-                      const PopupMenuItem<_ThreadAction>(
-                        key: Key('thread.ai_ledger'),
-                        value: _ThreadAction.ledger,
-                        child: _MenuItem(
-                          icon: Icons.receipt_long_outlined,
-                          label: 'Bitácora de acciones',
-                        ),
-                      ),
-                      const PopupMenuItem<_ThreadAction>(
-                        key: Key('thread.executions'),
-                        value: _ThreadAction.executions,
-                        child: _MenuItem(
-                          icon: Icons.history_outlined,
-                          label: 'Ejecuciones del chat',
-                        ),
-                      ),
-                      const PopupMenuDivider(),
-                      // Destructiva e irreversible (S07 RF#10): al final del
-                      // menú, tras su propio divisor, y con confirmación.
-                      const PopupMenuItem<_ThreadAction>(
-                        key: Key('thread.clear_history'),
-                        value: _ThreadAction.clearHistory,
-                        child: _MenuItem(
-                          icon: Icons.delete_sweep_outlined,
-                          label: 'Vaciar historial',
-                        ),
-                      ),
-                    ],
-                  ],
+                  onPressed: () => _openActionsSheet(context, isAdmin),
                 ),
               ],
             );
@@ -272,26 +307,4 @@ enum _ThreadAction {
   ledger,
   executions,
   clearHistory,
-}
-
-/// Contenido de una entrada del menú: ícono + etiqueta de texto. El texto es
-/// justo lo que los íconos sueltos del app bar no comunicaban.
-class _MenuItem extends StatelessWidget {
-  const _MenuItem({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        Icon(icon, size: 20),
-        const SizedBox(width: AppTokens.sp3),
-        // Acotar el texto al ancho del menú: si no cabe en una línea, envuelve
-        // (como cualquier ítem de menú), en vez de desbordar el Row.
-        Flexible(child: Text(label)),
-      ],
-    );
-  }
 }

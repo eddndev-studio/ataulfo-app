@@ -39,32 +39,56 @@ class ShellPage extends StatefulWidget {
 class _ShellPageState extends State<ShellPage> {
   int _index = 0;
 
-  // El asistente va de último para no recorrer los índices existentes
-  // (Ajustes sigue en 3, que es a donde apuntan los onOpenSettings).
-  static const int _assistantIndex = 4;
+  /// Índice de la tab Ajustes: destino del avatar de los headers de sección.
+  static const int _settingsIndex = 3;
 
-  static const List<_TabSpec> _tabs = <_TabSpec>[
-    _TabSpec(label: 'Bots', icon: Icons.smart_toy_outlined),
-    _TabSpec(label: 'Plantillas', icon: Icons.description_outlined),
-    _TabSpec(label: 'Etiquetas', icon: Icons.label_outline),
-    _TabSpec(label: 'Ajustes', icon: Icons.settings_outlined),
-    _TabSpec(label: 'Asistente', icon: Icons.auto_awesome),
-  ];
-
-  // Los bodies ya no son `static const` porque BotsListPage/TemplatesListPage
-  // reciben el routeObserver del widget. Late + final mantiene el mismo
-  // requisito de "se construye una sola vez al primer build".
-  late final List<Widget> _bodies = <Widget>[
-    BotsListPage(
-      routeObserver: widget.routeObserver,
-      onOpenSettings: () => _select(3),
+  /// Punto ÚNICO de verdad de las tabs: por entrada viven juntos la etiqueta
+  /// e ícono del navegador, la página del IndexedStack y el FAB contextual.
+  /// Late + final: la lista se construye una sola vez al primer build (las
+  /// páginas conservan su identidad de widget entre rebuilds, y con ella el
+  /// IndexedStack su estado); no puede ser const porque Bots/Templates
+  /// reciben el routeObserver del widget.
+  late final List<_TabSpec> _tabs = <_TabSpec>[
+    _TabSpec(
+      label: 'Bots',
+      icon: Icons.smart_toy_outlined,
+      page: BotsListPage(
+        routeObserver: widget.routeObserver,
+        onOpenSettings: () => _select(_settingsIndex),
+      ),
+      fab: _botCreateFab,
     ),
-    TemplatesListPage(
-      routeObserver: widget.routeObserver,
-      onOpenSettings: () => _select(3),
+    _TabSpec(
+      label: 'Plantillas',
+      icon: Icons.description_outlined,
+      page: TemplatesListPage(
+        routeObserver: widget.routeObserver,
+        onOpenSettings: () => _select(_settingsIndex),
+      ),
+      fab: _templateCreateFab,
     ),
-    LabelsAdminPage(onOpenSettings: () => _select(3)),
-    const SettingsPage(),
+    _TabSpec(
+      label: 'Etiquetas',
+      icon: Icons.label_outline,
+      page: LabelsAdminPage(onOpenSettings: () => _select(_settingsIndex)),
+      fab: _labelCreateFab,
+    ),
+    const _TabSpec(
+      label: 'Ajustes',
+      icon: Icons.settings_outlined,
+      page: SettingsPage(),
+    ),
+    // El asistente va al final (los índices previos son contrato de los
+    // onOpenSettings) y lazy: su chat (que lee PlatformAgentChatBloc y
+    // muestra un spinner mientras carga) no debe vivir offstage en el
+    // IndexedStack — evita el spinner oculto que colgaría pumpAndSettle y
+    // difiere la carga hasta abrir la tab.
+    const _TabSpec(
+      label: 'Asistente',
+      icon: Icons.auto_awesome,
+      page: PlatformAgentPage(),
+      lazy: true,
+    ),
   ];
 
   void _select(int i) => setState(() => _index = i);
@@ -76,31 +100,27 @@ class _ShellPageState extends State<ShellPage> {
         final useRail = constraints.maxWidth >= 600;
         // IndexedStack preserva el estado interno de cada tab (scroll
         // de la lista, bloc compartido por el shell) entre cambios. El aviso
-        // de verificación se apila ENCIMA del contenido de las tabs (sólo se
-        // pinta a sí mismo cuando el correo no está verificado), idéntico en
-        // ambos layouts (compact y rail).
-        // La pestaña del asistente se materializa SOLO cuando está activa: así
-        // su chat (que lee PlatformAgentChatBloc y muestra un spinner mientras
-        // carga) no vive offstage en el IndexedStack — evita el spinner oculto
-        // que colgaría pumpAndSettle y difiere la carga hasta abrir la tab.
-        final body = Column(
-          children: <Widget>[
-            const EmailVerificationBanner(),
-            Expanded(
-              child: IndexedStack(
-                index: _index,
-                children: <Widget>[
-                  ..._bodies,
-                  _index == _assistantIndex
-                      ? const PlatformAgentPage()
-                      : const SizedBox.shrink(),
-                ],
-              ),
-            ),
-          ],
+        // de verificación envuelve el contenido de las tabs (sólo pinta su
+        // franja cuando el correo no está verificado, y coordina el inset del
+        // status bar), idéntico en ambos layouts (compact y rail).
+        final body = EmailVerificationBanner(
+          child: IndexedStack(
+            index: _index,
+            children: <Widget>[
+              for (var i = 0; i < _tabs.length; i++)
+                if (_tabs[i].lazy && i != _index)
+                  const SizedBox.shrink()
+                else
+                  _tabs[i].page,
+            ],
+          ),
         );
-        // Sin AppBar del shell: TODAS las tabs traen header rico propio
-        // (la tarjeta-header full-bleed ES su encabezado).
+        // Sin AppBar del shell: cada tab trae su propio encabezado. Las
+        // secciones montan la tarjeta-header full-bleed del kit; el asistente
+        // (una superficie de chat con el hilo + composer fijos) trae chrome
+        // compacto tipo app bar, porque un header alto y fijo le restaría
+        // altura al hilo con el teclado abierto y sus acciones con estado no
+        // leerían sobre el gradiente.
         return Scaffold(
           body: useRail
               ? Row(
@@ -122,7 +142,7 @@ class _ShellPageState extends State<ShellPage> {
                   ],
                 )
               : body,
-          floatingActionButton: _fab(context, _index),
+          floatingActionButton: _tabs[_index].fab?.call(context),
           bottomNavigationBar: useRail
               ? null
               : BottomNavigationBar(
@@ -142,45 +162,58 @@ class _ShellPageState extends State<ShellPage> {
   }
 }
 
+/// Una tab del shell: etiqueta + ícono del navegador, la página que monta el
+/// IndexedStack, su FAB contextual (null ⇒ la tab no crea nada) y si la
+/// página se materializa solo con la tab activa.
 class _TabSpec {
-  const _TabSpec({required this.label, required this.icon});
+  const _TabSpec({
+    required this.label,
+    required this.icon,
+    required this.page,
+    this.fab,
+    this.lazy = false,
+  });
+
   final String label;
   final IconData icon;
+  final Widget page;
+  final Widget Function(BuildContext context)? fab;
+  final bool lazy;
 }
 
-/// FAB por tab. Bots y Plantillas abren su hoja de creación (bottom sheet)
-/// in situ sobre el shell; al crear con éxito la hoja devuelve la entidad y
-/// aquí se empuja su detalle. No navegan a una pantalla intermedia: el back
-/// físico cierra la hoja sin salir del listado. La tab Etiquetas abre su
-/// propia hoja de creación.
-Widget? _fab(BuildContext context, int index) => switch (index) {
-  0 => FloatingActionButton(
-    key: const Key('shell.fab.bot_create'),
-    onPressed: () async {
-      final bot = await BotCreateSheet.open(context);
-      if (bot != null && context.mounted) {
-        unawaited(context.push('/bots/${bot.id}'));
-      }
-    },
-    tooltip: 'Crear bot',
-    child: const Icon(Icons.add),
-  ),
-  1 => FloatingActionButton(
-    key: const Key('shell.fab.template_create'),
-    onPressed: () async {
-      final template = await TemplateCreateSheet.open(context);
-      if (template != null && context.mounted) {
-        unawaited(context.push('/templates/${template.id}'));
-      }
-    },
-    tooltip: 'Crear plantilla',
-    child: const Icon(Icons.add),
-  ),
-  2 => FloatingActionButton(
-    key: const Key('shell.fab.label_create'),
-    onPressed: () => LabelEditSheet.openCreate(context),
-    tooltip: 'Crear etiqueta',
-    child: const Icon(Icons.add),
-  ),
-  _ => null,
-};
+// FABs por tab. Bots y Plantillas abren su hoja de creación (bottom sheet)
+// in situ sobre el shell; al crear con éxito la hoja devuelve la entidad y
+// aquí se empuja su detalle. No navegan a una pantalla intermedia: el back
+// físico cierra la hoja sin salir del listado. La tab Etiquetas abre su
+// propia hoja de creación.
+
+Widget _botCreateFab(BuildContext context) => FloatingActionButton(
+  key: const Key('shell.fab.bot_create'),
+  onPressed: () async {
+    final bot = await BotCreateSheet.open(context);
+    if (bot != null && context.mounted) {
+      unawaited(context.push('/bots/${bot.id}'));
+    }
+  },
+  tooltip: 'Crear bot',
+  child: const Icon(Icons.add),
+);
+
+Widget _templateCreateFab(BuildContext context) => FloatingActionButton(
+  key: const Key('shell.fab.template_create'),
+  onPressed: () async {
+    final template = await TemplateCreateSheet.open(context);
+    if (template != null && context.mounted) {
+      unawaited(context.push('/templates/${template.id}'));
+    }
+  },
+  tooltip: 'Crear plantilla',
+  child: const Icon(Icons.add),
+);
+
+Widget _labelCreateFab(BuildContext context) => FloatingActionButton(
+  key: const Key('shell.fab.label_create'),
+  onPressed: () => LabelEditSheet.openCreate(context),
+  tooltip: 'Crear etiqueta',
+  child: const Icon(Icons.add),
+);

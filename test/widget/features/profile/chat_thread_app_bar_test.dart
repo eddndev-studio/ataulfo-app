@@ -294,6 +294,19 @@ void main() {
       expect(find.byKey(const Key('thread.more')), findsOneWidget);
     });
 
+    testWidgets('el menú abre como hoja inferior canónica, no PopupMenu', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const ProfileLoading());
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('thread.more')));
+      await tester.pumpAndSettle();
+      // Misma superficie que el resto de menús contextuales de la app
+      // (p. ej. las acciones sobre un mensaje): hoja inferior con manija.
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byWidgetPredicate((w) => w is PopupMenuButton), findsNothing);
+    });
+
     testWidgets('correr flujo y notas viven en el menú, no en la barra', (
       tester,
     ) async {

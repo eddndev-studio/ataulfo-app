@@ -10,6 +10,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../../core/i18n/role_labels.dart';
@@ -96,83 +97,47 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-/// Header full-bleed con el gradiente de marca: la identidad del operador es
-/// el contenido principal de Ajustes (quién soy, con qué rol), no un texto
-/// suelto al inicio de una lista.
+/// Header de Ajustes: el AppHeaderCard del kit con la identidad del operador
+/// como contenido principal (quién soy, con qué rol), no un texto suelto al
+/// inicio de una lista. Sin saludo ni avatar de perfil arriba: esta tab ES el
+/// perfil, así que la identidad vive en el slot de contenido.
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({required this.identity});
 
   final Identity identity;
 
-  /// Gradiente de marca VERTICAL, idéntico al de los headers de sección.
-  static const LinearGradient _gradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: <Color>[AppTokens.primary, AppTokens.accent],
-  );
-
   @override
   Widget build(BuildContext context) {
-    final topInset = MediaQuery.paddingOf(context).top;
     final user = userGreeting(identity.email);
-    return ClipRRect(
+    return AppHeaderCard(
       key: const Key('settings.header'),
-      borderRadius: const BorderRadius.only(
-        bottomLeft: Radius.circular(28),
-        bottomRight: Radius.circular(28),
-      ),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(gradient: _gradient),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppTokens.sp5,
-            topInset + AppTokens.sp5,
-            AppTokens.sp5,
-            AppTokens.sp6,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                'Ajustes',
-                style: AppTokens.heroTitle.copyWith(color: AppTokens.onPrimary),
-              ),
-              const SizedBox(height: AppTokens.sp5),
-              Row(
-                children: <Widget>[
-                  AppAvatar(
-                    name: user.initial,
-                    size: 56,
-                    colorKey: identity.email,
+      title: 'Ajustes',
+      content: Row(
+        children: <Widget>[
+          AppAvatar(name: user.initial, size: 56, colorKey: identity.email),
+          const SizedBox(width: AppTokens.sp4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  identity.email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: AppTokens.fontSans,
+                    fontSize: AppTokens.bodyLSize,
+                    fontWeight: FontWeight.w600,
+                    color: AppTokens.onPrimary,
                   ),
-                  const SizedBox(width: AppTokens.sp4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          identity.email,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: AppTokens.fontSans,
-                            fontSize: AppTokens.bodyLSize,
-                            fontWeight: FontWeight.w600,
-                            color: AppTokens.onPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: AppTokens.sp2),
-                        AppPill.glass(label: roleLabel(identity.role)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: AppTokens.sp2),
+                AppPill.glass(label: roleLabel(identity.role)),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
