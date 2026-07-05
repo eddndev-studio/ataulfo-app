@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/design/tokens.dart';
 import '../../domain/entities/media_asset.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
+import '../media_format.dart';
 
 /// Miniatura cuadrada de un asset en el grid de la galería.
 ///
@@ -190,22 +191,10 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
       color: AppTokens.surface2,
       alignment: Alignment.center,
       child: Icon(
-        _iconFor(asset.contentType),
+        mediaTypeIcon(asset.contentType),
         color: AppTokens.text2,
         size: 28,
       ),
     );
-  }
-
-  /// Ícono representativo por familia de `contentType`. Un tipo no catalogado
-  /// cae al genérico de archivo.
-  static IconData _iconFor(String contentType) {
-    if (contentType.startsWith('image/')) return Icons.image_outlined;
-    if (contentType.startsWith('video/')) return Icons.movie_outlined;
-    if (contentType.startsWith('audio/')) return Icons.audiotrack_outlined;
-    if (contentType == 'application/pdf') {
-      return Icons.picture_as_pdf_outlined;
-    }
-    return Icons.insert_drive_file_outlined;
   }
 }

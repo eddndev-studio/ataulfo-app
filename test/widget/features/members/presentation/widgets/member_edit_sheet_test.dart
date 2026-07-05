@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/features/members/domain/entities/member.dart';
 import 'package:ataulfo/features/members/presentation/widgets/member_edit_sheet.dart';
 import 'package:flutter/material.dart';
@@ -71,21 +72,27 @@ void main() {
     expect(find.byKey(const Key('member_edit.role')), findsOneWidget);
   });
 
-  testWidgets('el dropdown ofrece los cuatro roles', (tester) async {
+  testWidgets('el picker ofrece los cuatro roles como chips a la vista', (
+    tester,
+  ) async {
     final read = pumpHost(tester, _worker, isSelf: false);
     await read();
 
-    await tester.tap(find.byKey(const Key('member_edit.role')));
-    await tester.pumpAndSettle();
-
+    // Los cuatro roles como AppChoiceChip, sin abrir nada; el rol actual
+    // (WORKER) llega preseleccionado.
+    expect(find.byType(AppChoiceChip), findsNWidgets(4));
     for (final role in const <String>[
       'Propietario',
       'Administrador',
       'Supervisor',
       'Agente',
     ]) {
-      expect(find.text(role), findsWidgets);
+      expect(find.widgetWithText(AppChoiceChip, role), findsOneWidget);
     }
+    final worker = tester.widget<AppChoiceChip>(
+      find.widgetWithText(AppChoiceChip, 'Agente'),
+    );
+    expect(worker.selected, isTrue);
   });
 
   testWidgets('Guardar está deshabilitado si el rol no cambió (no-op)', (
@@ -106,9 +113,7 @@ void main() {
     final read = pumpHost(tester, _worker, isSelf: false);
     await read();
 
-    await tester.tap(find.byKey(const Key('member_edit.role')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Administrador').last);
+    await tester.tap(find.text('Administrador'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('member_edit.save')));

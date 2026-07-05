@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -16,7 +15,6 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
-import '../../../labels/domain/repositories/labels_repository.dart';
 import '../../../labels/presentation/bloc/labels_bloc.dart';
 import '../../../media/domain/entities/media_asset.dart';
 import '../../../triggers/presentation/widgets/flow_triggers_tab.dart';
@@ -566,38 +564,20 @@ class _StepCard extends StatelessWidget {
   }
 }
 
-/// Abre el sheet de edición pasando el FlowStepsBloc del scope y, si
-/// `step` viene, el step a editar. La función vive a nivel de archivo
-/// porque la usan tanto _StepsTab (botón "Nuevo paso") como _StepCard
-/// (tap del card).
+/// Abre el sheet de edición y, si `step` viene, el step a editar. La función
+/// vive a nivel de archivo porque la usan tanto _StepsTab (botón "Nuevo
+/// paso") como _StepCard (tap del card). `StepEditSheet.open` re-provee los
+/// blocs del scope y aplica el fondo canónico.
+///
+/// Al crear o reemplazar el recurso de un step multimedia, el selector abre
+/// la galería en modo picker (`/media/pick?type=<familia>`, filtrada por el
+/// tipo del paso) que devuelve el MediaAsset completo vía pop.
 void _openStepSheet(BuildContext context, sdom.Step? step) {
-  final bloc = context.read<FlowStepsBloc>();
-  final labelsRepo = context.read<LabelsRepository>();
-  showAppBottomSheet<void>(
+  StepEditSheet.open(
     context,
-    isScrollControlled: true,
-    builder: (sheetCtx) => MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<FlowStepsBloc>.value(value: bloc),
-        // LabelsBloc para el selector del paso LABEL (carga única del catálogo
-        // org-scoped). Si el usuario no elige LABEL, el bloc carga igual —
-        // barato — y se descarta al cerrar el sheet.
-        BlocProvider<LabelsBloc>(
-          create: (_) =>
-              LabelsBloc(repo: labelsRepo)..add(const LabelsLoadRequested()),
-        ),
-      ],
-      // Al crear o reemplazar el recurso de un step multimedia, el selector
-      // abre la galería en modo picker (`/media/pick?type=<familia>`, filtrada
-      // por el tipo del paso) que devuelve el MediaAsset completo vía pop. Se
-      // cablea igual al crear y al editar; el sheet decide la interactividad
-      // según el tipo de step y aporta la familia.
-      child: StepEditSheet(
-        editing: step,
-        pickMediaRef: (ctx, family) => ctx.push<MediaAsset>(
-          family == null ? '/media/pick' : '/media/pick?type=$family',
-        ),
-      ),
+    editing: step,
+    pickMediaRef: (ctx, family) => ctx.push<MediaAsset>(
+      family == null ? '/media/pick' : '/media/pick?type=$family',
     ),
   );
 }

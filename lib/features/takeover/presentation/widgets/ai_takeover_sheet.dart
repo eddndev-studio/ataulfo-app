@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_button.dart';
 import '../../../bots/domain/repositories/bots_repository.dart';
 import '../../../labels/domain/repositories/chat_labels_repository.dart';
 import '../../../templates/domain/repositories/templates_repository.dart';
@@ -58,15 +57,15 @@ class AiTakeoverSheet extends StatelessWidget {
         },
         builder: (context, state) => Padding(
           key: const Key('takeover.sheet'),
-          padding: const EdgeInsets.all(AppTokens.sp5),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp4,
+            vertical: AppTokens.sp5,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                'Control del bot en este chat',
-                style: textTheme.titleMedium,
-              ),
+              Text('Control del bot en este chat', style: textTheme.titleLarge),
               const SizedBox(height: AppTokens.sp4),
               switch (state) {
                 AiTakeoverLoading() => const Center(
@@ -130,14 +129,19 @@ class AiTakeoverSheet extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: AppTokens.sp4),
-        AppButton.filled(
+        const Divider(height: AppTokens.sp6),
+        // Fila de menú, no botón CTA: la hoja es un menú de acciones sobre el
+        // chat y su única acción habla el mismo idioma que las demás hojas de
+        // acciones (fila ListTile al ras del padding del sheet).
+        ListTile(
           key: const Key('takeover.toggle'),
-          label: paused ? 'Reanudar bot' : 'Pausar bot aquí',
-          onPressed: busy
-              ? null
-              : () => context.read<AiTakeoverCubit>().toggle(),
-          fullWidth: true,
+          contentPadding: EdgeInsets.zero,
+          enabled: !busy,
+          leading: Icon(
+            paused ? Icons.play_circle_outline : Icons.pause_circle_outline,
+          ),
+          title: Text(paused ? 'Reanudar bot' : 'Pausar bot aquí'),
+          onTap: () => context.read<AiTakeoverCubit>().toggle(),
         ),
       ],
     );

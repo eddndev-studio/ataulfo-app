@@ -7,6 +7,7 @@ import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_color_swatch_picker.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/label.dart';
 import '../../domain/failures/labels_failure.dart';
@@ -250,9 +251,9 @@ class _LabelEditSheetState extends State<LabelEditSheet> {
   };
 }
 
-/// Rejilla de swatches hex. El seleccionado lleva un anillo de marca. Si el
-/// color vigente no está en la paleta curada (p. ej. creado por API), se
-/// muestra como swatch extra al inicio para no perderlo.
+/// Rejilla de swatches hex sobre el picker compartido del kit. Si el color
+/// vigente no está en la paleta curada (p. ej. creado por API), se muestra
+/// como swatch extra al inicio para no perderlo.
 class _ColorPicker extends StatelessWidget {
   const _ColorPicker({
     required this.selected,
@@ -270,71 +271,24 @@ class _ColorPicker extends StatelessWidget {
     final inPalette = LabelColorPalette.hexColors.any(
       (c) => c.toLowerCase() == lower,
     );
-    return Wrap(
-      spacing: AppTokens.sp3,
-      runSpacing: AppTokens.sp3,
-      children: <Widget>[
+    return AppColorSwatchPicker(
+      enabled: enabled,
+      options: <AppColorSwatchOption>[
         if (!inPalette)
-          _Swatch(
-            swatchKey: const Key('label_palette.current'),
-            hex: selected,
+          AppColorSwatchOption(
+            key: const Key('label_palette.current'),
+            swatch: LabelDot(hex: selected, size: 28),
             selected: true,
-            enabled: enabled,
             onTap: () => onSelected(selected),
           ),
         for (var i = 0; i < LabelColorPalette.hexColors.length; i++)
-          _Swatch(
-            swatchKey: Key('label_palette.$i'),
-            hex: LabelColorPalette.hexColors[i],
+          AppColorSwatchOption(
+            key: Key('label_palette.$i'),
+            swatch: LabelDot(hex: LabelColorPalette.hexColors[i], size: 28),
             selected: LabelColorPalette.hexColors[i].toLowerCase() == lower,
-            enabled: enabled,
             onTap: () => onSelected(LabelColorPalette.hexColors[i]),
           ),
       ],
-    );
-  }
-}
-
-class _Swatch extends StatelessWidget {
-  const _Swatch({
-    required this.swatchKey,
-    required this.hex,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final Key swatchKey;
-  final String hex;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    // 44x44 de área de toque (el círculo visible sigue siendo 38): opaque
-    // hace tappable todo el cuadro, no sólo los píxeles pintados.
-    return GestureDetector(
-      key: swatchKey,
-      behavior: HitTestBehavior.opaque,
-      onTap: enabled ? onTap : null,
-      child: SizedBox(
-        width: 44,
-        height: 44,
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected ? AppTokens.primary : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: LabelDot(hex: hex, size: 28),
-          ),
-        ),
-      ),
     );
   }
 }

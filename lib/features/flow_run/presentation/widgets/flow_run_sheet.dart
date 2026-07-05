@@ -66,25 +66,25 @@ class _FlowRunSheetState extends State<FlowRunSheet> {
     final textTheme = Theme.of(context).textTheme;
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.only(bottom: context.safeBottomInset),
+        // Padding canónico de menú-sheet; las filas van al ras (contentPadding
+        // cero) y la sangría la aporta el propio sheet.
+        padding: EdgeInsets.fromLTRB(
+          AppTokens.sp4,
+          AppTokens.sp5,
+          AppTokens.sp4,
+          AppTokens.sp5 + context.safeBottomInset,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppTokens.sp4,
-                AppTokens.sp4,
-                AppTokens.sp4,
-                AppTokens.sp2,
-              ),
-              child: Text('Correr un flujo', style: textTheme.titleMedium),
-            ),
+            Text('Correr un flujo', style: textTheme.titleLarge),
+            const SizedBox(height: AppTokens.sp2),
             BlocBuilder<FlowRunCubit, FlowRunState>(
               builder: (context, state) => switch (state) {
                 FlowRunInitial() || FlowRunLoading() => const Padding(
                   key: Key('flow_run.loading'),
-                  padding: EdgeInsets.all(AppTokens.sp6),
+                  padding: EdgeInsets.symmetric(vertical: AppTokens.sp6),
                   child: Center(
                     child: CircularProgressIndicator(
                       valueColor: AlwaysStoppedAnimation<Color>(
@@ -97,7 +97,9 @@ class _FlowRunSheetState extends State<FlowRunSheet> {
                   flows.isEmpty
                       ? Padding(
                           key: const Key('flow_run.empty'),
-                          padding: const EdgeInsets.all(AppTokens.sp6),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppTokens.sp6,
+                          ),
                           child: Text(
                             'Este bot no tiene flujos activos',
                             style: textTheme.bodyLarge,
@@ -110,6 +112,7 @@ class _FlowRunSheetState extends State<FlowRunSheet> {
                               for (final f in flows)
                                 ListTile(
                                   key: Key('flow_run.item.${f.id}'),
+                                  contentPadding: EdgeInsets.zero,
                                   enabled: !_running,
                                   leading: const Icon(
                                     Icons.play_circle_outline,
@@ -123,7 +126,7 @@ class _FlowRunSheetState extends State<FlowRunSheet> {
                         ),
                 FlowRunFailed(failure: final f) => Padding(
                   key: const Key('flow_run.error'),
-                  padding: const EdgeInsets.all(AppTokens.sp6),
+                  padding: const EdgeInsets.symmetric(vertical: AppTokens.sp4),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,

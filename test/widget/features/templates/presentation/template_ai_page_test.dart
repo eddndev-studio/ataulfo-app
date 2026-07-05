@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
@@ -659,6 +660,30 @@ void main() {
             )
             .onPressed,
         isNull,
+      );
+    });
+
+    testWidgets('el copy de error sale del textTheme, no de un estilo crudo', (
+      tester,
+    ) async {
+      when(
+        () => labelsBloc.state,
+      ).thenReturn(const LabelsFailed(LabelsServerFailure()));
+
+      await tester.pumpWidget(host());
+      await tester.tap(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
+      await tester.pumpAndSettle();
+
+      final finder = find.descendant(
+        of: find.byKey(const Key('template_ai.sheet.silence.error')),
+        matching: find.text('No pudimos cargar las etiquetas.'),
+      );
+      final ctx = tester.element(finder);
+      expect(
+        tester.widget<Text>(finder).style,
+        Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
       );
     });
   });

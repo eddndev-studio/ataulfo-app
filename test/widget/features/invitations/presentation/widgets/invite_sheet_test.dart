@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/features/invitations/presentation/widgets/invite_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +42,20 @@ void main() {
 
     expect(find.byKey(const Key('invite.email')), findsOneWidget);
     expect(find.byKey(const Key('invite.role')), findsOneWidget);
+  });
+
+  testWidgets('el rol se elige con chips del kit (todos a la vista)', (
+    tester,
+  ) async {
+    final read = pumpHost(tester);
+    await read();
+
+    // Tres opciones (sin OWNER) como AppChoiceChip, con WORKER preseleccionado.
+    expect(find.byType(AppChoiceChip), findsNWidgets(3));
+    final worker = tester.widget<AppChoiceChip>(
+      find.widgetWithText(AppChoiceChip, 'Agente'),
+    );
+    expect(worker.selected, isTrue);
   });
 
   testWidgets('Enviar está deshabilitado con el correo vacío', (tester) async {
@@ -98,9 +113,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('invite.email')), 'a@x.com');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('invite.role')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Administrador').last);
+    await tester.tap(find.text('Administrador'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('invite.submit')));
     await tester.pumpAndSettle();

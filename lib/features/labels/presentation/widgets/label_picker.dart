@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_option_row.dart';
 import '../../domain/entities/label.dart';
 import '../bloc/labels_bloc.dart';
 import 'label_dot.dart';
@@ -186,38 +187,13 @@ class _LabelOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return InkWell(
+    return AppOptionRow(
       key: Key('$keyPrefix.option.${label.id}'),
+      leading: LabelDot(hex: label.color),
+      title: label.name,
+      selected: selected,
+      selectedIconKey: Key('$keyPrefix.selected'),
       onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      child: Padding(
-        // sp3 vertical ⇒ fila ≥44px: piso táctil para acertar con el pulgar.
-        padding: const EdgeInsets.symmetric(
-          vertical: AppTokens.sp3,
-          horizontal: AppTokens.sp1,
-        ),
-        child: Row(
-          children: <Widget>[
-            LabelDot(hex: label.color),
-            const SizedBox(width: AppTokens.sp2),
-            Expanded(
-              child: Text(
-                label.name,
-                style: textTheme.bodyMedium,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (selected)
-              Icon(
-                Icons.check_circle,
-                key: Key('$keyPrefix.selected'),
-                color: AppTokens.primary,
-                size: 20,
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -266,7 +242,7 @@ class _UnknownOption extends StatelessWidget {
             ),
           ),
           Icon(
-            Icons.check_circle,
+            Icons.check,
             key: Key('$keyPrefix.selected'),
             color: AppTokens.primary,
             size: 20,

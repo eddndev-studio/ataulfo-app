@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_option_row.dart';
 import '../../../labels/domain/entities/label.dart';
 import '../../../labels/presentation/widgets/label_dot.dart';
 import '../../domain/entities/wa_label.dart';
@@ -207,29 +208,11 @@ class _LabelOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return InkWell(
+    return AppOptionRow(
+      leading: LabelDot(hex: label.color, size: 18),
+      title: label.name,
+      selected: selected,
       onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp3),
-        child: Row(
-          children: <Widget>[
-            LabelDot(hex: label.color, size: 18),
-            const SizedBox(width: AppTokens.sp3),
-            Expanded(
-              child: Text(
-                label.name,
-                style: textTheme.bodyLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (selected)
-              const Icon(Icons.check, color: AppTokens.primary, size: 20),
-          ],
-        ),
-      ),
     );
   }
 }

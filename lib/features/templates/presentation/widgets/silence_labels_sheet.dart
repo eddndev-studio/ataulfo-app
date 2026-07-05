@@ -236,10 +236,12 @@ class _ErrorRetry extends StatelessWidget {
     return Row(
       key: const Key('template_ai.sheet.silence.error'),
       children: <Widget>[
-        const Expanded(
+        Expanded(
           child: Text(
             'No pudimos cargar las etiquetas.',
-            style: TextStyle(color: AppTokens.danger),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
           ),
         ),
         AppButton.text(

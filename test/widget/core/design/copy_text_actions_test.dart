@@ -53,6 +53,33 @@ void main() {
     expect(find.text('Mensaje copiado'), findsOneWidget);
   });
 
+  testWidgets('copias seguidas reemplazan el aviso en vez de encolarlo', (
+    tester,
+  ) async {
+    interceptClipboard(tester);
+    late BuildContext ctx;
+    await tester.pumpWidget(
+      host(
+        Builder(
+          builder: (context) {
+            ctx = context;
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    await copyTextToClipboard(ctx, 'uno', confirm: 'Aviso uno');
+    await tester.pump();
+    await copyTextToClipboard(ctx, 'dos', confirm: 'Aviso dos');
+    await tester.pump();
+    // Sin reemplazo, "Aviso dos" espera en cola a que "Aviso uno" agote sus
+    // segundos: copiar dos veces se sentiría sin respuesta.
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Aviso dos'), findsOneWidget);
+    expect(find.text('Aviso uno'), findsNothing);
+  });
+
   testWidgets('Seleccionar texto abre la hoja con SelectableText', (
     tester,
   ) async {

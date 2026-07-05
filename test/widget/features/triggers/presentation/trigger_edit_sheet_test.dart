@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
@@ -856,6 +857,47 @@ void main() {
       // con Loaded, no podría ni montarse. _didSubmit gate-a el pop.
       await pumpHost(tester);
       expect(find.text('Nuevo disparador'), findsOneWidget);
+    });
+  });
+
+  group('TriggerEditSheet.open', () {
+    testWidgets('abre el modal sobre surface1 con los blocs re-provistos', (
+      tester,
+    ) async {
+      final triggers = _MockTriggersBloc();
+      when(() => triggers.state).thenReturn(const TriggersLoaded(<Trigger>[]));
+      final labels = _MockLabelsBloc();
+      when(() => labels.state).thenReturn(LabelsLoaded(<Label>[_lbl()]));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TriggersBloc>.value(value: triggers),
+              BlocProvider<LabelsBloc>.value(value: labels),
+            ],
+            child: Scaffold(
+              body: Builder(
+                builder: (ctx) => Center(
+                  child: ElevatedButton(
+                    onPressed: () =>
+                        TriggerEditSheet.open(ctx, scopedFlow: _flow()),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+      expect(sheet.backgroundColor, AppTokens.surface1);
+      // El modal ve los blocs del scope: el form montó completo.
+      expect(find.byKey(const Key('trigger_edit.submit')), findsOneWidget);
     });
   });
 }

@@ -4,6 +4,8 @@ import '../../../../core/ai/ai_config.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_select_field.dart';
+import '../../../../core/design/widgets/app_toggle_row.dart';
 
 /// Sheet del seguimiento por inactividad: toggle + espera + intentos. La
 /// espera se elige de un set cerrado (el backend valida 30 min..30 días) y
@@ -59,52 +61,43 @@ class _AiConfigFollowUpSheetState extends State<AiConfigFollowUpSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text('Seguimiento por inactividad', style: textTheme.titleLarge),
-            const SizedBox(height: 2),
-            Text(
-              'Si el cliente no responde tras un tiempo, el bot decide si '
-              'enviar UN seguimiento útil (o no enviar nada). Un mensaje del '
-              'cliente reinicia el ciclo.',
-              style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-            ),
             const SizedBox(height: AppTokens.sp4),
-            SwitchListTile(
-              key: Key('${widget.keyPrefix}.sheet.follow_up.enabled'),
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Dar seguimiento automático'),
+            AppToggleRow(
+              switchKey: Key('${widget.keyPrefix}.sheet.follow_up.enabled'),
+              label: 'Dar seguimiento automático',
+              caption:
+                  'Si el cliente no responde tras un tiempo, el bot decide si '
+                  'enviar UN seguimiento útil (o no enviar nada). Un mensaje '
+                  'del cliente reinicia el ciclo.',
               value: _enabled,
               onChanged: (v) => setState(() => _enabled = v),
             ),
             if (_enabled) ...<Widget>[
-              const SizedBox(height: AppTokens.sp2),
-              DropdownButtonFormField<int>(
+              const SizedBox(height: AppTokens.sp4),
+              AppSelectField<int>(
                 key: Key('${widget.keyPrefix}.sheet.follow_up.delay'),
-                initialValue: _delay,
-                decoration: const InputDecoration(labelText: 'Esperar'),
+                label: 'Esperar',
+                value: _delay,
                 // Un delay guardado fuera del set (p. ej. fijado por el agente
                 // de plataforma) se muestra como entrada propia: el sheet
                 // JAMÁS aparenta un valor distinto del que Guardar persiste.
-                items: <DropdownMenuItem<int>>[
+                options: <AppSelectOption<int>>[
                   if (!_delays.containsValue(_delay))
-                    DropdownMenuItem<int>(
-                      value: _delay,
-                      child: Text('$_delay min (personalizado)'),
-                    ),
+                    AppSelectOption<int>(_delay, '$_delay min (personalizado)'),
                   for (final e in _delays.entries)
-                    DropdownMenuItem<int>(value: e.value, child: Text(e.key)),
+                    AppSelectOption<int>(e.value, e.key),
                 ],
                 onChanged: (v) => setState(() => _delay = v ?? 1440),
               ),
               const SizedBox(height: AppTokens.sp4),
-              DropdownButtonFormField<int>(
+              AppSelectField<int>(
                 key: Key('${widget.keyPrefix}.sheet.follow_up.attempts'),
-                initialValue: _attempts.clamp(1, 3),
-                decoration: const InputDecoration(
-                  labelText: 'Intentos máximos por ciclo',
-                ),
-                items: const <DropdownMenuItem<int>>[
-                  DropdownMenuItem<int>(value: 1, child: Text('1')),
-                  DropdownMenuItem<int>(value: 2, child: Text('2')),
-                  DropdownMenuItem<int>(value: 3, child: Text('3')),
+                label: 'Intentos máximos por ciclo',
+                value: _attempts.clamp(1, 3),
+                options: const <AppSelectOption<int>>[
+                  AppSelectOption<int>(1, '1'),
+                  AppSelectOption<int>(2, '2'),
+                  AppSelectOption<int>(3, '3'),
                 ],
                 onChanged: (v) => setState(() => _attempts = v ?? 1),
               ),

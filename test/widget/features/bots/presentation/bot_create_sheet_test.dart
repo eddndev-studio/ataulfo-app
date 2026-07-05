@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
@@ -287,6 +288,24 @@ void main() {
       await tester.pumpWidget(nameHost());
 
       expect(find.byKey(const Key('bot_create.error.network')), findsOneWidget);
+    });
+
+    testWidgets('el copy de error sale del textTheme, no de un estilo crudo', (
+      tester,
+    ) async {
+      tall(tester);
+      when(
+        () => botBloc.state,
+      ).thenReturn(const BotCreateFailed(BotsInvalidCreateFailure()));
+
+      await tester.pumpWidget(nameHost());
+
+      final finder = find.byKey(const Key('bot_create.error.invalid_create'));
+      final ctx = tester.element(finder);
+      expect(
+        tester.widget<Text>(finder).style,
+        Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
+      );
     });
 
     testWidgets('Failed(Server) colapsa al copy genérico', (tester) async {

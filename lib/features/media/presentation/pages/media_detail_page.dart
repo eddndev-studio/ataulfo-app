@@ -5,11 +5,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../domain/entities/media_asset.dart';
 import '../../domain/repositories/media_preview_launcher.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../bloc/media_detail_cubit.dart';
 import '../media_format.dart';
+import '../widgets/alias_edit_sheet.dart';
 
 /// Detalle de un asset de la galería: previsualización + metadata + copiar la
 /// referencia BARE + borrar. Cubit-driven: el [MediaDetailCubit] (inyectado por
@@ -121,13 +124,13 @@ class MediaDetailPage extends StatelessWidget {
     );
   }
 
-  /// Abre un diálogo para renombrar el alias (prefijado con el actual) y delega
+  /// Abre el form-sheet de renombrar (prefijado con el alias actual) y delega
   /// al cubit. Un alias vacío limpia el nombre amistoso (vuelve al filename).
   Future<void> _editAlias(BuildContext context) async {
     final cubit = context.read<MediaDetailCubit>();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (_) => _AliasEditDialog(initial: cubit.state.asset.alias),
+    final result = await AliasEditSheet.open(
+      context,
+      initial: cubit.state.asset.alias,
     );
     if (result != null) await cubit.setAlias(result);
   }
@@ -172,59 +175,6 @@ class MediaDetailPage extends StatelessWidget {
       confirmLabel: 'Borrar',
     );
     if (ok) await cubit.deleteAsset();
-  }
-}
-
-/// Diálogo de edición de alias. Es un StatefulWidget para que el
-/// [TextEditingController] viva y se libere con el ciclo del diálogo (disponerlo
-/// fuera de su `dispose` corre la carrera de usarlo tras liberarlo durante el
-/// teardown). Hace pop con el texto al guardar, o sin valor al cancelar.
-class _AliasEditDialog extends StatefulWidget {
-  const _AliasEditDialog({required this.initial});
-
-  final String initial;
-
-  @override
-  State<_AliasEditDialog> createState() => _AliasEditDialogState();
-}
-
-class _AliasEditDialogState extends State<_AliasEditDialog> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initial,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Renombrar'),
-      content: TextField(
-        key: const Key('media_detail.alias_field'),
-        controller: _controller,
-        autofocus: true,
-        maxLength: 200,
-        decoration: const InputDecoration(
-          labelText: 'Alias',
-          hintText: 'Nombre amistoso (vacío = nombre original)',
-        ),
-        onSubmitted: (v) => Navigator.of(context).pop(v),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: const Text('Guardar'),
-        ),
-      ],
-    );
   }
 }
 
@@ -290,18 +240,10 @@ class _PreviewState extends State<_Preview> {
   );
 
   Widget _typeIcon() => Icon(
-    _iconFor(widget.asset.contentType),
+    mediaTypeIcon(widget.asset.contentType),
     color: AppTokens.text2,
     size: 64,
   );
-
-  static IconData _iconFor(String contentType) {
-    if (contentType.startsWith('image/')) return Icons.image_outlined;
-    if (contentType.startsWith('video/')) return Icons.movie_outlined;
-    if (contentType.startsWith('audio/')) return Icons.audiotrack_outlined;
-    if (contentType == 'application/pdf') return Icons.picture_as_pdf_outlined;
-    return Icons.insert_drive_file_outlined;
-  }
 }
 
 /// Tarjeta de metadata: nombre, alias (si hay), tipo, tamaño, fecha y el ref
@@ -314,30 +256,26 @@ class _MetadataCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      decoration: BoxDecoration(
-        color: AppTokens.surface2,
-        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-      ),
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _row('Nombre', asset.filename),
-          if (asset.alias.isNotEmpty) _row('Alias', asset.alias),
-          _row('Tipo', asset.contentType),
-          _row('Tamaño', formatBytes(asset.size)),
+          _row(textTheme, 'Nombre', asset.filename),
+          if (asset.alias.isNotEmpty) _row(textTheme, 'Alias', asset.alias),
+          _row(textTheme, 'Tipo', asset.contentType),
+          _row(textTheme, 'Tamaño', formatBytes(asset.size)),
           if ((asset.durationMs ?? 0) > 0)
-            _row('Duración', formatDuration(asset.durationMs!)),
-          _row('Subido', formatDate(asset.createdAt.toLocal())),
-          const Divider(height: AppTokens.sp6, color: AppTokens.surface3),
+            _row(textTheme, 'Duración', formatDuration(asset.durationMs!)),
+          _row(textTheme, 'Subido', formatDate(asset.createdAt.toLocal())),
+          const Divider(height: AppTokens.sp6, color: AppTokens.divider),
           _RefRow(ref: asset.ref),
         ],
       ),
     );
   }
 
-  Widget _row(String label, String value) => Padding(
+  Widget _row(TextTheme textTheme, String label, String value) => Padding(
     padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,15 +284,10 @@ class _MetadataCard extends StatelessWidget {
           width: 88,
           child: Text(
             label,
-            style: const TextStyle(color: AppTokens.text2, fontSize: 13),
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
           ),
         ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(color: AppTokens.text1, fontSize: 13),
-          ),
-        ),
+        Expanded(child: Text(value, style: textTheme.bodyMedium)),
       ],
     ),
   );
@@ -369,22 +302,23 @@ class _RefRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const SizedBox(
+        SizedBox(
           width: 88,
           child: Text(
             'Referencia',
-            style: TextStyle(color: AppTokens.text2, fontSize: 13),
+            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
           ),
         ),
         Expanded(
           child: Text(
             ref,
-            style: const TextStyle(
+            // Monospace: el ref es un identificador, no prosa.
+            style: textTheme.bodySmall?.copyWith(
               color: AppTokens.text2,
-              fontSize: 12,
               fontFamily: 'monospace',
             ),
           ),
@@ -395,15 +329,8 @@ class _RefRow extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.copy_outlined, size: 18),
           color: AppTokens.text1,
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: ref));
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                const SnackBar(content: Text('Referencia copiada')),
-              );
-          },
+          onPressed: () =>
+              copyTextToClipboard(context, ref, confirm: 'Referencia copiada'),
         ),
       ],
     );

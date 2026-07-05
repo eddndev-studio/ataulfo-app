@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/ai/ai_config.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_option_row.dart';
 import '../../domain/entities/catalog.dart';
 
 /// Picker de modelo agrupado por proveedor para el editor de [AIConfig].
@@ -63,64 +64,38 @@ class AiConfigModelSheet extends StatelessWidget {
     return <Widget>[
       _providerHeader(entry.provider, textTheme),
       for (final m in entry.models)
-        InkWell(
+        AppOptionRow(
           key: Key('$keyPrefix.model.${m.id}'),
+          title: m.id,
+          // Badges de modalidad de ENTRADA: qué adjuntos del cliente
+          // puede VER este modelo. Sin flags = solo texto, sin ruido.
+          trailing: _modalityBadges(m),
+          selected: m.id == current,
           onTap: () =>
               Navigator.of(context).pop((provider: provider, model: m.id)),
-          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: AppTokens.sp3,
-              horizontal: AppTokens.sp1,
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(child: Text(m.id, style: textTheme.bodyLarge)),
-                // Badges de modalidad de ENTRADA: qué adjuntos del cliente
-                // puede VER este modelo. Sin flags = solo texto, sin ruido.
-                if (m.supportsImageInput)
-                  const Padding(
-                    padding: EdgeInsets.only(left: AppTokens.sp1),
-                    child: Icon(
-                      Icons.image_outlined,
-                      size: 16,
-                      color: AppTokens.text2,
-                    ),
-                  ),
-                if (m.supportsAudioInput)
-                  const Padding(
-                    padding: EdgeInsets.only(left: AppTokens.sp1),
-                    child: Icon(
-                      Icons.mic_none,
-                      size: 16,
-                      color: AppTokens.text2,
-                    ),
-                  ),
-                if (m.supportsDocumentInput)
-                  const Padding(
-                    padding: EdgeInsets.only(left: AppTokens.sp1),
-                    child: Icon(
-                      Icons.description_outlined,
-                      size: 16,
-                      color: AppTokens.text2,
-                    ),
-                  ),
-                if (m.id == current)
-                  const Padding(
-                    padding: EdgeInsets.only(left: AppTokens.sp2),
-                    child: Icon(
-                      Icons.check,
-                      color: AppTokens.primary,
-                      size: 20,
-                    ),
-                  ),
-              ],
-            ),
-          ),
         ),
     ];
   }
 }
+
+/// Íconos de modalidad de entrada de un modelo (imagen / audio / documento).
+List<Widget> _modalityBadges(AIModel m) => <Widget>[
+  if (m.supportsImageInput)
+    const Padding(
+      padding: EdgeInsets.only(left: AppTokens.sp1),
+      child: Icon(Icons.image_outlined, size: 16, color: AppTokens.text2),
+    ),
+  if (m.supportsAudioInput)
+    const Padding(
+      padding: EdgeInsets.only(left: AppTokens.sp1),
+      child: Icon(Icons.mic_none, size: 16, color: AppTokens.text2),
+    ),
+  if (m.supportsDocumentInput)
+    const Padding(
+      padding: EdgeInsets.only(left: AppTokens.sp1),
+      child: Icon(Icons.description_outlined, size: 16, color: AppTokens.text2),
+    ),
+];
 
 /// Picker del modelo de subagentes, agrupado por proveedor como
 /// [AiConfigModelSheet]. La primera opción es "Heredar (modelo principal)";
@@ -164,32 +139,11 @@ class AiConfigSubagentSheet extends StatelessWidget {
               style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
             ),
             const SizedBox(height: AppTokens.sp4),
-            InkWell(
+            AppOptionRow(
               key: Key('$keyPrefix.subagent.inherit'),
+              title: 'Heredar (modelo principal)',
+              selected: current == null,
               onTap: () => Navigator.of(context).pop((selection: null)),
-              borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: AppTokens.sp3,
-                  horizontal: AppTokens.sp1,
-                ),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Heredar (modelo principal)',
-                        style: textTheme.bodyLarge,
-                      ),
-                    ),
-                    if (current == null)
-                      const Icon(
-                        Icons.check,
-                        color: AppTokens.primary,
-                        size: 20,
-                      ),
-                  ],
-                ),
-              ),
             ),
             for (final entry in catalog.providers)
               ..._providerSection(context, entry, textTheme),
@@ -215,25 +169,13 @@ class AiConfigSubagentSheet extends StatelessWidget {
     return <Widget>[
       _providerHeader(entry.provider, textTheme),
       for (final m in entry.models)
-        InkWell(
+        AppOptionRow(
           key: Key('$keyPrefix.subagent.model.${m.id}'),
+          title: m.id,
+          selected: current?.provider == provider && current?.model == m.id,
           onTap: () => Navigator.of(
             context,
           ).pop((selection: SubagentModel(provider: provider, model: m.id))),
-          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: AppTokens.sp3,
-              horizontal: AppTokens.sp1,
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(child: Text(m.id, style: textTheme.bodyLarge)),
-                if (current?.provider == provider && current?.model == m.id)
-                  const Icon(Icons.check, color: AppTokens.primary, size: 20),
-              ],
-            ),
-          ),
         ),
     ];
   }

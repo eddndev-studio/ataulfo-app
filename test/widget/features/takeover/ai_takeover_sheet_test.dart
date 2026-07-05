@@ -1,4 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/features/takeover/presentation/cubit/ai_takeover_cubit.dart';
 import 'package:ataulfo/features/takeover/presentation/widgets/ai_takeover_sheet.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -82,5 +84,34 @@ void main() {
     when(() => cubit.state).thenReturn(const AiTakeoverError());
     await tester.pumpWidget(host());
     expect(find.byKey(const Key('takeover.error')), findsOneWidget);
+  });
+
+  group('anatomía de menú-sheet', () {
+    testWidgets('H1 titleLarge y la acción es una fila de menú, no un botón', (
+      tester,
+    ) async {
+      when(() => cubit.state).thenReturn(
+        const AiTakeoverReady(
+          silenceIds: <String>['s1'],
+          presentIds: <String>[],
+        ),
+      );
+      when(() => cubit.toggle()).thenAnswer((_) async {});
+      await tester.pumpWidget(host());
+
+      final h1 = tester.widget<Text>(find.text('Control del bot en este chat'));
+      expect(h1.style?.fontSize, AppTokens.titleLSize);
+
+      // La acción vive como fila tipo ListTile al ras del padding del sheet
+      // (idioma de menú-sheet), no como botón CTA.
+      final tile = tester.widget<ListTile>(
+        find.byKey(const Key('takeover.toggle')),
+      );
+      expect(tile.contentPadding, EdgeInsets.zero);
+      expect(find.byType(AppButton), findsNothing);
+
+      await tester.tap(find.byKey(const Key('takeover.toggle')));
+      verify(() => cubit.toggle()).called(1);
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -43,6 +44,26 @@ class VarDefFormSheet extends StatefulWidget {
   /// pre-llenan con los valores actuales y el submit dispatcha
   /// UpdateRequested only-changed.
   final VariableDef? editing;
+
+  /// Abre el editor como modal canónico (surface1) re-proveyendo el
+  /// `VarDefsBloc` del scope: el modal vive en otro subárbol del Navigator
+  /// que no hereda los providers del caller.
+  static Future<void> open(
+    BuildContext context, {
+    required Set<String> existingNames,
+    VariableDef? editing,
+  }) {
+    final bloc = context.read<VarDefsBloc>();
+    return showAppBottomSheet<void>(
+      context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => BlocProvider<VarDefsBloc>.value(
+        value: bloc,
+        child: VarDefFormSheet(existingNames: existingNames, editing: editing),
+      ),
+    );
+  }
 
   @override
   State<VarDefFormSheet> createState() => _VarDefFormSheetState();
@@ -149,72 +170,76 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
               name.isNotEmpty &&
               widget.existingNames.contains(name) &&
               (ed == null || name != ed.name);
-          return Padding(
-            padding: EdgeInsets.only(bottom: context.sheetBottomInset),
-            child: Container(
-              padding: const EdgeInsets.all(AppTokens.sp6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    isEditing ? 'Editar variable' : 'Nueva variable',
-                    style: textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppTokens.sp4),
-                  AppTextField(
-                    key: const Key('var_def_form.name'),
-                    label: 'Nombre',
-                    hint: 'saldo, nombre, id…',
-                    controller: _nameCtrl,
-                    enabled: !isMutating,
-                    autofocus: true,
-                  ),
-                  if (isDuplicate)
-                    Padding(
-                      key: const Key('var_def_form.dup_hint'),
-                      padding: const EdgeInsets.only(top: AppTokens.sp1),
-                      child: Text(
-                        'Ya existe una variable con ese nombre.',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppTokens.danger,
-                        ),
+          // Scroll propio: con el teclado abierto el alto útil se recorta y
+          // sin scroll la Column desbordaría dejando Guardar inalcanzable.
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              AppTokens.sp6,
+              AppTokens.sp6,
+              AppTokens.sp6,
+              AppTokens.sp6 + context.sheetBottomInset,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  isEditing ? 'Editar variable' : 'Nueva variable',
+                  style: textTheme.titleLarge,
+                ),
+                const SizedBox(height: AppTokens.sp4),
+                AppTextField(
+                  key: const Key('var_def_form.name'),
+                  label: 'Nombre',
+                  hint: 'saldo, nombre, id…',
+                  controller: _nameCtrl,
+                  enabled: !isMutating,
+                  autofocus: true,
+                ),
+                if (isDuplicate)
+                  Padding(
+                    key: const Key('var_def_form.dup_hint'),
+                    padding: const EdgeInsets.only(top: AppTokens.sp1),
+                    child: Text(
+                      'Ya existe una variable con ese nombre.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppTokens.danger,
                       ),
                     ),
-                  const SizedBox(height: AppTokens.sp4),
-                  // Default y descripción admiten párrafos (un default puede
-                  // ser un mensaje completo): piso de 3 líneas, techo de 8 y
-                  // scroll interno más allá. El name sigue single-line — un
-                  // identificador no es un párrafo.
-                  AppTextField(
-                    key: const Key('var_def_form.default'),
-                    label: 'Valor por defecto',
-                    hint: 'Usado cuando el bot no recibe valor',
-                    controller: _defaultCtrl,
-                    enabled: !isMutating,
-                    minLines: 3,
-                    maxLines: 8,
                   ),
-                  const SizedBox(height: AppTokens.sp4),
-                  AppTextField(
-                    key: const Key('var_def_form.description'),
-                    label: 'Descripción',
-                    hint: 'Qué representa esta variable (opcional)',
-                    controller: _descCtrl,
-                    enabled: !isMutating,
-                    minLines: 3,
-                    maxLines: 8,
-                  ),
-                  const SizedBox(height: AppTokens.sp6),
-                  AppButton.filled(
-                    key: const Key('var_def_form.submit'),
-                    label: 'Guardar',
-                    onPressed: name.isEmpty ? null : _submit,
-                    loading: isMutating,
-                    fullWidth: true,
-                  ),
-                ],
-              ),
+                const SizedBox(height: AppTokens.sp4),
+                // Default y descripción admiten párrafos (un default puede
+                // ser un mensaje completo): piso de 3 líneas, techo de 8 y
+                // scroll interno más allá. El name sigue single-line — un
+                // identificador no es un párrafo.
+                AppTextField(
+                  key: const Key('var_def_form.default'),
+                  label: 'Valor por defecto',
+                  hint: 'Usado cuando el bot no recibe valor',
+                  controller: _defaultCtrl,
+                  enabled: !isMutating,
+                  minLines: 3,
+                  maxLines: 8,
+                ),
+                const SizedBox(height: AppTokens.sp4),
+                AppTextField(
+                  key: const Key('var_def_form.description'),
+                  label: 'Descripción',
+                  hint: 'Qué representa esta variable (opcional)',
+                  controller: _descCtrl,
+                  enabled: !isMutating,
+                  minLines: 3,
+                  maxLines: 8,
+                ),
+                const SizedBox(height: AppTokens.sp6),
+                AppButton.filled(
+                  key: const Key('var_def_form.submit'),
+                  label: 'Guardar',
+                  onPressed: name.isEmpty ? null : _submit,
+                  loading: isMutating,
+                  fullWidth: true,
+                ),
+              ],
             ),
           );
         },

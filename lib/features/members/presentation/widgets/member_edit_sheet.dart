@@ -4,9 +4,10 @@ import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/i18n/role_labels.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/i18n/role_labels.dart';
 import '../../domain/entities/member.dart';
 
 /// Resultado que la hoja devuelve al cerrarse. La hoja NO conoce ningún bloc:
@@ -140,12 +141,6 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final items = MemberEditSheet.roleOptions
-        // value crudo del contrato; sólo el texto visible se humaniza.
-        .map(
-          (r) => DropdownMenuItem<String>(value: r, child: Text(roleLabel(r))),
-        )
-        .toList(growable: false);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         AppTokens.sp6,
@@ -172,15 +167,21 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
             style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
           ),
           const SizedBox(height: AppTokens.sp1),
-          DropdownButtonFormField<String>(
+          // Set cerrado de roles como chips a la vista (selección única). El
+          // value crudo del contrato viaja intacto; sólo el label se humaniza.
+          // Un rol fuera del set (defensivo) simplemente no marca ningún chip.
+          Wrap(
             key: const Key('member_edit.role'),
-            initialValue: items.any((i) => i.value == _selected)
-                ? _selected
-                : null,
-            items: items,
-            onChanged: (v) {
-              if (v != null) setState(() => _selected = v);
-            },
+            spacing: 6,
+            runSpacing: 6,
+            children: <Widget>[
+              for (final r in MemberEditSheet.roleOptions)
+                AppChoiceChip(
+                  label: roleLabel(r),
+                  selected: r == _selected,
+                  onSelected: (_) => setState(() => _selected = r),
+                ),
+            ],
           ),
           const SizedBox(height: AppTokens.sp5),
           AppButton.filled(

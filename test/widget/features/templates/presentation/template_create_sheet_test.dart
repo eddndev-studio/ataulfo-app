@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -107,6 +108,23 @@ void main() {
 
     expect(submitButton(tester).loading, true);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('el copy de error sale del textTheme, no de un estilo crudo', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const TemplateCreateFailed(TemplatesInvalidNameFailure()));
+
+    await tester.pumpWidget(host());
+
+    final finder = find.byKey(const Key('template_create.error.invalid_name'));
+    final ctx = tester.element(finder);
+    expect(
+      tester.widget<Text>(finder).style,
+      Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
+    );
   });
 
   testWidgets('Failed(InvalidName) muestra error específico', (tester) async {

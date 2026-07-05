@@ -5,8 +5,10 @@ import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_color_swatch_picker.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../labels/presentation/widgets/label_color_palette.dart';
+import '../../../labels/presentation/widgets/label_dot.dart';
 import '../../domain/entities/note.dart';
 import '../bloc/notes_bloc.dart';
 
@@ -113,76 +115,74 @@ class _NoteEditSheetState extends State<NoteEditSheet> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final media = MediaQuery.of(context);
-    return Padding(
-      // El inset del teclado para que el form no quede tapado al escribir.
-      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          AppTokens.sp6,
-          AppTokens.sp6,
-          AppTokens.sp6,
-          AppTokens.sp6 + context.safeBottomInset,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              _isEdit ? 'Editar nota' : 'Nueva nota',
-              style: textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppTokens.sp4),
-            AppTextField(
-              key: const Key('note_edit.content'),
-              label: 'Nota',
-              hint: 'Acuerdos, preferencias, contexto del cliente…',
-              controller: _contentCtrl,
-              minLines: 4,
-              maxLines: null,
-            ),
-            const SizedBox(height: AppTokens.sp4),
-            AppTextField(
-              key: const Key('note_edit.tags'),
-              label: 'Etiquetas (separadas por comas)',
-              hint: 'ventas, urgente…',
-              controller: _tagsCtrl,
-            ),
-            const SizedBox(height: AppTokens.sp4),
-            Text(
-              'Color',
-              style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
-            ),
-            const SizedBox(height: AppTokens.sp2),
-            _ColorPicker(
-              selected: _color,
-              onChanged: (hex) => setState(() => _color = hex),
-            ),
-            const SizedBox(height: AppTokens.sp6),
-            AppButton.filled(
-              key: const Key('note_edit.save'),
-              label: 'Guardar',
-              onPressed: _save,
+    // Un solo inset inferior: sheetBottomInset ya es max(teclado, nav).
+    // Sumar viewInsets encima lo contaría dos veces con teclado abierto.
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp6,
+        AppTokens.sp6,
+        AppTokens.sp6,
+        AppTokens.sp6 + context.sheetBottomInset,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            _isEdit ? 'Editar nota' : 'Nueva nota',
+            style: textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          AppTextField(
+            key: const Key('note_edit.content'),
+            label: 'Nota',
+            hint: 'Acuerdos, preferencias, contexto del cliente…',
+            controller: _contentCtrl,
+            minLines: 4,
+            maxLines: null,
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          AppTextField(
+            key: const Key('note_edit.tags'),
+            label: 'Etiquetas (separadas por comas)',
+            hint: 'ventas, urgente…',
+            controller: _tagsCtrl,
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          Text(
+            'Color',
+            style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+          ),
+          const SizedBox(height: AppTokens.sp2),
+          _ColorPicker(
+            selected: _color,
+            onChanged: (hex) => setState(() => _color = hex),
+          ),
+          const SizedBox(height: AppTokens.sp6),
+          AppButton.filled(
+            key: const Key('note_edit.save'),
+            label: 'Guardar',
+            onPressed: _save,
+            fullWidth: true,
+          ),
+          if (_isEdit) ...<Widget>[
+            const SizedBox(height: AppTokens.sp3),
+            AppButton.tonal(
+              key: const Key('note_edit.delete'),
+              label: 'Borrar nota',
+              onPressed: _delete,
               fullWidth: true,
             ),
-            if (_isEdit) ...<Widget>[
-              const SizedBox(height: AppTokens.sp3),
-              AppButton.tonal(
-                key: const Key('note_edit.delete'),
-                label: 'Borrar nota',
-                onPressed: _delete,
-                fullWidth: true,
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
-/// Swatches de la paleta compartida + "sin color" al frente. Reusa la
-/// paleta curada de Labels: mismo lenguaje visual en todo el producto.
+/// Swatches de la paleta compartida + "sin color" al frente, sobre el picker
+/// compartido del kit. Reusa la paleta curada de Labels: mismo lenguaje
+/// visual en todo el producto.
 class _ColorPicker extends StatelessWidget {
   const _ColorPicker({required this.selected, required this.onChanged});
 
@@ -191,66 +191,41 @@ class _ColorPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppTokens.sp2,
-      runSpacing: AppTokens.sp2,
-      children: <Widget>[
-        _Swatch(
+    return AppColorSwatchPicker(
+      options: <AppColorSwatchOption>[
+        AppColorSwatchOption(
           key: const Key('note_edit.color.none'),
-          color: null,
-          isSelected: selected.isEmpty,
+          swatch: const _NoneSwatch(),
+          selected: selected.isEmpty,
           onTap: () => onChanged(''),
         ),
         for (final hex in LabelColorPalette.hexColors)
-          _Swatch(
+          AppColorSwatchOption(
             key: Key('note_edit.color.$hex'),
-            color: _parse(hex),
-            isSelected: selected == hex,
+            swatch: LabelDot(hex: hex, size: 28),
+            selected: selected == hex,
             onTap: () => onChanged(hex),
           ),
       ],
     );
   }
-
-  static Color _parse(String hex) {
-    final value = int.tryParse(hex.replaceFirst('#', ''), radix: 16) ?? 0;
-    return Color(0xFF000000 | value);
-  }
 }
 
-class _Swatch extends StatelessWidget {
-  const _Swatch({
-    super.key,
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  /// `null` = sin color (swatch tachado).
-  final Color? color;
-  final bool isSelected;
-  final VoidCallback onTap;
+/// Swatch "sin color": círculo neutro tachado, misma silueta que un dot.
+class _NoneSwatch extends StatelessWidget {
+  const _NoneSwatch();
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: color ?? AppTokens.surface2,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isSelected ? AppTokens.primary : AppTokens.surface3,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: color == null
-            ? const Icon(Icons.block, size: 14, color: AppTokens.text2)
-            : null,
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: AppTokens.surface2,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppTokens.divider),
       ),
+      child: const Icon(Icons.block, size: 14, color: AppTokens.text2),
     );
   }
 }

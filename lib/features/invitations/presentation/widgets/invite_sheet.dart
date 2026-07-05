@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/i18n/role_labels.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/i18n/role_labels.dart';
 
 /// Lo que la hoja devuelve al enviarse: a quién invitar y con qué rol. La hoja
 /// NO conoce ningún bloc; la página despacha la creación sobre su cubit (la hoja
@@ -113,20 +114,20 @@ class _InviteSheetState extends State<InviteSheet> {
             style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
           ),
           const SizedBox(height: AppTokens.sp1),
-          DropdownButtonFormField<String>(
+          // Set cerrado y corto: chips a la vista (selección única), no un
+          // dropdown que esconde las opciones tras un tap.
+          Wrap(
             key: const Key('invite.role'),
-            initialValue: _role,
-            items: InviteSheet.roleOptions
-                .map(
-                  (r) => DropdownMenuItem<String>(
-                    value: r,
-                    child: Text(roleLabel(r)),
-                  ),
-                )
-                .toList(growable: false),
-            onChanged: (v) {
-              if (v != null) setState(() => _role = v);
-            },
+            spacing: 6,
+            runSpacing: 6,
+            children: <Widget>[
+              for (final r in InviteSheet.roleOptions)
+                AppChoiceChip(
+                  label: roleLabel(r),
+                  selected: r == _role,
+                  onSelected: (_) => setState(() => _role = r),
+                ),
+            ],
           ),
           const SizedBox(height: AppTokens.sp5),
           AppButton.filled(

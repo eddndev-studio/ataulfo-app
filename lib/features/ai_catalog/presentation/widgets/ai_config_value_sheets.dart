@@ -5,6 +5,7 @@ import '../../../../core/ai/ai_config.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_option_row.dart';
 import '../../../../core/design/widgets/app_slider.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import 'thinking_label.dart';
@@ -114,32 +115,11 @@ class AiConfigThinkingSheet extends StatelessWidget {
             Text('Razonamiento', style: textTheme.titleLarge),
             const SizedBox(height: AppTokens.sp3),
             for (final level in ThinkingLevel.values)
-              InkWell(
+              AppOptionRow(
                 key: Key('$keyPrefix.thinking.${level.name}'),
+                title: thinkingLabel(level),
+                selected: level == current,
                 onTap: () => Navigator.of(context).pop(level),
-                borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: AppTokens.sp3,
-                    horizontal: AppTokens.sp1,
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          thinkingLabel(level),
-                          style: textTheme.bodyLarge,
-                        ),
-                      ),
-                      if (level == current)
-                        const Icon(
-                          Icons.check,
-                          color: AppTokens.primary,
-                          size: 20,
-                        ),
-                    ],
-                  ),
-                ),
               ),
           ],
         ),

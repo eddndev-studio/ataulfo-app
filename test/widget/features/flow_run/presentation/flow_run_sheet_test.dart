@@ -1,4 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/features/flow_run/domain/entities/runnable_flow.dart';
 import 'package:ataulfo/features/flow_run/domain/failures/flow_run_failure.dart';
 import 'package:ataulfo/features/flow_run/presentation/bloc/flow_run_cubit.dart';
 import 'package:ataulfo/features/flow_run/presentation/widgets/flow_run_sheet.dart';
@@ -57,5 +59,26 @@ void main() {
 
     expect(find.byKey(const Key('flow_run.error')), findsOneWidget);
     expect(find.text('Reintentar'), findsNothing);
+  });
+
+  group('anatomía de menú-sheet', () {
+    testWidgets('H1 titleLarge y filas ListTile al ras del padding del sheet', (
+      tester,
+    ) async {
+      when(() => cubit.state).thenReturn(
+        const FlowRunLoaded(<RunnableFlow>[
+          RunnableFlow(id: 'f1', name: 'Bienvenida'),
+        ]),
+      );
+      await tester.pumpWidget(host());
+
+      final h1 = tester.widget<Text>(find.text('Correr un flujo'));
+      expect(h1.style?.fontSize, AppTokens.titleLSize);
+
+      final tile = tester.widget<ListTile>(
+        find.byKey(const Key('flow_run.item.f1')),
+      );
+      expect(tile.contentPadding, EdgeInsets.zero);
+    });
   });
 }

@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -18,9 +19,10 @@ import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
+import '../../../labels/presentation/bloc/labels_bloc.dart';
+import '../../../labels/presentation/widgets/label_picker.dart';
 import '../../domain/entities/trigger.dart';
 import '../../domain/failures/triggers_failure.dart';
-import '../../../labels/presentation/widgets/label_picker.dart';
 import '../bloc/triggers_bloc.dart';
 
 /// Modal sheet de creación/edición de un Trigger. El sheet vive siempre
@@ -51,6 +53,33 @@ class TriggerEditSheet extends StatefulWidget {
   /// confirma el destino (en edit). El sheet muestra su nombre en una
   /// línea informativa read-only; no consulta a `FlowsBloc`.
   final fdom.Flow scopedFlow;
+
+  /// Abre el editor como modal canónico (surface1) re-proveyendo los blocs
+  /// del scope (`TriggersBloc` + `LabelsBloc` para el selector de etiqueta):
+  /// el modal vive en otro subárbol del Navigator que no hereda providers.
+  static Future<void> open(
+    BuildContext context, {
+    required fdom.Flow scopedFlow,
+    Trigger? editing,
+  }) {
+    final triggersBloc = context.read<TriggersBloc>();
+    final labelsBloc = context.read<LabelsBloc>();
+    return showAppBottomSheet<void>(
+      context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<TriggersBloc>.value(value: triggersBloc),
+          BlocProvider<LabelsBloc>.value(value: labelsBloc),
+        ],
+        // El inset del teclado lo aplica el PROPIO sheet (su context sí se
+        // reconstruye con el MediaQuery); aplicarlo aquí lo congelaría al
+        // valor del momento de abrir.
+        child: TriggerEditSheet(editing: editing, scopedFlow: scopedFlow),
+      ),
+    );
+  }
 
   @override
   State<TriggerEditSheet> createState() => _TriggerEditSheetState();

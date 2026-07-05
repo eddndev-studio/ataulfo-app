@@ -551,7 +551,9 @@ class _FailedView extends StatelessWidget {
     return Text(
       copy,
       key: Key(key),
-      style: const TextStyle(color: AppTokens.danger),
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
     );
   }
 

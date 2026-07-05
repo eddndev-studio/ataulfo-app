@@ -6,6 +6,7 @@ import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_color_swatch_picker.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/wa_label.dart';
 import '../../domain/failures/wa_labels_failure.dart';
@@ -221,8 +222,8 @@ class _WaLabelEditSheetState extends State<WaLabelEditSheet> {
   };
 }
 
-/// Rejilla de swatches para elegir el índice de paleta de WhatsApp. El
-/// seleccionado lleva un anillo de marca. Tocar un swatch fija el índice.
+/// Rejilla de swatches sobre el picker compartido del kit para elegir el
+/// índice de paleta de WhatsApp. Tocar un swatch fija el índice.
 class _PalettePicker extends StatelessWidget {
   const _PalettePicker({
     required this.selected,
@@ -236,25 +237,15 @@ class _PalettePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppTokens.sp3,
-      runSpacing: AppTokens.sp3,
-      children: <Widget>[
+    return AppColorSwatchPicker(
+      enabled: enabled,
+      options: <AppColorSwatchOption>[
         for (var i = 0; i < WaLabelPalette.colors.length; i++)
-          GestureDetector(
+          AppColorSwatchOption(
             key: Key('wa_palette.$i'),
-            onTap: enabled ? () => onSelected(i) : null,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: i == selected ? AppTokens.primary : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-              child: WaLabelSwatch(colorIndex: i, size: 28),
-            ),
+            swatch: WaLabelSwatch(colorIndex: i, size: 28),
+            selected: i == selected,
+            onTap: () => onSelected(i),
           ),
       ],
     );

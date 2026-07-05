@@ -1,5 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_preview_launcher.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
@@ -233,6 +235,37 @@ void main() {
     await tester.pumpAndSettle();
 
     verifyNever(() => repo.delete(any()));
+  });
+
+  testWidgets('la metadata vive sobre AppCard, no en un Container ad-hoc', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(_asset()));
+    await tester.pump();
+
+    expect(
+      find.ancestor(of: find.text('Tipo'), matching: find.byType(AppCard)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('renombrar abre el form-sheet canónico, no un diálogo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(_asset()));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('media_detail.edit_alias')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+    expect(sheet.backgroundColor, AppTokens.surface1);
+    // H1 canónico + campo con su key de contrato + submit del kit.
+    final h1 = tester.widget<Text>(find.text('Renombrar'));
+    expect(h1.style?.fontSize, AppTokens.titleLSize);
+    expect(find.byKey(const Key('media_detail.alias_field')), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Guardar'), findsOneWidget);
   });
 
   testWidgets('renombrar: editar y guardar llama repo.setAlias y refleja', (

@@ -16,6 +16,9 @@ Future<void> copyTextToClipboard(
 }) async {
   final messenger = ScaffoldMessenger.of(context);
   await Clipboard.setData(ClipboardData(text: text));
+  // Copias seguidas reemplazan el aviso: encolado, el segundo esperaría los
+  // segundos del primero y la acción se sentiría sin respuesta.
+  messenger.hideCurrentSnackBar();
   messenger.showSnackBar(SnackBar(content: Text(confirm)));
 }
 

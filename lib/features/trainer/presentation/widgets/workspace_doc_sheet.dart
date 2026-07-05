@@ -3,6 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
+import '../../../../core/design/safe_bottom.dart';
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/workspace_doc.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../../domain/repositories/trainer_repositories.dart';
@@ -14,8 +19,9 @@ import '../pages/trainer_chat_page.dart' show trainerFailureCopy;
 /// nuevo pide nombre + contenido. Guardar despacha al WorkspaceBloc del
 /// padre (mutación→recarga); borrar pide confirmación.
 class WorkspaceDocSheet extends StatelessWidget {
-  const WorkspaceDocSheet._({required this.name});
+  const WorkspaceDocSheet({super.key, this.name});
 
+  /// `null` ⇒ modo creación; no-null ⇒ nombre del doc existente a cargar.
   final String? name;
 
   static Future<void> openCreate(BuildContext context) => _open(context, null);
@@ -31,13 +37,14 @@ class WorkspaceDocSheet extends StatelessWidget {
     return showAppBottomSheet<void>(
       context,
       isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
       builder: (_) => MultiBlocProvider(
         providers: <BlocProvider<dynamic>>[
           BlocProvider<WorkspaceBloc>.value(value: bloc),
         ],
         child: RepositoryProvider<WorkspaceRepository>.value(
           value: repo,
-          child: WorkspaceDocSheet._(name: name),
+          child: WorkspaceDocSheet(name: name),
         ),
       ),
     );
@@ -45,14 +52,8 @@ class WorkspaceDocSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: name == null
-          ? const _DocForm(doc: null)
-          : _ExistingDocLoader(name: name!),
-    );
+    final n = name;
+    return n == null ? const _DocForm(doc: null) : _ExistingDocLoader(name: n);
   }
 }
 
@@ -86,7 +87,7 @@ class _ExistingDocLoaderState extends State<_ExistingDocLoader> {
         if (snap.hasError) {
           final err = snap.error;
           return Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppTokens.sp6),
             child: Text(
               err is TrainerFailure
                   ? trainerFailureCopy(err)
@@ -97,7 +98,7 @@ class _ExistingDocLoaderState extends State<_ExistingDocLoader> {
         if (!snap.hasData) {
           return const SizedBox(
             height: 160,
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: AppLoadingIndicator()),
           );
         }
         return _DocForm(doc: snap.data);
@@ -169,64 +170,70 @@ class _DocFormState extends State<_DocForm> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final isNew = widget.doc == null;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              isNew ? 'Nuevo documento' : widget.doc!.name,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            if (isNew) ...<Widget>[
-              TextField(
-                key: const Key('workspace_doc.name'),
-                controller: _name,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre (ej. menu-precios)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        AppTokens.sp6,
+        AppTokens.sp6,
+        AppTokens.sp6,
+        AppTokens.sp6 + context.sheetBottomInset,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  isNew ? 'Nuevo documento' : widget.doc!.name,
+                  style: textTheme.titleLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(height: 12),
-            ],
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 320),
-              child: TextField(
-                key: const Key('workspace_doc.content'),
-                controller: _content,
-                maxLines: null,
-                minLines: 6,
-                decoration: const InputDecoration(
-                  labelText: 'Contenido',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: <Widget>[
-                if (!isNew)
-                  TextButton(
-                    key: const Key('workspace_doc.delete'),
-                    onPressed: _delete,
-                    child: const Text('Borrar'),
+              if (!isNew)
+                IconButton(
+                  key: const Key('workspace_doc.delete'),
+                  tooltip: 'Borrar documento',
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: AppTokens.danger,
                   ),
-                const Spacer(),
-                FilledButton(
-                  key: const Key('workspace_doc.save'),
-                  onPressed: _save,
-                  child: Text(isNew ? 'Crear' : 'Guardar'),
+                  onPressed: _delete,
                 ),
-              ],
+            ],
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          if (isNew) ...<Widget>[
+            AppTextField(
+              key: const Key('workspace_doc.name'),
+              label: 'Nombre',
+              hint: 'menu-precios',
+              controller: _name,
+              autofocus: true,
             ),
+            const SizedBox(height: AppTokens.sp4),
           ],
-        ),
+          // Un doc es un texto largo: piso de 6 líneas, techo de 12 y scroll
+          // interno más allá (el techo evita que el CTA salga de pantalla).
+          AppTextField(
+            key: const Key('workspace_doc.content'),
+            label: 'Contenido',
+            hint: 'Lo que el bot podrá consultar de este documento',
+            controller: _content,
+            minLines: 6,
+            maxLines: 12,
+          ),
+          const SizedBox(height: AppTokens.sp6),
+          AppButton.filled(
+            key: const Key('workspace_doc.save'),
+            label: isNew ? 'Crear' : 'Guardar',
+            onPressed: _save,
+            fullWidth: true,
+          ),
+        ],
       ),
     );
   }

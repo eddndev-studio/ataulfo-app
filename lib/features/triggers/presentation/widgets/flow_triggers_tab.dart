@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -107,32 +106,11 @@ class FlowTriggersBody extends StatelessWidget {
   }
 }
 
-/// Abre el sheet de creación/edición pasando los blocs del scope y el
-/// flow del editor como `scopedFlow`. El sheet ya sabe que no hay
-/// `FlowsBloc` y oculta el dropdown.
-///
-/// El sheet se monta en una ruta nueva del
-/// `Navigator` que NO hereda los providers de esta página: leemos los
-/// blocs aquí (en el context de la página) y los re-proveemos `.value`
-/// al subtree del modal. Sin esto, el selector de etiqueta del sheet no
-/// vería el `LabelsBloc`.
+/// Abre el sheet de creación/edición con el flow del editor como
+/// `scopedFlow`. `TriggerEditSheet.open` re-provee los blocs del scope
+/// (el modal no hereda providers) y aplica el fondo canónico.
 void _openSheet(BuildContext context, fdom.Flow flow, {Trigger? editing}) {
-  final triggersBloc = context.read<TriggersBloc>();
-  final labelsBloc = context.read<LabelsBloc>();
-  showAppBottomSheet<void>(
-    context,
-    isScrollControlled: true,
-    builder: (_) => MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<TriggersBloc>.value(value: triggersBloc),
-        BlocProvider<LabelsBloc>.value(value: labelsBloc),
-      ],
-      // El inset del teclado lo aplica el PROPIO sheet (su context sí se
-      // reconstruye con el MediaQuery); ponerlo aquí lo congelaba al valor
-      // del momento de abrir y el teclado tapaba el formulario.
-      child: TriggerEditSheet(editing: editing, scopedFlow: flow),
-    ),
-  );
+  TriggerEditSheet.open(context, scopedFlow: flow, editing: editing);
 }
 
 class _List extends StatelessWidget {

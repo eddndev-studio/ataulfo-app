@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -160,25 +159,17 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
     );
   }
 
-  /// Monta el sheet de creación o edición. El sheet vive sobre el bloc del
-  /// scope; `.value` le pasa la misma instancia (el modal crea un context
-  /// que no hereda los BlocProviders del padre por default).
+  /// Monta el sheet de creación o edición; `VarDefFormSheet.open` re-provee
+  /// el bloc del scope y aplica el fondo canónico.
   void _openSheet(
     BuildContext context,
     List<VariableDef> defs, {
     VariableDef? editing,
   }) {
-    final bloc = context.read<VarDefsBloc>();
-    showAppBottomSheet<void>(
+    VarDefFormSheet.open(
       context,
-      isScrollControlled: true,
-      builder: (_) => BlocProvider<VarDefsBloc>.value(
-        value: bloc,
-        child: VarDefFormSheet(
-          existingNames: defs.map((d) => d.name).toSet(),
-          editing: editing,
-        ),
-      ),
+      existingNames: defs.map((d) => d.name).toSet(),
+      editing: editing,
     );
   }
 }

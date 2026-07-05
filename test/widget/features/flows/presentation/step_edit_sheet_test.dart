@@ -1,12 +1,14 @@
 import 'dart:convert';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/widgets/step_edit_sheet.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -1278,4 +1280,69 @@ void main() {
       },
     );
   });
+
+  group('StepEditSheet.open', () {
+    testWidgets('abre el modal sobre surface1 con blocs y catálogo cableados', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<FlowStepsBloc>.value(value: bloc),
+            ],
+            child: RepositoryProvider<LabelsRepository>.value(
+              value: _FakeLabelsRepository(),
+              child: Scaffold(
+                body: Builder(
+                  builder: (ctx) => Center(
+                    child: ElevatedButton(
+                      onPressed: () => StepEditSheet.open(ctx),
+                      child: const Text('open'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+      expect(sheet.backgroundColor, AppTokens.surface1);
+      expect(find.byKey(const Key('step_edit.submit')), findsOneWidget);
+    });
+  });
+}
+
+/// Catálogo mínimo para el LabelsBloc que StepEditSheet.open crea él mismo.
+class _FakeLabelsRepository implements LabelsRepository {
+  @override
+  Future<List<Label>> listLabels() async => <Label>[_lbl()];
+
+  @override
+  Future<Label> createLabel({
+    required String name,
+    required String color,
+    required String description,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<Label> updateLabel({
+    required String id,
+    required String name,
+    required String color,
+    required String description,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> deleteLabel({required String id}) => throw UnimplementedError();
 }

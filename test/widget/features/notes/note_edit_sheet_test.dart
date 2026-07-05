@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/features/notes/domain/entities/note.dart';
 import 'package:ataulfo/features/notes/presentation/bloc/notes_bloc.dart';
 import 'package:ataulfo/features/notes/presentation/widgets/note_edit_sheet.dart';
@@ -127,4 +128,69 @@ void main() {
     await tester.pumpWidget(host());
     expect(find.byKey(const Key('note_edit.delete')), findsNothing);
   });
+
+  testWidgets('el título del sheet es el H1 canónico (titleLarge)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    final theme = AppDesignTheme.dark();
+    final title = tester.widget<Text>(find.text('Nueva nota'));
+    expect(title.style?.fontSize, theme.textTheme.titleLarge?.fontSize);
+  });
+
+  testWidgets(
+    'el inset del teclado se aplica UNA vez (sp6 + max(teclado, nav))',
+    (tester) async {
+      // Teclado + gesture-nav a la vez: el inset efectivo debe ser el máximo
+      // de ambos, no su suma. Duplicarlo (Padding externo con viewInsets +
+      // padding interno con la nav) deja un hueco muerto sobre el teclado.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: Scaffold(
+            body: MediaQuery(
+              data: const MediaQueryData(
+                viewInsets: EdgeInsets.only(bottom: 100),
+                viewPadding: EdgeInsets.only(bottom: 32),
+              ),
+              child: BlocProvider<NotesBloc>.value(
+                value: bloc,
+                child: const NoteEditSheet(),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final scroll = tester.widget<SingleChildScrollView>(
+        find.descendant(
+          of: find.byType(NoteEditSheet),
+          matching: find.byType(SingleChildScrollView),
+        ),
+      );
+      final scrollBottom = (scroll.padding! as EdgeInsets).bottom;
+      expect(scrollBottom, AppTokens.sp6 + 100);
+
+      // Ningún wrapper del scroll vuelve a sumar el teclado (eso duplicaba
+      // el inset: hueco muerto sobre el teclado con gesture-nav presente).
+      final wrappers = tester.widgetList<Padding>(
+        find.ancestor(
+          of: find.byType(SingleChildScrollView),
+          matching: find.descendant(
+            of: find.byType(NoteEditSheet),
+            matching: find.byType(Padding),
+          ),
+        ),
+      );
+      expect(
+        wrappers.where(
+          (p) =>
+              p.padding is EdgeInsets && (p.padding as EdgeInsets).bottom > 0,
+        ),
+        isEmpty,
+        reason: 'el inset vive en el padding del scroll, no en un wrapper',
+      );
+    },
+  );
 }

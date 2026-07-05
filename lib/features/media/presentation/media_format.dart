@@ -3,6 +3,19 @@
 /// del repo). El call-site decide la zona horaria (pasa `.toLocal()` si quiere).
 library;
 
+import 'package:flutter/material.dart' show IconData, Icons;
+
+/// Ícono representativo por familia de `contentType`; la identidad visual del
+/// tipo es la misma en la miniatura de la galería y en el detalle. Un tipo no
+/// catalogado cae al genérico de archivo.
+IconData mediaTypeIcon(String contentType) {
+  if (contentType.startsWith('image/')) return Icons.image_outlined;
+  if (contentType.startsWith('video/')) return Icons.movie_outlined;
+  if (contentType.startsWith('audio/')) return Icons.audiotrack_outlined;
+  if (contentType == 'application/pdf') return Icons.picture_as_pdf_outlined;
+  return Icons.insert_drive_file_outlined;
+}
+
 /// Tamaño legible (base binaria 1024). Bytes crudos por debajo de 1 KiB; KB/MB/
 /// GB con un decimal. Negativo (defensivo, no debería ocurrir) ⇒ "0 B".
 String formatBytes(int bytes) {

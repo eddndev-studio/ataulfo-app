@@ -1,4 +1,5 @@
 import 'package:ataulfo/features/media/presentation/media_format.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -58,6 +59,23 @@ void main() {
       expect(formatDate(DateTime(2026, 6, 5, 14, 30)), '05/06/2026 14:30');
       expect(formatDate(DateTime(2026, 12, 31, 9, 5)), '31/12/2026 09:05');
       expect(formatDate(DateTime(2026, 1, 1, 0, 0)), '01/01/2026 00:00');
+    });
+  });
+
+  group('mediaTypeIcon', () {
+    test('ícono por familia de contentType', () {
+      expect(mediaTypeIcon('image/png'), Icons.image_outlined);
+      expect(mediaTypeIcon('video/mp4'), Icons.movie_outlined);
+      expect(mediaTypeIcon('audio/ogg'), Icons.audiotrack_outlined);
+      expect(mediaTypeIcon('application/pdf'), Icons.picture_as_pdf_outlined);
+    });
+
+    test('tipo no catalogado cae al genérico de archivo', () {
+      expect(
+        mediaTypeIcon('application/zip'),
+        Icons.insert_drive_file_outlined,
+      );
+      expect(mediaTypeIcon(''), Icons.insert_drive_file_outlined);
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
@@ -409,18 +410,16 @@ void main() {
     );
 
     double sheetBottomPadding(WidgetTester tester) {
-      // El sheet wrappea su Container interno en un Padding cuyo único
-      // propósito es respetar el inset inferior. Lo identificamos como
-      // el Padding ancestro inmediato del Container con padding.all.
-      final padding = tester.widget<Padding>(
-        find.ancestor(
-          of: find.byType(AppButton),
-          matching: find.byWidgetPredicate(
-            (w) => w is Padding && w.child is Container,
-          ),
+      // Anatomía canónica de form-sheet: el inset inferior viaja en el
+      // padding del SingleChildScrollView como sp6 (padding propio del
+      // contenido) + max(teclado, system-nav). Restar sp6 aísla el inset.
+      final scroll = tester.widget<SingleChildScrollView>(
+        find.descendant(
+          of: find.byType(VarDefFormSheet),
+          matching: find.byType(SingleChildScrollView),
         ),
       );
-      return (padding.padding as EdgeInsets).bottom;
+      return (scroll.padding! as EdgeInsets).bottom - AppTokens.sp6;
     }
 
     testWidgets(
@@ -623,5 +622,75 @@ void main() {
         verifyNever(() => bloc.add(any(that: isA<VarDefsUpdateRequested>())));
       },
     );
+  });
+
+  group('VarDefFormSheet — teclado', () {
+    testWidgets('con el teclado abierto el form scrollea en vez de desbordar', (
+      tester,
+    ) async {
+      // Teclado simulado: viewInsets recorta el alto disponible como en un
+      // device real. Sin scroll interno, la Column desborda (RenderFlex
+      // overflow) y el botón Guardar queda inalcanzable.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(800, 600),
+              viewInsets: EdgeInsets.only(bottom: 480),
+            ),
+            child: Scaffold(
+              body: BlocProvider<VarDefsBloc>.value(
+                value: bloc,
+                child: const VarDefFormSheet(existingNames: <String>{}),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(
+          of: find.byType(VarDefFormSheet),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('VarDefFormSheet.open', () {
+    testWidgets('abre el modal sobre surface1 con el bloc re-provisto', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: BlocProvider<VarDefsBloc>.value(
+            value: bloc,
+            child: Scaffold(
+              body: Builder(
+                builder: (ctx) => Center(
+                  child: ElevatedButton(
+                    onPressed: () => VarDefFormSheet.open(
+                      ctx,
+                      existingNames: <String>{'nombre'},
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+      expect(sheet.backgroundColor, AppTokens.surface1);
+      expect(find.byKey(const Key('var_def_form.submit')), findsOneWidget);
+    });
   });
 }

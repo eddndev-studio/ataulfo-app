@@ -12,12 +12,15 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../labels/domain/repositories/labels_repository.dart';
+import '../../../labels/presentation/bloc/labels_bloc.dart';
 import '../../../media/domain/entities/media_asset.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import '../../domain/entities/label_step_metadata.dart';
@@ -72,6 +75,34 @@ class StepEditSheet extends StatefulWidget {
   /// de un step en edición. `null` ⇒ el selector queda read-only: no abre
   /// nada, lo que mantiene el sheet testeable aislado.
   final MediaRefPicker? pickMediaRef;
+
+  /// Abre el editor como modal canónico (surface1) re-proveyendo el
+  /// `FlowStepsBloc` del scope y creando un `LabelsBloc` propio para el
+  /// selector del paso LABEL (carga única del catálogo org-scoped; si el
+  /// operador no elige LABEL, la carga es barata y se descarta al cerrar).
+  static Future<void> open(
+    BuildContext context, {
+    fdom.Step? editing,
+    MediaRefPicker? pickMediaRef,
+  }) {
+    final bloc = context.read<FlowStepsBloc>();
+    final labelsRepo = context.read<LabelsRepository>();
+    return showAppBottomSheet<void>(
+      context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<FlowStepsBloc>.value(value: bloc),
+          BlocProvider<LabelsBloc>(
+            create: (_) =>
+                LabelsBloc(repo: labelsRepo)..add(const LabelsLoadRequested()),
+          ),
+        ],
+        child: StepEditSheet(editing: editing, pickMediaRef: pickMediaRef),
+      ),
+    );
+  }
 
   @override
   State<StepEditSheet> createState() => _StepEditSheetState();
