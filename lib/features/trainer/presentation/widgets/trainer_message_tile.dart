@@ -7,6 +7,7 @@ import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
 import '../../../messages/presentation/widgets/attachment_content.dart';
+import '../../../messages/presentation/widgets/audio_message_content.dart';
 import '../../domain/entities/trainer_message.dart';
 import 'trainer_change_card.dart';
 import 'trainer_inspect_flow_card.dart';
@@ -77,7 +78,13 @@ class TrainerMessageTile extends StatelessWidget {
                 ),
               ),
           ],
-          if (message.content.isNotEmpty)
+          // Una nota de voz reproduce inline (la copia local grabada en este
+          // dispositivo, sembrada en caché al enviar) y, si el server la
+          // transcribió, el texto abajo. El `content` crudo no se pinta (es
+          // el marcador "[audio…]" o duplica el transcrito).
+          if (message.isVoiceNote)
+            _VoiceNote(message: message)
+          else if (message.content.isNotEmpty)
             message.isAssistant
                 ? AssistantMarkdown(data: message.content)
                 : Text(
@@ -106,9 +113,49 @@ class TrainerMessageTile extends StatelessWidget {
       children: <Widget>[
         if (message.isAssistant && message.thinking.isNotEmpty)
           ReasoningDisclosure(reasoning: message.thinking, keyId: message.id),
-        if (message.content.isNotEmpty || message.attachments.isNotEmpty)
+        if (message.content.isNotEmpty ||
+            message.attachments.isNotEmpty ||
+            message.isVoiceNote)
           bubble,
         MessageTimestamp(at: message.createdAt),
+      ],
+    );
+  }
+}
+
+/// Nota de voz del operador: burbuja de audio reproducible inline (la fuente
+/// es la copia local grabada en este dispositivo, sembrada en caché al enviar;
+/// el wire no trae URL firmada) y, cuando el server la transcribió
+/// (`transcriptStatus` done y texto no vacío), el transcrito debajo. Nunca
+/// pinta el `content` crudo, que es el marcador de audio o una copia del
+/// transcrito.
+class _VoiceNote extends StatelessWidget {
+  const _VoiceNote({required this.message});
+
+  final TrainerMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final hasTranscript =
+        message.transcriptStatus == 'done' && message.transcript.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        AudioMessageContent(
+          id: message.id,
+          mediaRef: message.audioRef,
+          url: null,
+          ptt: true,
+        ),
+        if (hasTranscript) ...<Widget>[
+          const SizedBox(height: AppTokens.sp1),
+          Text(
+            message.transcript,
+            style: textTheme.bodyLarge?.copyWith(color: AppTokens.text1),
+          ),
+        ],
       ],
     );
   }

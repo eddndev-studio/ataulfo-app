@@ -90,6 +90,25 @@ final class TrainerChatTurnCancelRequested extends TrainerChatEvent {
   const TrainerChatTurnCancelRequested();
 }
 
+/// Empieza a grabar una nota de voz (bloquea el envío de texto: una a la vez).
+final class TrainerChatVoiceStarted extends TrainerChatEvent {
+  const TrainerChatVoiceStarted();
+}
+
+/// Descarta la grabación en curso sin enviarla.
+final class TrainerChatVoiceCancelled extends TrainerChatEvent {
+  const TrainerChatVoiceCancelled();
+}
+
+/// Envía la nota de voz grabada: corre el turno vía sendAudio (mismo manejo
+/// que un mensaje de texto: sending/typing/SSE/cancel/fallos).
+final class TrainerChatVoiceSent extends TrainerChatEvent {
+  const TrainerChatVoiceSent(this.bytes, {this.filename = 'voice.ogg'});
+
+  final Uint8List bytes;
+  final String filename;
+}
+
 /// El composer cambió: persiste el borrador del hilo activo (sin re-emitir por
 /// tecla; el borrador se siembra al cambiar de hilo).
 final class TrainerChatDraftChanged extends TrainerChatEvent {
@@ -157,6 +176,7 @@ final class TrainerChatLoaded extends TrainerChatState {
     this.attaching = false,
     this.lastAttemptedContent = '',
     this.draft = '',
+    this.recordingVoice = false,
   });
 
   final TrainerConversation conversation;
@@ -239,6 +259,10 @@ final class TrainerChatLoaded extends TrainerChatState {
   /// cancelar (la persistencia por-hilo vive en el bloc, en memoria).
   final String draft;
 
+  /// true mientras se graba una nota de voz: reemplaza el composer por la barra
+  /// de grabación y bloquea el envío de texto (una cosa a la vez).
+  final bool recordingVoice;
+
   TrainerChatLoaded copyWith({
     TrainerConversation? conversation,
     List<TrainerConversation>? conversations,
@@ -253,6 +277,7 @@ final class TrainerChatLoaded extends TrainerChatState {
     bool? attaching,
     String? lastAttemptedContent,
     String? draft,
+    bool? recordingVoice,
   }) => TrainerChatLoaded(
     conversation: conversation ?? this.conversation,
     conversations: conversations ?? this.conversations,
@@ -268,6 +293,7 @@ final class TrainerChatLoaded extends TrainerChatState {
     attaching: attaching ?? this.attaching,
     lastAttemptedContent: lastAttemptedContent ?? this.lastAttemptedContent,
     draft: draft ?? this.draft,
+    recordingVoice: recordingVoice ?? this.recordingVoice,
   );
 
   @override
@@ -286,7 +312,8 @@ final class TrainerChatLoaded extends TrainerChatState {
       mapEquals(other.pendingThumbnails, pendingThumbnails) &&
       other.attaching == attaching &&
       other.lastAttemptedContent == lastAttemptedContent &&
-      other.draft == draft;
+      other.draft == draft &&
+      other.recordingVoice == recordingVoice;
 
   @override
   int get hashCode => Object.hash(
@@ -304,6 +331,7 @@ final class TrainerChatLoaded extends TrainerChatState {
     attaching,
     lastAttemptedContent,
     draft,
+    recordingVoice,
   );
 }
 
@@ -330,6 +358,9 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     on<TrainerChatProgressReceived>(_onProgressReceived);
     on<TrainerChatTurnCancelRequested>(_onTurnCancelRequested);
     on<TrainerChatDraftChanged>(_onDraftChanged);
+    on<TrainerChatVoiceStarted>(_onVoiceStarted);
+    on<TrainerChatVoiceCancelled>(_onVoiceCancelled);
+    on<TrainerChatVoiceSent>(_onVoiceSent);
   }
 
   final TrainerRepository _repo;
@@ -440,7 +471,11 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     // a mitad de subida enviaría un subconjunto y, al limpiar los pendientes con
     // ese estado stale, dejaría los archivos que aún subían huérfanos en storage
     // (perdidos sin aviso). El operador reenvía cuando la subida cierra.
-    if (current is! TrainerChatLoaded || current.sending || current.attaching) {
+    // Grabando una nota de voz tampoco se envía texto (una cosa a la vez).
+    if (current is! TrainerChatLoaded ||
+        current.sending ||
+        current.attaching ||
+        current.recordingVoice) {
       return;
     }
     _cancelRequested = false;
@@ -736,6 +771,123 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         draft: cancelled,
       ),
     );
+  }
+
+  void _onVoiceStarted(
+    TrainerChatVoiceStarted event,
+    Emitter<TrainerChatState> emit,
+  ) {
+    final current = state;
+    // No arrancar sobre un turno en vuelo, una subida de adjuntos, ni una
+    // grabación ya activa (una cosa a la vez).
+    if (current is! TrainerChatLoaded ||
+        current.sending ||
+        current.attaching ||
+        current.recordingVoice) {
+      return;
+    }
+    emit(current.copyWith(recordingVoice: true, clearSendFailure: true));
+  }
+
+  void _onVoiceCancelled(
+    TrainerChatVoiceCancelled event,
+    Emitter<TrainerChatState> emit,
+  ) {
+    final current = state;
+    if (current is! TrainerChatLoaded || !current.recordingVoice) return;
+    emit(current.copyWith(recordingVoice: false));
+  }
+
+  /// Corre el turno de una nota de voz: sube el clip vía sendAudio y cierra con
+  /// el assistant final, reusando la máquina del turno de texto (sending/typing/
+  /// SSE/recarga). No hay burbuja optimista del user (el audio aún no tiene ref;
+  /// el user con su transcript llega en la recarga) ni reintento (el clip ya no
+  /// está en mano tras enviarlo).
+  Future<void> _onVoiceSent(
+    TrainerChatVoiceSent event,
+    Emitter<TrainerChatState> emit,
+  ) async {
+    final current = state;
+    // Sin grabación en curso no hay clip que enviar: un VoiceSent espurio (sin
+    // el VoiceStarted previo) no debe correr un turno de audio. Espeja la guarda
+    // de _onVoiceStarted (que ignora arrancar sobre una grabación ya activa).
+    if (current is! TrainerChatLoaded ||
+        current.sending ||
+        current.attaching ||
+        !current.recordingVoice) {
+      return;
+    }
+    final convId = current.conversation.id;
+    _cancelRequested = false;
+    emit(
+      current.copyWith(
+        recordingVoice: false,
+        sending: true,
+        liveProgress: 'Pensando…',
+        clearSendFailure: true,
+        lastAttemptedContent: '',
+      ),
+    );
+    unawaited(_progressSub?.cancel());
+    _progressSub = _events?.progress(_templateId, convId).listen((e) {
+      if (!isClosed) add(TrainerChatProgressReceived(e));
+    }, onError: (Object _) {});
+    try {
+      final assistant = await _repo.sendAudio(
+        templateId: _templateId,
+        conversationId: convId,
+        bytes: event.bytes,
+        filename: event.filename,
+      );
+      unawaited(_progressSub?.cancel());
+      _progressSub = null;
+      emit(
+        current.copyWith(
+          messages: <TrainerMessage>[...current.messages, assistant],
+          recordingVoice: false,
+          sending: false,
+          liveProgress: '',
+          clearSendFailure: true,
+        ),
+      );
+      // Recarga best-effort: trae el user de voz (con su transcript) y los
+      // tool results que el POST no devuelve.
+      await _reloadThread(emit, convId);
+      _seedVoiceBytes(event.bytes);
+    } on TrainerFailure catch (f) {
+      unawaited(_progressSub?.cancel());
+      _progressSub = null;
+      // El turno se canceló: el handler de cancelación ya dejó el estado limpio.
+      if (_cancelRequested) {
+        _cancelRequested = false;
+        return;
+      }
+      emit(
+        current.copyWith(
+          recordingVoice: false,
+          sending: false,
+          liveProgress: '',
+          sendFailure: f,
+        ),
+      );
+    }
+  }
+
+  /// Siembra los bytes recién grabados bajo el `audio_ref` del user de voz que
+  /// la recarga trajo (el más reciente del hilo): así la burbuja reproduce
+  /// desde la copia local, porque el wire no trae URL firmada. Sin recarga
+  /// (falló / el operador cambió de hilo) no hay ref conocida y se omite
+  /// (degradación honesta a audio sin fuente).
+  void _seedVoiceBytes(Uint8List bytes) {
+    final sink = _mediaSink;
+    final s = state;
+    if (sink == null || s is! TrainerChatLoaded) return;
+    for (final m in s.messages.reversed) {
+      if (m.isUser && m.audioRef.isNotEmpty) {
+        unawaited(sink.cache(m.audioRef, bytes));
+        return;
+      }
+    }
   }
 
   void _onDraftChanged(

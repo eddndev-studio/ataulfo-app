@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -6,18 +8,18 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/live_typing_progress.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
+import '../../../../core/design/widgets/voice_recording_mixin.dart';
 import '../../../messages/presentation/widgets/audio_failures_listener.dart';
 import '../bloc/platform_agent_chat_bloc.dart';
 import 'pa_chat_empty_state.dart';
 import 'pa_failure_copy.dart';
 import 'pa_message_tile.dart';
-import 'pa_voice_recording_mixin.dart';
 
 /// Cuerpo del chat del asistente: hilo (o estado vacío con sugerencias), avisos
 /// de fallo/modalidad, adjuntos pendientes y el composer —con la barra de nota
 /// de voz reemplazándolo mientras se graba—. El composer es el origen del
 /// borrador (que el bloc persiste por hilo); la máquina de la nota de voz vive
-/// en [PaVoiceRecordingMixin].
+/// en el [VoiceRecordingMixin] compartido.
 class PaChatView extends StatefulWidget {
   const PaChatView({super.key, required this.state, required this.onSend});
 
@@ -29,7 +31,7 @@ class PaChatView extends StatefulWidget {
 }
 
 class _PaChatViewState extends State<PaChatView>
-    with PaVoiceRecordingMixin<PaChatView> {
+    with VoiceRecordingMixin<PaChatView> {
   /// Controller compartido: las acciones rápidas PREFIJAN el texto del composer
   /// (el operador lo edita antes de enviar) en vez de auto-enviar. También es el
   /// origen del borrador, que el bloc persiste por hilo.
@@ -40,7 +42,16 @@ class _PaChatViewState extends State<PaChatView>
   late final PlatformAgentChatBloc _bloc;
 
   @override
-  PlatformAgentChatBloc get voiceBloc => _bloc;
+  void notifyVoiceStarted() => _bloc.add(const PaChatVoiceStarted());
+
+  @override
+  void notifyVoiceCancelled() {
+    // También corre en la limpieza de dispose: un bloc ya cerrado no recibe.
+    if (!_bloc.isClosed) _bloc.add(const PaChatVoiceCancelled());
+  }
+
+  @override
+  void notifyVoiceSent(Uint8List bytes) => _bloc.add(PaChatVoiceSent(bytes));
 
   @override
   void initState() {

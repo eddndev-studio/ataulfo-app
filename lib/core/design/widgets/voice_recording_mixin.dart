@@ -1,17 +1,20 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/audio/audio_recorder.dart';
-import '../bloc/platform_agent_chat_bloc.dart';
+import '../../audio/audio_recorder.dart';
 
-/// Máquina de estados de la nota de voz del asistente, aislada del composer que
-/// la hospeda. El host provee el bloc vía [voiceBloc] y llama [initVoice] /
-/// [disposeVoice] desde su ciclo de vida; el resto (permiso, arranque, pausa,
-/// envío, descarte) vive aquí. Toda transición avisa al bloc y refresca el host
-/// con `setState`, de modo que la barra de grabación refleje el estado real.
-mixin PaVoiceRecordingMixin<T extends StatefulWidget> on State<T> {
+/// Máquina de estados de la nota de voz por tap (sin gesto de mantener),
+/// compartida por los composers de los chats de agentes (asistente de
+/// plataforma y entrenador). El host llama [initVoice]/[disposeVoice] desde su
+/// ciclo de vida e implementa los avisos [notifyVoiceStarted]/
+/// [notifyVoiceCancelled]/[notifyVoiceSent] hacia su bloc; el resto (permiso,
+/// arranque, pausa, envío, descarte) vive aquí. Toda transición avisa al host
+/// y lo refresca con `setState`, de modo que la barra de grabación
+/// ([VoiceRecordingBar]) refleje el estado real.
+mixin VoiceRecordingMixin<T extends StatefulWidget> on State<T> {
   /// Grabador compartido (Noop/ausente fuera de Android): NO se dispone aquí.
   /// null ⇒ la superficie no ofrece el micrófono.
   AudioRecorder? recorder;
@@ -29,9 +32,17 @@ mixin PaVoiceRecordingMixin<T extends StatefulWidget> on State<T> {
   /// Subiendo el clip tras detener: deshabilita enviar/pausar en la barra.
   bool sendingVoice = false;
 
-  /// Bloc al que la máquina avisa cada transición. Lo provee el host (capturado
-  /// al montar, así la limpieza en dispose no depende de un context ya inválido).
-  PlatformAgentChatBloc get voiceBloc;
+  /// Avisa al bloc del host que la grabación arrancó. El host lo implementa
+  /// despachando su evento propio (capturar el bloc al montar: la limpieza en
+  /// dispose no puede depender de un context ya inválido).
+  void notifyVoiceStarted();
+
+  /// Avisa al bloc del host que la grabación se descartó. También corre en la
+  /// limpieza de dispose: el host debe tolerar un bloc ya cerrado.
+  void notifyVoiceCancelled();
+
+  /// Entrega el clip grabado al bloc del host (corre el turno vía audio).
+  void notifyVoiceSent(Uint8List bytes);
 
   /// Cablea el grabador desde el scope y consulta si la plataforma lo soporta.
   void initVoice() {
@@ -47,7 +58,7 @@ mixin PaVoiceRecordingMixin<T extends StatefulWidget> on State<T> {
   void disposeVoice() {
     if (recording) {
       unawaited(recorder?.cancel());
-      if (!voiceBloc.isClosed) voiceBloc.add(const PaChatVoiceCancelled());
+      notifyVoiceCancelled();
     }
   }
 
@@ -93,7 +104,7 @@ mixin PaVoiceRecordingMixin<T extends StatefulWidget> on State<T> {
       return;
     }
     setState(() => recording = true);
-    voiceBloc.add(const PaChatVoiceStarted());
+    notifyVoiceStarted();
   }
 
   /// Descarta la grabación en curso sin enviarla.
@@ -105,7 +116,7 @@ mixin PaVoiceRecordingMixin<T extends StatefulWidget> on State<T> {
       paused = false;
       sendingVoice = false;
     });
-    voiceBloc.add(const PaChatVoiceCancelled());
+    notifyVoiceCancelled();
   }
 
   /// Detiene la grabación y despacha el clip: el bloc corre el turno vía audio.
@@ -128,13 +139,13 @@ mixin PaVoiceRecordingMixin<T extends StatefulWidget> on State<T> {
         paused = false;
         sendingVoice = false;
       });
-      voiceBloc.add(const PaChatVoiceCancelled());
+      notifyVoiceCancelled();
       messenger.showSnackBar(
         const SnackBar(content: Text('No se grabó audio')),
       );
       return;
     }
-    voiceBloc.add(PaChatVoiceSent(voice.bytes));
+    notifyVoiceSent(voice.bytes);
     if (mounted) {
       setState(() {
         recording = false;

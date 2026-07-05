@@ -1252,6 +1252,10 @@ class AppRouter {
               RepositoryProvider<VideoPlayback>.value(
                 value: const InAppVideoPlayback(),
               ),
+              // Grabador de notas de voz para el composer del entrenador
+              // (Noop fuera de Android: el micrófono no se ofrece si no está
+              // soportado).
+              RepositoryProvider<AudioRecorder>.value(value: _audioRecorder),
             ],
             child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[

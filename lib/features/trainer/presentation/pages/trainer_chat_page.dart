@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,8 @@ import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_thread_list_sheet.dart';
 import '../../../../core/design/widgets/live_typing_progress.dart';
+import '../../../../core/design/widgets/voice_recording_bar.dart';
+import '../../../../core/design/widgets/voice_recording_mixin.dart';
 import '../../../messages/presentation/widgets/audio_failures_listener.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../bloc/trainer_chat_bloc.dart';
@@ -157,16 +161,36 @@ class _ChatView extends StatefulWidget {
   State<_ChatView> createState() => _ChatViewState();
 }
 
-class _ChatViewState extends State<_ChatView> {
+class _ChatViewState extends State<_ChatView>
+    with VoiceRecordingMixin<_ChatView> {
   /// Controller externo: es el origen del borrador (que el bloc persiste por
   /// hilo) y permite re-sembrar el composer al cambiar de hilo, fallar o cancelar.
   final TextEditingController _composer = TextEditingController();
 
+  /// Bloc capturado al montar: lo usa el ciclo de la nota de voz (incluida la
+  /// limpieza en dispose, cuando el context ya no es fiable).
+  late final TrainerChatBloc _bloc;
+
+  @override
+  void notifyVoiceStarted() => _bloc.add(const TrainerChatVoiceStarted());
+
+  @override
+  void notifyVoiceCancelled() {
+    // También corre en la limpieza de dispose: un bloc ya cerrado no recibe.
+    if (!_bloc.isClosed) _bloc.add(const TrainerChatVoiceCancelled());
+  }
+
+  @override
+  void notifyVoiceSent(Uint8List bytes) =>
+      _bloc.add(TrainerChatVoiceSent(bytes));
+
   @override
   void initState() {
     super.initState();
+    _bloc = context.read<TrainerChatBloc>();
     _composer.text = widget.state.draft;
     _composer.addListener(_onComposerChanged);
+    initVoice();
   }
 
   @override
@@ -210,6 +234,7 @@ class _ChatViewState extends State<_ChatView> {
 
   @override
   void dispose() {
+    disposeVoice();
     _composer.removeListener(_onComposerChanged);
     _composer.dispose();
     super.dispose();
@@ -364,34 +389,61 @@ class _ChatViewState extends State<_ChatView> {
               },
             ),
           ),
-        AppChatComposer(
-          controller: _composer,
-          fieldKey: const Key('trainer.composer.field'),
-          sendKey: const Key('trainer.composer.send'),
-          hint: 'Cuéntale de tu negocio…',
-          // El envío se atenúa durante la subida de adjuntos además del turno
-          // en vuelo: evita la carrera adjuntar-mientras-envía.
-          enabled: !s.sending && !s.attaching,
-          onSend: _send,
-          leading: <Widget>[
-            IconButton(
-              key: const Key('trainer.attach'),
-              tooltip: 'Adjuntar imagen, video o PDF',
-              icon: s.attaching
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.attach_file, color: AppTokens.text2),
-              onPressed: s.attaching || s.sending
-                  ? null
-                  : () => context.read<TrainerChatBloc>().add(
-                      const TrainerChatAttachRequested(),
+        // Grabando: la barra de nota de voz reemplaza al composer (una cosa a
+        // la vez). Si no, el composer con el micrófono en el slot final vacío.
+        if (s.recordingVoice && recorder != null)
+          VoiceRecordingBar(
+            elapsed: recorder!.elapsed,
+            amplitude: recorder!.amplitude,
+            onCancel: cancelVoice,
+            onSend: sendVoice,
+            onPauseResume: togglePauseVoice,
+            paused: paused,
+            sending: sendingVoice,
+          )
+        else
+          AppChatComposer(
+            controller: _composer,
+            fieldKey: const Key('trainer.composer.field'),
+            sendKey: const Key('trainer.composer.send'),
+            hint: 'Cuéntale de tu negocio…',
+            // El envío se atenúa durante la subida de adjuntos además del turno
+            // en vuelo: evita la carrera adjuntar-mientras-envía.
+            enabled: !s.sending && !s.attaching,
+            onSend: _send,
+            // Micrófono en el slot final mientras el campo está vacío: solo si
+            // el grabador está soportado y no hay adjuntos pendientes (esos se
+            // envían por el flujo de texto).
+            emptyTrailing: (canRecord && s.pendingAttachments.isEmpty)
+                ? IconButton(
+                    key: const Key('trainer.voice.mic'),
+                    tooltip: 'Grabar nota de voz',
+                    icon: const Icon(
+                      Icons.mic_none_outlined,
+                      color: AppTokens.text2,
                     ),
-            ),
-          ],
-        ),
+                    onPressed: startVoice,
+                  )
+                : null,
+            leading: <Widget>[
+              IconButton(
+                key: const Key('trainer.attach'),
+                tooltip: 'Adjuntar imagen, video o PDF',
+                icon: s.attaching
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.attach_file, color: AppTokens.text2),
+                onPressed: s.attaching || s.sending
+                    ? null
+                    : () => context.read<TrainerChatBloc>().add(
+                        const TrainerChatAttachRequested(),
+                      ),
+              ),
+            ],
+          ),
       ],
     );
   }

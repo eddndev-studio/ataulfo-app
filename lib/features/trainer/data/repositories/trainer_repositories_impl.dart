@@ -115,6 +115,19 @@ class TrainerRepositoryImpl implements TrainerRepository {
   );
 
   @override
+  Future<TrainerMessage> sendAudio({
+    required String templateId,
+    required String conversationId,
+    required Uint8List bytes,
+    String filename = 'voice.ogg',
+  }) => _ds.sendAudio(
+    templateId: templateId,
+    conversationId: conversationId,
+    bytes: bytes,
+    filename: filename,
+  );
+
+  @override
   Future<TrainerModels> listModels({required String templateId}) =>
       _ds.listModels(templateId: templateId);
 

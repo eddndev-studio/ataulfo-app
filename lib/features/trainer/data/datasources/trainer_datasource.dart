@@ -52,6 +52,17 @@ abstract interface class TrainerDatasource {
     required String filename,
   });
 
+  /// Sube una nota de voz (multipart, part `audio`) y corre el turno: el server
+  /// persiste el user con el audio (y su transcript si pudo) y devuelve el
+  /// assistant final. Mismo presupuesto de tiempo y token de cancelación que
+  /// `sendMessage`. 413/415 tipados.
+  Future<TrainerMessage> sendAudio({
+    required String templateId,
+    required String conversationId,
+    required Uint8List bytes,
+    String filename,
+  });
+
   /// Allowlist de modelos del entrenador + default de la plataforma. El
   /// caller la trata como best-effort: cualquier fallo oculta el selector.
   Future<TrainerModels> listModels({required String templateId});
@@ -182,6 +193,40 @@ class DioTrainerDatasource implements TrainerDatasource {
           'model': ?model,
           if (attachments.isNotEmpty) 'attachments': attachments,
         },
+        options: Options(receiveTimeout: turnReceiveTimeout),
+        cancelToken: token,
+      );
+      final body = res.data;
+      if (body == null) throw const TrainerUnknownFailure();
+      return TrainerMessageDto.fromJson(body).toEntity();
+    } on TrainerFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw mapTrainerDioException(e);
+    } on FormatException {
+      throw const TrainerUnknownFailure();
+    } on TypeError {
+      throw const TrainerUnknownFailure();
+    } finally {
+      if (identical(_inFlight, token)) _inFlight = null;
+    }
+  }
+
+  @override
+  Future<TrainerMessage> sendAudio({
+    required String templateId,
+    required String conversationId,
+    required Uint8List bytes,
+    String filename = 'voice.ogg',
+  }) async {
+    final token = CancelToken();
+    _inFlight = token;
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '${_base(templateId)}/$conversationId/audio',
+        data: FormData.fromMap(<String, dynamic>{
+          'audio': MultipartFile.fromBytes(bytes, filename: filename),
+        }),
         options: Options(receiveTimeout: turnReceiveTimeout),
         cancelToken: token,
       );

@@ -65,6 +65,15 @@ abstract interface class TrainerRepository {
     required String filename,
   });
 
+  /// Sube una nota de voz y corre el turno (multipart al endpoint de audio);
+  /// devuelve el assistant final. Mismo token de cancelación que sendMessage.
+  Future<TrainerMessage> sendAudio({
+    required String templateId,
+    required String conversationId,
+    required Uint8List bytes,
+    String filename,
+  });
+
   /// Allowlist de modelos del entrenador (best-effort en el caller).
   Future<TrainerModels> listModels({required String templateId});
 
