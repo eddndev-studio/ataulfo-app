@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_media_thumb.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/label_step_metadata.dart';
 import '../../domain/entities/step.dart' as sdom;
@@ -11,6 +12,7 @@ import '../media_step_name.dart';
 import 'step_card_conditional.dart';
 import 'step_delete.dart';
 import 'step_edit_support.dart';
+import 'step_media_field.dart';
 import 'step_type_label.dart';
 
 /// Card read-only por step. Muestra index (order+1), label humanizado del
@@ -31,6 +33,7 @@ class StepCard extends StatelessWidget {
     this.resolvedMediaName,
     this.labelNames = const <String, String>{},
     this.stepRefs = const <String, ({int order, String label})>{},
+    this.thumbResolver,
   });
 
   final sdom.Step step;
@@ -54,6 +57,12 @@ class StepCard extends StatelessWidget {
   /// resumen del condicional resuelva sus destinos por nombre (mismo
   /// motivo de planitud que los otros catálogos).
   final Map<String, ({int order, String label})> stepRefs;
+
+  /// Resolutor de bytes de la miniatura del paso multimedia. `null` ⇒ el de
+  /// sesión con el cache real en disco. Autocontenido a propósito (no es un
+  /// provider): el subárbol se eleva al overlay durante el drag y un lookup
+  /// ahí lanzaría ProviderNotFound.
+  final StepMediaThumbResolver? thumbResolver;
 
   /// Borrado directo desde la card (long-press): una capa menos que la
   /// ruta card → sheet → basura. Lee el bloc EN EL GESTO (no en build):
@@ -92,6 +101,7 @@ class StepCard extends StatelessWidget {
           resolvedMediaName: resolvedMediaName,
           labelNames: labelNames,
           stepRefs: stepRefs,
+          thumbResolver: thumbResolver,
         ),
         const SizedBox(height: AppTokens.sp3),
         Wrap(
@@ -169,10 +179,14 @@ class _StepBody extends StatelessWidget {
     this.resolvedMediaName,
     this.labelNames = const <String, String>{},
     this.stepRefs = const <String, ({int order, String label})>{},
+    this.thumbResolver,
   });
 
   final sdom.Step step;
   final TextTheme textTheme;
+
+  /// Resolutor de bytes de la miniatura (ver [StepCard.thumbResolver]).
+  final StepMediaThumbResolver? thumbResolver;
 
   /// Catálogo id→nombre de labels, plano por el mismo motivo que
   /// [resolvedMediaName].
@@ -256,24 +270,44 @@ class _StepBody extends StatelessWidget {
       metadataJson: step.metadataJson,
       resolvedName: resolvedMediaName,
     );
-    return Column(
+    final resolver = thumbResolver ?? StepMediaThumbResolver.session;
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          mediaText,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: mono
-              ? textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  color: AppTokens.text2,
-                )
-              : textTheme.bodyMedium,
+        // Miniatura efímera resuelta SOLO por el ref BARE (la lista no tiene
+        // asset a mano): bytes del cache compartido con la galería, o el glifo
+        // por tipo cuando el cache está frío. Para VIDEO eso significa poster
+        // sólo si la galería ya lo derivó y cacheó — sin cache, glifo de video:
+        // derivar un poster localmente exigiría bajar el archivo entero.
+        AppMediaThumb(
+          mediaRef: step.mediaRef,
+          kind: mediaKindForStepType(step.type),
+          size: 40,
+          loader: (r) => resolver.load(r),
         ),
-        if (step.content.isNotEmpty) ...<Widget>[
-          const SizedBox(height: AppTokens.sp1),
-          Text(step.content, style: textTheme.bodyMedium),
-        ],
+        const SizedBox(width: AppTokens.sp3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                mediaText,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: mono
+                    ? textTheme.bodyMedium?.copyWith(
+                        fontFamily: 'monospace',
+                        color: AppTokens.text2,
+                      )
+                    : textTheme.bodyMedium,
+              ),
+              if (step.content.isNotEmpty) ...<Widget>[
+                const SizedBox(height: AppTokens.sp1),
+                Text(step.content, style: textTheme.bodyMedium),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
