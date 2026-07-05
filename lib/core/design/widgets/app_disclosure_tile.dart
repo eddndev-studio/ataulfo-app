@@ -28,17 +28,28 @@ class AppDisclosureTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    // El tile comparte curva con las cards del kit (radiusCard): un radio
+    // menor desentonaría junto a los campos y tarjetas que lo rodean. La
+    // misma forma se declara tres veces a propósito: el Material pinta el
+    // fondo, el clip recorta el ripple del ExpansionTile en las esquinas y
+    // el shape/collapsedShape hace que highlight y splash respeten la curva.
+    const shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(AppTokens.radiusCard)),
+    );
     // El fondo lo da un Material (no un DecoratedBox con color): el ListTile
     // interno del ExpansionTile pinta su superficie y tinte sobre el Material
     // ancestro más cercano; si el color viviera en un DecoratedBox intermedio
     // lo taparía.
     return Material(
       color: AppTokens.surface2,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+      clipBehavior: Clip.antiAlias,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: initiallyExpanded,
+          shape: shape,
+          collapsedShape: shape,
           tilePadding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
           childrenPadding: const EdgeInsets.fromLTRB(
             AppTokens.sp3,

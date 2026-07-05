@@ -29,7 +29,9 @@ export 'step_media_field.dart' show MediaRefPicker;
 /// cambiar de tipo es crear un paso nuevo (el header lo dice en su caption).
 /// Rangos espejan al validador del backend (`ataulfo-go/internal/domain/
 /// flow/step.go`, ajustar límites primero allí): `delayMs` 1s..5 min
-/// (LABEL y END exentos: no envían al wire), `jitterPct` 0..100%.
+/// (LABEL y END exentos: no envían al wire), `jitterPct` 0..100%. El editor
+/// ofrece el retraso en 1 s..1 min; un valor mayor ya guardado (válido en
+/// el backend) se conserva intacto mientras el operador no mueva el slider.
 ///
 /// El sheet escucha el `FlowStepsBloc`:
 /// - Mutating ⇒ submit bloqueado con loading.
@@ -75,7 +77,6 @@ class StepEditSheet extends StatefulWidget {
 /// consulte [shouldGuardDiscard] a través de la GlobalKey del sheet.
 class StepEditSheetState extends State<StepEditSheet> {
   static const int _minDelayMs = 1000;
-  static const int _maxDelayMs = 5 * 60 * 1000;
   static const int _maxJitterPct = 100;
 
   late final TextEditingController _contentCtrl;
@@ -370,7 +371,6 @@ class StepEditSheetState extends State<StepEditSheet> {
                       legacyDelayCured: _legacyDelayCured,
                       delayMs: _delayMs,
                       minDelayMs: _minDelayMs,
-                      maxDelayMs: _maxDelayMs,
                       jitterController: _jitterCtrl,
                       jitterInvalid: _jitterInvalid,
                       mode: _mode,

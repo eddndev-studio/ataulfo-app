@@ -57,7 +57,8 @@ void main() {
     expect(find.text('cuerpo secreto'), findsOneWidget);
   });
 
-  testWidgets('la superficie es surface2 con radio sm', (tester) async {
+  testWidgets('la superficie es surface2 con radio de card y el ripple queda '
+      'recortado a la curva', (tester) async {
     await tester.pumpWidget(
       _wrap(
         const AppDisclosureTile(
@@ -67,12 +68,30 @@ void main() {
         ),
       ),
     );
-    final material = tester.widget<Material>(
-      find.descendant(
-        of: find.byType(AppDisclosureTile),
-        matching: find.byType(Material),
-      ),
-    );
+    // El ExpansionTile con shape monta su propio Material transparente
+    // para el ink: el de la SUPERFICIE es el primero (el más externo).
+    final material = tester
+        .widgetList<Material>(
+          find.descendant(
+            of: find.byType(AppDisclosureTile),
+            matching: find.byType(Material),
+          ),
+        )
+        .first;
     expect(material.color, AppTokens.surface2);
+    // Radio de card (no radiusSm): el tile convive con las cards del kit
+    // y con los campos redondeados sin desentonar.
+    expect(material.borderRadius, BorderRadius.circular(AppTokens.radiusCard));
+    // El ripple del ExpansionTile no debe asomar por las esquinas.
+    expect(material.clipBehavior, Clip.antiAlias);
+
+    // El highlight/splash del tile respeta la misma curva en ambos
+    // estados (expandido y colapsado).
+    const shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(AppTokens.radiusCard)),
+    );
+    final tile = tester.widget<ExpansionTile>(find.byType(ExpansionTile));
+    expect(tile.shape, shape);
+    expect(tile.collapsedShape, shape);
   });
 }

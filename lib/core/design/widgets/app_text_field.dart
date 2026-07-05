@@ -221,15 +221,18 @@ class _AppTextFieldState extends State<AppTextField> {
     final hasError = widget.errorText != null;
     final focused = _focusNode.hasFocus;
 
-    // El error gana sobre el foco; el borde reserva siempre 2px (incluso en
-    // default, con color transparente) para que enfocar no salte el layout.
+    // El error gana sobre el foco; el borde mide siempre 2px para que
+    // enfocar no salte el layout. En reposo el borde es divider (hairline
+    // visible): el fill translúcido desaparece sobre superficies elevadas
+    // (surface2 de un acordeón, p. ej.) y sin borde el campo se leía como
+    // texto suelto — un campo debe verse campo sobre cualquier superficie.
     final Color borderColor;
     if (hasError) {
       borderColor = AppTokens.danger;
     } else if (focused) {
       borderColor = AppTokens.primary;
     } else {
-      borderColor = Colors.transparent;
+      borderColor = AppTokens.divider;
     }
 
     // El glow solo acompaña al foco limpio (sin error): comunica «aquí está

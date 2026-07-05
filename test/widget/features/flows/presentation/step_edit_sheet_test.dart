@@ -5,7 +5,7 @@ import 'package:ataulfo/core/design/app_bottom_sheet.dart';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
-import 'package:ataulfo/core/design/widgets/app_duration_field.dart';
+import 'package:ataulfo/core/design/widgets/app_slider.dart';
 import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
@@ -212,13 +212,14 @@ void main() {
     );
 
     testWidgets(
-      'expandir "Opciones de envío" revela retraso (stepper con presets), '
+      'expandir "Opciones de envío" revela retraso (slider con readout), '
       'variación y modo',
       (tester) async {
         await pumpHost(tester);
         await openSendOptions(tester);
 
-        expect(find.byType(AppDurationField), findsOneWidget);
+        expect(find.byType(AppSlider), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.delay.slider')), findsOneWidget);
         expect(find.byKey(const Key('step_edit.delay.value')), findsOneWidget);
         expect(find.byKey(const Key('step_edit.jitter')), findsOneWidget);
         expect(find.byKey(const Key('step_edit.mode.always')), findsOneWidget);
@@ -338,7 +339,8 @@ void main() {
     );
 
     testWidgets(
-      'el preset de retraso salta directo al valor: 10 s → 10000 ms',
+      'arrastrar el slider de retraso al tope manda delayMs=60000 (1 min) y '
+      'el readout acompaña ("1 min")',
       (tester) async {
         await pumpHost(tester);
 
@@ -349,39 +351,55 @@ void main() {
         await tester.pump();
         await openSendOptions(tester);
         await tester.ensureVisible(
-          find.byKey(const Key('step_edit.delay.preset.10')),
+          find.byKey(const Key('step_edit.delay.slider')),
         );
-        await tester.tap(find.byKey(const Key('step_edit.delay.preset.10')));
+        // Más allá del ancho del control → clava en el máximo (60 s).
+        await tester.drag(
+          find.byKey(const Key('step_edit.delay.slider')),
+          const Offset(2000, 0),
+        );
         await tester.pump();
+
+        final readout = tester.widget<Text>(
+          find.byKey(const Key('step_edit.delay.value')),
+        );
+        expect(readout.data, '1 min');
+
         await tester.tap(find.byKey(const Key('step_edit.submit')));
         await tester.pump();
 
         final captured = verify(() => bloc.add(captureAny())).captured;
         final ev = captured.single as FlowStepsAddRequested;
-        expect(ev.delayMs, 10000);
+        expect(ev.delayMs, 60000);
       },
     );
 
-    testWidgets('el stepper de retraso incrementa con paso fino: 1 s → 2 s', (
-      tester,
-    ) async {
-      await pumpHost(tester);
+    testWidgets(
+      'la caption del retraso anuncia el rango del slider (1 s a 1 min) y '
+      'sin valores fuera de rango no hay caption legacy',
+      (tester) async {
+        await pumpHost(tester);
 
-      await tester.enterText(find.byKey(const Key('step_edit.content')), 'Hi');
-      await tester.pump();
-      await openSendOptions(tester);
-      await tester.ensureVisible(
-        find.byKey(const Key('step_edit.delay.increment')),
-      );
-      await tester.tap(find.byKey(const Key('step_edit.delay.increment')));
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('step_edit.submit')));
-      await tester.pump();
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Hi',
+        );
+        await tester.pump();
+        await openSendOptions(tester);
 
-      final captured = verify(() => bloc.add(captureAny())).captured;
-      final ev = captured.single as FlowStepsAddRequested;
-      expect(ev.delayMs, 2000);
-    });
+        expect(
+          find.text(
+            'Cuánto espera el bot antes de enviar el paso '
+            '(1 s a 1 min).',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('step_edit.delay.legacy_range')),
+          findsNothing,
+        );
+      },
+    );
 
     testWidgets('la variación es un campo numérico: 15 → jitterPct 15', (
       tester,
@@ -507,6 +525,104 @@ void main() {
         findsNothing,
       );
     });
+
+    // Un retraso guardado por encima del tope del slider (el backend admite
+    // hasta 5 min): el control pinta clavado al máximo, el readout dice el
+    // valor REAL y una caption explica que arrastrar lo reemplaza.
+    const legacyLong = fdom.Step(
+      id: 's-long',
+      flowId: 'f1',
+      type: fdom.StepType.text,
+      order: 0,
+      content: 'lento',
+      mediaRef: '',
+      metadataJson: '{}',
+      delayMs: 300000,
+      jitterPct: 0,
+      aiOnly: false,
+    );
+
+    testWidgets(
+      'delay legado > 1 min: slider clavado al máximo, readout con el valor '
+      'REAL ("5 min") y caption quieta explicando cómo cambiarlo',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[legacyLong]));
+        await pumpHost(tester, editing: legacyLong);
+        await openSendOptions(tester);
+
+        final readout = tester.widget<Text>(
+          find.byKey(const Key('step_edit.delay.value')),
+        );
+        expect(readout.data, '5 min');
+
+        final slider = tester.widget<AppSlider>(
+          find.byKey(const Key('step_edit.delay.slider')),
+        );
+        expect(slider.value, slider.max);
+
+        expect(
+          find.byKey(const Key('step_edit.delay.legacy_range')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'delay legado > 1 min se CONSERVA al guardar si el slider no se toca: '
+      'cambiar solo el content no manda delayMs',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[legacyLong]));
+        await pumpHost(tester, editing: legacyLong);
+
+        // El slider llega a construirse (pintado clavado al máximo): ese
+        // clamp de pintado NO debe emitir onDelayChanged por sí solo.
+        await openSendOptions(tester);
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'nuevo',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        final ev = captured.single as FlowStepsUpdateRequested;
+        expect(ev.content, 'nuevo');
+        // El valor exacto (5 min) sobrevive: no viaja delayMs en el PATCH.
+        expect(ev.delayMs, isNull);
+      },
+    );
+
+    testWidgets(
+      'arrastrar el slider de un delay legado > 1 min lo trae al rango: '
+      'al mínimo → delayMs 1000',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[legacyLong]));
+        await pumpHost(tester, editing: legacyLong);
+        await openSendOptions(tester);
+
+        await tester.ensureVisible(
+          find.byKey(const Key('step_edit.delay.slider')),
+        );
+        await tester.drag(
+          find.byKey(const Key('step_edit.delay.slider')),
+          const Offset(-2000, 0),
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        final ev = captured.single as FlowStepsUpdateRequested;
+        expect(ev.delayMs, 1000);
+      },
+    );
 
     testWidgets(
       'estado Mutating bloquea el submit (tap no dispatcha AddRequested)',
@@ -1882,7 +1998,13 @@ void main() {
       await pumpGuardHost(tester);
       await tester.tap(find.byKey(const Key('step_edit.send_options')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('step_edit.delay.increment')));
+      await tester.ensureVisible(
+        find.byKey(const Key('step_edit.delay.slider')),
+      );
+      await tester.drag(
+        find.byKey(const Key('step_edit.delay.slider')),
+        const Offset(2000, 0),
+      );
       await tester.pump();
 
       await tapScrim(tester);

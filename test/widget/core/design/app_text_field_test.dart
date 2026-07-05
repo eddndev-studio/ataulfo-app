@@ -414,23 +414,21 @@ void main() {
       expect(shellDecoration(tester).color, AppTokens.input);
     });
 
-    testWidgets(
-      'default: borde 2px transparente (reserva el grosor para no saltar al '
-      'enfocar)',
-      (tester) async {
-        await pump(
-          tester,
-          AppTextField(
-            label: 'X',
-            hint: 'h',
-            controller: TextEditingController(),
-          ),
-        );
-        final side = topSide(shellDecoration(tester));
-        expect(side.width, 2);
-        expect(side.color, Colors.transparent);
-      },
-    );
+    testWidgets('default: borde 2px divider — el campo se lee como campo sobre '
+        'cualquier superficie (surface2 incluido), y el grosor no salta al '
+        'enfocar', (tester) async {
+      await pump(
+        tester,
+        AppTextField(
+          label: 'X',
+          hint: 'h',
+          controller: TextEditingController(),
+        ),
+      );
+      final side = topSide(shellDecoration(tester));
+      expect(side.width, 2);
+      expect(side.color, AppTokens.divider);
+    });
 
     testWidgets('default: sin glow (boxShadow nulo o vacío)', (tester) async {
       await pump(

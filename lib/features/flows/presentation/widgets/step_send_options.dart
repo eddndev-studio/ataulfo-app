@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/design/format_duration.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_disclosure_tile.dart';
-import '../../../../core/design/widgets/app_duration_field.dart';
 import '../../../../core/design/widgets/app_notice_banner.dart';
+import '../../../../core/design/widgets/app_slider.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 
 /// Modo de ejecución del paso. Mapea 1:1 a los flags excluyentes del wire
@@ -64,7 +65,6 @@ class StepSendOptions extends StatelessWidget {
     required this.legacyDelayCured,
     required this.delayMs,
     required this.minDelayMs,
-    required this.maxDelayMs,
     required this.jitterController,
     required this.jitterInvalid,
     required this.mode,
@@ -77,7 +77,6 @@ class StepSendOptions extends StatelessWidget {
   final bool legacyDelayCured;
   final int delayMs;
   final int minDelayMs;
-  final int maxDelayMs;
 
   /// Controller del campo de variación; lo posee el sheet para que el valor
   /// sobreviva al colapso del disclosure (que desmonta a sus hijos).
@@ -92,19 +91,19 @@ class StepSendOptions extends StatelessWidget {
   final ValueChanged<int> onDelayChanged;
   final ValueChanged<StepMode> onModeChanged;
 
-  /// Saltos típicos del retraso; el rango completo sigue disponible con −/+.
-  static const List<Duration> _delayPresets = <Duration>[
-    Duration(seconds: 1),
-    Duration(seconds: 3),
-    Duration(seconds: 10),
-    Duration(seconds: 30),
-    Duration(minutes: 1),
-    Duration(minutes: 5),
-  ];
+  /// Tope del slider de retraso (1 min). El backend admite valores mayores
+  /// ya guardados (hasta 5 min): esos se CONSERVAN mientras el control no se
+  /// arrastre — el slider pinta clavado al máximo, el readout dice el valor
+  /// real y una caption explica que mover el control lo reemplaza.
+  static const int _sliderMaxMs = 60000;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    // True cuando el retraso guardado excede el tope del slider: el valor
+    // exacto sobrevive al guardado porque onDelayChanged solo se emite al
+    // arrastrar (el clamp de pintado no notifica).
+    final delayBeyondSlider = delayMs > _sliderMaxMs;
     return AppDisclosureTile(
       key: const Key('step_edit.send_options'),
       icon: Icons.tune,
@@ -123,26 +122,48 @@ class StepSendOptions extends StatelessWidget {
             const SizedBox(height: AppTokens.sp4),
           ],
           if (showPacing) ...<Widget>[
-            Text(
-              'Retraso',
-              style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Text(
+                  'Retraso',
+                  style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+                ),
+                // La lectura humana del valor VIGENTE, que puede exceder el
+                // rango del slider (retraso legado): siempre dice la verdad.
+                Text(
+                  formatAppDuration(Duration(milliseconds: delayMs)),
+                  key: const Key('step_edit.delay.value'),
+                  style: textTheme.bodyMedium,
+                ),
+              ],
             ),
-            const SizedBox(height: AppTokens.sp2),
-            AppDurationField(
-              keyPrefix: 'step_edit.delay',
-              value: Duration(milliseconds: delayMs),
-              min: Duration(milliseconds: minDelayMs),
-              max: Duration(milliseconds: maxDelayMs),
-              presets: _delayPresets,
+            AppSlider(
+              key: const Key('step_edit.delay.slider'),
+              // El pintado se acota al rango; el valor real vive en delayMs.
+              value: delayMs.clamp(minDelayMs, _sliderMaxMs) / 1000,
+              min: minDelayMs / 1000,
+              max: _sliderMaxMs / 1000,
+              // Paradas de 1 s en todo el rango [1 s, 60 s].
+              divisions: (_sliderMaxMs - minDelayMs) ~/ 1000,
               onChanged: enabled
-                  ? (d) => onDelayChanged(d.inMilliseconds)
+                  ? (v) => onDelayChanged(v.round() * 1000)
                   : null,
             ),
             const SizedBox(height: AppTokens.sp1),
             Text(
-              'Cuánto espera el bot antes de enviar el paso (1 s a 5 min).',
+              'Cuánto espera el bot antes de enviar el paso (1 s a 1 min).',
               style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
             ),
+            if (delayBeyondSlider) ...<Widget>[
+              const SizedBox(height: AppTokens.sp1),
+              Text(
+                'Este paso conserva su retraso actual; mueve el control '
+                'para cambiarlo.',
+                key: const Key('step_edit.delay.legacy_range'),
+                style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+              ),
+            ],
             const SizedBox(height: AppTokens.sp4),
             AppTextField(
               key: const Key('step_edit.jitter'),
