@@ -4,7 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_disclosure_tile.dart';
 import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/assistant_markdown.dart';
+import '../../../../core/design/widgets/chat_bubble.dart';
+import '../../../../core/design/widgets/reasoning_disclosure.dart';
 import '../../domain/ai_log_runs.dart';
 import '../../domain/entities/ai_log_entry.dart';
 import '../../domain/failures/ai_log_failure.dart';
@@ -123,11 +127,13 @@ class _RunCard extends StatelessWidget {
               // abreviados; las flechas comunican la dirección sin texto extra.
               if (run.promptTokens > 0)
                 AppPill.neutral(
-                  label: '↑ ${formatTokensCompact(run.promptTokens)}',
+                  icon: Icons.arrow_upward,
+                  label: formatTokensCompact(run.promptTokens),
                 ),
               if (run.completionTokens > 0)
                 AppPill.neutral(
-                  label: '↓ ${formatTokensCompact(run.completionTokens)}',
+                  icon: Icons.arrow_downward,
+                  label: formatTokensCompact(run.completionTokens),
                 ),
               // Proporción del prompt servida desde caché (más barata). Una
               // proporción real que redondea a 0% se omite: "caché 0%" leería
@@ -162,50 +168,23 @@ class _EntryTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTokens.sp3),
       child: switch (entry.role) {
-        AiLogRole.user => _bubble(
-          context,
+        // El cliente es el emisor "local" de esta vista: su turno va a la
+        // derecha, como en el hilo real. Su texto es transcripción verbatim
+        // de WhatsApp — nunca se reinterpreta como Markdown.
+        AiLogRole.user => _Turn(
           icon: Icons.person_outline,
           title: 'Cliente',
+          mine: true,
           child: Text(entry.content, style: textTheme.bodyMedium),
         ),
-        AiLogRole.assistant => _bubble(
-          context,
-          icon: Icons.smart_toy_outlined,
-          title: 'Bot',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              if (entry.reasoning.isNotEmpty)
-                _Reasoning(reasoning: entry.reasoning, entryId: entry.id),
-              if (entry.content.isNotEmpty)
-                Text(entry.content, style: textTheme.bodyMedium),
-              if (entry.toolCalls.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppTokens.sp2),
-                  child: Wrap(
-                    spacing: AppTokens.sp2,
-                    runSpacing: AppTokens.sp1,
-                    children: <Widget>[
-                      for (final tc in entry.toolCalls)
-                        Tooltip(
-                          message: tc.argumentsJson.isEmpty
-                              ? tc.name
-                              : tc.argumentsJson,
-                          child: AppPill.primary(label: '⚙ ${tc.name}'),
-                        ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
+        AiLogRole.assistant => _AssistantTurn(entry: entry),
         AiLogRole.tool => ToolResultView(entry: entry),
         // La voz del MOTOR (p.ej. el nudge de disciplina): rotulada Sistema y
         // atenuada, para que el operador no la lea como palabras del cliente.
-        AiLogRole.system => _bubble(
-          context,
+        AiLogRole.system => _Turn(
           icon: Icons.settings_outlined,
           title: 'Sistema',
+          mine: false,
           child: Text(
             entry.content,
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
@@ -221,85 +200,117 @@ class _EntryTile extends StatelessWidget {
       },
     );
   }
+}
 
-  Widget _bubble(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required Widget child,
-  }) {
+/// Turno simple (user/system): caption de rol sobre la [ChatBubble] canónica,
+/// apilados del lado del emisor.
+class _Turn extends StatelessWidget {
+  const _Turn({
+    required this.icon,
+    required this.title,
+    required this.mine,
+    required this.child,
+  });
+
+  final IconData icon;
+  final String title;
+  final bool mine;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: mine
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        _RoleCaption(icon: icon, title: title),
+        ChatBubble(mine: mine, child: child),
+      ],
+    );
+  }
+}
+
+/// Turno del bot: caption + razonamiento colapsable del kit + la respuesta en
+/// burbuja Markdown (los agentes emiten CommonMark) + una tarjeta expandible
+/// por llamada a tool. Un turno puro tool_calls no pinta burbuja vacía.
+class _AssistantTurn extends StatelessWidget {
+  const _AssistantTurn({required this.entry});
+
+  final AiLogEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const _RoleCaption(icon: Icons.smart_toy_outlined, title: 'Bot'),
+        if (entry.reasoning.isNotEmpty)
+          ReasoningDisclosure(reasoning: entry.reasoning, keyId: '${entry.id}'),
+        if (entry.content.isNotEmpty)
+          ChatBubble(
+            mine: false,
+            child: AssistantMarkdown(data: entry.content),
+          ),
+        for (final tc in entry.toolCalls) _ToolCallTile(call: tc),
+      ],
+    );
+  }
+}
+
+/// Caption de rol sobre la burbuja: quién habla en este turno.
+class _RoleCaption extends StatelessWidget {
+  const _RoleCaption({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Icon(icon, size: 18, color: AppTokens.text2),
-        const SizedBox(width: AppTokens.sp2),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                title,
-                style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
-              ),
-              const SizedBox(height: AppTokens.sp1),
-              child,
-            ],
-          ),
+        Icon(icon, size: 14, color: AppTokens.text2),
+        const SizedBox(width: AppTokens.sp1),
+        Text(
+          title,
+          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
         ),
       ],
     );
   }
 }
 
-/// Razonamiento colapsable: cerrado por default (es detalle de
-/// diagnóstico), expandible por turno.
-class _Reasoning extends StatelessWidget {
-  const _Reasoning({required this.reasoning, required this.entryId});
+/// Llamada a una tool del turno assistant: el nombre a la vista y los
+/// argumentos JSON expandibles al tocar — el mismo patrón que el resultado un
+/// renglón abajo. (Un tooltip de hover sería inaccesible en táctil.)
+class _ToolCallTile extends StatelessWidget {
+  const _ToolCallTile({required this.call});
 
-  final String reasoning;
-  final int entryId;
+  final AiToolCall call;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppTokens.sp2),
-      // El fondo lo da un Material (no un DecoratedBox con color): el ListTile
-      // interno del ExpansionTile pinta su superficie/tinte sobre el Material
-      // ancestro más cercano; un color en un DecoratedBox intermedio lo taparía.
-      child: Material(
-        color: AppTokens.surface2,
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-        child: Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            key: Key('ai_log.reasoning.$entryId'),
-            tilePadding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
-            childrenPadding: const EdgeInsets.fromLTRB(
-              AppTokens.sp3,
-              0,
-              AppTokens.sp3,
-              AppTokens.sp3,
-            ),
-            leading: const Icon(
-              Icons.psychology_outlined,
-              size: 18,
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTokens.sp2),
+      child: AppDisclosureTile(
+        key: Key('ai_log.tool_call.${call.id}'),
+        icon: Icons.bolt_outlined,
+        title: call.name,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            call.argumentsJson.isEmpty
+                ? '(sin argumentos)'
+                : call.argumentsJson,
+            style: textTheme.bodySmall?.copyWith(
+              fontFamily: 'monospace',
               color: AppTokens.text2,
             ),
-            title: Text(
-              'Razonamiento',
-              style: textTheme.labelMedium?.copyWith(color: AppTokens.text2),
-            ),
-            children: <Widget>[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  reasoning,
-                  style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-                ),
-              ),
-            ],
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/widgets/app_chat_composer.dart';
+import 'package:ataulfo/core/design/widgets/message_timestamp.dart';
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_conversation.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_message.dart';
@@ -129,6 +130,16 @@ void main() {
         ),
       ).called(1);
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('cada turno user/assistant lleva su hora bajo la burbuja', (
+      tester,
+    ) async {
+      await pump(tester, <TrainerMessage>[
+        _msg('m1', 'user', 'hola'),
+        _msg('m2', 'assistant', 'buenas'),
+      ]);
+      expect(find.byType(MessageTimestamp), findsNWidgets(2));
     });
 
     testWidgets('hilo vacío muestra un tip de fondo que orienta al usuario', (

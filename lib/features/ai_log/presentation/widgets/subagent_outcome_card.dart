@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/subagent_outcome_envelope.dart';
 
@@ -19,49 +20,39 @@ class SubagentOutcomeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isError = !envelope.isCompleted;
-    return Material(
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: AppTokens.divider),
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp3),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(
-                  isError ? Icons.error_outline : Icons.smart_toy_outlined,
-                  size: 18,
-                  color: isError ? AppTokens.danger : AppTokens.text2,
-                ),
-                const SizedBox(width: AppTokens.sp2),
-                Expanded(
-                  child: Text('Subagente', style: textTheme.labelMedium),
-                ),
-                _statusPill(envelope.status),
-              ],
-            ),
-            if (envelope.isCompleted &&
-                envelope.summary.isNotEmpty) ...<Widget>[
-              const SizedBox(height: AppTokens.sp2),
-              Text(envelope.summary, style: textTheme.bodyMedium),
-            ],
-            if (envelope.isCompleted && envelope.result.isNotEmpty) ...<Widget>[
-              const SizedBox(height: AppTokens.sp2),
-              _ResultBlock(result: envelope.result),
-            ],
-            if (isError && envelope.reason.isNotEmpty) ...<Widget>[
-              const SizedBox(height: AppTokens.sp2),
-              Text(
-                envelope.reason,
-                style: textTheme.bodySmall?.copyWith(color: AppTokens.danger),
+    return AppCard.outline(
+      padding: const EdgeInsets.all(AppTokens.sp3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                isError ? Icons.error_outline : Icons.smart_toy_outlined,
+                size: 18,
+                color: isError ? AppTokens.danger : AppTokens.text2,
               ),
+              const SizedBox(width: AppTokens.sp2),
+              Expanded(child: Text('Subagente', style: textTheme.labelMedium)),
+              _statusPill(envelope.status),
             ],
+          ),
+          if (envelope.isCompleted && envelope.summary.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppTokens.sp2),
+            Text(envelope.summary, style: textTheme.bodyMedium),
           ],
-        ),
+          if (envelope.isCompleted && envelope.result.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppTokens.sp2),
+            _ResultBlock(result: envelope.result),
+          ],
+          if (isError && envelope.reason.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppTokens.sp2),
+            Text(
+              envelope.reason,
+              style: textTheme.bodySmall?.copyWith(color: AppTokens.danger),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -90,12 +81,11 @@ class _ResultBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Material(
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: AppTokens.divider),
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      ),
+    // AppCard.outline sin padding: el ExpansionTile trae el suyo y su ListTile
+    // pinta sobre el Material transparente de la card (no hereda el fondo
+    // coloreado de la tarjeta contenedora).
+    return AppCard.outline(
+      padding: EdgeInsets.zero,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(

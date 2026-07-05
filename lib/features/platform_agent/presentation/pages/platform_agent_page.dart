@@ -8,7 +8,7 @@ import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
-import '../../../../core/design/widgets/typing_bubble.dart';
+import '../../../../core/design/widgets/live_typing_progress.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
 import '../../domain/entities/pa_conversation.dart';
 import '../../domain/failures/pa_failure.dart';
@@ -592,7 +592,10 @@ class _ChatViewState extends State<_ChatView> {
                       (s.nextCursor.isNotEmpty ? 1 : 0),
                   itemBuilder: (context, i) {
                     if (s.sending && i == 0) {
-                      return _LiveProgress(label: s.liveProgress);
+                      return LiveTypingProgress(
+                        label: s.liveProgress,
+                        keyId: 'pa',
+                      );
                     }
                     // El cargar-más vive en el tope visual (último índice del
                     // reverse), por encima del mensaje más viejo.
@@ -784,35 +787,6 @@ class _ChatViewState extends State<_ChatView> {
               ),
             ],
           ),
-      ],
-    );
-  }
-}
-
-/// Indicador en vivo del turno: typing + la etiqueta de progreso del SSE.
-class _LiveProgress extends StatelessWidget {
-  const _LiveProgress({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: <Widget>[
-        const TypingBubble(key: Key('pa.typing')),
-        if (label.isNotEmpty) ...<Widget>[
-          const SizedBox(width: AppTokens.sp2),
-          Flexible(
-            child: Text(
-              label,
-              key: const Key('pa.live_progress'),
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(color: AppTokens.text2),
-            ),
-          ),
-        ],
       ],
     );
   }

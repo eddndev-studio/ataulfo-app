@@ -1,4 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/assistant_markdown.dart';
+import 'package:ataulfo/core/design/widgets/chat_bubble.dart';
 import 'package:ataulfo/features/ai_log/domain/entities/ai_log_entry.dart';
 import 'package:ataulfo/features/ai_log/presentation/bloc/ai_log_bloc.dart';
 import 'package:ataulfo/features/ai_log/presentation/pages/ai_log_page.dart';
@@ -61,8 +64,8 @@ void main() {
     );
   }
 
-  testWidgets('pinta la corrida: cliente, razonamiento colapsable, tool '
-      'chip, resultado y tokens', (tester) async {
+  testWidgets('pinta la corrida: cliente, razonamiento colapsable, llamada a '
+      'tool expandible, resultado y tokens', (tester) async {
     when(() => bloc.state).thenReturn(
       AiLogLoaded(
         entries: <AiLogEntry>[
@@ -72,7 +75,11 @@ void main() {
             2,
             reasoning: 'consulto el doc de horarios',
             toolCalls: const <AiToolCall>[
-              AiToolCall(id: 'c0', name: 'read_doc', argumentsJson: '{}'),
+              AiToolCall(
+                id: 'c0',
+                name: 'read_doc',
+                argumentsJson: '{"doc":"horarios"}',
+              ),
             ],
           ),
           e(1, role: AiLogRole.user, content: '¿horario?'),
@@ -85,15 +92,92 @@ void main() {
 
     expect(find.text('¿horario?'), findsOneWidget);
     expect(find.text('Abrimos 9-18.'), findsOneWidget);
-    expect(find.text('⚙ read_doc'), findsOneWidget);
-    expect(find.byKey(const Key('ai_log.reasoning.2')), findsOneWidget);
+    expect(find.byKey(const Key('reasoning.disclosure.2')), findsOneWidget);
     expect(find.byKey(const Key('ai_log.tool_result.3')), findsOneWidget);
     expect(find.text('15 tokens'), findsOneWidget);
     // El razonamiento arranca colapsado; al expandir aparece el texto.
     expect(find.text('consulto el doc de horarios'), findsNothing);
-    await tester.tap(find.byKey(const Key('ai_log.reasoning.2')));
+    await tester.tap(find.byKey(const Key('reasoning.disclosure.2')));
     await tester.pumpAndSettle();
     expect(find.text('consulto el doc de horarios'), findsOneWidget);
+    // La llamada a tool: nombre visible con glifo (no un emoji en el label) y
+    // los argumentos expandibles al TOCAR — un tooltip de hover no sirve en
+    // táctil.
+    expect(find.text('read_doc'), findsOneWidget);
+    expect(find.byIcon(Icons.bolt_outlined), findsOneWidget);
+    expect(find.text('{"doc":"horarios"}'), findsNothing);
+    await tester.tap(find.byKey(const Key('ai_log.tool_call.c0')));
+    await tester.pumpAndSettle();
+    expect(find.text('{"doc":"horarios"}'), findsOneWidget);
+  });
+
+  testWidgets('tool-call sin argumentos muestra "(sin argumentos)" al '
+      'expandir', (tester) async {
+    when(() => bloc.state).thenReturn(
+      AiLogLoaded(
+        entries: <AiLogEntry>[
+          e(
+            1,
+            toolCalls: const <AiToolCall>[
+              AiToolCall(id: 'c1', name: 'done', argumentsJson: ''),
+            ],
+          ),
+        ],
+        nextBefore: null,
+        isLoadingMore: false,
+      ),
+    );
+    await pump(tester);
+
+    expect(find.text('(sin argumentos)'), findsNothing);
+    await tester.tap(find.byKey(const Key('ai_log.tool_call.c1')));
+    await tester.pumpAndSettle();
+    expect(find.text('(sin argumentos)'), findsOneWidget);
+  });
+
+  testWidgets('user y assistant van en ChatBubble del kit; solo el cliente '
+      'a la derecha, con su caption de rol', (tester) async {
+    when(() => bloc.state).thenReturn(
+      AiLogLoaded(
+        entries: <AiLogEntry>[
+          e(2, content: 'buenas'),
+          e(1, role: AiLogRole.user, content: 'hola'),
+        ],
+        nextBefore: null,
+        isLoadingMore: false,
+      ),
+    );
+    await pump(tester);
+
+    final bubbles = tester
+        .widgetList<ChatBubble>(find.byType(ChatBubble))
+        .toList();
+    expect(bubbles.length, 2);
+    expect(bubbles.where((b) => b.mine).length, 1);
+    expect(find.text('Cliente'), findsOneWidget);
+    expect(find.text('Bot'), findsOneWidget);
+  });
+
+  testWidgets('el contenido del bot renderiza Markdown; el del cliente va '
+      'verbatim', (tester) async {
+    when(() => bloc.state).thenReturn(
+      AiLogLoaded(
+        entries: <AiLogEntry>[
+          e(2, content: 'Claro, con **gusto**.'),
+          e(1, role: AiLogRole.user, content: 'pásame el *menú*'),
+        ],
+        nextBefore: null,
+        isLoadingMore: false,
+      ),
+    );
+    await pump(tester);
+
+    // El operador ve la negrita renderizada, no los asteriscos crudos.
+    expect(find.byType(AssistantMarkdown), findsOneWidget);
+    expect(find.textContaining('**'), findsNothing);
+    // El turno del cliente es transcripción verbatim de WhatsApp: los
+    // asteriscos se muestran tal cual llegaron.
+    expect(find.text('pásame el *menú*'), findsOneWidget);
   });
 
   testWidgets('el aviso del motor (rol system) se rotula Sistema, no Cliente', (
@@ -176,8 +260,12 @@ void main() {
         ]);
         await pump(tester);
 
-        expect(find.text('↑ 730'), findsOneWidget);
-        expect(find.text('↓ 120'), findsOneWidget);
+        // Entrada/salida como pills con glifo de flecha del kit, no un
+        // carácter Unicode incrustado en el label.
+        expect(find.text('730'), findsOneWidget);
+        expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+        expect(find.text('120'), findsOneWidget);
+        expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
         // 100/730 = 13.69…% ⇒ el redondeo debe subir a 14.
         expect(find.text('caché 14%'), findsOneWidget);
         expect(find.text(r'$1.25'), findsOneWidget);
@@ -194,7 +282,8 @@ void main() {
       ]);
       await pump(tester);
 
-      expect(find.text('↑ 35k'), findsOneWidget);
+      expect(find.text('35k'), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
       expect(find.textContaining('caché'), findsNothing);
     });
 
@@ -204,8 +293,10 @@ void main() {
       load(<AiLogEntry>[e(1, promptTokens: 1200, completionTokens: 35000)]);
       await pump(tester);
 
-      expect(find.text('↑ 1.2k'), findsOneWidget);
-      expect(find.text('↓ 35k'), findsOneWidget);
+      expect(find.text('1.2k'), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+      expect(find.text('35k'), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
       expect(find.textContaining('caché'), findsNothing);
       expect(find.textContaining(r'$'), findsNothing);
     });
@@ -217,7 +308,7 @@ void main() {
       await pump(tester);
 
       expect(find.text('15 tokens'), findsOneWidget);
-      expect(find.textContaining('↑'), findsNothing);
+      expect(find.byIcon(Icons.arrow_upward), findsNothing);
     });
   });
 
@@ -287,6 +378,15 @@ void main() {
       expect(find.byKey(const Key('ai_log.tool_result.7')), findsOneWidget);
       // El blob del fallback conserva el icono de la tool (no el default).
       expect(find.byIcon(Icons.insights_outlined), findsOneWidget);
+      // Y vive en un AppCard.outline del kit: sus ancestros AppCard son la
+      // tarjeta de la corrida MÁS la del blob (2), no solo la corrida.
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('ai_log.tool_result.7')),
+          matching: find.byType(AppCard),
+        ),
+        findsNWidgets(2),
+      );
     });
 
     testWidgets('toolName desconocido (read_messages) → blob con su icono', (

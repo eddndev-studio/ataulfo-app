@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/features/ai_log/domain/entities/subagent_outcome_envelope.dart';
 import 'package:ataulfo/features/ai_log/presentation/widgets/subagent_outcome_card.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,9 @@ void main() {
       ),
     );
 
+    // Tarjeta y bloque de detalle son AppCard del kit (outline), no
+    // Materiales con borde ad-hoc.
+    expect(find.byType(AppCard), findsNWidgets(2));
     expect(find.text('encontré 3 facturas'), findsOneWidget);
     expect(find.byKey(resultKey), findsOneWidget);
     expect(find.textContaining('detalle largo del subagente'), findsNothing);

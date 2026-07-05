@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/features/ai_log/domain/entities/chat_analysis_envelope.dart';
 import 'package:ataulfo/features/ai_log/presentation/widgets/analysis_card.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +31,9 @@ void main() {
       ),
     );
 
+    // La tarjeta es un AppCard del kit (variante outline), no un Material
+    // con borde ad-hoc: misma geometría que el resto del design system.
+    expect(find.byType(AppCard), findsOneWidget);
     expect(find.text('el cliente quiere mayoreo'), findsOneWidget);
     expect(find.textContaining('compra recurrente'), findsOneWidget);
     expect(find.textContaining('paga a 30 días'), findsOneWidget);

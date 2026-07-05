@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_card.dart';
 import '../../domain/entities/ai_log_entry.dart';
 import '../../domain/entities/chat_analysis_envelope.dart';
 import '../../domain/entities/subagent_outcome_envelope.dart';
@@ -59,15 +60,11 @@ class _ToolResultBlob extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Material(
-      // Borde sin relleno vía `shape`; al ser un Material, el ListTile del
-      // ExpansionTile encuentra superficie aquí y no hereda el fondo coloreado
-      // de la AppCard contenedora (que dispararía el assert de Material 3).
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: AppTokens.divider),
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      ),
+    // AppCard.outline sin padding: delimita el blob con la geometría del kit
+    // y su Material transparente da superficie al ListTile del ExpansionTile
+    // (que no hereda así el fondo coloreado de la tarjeta de la corrida).
+    return AppCard.outline(
+      padding: EdgeInsets.zero,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(

@@ -11,9 +11,9 @@ import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/assistant_markdown.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/copy_text_actions.dart';
+import '../../../../core/design/widgets/live_typing_progress.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
-import '../../../../core/design/widgets/typing_bubble.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
 import '../../domain/failures/trainer_failure.dart';
@@ -283,7 +283,10 @@ class _ChatViewState extends State<_ChatView> {
                   itemCount: s.messages.length + (s.sending ? 1 : 0),
                   itemBuilder: (context, i) {
                     if (s.sending && i == 0) {
-                      return _LiveProgress(label: s.liveProgress);
+                      return LiveTypingProgress(
+                        label: s.liveProgress,
+                        keyId: 'trainer',
+                      );
                     }
                     final idx =
                         s.messages.length - 1 - (i - (s.sending ? 1 : 0));
@@ -447,37 +450,6 @@ class _ChatViewState extends State<_ChatView> {
             ),
           ],
         ),
-      ],
-    );
-  }
-}
-
-/// Indicador en vivo del turno: la burbuja de "escribiendo" + la etiqueta de
-/// progreso del SSE ("Pensando…/Usando {tool}…"). Sin etiqueta (SSE no conectó
-/// aún) muestra solo el typing.
-class _LiveProgress extends StatelessWidget {
-  const _LiveProgress({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: <Widget>[
-        const TypingBubble(key: Key('trainer.typing')),
-        if (label.isNotEmpty) ...<Widget>[
-          const SizedBox(width: AppTokens.sp2),
-          Flexible(
-            child: Text(
-              label,
-              key: const Key('trainer.live_progress'),
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(color: AppTokens.text2),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -665,19 +637,21 @@ class _MessageTile extends StatelessWidget {
       keyId: 'trainer.${message.id}',
       child: rawBubble,
     );
-    // El razonamiento del assistant (si viaja) va colapsado SOBRE la burbuja.
-    if (message.isAssistant && message.thinking.isNotEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
+    // El razonamiento del assistant (si viaja) va colapsado SOBRE la burbuja;
+    // la hora del turno, debajo y del lado del emisor.
+    return Column(
+      crossAxisAlignment: message.isUser
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (message.isAssistant && message.thinking.isNotEmpty)
           ReasoningDisclosure(reasoning: message.thinking, keyId: message.id),
-          if (message.content.isNotEmpty || message.attachments.isNotEmpty)
-            bubble,
-        ],
-      );
-    }
-    return bubble;
+        if (message.content.isNotEmpty || message.attachments.isNotEmpty)
+          bubble,
+        MessageTimestamp(at: message.createdAt),
+      ],
+    );
   }
 }
 
