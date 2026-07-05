@@ -99,13 +99,17 @@ class _NotificationInboxTileState extends State<NotificationInboxTile> {
                     const SizedBox(height: AppTokens.sp2),
                     Text(
                       _item.body,
-                      style: const TextStyle(color: AppTokens.text2),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.text2,
+                      ),
                     ),
                     if (_item.count > 1) ...<Widget>[
                       const SizedBox(height: AppTokens.sp3),
                       Text(
                         '${_item.count} eventos',
-                        style: const TextStyle(color: AppTokens.textDisabled),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppTokens.textDisabled,
+                        ),
                       ),
                     ],
                   ],
@@ -171,6 +175,7 @@ class _DetailSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppTokens.sp3),
@@ -184,7 +189,7 @@ class _DetailSection extends StatelessWidget {
           if (code != null)
             Text(
               code!,
-              style: const TextStyle(
+              style: textTheme.bodyMedium?.copyWith(
                 color: AppTokens.text2,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
@@ -195,10 +200,11 @@ class _DetailSection extends StatelessWidget {
           if (detail != null)
             SelectableText(
               detail!,
-              style: const TextStyle(
+              // Volcado técnico: bodySmall en monospace, como el error crudo
+              // del historial de ejecuciones.
+              style: textTheme.bodySmall?.copyWith(
                 color: AppTokens.text2,
                 fontFamily: 'monospace',
-                fontSize: AppTokens.captionSize,
               ),
             ),
         ],

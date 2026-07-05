@@ -5,6 +5,7 @@ import '../../../../core/ai/ai_config.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_slider.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import 'thinking_label.dart';
 
@@ -52,12 +53,11 @@ class _AiConfigTemperatureSheetState extends State<AiConfigTemperatureSheet> {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Slider(
+                  child: AppSlider(
                     value: _value,
                     min: 0.0,
                     max: 2.0,
                     divisions: 20,
-                    activeColor: AppTokens.primary,
                     onChanged: (v) => setState(() => _value = v),
                   ),
                 ),

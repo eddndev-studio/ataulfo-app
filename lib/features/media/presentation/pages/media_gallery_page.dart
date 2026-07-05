@@ -366,7 +366,7 @@ class _LoadedViewState extends State<_LoadedView> {
                                 ? 'Borrando archivo…'
                                 : 'Borrando ${state.deleteDone} de '
                                       '${state.deleteTotal}…',
-                            style: const TextStyle(color: AppTokens.text1),
+                            style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
                       ),
@@ -407,7 +407,7 @@ class _UploadProgressBar extends StatelessWidget {
               children: <Widget>[
                 Text(
                   'Subiendo $done de $total…',
-                  style: const TextStyle(color: AppTokens.text1),
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
             ),
@@ -448,10 +448,9 @@ class _SelectionBar extends StatelessWidget {
             Expanded(
               child: Text(
                 '$count seleccionado${count == 1 ? '' : 's'}',
-                style: const TextStyle(
-                  color: AppTokens.text1,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             IconButton(

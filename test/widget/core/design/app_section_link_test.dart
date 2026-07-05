@@ -86,7 +86,7 @@ void main() {
     expect(caption.maxLines, 2);
   });
 
-  testWidgets('onTap null deja la fila inerte con el título atenuado', (
+  testWidgets('onTap null deja la fila inerte con título y glifo atenuados', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -107,6 +107,41 @@ void main() {
     final title = tester.widget<Text>(find.text('Permisos'));
     expect(title.style?.color, AppTokens.text2);
     expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+
+    // El glifo acompaña la inercia: atenuado al idioma disabled del kit
+    // (0.4), no solo el título — un glifo pleno prometía una fila operable.
+    final iconOpacity = tester.widget<Opacity>(
+      find
+          .ancestor(
+            of: find.byType(AppEntityIcon),
+            matching: find.byType(Opacity),
+          )
+          .first,
+    );
+    expect(iconOpacity.opacity, 0.4);
+  });
+
+  testWidgets('con onTap el glifo va a plena opacidad', (tester) async {
+    await tester.pumpWidget(
+      host(
+        AppSectionLink(
+          rowKey: const Key('x.link'),
+          icon: Icons.build_circle_outlined,
+          title: 'Permisos',
+          onTap: () {},
+        ),
+      ),
+    );
+
+    final iconOpacity = tester.widget<Opacity>(
+      find
+          .ancestor(
+            of: find.byType(AppEntityIcon),
+            matching: find.byType(Opacity),
+          )
+          .first,
+    );
+    expect(iconOpacity.opacity, 1.0);
   });
 
   testWidgets('con onTap el título va en el titleMedium del theme', (

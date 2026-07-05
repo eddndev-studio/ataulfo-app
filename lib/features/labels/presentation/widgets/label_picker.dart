@@ -93,10 +93,12 @@ class _ErrorRetry extends StatelessWidget {
     return Row(
       key: Key('$keyPrefix.error'),
       children: <Widget>[
-        const Expanded(
+        Expanded(
           child: Text(
             'No pudimos cargar las etiquetas.',
-            style: TextStyle(color: AppTokens.danger),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
           ),
         ),
         AppButton.text(

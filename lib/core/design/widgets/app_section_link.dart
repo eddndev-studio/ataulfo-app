@@ -26,7 +26,8 @@ class AppSectionLink extends StatelessWidget {
   final String title;
 
   /// Nulo ⇒ fila inerte (p.ej. mientras carga el dato que resume o hay una
-  /// mutación en vuelo): el InkWell no reacciona y el título baja a `text2`.
+  /// mutación en vuelo): el InkWell no reacciona, el título baja a `text2` y
+  /// el glifo se atenúa al idioma disabled del kit (0.4).
   final VoidCallback? onTap;
 
   /// Items del área. Con valor > 0 acompaña al título como pill; null (sin
@@ -49,7 +50,10 @@ class AppSectionLink extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
         child: Row(
           children: <Widget>[
-            AppEntityIcon(icon: icon, size: 44),
+            Opacity(
+              opacity: onTap != null ? 1.0 : 0.4,
+              child: AppEntityIcon(icon: icon, size: 44),
+            ),
             const SizedBox(width: AppTokens.sp4),
             Expanded(
               child: Column(

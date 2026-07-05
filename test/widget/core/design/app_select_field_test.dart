@@ -16,6 +16,7 @@ void main() {
     ValueChanged<String?>? onChanged,
     bool enabled = true,
     String? helperText,
+    String? hint,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -23,6 +24,7 @@ void main() {
           body: AppSelectField<String>(
             label: 'Modelo',
             helperText: helperText,
+            hint: hint,
             value: value,
             options: options,
             onChanged: onChanged,
@@ -90,5 +92,30 @@ void main() {
   testWidgets('helperText: se pinta bajo el field', (tester) async {
     await pumpField(tester, value: 'a', helperText: 'Ayuda del campo');
     expect(find.text('Ayuda del campo'), findsOneWidget);
+  });
+
+  testWidgets('hint: placeholder atenuado mientras no hay selección', (
+    tester,
+  ) async {
+    await pumpField(tester, value: null, hint: 'Elige una opción');
+
+    // Sin selección el campo no queda mudo: el hint invita a elegir, en
+    // text2 para no confundirse con un valor elegido.
+    final hint = tester.widget<Text>(find.text('Elige una opción'));
+    expect(hint.style?.color, AppTokens.text2);
+
+    // Con selección el hint cede su lugar al label de la opción.
+    await pumpField(tester, value: 'a', hint: 'Elige una opción');
+    expect(find.text('Elige una opción'), findsNothing);
+    expect(find.text('Opción A'), findsOneWidget);
+  });
+
+  testWidgets('una opción larga ellipsa a una línea (no rompe el shell)', (
+    tester,
+  ) async {
+    await pumpField(tester, value: 'a');
+    final itemText = tester.widget<Text>(find.text('Opción A'));
+    expect(itemText.maxLines, 1);
+    expect(itemText.overflow, TextOverflow.ellipsis);
   });
 }

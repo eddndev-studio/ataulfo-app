@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_detail_bloc.dart';
@@ -121,6 +122,31 @@ void main() {
         expect(find.text('Recordatorio'), findsOneWidget);
       },
     );
+
+    testWidgets('los chips de exclusión son AppChoiceChip del kit', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        FlowDetailLoaded(
+          _flow(cooldownMs: 5000, usageLimit: 3, excludesFlows: <String>['f2']),
+          const <fdom.Flow>[_sib1, _sib2],
+          siblingsFailed: false,
+        ),
+      );
+
+      await tester.pumpWidget(host());
+
+      // El multi-select no reinventa el chip (AppPill + InkWell artesanal):
+      // usa el AppChoiceChip del kit y su estado refleja excludesFlows.
+      final selected = tester.widget<AppChoiceChip>(
+        find.byKey(const Key('flow_settings.excludes.chip.f2')),
+      );
+      expect(selected.selected, isTrue);
+      final unselected = tester.widget<AppChoiceChip>(
+        find.byKey(const Key('flow_settings.excludes.chip.f3')),
+      );
+      expect(unselected.selected, isFalse);
+    });
 
     testWidgets('botón Guardar empieza disabled (no dirty)', (tester) async {
       when(() => bloc.state).thenReturn(

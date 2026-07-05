@@ -1,7 +1,9 @@
 import 'dart:convert';
 
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
+import 'package:ataulfo/core/design/widgets/app_select_field.dart';
 import 'package:ataulfo/features/flows/domain/entities/conditional_time_metadata.dart';
 import 'package:ataulfo/features/flows/presentation/widgets/conditional_time_form.dart';
 import 'package:flutter/material.dart';
@@ -67,6 +69,29 @@ Future<void> selectTargets(WidgetTester tester) async {
 }
 
 void main() {
+  group('ConditionalTimeForm (kit)', () {
+    testWidgets('tz y destinos son AppSelectField del design system', (
+      tester,
+    ) async {
+      await pumpForm(tester);
+
+      // Los selects no reinventan el idioma (DropdownButtonFormField con
+      // decoración Material): usan el AppSelectField del kit.
+      expect(
+        tester.widget(find.byKey(const Key('ct_form.tz_dropdown'))),
+        isA<AppSelectField<String>>(),
+      );
+      expect(
+        tester.widget(find.byKey(const Key('ct_form.on_match_dropdown'))),
+        isA<AppSelectField<String>>(),
+      );
+      expect(
+        tester.widget(find.byKey(const Key('ct_form.on_else_dropdown'))),
+        isA<AppSelectField<String>>(),
+      );
+    });
+  });
+
   group('ConditionalTimeForm (create)', () {
     testWidgets(
       'mount inicial SIN destinos → onChanged(null): elegir las ramas es '
@@ -316,6 +341,34 @@ void main() {
       expect(
         find.text('La hora de inicio debe ser anterior al final'),
         findsOneWidget,
+      );
+    });
+
+    testWidgets('el motivo del bloqueo sale del textTheme (labelSmall)', (
+      tester,
+    ) async {
+      await pumpForm(
+        tester,
+        initial: const ConditionalTimeMetadata(
+          tz: 'America/Mexico_City',
+          windows: <TimeWindow>[
+            TimeWindow(days: <int>[1, 2], from: '18:00', to: '09:00'),
+          ],
+          onMatchStepId: 'sC',
+          onElseStepId: 'sA',
+        ),
+      );
+
+      final context = tester.element(find.byType(ConditionalTimeForm));
+      final textTheme = Theme.of(context).textTheme;
+      // Aviso inline = labelSmall del theme teñido a danger, no un calco
+      // manual de captionSize/captionWeight.
+      final reason = tester.widget<Text>(
+        find.text('La hora de inicio debe ser anterior al final'),
+      );
+      expect(
+        reason.style,
+        textTheme.labelSmall?.copyWith(color: AppTokens.danger),
       );
     });
 

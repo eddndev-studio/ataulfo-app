@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
@@ -260,6 +261,23 @@ void main() {
     await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
     verify(() => flowsBloc.add(const FlowsLoadRequested())).called(1);
+  });
+
+  testWidgets('la copy del fallo sale del textTheme (bodyMedium + danger)', (
+    tester,
+  ) async {
+    when(
+      () => flowsBloc.state,
+    ).thenReturn(const FlowsFailed(FlowsServerFailure()));
+
+    await tester.pumpWidget(host());
+
+    final context = tester.element(find.byKey(const Key('flows.failed')));
+    final textTheme = Theme.of(context).textTheme;
+    final copy = tester.widget<Text>(
+      find.text('No pudimos cargar los flujos.'),
+    );
+    expect(copy.style, textTheme.bodyMedium?.copyWith(color: AppTokens.danger));
   });
 
   testWidgets('tap borrar abre confirm; Eliminar dispatcha DeleteRequested', (

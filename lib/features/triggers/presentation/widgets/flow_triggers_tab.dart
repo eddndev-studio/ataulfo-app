@@ -308,10 +308,12 @@ class _FailedView extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          const Expanded(
+          Expanded(
             child: Text(
               'No pudimos cargar los disparadores de este flujo.',
-              style: TextStyle(color: AppTokens.danger),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
             ),
           ),
           AppButton.text(

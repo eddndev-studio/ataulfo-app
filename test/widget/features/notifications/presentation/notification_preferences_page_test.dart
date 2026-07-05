@@ -173,6 +173,43 @@ void main() {
     expect(find.byIcon(Icons.link_off_outlined), findsNothing);
   });
 
+  testWidgets('la copy del estado vacío sale del textTheme', (tester) async {
+    when(() => bloc.state).thenReturn(
+      const NotificationPreferencesLoaded(
+        preferences: <NotificationPreference>[],
+      ),
+    );
+
+    await tester.pumpWidget(host());
+
+    final context = tester.element(find.byType(NotificationPreferencesPage));
+    final textTheme = Theme.of(context).textTheme;
+    // Copy secundaria = bodyMedium del theme atenuado a text2, no un
+    // TextStyle crudo.
+    final empty = tester.widget<Text>(
+      find.text('Sin preferencias configuradas'),
+    );
+    expect(empty.style, textTheme.bodyMedium?.copyWith(color: AppTokens.text2));
+  });
+
+  testWidgets('la copy del fallo sale del textTheme', (tester) async {
+    when(() => bloc.state).thenReturn(
+      const NotificationPreferencesFailed(NotificationsNetworkFailure()),
+    );
+
+    await tester.pumpWidget(host());
+
+    final context = tester.element(find.byType(NotificationPreferencesPage));
+    final textTheme = Theme.of(context).textTheme;
+    final failedCopy = tester.widget<Text>(
+      find.text('No se pudieron cargar las preferencias'),
+    );
+    expect(
+      failedCopy.style,
+      textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+    );
+  });
+
   testWidgets('failed muestra retry', (tester) async {
     when(() => bloc.state).thenReturn(
       const NotificationPreferencesFailed(NotificationsNetworkFailure()),

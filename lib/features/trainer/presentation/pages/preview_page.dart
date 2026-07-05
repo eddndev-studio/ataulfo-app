@@ -171,7 +171,9 @@ class _PreviewThreadState extends State<_PreviewThread> {
             child: Text(
               trainerFailureCopy(s.failure!),
               key: const Key('preview.failure'),
-              style: const TextStyle(color: AppTokens.danger),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
             ),
           ),
         if (s.accumulatingUntil != null) const _AccumulatingBanner(),

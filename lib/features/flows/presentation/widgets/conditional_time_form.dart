@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_select_field.dart';
 import '../../domain/entities/conditional_time_metadata.dart';
 import 'conditional_time_day_mapping.dart';
 
@@ -244,25 +245,21 @@ class _ConditionalTimeFormState extends State<ConditionalTimeForm> {
           ),
           const SizedBox(height: AppTokens.sp4),
         ],
-        Text(
-          'Zona horaria',
-          style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
-        ),
-        const SizedBox(height: AppTokens.sp1),
-        DropdownButtonFormField<String>(
+        AppSelectField<String>(
           key: const Key('ct_form.tz_dropdown'),
-          initialValue: _availableTimezones.contains(_tz) ? _tz : null,
-          isExpanded: true,
-          items: _availableTimezones
-              .map((z) => DropdownMenuItem<String>(value: z, child: Text(z)))
-              .toList(),
-          onChanged: widget.enabled
-              ? (v) {
-                  if (v == null) return;
-                  setState(() => _tz = v);
-                  _emit();
-                }
-              : null,
+          label: 'Zona horaria',
+          // Una tz fuera del set curado (escrita por otro cliente) aparece
+          // sin selección; elegir del set la reemplaza.
+          value: _availableTimezones.contains(_tz) ? _tz : null,
+          options: <AppSelectOption<String>>[
+            for (final z in _availableTimezones) AppSelectOption<String>(z, z),
+          ],
+          enabled: widget.enabled,
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() => _tz = v);
+            _emit();
+          },
         ),
         const SizedBox(height: AppTokens.sp5),
         Text(
@@ -426,12 +423,9 @@ class _WindowBlock extends StatelessWidget {
               padding: const EdgeInsets.only(top: AppTokens.sp2),
               child: Text(
                 _invalidReason!,
-                style: const TextStyle(
-                  color: AppTokens.danger,
-                  fontSize: AppTokens.captionSize,
-                  height: AppTokens.captionLineHeight / AppTokens.captionSize,
-                  fontWeight: AppTokens.captionWeight,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: AppTokens.danger),
               ),
             ),
         ],
@@ -500,36 +494,39 @@ class _TargetDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Sin candidatos (flow sin pasos que puedan ser destino): explicar el
-    // bloqueo en lugar de un dropdown vacío que confunde.
+    // bloqueo en lugar de un select vacío que confunde.
     if (targets.isEmpty) {
-      return InputDecorator(
-        decoration: InputDecoration(labelText: label, enabled: false),
-        child: const Text(
-          'Agrega primero los pasos de cada rama; después configura el '
-          'condicional.',
-        ),
-      );
-    }
-    final items = targets
-        .map(
-          (t) => DropdownMenuItem<String>(
-            value: t.id,
-            child: Text(
-              '${t.order + 1}. ${t.label}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+      final textTheme = Theme.of(context).textTheme;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+          ),
+          const SizedBox(height: AppTokens.sp1),
+          Text(
+            'Agrega primero los pasos de cada rama; después configura el '
+            'condicional.',
+            style: textTheme.bodySmall?.copyWith(
+              color: AppTokens.text2,
+              fontStyle: FontStyle.italic,
             ),
           ),
-        )
-        .toList();
-    return DropdownButtonFormField<String>(
+        ],
+      );
+    }
+    return AppSelectField<String>(
       key: dropdownKey,
-      isExpanded: true,
-      initialValue: value,
-      hint: const Text('Elige un paso'),
-      decoration: InputDecoration(labelText: label),
-      items: items,
-      onChanged: enabled ? onChanged : null,
+      label: label,
+      hint: 'Elige un paso',
+      value: value,
+      options: <AppSelectOption<String>>[
+        for (final t in targets)
+          AppSelectOption<String>(t.id, '${t.order + 1}. ${t.label}'),
+      ],
+      enabled: enabled,
+      onChanged: onChanged,
     );
   }
 }

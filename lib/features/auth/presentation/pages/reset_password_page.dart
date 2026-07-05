@@ -111,20 +111,20 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               final submitting = state is ResetPasswordSubmitting;
               return SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 32,
+                  horizontal: AppTokens.sp6,
+                  vertical: AppTokens.sp7,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppTokens.sp4),
                     Text(
                       'Te enviamos un código a tu correo (si existe una cuenta). '
                       'Escríbelo aquí y elige una contraseña nueva. El código '
                       'vence en 15 minutos.',
                       style: textTheme.bodyMedium,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppTokens.sp6),
                     AppTextField(
                       key: const Key('reset.email'),
                       label: 'Email',
@@ -134,7 +134,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppTokens.sp4),
                     Text(
                       'Código',
                       style: textTheme.labelSmall?.copyWith(
@@ -147,7 +147,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       controller: _code,
                       enabled: !submitting,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppTokens.sp4),
                     AppTextField(
                       key: const Key('reset.password'),
                       label: 'Nueva contraseña',
@@ -157,7 +157,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       obscureText: true,
                       obscureToggle: true,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppTokens.sp6),
                     AppButton.filled(
                       key: const Key('reset.submit'),
                       label: 'Restablecer contraseña',
@@ -165,18 +165,20 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       loading: submitting,
                       onPressed: submitting ? null : _submit,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppTokens.sp2),
                     ResendCodeButton(
                       key: const Key('reset.resend'),
                       onResend: _resend,
                       enabled: !submitting,
                     ),
                     if (state is ResetPasswordFailed) ...<Widget>[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTokens.sp4),
                       Text(
                         _messageFor(state.kind),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppTokens.danger),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppTokens.danger,
+                        ),
                       ),
                     ],
                   ],

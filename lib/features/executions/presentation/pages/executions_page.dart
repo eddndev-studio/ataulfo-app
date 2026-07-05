@@ -23,8 +23,9 @@ class ExecutionsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     // Pull-to-refresh sobre las tres vistas interactivas (lista/vacío/error):
     // cada una aporta su scrollable AlwaysScrollable para que el gesto viva.
-    // load() reemite Loading y recarga — el costo honesto de un cubit sin
-    // refresh incremental; el Future mantiene el spinner hasta terminar.
+    // Con datos en pantalla load() recarga sin pasar por Loading: la lista
+    // sigue visible y el RefreshIndicator (cuyo Future mantiene el spinner
+    // hasta terminar) es el único indicador de progreso.
     return RefreshIndicator(
       onRefresh: () => context.read<ExecutionsCubit>().load(),
       child: BlocBuilder<ExecutionsCubit, ExecutionsState>(
@@ -142,10 +143,11 @@ class _ExecutionRow extends StatelessWidget {
               ),
               child: SelectableText(
                 execution.error,
-                style: const TextStyle(
+                // Volcado técnico: bodySmall en monospace — señal de error
+                // crudo del motor, no copy del producto.
+                style: textTheme.bodySmall?.copyWith(
                   color: AppTokens.danger,
                   fontFamily: 'monospace',
-                  fontSize: AppTokens.captionSize,
                 ),
               ),
             ),

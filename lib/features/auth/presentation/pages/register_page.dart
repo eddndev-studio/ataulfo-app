@@ -91,17 +91,20 @@ class _RegisterPageState extends State<RegisterPage> {
             // Scrolleable: cuando el teclado encoge el body, el contenido se
             // desplaza y el campo enfocado/botón quedan alcanzables.
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.sp6,
+                vertical: AppTokens.sp7,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const SizedBox(height: 32),
+                  const SizedBox(height: AppTokens.sp7),
                   Text(
                     'Ataúlfo',
                     style: textTheme.displayLarge,
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: AppTokens.sp8),
                   AppTextField(
                     key: const Key('register.email'),
                     label: 'Email',
@@ -111,7 +114,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTokens.sp4),
                   AppTextField(
                     key: const Key('register.password'),
                     label: 'Contraseña',
@@ -121,7 +124,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     obscureText: true,
                     obscureToggle: true,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTokens.sp4),
                   AppTextField(
                     key: const Key('register.confirmPassword'),
                     label: 'Confirmar contraseña',
@@ -131,14 +134,14 @@ class _RegisterPageState extends State<RegisterPage> {
                     obscureText: true,
                     obscureToggle: true,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppTokens.sp6),
                   AppButton.filled(
                     label: 'Crear cuenta',
                     fullWidth: true,
                     loading: submitting,
                     onPressed: (_canSubmit && !submitting) ? _submit : null,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppTokens.sp2),
                   TextButton(
                     onPressed: submitting ? null : widget.onGoToLogin,
                     child: const Text('Ya tengo cuenta'),
@@ -147,7 +150,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     Text(
                       _messageFor(state.kind),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppTokens.danger),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.danger,
+                      ),
                     ),
                 ],
               ),

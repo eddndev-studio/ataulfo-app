@@ -103,6 +103,89 @@ void main() {
     ],
   );
 
+  blocTest<ExecutionsCubit, ExecutionsState>(
+    'refresh desde Loaded no pasa por Loading: la lista visible se conserva',
+    setUp: () {
+      when(() => exec.listBySession(botId: 'b1', chatLid: 'c1')).thenAnswer(
+        (_) async => <Execution>[
+          _exe('exe-1', ExecutionStatus.completed, 'flw-1'),
+          _exe('exe-2', ExecutionStatus.failed, 'flw-1'),
+        ],
+      );
+      when(() => flows.listRunnable('b1')).thenAnswer(
+        (_) async => const <RunnableFlow>[
+          RunnableFlow(id: 'flw-1', name: 'Bienvenida'),
+        ],
+      );
+    },
+    build: build,
+    seed: () => ExecutionsLoaded(
+      executions: <Execution>[
+        _exe('exe-1', ExecutionStatus.completed, 'flw-1'),
+      ],
+      flowNames: const <String, String>{},
+    ),
+    act: (c) => c.load(),
+    expect: () => <Matcher>[
+      isA<ExecutionsLoaded>().having(
+        (s) => s.executions.length,
+        'executions',
+        2,
+      ),
+    ],
+  );
+
+  blocTest<ExecutionsCubit, ExecutionsState>(
+    'refresh con las mismas ejecuciones pero un flujo renombrado sí emite',
+    setUp: () {
+      when(() => exec.listBySession(botId: 'b1', chatLid: 'c1')).thenAnswer(
+        (_) async => <Execution>[
+          _exe('exe-1', ExecutionStatus.completed, 'flw-1'),
+        ],
+      );
+      when(() => flows.listRunnable('b1')).thenAnswer(
+        (_) async => const <RunnableFlow>[
+          RunnableFlow(id: 'flw-1', name: 'Nuevo'),
+        ],
+      );
+    },
+    build: build,
+    seed: () => ExecutionsLoaded(
+      executions: <Execution>[
+        _exe('exe-1', ExecutionStatus.completed, 'flw-1'),
+      ],
+      flowNames: const <String, String>{'flw-1': 'Viejo'},
+    ),
+    act: (c) => c.load(),
+    // Sin Loading de por medio, la igualdad del estado decide si el bloc
+    // emite: si ignorara flowNames, el rename quedaría invisible en pantalla.
+    expect: () => <Matcher>[
+      isA<ExecutionsLoaded>().having(
+        (s) => s.flowNames['flw-1'],
+        'nombre refrescado',
+        'Nuevo',
+      ),
+    ],
+  );
+
+  blocTest<ExecutionsCubit, ExecutionsState>(
+    'reintento desde Failed sí regresa a Loading antes del resultado',
+    setUp: () {
+      when(() => exec.listBySession(botId: 'b1', chatLid: 'c1')).thenAnswer(
+        (_) async => <Execution>[
+          _exe('exe-1', ExecutionStatus.completed, 'flw-1'),
+        ],
+      );
+      when(
+        () => flows.listRunnable('b1'),
+      ).thenAnswer((_) async => const <RunnableFlow>[]);
+    },
+    build: build,
+    seed: () => const ExecutionsFailed(ExecutionNetworkFailure()),
+    act: (c) => c.load(),
+    expect: () => <Matcher>[isA<ExecutionsLoading>(), isA<ExecutionsLoaded>()],
+  );
+
   // El cubit es page-scoped: al hacer pop de la pantalla el BlocProvider lo
   // cierra. Si load() está en vuelo (entre un await y su emit) el emit caería
   // sobre un controller cerrado y lanzaría StateError en un Future no-aguardado

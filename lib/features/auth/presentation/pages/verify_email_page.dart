@@ -85,17 +85,20 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
           builder: (context, state) {
             final submitting = state is VerifyEmailSubmitting;
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.sp6,
+                vertical: AppTokens.sp7,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTokens.sp4),
                   Text(
                     'Te enviamos un código a tu correo. Escríbelo aquí para '
                     'verificar tu cuenta.',
                     style: textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppTokens.sp6),
                   AppTextField(
                     key: const Key('verify.email'),
                     label: 'Email',
@@ -105,7 +108,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTokens.sp4),
                   Text(
                     'Código',
                     style: textTheme.labelSmall?.copyWith(
@@ -118,7 +121,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                     controller: _code,
                     enabled: !submitting,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppTokens.sp6),
                   AppButton.filled(
                     key: const Key('verify.submit'),
                     label: 'Verificar',
@@ -127,7 +130,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                     onPressed: submitting ? null : _submit,
                   ),
                   if (onResend != null) ...<Widget>[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppTokens.sp2),
                     ResendCodeButton(
                       key: const Key('verify.resend'),
                       // Con sesión el reenvío siempre se inicia (Bearer válido);
@@ -141,7 +144,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                     ),
                   ],
                   if (onSkip != null) ...<Widget>[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppTokens.sp1),
                     AppButton.text(
                       key: const Key('verify.skip'),
                       label: 'Omitir por ahora',
@@ -150,11 +153,13 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                     ),
                   ],
                   if (state is VerifyEmailFailed) ...<Widget>[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppTokens.sp4),
                     Text(
                       _messageFor(state.kind),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppTokens.danger),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.danger,
+                      ),
                     ),
                   ],
                 ],

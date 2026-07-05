@@ -27,6 +27,7 @@ class AppSelectField<T> extends StatefulWidget {
     super.key,
     required this.label,
     this.helperText,
+    this.hint,
     required this.value,
     required this.options,
     this.onChanged,
@@ -37,6 +38,10 @@ class AppSelectField<T> extends StatefulWidget {
 
   /// Texto de ayuda bajo el field, en `text2`. Null ⇒ sin ayuda.
   final String? helperText;
+
+  /// Placeholder dentro del field mientras [value] es null, en `text2` para
+  /// no confundirse con un valor elegido. Null ⇒ campo vacío sin selección.
+  final String? hint;
 
   final T? value;
   final List<AppSelectOption<T>> options;
@@ -121,6 +126,16 @@ class _AppSelectFieldState<T> extends State<AppSelectField<T>> {
             ),
             child: DropdownButton<T>(
               value: widget.value,
+              hint: widget.hint != null
+                  ? Text(
+                      widget.hint!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.text2,
+                      ),
+                    )
+                  : null,
               focusNode: _focusNode,
               isExpanded: true,
               isDense: true,
@@ -137,7 +152,13 @@ class _AppSelectFieldState<T> extends State<AppSelectField<T>> {
                   .map(
                     (o) => DropdownMenuItem<T>(
                       value: o.value,
-                      child: Text(o.label),
+                      // Una línea con ellipsis: una opción larga no debe
+                      // desbordar la píldora ni partirse en renglones.
+                      child: Text(
+                        o.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   )
                   .toList(),

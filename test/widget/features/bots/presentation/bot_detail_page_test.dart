@@ -695,6 +695,27 @@ void main() {
       );
     });
 
+    testWidgets('el heading de la card va en titleMedium atenuado a text2', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      // Convención de heading de card: titleMedium atenuado a text2, para
+      // distinguir el heading de los labels/valores de los controles (los
+      // que sí van en el primario). Igual que la ficha de IA de plantilla.
+      final context = tester.element(find.text('En grupos'));
+      final heading = tester.widget<Text>(find.text('En grupos'));
+      expect(
+        heading.style,
+        Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(color: AppTokens.text2),
+      );
+    });
+
     testWidgets('WORKER no ve los switches (gateo ADMIN+)', (tester) async {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 

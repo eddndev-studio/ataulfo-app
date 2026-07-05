@@ -306,7 +306,9 @@ class _ChatViewState extends State<_ChatView> {
                   child: Text(
                     trainerFailureCopy(s.sendFailure!),
                     key: const Key('trainer.send_failure'),
-                    style: const TextStyle(color: AppTokens.danger),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
                   ),
                 ),
                 if (s.lastAttemptedContent.isNotEmpty)

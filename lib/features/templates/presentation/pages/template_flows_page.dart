@@ -315,10 +315,12 @@ class _FailedView extends StatelessWidget {
       child: Row(
         key: const Key('flows.failed'),
         children: <Widget>[
-          const Expanded(
+          Expanded(
             child: Text(
               'No pudimos cargar los flujos.',
-              style: TextStyle(color: AppTokens.danger),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
             ),
           ),
           AppButton.text(

@@ -5,7 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
-import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_slider.dart';
 import '../../../../core/design/widgets/app_switch.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../domain/entities/flow.dart' as fdom;
@@ -321,22 +322,14 @@ class _CooldownField extends StatelessWidget {
           style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
         ),
         const SizedBox(height: AppTokens.sp2),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: AppTokens.primary,
-            inactiveTrackColor: AppTokens.surface3,
-            thumbColor: AppTokens.primary,
-            overlayColor: AppTokens.primary.withValues(alpha: 0.12),
-          ),
-          child: Slider(
-            key: const Key('flow_settings.cooldown.slider'),
-            value: hours,
-            min: 0,
-            max: _kMaxCooldownHours.toDouble(),
-            // Granularidad de 1 hora en todo el rango [0, 5 días].
-            divisions: _kMaxCooldownHours,
-            onChanged: onChanged,
-          ),
+        AppSlider(
+          key: const Key('flow_settings.cooldown.slider'),
+          value: hours,
+          min: 0,
+          max: _kMaxCooldownHours.toDouble(),
+          // Granularidad de 1 hora en todo el rango [0, 5 días].
+          divisions: _kMaxCooldownHours,
+          onChanged: onChanged,
         ),
       ],
     );
@@ -452,39 +445,15 @@ class _ExcludesPicker extends StatelessWidget {
             runSpacing: AppTokens.sp2,
             children: <Widget>[
               for (final s in siblings)
-                _ExcludeChip(
+                AppChoiceChip(
                   key: Key('flow_settings.excludes.chip.${s.id}'),
-                  flow: s,
-                  isSelected: selected.contains(s.id),
-                  onTap: () => onToggle(s.id),
+                  label: s.name,
+                  selected: selected.contains(s.id),
+                  onSelected: (_) => onToggle(s.id),
                 ),
             ],
           ),
       ],
-    );
-  }
-}
-
-class _ExcludeChip extends StatelessWidget {
-  const _ExcludeChip({
-    super.key,
-    required this.flow,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final fdom.Flow flow;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-      child: isSelected
-          ? AppPill.primary(label: flow.name)
-          : AppPill.outline(label: flow.name),
     );
   }
 }

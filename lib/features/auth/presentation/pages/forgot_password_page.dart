@@ -75,16 +75,19 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             final submitting = state is ForgotPasswordSubmitting;
             final sent = state is ForgotPasswordSent;
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.sp6,
+                vertical: AppTokens.sp7,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTokens.sp4),
                   Text(
                     'Te enviaremos un código para restablecer tu contraseña.',
                     style: textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppTokens.sp6),
                   AppTextField(
                     key: const Key('forgot.email'),
                     label: 'Email',
@@ -94,20 +97,20 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppTokens.sp6),
                   AppButton.filled(
                     label: 'Enviar instrucciones',
                     fullWidth: true,
                     loading: submitting,
                     onPressed: (_canSubmit && !submitting) ? _submit : null,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppTokens.sp2),
                   TextButton(
                     onPressed: submitting ? null : widget.onHaveCode,
                     child: const Text('Ya tengo un código'),
                   ),
                   if (sent) ...<Widget>[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppTokens.sp4),
                     Text(
                       'Si existe una cuenta con ese correo, te enviamos '
                       'instrucciones para restablecer la contraseña.',
@@ -116,11 +119,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     ),
                   ],
                   if (state is ForgotPasswordFailed) ...<Widget>[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppTokens.sp4),
                     Text(
                       _messageFor(state.kind),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppTokens.danger),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.danger,
+                      ),
                     ),
                   ],
                 ],

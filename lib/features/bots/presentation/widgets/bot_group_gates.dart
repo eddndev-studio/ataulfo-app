@@ -34,7 +34,12 @@ class BotGroupGates extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('En grupos', style: textTheme.titleMedium),
+          // Heading de card: titleMedium atenuado a text2 (ver [AppCard]);
+          // el primario queda para los labels/valores de los controles.
+          Text(
+            'En grupos',
+            style: textTheme.titleMedium?.copyWith(color: AppTokens.text2),
+          ),
           const SizedBox(height: AppTokens.sp1),
           Text(
             'En los chats de grupo de WhatsApp puedes apagar la IA y los '

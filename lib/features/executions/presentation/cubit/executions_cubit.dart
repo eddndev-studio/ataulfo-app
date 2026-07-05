@@ -28,7 +28,11 @@ class ExecutionsCubit extends Cubit<ExecutionsState> {
   final String _chatLid;
 
   Future<void> load() async {
-    if (state is! ExecutionsLoading) {
+    // El load inicial ya nace en Loading y el refresh desde Loaded conserva
+    // la lista visible (el RefreshIndicator comunica el progreso); solo el
+    // reintento desde Failed regresa a Loading, porque ahí no hay nada que
+    // conservar en pantalla.
+    if (state is ExecutionsFailed) {
       emit(const ExecutionsLoading());
     }
     final List<Execution> executions;
@@ -89,12 +93,20 @@ class ExecutionsLoaded extends ExecutionsState {
     for (var i = 0; i < executions.length; i++) {
       if (other.executions[i] != executions[i]) return false;
     }
+    // Sin Loading intermedio en el refresh, esta igualdad es lo único que
+    // decide si el bloc re-pinta: un flujo renombrado también es un cambio.
+    if (other.flowNames.length != flowNames.length) return false;
+    for (final entry in flowNames.entries) {
+      if (other.flowNames[entry.key] != entry.value) return false;
+    }
     return true;
   }
 
   @override
-  int get hashCode =>
-      Object.hashAll(executions.map((e) => Object.hash(e.id, e.status)));
+  int get hashCode => Object.hash(
+    Object.hashAll(executions.map((e) => Object.hash(e.id, e.status))),
+    Object.hashAll(flowNames.entries.map((e) => Object.hash(e.key, e.value))),
+  );
 }
 
 class ExecutionsFailed extends ExecutionsState {

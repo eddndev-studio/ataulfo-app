@@ -74,18 +74,21 @@ class _LoginPageState extends State<LoginPage> {
             // Scrolleable: cuando el teclado encoge el body, el contenido se
             // desplaza y el campo enfocado/botón quedan alcanzables.
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.sp6,
+                vertical: AppTokens.sp7,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const SizedBox(height: 32),
+                  const SizedBox(height: AppTokens.sp7),
                   Text(
                     'Ataúlfo',
                     style: textTheme.displayLarge,
                     textAlign: TextAlign.center,
                   ),
                   if (widget.justReset) ...<Widget>[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppTokens.sp6),
                     Text(
                       'Contraseña restablecida. Inicia sesión con la nueva.',
                       textAlign: TextAlign.center,
@@ -94,7 +97,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 48),
+                  const SizedBox(height: AppTokens.sp8),
                   AppTextField(
                     key: const Key('login.email'),
                     label: 'Email',
@@ -104,7 +107,7 @@ class _LoginPageState extends State<LoginPage> {
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTokens.sp4),
                   AppTextField(
                     key: const Key('login.password'),
                     label: 'Contraseña',
@@ -114,7 +117,7 @@ class _LoginPageState extends State<LoginPage> {
                     obscureText: true,
                     obscureToggle: true,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppTokens.sp6),
                   // El feedback de envío vive en el propio botón (loading
                   // bloquea el tap internamente, sin nullificar onPressed).
                   AppButton.filled(
@@ -123,7 +126,7 @@ class _LoginPageState extends State<LoginPage> {
                     loading: submitting,
                     onPressed: _submit,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppTokens.sp2),
                   TextButton(
                     onPressed: submitting ? null : widget.onCreateAccount,
                     child: const Text('Crear cuenta'),
@@ -132,12 +135,14 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: submitting ? null : widget.onForgotPassword,
                     child: const Text('¿Olvidaste tu contraseña?'),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTokens.sp4),
                   if (state is LoginFailed)
                     Text(
                       _messageFor(state.kind),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppTokens.danger),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTokens.danger,
+                      ),
                     ),
                 ],
               ),

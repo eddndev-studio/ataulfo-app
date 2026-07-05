@@ -272,10 +272,12 @@ class _FailedView extends StatelessWidget {
       child: Row(
         key: const Key('var_defs.failed'),
         children: <Widget>[
-          const Expanded(
+          Expanded(
             child: Text(
               'No pudimos cargar las variables.',
-              style: TextStyle(color: AppTokens.danger),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
             ),
           ),
           AppButton.text(

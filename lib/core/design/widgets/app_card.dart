@@ -14,6 +14,10 @@ enum _AppCardVariant { surface, gradient, glass, outline }
 /// surfaces, no con elevación). Si recibe [onTap], expone ripple/press feedback
 /// con colores propios sobre el fondo oscuro.
 ///
+/// Cuando la card es una subsección con título propio, su heading interno va
+/// en `titleMedium` atenuado a `text2`: lo distingue de los labels y valores
+/// de los controles, que conservan el primario.
+///
 /// Tres variantes comparten geometría:
 /// - default: fondo `surface2`, la card de contenido habitual.
 /// - `.gradient`: fill de marca (`brandGradient`) para la card destacada del

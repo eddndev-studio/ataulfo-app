@@ -38,11 +38,11 @@ void main() {
     bloc = _MockNotificationsBloc();
   });
 
-  Widget host() => MaterialApp(
+  Widget host([NotificationInboxItem? item]) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: BlocProvider<NotificationsBloc>.value(
       value: bloc,
-      child: Scaffold(body: NotificationInboxTile(item: _item)),
+      child: Scaffold(body: NotificationInboxTile(item: item ?? _item)),
     ),
   );
 
@@ -67,6 +67,86 @@ void main() {
     expect(
       ts.style,
       textTheme.labelSmall?.copyWith(color: AppTokens.textDisabled),
+    );
+  });
+
+  testWidgets('body y contador de eventos salen del textTheme', (tester) async {
+    final collapsed = NotificationInboxItem(
+      id: 'ni-2',
+      eventType: NotificationEventType.botDisconnected,
+      title: 'Bot desconectado',
+      body: 'El bot perdió conexión',
+      priority: NotificationPriority.high,
+      count: 3,
+      status: NotificationInboxStatus.unread,
+      createdAt: DateTime.utc(2026, 6, 3, 12),
+      updatedAt: DateTime.utc(2026, 6, 3, 12),
+    );
+    await tester.pumpWidget(host(collapsed));
+
+    final context = tester.element(find.byType(NotificationInboxTile));
+    final textTheme = Theme.of(context).textTheme;
+
+    // Copy secundaria = bodyMedium del theme atenuado, no TextStyle crudo.
+    final body = tester.widget<Text>(find.text('El bot perdió conexión'));
+    expect(body.style, textTheme.bodyMedium?.copyWith(color: AppTokens.text2));
+
+    // El contador de eventos colapsados es meta-info: mismas métricas de
+    // bodyMedium, atenuado a textDisabled como el timestamp.
+    final count = tester.widget<Text>(find.text('3 eventos'));
+    expect(
+      count.style,
+      textTheme.bodyMedium?.copyWith(color: AppTokens.textDisabled),
+    );
+  });
+
+  testWidgets('el detalle técnico expandido sale del textTheme', (
+    tester,
+  ) async {
+    final withDetail = NotificationInboxItem(
+      id: 'ni-3',
+      eventType: NotificationEventType.flowFailed,
+      title: 'Flujo fallido',
+      body: 'No se pudo completar el flujo',
+      priority: NotificationPriority.high,
+      count: 1,
+      status: NotificationInboxStatus.unread,
+      createdAt: DateTime.utc(2026, 6, 3, 12),
+      updatedAt: DateTime.utc(2026, 6, 3, 12),
+      payload: const <String, String>{
+        'code': 'send_failed',
+        'detail': 'upload failed with status code 400',
+      },
+    );
+    await tester.pumpWidget(host(withDetail));
+
+    await tester.tap(find.byKey(const Key('notifications.item.ni-3.expand')));
+    await tester.pump();
+
+    final context = tester.element(find.byType(NotificationInboxTile));
+    final textTheme = Theme.of(context).textTheme;
+
+    // Código estable = bodyMedium del theme en monospace w700, no un
+    // TextStyle crudo.
+    final code = tester.widget<Text>(find.text('send_failed'));
+    expect(
+      code.style,
+      textTheme.bodyMedium?.copyWith(
+        color: AppTokens.text2,
+        fontWeight: FontWeight.w700,
+        fontFamily: 'monospace',
+      ),
+    );
+
+    // Razón cruda del servidor = volcado técnico: bodySmall en monospace,
+    // como el error crudo del historial de ejecuciones.
+    final detail = tester.widget<SelectableText>(find.byType(SelectableText));
+    expect(
+      detail.style,
+      textTheme.bodySmall?.copyWith(
+        color: AppTokens.text2,
+        fontFamily: 'monospace',
+      ),
     );
   });
 }

@@ -88,6 +88,39 @@ void main() {
     ); // error inline
   });
 
+  testWidgets('el volcado de error usa bodySmall monospace del theme', (
+    tester,
+  ) async {
+    when(() => cubit.state).thenReturn(
+      ExecutionsLoaded(
+        executions: <Execution>[
+          _exe(
+            'exe-1',
+            ExecutionStatus.failed,
+            'flw-1',
+            error: 'send_failed: upload failed with status code 400',
+          ),
+        ],
+        flowNames: const <String, String>{'flw-1': 'Bienvenida'},
+      ),
+    );
+
+    await tester.pumpWidget(host());
+
+    final context = tester.element(find.byType(ExecutionsPage));
+    final textTheme = Theme.of(context).textTheme;
+    // Error crudo del motor = volcado técnico: bodySmall del theme en
+    // monospace + danger, no un TextStyle con fontSize calcado a mano.
+    final dump = tester.widget<SelectableText>(find.byType(SelectableText));
+    expect(
+      dump.style,
+      textTheme.bodySmall?.copyWith(
+        color: AppTokens.danger,
+        fontFamily: 'monospace',
+      ),
+    );
+  });
+
   testWidgets('la fila usa la tipografía del theme (título y timestamp)', (
     tester,
   ) async {

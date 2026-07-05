@@ -406,6 +406,50 @@ void main() {
     verify(() => bloc.add(const MediaGallerySelectionCleared())).called(1);
   });
 
+  testWidgets('el contador de selección sale del textTheme', (tester) async {
+    when(() => bloc.state).thenReturn(
+      MediaGalleryLoaded(
+        items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+        nextCursor: '',
+        selectedRefs: const <String>{'media/a'},
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    final context = tester.element(find.byType(MediaGalleryPage));
+    final textTheme = Theme.of(context).textTheme;
+    // Contador de la barra de selección = bodyMedium del theme con el
+    // énfasis w600, no un TextStyle crudo con color calcado.
+    final counter = tester.widget<Text>(find.text('1 seleccionado'));
+    expect(
+      counter.style,
+      textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+    );
+  });
+
+  testWidgets('la copy de progreso de subida sale del textTheme', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      const MediaGalleryLoaded(
+        items: <MediaAsset>[],
+        nextCursor: '',
+        isUploading: true,
+        uploadTotal: 3,
+        uploadDone: 1,
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    final context = tester.element(find.byType(MediaGalleryPage));
+    final textTheme = Theme.of(context).textTheme;
+    // Copy de progreso de subida = bodyMedium del theme tal cual.
+    final progress = tester.widget<Text>(find.text('Subiendo 1 de 3…'));
+    expect(progress.style, textTheme.bodyMedium);
+  });
+
   testWidgets('modo selección: borrar pide confirmación y despacha el lote', (
     tester,
   ) async {

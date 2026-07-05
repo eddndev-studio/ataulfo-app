@@ -68,11 +68,13 @@ class _PreferencesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (preferences.isEmpty) {
-      return const Center(
-        key: Key('notification_preferences.empty'),
+      return Center(
+        key: const Key('notification_preferences.empty'),
         child: Text(
           'Sin preferencias configuradas',
-          style: TextStyle(color: AppTokens.text2),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
         ),
       );
     }
@@ -160,10 +162,12 @@ class _PreferencesError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Text(
+            Text(
               'No se pudieron cargar las preferencias',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppTokens.text2),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
             ),
             const SizedBox(height: AppTokens.sp4),
             AppButton.tonal(

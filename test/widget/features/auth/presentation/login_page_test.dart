@@ -241,6 +241,30 @@ void main() {
     expect(t.style?.color, AppTokens.danger);
   });
 
+  testWidgets('el mensaje de error sale del textTheme (bodyMedium + danger)', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      Stream<LoginState>.fromIterable(const <LoginState>[
+        LoginFailed(LoginFailureKind.unknown),
+      ]),
+      initialState: const LoginInitial(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    final context = tester.element(find.byType(LoginPage));
+    final textTheme = Theme.of(context).textTheme;
+    // Copy de error = bodyMedium del theme teñido a danger, no un
+    // TextStyle crudo que pierde las métricas del design system.
+    final t = tester.widget<Text>(
+      find.text('Algo salió mal, intenta de nuevo'),
+    );
+    expect(t.style, textTheme.bodyMedium?.copyWith(color: AppTokens.danger));
+  });
+
   testWidgets('"Crear cuenta" invoca onCreateAccount', (tester) async {
     var tapped = false;
     await tester.pumpWidget(host(onCreateAccount: () => tapped = true));

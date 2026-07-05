@@ -195,7 +195,9 @@ class _AcceptFormState extends State<_AcceptForm> {
                 Text(
                   _messageFor(failedKind),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTokens.danger),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppTokens.danger,
+                  ),
                 ),
               ],
             ],
