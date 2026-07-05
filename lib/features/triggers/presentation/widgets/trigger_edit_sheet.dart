@@ -64,10 +64,15 @@ class TriggerEditSheet extends StatefulWidget {
   }) {
     final triggersBloc = context.read<TriggersBloc>();
     final labelsBloc = context.read<LabelsBloc>();
+    // El guard de descarte consulta al propio sheet por cambios sin guardar:
+    // la key da acceso al estado vivo desde el closure. Si el estado ya no
+    // existe (sheet desmontado) no hay nada que proteger.
+    final sheetKey = GlobalKey<_TriggerEditSheetState>();
     return showAppBottomSheet<void>(
       context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
+      confirmDiscard: () => sheetKey.currentState?.shouldGuardDiscard ?? false,
       builder: (_) => MultiBlocProvider(
         providers: <BlocProvider<dynamic>>[
           BlocProvider<TriggersBloc>.value(value: triggersBloc),
@@ -76,7 +81,11 @@ class TriggerEditSheet extends StatefulWidget {
         // El inset del teclado lo aplica el PROPIO sheet (su context sí se
         // reconstruye con el MediaQuery); aplicarlo aquí lo congelaría al
         // valor del momento de abrir.
-        child: TriggerEditSheet(editing: editing, scopedFlow: scopedFlow),
+        child: TriggerEditSheet(
+          key: sheetKey,
+          editing: editing,
+          scopedFlow: scopedFlow,
+        ),
       ),
     );
   }
@@ -107,6 +116,17 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
   /// haya hecho submit. Espejo de `_didSubmit` en `StepEditSheet`.
   bool _didSubmit = false;
 
+  /// Snapshot del arranque del form (defaults en creación, valores
+  /// hidratados en edición): baseline del guard de descarte. Hidratar no es
+  /// trabajo del operador; solo lo que difiere de este snapshot lo es.
+  late final String _initialKeyword;
+  late final String? _initialLabelId;
+  late final TriggerType _initialTriggerType;
+  late final MatchType _initialMatchType;
+  late final LabelAction _initialLabelAction;
+  late final TriggerScope _initialScope;
+  late final bool _initialIsActive;
+
   @override
   void initState() {
     super.initState();
@@ -120,6 +140,13 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     _labelAction = ed?.labelAction ?? LabelAction.add;
     _scope = ed?.scope ?? TriggerScope.both;
     _isActive = ed?.isActive ?? true;
+    _initialKeyword = _keywordCtrl.text.trim();
+    _initialLabelId = _selectedLabelId;
+    _initialTriggerType = _triggerType;
+    _initialMatchType = _matchType;
+    _initialLabelAction = _labelAction;
+    _initialScope = _scope;
+    _initialIsActive = _isActive;
     _keywordCtrl.addListener(_onTextChanged);
   }
 
@@ -147,6 +174,22 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     }
     return true;
   }
+
+  /// True cuando descartar el sheet perdería trabajo del operador: cualquier
+  /// campo que difiera del snapshot con que el form arrancó (incluidos los
+  /// de un modo no visible: un keyword escrito antes de cambiar a LABEL
+  /// sigue siendo trabajo). Tras un submit en vuelo o persistido no hay nada
+  /// que perder; un fallo de mutación revierte el flag y vuelve a proteger.
+  bool get shouldGuardDiscard => !_didSubmit && _hasUnsavedChanges;
+
+  bool get _hasUnsavedChanges =>
+      _keywordCtrl.text.trim() != _initialKeyword ||
+      _selectedLabelId != _initialLabelId ||
+      _triggerType != _initialTriggerType ||
+      _matchType != _initialMatchType ||
+      _labelAction != _initialLabelAction ||
+      _scope != _initialScope ||
+      _isActive != _initialIsActive;
 
   Future<void> _confirmDelete() async {
     final ed = widget.editing;
@@ -204,6 +247,14 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
     final textTheme = Theme.of(context).textTheme;
     return BlocListener<TriggersBloc, TriggersState>(
       listener: (context, state) {
+        // Un fallo de mutación invalida el intento: el cambio NO persistió,
+        // el operador sigue con trabajo vivo en el form y el guard de
+        // descarte debe volver a protegerlo (y un Loaded posterior ajeno a
+        // este sheet ya no debe popearlo).
+        if (state is TriggersMutationFailed) {
+          _didSubmit = false;
+          return;
+        }
         if (_didSubmit && state is TriggersLoaded) {
           Navigator.of(context).maybePop();
         }
@@ -319,12 +370,29 @@ class _TriggerEditSheetState extends State<TriggerEditSheet> {
                     ),
                   ],
                   const SizedBox(height: AppTokens.sp6),
-                  AppButton.filled(
-                    key: const Key('trigger_edit.submit'),
-                    label: 'Guardar',
-                    onPressed: _isSubmittable ? _submit : null,
-                    loading: isMutating,
-                    fullWidth: true,
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: AppButton.tonal(
+                          key: const Key('trigger_edit.cancel'),
+                          label: 'Cancelar',
+                          // maybePop pasa por el guard del sheet: con
+                          // cambios pide confirmación; sin cambios cierra.
+                          onPressed: isMutating
+                              ? null
+                              : () => Navigator.of(context).maybePop(),
+                        ),
+                      ),
+                      const SizedBox(width: AppTokens.sp3),
+                      Expanded(
+                        child: AppButton.filled(
+                          key: const Key('trigger_edit.submit'),
+                          label: 'Guardar',
+                          onPressed: _isSubmittable ? _submit : null,
+                          loading: isMutating,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

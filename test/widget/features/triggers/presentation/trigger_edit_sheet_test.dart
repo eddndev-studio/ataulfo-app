@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ataulfo/core/design/app_bottom_sheet.dart';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
@@ -899,5 +900,219 @@ void main() {
       // El modal ve los blocs del scope: el form montó completo.
       expect(find.byKey(const Key('trigger_edit.submit')), findsOneWidget);
     });
+  });
+
+  group('TriggerEditSheet · guard de descarte y pie Cancelar', () {
+    // Abre el sheet por la vía de producción (TriggerEditSheet.open), que es
+    // donde vive el guard: scrim, drag y back piden confirmación con
+    // cambios sin guardar.
+    Future<void> pumpGuardHost(WidgetTester tester, {Trigger? editing}) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<TriggersBloc>.value(value: triggers),
+              BlocProvider<LabelsBloc>.value(value: labels),
+            ],
+            child: Scaffold(
+              body: Builder(
+                builder: (ctx) => Center(
+                  child: ElevatedButton(
+                    onPressed: () => TriggerEditSheet.open(
+                      ctx,
+                      scopedFlow: _flow(),
+                      editing: editing,
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapScrim(WidgetTester tester) async {
+      await tester.tapAt(const Offset(400, 12));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('sin cambios: el scrim descarta directo, sin confirmación', (
+      tester,
+    ) async {
+      await pumpGuardHost(tester);
+      await tapScrim(tester);
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.byKey(const Key('trigger_edit.submit')), findsNothing);
+    });
+
+    testWidgets(
+      'con cambios: el scrim pide confirmación y seguir editando conserva '
+      'el keyword',
+      (tester) async {
+        await pumpGuardHost(tester);
+        await tester.enterText(
+          find.byKey(const Key('trigger_edit.keyword')),
+          'hola guard',
+        );
+        await tester.pump();
+
+        await tapScrim(tester);
+        expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+        await tester.tap(find.byKey(appSheetDiscardCancelKey));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('trigger_edit.submit')), findsOneWidget);
+        expect(find.text('hola guard'), findsOneWidget);
+      },
+    );
+
+    testWidgets('con cambios: confirmar el descarte cierra el sheet', (
+      tester,
+    ) async {
+      await pumpGuardHost(tester);
+      await tester.enterText(
+        find.byKey(const Key('trigger_edit.keyword')),
+        'hola guard',
+      );
+      await tester.pump();
+
+      await tapScrim(tester);
+      await tester.tap(find.byKey(appSheetDiscardConfirmKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('trigger_edit.submit')), findsNothing);
+    });
+
+    testWidgets(
+      'el pie muestra Cancelar junto a Guardar; sin cambios Cancelar cierra '
+      'directo',
+      (tester) async {
+        await pumpGuardHost(tester);
+        expect(find.byKey(const Key('trigger_edit.cancel')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('trigger_edit.cancel')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('trigger_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets('Cancelar con cambios pide confirmación (respeta el guard)', (
+      tester,
+    ) async {
+      await pumpGuardHost(tester);
+      await tester.enterText(
+        find.byKey(const Key('trigger_edit.keyword')),
+        'a medias',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('trigger_edit.cancel')));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+      await tester.tap(find.byKey(appSheetDiscardCancelKey));
+      await tester.pumpAndSettle();
+      expect(find.text('a medias'), findsOneWidget);
+    });
+
+    testWidgets('apagar el switch Activo cuenta como cambio', (tester) async {
+      await pumpGuardHost(tester);
+      await tester.tap(find.byType(AppSwitch));
+      await tester.pump();
+
+      await tapScrim(tester);
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+    });
+
+    testWidgets(
+      'Guardar no pide confirmación: el sheet cierra al llegar el Loaded '
+      'post-submit',
+      (tester) async {
+        final states = StreamController<TriggersState>();
+        addTearDown(states.close);
+        whenListen(
+          triggers,
+          states.stream,
+          initialState: const TriggersLoaded(<Trigger>[]),
+        );
+        await pumpGuardHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('trigger_edit.keyword')),
+          'hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
+        await tester.pump();
+
+        states.add(const TriggersMutating(<Trigger>[]));
+        await tester.pump();
+        states.add(
+          TriggersLoaded(<Trigger>[_textTrigger(id: 'new', keyword: 'hola')]),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('trigger_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'editar sin tocar nada: el scrim descarta directo (hidratar no es '
+      'cambio)',
+      (tester) async {
+        await pumpGuardHost(tester, editing: _textTrigger());
+        await tapScrim(tester);
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('trigger_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'tras un fallo de mutación los cambios siguen protegidos por el guard',
+      (tester) async {
+        final states = StreamController<TriggersState>();
+        addTearDown(states.close);
+        whenListen(
+          triggers,
+          states.stream,
+          initialState: const TriggersLoaded(<Trigger>[]),
+        );
+        await pumpGuardHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('trigger_edit.keyword')),
+          'hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('trigger_edit.submit')));
+        await tester.pump();
+
+        states.add(const TriggersMutating(<Trigger>[]));
+        await tester.pump();
+        // La mutación murió: el intento no persistió y el trabajo sigue vivo.
+        states.add(
+          const TriggersMutationFailed(<Trigger>[], TriggersServerFailure()),
+        );
+        await tester.pump();
+
+        await tapScrim(tester);
+        expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+        expect(find.byKey(const Key('trigger_edit.submit')), findsOneWidget);
+      },
+    );
   });
 }

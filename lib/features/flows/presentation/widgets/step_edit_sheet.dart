@@ -88,10 +88,15 @@ class StepEditSheet extends StatefulWidget {
   }) {
     final bloc = context.read<FlowStepsBloc>();
     final labelsRepo = context.read<LabelsRepository>();
+    // El guard de descarte consulta al propio sheet por cambios sin guardar:
+    // la key da acceso al estado vivo desde el closure. Si el estado ya no
+    // existe (sheet desmontado) no hay nada que proteger.
+    final sheetKey = GlobalKey<_StepEditSheetState>();
     return showAppBottomSheet<void>(
       context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
+      confirmDiscard: () => sheetKey.currentState?.shouldGuardDiscard ?? false,
       builder: (_) => MultiBlocProvider(
         providers: <BlocProvider<dynamic>>[
           BlocProvider<FlowStepsBloc>.value(value: bloc),
@@ -100,7 +105,11 @@ class StepEditSheet extends StatefulWidget {
                 LabelsBloc(repo: labelsRepo)..add(const LabelsLoadRequested()),
           ),
         ],
-        child: StepEditSheet(editing: editing, pickMediaRef: pickMediaRef),
+        child: StepEditSheet(
+          key: sheetKey,
+          editing: editing,
+          pickMediaRef: pickMediaRef,
+        ),
       ),
     );
   }
@@ -135,6 +144,10 @@ class _StepEditSheetState extends State<StepEditSheet> {
   late final TextEditingController _mediaCtrl;
   late fdom.StepType _type;
   late int _delayMs;
+
+  /// Delay con el que el sheet arrancó, ya curado (el legacy 0 sube al piso
+  /// al abrir). Baseline del guard de descarte.
+  late int _initialDelayMs;
   late int _jitterPct;
   late _StepMode _mode;
   bool _didSubmit = false;
@@ -185,6 +198,11 @@ class _StepEditSheetState extends State<StepEditSheet> {
     if (_type != fdom.StepType.label && _delayMs < _minDelayMs) {
       _delayMs = _minDelayMs;
     }
+    // Baseline del guard de descarte: el delay YA curado con que el sheet
+    // arranca. La curación del legacy 0 no es trabajo del operador y no debe
+    // disparar la confirmación (el submit sí compara contra el original para
+    // persistirla).
+    _initialDelayMs = _delayMs;
     _jitterPct = ed?.jitterPct ?? 0;
     _mode = _StepMode.of(
       aiOnly: ed?.aiOnly ?? false,
@@ -360,12 +378,37 @@ class _StepEditSheetState extends State<StepEditSheet> {
     return min;
   }
 
-  void _submit() {
-    if (!_isSubmittable) return;
-    final content = _contentCtrl.text.trim();
-    final mediaRef = _mediaCtrl.text.trim();
+  /// True cuando descartar el sheet perdería trabajo del operador: en
+  /// creación, cualquier campo tocado respecto del arranque; en edición,
+  /// cualquier diferencia only-changed contra el step original. Tras un
+  /// submit en vuelo o persistido no hay nada que perder (el auto-pop
+  /// post-mutación pasa por el guard vía maybePop y debe salir directo);
+  /// un fallo de mutación revierte el flag y vuelve a proteger.
+  bool get shouldGuardDiscard => !_didSubmit && _hasUnsavedChanges;
+
+  bool get _hasUnsavedChanges {
     final ed = widget.editing;
     if (ed == null) {
+      // Creación: el arranque es TEXT con todos los defaults; cualquier
+      // desviación (incluido elegir otro tipo) es trabajo del operador.
+      // Los metadata de CT/LABEL no se consultan: exigen haber cambiado
+      // el tipo, que ya marca cambio por sí solo.
+      return _type != fdom.StepType.text ||
+          _contentCtrl.text.trim().isNotEmpty ||
+          _mediaCtrl.text.trim().isNotEmpty ||
+          _delayMs != _minDelayMs ||
+          _jitterPct != 0 ||
+          _mode != _StepMode.always;
+    }
+    return !_editPatch(ed, delayBaseline: _initialDelayMs).isEmpty;
+  }
+
+  void _submit() {
+    if (!_isSubmittable) return;
+    final ed = widget.editing;
+    if (ed == null) {
+      final content = _contentCtrl.text.trim();
+      final mediaRef = _mediaCtrl.text.trim();
       final bloc = context.read<FlowStepsBloc>();
       _didSubmit = true;
       bloc.add(
@@ -391,8 +434,37 @@ class _StepEditSheetState extends State<StepEditSheet> {
       return;
     }
 
-    // Modo edit: only-changed. Diff contra el editing original; si
-    // nada cambió, no-op (la UI evita el round-trip).
+    // Modo edit: only-changed. Diff contra el editing original; si nada
+    // cambió, no-op (la UI evita el round-trip). El baseline del delay es
+    // el ORIGINAL del step: si traía un legacy 0 curado al abrir, el PATCH
+    // lo persiste al piso aunque el operador no lo haya tocado.
+    final patch = _editPatch(ed, delayBaseline: ed.delayMs);
+    if (patch.isEmpty) return;
+
+    _didSubmit = true;
+    context.read<FlowStepsBloc>().add(
+      FlowStepsUpdateRequested(
+        stepId: ed.id,
+        content: patch.content,
+        mediaRef: patch.mediaRef,
+        delayMs: patch.delayMs,
+        jitterPct: patch.jitterPct,
+        aiOnly: patch.aiOnly,
+        manualOnly: patch.manualOnly,
+        metadataJson: patch.metadataJson,
+      ),
+    );
+  }
+
+  /// Diff only-changed del sheet contra el step en edición: cada campo
+  /// no-null cambió respecto del original. [delayBaseline] separa a los dos
+  /// consumidores: el submit compara contra el delay original del step (así
+  /// la curación del legacy 0 viaja en el PATCH) y el guard de descarte
+  /// contra el delay ya curado con que el sheet abrió (la curación no es
+  /// trabajo del operador y no debe pedir confirmación).
+  _StepPatch _editPatch(fdom.Step ed, {required int delayBaseline}) {
+    final content = _contentCtrl.text.trim();
+    final mediaRef = _mediaCtrl.text.trim();
     final newContent = (_isConditionalTime || _isLabel)
         ? null // CT/LABEL no editan content vía sheet — su form maneja todo.
         : content != ed.content
@@ -404,7 +476,7 @@ class _StepEditSheetState extends State<StepEditSheet> {
         _isMultimedia && mediaRef.isNotEmpty && mediaRef != ed.mediaRef
         ? mediaRef
         : null;
-    final newDelay = _delayMs != ed.delayMs ? _delayMs : null;
+    final newDelay = _delayMs != delayBaseline ? _delayMs : null;
     final newJitter = _jitterPct != ed.jitterPct ? _jitterPct : null;
     final modeAiOnly = _mode == _StepMode.aiOnly;
     final modeManualOnly = _mode == _StepMode.manualOnly;
@@ -453,28 +525,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
       }
     }
 
-    final isNoOp =
-        newContent == null &&
-        newMediaRef == null &&
-        newDelay == null &&
-        newJitter == null &&
-        newAiOnly == null &&
-        newManualOnly == null &&
-        newMetadata == null;
-    if (isNoOp) return;
-
-    _didSubmit = true;
-    context.read<FlowStepsBloc>().add(
-      FlowStepsUpdateRequested(
-        stepId: ed.id,
-        content: newContent,
-        mediaRef: newMediaRef,
-        delayMs: newDelay,
-        jitterPct: newJitter,
-        aiOnly: newAiOnly,
-        manualOnly: newManualOnly,
-        metadataJson: newMetadata,
-      ),
+    return _StepPatch(
+      content: newContent,
+      mediaRef: newMediaRef,
+      delayMs: newDelay,
+      jitterPct: newJitter,
+      aiOnly: newAiOnly,
+      manualOnly: newManualOnly,
+      metadataJson: newMetadata,
     );
   }
 
@@ -483,6 +541,14 @@ class _StepEditSheetState extends State<StepEditSheet> {
     final textTheme = Theme.of(context).textTheme;
     return BlocListener<FlowStepsBloc, FlowStepsState>(
       listener: (context, state) {
+        // Un fallo de mutación invalida el intento: el cambio NO persistió,
+        // el operador sigue con trabajo vivo en el form y el guard de
+        // descarte debe volver a protegerlo (y un Loaded posterior ajeno a
+        // este sheet ya no debe popearlo).
+        if (state is FlowStepsMutationFailed) {
+          _didSubmit = false;
+          return;
+        }
         // El pop llega en cuanto la mutación PERSISTIÓ: Refreshing es esa
         // señal (el refetch posterior puede fallar y el cambio ya existe
         // en el backend — dejar el sheet abierto ofrecería un Guardar que
@@ -676,12 +742,29 @@ class _StepEditSheetState extends State<StepEditSheet> {
                     ),
                   ],
                   const SizedBox(height: AppTokens.sp6),
-                  AppButton.filled(
-                    key: const Key('step_edit.submit'),
-                    label: 'Guardar',
-                    onPressed: canSubmit ? _submit : null,
-                    loading: isMutating,
-                    fullWidth: true,
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: AppButton.tonal(
+                          key: const Key('step_edit.cancel'),
+                          label: 'Cancelar',
+                          // maybePop pasa por el guard del sheet: con
+                          // cambios pide confirmación; sin cambios cierra.
+                          onPressed: isMutating
+                              ? null
+                              : () => Navigator.of(context).maybePop(),
+                        ),
+                      ),
+                      const SizedBox(width: AppTokens.sp3),
+                      Expanded(
+                        child: AppButton.filled(
+                          key: const Key('step_edit.submit'),
+                          label: 'Guardar',
+                          onPressed: canSubmit ? _submit : null,
+                          loading: isMutating,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1024,6 +1107,38 @@ class _MediaField extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Resultado del diff only-changed de una edición: cada campo no-null
+/// difiere del step original y viaja en el PATCH. Todos null ⇒ no hay nada
+/// que guardar (submit no-op) ni que perder (descarte sin confirmación).
+class _StepPatch {
+  const _StepPatch({
+    this.content,
+    this.mediaRef,
+    this.delayMs,
+    this.jitterPct,
+    this.aiOnly,
+    this.manualOnly,
+    this.metadataJson,
+  });
+
+  final String? content;
+  final String? mediaRef;
+  final int? delayMs;
+  final int? jitterPct;
+  final bool? aiOnly;
+  final bool? manualOnly;
+  final String? metadataJson;
+
+  bool get isEmpty =>
+      content == null &&
+      mediaRef == null &&
+      delayMs == null &&
+      jitterPct == null &&
+      aiOnly == null &&
+      manualOnly == null &&
+      metadataJson == null;
 }
 
 /// Steps vigentes del bloc state (Loading/Failed iniciales ⇒ vacío).

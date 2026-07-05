@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:ataulfo/core/design/app_bottom_sheet.dart';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
@@ -1476,6 +1477,285 @@ void main() {
         expect(find.byKey(const Key('step_edit.submit')), findsNothing);
         // …pero la página que lo abrió DEBE seguir en pantalla.
         expect(find.byKey(const Key('probe.open')), findsOneWidget);
+      },
+    );
+  });
+
+  group('StepEditSheet · guard de descarte y pie Cancelar', () {
+    // Abre el sheet por la vía de producción (StepEditSheet.open), que es
+    // donde vive el guard: scrim, drag y back pasan por la confirmación
+    // cuando hay cambios sin guardar.
+    Future<void> pumpGuardHost(
+      WidgetTester tester, {
+      fdom.Step? editing,
+    }) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<FlowStepsBloc>.value(value: bloc),
+            ],
+            child: RepositoryProvider<LabelsRepository>.value(
+              value: _FakeLabelsRepository(),
+              child: Scaffold(
+                body: Builder(
+                  builder: (ctx) => Center(
+                    child: ElevatedButton(
+                      onPressed: () =>
+                          StepEditSheet.open(ctx, editing: editing),
+                      child: const Text('open'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapScrim(WidgetTester tester) async {
+      await tester.tapAt(const Offset(400, 12));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('sin cambios: el scrim descarta directo, sin confirmación', (
+      tester,
+    ) async {
+      await pumpGuardHost(tester);
+      await tapScrim(tester);
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+    });
+
+    testWidgets(
+      'con cambios: el scrim pide confirmación y seguir editando conserva '
+      'lo escrito',
+      (tester) async {
+        await pumpGuardHost(tester);
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Hola guard',
+        );
+        await tester.pump();
+
+        await tapScrim(tester);
+        expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+        await tester.tap(find.byKey(appSheetDiscardCancelKey));
+        await tester.pumpAndSettle();
+        // El sheet sigue montado con el texto intacto.
+        expect(find.byKey(const Key('step_edit.submit')), findsOneWidget);
+        expect(find.text('Hola guard'), findsOneWidget);
+      },
+    );
+
+    testWidgets('con cambios: confirmar el descarte cierra el sheet', (
+      tester,
+    ) async {
+      await pumpGuardHost(tester);
+      await tester.enterText(
+        find.byKey(const Key('step_edit.content')),
+        'Hola guard',
+      );
+      await tester.pump();
+
+      await tapScrim(tester);
+      await tester.tap(find.byKey(appSheetDiscardConfirmKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+    });
+
+    testWidgets(
+      'el pie muestra Cancelar junto a Guardar; sin cambios Cancelar cierra '
+      'directo',
+      (tester) async {
+        await pumpGuardHost(tester);
+        expect(find.byKey(const Key('step_edit.cancel')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('step_edit.cancel')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets('Cancelar con cambios pide confirmación (respeta el guard)', (
+      tester,
+    ) async {
+      await pumpGuardHost(tester);
+      await tester.enterText(
+        find.byKey(const Key('step_edit.content')),
+        'Trabajo a medias',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('step_edit.cancel')));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+      await tester.tap(find.byKey(appSheetDiscardCancelKey));
+      await tester.pumpAndSettle();
+      expect(find.text('Trabajo a medias'), findsOneWidget);
+    });
+
+    testWidgets('elegir solo el tipo ya cuenta como cambio', (tester) async {
+      await pumpGuardHost(tester);
+      await tester.tap(find.byKey(const Key('step_edit.type.image')));
+      await tester.pump();
+
+      await tapScrim(tester);
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+    });
+
+    testWidgets(
+      'Guardar no pide confirmación: el sheet cierra al persistir la mutación',
+      (tester) async {
+        final states = StreamController<FlowStepsState>();
+        addTearDown(states.close);
+        whenListen(
+          bloc,
+          states.stream,
+          initialState: const FlowStepsLoaded(<fdom.Step>[]),
+        );
+        await pumpGuardHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        states.add(const FlowStepsMutating(<fdom.Step>[]));
+        await tester.pump();
+        states.add(const FlowStepsRefreshing(<fdom.Step>[]));
+        await tester.pumpAndSettle();
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'editar sin tocar nada: el scrim descarta directo (el diff no marca '
+      'cambios)',
+      (tester) async {
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[editingStep]));
+        await pumpGuardHost(tester, editing: editingStep);
+
+        await tapScrim(tester);
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'editar un CT sin tocar nada: el re-emit inicial del form no cuenta '
+      'como cambio (scrim directo)',
+      (tester) async {
+        const ctStep = fdom.Step(
+          id: 's-ct',
+          flowId: 'f1',
+          type: fdom.StepType.conditionalTime,
+          order: 0,
+          content: '',
+          mediaRef: '',
+          metadataJson:
+              '{"tz":"UTC","windows":[{"days":[1,2],"from":"08:00",'
+              '"to":"12:00"}],"on_match_step_id":"t-hola",'
+              '"on_else_step_id":"t-cerrados",'
+              '"on_match_order":1,"on_else_order":2}',
+          delayMs: 1000,
+          jitterPct: 0,
+          aiOnly: false,
+        );
+        when(() => bloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[ctStep, _tHolaAt1, _tCerradosAt2]),
+        );
+        await pumpGuardHost(tester, editing: ctStep);
+        await tester.pumpAndSettle();
+
+        await tapScrim(tester);
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'el delay legacy curado al abrir (0→1s) NO cuenta como cambio del '
+      'operador',
+      (tester) async {
+        const legacy = fdom.Step(
+          id: 's-legacy',
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: 'old',
+          mediaRef: '',
+          metadataJson: '{}',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        );
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[legacy]));
+        await pumpGuardHost(tester, editing: legacy);
+
+        await tapScrim(tester);
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'tras un fallo de mutación los cambios siguen protegidos por el guard',
+      (tester) async {
+        final states = StreamController<FlowStepsState>();
+        addTearDown(states.close);
+        whenListen(
+          bloc,
+          states.stream,
+          initialState: const FlowStepsLoaded(<fdom.Step>[]),
+        );
+        await pumpGuardHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        states.add(const FlowStepsMutating(<fdom.Step>[]));
+        await tester.pump();
+        // La mutación murió: el intento no persistió y el trabajo sigue vivo.
+        states.add(
+          const FlowStepsMutationFailed(<fdom.Step>[], FlowsServerFailure()),
+        );
+        await tester.pump();
+
+        await tapScrim(tester);
+        expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.submit')), findsOneWidget);
       },
     );
   });
