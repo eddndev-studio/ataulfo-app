@@ -533,27 +533,46 @@ void main() {
         findsNothing,
       );
 
+      // Dos tiempos: la CTA abre el SELECTOR de tipo, no la composición.
       await tester.tap(find.text('Crear el primer paso'));
       await tester.pumpAndSettle();
+      expect(find.text('Tipo de paso'), findsOneWidget);
 
-      expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
-    });
-
-    testWidgets('con pasos muestra el botón "Nuevo paso" que abre el sheet', (
-      tester,
-    ) async {
-      when(
-        () => stepsBloc.state,
-      ).thenReturn(FlowStepsLoaded(<fdom.Step>[textStep()]));
-
-      await tester.pumpWidget(host());
-
-      await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
+      await tester.tap(find.byKey(const Key('step_edit.type.text')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
     });
+
+    testWidgets(
+      'con pasos, "Nuevo paso" abre el selector de tipo; elegir Texto abre '
+      'la composición y cancelar el selector no abre nada',
+      (tester) async {
+        when(
+          () => stepsBloc.state,
+        ).thenReturn(FlowStepsLoaded(<fdom.Step>[textStep()]));
+
+        await tester.pumpWidget(host());
+
+        // Cancelar el selector (scrim) no abre composición alguna.
+        await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('Tipo de paso'), findsOneWidget);
+        await tester.tapAt(const Offset(400, 12));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('step_edit.content')), findsNothing);
+
+        // Elegir Texto abre la composición de ese tipo.
+        await tester.tap(find.byKey(const Key('flow_detail.steps.add_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('step_edit.type.text')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Nuevo paso · Texto'), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.send_options')), findsOneWidget);
+      },
+    );
 
     testWidgets('FlowStepsLoading muestra spinner inline; los launchers '
         'siguen operables', (tester) async {

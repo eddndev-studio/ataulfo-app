@@ -5,10 +5,12 @@ import 'package:ataulfo/core/design/app_bottom_sheet.dart';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
+import 'package:ataulfo/core/design/widgets/app_duration_field.dart';
 import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
 import 'package:ataulfo/features/flows/presentation/widgets/step_edit_sheet.dart';
+import 'package:ataulfo/features/flows/presentation/widgets/step_editor_launcher.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
@@ -127,13 +129,13 @@ void main() {
   // picker + ventanas con time pickers + dropdowns) supera el viewport
   // default de flutter_test (800x600). `pumpHost` agranda y restaura.
   //
-  // [pickMediaRef] cablea el selector de multimedia. Cuando es null el
-  // selector es read-only (no abre nada): así el sheet sigue testeable
-  // aislado. Los tests que ejercen la selección pasan un fake que
-  // devuelve un `ref` BARE conocido.
+  // [createType] es el tipo elegido en el selector del primer tiempo (el
+  // sheet ya no ofrece cambiar de tipo). [pickMediaRef] cablea el selector
+  // de multimedia; null ⇒ read-only, el sheet sigue testeable aislado.
   Future<void> pumpHost(
     WidgetTester tester, {
     fdom.Step? editing,
+    fdom.StepType createType = fdom.StepType.text,
     MediaRefPicker? pickMediaRef,
     LabelsState? labelsState,
   }) async {
@@ -155,7 +157,12 @@ void main() {
           child: Scaffold(
             body: SafeArea(
               child: StepEditSheet(
+                // El tipo se fija en initState (en producción cada sheet es
+                // un modal recién montado); la key fuerza un State nuevo
+                // cuando un mismo test re-pumpea con otro tipo.
+                key: ValueKey<String>('${editing?.id}·${createType.name}'),
                 editing: editing,
+                createType: editing == null ? createType : null,
                 pickMediaRef: pickMediaRef,
               ),
             ),
@@ -163,6 +170,14 @@ void main() {
         ),
       ),
     );
+  }
+
+  // Expande el disclosure "Opciones de envío" (colapsado por default): los
+  // controles de retraso/variación/modo viven dentro.
+  Future<void> openSendOptions(WidgetTester tester) async {
+    await tester.ensureVisible(find.byKey(const Key('step_edit.send_options')));
+    await tester.tap(find.byKey(const Key('step_edit.send_options')));
+    await tester.pumpAndSettle();
   }
 
   const editingStep = fdom.Step(
@@ -179,22 +194,38 @@ void main() {
   );
 
   group('StepEditSheet (Add mode)', () {
-    testWidgets('renderiza título "Nuevo paso", campo content y sliders', (
-      tester,
-    ) async {
-      await pumpHost(tester);
+    testWidgets(
+      'el header nombra el tipo elegido: "Nuevo paso · Texto"; el campo '
+      'principal va primero y las opciones de envío viven colapsadas',
+      (tester) async {
+        await pumpHost(tester);
 
-      expect(find.text('Nuevo paso'), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.delay_slider')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.jitter_slider')), findsOneWidget);
-      // Selector tri-estado del modo de ejecución (reemplaza al viejo switch
-      // binario de "Solo IA").
-      expect(find.byKey(const Key('step_edit.mode.always')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.mode.ai')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.mode.manual')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.submit')), findsOneWidget);
-    });
+        expect(find.text('Nuevo paso · Texto'), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.content')), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.send_options')), findsOneWidget);
+        // Colapsado: ni retraso, ni variación, ni chips de modo a la vista.
+        expect(find.byKey(const Key('step_edit.delay.value')), findsNothing);
+        expect(find.byKey(const Key('step_edit.jitter')), findsNothing);
+        expect(find.byKey(const Key('step_edit.mode.always')), findsNothing);
+        expect(find.byKey(const Key('step_edit.submit')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'expandir "Opciones de envío" revela retraso (stepper con presets), '
+      'variación y modo',
+      (tester) async {
+        await pumpHost(tester);
+        await openSendOptions(tester);
+
+        expect(find.byType(AppDurationField), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.delay.value')), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.jitter')), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.mode.always')), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.mode.ai')), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.mode.manual')), findsOneWidget);
+      },
+    );
 
     testWidgets(
       'submit con content vacío es no-op (no dispatcha AddRequested)',
@@ -244,6 +275,7 @@ void main() {
           'Promo',
         );
         await tester.pump();
+        await openSendOptions(tester);
         await tester.ensureVisible(
           find.byKey(const Key('step_edit.mode.manual')),
         );
@@ -270,6 +302,7 @@ void main() {
           'Promo',
         );
         await tester.pump();
+        await openSendOptions(tester);
         await tester.ensureVisible(find.byKey(const Key('step_edit.mode.ai')));
         await tester.tap(find.byKey(const Key('step_edit.mode.ai')));
         await tester.pump();
@@ -305,6 +338,91 @@ void main() {
     );
 
     testWidgets(
+      'el preset de retraso salta directo al valor: 10 s → 10000 ms',
+      (tester) async {
+        await pumpHost(tester);
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Hi',
+        );
+        await tester.pump();
+        await openSendOptions(tester);
+        await tester.ensureVisible(
+          find.byKey(const Key('step_edit.delay.preset.10')),
+        );
+        await tester.tap(find.byKey(const Key('step_edit.delay.preset.10')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        final captured = verify(() => bloc.add(captureAny())).captured;
+        final ev = captured.single as FlowStepsAddRequested;
+        expect(ev.delayMs, 10000);
+      },
+    );
+
+    testWidgets('el stepper de retraso incrementa con paso fino: 1 s → 2 s', (
+      tester,
+    ) async {
+      await pumpHost(tester);
+
+      await tester.enterText(find.byKey(const Key('step_edit.content')), 'Hi');
+      await tester.pump();
+      await openSendOptions(tester);
+      await tester.ensureVisible(
+        find.byKey(const Key('step_edit.delay.increment')),
+      );
+      await tester.tap(find.byKey(const Key('step_edit.delay.increment')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      final captured = verify(() => bloc.add(captureAny())).captured;
+      final ev = captured.single as FlowStepsAddRequested;
+      expect(ev.delayMs, 2000);
+    });
+
+    testWidgets('la variación es un campo numérico: 15 → jitterPct 15', (
+      tester,
+    ) async {
+      await pumpHost(tester);
+
+      await tester.enterText(find.byKey(const Key('step_edit.content')), 'Hi');
+      await tester.pump();
+      await openSendOptions(tester);
+      await tester.ensureVisible(find.byKey(const Key('step_edit.jitter')));
+      await tester.enterText(find.byKey(const Key('step_edit.jitter')), '15');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      final captured = verify(() => bloc.add(captureAny())).captured;
+      final ev = captured.single as FlowStepsAddRequested;
+      expect(ev.jitterPct, 15);
+    });
+
+    testWidgets('variación fuera de rango (>100) marca error y gatea submit', (
+      tester,
+    ) async {
+      await pumpHost(tester);
+
+      await tester.enterText(find.byKey(const Key('step_edit.content')), 'Hi');
+      await tester.pump();
+      await openSendOptions(tester);
+      await tester.ensureVisible(find.byKey(const Key('step_edit.jitter')));
+      await tester.enterText(find.byKey(const Key('step_edit.jitter')), '150');
+      await tester.pump();
+
+      expect(find.text('La variación va de 0 a 100.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('step_edit.submit')));
+      await tester.pump();
+
+      verifyNever(() => bloc.add(any()));
+    });
+
+    testWidgets(
       'editar un paso legacy con delay 0 lo sube al piso (1s) al guardar',
       (tester) async {
         const legacy = fdom.Step(
@@ -338,6 +456,57 @@ void main() {
         expect(ev.delayMs, 1000);
       },
     );
+
+    testWidgets(
+      'delay legacy 0: las opciones de envío abren EXPANDIDAS con el aviso '
+      'honesto de la curación',
+      (tester) async {
+        const legacy = fdom.Step(
+          id: 's-legacy',
+          flowId: 'f1',
+          type: fdom.StepType.text,
+          order: 0,
+          content: 'old',
+          mediaRef: '',
+          metadataJson: '{}',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        );
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[legacy]));
+        await pumpHost(tester, editing: legacy);
+        await tester.pumpAndSettle();
+
+        // Sin tocar el disclosure: los controles ya están a la vista…
+        expect(find.byKey(const Key('step_edit.delay.value')), findsOneWidget);
+        // …junto con el aviso de que guardar ajustará el retraso al mínimo.
+        expect(
+          find.byKey(const Key('step_edit.legacy_delay_notice')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Este paso enviaba sin retraso'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('un paso con delay normal NO muestra el aviso de curación', (
+      tester,
+    ) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const FlowStepsLoaded(<fdom.Step>[editingStep]));
+      await pumpHost(tester, editing: editingStep);
+
+      expect(find.byKey(const Key('step_edit.delay.value')), findsNothing);
+      expect(
+        find.byKey(const Key('step_edit.legacy_delay_notice')),
+        findsNothing,
+      );
+    });
 
     testWidgets(
       'estado Mutating bloquea el submit (tap no dispatcha AddRequested)',
@@ -390,62 +559,16 @@ void main() {
 
   group('StepEditSheet (Add mode · multimedia)', () {
     testWidgets(
-      'renderiza picker con 10 chips (text + 6 multimedia + conditionalTime + '
-      'label + end); default TEXT',
+      'crear con tipo multimedia muestra el selector de recurso; con TEXT no',
       (tester) async {
+        await pumpHost(tester, createType: fdom.StepType.image);
+        expect(find.text('Nuevo paso · Imagen'), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.media_picker')), findsOneWidget);
+
         await pumpHost(tester);
-
-        for (final id in const <String>[
-          'text',
-          'image',
-          'video',
-          'document',
-          'audio',
-          'ptt',
-          'sticker',
-          'conditionalTime',
-          'label',
-          'end',
-        ]) {
-          expect(
-            find.byKey(Key('step_edit.type.$id')),
-            findsOneWidget,
-            reason: 'falta chip step_edit.type.$id',
-          );
-        }
-
-        final textChip = tester.widget<AppChoiceChip>(
-          find.byKey(const Key('step_edit.type.text')),
-        );
-        expect(textChip.selected, isTrue);
-        final imageChip = tester.widget<AppChoiceChip>(
-          find.byKey(const Key('step_edit.type.image')),
-        );
-        expect(imageChip.selected, isFalse);
-        final ctChip = tester.widget<AppChoiceChip>(
-          find.byKey(const Key('step_edit.type.conditionalTime')),
-        );
-        expect(ctChip.selected, isFalse);
+        expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
       },
     );
-
-    testWidgets('el selector de multimedia aparece al elegir tipo multimedia y '
-        'desaparece en TEXT', (tester) async {
-      await pumpHost(tester);
-
-      // TEXT por default → sin selector de multimedia.
-      expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
-
-      // Cambio a IMAGE → el selector "Seleccionar multimedia" aparece.
-      await tester.tap(find.byKey(const Key('step_edit.type.image')));
-      await tester.pump();
-      expect(find.byKey(const Key('step_edit.media_picker')), findsOneWidget);
-
-      // Vuelvo a TEXT → el selector se oculta.
-      await tester.tap(find.byKey(const Key('step_edit.type.text')));
-      await tester.pump();
-      expect(find.byKey(const Key('step_edit.media_picker')), findsNothing);
-    });
 
     testWidgets(
       'elegir un asset vía el picker y submit dispatcha AddRequested con el '
@@ -455,10 +578,12 @@ void main() {
         // despachado DEBE llevar exactamente ese ref — re-pinea el
         // linchpin a nivel del sheet: lo que se persiste es el ref BARE.
         const bareRef = 'tenant/org1/media/abc123.png';
-        await pumpHost(tester, pickMediaRef: (_, _) async => _asset(bareRef));
+        await pumpHost(
+          tester,
+          createType: fdom.StepType.image,
+          pickMediaRef: (_, _) async => _asset(bareRef),
+        );
 
-        await tester.tap(find.byKey(const Key('step_edit.type.image')));
-        await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.media_picker')));
         await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.submit')));
@@ -489,6 +614,7 @@ void main() {
         String? gotFamily = 'sentinel';
         await pumpHost(
           tester,
+          createType: fdom.StepType.document,
           pickMediaRef: (_, family) async {
             gotFamily = family;
             return _asset(
@@ -499,8 +625,6 @@ void main() {
           },
         );
 
-        await tester.tap(find.byKey(const Key('step_edit.type.document')));
-        await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.media_picker')));
         await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.submit')));
@@ -528,12 +652,11 @@ void main() {
       (tester) async {
         await pumpHost(
           tester,
+          createType: fdom.StepType.image,
           pickMediaRef: (_, _) async =>
               _asset('tenant/org1/media/foto.png', filename: 'foto.png'),
         );
 
-        await tester.tap(find.byKey(const Key('step_edit.type.image')));
-        await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.media_picker')));
         await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.submit')));
@@ -552,11 +675,10 @@ void main() {
     ) async {
       await pumpHost(
         tester,
+        createType: fdom.StepType.image,
         pickMediaRef: (_, _) async => _asset('tenant/o/media/x.png'),
       );
 
-      await tester.tap(find.byKey(const Key('step_edit.type.image')));
-      await tester.pump();
       // Sin tocar el picker → _mediaCtrl sigue vacío.
       await tester.tap(find.byKey(const Key('step_edit.submit')));
       await tester.pump();
@@ -567,10 +689,12 @@ void main() {
     testWidgets(
       'cancelar el picker (devuelve null) no cambia nada; submit sigue no-op',
       (tester) async {
-        await pumpHost(tester, pickMediaRef: (_, _) async => null);
+        await pumpHost(
+          tester,
+          createType: fdom.StepType.image,
+          pickMediaRef: (_, _) async => null,
+        );
 
-        await tester.tap(find.byKey(const Key('step_edit.type.image')));
-        await tester.pump();
         await tester.tap(find.byKey(const Key('step_edit.media_picker')));
         await tester.pump();
 
@@ -593,27 +717,52 @@ void main() {
       );
     });
 
-    testWidgets('renderiza título "Editar paso" y prefilling del content', (
+    testWidgets(
+      'renderiza "Editar paso" con la identidad del tipo visible (pill) y '
+      'el porqué de su inmutabilidad; prefill del content',
+      (tester) async {
+        await pumpHost(tester, editing: editingStep);
+
+        expect(find.text('Editar paso'), findsOneWidget);
+        // La identidad del objeto editado siempre visible: pill del tipo.
+        expect(find.byKey(const Key('step_edit.type_pill')), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('step_edit.type_pill')),
+            matching: find.text('Texto'),
+          ),
+          findsOneWidget,
+        );
+        // El porqué del tipo fijo cabe en una caption discreta.
+        expect(find.byKey(const Key('step_edit.type_caption')), findsOneWidget);
+        // Ya no existe el muro de chips para cambiar el tipo.
+        expect(find.byKey(const Key('step_edit.type.text')), findsNothing);
+        expect(find.byKey(const Key('step_edit.type.image')), findsNothing);
+        // El TextField está prefilled con el content del editing.
+        final tf = tester.widget<TextField>(
+          find.descendant(
+            of: find.byKey(const Key('step_edit.content')),
+            matching: find.byType(TextField),
+          ),
+        );
+        expect(tf.controller?.text, 'Hola original');
+      },
+    );
+
+    testWidgets('crear NO muestra pill de tipo (el título ya lo nombra)', (
       tester,
     ) async {
-      await pumpHost(tester, editing: editingStep);
+      await pumpHost(tester);
 
-      expect(find.text('Editar paso'), findsOneWidget);
-      // El TextField está prefilled con el content del editing.
-      final tf = tester.widget<TextField>(
-        find.descendant(
-          of: find.byKey(const Key('step_edit.content')),
-          matching: find.byType(TextField),
-        ),
-      );
-      expect(tf.controller?.text, 'Hola original');
+      expect(find.byKey(const Key('step_edit.type_pill')), findsNothing);
+      expect(find.byKey(const Key('step_edit.type_caption')), findsNothing);
     });
 
     testWidgets('edit con cambios dispatcha UpdateRequested con only-changed', (
       tester,
     ) async {
       await pumpHost(tester, editing: editingStep);
-      // Cambia solo el content; los sliders/switch quedan iguales.
+      // Cambia solo el content; retraso/variación/modo quedan iguales.
       await tester.enterText(
         find.byKey(const Key('step_edit.content')),
         'Hola edited',
@@ -646,6 +795,7 @@ void main() {
         // editingStep tiene aiOnly:true ⇒ el selector arranca en "Solo IA".
         await pumpHost(tester, editing: editingStep);
 
+        await openSendOptions(tester);
         await tester.ensureVisible(
           find.byKey(const Key('step_edit.mode.manual')),
         );
@@ -671,6 +821,7 @@ void main() {
       (tester) async {
         await pumpHost(tester, editing: editingStep);
 
+        await openSendOptions(tester);
         await tester.ensureVisible(
           find.byKey(const Key('step_edit.mode.always')),
         );
@@ -744,6 +895,54 @@ void main() {
 
       verifyNever(() => bloc.add(any()));
     });
+
+    testWidgets(
+      'paso destino de un condicional: el diálogo NO ofrece "Eliminar" — '
+      'CTA única "Entendido" y nada se dispatcha',
+      (tester) async {
+        // Un CT del flujo apunta a editingStep (s1): la acción está condenada
+        // al 409 y por eso no se ofrece.
+        const ct = fdom.Step(
+          id: 's-ct',
+          flowId: 'f1',
+          type: fdom.StepType.conditionalTime,
+          order: 1,
+          content: '',
+          mediaRef: '',
+          metadataJson:
+              '{"tz":"UTC","windows":[{"days":[1],"from":"08:00",'
+              '"to":"12:00"}],"on_match_step_id":"s1",'
+              '"on_else_step_id":"t-cerrados"}',
+          delayMs: 1000,
+          jitterPct: 0,
+          aiOnly: false,
+        );
+        when(() => bloc.state).thenReturn(
+          const FlowStepsLoaded(<fdom.Step>[editingStep, ct, _tCerradosAt2]),
+        );
+        await pumpHost(tester, editing: editingStep);
+
+        await tester.tap(find.byKey(const Key('step_edit.delete')));
+        await tester.pumpAndSettle();
+
+        // La acción condenada no se ofrece: no hay botón "Eliminar".
+        expect(
+          find.byKey(const Key('step_edit.delete_confirm.ok')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('step_edit.delete_blocked.ok')),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byKey(const Key('step_edit.delete_blocked.ok')));
+        await tester.pumpAndSettle();
+
+        verifyNever(() => bloc.add(any()));
+        // El sheet sigue abierto: entender no es descartar el trabajo.
+        expect(find.byKey(const Key('step_edit.submit')), findsOneWidget);
+      },
+    );
   });
 
   group('StepEditSheet (Edit mode · multimedia)', () {
@@ -761,27 +960,18 @@ void main() {
       aiOnly: false,
     );
 
-    testWidgets('editing multimedia oculta el picker (type inmutable)', (
+    testWidgets('editing multimedia muestra la identidad del tipo en el pill', (
       tester,
     ) async {
       await pumpHost(tester, editing: imgStep);
 
-      for (final id in const <String>[
-        'text',
-        'image',
-        'video',
-        'document',
-        'audio',
-        'ptt',
-        'sticker',
-        'conditionalTime',
-      ]) {
-        expect(
-          find.byKey(Key('step_edit.type.$id')),
-          findsNothing,
-          reason: 'chip step_edit.type.$id no debería aparecer en edit',
-        );
-      }
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('step_edit.type_pill')),
+          matching: find.text('Imagen'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
@@ -808,7 +998,7 @@ void main() {
       'editing multimedia con pickMediaRef cableado expone "Cambiar" — la '
       'edición de multimedia es interactiva',
       (tester) async {
-        // Espeja producción: _openStepSheet cablea pickMediaRef SIEMPRE, tanto
+        // Espeja producción: el call-site cablea pickMediaRef SIEMPRE, tanto
         // al crear como al editar. Con el callback presente, el chip de recurso
         // expone "Cambiar" para reabrir el picker y reemplazar el media. Sin
         // callback el chip queda read-only (test aparte). Este test le da
@@ -944,15 +1134,12 @@ void main() {
 
   group('StepEditSheet (Add mode · conditionalTime)', () {
     testWidgets(
-      'pick chip Condicional muestra el form CT y oculta content/selector',
+      'crear con tipo Condicional muestra el form CT y oculta content/selector',
       (tester) async {
-        await pumpHost(tester);
-
-        await tester.tap(
-          find.byKey(const Key('step_edit.type.conditionalTime')),
-        );
+        await pumpHost(tester, createType: fdom.StepType.conditionalTime);
         await tester.pumpAndSettle();
 
+        expect(find.text('Nuevo paso · Condicional'), findsOneWidget);
         // El form CT está presente.
         expect(find.byKey(const Key('ct_form.tz_dropdown')), findsOneWidget);
         // content y el selector de multimedia están ocultos.
@@ -966,8 +1153,7 @@ void main() {
       when(
         () => bloc.state,
       ).thenReturn(const FlowStepsLoaded(<fdom.Step>[_tHola, _tCerrados]));
-      await pumpHost(tester);
-      await tester.tap(find.byKey(const Key('step_edit.type.conditionalTime')));
+      await pumpHost(tester, createType: fdom.StepType.conditionalTime);
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('step_edit.submit')));
@@ -982,10 +1168,7 @@ void main() {
         when(
           () => bloc.state,
         ).thenReturn(const FlowStepsLoaded(<fdom.Step>[_tHola, _tCerrados]));
-        await pumpHost(tester);
-        await tester.tap(
-          find.byKey(const Key('step_edit.type.conditionalTime')),
-        );
+        await pumpHost(tester, createType: fdom.StepType.conditionalTime);
         await tester.pumpAndSettle();
 
         // match → "1. Hola" (order 0), else → "2. Cerrados" (order 1).
@@ -1020,8 +1203,7 @@ void main() {
       when(() => bloc.state).thenReturn(
         const FlowStepsMutationFailed(<fdom.Step>[], FlowsInvalidStepFailure()),
       );
-      await pumpHost(tester);
-      await tester.tap(find.byKey(const Key('step_edit.type.conditionalTime')));
+      await pumpHost(tester, createType: fdom.StepType.conditionalTime);
       await tester.pumpAndSettle();
 
       expect(
@@ -1036,25 +1218,23 @@ void main() {
   });
 
   group('StepEditSheet (END)', () {
-    testWidgets('elegir tipo Fin muestra el helper y oculta content/sliders', (
-      tester,
-    ) async {
-      await pumpHost(tester);
-      await tester.tap(find.byKey(const Key('step_edit.type.end')));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'crear tipo Fin muestra el resumen y NO ofrece opciones de envío '
+      '(un paso que termina el flujo no envía nada)',
+      (tester) async {
+        await pumpHost(tester, createType: fdom.StepType.end);
 
-      expect(find.byKey(const Key('step_edit.end_helper')), findsOneWidget);
-      expect(find.byKey(const Key('step_edit.content')), findsNothing);
-      expect(find.byKey(const Key('step_edit.delay_slider')), findsNothing);
-      expect(find.byKey(const Key('step_edit.jitter_slider')), findsNothing);
-    });
+        expect(find.text('Nuevo paso · Fin'), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.end_helper')), findsOneWidget);
+        expect(find.byKey(const Key('step_edit.content')), findsNothing);
+        expect(find.byKey(const Key('step_edit.send_options')), findsNothing);
+      },
+    );
 
     testWidgets(
       'submit END dispatcha AddRequested(end) sin campos y delayMs 0',
       (tester) async {
-        await pumpHost(tester);
-        await tester.tap(find.byKey(const Key('step_edit.type.end')));
-        await tester.pumpAndSettle();
+        await pumpHost(tester, createType: fdom.StepType.end);
 
         await tester.tap(find.byKey(const Key('step_edit.submit')));
         await tester.pump();
@@ -1066,6 +1246,41 @@ void main() {
         expect(ev.content, '');
         expect(ev.delayMs, 0);
         expect(ev.metadataJson, isNull);
+      },
+    );
+
+    testWidgets(
+      'editar un END con delay legacy 0 NO lo cura: Guardar sin tocar nada '
+      'es no-op (END no envía al wire; un PATCH delayMs 1000 sería espurio)',
+      (tester) async {
+        const endStep = fdom.Step(
+          id: 's-end',
+          flowId: 'f1',
+          type: fdom.StepType.end,
+          order: 0,
+          content: '',
+          mediaRef: '',
+          metadataJson: '{}',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        );
+        when(
+          () => bloc.state,
+        ).thenReturn(const FlowStepsLoaded(<fdom.Step>[endStep]));
+        await pumpHost(tester, editing: endStep);
+
+        // Sin opciones de envío ni aviso de curación: END no tiene pacing.
+        expect(find.byKey(const Key('step_edit.send_options')), findsNothing);
+        expect(
+          find.byKey(const Key('step_edit.legacy_delay_notice')),
+          findsNothing,
+        );
+
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        verifyNever(() => bloc.add(any()));
       },
     );
   });
@@ -1152,15 +1367,12 @@ void main() {
   });
 
   group('StepEditSheet (LABEL)', () {
-    Future<void> selectLabelType(WidgetTester tester) async {
-      await tester.tap(find.byKey(const Key('step_edit.type.label')));
+    testWidgets('crear tipo LABEL muestra el form (picker + acción) y oculta '
+        'content/retraso; el modo vive en "Opciones de ejecución"', (
+      tester,
+    ) async {
+      await pumpHost(tester, createType: fdom.StepType.label);
       await tester.pumpAndSettle();
-    }
-
-    testWidgets('elegir tipo LABEL muestra el form (picker + acción) y oculta '
-        'content/sliders', (tester) async {
-      await pumpHost(tester);
-      await selectLabelType(tester);
 
       expect(find.byKey(const Key('step_edit.label_form')), findsOneWidget);
       expect(
@@ -1171,15 +1383,20 @@ void main() {
         find.byKey(const Key('step_edit.label_action.remove')),
         findsOneWidget,
       );
-      // LABEL no envía al wire: sin campo de content ni sliders de pacing.
+      // LABEL no envía al wire: sin campo de content ni pacing, pero el
+      // modo de ejecución sí aplica y vive en su propio disclosure.
       expect(find.byKey(const Key('step_edit.content')), findsNothing);
-      expect(find.byKey(const Key('step_edit.delay_slider')), findsNothing);
-      expect(find.byKey(const Key('step_edit.jitter_slider')), findsNothing);
+      expect(find.text('Opciones de ejecución'), findsOneWidget);
+
+      await openSendOptions(tester);
+      expect(find.byKey(const Key('step_edit.delay.value')), findsNothing);
+      expect(find.byKey(const Key('step_edit.jitter')), findsNothing);
+      expect(find.byKey(const Key('step_edit.mode.always')), findsOneWidget);
     });
 
     testWidgets('submit LABEL sin elegir etiqueta es no-op', (tester) async {
-      await pumpHost(tester);
-      await selectLabelType(tester);
+      await pumpHost(tester, createType: fdom.StepType.label);
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('step_edit.submit')));
       await tester.pump();
@@ -1188,8 +1405,8 @@ void main() {
 
     testWidgets('elegir etiqueta (ADD por default) → submit dispatcha '
         'AddRequested(label, metadata {label_id, action:ADD})', (tester) async {
-      await pumpHost(tester);
-      await selectLabelType(tester);
+      await pumpHost(tester, createType: fdom.StepType.label);
+      await tester.pumpAndSettle();
 
       await tester.tap(
         find.byKey(const Key('step_edit.label_picker.option.vip')),
@@ -1213,8 +1430,8 @@ void main() {
     testWidgets('nuevo paso LABEL manda delayMs 0 (exento del piso)', (
       tester,
     ) async {
-      await pumpHost(tester);
-      await selectLabelType(tester);
+      await pumpHost(tester, createType: fdom.StepType.label);
+      await tester.pumpAndSettle();
 
       await tester.tap(
         find.byKey(const Key('step_edit.label_picker.option.vip')),
@@ -1232,8 +1449,8 @@ void main() {
     testWidgets('elegir acción "Quitar etiqueta" → metadata action:REMOVE', (
       tester,
     ) async {
-      await pumpHost(tester);
-      await selectLabelType(tester);
+      await pumpHost(tester, createType: fdom.StepType.label);
+      await tester.pumpAndSettle();
 
       await tester.tap(
         find.byKey(const Key('step_edit.label_picker.option.vip')),
@@ -1283,7 +1500,7 @@ void main() {
     );
   });
 
-  group('StepEditSheet.open', () {
+  group('showStepEditSheet', () {
     testWidgets('abre el modal sobre surface1 con blocs y catálogo cableados', (
       tester,
     ) async {
@@ -1305,7 +1522,10 @@ void main() {
                 body: Builder(
                   builder: (ctx) => Center(
                     child: ElevatedButton(
-                      onPressed: () => StepEditSheet.open(ctx),
+                      onPressed: () => showStepEditSheet(
+                        ctx,
+                        createType: fdom.StepType.text,
+                      ),
                       child: const Text('open'),
                     ),
                   ),
@@ -1354,7 +1574,10 @@ void main() {
                   body: Builder(
                     builder: (ctx) => Center(
                       child: ElevatedButton(
-                        onPressed: () => StepEditSheet.open(ctx),
+                        onPressed: () => showStepEditSheet(
+                          ctx,
+                          createType: fdom.StepType.text,
+                        ),
                         child: const Text('open'),
                       ),
                     ),
@@ -1431,7 +1654,10 @@ void main() {
                                 builder: (ctx) => Center(
                                   child: ElevatedButton(
                                     key: const Key('probe.open'),
-                                    onPressed: () => StepEditSheet.open(ctx),
+                                    onPressed: () => showStepEditSheet(
+                                      ctx,
+                                      createType: fdom.StepType.text,
+                                    ),
                                     child: const Text('open'),
                                   ),
                                 ),
@@ -1482,12 +1708,13 @@ void main() {
   });
 
   group('StepEditSheet · guard de descarte y pie Cancelar', () {
-    // Abre el sheet por la vía de producción (StepEditSheet.open), que es
+    // Abre el sheet por la vía de producción (showStepEditSheet), que es
     // donde vive el guard: scrim, drag y back pasan por la confirmación
     // cuando hay cambios sin guardar.
     Future<void> pumpGuardHost(
       WidgetTester tester, {
       fdom.Step? editing,
+      fdom.StepType createType = fdom.StepType.text,
     }) async {
       tester.view.physicalSize = const Size(800, 2000);
       tester.view.devicePixelRatio = 1.0;
@@ -1506,8 +1733,11 @@ void main() {
                 body: Builder(
                   builder: (ctx) => Center(
                     child: ElevatedButton(
-                      onPressed: () =>
-                          StepEditSheet.open(ctx, editing: editing),
+                      onPressed: () => showStepEditSheet(
+                        ctx,
+                        editing: editing,
+                        createType: editing == null ? createType : null,
+                      ),
                       child: const Text('open'),
                     ),
                   ),
@@ -1535,6 +1765,18 @@ void main() {
       expect(find.text('¿Descartar los cambios?'), findsNothing);
       expect(find.byKey(const Key('step_edit.submit')), findsNothing);
     });
+
+    testWidgets(
+      'haber elegido el tipo en el selector NO cuenta como cambio: el sheet '
+      'recién abierto descarta directo',
+      (tester) async {
+        await pumpGuardHost(tester, createType: fdom.StepType.image);
+        await tapScrim(tester);
+
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+      },
+    );
 
     testWidgets(
       'con cambios: el scrim pide confirmación y seguir editando conserva '
@@ -1609,9 +1851,11 @@ void main() {
       expect(find.text('Trabajo a medias'), findsOneWidget);
     });
 
-    testWidgets('elegir solo el tipo ya cuenta como cambio', (tester) async {
+    testWidgets('tocar el retraso ya cuenta como cambio', (tester) async {
       await pumpGuardHost(tester);
-      await tester.tap(find.byKey(const Key('step_edit.type.image')));
+      await tester.tap(find.byKey(const Key('step_edit.send_options')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('step_edit.delay.increment')));
       await tester.pump();
 
       await tapScrim(tester);
@@ -1761,7 +2005,7 @@ void main() {
   });
 }
 
-/// Catálogo mínimo para el LabelsBloc que StepEditSheet.open crea él mismo.
+/// Catálogo mínimo para el LabelsBloc que showStepEditSheet crea él mismo.
 class _FakeLabelsRepository implements LabelsRepository {
   @override
   Future<List<Label>> listLabels() async => <Label>[_lbl()];

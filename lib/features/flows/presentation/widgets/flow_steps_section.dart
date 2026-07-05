@@ -15,7 +15,7 @@ import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_steps_bloc.dart';
 import '../bloc/media_names_cubit.dart';
 import 'step_card.dart';
-import 'step_edit_sheet.dart';
+import 'step_editor_launcher.dart';
 
 /// Cuerpo principal del hub del editor: la lista de pasos atada al
 /// `FlowStepsBloc`, con [header] (identidad excepcional del flujo) por
@@ -300,16 +300,17 @@ class _StepsListView extends StatelessWidget {
   }
 }
 
-/// Abre el sheet de edición y, si `step` viene, el step a editar. Lo usan
+/// Abre el editor de pasos en dos tiempos: sin `step`, primero el selector
+/// de tipo y luego la composición del tipo elegido (cancelar el selector no
+/// abre nada); con `step`, directo a la composición en modo edición. Lo usan
 /// la CTA de alta (botón / empty state) y el tap de cada card.
-/// `StepEditSheet.open` re-provee los blocs del scope y aplica el fondo
-/// canónico.
+/// `openStepEditor` re-provee los blocs del scope y aplica el fondo canónico.
 ///
 /// Al crear o reemplazar el recurso de un step multimedia, el selector abre
 /// la galería en modo picker (`/media/pick?type=<familia>`, filtrada por el
 /// tipo del paso) que devuelve el MediaAsset completo vía pop.
 void openStepSheet(BuildContext context, sdom.Step? step) {
-  StepEditSheet.open(
+  openStepEditor(
     context,
     editing: step,
     pickMediaRef: (ctx, family) => ctx.push<MediaAsset>(

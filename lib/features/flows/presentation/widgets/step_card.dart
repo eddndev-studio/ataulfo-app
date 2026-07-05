@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/label_step_metadata.dart';
 import '../../domain/entities/step.dart' as sdom;
+import '../bloc/flow_steps_bloc.dart';
 import '../media_step_name.dart';
 import 'step_card_conditional.dart';
+import 'step_delete.dart';
+import 'step_edit_support.dart';
 import 'step_type_label.dart';
 
 /// Card read-only por step. Muestra index (order+1), label humanizado del
@@ -50,6 +54,20 @@ class StepCard extends StatelessWidget {
   /// resumen del condicional resuelva sus destinos por nombre (mismo
   /// motivo de planitud que los otros catálogos).
   final Map<String, ({int order, String label})> stepRefs;
+
+  /// Borrado directo desde la card (long-press): una capa menos que la
+  /// ruta card → sheet → basura. Lee el bloc EN EL GESTO (no en build):
+  /// la card sigue siendo presentación pura y el lookup ocurre con el item
+  /// montado en el árbol normal, nunca elevado al overlay del drag.
+  Future<void> _requestDelete(BuildContext context) async {
+    final bloc = context.read<FlowStepsBloc>();
+    final confirmed = await confirmStepDelete(
+      context,
+      stepId: step.id,
+      steps: stepsFromState(bloc.state),
+    );
+    if (confirmed) bloc.add(FlowStepsDeleteRequested(step.id));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +117,7 @@ class StepCard extends StatelessWidget {
               key: Key('flow_detail.step_card.${step.id}'),
               borderRadius: BorderRadius.circular(AppTokens.radiusCard),
               onTap: onTap,
+              onLongPress: () => _requestDelete(context),
               child: content,
             ),
           ),

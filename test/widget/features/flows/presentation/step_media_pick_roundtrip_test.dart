@@ -113,6 +113,9 @@ void main() {
                             BlocProvider<FlowStepsBloc>.value(
                               value: bloc,
                               child: StepEditSheet(
+                                // El tipo llega decidido del selector del
+                                // primer tiempo: composición de una IMAGEN.
+                                createType: fdom.StepType.image,
                                 pickMediaRef: (c, family) => c.push<MediaAsset>(
                                   family == null
                                       ? '/media/pick'
@@ -163,11 +166,9 @@ void main() {
     (tester) async {
       await pumpHost(tester);
 
-      // Abrir el sheet, elegir IMAGE, abrir el picker.
+      // Abrir el sheet de composición (IMAGE) y abrir el picker.
       await tester.tap(find.byKey(const Key('host.open_sheet')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('step_edit.type.image')));
-      await tester.pump();
       await tester.tap(find.byKey(const Key('step_edit.media_picker')));
       await tester.pumpAndSettle();
 
