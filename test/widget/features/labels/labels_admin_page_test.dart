@@ -205,4 +205,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Editar etiqueta'), findsOneWidget);
   });
+
+  testWidgets('el scroll despeja el FAB del shell al fondo', (tester) async {
+    when(() => bloc.state).thenReturn(
+      const LabelsAdminLoaded(
+        labels: <Label>[
+          Label(id: '1', name: 'VIP', color: '#7c3aed', description: ''),
+        ],
+        isRefreshing: false,
+      ),
+    );
+    await tester.pumpWidget(host());
+
+    final padding = tester.widget<Padding>(
+      find.byKey(const Key('labels_admin.content_padding')),
+    );
+    final resolved = padding.padding.resolve(TextDirection.ltr);
+    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
+  });
 }

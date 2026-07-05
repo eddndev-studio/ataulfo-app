@@ -126,11 +126,14 @@ class _LabelsAdminPageState extends State<LabelsAdminPage> {
               watermark: Icons.label,
             ),
             Padding(
+              key: const Key('labels_admin.content_padding'),
               padding: EdgeInsets.fromLTRB(
                 AppTokens.sp5,
                 AppTokens.sp5,
                 AppTokens.sp5,
-                AppTokens.sp5 + context.safeBottomInset,
+                // fabClearance: la última fila debe poder quedar por encima
+                // del FAB de crear que flota sobre esta tab.
+                AppTokens.fabClearance + context.safeBottomInset,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -4,6 +4,8 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_dot_label.dart';
 import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
@@ -250,7 +252,9 @@ void main() {
     expect(find.byIcon(Icons.pause_circle), findsNothing);
   });
 
-  testWidgets('bot activo muestra AppPill "Activo"', (tester) async {
+  testWidgets('bot activo NO pinta pill de estado (el default calla)', (
+    tester,
+  ) async {
     tall(tester);
     when(
       () => bloc.state,
@@ -258,7 +262,36 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.widgetWithText(AppPill, 'Activo'), findsOneWidget);
+    expect(find.widgetWithText(AppPill, 'Activo'), findsNothing);
+  });
+
+  testWidgets('los bots viven en UNA card con dividers, no en cards sueltas', (
+    tester,
+  ) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    // Una sola card contiene ambas filas; entre filas hay divider hairline.
+    final cardsWithTile = find.ancestor(
+      of: find.byKey(const Key('bots.tile.b1')),
+      matching: find.byType(AppCard),
+    );
+    expect(cardsWithTile, findsOneWidget);
+    expect(
+      find.descendant(
+        of: cardsWithTile,
+        matching: find.byKey(const Key('bots.tile.b2')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: cardsWithTile, matching: find.byType(Divider)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('el estado de sesión del cubit se pinta en el tile', (
@@ -276,7 +309,7 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.widgetWithText(AppPill, 'Enlazado'), findsOneWidget);
+    expect(find.widgetWithText(AppDotLabel, 'Enlazado'), findsOneWidget);
   });
 
   testWidgets('sin dato de sesión, el tile no inventa indicador', (
@@ -286,11 +319,25 @@ void main() {
     when(
       () => bloc.state,
     ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
-    // Estado de sesiones vacío (fetch en vuelo o fallido): sin pill de sesión.
+    // Estado de sesiones vacío (fetch en vuelo o fallido): sin indicador.
     await tester.pumpWidget(host());
 
-    expect(find.widgetWithText(AppPill, 'Enlazado'), findsNothing);
-    expect(find.widgetWithText(AppPill, 'Sin enlazar'), findsNothing);
+    expect(find.byType(AppDotLabel), findsNothing);
+  });
+
+  testWidgets('el scroll despeja el FAB del shell al fondo', (tester) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+
+    await tester.pumpWidget(host());
+
+    final padding = tester.widget<Padding>(
+      find.byKey(const Key('bots.content_padding')),
+    );
+    final resolved = padding.padding.resolve(TextDirection.ltr);
+    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   testWidgets('al asentarse el listado, abanica las sesiones por id', (

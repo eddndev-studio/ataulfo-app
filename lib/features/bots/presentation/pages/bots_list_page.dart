@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
@@ -179,11 +180,14 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
               watermark: Icons.smart_toy,
             ),
             Padding(
+              key: const Key('bots.content_padding'),
               padding: EdgeInsets.fromLTRB(
                 AppTokens.sp5,
                 AppTokens.sp5,
                 AppTokens.sp5,
-                AppTokens.sp5 + context.safeBottomInset,
+                // fabClearance: la última fila debe poder quedar por encima
+                // del FAB de crear que flota sobre esta tab.
+                AppTokens.fabClearance + context.safeBottomInset,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,24 +205,46 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
                     // El estado de sesión por bot lo aporta el cubit compañero;
                     // el tile lo pinta conforme llega (o lo omite si no hay dato).
                     BlocBuilder<BotSessionsCubit, BotSessionsState>(
-                      builder: (context, sessions) => Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          for (final bot in filtered) ...<Widget>[
-                            BotTile(
-                              bot: bot,
-                              sessionState: sessions.stateFor(bot.id),
-                            ),
-                            const SizedBox(height: AppTokens.cardGap),
-                          ],
-                        ],
-                      ),
+                      builder: (context, sessions) =>
+                          _BotsCard(bots: filtered, sessions: sessions),
                     ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// El listado como UNA card que apila las filas de bots separadas por divider
+/// hairline (idioma de los hubs y de ajustes), en lugar de una card suelta por
+/// item.
+class _BotsCard extends StatelessWidget {
+  const _BotsCard({required this.bots, required this.sessions});
+
+  final List<Bot> bots;
+  final BotSessionsState sessions;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < bots.length; i++) {
+      if (i > 0) {
+        rows.add(
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+        );
+      }
+      rows.add(
+        BotTile(bot: bots[i], sessionState: sessions.stateFor(bots[i].id)),
+      );
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: rows,
       ),
     );
   }

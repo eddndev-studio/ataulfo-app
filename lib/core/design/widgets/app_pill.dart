@@ -172,8 +172,10 @@ class AppPill extends StatelessWidget {
       }
     }
     switch (dot) {
+      // Verde de éxito, no el accent de marca: "encendido" comunica salud y
+      // el cálido, repetido en cada fila sana, leería como alerta permanente.
       case AppPillDot.active:
-        return AppTokens.accent;
+        return AppTokens.success;
       case AppPillDot.paused:
         return AppTokens.text2;
       case AppPillDot.danger:

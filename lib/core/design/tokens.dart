@@ -190,6 +190,11 @@ class AppTokens {
   /// la ventana; en móvil es transparente (el max supera el ancho real).
   static const double maxContentWidth = 450.0;
 
+  /// Despeje inferior extra para las listas de las tabs con FAB: el FAB del
+  /// shell (56) más sus márgenes flotantes. Sumado al padding del scroll,
+  /// garantiza que la última fila pueda quedar por ENCIMA del botón.
+  static const double fabClearance = 88.0;
+
   // ── Typography ──────────────────────────────────────────────────────────
   static const String fontSans = 'DMSans';
 

@@ -19,7 +19,7 @@ import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
-import '../../../../core/design/widgets/app_pill.dart';
+import '../../../../core/design/widgets/app_dot_label.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../../core/util/user_greeting.dart';
@@ -162,11 +162,14 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
               watermark: Icons.description,
             ),
             Padding(
+              key: const Key('templates.content_padding'),
               padding: EdgeInsets.fromLTRB(
                 AppTokens.sp5,
                 AppTokens.sp5,
                 AppTokens.sp5,
-                AppTokens.sp5 + context.safeBottomInset,
+                // fabClearance: la última fila debe poder quedar por encima
+                // del FAB de crear que flota sobre esta tab.
+                AppTokens.fabClearance + context.safeBottomInset,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,10 +184,7 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
                   if (filtered.isEmpty)
                     const _NoResults()
                   else
-                    for (final template in filtered) ...<Widget>[
-                      _TemplateTile(template: template),
-                      const SizedBox(height: AppTokens.cardGap),
-                    ],
+                    _TemplatesCard(templates: filtered),
                 ],
               ),
             ),
@@ -241,8 +241,39 @@ class _FilterChips extends StatelessWidget {
   );
 }
 
-/// Card tappable de una plantilla. Glifo de entidad + nombre + badge IA arriba;
-/// fila de métricas (bots/flujos/variables) abajo cuando el listado las trae.
+/// El listado como UNA card que apila las filas de plantillas separadas por
+/// divider hairline (idioma de los hubs y de ajustes), en lugar de una card
+/// suelta por item.
+class _TemplatesCard extends StatelessWidget {
+  const _TemplatesCard({required this.templates});
+
+  final List<Template> templates;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < templates.length; i++) {
+      if (i > 0) {
+        rows.add(
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+        );
+      }
+      rows.add(_TemplateTile(template: templates[i]));
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: rows,
+      ),
+    );
+  }
+}
+
+/// Fila de una plantilla dentro de la card del listado: glifo de entidad +
+/// nombre con las métricas (bots/flujos/variables) como caption debajo, y a la
+/// derecha el estado de IA quieto. Toda la fila es tap-target hacia el detalle;
+/// el InkWell propio da el ripple (la card contenedora no es tappable).
 class _TemplateTile extends StatelessWidget {
   const _TemplateTile({required this.template});
 
@@ -252,46 +283,50 @@ class _TemplateTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final counts = template.counts;
-    return AppCard(
+    return InkWell(
       key: Key('templates.tile.${template.id}'),
       // push (no go): el detalle se apila sobre el listado para que el back
       // físico y la flecha del AppBar vuelvan al shell con la tab Plantillas.
       onTap: () => context.push('/templates/${template.id}'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              const AppEntityIcon(icon: Icons.description_outlined),
-              const SizedBox(width: AppTokens.sp4),
-              Expanded(
-                child: Text(
-                  template.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium,
-                ),
+      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        child: Row(
+          children: <Widget>[
+            const AppEntityIcon(icon: Icons.description_outlined),
+            const SizedBox(width: AppTokens.sp4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    template.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium,
+                  ),
+                  // counts == null ⇒ respuesta sin enriquecer (no es el
+                  // listado): se omite la fila. Counts en cero SÍ se muestran.
+                  if (counts != null) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp1),
+                    _MetricsRow(templateId: template.id, counts: counts),
+                  ],
+                ],
               ),
-              const SizedBox(width: AppTokens.sp3),
-              _AiBadge(ai: template.ai),
-            ],
-          ),
-          // counts == null ⇒ respuesta sin enriquecer (no es el listado): se
-          // omite la fila entera. counts en cero SÍ se muestran (honesto).
-          if (counts != null) ...<Widget>[
-            const SizedBox(height: AppTokens.sp4),
-            _MetricsRow(templateId: template.id, counts: counts),
+            ),
+            const SizedBox(width: AppTokens.sp3),
+            _AiBadge(ai: template.ai),
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
-/// Badge de IA de la plantilla. Encendida → pill neutral con dot activo y el
-/// proveedor ("IA · OpenAI"). Apagada → pill outline "Sin IA". Mismo lenguaje
-/// discreto que el pill de estado de los bots: el dot cálido basta.
+/// Estado de IA de la plantilla como indicador quieto: encendida → dot success
+/// + proveedor ("IA · OpenAI"); apagada → "Sin IA" con dot neutro. El color
+/// vive solo en el dot — repetido por fila, un pill por plantilla sería ruido.
 class _AiBadge extends StatelessWidget {
   const _AiBadge({required this.ai});
 
@@ -300,11 +335,11 @@ class _AiBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!ai.enabled) {
-      return const AppPill.outline(label: 'Sin IA');
+      return const AppDotLabel(color: AppTokens.text2, label: 'Sin IA');
     }
-    return AppPill.neutral(
+    return AppDotLabel(
+      color: AppTokens.success,
       label: 'IA · ${ProviderBadge.labelOf(ai.provider)}',
-      dot: AppPillDot.active,
     );
   }
 }

@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_dot_label.dart';
+import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_header_card.dart';
@@ -210,6 +213,64 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('las plantillas viven en UNA card con dividers', (tester) async {
+    loaded(const <Template>[_t1, _t2]);
+    await tester.pumpWidget(host());
+
+    final cardsWithTile = find.ancestor(
+      of: find.byKey(const Key('templates.tile.t1')),
+      matching: find.byType(AppCard),
+    );
+    expect(cardsWithTile, findsOneWidget);
+    expect(
+      find.descendant(
+        of: cardsWithTile,
+        matching: find.byKey(const Key('templates.tile.t2')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: cardsWithTile, matching: find.byType(Divider)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('IA encendida es un indicador quieto con dot success, sin pill', (
+    tester,
+  ) async {
+    loaded(const <Template>[_t1]);
+    await tester.pumpWidget(host());
+
+    final tile = find.byKey(const Key('templates.tile.t1'));
+    expect(
+      find.descendant(
+        of: tile,
+        matching: find.widgetWithText(AppDotLabel, 'IA · OpenAI'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tile, matching: find.byType(AppPill)),
+      findsNothing,
+    );
+
+    final dot = tester.widget<Container>(
+      find.byKey(const ValueKey('app_dot_label.dot')),
+    );
+    expect((dot.decoration as BoxDecoration).color, AppTokens.success);
+  });
+
+  testWidgets('el scroll despeja el FAB del shell al fondo', (tester) async {
+    loaded(const <Template>[_t1]);
+    await tester.pumpWidget(host());
+
+    final padding = tester.widget<Padding>(
+      find.byKey(const Key('templates.content_padding')),
+    );
+    final resolved = padding.padding.resolve(TextDirection.ltr);
+    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   testWidgets('búsqueda filtra por nombre', (tester) async {

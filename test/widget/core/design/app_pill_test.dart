@@ -129,14 +129,16 @@ void main() {
       expect(d.shape, BoxShape.circle);
     });
 
-    testWidgets('dot active en neutral: círculo color accent', (tester) async {
+    testWidgets('dot active en neutral: círculo color success', (tester) async {
       await pumpPill(
         tester,
         const AppPill.neutral(label: 'Activo', dot: AppPillDot.active),
       );
       final dot = tester.widget<Container>(dotFinder());
       final d = dot.decoration as BoxDecoration;
-      expect(d.color, AppTokens.accent);
+      // Verde de éxito, no el accent de marca: un estado "encendido" comunica
+      // salud, y el cálido leería como advertencia permanente.
+      expect(d.color, AppTokens.success);
       expect(d.shape, BoxShape.circle);
     });
 

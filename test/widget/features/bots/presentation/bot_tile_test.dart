@@ -1,4 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_dot_label.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
@@ -18,6 +20,18 @@ const _bot = Bot(
   aiDisabled: false,
 );
 
+final _paused = Bot(
+  id: _bot.id,
+  orgId: _bot.orgId,
+  templateId: _bot.templateId,
+  name: _bot.name,
+  channel: _bot.channel,
+  identifier: _bot.identifier,
+  version: _bot.version,
+  paused: true,
+  aiDisabled: _bot.aiDisabled,
+);
+
 Widget _host(Bot bot, {SessionState? session}) => MaterialApp(
   theme: AppDesignTheme.dark(),
   home: Scaffold(
@@ -25,29 +39,54 @@ Widget _host(Bot bot, {SessionState? session}) => MaterialApp(
   ),
 );
 
+Color _dotColorOf(WidgetTester tester) {
+  final dot = tester.widget<Container>(
+    find.byKey(const ValueKey('app_dot_label.dot')),
+  );
+  return (dot.decoration as BoxDecoration).color!;
+}
+
 void main() {
-  testWidgets('sin dato de sesión → solo la pill de estado, sin la de sesión', (
+  testWidgets('bot activo NO pinta pill de estado: activo es el default', (
     tester,
   ) async {
     await tester.pumpWidget(_host(_bot));
 
-    expect(find.widgetWithText(AppPill, 'Activo'), findsOneWidget);
-    expect(find.widgetWithText(AppPill, 'Enlazado'), findsNothing);
-    expect(find.widgetWithText(AppPill, 'Sin enlazar'), findsNothing);
-    expect(find.widgetWithText(AppPill, 'Conectando…'), findsNothing);
+    expect(find.widgetWithText(AppPill, 'Activo'), findsNothing);
+    expect(find.byType(AppPill), findsNothing);
   });
 
-  testWidgets('CONNECTED → pill "Enlazado"', (tester) async {
+  testWidgets('bot pausado → pill "Pausado" (el estado excepcional sí habla)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(_paused));
+
+    expect(find.widgetWithText(AppPill, 'Pausado'), findsOneWidget);
+  });
+
+  testWidgets('sin dato de sesión → sin indicador de sesión', (tester) async {
+    await tester.pumpWidget(_host(_bot));
+
+    expect(find.byType(AppDotLabel), findsNothing);
+  });
+
+  testWidgets('CONNECTED → "Enlazado" quieto con dot success', (tester) async {
     await tester.pumpWidget(_host(_bot, session: SessionState.connected));
-    expect(find.widgetWithText(AppPill, 'Enlazado'), findsOneWidget);
+
+    expect(find.widgetWithText(AppDotLabel, 'Enlazado'), findsOneWidget);
+    expect(_dotColorOf(tester), AppTokens.success);
   });
 
-  testWidgets('DISCONNECTED → pill "Sin enlazar"', (tester) async {
+  testWidgets('DISCONNECTED → "Sin enlazar" con dot danger (accionable)', (
+    tester,
+  ) async {
     await tester.pumpWidget(_host(_bot, session: SessionState.disconnected));
-    expect(find.widgetWithText(AppPill, 'Sin enlazar'), findsOneWidget);
+
+    expect(find.widgetWithText(AppDotLabel, 'Sin enlazar'), findsOneWidget);
+    expect(_dotColorOf(tester), AppTokens.danger);
   });
 
-  testWidgets('estados de transición → pill honesta "Conectando…"', (
+  testWidgets('estados de transición → "Conectando…" con dot neutro', (
     tester,
   ) async {
     for (final s in <SessionState>[
@@ -57,11 +96,23 @@ void main() {
     ]) {
       await tester.pumpWidget(_host(_bot, session: s));
       expect(
-        find.widgetWithText(AppPill, 'Conectando…'),
+        find.widgetWithText(AppDotLabel, 'Conectando…'),
         findsOneWidget,
         reason: 'estado $s debe leerse como Conectando…',
       );
+      expect(
+        _dotColorOf(tester),
+        AppTokens.text2,
+        reason: 'transición es ambiental, no alarma',
+      );
     }
+  });
+
+  testWidgets('pausado Y sin enlazar conviven (pill + dot)', (tester) async {
+    await tester.pumpWidget(_host(_paused, session: SessionState.disconnected));
+
+    expect(find.widgetWithText(AppPill, 'Pausado'), findsOneWidget);
+    expect(find.widgetWithText(AppDotLabel, 'Sin enlazar'), findsOneWidget);
   });
 
   testWidgets('la key del tile se conserva (bots.tile.<id>)', (tester) async {
