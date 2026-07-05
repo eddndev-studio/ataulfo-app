@@ -18,7 +18,7 @@ import '../bloc/template_detail_bloc.dart';
 import '../bloc/var_defs_bloc.dart';
 import '../widgets/template_detail_header.dart';
 import '../widgets/template_rename_sheet.dart';
-import '../widgets/thinking_label.dart';
+import '../../../ai_catalog/presentation/widgets/thinking_label.dart';
 import '../widgets/trainer_hero_card.dart';
 
 /// Detalle de una Template (S03): el HUB de la plantilla. Identidad en el

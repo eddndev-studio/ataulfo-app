@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
 import '../../domain/entities/org_ai_config.dart';
 
@@ -121,9 +122,9 @@ class _ModelHostRow extends StatelessWidget {
               spacing: AppTokens.sp2,
               children: <Widget>[
                 for (final h in model.hosts)
-                  ChoiceChip(
+                  AppChoiceChip(
                     key: Key('org_ai.host.${model.id}.$h'),
-                    label: Text(hostLabel(h)),
+                    label: hostLabel(h),
                     selected: selected == h,
                     onSelected: enabled
                         ? (isSel) => onHostChanged(model.id, isSel ? h : null)
@@ -131,9 +132,9 @@ class _ModelHostRow extends StatelessWidget {
                   ),
                 // Chip "Automático": refleja "sin fijar" y permite volver al
                 // default tocándolo.
-                ChoiceChip(
+                AppChoiceChip(
                   key: Key('org_ai.host.${model.id}.auto'),
-                  label: const Text('Automático'),
+                  label: 'Automático',
                   selected: selected == null,
                   onSelected: enabled
                       ? (_) => onHostChanged(model.id, null)

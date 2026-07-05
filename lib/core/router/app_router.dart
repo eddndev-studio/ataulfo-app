@@ -1163,7 +1163,9 @@ class AppRouter {
         // defaults de plantillas nuevas. El gate de la tile en Settings es
         // cosmético; la autoridad real es el 403 del backend (cae en
         // OrgAiConfigLoadFailed → "sin permiso"). CatalogBloc alimenta los
-        // hosts seleccionables y el picker de modelo de los defaults.
+        // hosts seleccionables y el picker de modelo de los defaults. La
+        // acción Guardar vive en el AppBar: la pantalla edita varios campos
+        // que viajan juntos en UN PUT, así que el guardado es explícito.
         path: '/org/ai-config',
         builder: (context, state) {
           return MultiBlocProvider(
@@ -1179,7 +1181,13 @@ class AppRouter {
                       ..add(const CatalogLoadRequested()),
               ),
             ],
-            child: const OrgAiConfigPage(),
+            child: Scaffold(
+              appBar: AppBar(
+                title: const Text('Configuración de IA'),
+                actions: const <Widget>[OrgAiConfigSaveAction()],
+              ),
+              body: const OrgAiConfigPage(),
+            ),
           );
         },
       ),

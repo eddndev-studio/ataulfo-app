@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/bloc/catalog_bloc.dart';
 import 'package:ataulfo/features/org_ai_config/domain/entities/org_ai_config.dart';
@@ -76,6 +80,8 @@ void main() {
     ).thenReturn(const CatalogLoaded(catalog: _catalog));
   });
 
+  // La página es content-only: el host replica el montaje del router
+  // (Scaffold + AppBar planos con la acción Guardar como widget público).
   Widget host() => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: MultiBlocProvider(
@@ -83,7 +89,13 @@ void main() {
         BlocProvider<OrgAiConfigBloc>.value(value: bloc),
         BlocProvider<CatalogBloc>.value(value: catalogBloc),
       ],
-      child: const OrgAiConfigPage(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Configuración de IA'),
+          actions: const <Widget>[OrgAiConfigSaveAction()],
+        ),
+        body: const OrgAiConfigPage(),
+      ),
     ),
   );
 
@@ -134,6 +146,65 @@ void main() {
     ).called(1);
   });
 
+  group('defaults sobre el editor compartido', () {
+    setUp(() {
+      when(
+        () => bloc.state,
+      ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+    });
+
+    testWidgets('el toggle de IA activa dispatcha DefaultsChanged', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      final sw = find.byKey(const Key('org_ai.defaults.enabled'));
+      await tester.ensureVisible(sw);
+      expect(tester.widget<AppSwitch>(sw).value, isFalse);
+
+      await tester.tap(sw);
+      await tester.pump();
+
+      verify(
+        () => bloc.add(
+          OrgAiConfigDefaultsChanged(_defaults.copyWith(enabled: true)),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('elegir modelo en el picker dispatcha DefaultsChanged con '
+        'provider y modelo', (tester) async {
+      await tester.pumpWidget(host());
+
+      final tile = find.byKey(const Key('org_ai.defaults.tile.model'));
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('org_ai.defaults.sheet.model')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('org_ai.defaults.model.MiniMax-M3')),
+      );
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          OrgAiConfigDefaultsChanged(
+            _defaults.copyWith(
+              provider: AIProvider.minimax,
+              model: 'MiniMax-M3',
+            ),
+          ),
+        ),
+      ).called(1);
+    });
+  });
+
   testWidgets('Guardar habilitado con cambios → dispatcha SaveRequested', (
     tester,
   ) async {
@@ -145,7 +216,7 @@ void main() {
 
     await tester.pumpWidget(host());
     final saveBtn = find.byKey(const Key('org_ai.save'));
-    expect(tester.widget<TextButton>(saveBtn).onPressed, isNotNull);
+    expect(tester.widget<AppButton>(saveBtn).onPressed, isNotNull);
 
     await tester.tap(saveBtn);
     await tester.pump();
@@ -159,8 +230,40 @@ void main() {
 
     await tester.pumpWidget(host());
     expect(
-      tester.widget<TextButton>(find.byKey(const Key('org_ai.save'))).onPressed,
+      tester.widget<AppButton>(find.byKey(const Key('org_ai.save'))).onPressed,
       isNull,
+    );
+  });
+
+  testWidgets('saveError inválido → SnackBar que cubre hosts Y defaults', (
+    tester,
+  ) async {
+    // El PUT valida la config completa: el copy no puede señalar solo al
+    // host cuando el campo inválido puede venir de los defaults.
+    final controller = StreamController<OrgAiConfigState>.broadcast();
+    addTearDown(controller.close);
+    whenListen<OrgAiConfigState>(
+      bloc,
+      controller.stream,
+      initialState: const OrgAiConfigLoaded(saved: _saved, working: _saved),
+    );
+
+    await tester.pumpWidget(host());
+    controller.add(
+      const OrgAiConfigLoaded(
+        saved: _saved,
+        working: _saved,
+        saveError: OrgAiConfigInvalidFailure(),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Configuración inválida: revisa los valores por defecto o el host '
+        'de algún modelo.',
+      ),
+      findsOneWidget,
     );
   });
 
@@ -175,5 +278,21 @@ void main() {
 
     expect(find.textContaining('No tienes permiso'), findsOneWidget);
     expect(find.byKey(const Key('org_ai.retry')), findsNothing);
+    expect(find.widgetWithText(AppButton, 'Reintentar'), findsNothing);
+  });
+
+  testWidgets('LoadFailed no-forbidden → Reintentar dispatcha load', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoadFailed(OrgAiConfigServerFailure()));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('org_ai.retry')), findsOneWidget);
+    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
+    await tester.pump();
+    verify(() => bloc.add(const OrgAiConfigLoadRequested())).called(1);
   });
 }
