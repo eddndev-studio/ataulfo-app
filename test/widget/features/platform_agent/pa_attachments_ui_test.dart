@@ -15,6 +15,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../../support/chat_media_providers.dart';
+
 class _MockRepo extends Mock implements PlatformAgentRepository {}
 
 class _MockEvents extends Mock implements PlatformAgentEvents {}
@@ -87,7 +89,7 @@ void main() {
                 events: events,
                 picker: picker,
               )..add(const PaChatStarted()),
-              child: const PlatformAgentPage(),
+              child: wrapWithChatMedia(const PlatformAgentPage()),
             ),
           ),
         ),

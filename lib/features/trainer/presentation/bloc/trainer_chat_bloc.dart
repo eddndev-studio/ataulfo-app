@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/media/media_byte_sink.dart';
 import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
@@ -312,10 +313,12 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     required String templateId,
     MediaFilePicker? picker,
     TrainerEvents? events,
+    MediaByteSink? mediaSink,
   }) : _repo = repo,
        _templateId = templateId,
        _picker = picker,
        _events = events,
+       _mediaSink = mediaSink,
        super(const TrainerChatLoading()) {
     on<TrainerChatStarted>(_onStarted);
     on<TrainerChatMessageSent>(_onMessageSent);
@@ -343,6 +346,12 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
 
   /// Picker de archivos (nil ⇒ el composer oculta el clip — DX/tests).
   final MediaFilePicker? _picker;
+
+  /// Caché local donde sembrar los bytes de un adjunto recién subido bajo su
+  /// ref definitiva: el wire del entrenador no trae URL firmada, así que la
+  /// burbuja enviada solo puede pintarse/reproducirse desde esta copia.
+  /// nil ⇒ sin siembra (la burbuja degrada a la tarjeta con nombre).
+  final MediaByteSink? _mediaSink;
 
   /// Realtime del turno (nil ⇒ sin indicador en vivo: el turno sigue funcionando
   /// con "Pensando…" estático). Best-effort, cosmético.
@@ -598,6 +607,11 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
           bytes: p.bytes,
           filename: p.filename,
         );
+        // Siembra la copia local bajo la ref definitiva: la burbuja del turno
+        // enviado se pinta/reproduce desde caché (el wire no trae URL firmada).
+        // Best-effort y no bloqueante de la subida del lote.
+        final sink = _mediaSink;
+        if (sink != null) unawaited(sink.cache(att.ref, p.bytes));
         final cur = state;
         if (cur is! TrainerChatLoaded) return;
         // La miniatura local solo aplica a imágenes; el resto usa ícono.

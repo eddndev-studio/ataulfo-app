@@ -14,6 +14,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../../support/chat_media_providers.dart';
+
 class _MockTrainerRepo extends Mock implements TrainerRepository {}
 
 class _MockPicker extends Mock implements MediaFilePicker {}
@@ -76,7 +78,7 @@ void main() {
           create: (_) =>
               TrainerChatBloc(repo: repo, templateId: 't1', picker: picker)
                 ..add(const TrainerChatStarted()),
-          child: const TrainerChatPage(templateId: 't1'),
+          child: wrapWithChatMedia(const TrainerChatPage(templateId: 't1')),
         ),
       ),
     );

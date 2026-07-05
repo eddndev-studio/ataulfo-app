@@ -25,10 +25,10 @@ import '../../domain/reactions.dart';
 import '../bloc/attach_panel_cubit.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/reply_draft_cubit.dart';
-import '../bloc/thread_audio_cubit.dart';
 import '../../../monitor/presentation/widgets/alert_banner.dart';
 import '../../../monitor/presentation/widgets/live_activity.dart';
 import '../widgets/attach_panel.dart';
+import '../widgets/audio_failures_listener.dart';
 import '../widgets/message_composer.dart';
 import '../widgets/message_media.dart';
 
@@ -57,7 +57,7 @@ class MessageThreadPage extends StatelessWidget {
         // composer y lo pinta esta página bajo el composer (no es ruta).
         BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
       ],
-      child: _AudioFailuresListener(
+      child: AudioFailuresListener(
         child: _ReactFailuresListener(
           child: _CorrectionFailuresListener(
             child: BlocBuilder<MessagesBloc, MessagesState>(
@@ -120,28 +120,6 @@ class _ThreadContent extends StatelessWidget {
         const LiveActivity(),
         if (showComposer) const MessageComposer(),
       ],
-    );
-  }
-}
-
-/// Anuncia con SnackBar cuando una nota de voz/audio no se pudo cargar o
-/// reproducir (sin copia local ni firma viva, plataforma sin player). El cubit
-/// señala la fuente fallida en `failedKey`; sólo el CAMBIO de ese campo dispara
-/// el aviso.
-class _AudioFailuresListener extends StatelessWidget {
-  const _AudioFailuresListener({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocListener<ThreadAudioCubit, ThreadAudioState>(
-      listenWhen: (prev, next) =>
-          next.failedKey != null && prev.failedKey != next.failedKey,
-      listener: (context, _) => ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo reproducir el audio')),
-      ),
-      child: child,
     );
   }
 }

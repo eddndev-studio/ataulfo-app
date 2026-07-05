@@ -27,6 +27,7 @@ class AudioMessageContent extends StatefulWidget {
     required this.mediaRef,
     required this.url,
     required this.ptt,
+    this.contentType = 'audio/ogg',
   });
 
   final String id;
@@ -38,6 +39,10 @@ class AudioMessageContent extends StatefulWidget {
   /// la firma no ha llegado: la burbuja igual se pinta y suena desde disco.
   final String? url;
   final bool ptt;
+
+  /// MIME de los bytes para el transporte. Las notas del canal son Opus/Ogg
+  /// (default); un adjunto de agente pasa su MIME real (mp3, m4a…).
+  final String contentType;
 
   @override
   State<AudioMessageContent> createState() => _AudioMessageContentState();
@@ -87,6 +92,7 @@ class _AudioMessageContentState extends State<AudioMessageContent> {
       widget.mediaRef,
       bytes: bytes,
       url: widget.url,
+      contentType: widget.contentType,
       fallbackDuration: ms == null ? null : Duration(milliseconds: ms),
     );
   }

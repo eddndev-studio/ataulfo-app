@@ -6,6 +6,8 @@ import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
+import '../../../messages/presentation/widgets/attachment_content.dart';
+import '../../../messages/presentation/widgets/audio_message_content.dart';
 import '../../domain/entities/pa_message.dart';
 import 'pa_tool_cards.dart';
 
@@ -71,31 +73,24 @@ class PaMessageTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
+                // Adjuntos con el renderer compartido de media (miniatura de
+                // imagen, audio reproducible, tarjetas de video/documento). El
+                // wire del asistente no trae URL firmada: la fuente es la copia
+                // local que la subida sembró en caché; sin ella degrada a la
+                // tarjeta con nombre.
                 for (final att in message.attachments)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppTokens.sp1),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Icon(
-                          paAttachmentIcon(att.mime),
-                          size: 16,
-                          color: AppTokens.text2,
-                        ),
-                        const SizedBox(width: AppTokens.sp1),
-                        Flexible(
-                          child: Text(
-                            att.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(color: AppTokens.text2),
-                          ),
-                        ),
-                      ],
+                    child: AttachmentContent(
+                      id: '${message.id}.${att.ref}',
+                      mediaRef: att.ref,
+                      mime: att.mime,
+                      name: att.name,
                     ),
                   ),
-                // Una nota de voz se rotula honestamente: chip "Nota de voz" y,
-                // si el server la transcribió, el texto abajo. El `content` crudo
+                // Una nota de voz reproduce inline (la copia local grabada en
+                // este dispositivo, sembrada en caché al enviar) y, si el
+                // server la transcribió, el texto abajo. El `content` crudo
                 // no se pinta (es el marcador "[audio…]" o duplica el transcrito).
                 if (message.isVoiceNote)
                   _VoiceNote(message: message)
@@ -116,10 +111,12 @@ class PaMessageTile extends StatelessWidget {
   }
 }
 
-/// Render honesto de una nota de voz del operador: rótulo "Nota de voz" con
-/// ícono de micrófono y, cuando el server la transcribió (`transcriptStatus`
-/// done y texto no vacío), el transcrito debajo. Nunca pinta el `content`
-/// crudo, que es el marcador de audio o una copia del transcrito.
+/// Nota de voz del operador: burbuja de audio reproducible inline (la fuente
+/// es la copia local grabada en este dispositivo, sembrada en caché al enviar;
+/// el wire no trae URL firmada) y, cuando el server la transcribió
+/// (`transcriptStatus` done y texto no vacío), el transcrito debajo. Nunca
+/// pinta el `content` crudo, que es el marcador de audio o una copia del
+/// transcrito.
 class _VoiceNote extends StatelessWidget {
   const _VoiceNote({required this.message});
 
@@ -134,20 +131,11 @@ class _VoiceNote extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(
-              Icons.mic_none_outlined,
-              size: 16,
-              color: AppTokens.text2,
-            ),
-            const SizedBox(width: AppTokens.sp1),
-            Text(
-              'Nota de voz',
-              style: textTheme.labelMedium?.copyWith(color: AppTokens.text2),
-            ),
-          ],
+        AudioMessageContent(
+          id: message.id,
+          mediaRef: message.audioRef,
+          url: null,
+          ptt: true,
         ),
         if (hasTranscript) ...<Widget>[
           const SizedBox(height: AppTokens.sp1),

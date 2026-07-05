@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../../../core/media/media_byte_sink.dart';
 import '../../../media/domain/repositories/media_byte_store.dart';
 
 /// Descarga los bytes de una URL de media. Devuelve `null` si la descarga falla
@@ -18,7 +19,7 @@ typedef MediaDownloader = Future<Uint8List?> Function(String url);
 /// martillar al CDN en cada repintado del hilo. Los bytes en disco NO se purgan
 /// en logout (el ref embebe el tenant ⇒ sin colisión entre cuentas, inmutables);
 /// [invalidate] sólo limpia la memoria.
-class MessageMediaCache {
+class MessageMediaCache implements MediaByteSink {
   MessageMediaCache({
     required MediaByteStore store,
     required MediaDownloader download,
@@ -104,6 +105,7 @@ class MessageMediaCache {
   /// tras subir. Así la burbuja reproduce desde disco al instante —sin esperar
   /// el round-trip de la URL firmada— y la duración aparece de inmediato. Un
   /// fallo de escritura no es fatal: los bytes igual quedan en L1.
+  @override
   Future<void> cache(String mediaRef, Uint8List bytes) async {
     try {
       await _store.write(mediaRef, bytes);

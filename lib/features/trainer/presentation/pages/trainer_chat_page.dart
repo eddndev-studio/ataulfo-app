@@ -10,6 +10,7 @@ import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_thread_list_sheet.dart';
 import '../../../../core/design/widgets/live_typing_progress.dart';
+import '../../../messages/presentation/widgets/audio_failures_listener.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../bloc/trainer_chat_bloc.dart';
 import '../widgets/trainer_chat_empty_state.dart';
@@ -62,12 +63,16 @@ class TrainerChatPage extends StatelessWidget {
           ),
         ],
       ),
-      body: BlocBuilder<TrainerChatBloc, TrainerChatState>(
-        builder: (context, state) => switch (state) {
-          TrainerChatLoading() => const AppLoadingIndicator(),
-          TrainerChatFailed(:final failure) => _FailedView(failure: failure),
-          TrainerChatLoaded() => _ChatView(state: state),
-        },
+      // El aviso de audio irreproducible cubre todo el hilo: cualquier burbuja
+      // de audio sin fuente (adjunto de otro dispositivo) lo dispara.
+      body: AudioFailuresListener(
+        child: BlocBuilder<TrainerChatBloc, TrainerChatState>(
+          builder: (context, state) => switch (state) {
+            TrainerChatLoading() => const AppLoadingIndicator(),
+            TrainerChatFailed(:final failure) => _FailedView(failure: failure),
+            TrainerChatLoaded() => _ChatView(state: state),
+          },
+        ),
       ),
     );
   }

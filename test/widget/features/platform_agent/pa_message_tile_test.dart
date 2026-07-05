@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/chat_media_providers.dart';
+
 /// Construye el `tool_results` tal como llega del wire: jsonb crudo con claves
 /// snake_case y `content` DOBLE-CODIFICADO (string JSON del output del tool).
 String _toolRaw(String toolName, Map<String, dynamic> content) =>
@@ -34,7 +36,7 @@ PaMessage _textMsg(String role, String content) => PaMessage(
 );
 
 Widget _wrap(Widget child) => MaterialApp(
-  home: Scaffold(body: Center(child: child)),
+  home: Scaffold(body: Center(child: wrapWithChatMedia(child))),
 );
 
 void main() {

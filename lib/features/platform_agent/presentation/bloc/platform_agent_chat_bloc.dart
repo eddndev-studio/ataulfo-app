@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/media/media_byte_sink.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../domain/entities/pa_attachment.dart';
 import '../../domain/entities/pa_conversation.dart';
@@ -397,9 +398,11 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     required PlatformAgentRepository repo,
     required PlatformAgentEvents events,
     MediaFilePicker? picker,
+    MediaByteSink? mediaSink,
   }) : _repo = repo,
        _events = events,
        _picker = picker,
+       _mediaSink = mediaSink,
        super(const PaChatLoading()) {
     on<PaChatStarted>(_onStarted);
     on<PaChatMessageSent>(_onMessageSent);
@@ -424,6 +427,13 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
 
   /// Picker de archivos (nil ⇒ el composer oculta el clip — DX/tests).
   final MediaFilePicker? _picker;
+
+  /// Caché local donde sembrar los bytes de un adjunto recién subido (o de la
+  /// nota de voz recién grabada) bajo su ref definitiva: el wire del asistente
+  /// no trae URL firmada, así que la burbuja enviada solo puede
+  /// pintarse/reproducirse desde esta copia. nil ⇒ sin siembra (la burbuja
+  /// degrada a la tarjeta con nombre / audio sin fuente).
+  final MediaByteSink? _mediaSink;
 
   /// Máximo de adjuntos por turno (server-side) y peso por archivo. Se aplican
   /// client-side ANTES de subir para no gastar red en lo que el server rechaza.
@@ -894,6 +904,11 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           bytes: p.bytes,
           filename: p.filename,
         );
+        // Siembra la copia local bajo la ref definitiva: la burbuja del turno
+        // enviado se pinta/reproduce desde caché (el wire no trae URL firmada).
+        // Best-effort y no bloqueante de la subida del lote.
+        final sink = _mediaSink;
+        if (sink != null) unawaited(sink.cache(att.ref, p.bytes));
         final cur = state;
         if (cur is! PaChatLoaded) return;
         // La miniatura local solo aplica a imágenes; el resto usa ícono.
@@ -1058,6 +1073,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       // Recarga best-effort: trae el user de voz (con su transcript) y los
       // mensajes de tool que el POST no devuelve.
       await _reloadThread(emit, convId, assistant.id);
+      _seedVoiceBytes(event.bytes);
     } on PaFailure catch (f) {
       unawaited(_progressSub?.cancel());
       _progressSub = null;
@@ -1074,6 +1090,23 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           sendFailure: f,
         ),
       );
+    }
+  }
+
+  /// Siembra los bytes recién grabados bajo el `audio_ref` del user de voz que
+  /// la recarga trajo (el más reciente del hilo): así la burbuja reproduce
+  /// desde la copia local, porque el wire no trae URL firmada. Sin recarga
+  /// (falló / el operador cambió de hilo) no hay ref conocida y se omite
+  /// (degradación honesta a audio sin fuente).
+  void _seedVoiceBytes(Uint8List bytes) {
+    final sink = _mediaSink;
+    final s = state;
+    if (sink == null || s is! PaChatLoaded) return;
+    for (final m in s.messages.reversed) {
+      if (m.isUser && m.audioRef.isNotEmpty) {
+        unawaited(sink.cache(m.audioRef, bytes));
+        return;
+      }
     }
   }
 

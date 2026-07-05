@@ -9,6 +9,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../../support/chat_media_providers.dart';
+
 class _MockBloc extends MockBloc<PaChatEvent, PaChatState>
     implements PlatformAgentChatBloc {}
 
@@ -47,7 +49,7 @@ void main() {
             height: 700,
             child: BlocProvider<PlatformAgentChatBloc>.value(
               value: bloc,
-              child: const PlatformAgentPage(),
+              child: wrapWithChatMedia(const PlatformAgentPage()),
             ),
           ),
         ),

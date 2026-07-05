@@ -108,6 +108,7 @@ import '../../features/memberships/presentation/pages/memberships_page.dart';
 import '../../features/memberships/presentation/pages/select_org_page.dart';
 import '../../features/messages/domain/repositories/audio_engine.dart';
 import '../audio/audio_recorder.dart';
+import '../../features/messages/data/cache/message_media_cache.dart';
 import '../../features/messages/domain/repositories/media_opener.dart';
 import '../../features/messages/presentation/widgets/video_playback.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
@@ -588,62 +589,85 @@ class AppRouter {
               // singleton de la app, independiente de la org.
               child: RepositoryProvider<AudioRecorder>.value(
                 value: _audioRecorder,
-                child: KeyedSubtree(
-                  key: ValueKey<String>(orgId),
-                  // El borrador del wizard de creación de bot es estado de la org
-                  // activa: vive DENTRO del subárbol keyeado por orgId, así un
-                  // switch-org lo descarta (un borrador con la plantilla de la org
-                  // A no debe asomar en la org B).
-                  child: RepositoryProvider<BotCreateDraftStore>(
-                    create: (_) => BotCreateDraftStore(),
-                    child: MultiBlocProvider(
-                      providers: <BlocProvider<dynamic>>[
-                        BlocProvider<BotsBloc>(
-                          create: (_) =>
-                              BotsBloc(_botsRepo)
-                                ..add(const BotsLoadRequested()),
-                        ),
-                        // Compañero del listado de bots: al asentarse la lista,
-                        // la page le pide abanicar el estado de sesión por bot.
-                        // Scoped al shell, como BotsBloc, para preservar los
-                        // indicadores entre cambios de tab.
-                        BlocProvider<BotSessionsCubit>(
-                          create: (_) => BotSessionsCubit(_botSessionRepo),
-                        ),
-                        BlocProvider<TemplatesBloc>(
-                          create: (_) =>
-                              TemplatesBloc(_templatesRepo)
-                                ..add(const TemplatesLoadRequested()),
-                        ),
-                        BlocProvider<LabelsAdminBloc>(
-                          create: (_) =>
-                              LabelsAdminBloc(repo: _labelsRepo)
-                                ..add(const LabelsAdminLoadRequested()),
-                        ),
-                        // Cubit del reenvío de verificación, scoped al shell para que el
-                        // aviso "verifica tu correo" lo dispare y reaccione a su
-                        // SnackBar.
-                        BlocProvider<ResendVerificationCubit>(
-                          create: (_) => ResendVerificationCubit(_authRepo),
-                        ),
-                        // Asistente de plataforma, scoped al shell: el dock vive
-                        // sobre las 4 tabs. La carga se difiere hasta la 1ª
-                        // apertura (el dock dispara PaChatStarted), sin coste en
-                        // el arranque si el operador nunca lo abre.
-                        BlocProvider<PlatformAgentChatBloc>(
-                          create: (_) => PlatformAgentChatBloc(
-                            repo: _platformAgentRepo,
-                            events: _platformAgentEvents,
-                            picker: FilePickerMediaFilePicker(),
+                // El renderer compartido de adjuntos del asistente exige el
+                // abridor de documentos y el reproductor de video en contexto;
+                // como el grabador, son singletons independientes de la org.
+                child: MultiRepositoryProvider(
+                  providers: <RepositoryProvider<dynamic>>[
+                    RepositoryProvider<MediaOpener>.value(value: _mediaOpener),
+                    RepositoryProvider<VideoPlayback>.value(
+                      value: const InAppVideoPlayback(),
+                    ),
+                  ],
+                  child: KeyedSubtree(
+                    key: ValueKey<String>(orgId),
+                    // El borrador del wizard de creación de bot es estado de la org
+                    // activa: vive DENTRO del subárbol keyeado por orgId, así un
+                    // switch-org lo descarta (un borrador con la plantilla de la org
+                    // A no debe asomar en la org B).
+                    child: RepositoryProvider<BotCreateDraftStore>(
+                      create: (_) => BotCreateDraftStore(),
+                      child: MultiBlocProvider(
+                        providers: <BlocProvider<dynamic>>[
+                          BlocProvider<BotsBloc>(
+                            create: (_) =>
+                                BotsBloc(_botsRepo)
+                                  ..add(const BotsLoadRequested()),
                           ),
-                        ),
-                      ],
-                      // Blocs page-scoped a nivel del shell: cambiar de tab no
-                      // rebuildea los providers y cada lista preserva estado
-                      // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
-                      // El routeObserver se atraviesa al shell para que ambos list
-                      // pages disparen su refresh al volver de una sub-ruta.
-                      child: ShellPage(routeObserver: _routeObserver),
+                          // Compañero del listado de bots: al asentarse la lista,
+                          // la page le pide abanicar el estado de sesión por bot.
+                          // Scoped al shell, como BotsBloc, para preservar los
+                          // indicadores entre cambios de tab.
+                          BlocProvider<BotSessionsCubit>(
+                            create: (_) => BotSessionsCubit(_botSessionRepo),
+                          ),
+                          BlocProvider<TemplatesBloc>(
+                            create: (_) =>
+                                TemplatesBloc(_templatesRepo)
+                                  ..add(const TemplatesLoadRequested()),
+                          ),
+                          BlocProvider<LabelsAdminBloc>(
+                            create: (_) =>
+                                LabelsAdminBloc(repo: _labelsRepo)
+                                  ..add(const LabelsAdminLoadRequested()),
+                          ),
+                          // Cubit del reenvío de verificación, scoped al shell para que el
+                          // aviso "verifica tu correo" lo dispare y reaccione a su
+                          // SnackBar.
+                          BlocProvider<ResendVerificationCubit>(
+                            create: (_) => ResendVerificationCubit(_authRepo),
+                          ),
+                          // Asistente de plataforma, scoped al shell: el dock vive
+                          // sobre las 4 tabs. La carga se difiere hasta la 1ª
+                          // apertura (el dock dispara PaChatStarted), sin coste en
+                          // el arranque si el operador nunca lo abre.
+                          BlocProvider<PlatformAgentChatBloc>(
+                            create: (context) => PlatformAgentChatBloc(
+                              repo: _platformAgentRepo,
+                              events: _platformAgentEvents,
+                              picker: FilePickerMediaFilePicker(),
+                              // Siembra la copia local de cada adjunto subido y
+                              // de la nota de voz grabada: el wire del asistente
+                              // no trae URL firmada y la burbuja rica solo puede
+                              // servirse de la caché.
+                              mediaSink: context.read<MessageMediaCache>(),
+                            ),
+                          ),
+                          // Player de audio del chat del asistente (uno por
+                          // shell; el provider lo cierra y el cubit dispone el
+                          // engine). Lazy: no crea engine si nunca suena nada.
+                          BlocProvider<ThreadAudioCubit>(
+                            create: (_) =>
+                                ThreadAudioCubit(engine: _audioEngineFactory()),
+                          ),
+                        ],
+                        // Blocs page-scoped a nivel del shell: cambiar de tab no
+                        // rebuildea los providers y cada lista preserva estado
+                        // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
+                        // El routeObserver se atraviesa al shell para que ambos list
+                        // pages disparen su refresh al volver de una sub-ruta.
+                        child: ShellPage(routeObserver: _routeObserver),
+                      ),
                     ),
                   ),
                 ),
@@ -1219,14 +1243,39 @@ class AppRouter {
         path: '/templates/:id/trainer',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return BlocProvider<TrainerChatBloc>(
-            create: (_) => TrainerChatBloc(
-              repo: _trainerRepo,
-              templateId: id,
-              picker: FilePickerMediaFilePicker(),
-              events: _trainerEvents,
-            )..add(const TrainerChatStarted()),
-            child: TrainerChatPage(templateId: id),
+          // El renderer compartido de adjuntos (AttachmentContent) exige en
+          // contexto el abridor de documentos, el reproductor de video y el
+          // player de audio del hilo; la caché de bytes ya es app-wide.
+          return MultiRepositoryProvider(
+            providers: <RepositoryProvider<dynamic>>[
+              RepositoryProvider<MediaOpener>.value(value: _mediaOpener),
+              RepositoryProvider<VideoPlayback>.value(
+                value: const InAppVideoPlayback(),
+              ),
+            ],
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<TrainerChatBloc>(
+                  create: (context) => TrainerChatBloc(
+                    repo: _trainerRepo,
+                    templateId: id,
+                    picker: FilePickerMediaFilePicker(),
+                    events: _trainerEvents,
+                    // Siembra la copia local de cada adjunto subido: el wire
+                    // del entrenador no trae URL firmada y la burbuja rica
+                    // solo puede servirse de la caché.
+                    mediaSink: context.read<MessageMediaCache>(),
+                  )..add(const TrainerChatStarted()),
+                ),
+                // Player de audio del hilo (uno por visita; el provider lo
+                // cierra al salir y el cubit dispone el engine).
+                BlocProvider<ThreadAudioCubit>(
+                  create: (_) =>
+                      ThreadAudioCubit(engine: _audioEngineFactory()),
+                ),
+              ],
+              child: TrainerChatPage(templateId: id),
+            ),
           );
         },
       ),

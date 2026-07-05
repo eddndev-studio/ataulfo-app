@@ -6,6 +6,7 @@ import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
+import '../../../messages/presentation/widgets/attachment_content.dart';
 import '../../domain/entities/trainer_message.dart';
 import 'trainer_change_card.dart';
 import 'trainer_inspect_flow_card.dart';
@@ -60,29 +61,19 @@ class TrainerMessageTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
+          // Adjuntos con el renderer compartido de media (miniatura de imagen,
+          // audio reproducible, tarjetas de video/documento). El wire del
+          // entrenador no trae URL firmada: la fuente es la copia local que la
+          // subida sembró en caché; sin ella degrada a la tarjeta con nombre.
           if (message.attachments.isNotEmpty) ...<Widget>[
             for (final att in message.attachments)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppTokens.sp1),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Icon(
-                      attachmentIcon(att.mime),
-                      size: 16,
-                      color: AppTokens.text2,
-                    ),
-                    const SizedBox(width: AppTokens.sp1),
-                    Flexible(
-                      child: Text(
-                        att.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppTokens.text2,
-                        ),
-                      ),
-                    ),
-                  ],
+                child: AttachmentContent(
+                  id: '${message.id}.${att.ref}',
+                  mediaRef: att.ref,
+                  mime: att.mime,
+                  name: att.name,
                 ),
               ),
           ],

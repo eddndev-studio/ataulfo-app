@@ -6,6 +6,7 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/live_typing_progress.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
+import '../../../messages/presentation/widgets/audio_failures_listener.dart';
 import '../bloc/platform_agent_chat_bloc.dart';
 import 'pa_chat_empty_state.dart';
 import 'pa_failure_copy.dart';
@@ -104,216 +105,221 @@ class _PaChatViewState extends State<PaChatView>
   Widget build(BuildContext context) {
     final s = widget.state;
     final onSend = widget.onSend;
-    return Column(
-      children: <Widget>[
-        Expanded(
-          child: (s.messages.isEmpty && !s.sending)
-              ? PaChatEmptyState(onPrefill: _prefill)
-              : ListView.builder(
-                  reverse: true,
-                  padding: const EdgeInsets.all(AppTokens.sp3),
-                  itemCount:
-                      s.messages.length +
-                      (s.sending ? 1 : 0) +
-                      (s.nextCursor.isNotEmpty ? 1 : 0),
-                  itemBuilder: (context, i) {
-                    if (s.sending && i == 0) {
-                      return LiveTypingProgress(
-                        label: s.liveProgress,
-                        keyId: 'pa',
+    // El aviso de audio irreproducible cubre todo el hilo: cualquier burbuja
+    // de audio sin fuente (adjunto/nota de otro dispositivo) lo dispara.
+    return AudioFailuresListener(
+      child: Column(
+        children: <Widget>[
+          Expanded(
+            child: (s.messages.isEmpty && !s.sending)
+                ? PaChatEmptyState(onPrefill: _prefill)
+                : ListView.builder(
+                    reverse: true,
+                    padding: const EdgeInsets.all(AppTokens.sp3),
+                    itemCount:
+                        s.messages.length +
+                        (s.sending ? 1 : 0) +
+                        (s.nextCursor.isNotEmpty ? 1 : 0),
+                    itemBuilder: (context, i) {
+                      if (s.sending && i == 0) {
+                        return LiveTypingProgress(
+                          label: s.liveProgress,
+                          keyId: 'pa',
+                        );
+                      }
+                      // El cargar-más vive en el tope visual (último índice del
+                      // reverse), por encima del mensaje más viejo.
+                      final base = s.messages.length + (s.sending ? 1 : 0);
+                      if (s.nextCursor.isNotEmpty && i == base) {
+                        return _LoadMoreButton(
+                          loading: s.loadingMore,
+                          onTap: () => context
+                              .read<PlatformAgentChatBloc>()
+                              .add(const PaChatLoadMore()),
+                        );
+                      }
+                      final idx =
+                          s.messages.length - 1 - (i - (s.sending ? 1 : 0));
+                      return PaMessageTile(
+                        message: s.messages[idx],
+                        onConfirm: s.sending
+                            ? null
+                            : () => onSend('Sí, confírmalo y procede.'),
                       );
-                    }
-                    // El cargar-más vive en el tope visual (último índice del
-                    // reverse), por encima del mensaje más viejo.
-                    final base = s.messages.length + (s.sending ? 1 : 0);
-                    if (s.nextCursor.isNotEmpty && i == base) {
-                      return _LoadMoreButton(
-                        loading: s.loadingMore,
-                        onTap: () => context.read<PlatformAgentChatBloc>().add(
-                          const PaChatLoadMore(),
-                        ),
-                      );
-                    }
-                    final idx =
-                        s.messages.length - 1 - (i - (s.sending ? 1 : 0));
-                    return PaMessageTile(
-                      message: s.messages[idx],
-                      onConfirm: s.sending
-                          ? null
-                          : () => onSend('Sí, confírmalo y procede.'),
-                    );
-                  },
-                ),
-        ),
-        if (s.sendFailure != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.sp3,
-              vertical: AppTokens.sp1,
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    platformAgentFailureCopy(s.sendFailure!),
-                    key: const Key('pa.send_failure'),
-                    style: const TextStyle(color: AppTokens.danger),
-                  ),
-                ),
-                if (s.lastAttemptedContent.isNotEmpty)
-                  AppButton.text(
-                    key: const Key('pa.send_failure.retry'),
-                    label: 'Reintentar',
-                    // Reintentar re-despacha sin pasar por el composer; limpiarlo
-                    // evita que el texto ya enviado quede y se reenvíe a mano.
-                    onPressed: () {
-                      _setComposer('');
-                      onSend(s.lastAttemptedContent);
                     },
                   ),
-              ],
-            ),
           ),
-        if (s.sending)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: AppButton.text(
-                key: const Key('pa.turn_cancel'),
-                label: 'Detener',
-                icon: Icons.stop_rounded,
-                onPressed: () => context.read<PlatformAgentChatBloc>().add(
-                  const PaChatTurnCancelRequested(),
-                ),
+          if (s.sendFailure != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.sp3,
+                vertical: AppTokens.sp1,
               ),
-            ),
-          ),
-        if (s.modalityWarning.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.sp3,
-              vertical: AppTokens.sp1,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const Icon(
-                  Icons.info_outline,
-                  size: 14,
-                  color: AppTokens.text2,
-                ),
-                const SizedBox(width: AppTokens.sp1),
-                Flexible(
-                  child: Text(
-                    s.modalityWarning,
-                    key: const Key('pa.modality_warning'),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: AppTokens.text2),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        if (s.pendingAttachments.isNotEmpty)
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              key: const Key('pa.pending_attachments'),
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
-              itemCount: s.pendingAttachments.length,
-              separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
-              itemBuilder: (context, i) {
-                final att = s.pendingAttachments[i];
-                final thumb = s.pendingThumbnails[att.ref];
-                return InputChip(
-                  key: Key('pa.pending_att.${att.ref}'),
-                  avatar: thumb != null
-                      // Miniatura real desde los bytes locales del pendiente.
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            AppTokens.radiusSm,
-                          ),
-                          child: Image.memory(
-                            thumb,
-                            key: Key('pa.pending_thumb.${att.ref}'),
-                            width: 20,
-                            height: 20,
-                            fit: BoxFit.cover,
-                            // Bytes que no decodifican caen al ícono en vez de
-                            // tumbar la fila.
-                            errorBuilder: (_, _, _) =>
-                                Icon(paAttachmentIcon(att.mime), size: 16),
-                          ),
-                        )
-                      : Icon(paAttachmentIcon(att.mime), size: 16),
-                  deleteIcon: const Icon(Icons.close, size: 16),
-                  label: Text(att.name, overflow: TextOverflow.ellipsis),
-                  onDeleted: () => context.read<PlatformAgentChatBloc>().add(
-                    PaChatAttachmentRemoved(att.ref),
-                  ),
-                );
-              },
-            ),
-          ),
-        // Grabando: la barra de nota de voz reemplaza al composer (una cosa a la
-        // vez). Si no, el composer con el micrófono en el slot final vacío.
-        if (s.recordingVoice && recorder != null)
-          VoiceRecordingBar(
-            elapsed: recorder!.elapsed,
-            amplitude: recorder!.amplitude,
-            onCancel: cancelVoice,
-            onSend: sendVoice,
-            onPauseResume: togglePauseVoice,
-            paused: paused,
-            sending: sendingVoice,
-          )
-        else
-          AppChatComposer(
-            controller: _composer,
-            fieldKey: const Key('pa.composer.field'),
-            sendKey: const Key('pa.composer.send'),
-            hint: 'Pídele algo a tu asistente…',
-            // El envío se atenúa durante la subida de adjuntos además del turno
-            // en vuelo: evita la carrera adjuntar-mientras-envía.
-            enabled: !s.sending && !s.attaching,
-            onSend: onSend,
-            // Micrófono en el slot final mientras el campo está vacío: solo si el
-            // grabador está soportado y no hay adjuntos pendientes (esos se envían
-            // por el flujo de texto).
-            emptyTrailing: (canRecord && s.pendingAttachments.isEmpty)
-                ? IconButton(
-                    key: const Key('pa.voice.mic'),
-                    tooltip: 'Grabar nota de voz',
-                    icon: const Icon(
-                      Icons.mic_none_outlined,
-                      color: AppTokens.text2,
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      platformAgentFailureCopy(s.sendFailure!),
+                      key: const Key('pa.send_failure'),
+                      style: const TextStyle(color: AppTokens.danger),
                     ),
-                    onPressed: startVoice,
-                  )
-                : null,
-            leading: <Widget>[
-              IconButton(
-                key: const Key('pa.attach'),
-                tooltip: 'Adjuntar imagen o PDF',
-                icon: s.attaching
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.attach_file, color: AppTokens.text2),
-                onPressed: s.attaching || s.sending
-                    ? null
-                    : () => context.read<PlatformAgentChatBloc>().add(
-                        const PaChatAttachRequested(),
-                      ),
+                  ),
+                  if (s.lastAttemptedContent.isNotEmpty)
+                    AppButton.text(
+                      key: const Key('pa.send_failure.retry'),
+                      label: 'Reintentar',
+                      // Reintentar re-despacha sin pasar por el composer; limpiarlo
+                      // evita que el texto ya enviado quede y se reenvíe a mano.
+                      onPressed: () {
+                        _setComposer('');
+                        onSend(s.lastAttemptedContent);
+                      },
+                    ),
+                ],
               ),
-            ],
-          ),
-      ],
+            ),
+          if (s.sending)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: AppButton.text(
+                  key: const Key('pa.turn_cancel'),
+                  label: 'Detener',
+                  icon: Icons.stop_rounded,
+                  onPressed: () => context.read<PlatformAgentChatBloc>().add(
+                    const PaChatTurnCancelRequested(),
+                  ),
+                ),
+              ),
+            ),
+          if (s.modalityWarning.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.sp3,
+                vertical: AppTokens.sp1,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: AppTokens.text2,
+                  ),
+                  const SizedBox(width: AppTokens.sp1),
+                  Flexible(
+                    child: Text(
+                      s.modalityWarning,
+                      key: const Key('pa.modality_warning'),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (s.pendingAttachments.isNotEmpty)
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                key: const Key('pa.pending_attachments'),
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
+                itemCount: s.pendingAttachments.length,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: AppTokens.sp2),
+                itemBuilder: (context, i) {
+                  final att = s.pendingAttachments[i];
+                  final thumb = s.pendingThumbnails[att.ref];
+                  return InputChip(
+                    key: Key('pa.pending_att.${att.ref}'),
+                    avatar: thumb != null
+                        // Miniatura real desde los bytes locales del pendiente.
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              AppTokens.radiusSm,
+                            ),
+                            child: Image.memory(
+                              thumb,
+                              key: Key('pa.pending_thumb.${att.ref}'),
+                              width: 20,
+                              height: 20,
+                              fit: BoxFit.cover,
+                              // Bytes que no decodifican caen al ícono en vez de
+                              // tumbar la fila.
+                              errorBuilder: (_, _, _) =>
+                                  Icon(paAttachmentIcon(att.mime), size: 16),
+                            ),
+                          )
+                        : Icon(paAttachmentIcon(att.mime), size: 16),
+                    deleteIcon: const Icon(Icons.close, size: 16),
+                    label: Text(att.name, overflow: TextOverflow.ellipsis),
+                    onDeleted: () => context.read<PlatformAgentChatBloc>().add(
+                      PaChatAttachmentRemoved(att.ref),
+                    ),
+                  );
+                },
+              ),
+            ),
+          // Grabando: la barra de nota de voz reemplaza al composer (una cosa a la
+          // vez). Si no, el composer con el micrófono en el slot final vacío.
+          if (s.recordingVoice && recorder != null)
+            VoiceRecordingBar(
+              elapsed: recorder!.elapsed,
+              amplitude: recorder!.amplitude,
+              onCancel: cancelVoice,
+              onSend: sendVoice,
+              onPauseResume: togglePauseVoice,
+              paused: paused,
+              sending: sendingVoice,
+            )
+          else
+            AppChatComposer(
+              controller: _composer,
+              fieldKey: const Key('pa.composer.field'),
+              sendKey: const Key('pa.composer.send'),
+              hint: 'Pídele algo a tu asistente…',
+              // El envío se atenúa durante la subida de adjuntos además del turno
+              // en vuelo: evita la carrera adjuntar-mientras-envía.
+              enabled: !s.sending && !s.attaching,
+              onSend: onSend,
+              // Micrófono en el slot final mientras el campo está vacío: solo si el
+              // grabador está soportado y no hay adjuntos pendientes (esos se envían
+              // por el flujo de texto).
+              emptyTrailing: (canRecord && s.pendingAttachments.isEmpty)
+                  ? IconButton(
+                      key: const Key('pa.voice.mic'),
+                      tooltip: 'Grabar nota de voz',
+                      icon: const Icon(
+                        Icons.mic_none_outlined,
+                        color: AppTokens.text2,
+                      ),
+                      onPressed: startVoice,
+                    )
+                  : null,
+              leading: <Widget>[
+                IconButton(
+                  key: const Key('pa.attach'),
+                  tooltip: 'Adjuntar imagen o PDF',
+                  icon: s.attaching
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.attach_file, color: AppTokens.text2),
+                  onPressed: s.attaching || s.sending
+                      ? null
+                      : () => context.read<PlatformAgentChatBloc>().add(
+                          const PaChatAttachRequested(),
+                        ),
+                ),
+              ],
+            ),
+        ],
+      ),
     );
   }
 }
