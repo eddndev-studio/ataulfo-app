@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'package:ataulfo/core/design/widgets/app_header_card.dart';
 import 'package:ataulfo/main.dart' as app;
 
 /// Smoke E2E del cliente Flutter contra un backend ataulfo-go real.
@@ -53,16 +54,19 @@ void main() {
       await tester.tap(find.text('Entrar'));
 
       // El AuthBloc emite Authenticated; el router empuja /home (ShellPage).
-      // El primer tab (Bots) es el activo por default — esperamos su AppBar.
+      // El primer tab (Bots) es el activo por default — esperamos su header.
       await _pumpUntil(
         tester,
-        find.widgetWithText(AppBar, 'Bots'),
+        find.widgetWithText(AppHeaderCard, 'Bots'),
         timeout: const Duration(seconds: 15),
       );
 
       // Cambiar a la tab Plantillas (BottomNavigationBarItem index 1).
       await tester.tap(find.text('Plantillas').last);
-      await _pumpUntil(tester, find.widgetWithText(AppBar, 'Plantillas'));
+      await _pumpUntil(
+        tester,
+        find.widgetWithText(AppHeaderCard, 'Plantillas'),
+      );
 
       // La lista se carga con spinner. Espera el primer tile o el
       // empty state — cualquiera de los dos resuelve el smoke.
@@ -175,13 +179,16 @@ void main() {
       await tester.tap(find.text('Entrar'));
       await _pumpUntil(
         tester,
-        find.widgetWithText(AppBar, 'Bots'),
+        find.widgetWithText(AppHeaderCard, 'Bots'),
         timeout: const Duration(seconds: 15),
       );
 
       // Tab Plantillas + primera tarjeta.
       await tester.tap(find.text('Plantillas').last);
-      await _pumpUntil(tester, find.widgetWithText(AppBar, 'Plantillas'));
+      await _pumpUntil(
+        tester,
+        find.widgetWithText(AppHeaderCard, 'Plantillas'),
+      );
 
       final emptyFinder = find.byKey(const Key('templates.empty'));
       final tileFinder = find.byType(InkWell).hitTestable();
@@ -354,12 +361,15 @@ void main() {
       await tester.tap(find.text('Entrar'));
       await _pumpUntil(
         tester,
-        find.widgetWithText(AppBar, 'Bots'),
+        find.widgetWithText(AppHeaderCard, 'Bots'),
         timeout: const Duration(seconds: 15),
       );
 
       await tester.tap(find.text('Plantillas').last);
-      await _pumpUntil(tester, find.widgetWithText(AppBar, 'Plantillas'));
+      await _pumpUntil(
+        tester,
+        find.widgetWithText(AppHeaderCard, 'Plantillas'),
+      );
 
       final emptyTemplatesFinder = find.byKey(const Key('templates.empty'));
       final tileFinder = find.byType(InkWell).hitTestable();
