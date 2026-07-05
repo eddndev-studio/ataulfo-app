@@ -123,8 +123,11 @@ void main() {
     tester,
   ) async {
     await pump(tester, const PaChatFailed(PaServerFailure()));
-    expect(find.byKey(const Key('pa.retry')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('pa.retry')));
+    // El fallo de carga usa el estado de error del kit (AppErrorState): el
+    // reintento es su botón 'Reintentar'.
+    expect(find.text('Reintentar'), findsOneWidget);
+    await tester.tap(find.text('Reintentar'));
+    await tester.pump();
     verify(() => bloc.add(const PaChatStarted())).called(1);
   });
 
@@ -145,9 +148,10 @@ void main() {
       ),
     );
     await tester.tap(find.byKey(const Key('pa.history')));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('pa.history.item.c2')), findsOneWidget);
     await tester.tap(find.byKey(const Key('pa.history.item.c2')));
+    await tester.pumpAndSettle();
     verify(() => bloc.add(const PaChatConversationSelected('c2'))).called(1);
   });
 
@@ -164,7 +168,7 @@ void main() {
       ),
     );
     await tester.tap(find.byKey(const Key('pa.history')));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('pa.history.menu.c2')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Eliminar').last);
@@ -172,6 +176,37 @@ void main() {
     await tester.tap(find.byKey(const Key('pa.history.delete.confirm')));
     await tester.pumpAndSettle();
     verify(() => bloc.add(const PaChatConversationDeleted('c2'))).called(1);
+  });
+
+  testWidgets('historial: renombrar abre el form-sheet y dispara Renamed', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      _loaded(
+        conversations: <PaConversation>[
+          _conv(),
+          _conv(id: 'c2', title: 'Ventas'),
+        ],
+      ),
+    );
+    await tester.tap(find.byKey(const Key('pa.history')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pa.history.menu.c2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Renombrar').last);
+    await tester.pumpAndSettle();
+    // El form-sheet del kit reemplaza al AlertDialog crudo y prefija el título.
+    expect(find.byKey(const Key('pa.history.rename.field')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('pa.history.rename.field')),
+      'Ventas MX',
+    );
+    await tester.tap(find.byKey(const Key('pa.history.rename.confirm')));
+    await tester.pumpAndSettle();
+    verify(
+      () => bloc.add(const PaChatConversationRenamed('c2', 'Ventas MX')),
+    ).called(1);
   });
 
   testWidgets('enviar texto dispara MessageSent', (tester) async {

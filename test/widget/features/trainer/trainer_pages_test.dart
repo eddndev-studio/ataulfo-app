@@ -105,31 +105,29 @@ void main() {
       expect(find.textContaining('Prompt actualizado'), findsOneWidget);
     });
 
-    testWidgets('hilo nuevo muestra chips de arranque y mandan el mensaje', (
+    testWidgets('hilo nuevo muestra chips de arranque que PREFIJAN el composer', (
       tester,
     ) async {
       await pump(tester, <TrainerMessage>[]);
       expect(find.byKey(const Key('trainer.chip.0')), findsOneWidget);
 
-      when(
-        () => repo.sendMessage(
-          templateId: 't1',
-          conversationId: 'c1',
-          content: any(named: 'content'),
-          attachments: any(named: 'attachments'),
-        ),
-      ).thenAnswer((_) async => _msg('mx', 'assistant', 'ok'));
-
       await tester.tap(find.byKey(const Key('trainer.chip.0')));
       await tester.pump();
-      verify(
+
+      // Semántica de prefill: el chip llena el composer para que el operador lo
+      // edite y envíe; NO auto-envía un turno del modelo.
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('trainer.composer.field')),
+      );
+      expect(field.controller?.text, '¿Qué necesitas saber de mi negocio?');
+      verifyNever(
         () => repo.sendMessage(
           templateId: 't1',
           conversationId: 'c1',
           content: any(named: 'content'),
           attachments: any(named: 'attachments'),
         ),
-      ).called(1);
+      );
       await tester.pumpAndSettle();
     });
 
