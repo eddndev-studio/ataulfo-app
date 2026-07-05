@@ -353,6 +353,13 @@ class _MessageComposerState extends State<MessageComposer> {
   /// donde existe sin cargar estado al composer. Con carrete accesible, la
   /// previsualización de recientes viene embebida en el propio sheet.
   Future<void> _openAttachMenu() async {
+    // Suelta el foco del campo YA, en el instante del tap: el teclado virtual
+    // empieza a cerrarse de inmediato y el Scaffold reacomoda. Sin esto, el
+    // foco sólo se perdería como efecto colateral de que el sheet modal lo roba
+    // al abrir — retrasado por los isSupported() de abajo (el del carrete es
+    // un round-trip real a la plataforma), dejando un hueco del alto del
+    // teclado entre el composer y el sheet.
+    FocusManager.instance.primaryFocus?.unfocus();
     final camera = context.read<CameraCapture>();
     final gallery = context.read<DeviceGalleryPort>();
     final canUseCamera = await camera.isSupported();
