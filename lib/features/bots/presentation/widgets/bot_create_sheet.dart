@@ -4,9 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../templates/domain/entities/template.dart';
@@ -323,7 +324,9 @@ class _PickTile extends StatelessWidget {
       onTap: () => onPick(template),
       child: Row(
         children: <Widget>[
-          AppAvatar(name: template.name, colorKey: template.id),
+          // Una plantilla no es una persona: mismo glifo de entidad que el
+          // hub de Plantillas, nunca un avatar con inicial.
+          const AppEntityIcon(icon: Icons.description_outlined),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(
@@ -527,36 +530,12 @@ class _TemplateChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    // Cápsula read-only del design system: el mismo patrón que el canal en la
+    // hoja de edición del bot, en vez de una cápsula reconstruida a mano.
     return Align(
       key: const Key('bot_create.template_chip'),
       alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.sp3,
-          vertical: AppTokens.sp1,
-        ),
-        decoration: BoxDecoration(
-          color: AppTokens.surface2,
-          borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-          border: Border.all(color: AppTokens.divider),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(
-              Icons.description_outlined,
-              size: 18,
-              color: AppTokens.text2,
-            ),
-            const SizedBox(width: AppTokens.sp2),
-            Text(
-              name,
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
-            ),
-          ],
-        ),
-      ),
+      child: AppPill.outline(label: name),
     );
   }
 }

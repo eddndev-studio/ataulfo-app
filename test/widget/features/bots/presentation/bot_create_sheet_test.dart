@@ -1,9 +1,10 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
-import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
+import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/core/design/widgets/provider_badge.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
@@ -169,7 +170,15 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('Soporte ventas'), findsOneWidget);
-        expect(find.byIcon(Icons.description_outlined), findsOneWidget);
+        // El chip de referencia read-only converge a AppPill.outline, igual
+        // que el canal en la hoja de edición del bot.
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('bot_create.template_chip')),
+            matching: find.widgetWithText(AppPill, 'Soporte ventas'),
+          ),
+          findsOneWidget,
+        );
         expect(find.byType(AppTextField), findsNWidgets(2));
         expect(find.byKey(const Key('bot_create.field.name')), findsOneWidget);
         expect(
@@ -293,8 +302,8 @@ void main() {
   });
 
   group('paso selección de plantilla', () {
-    testWidgets('Loaded lista una AppCard con AppAvatar + ProviderBadge por '
-        'plantilla', (tester) async {
+    testWidgets('Loaded lista una AppCard con AppEntityIcon + ProviderBadge '
+        'por plantilla', (tester) async {
       tall(tester);
       await tester.pumpWidget(pickHost());
 
@@ -302,7 +311,10 @@ void main() {
       expect(find.text('Soporte ventas'), findsOneWidget);
       expect(find.text('Cobranza'), findsOneWidget);
       expect(find.byType(AppCard), findsNWidgets(2));
-      expect(find.byType(AppAvatar), findsNWidgets(2));
+      // Una plantilla no es una persona: el mismo glifo de entidad que usa
+      // el hub de Plantillas, nunca un avatar con inicial.
+      expect(find.byType(AppEntityIcon), findsNWidgets(2));
+      expect(find.byIcon(Icons.description_outlined), findsNWidgets(2));
       expect(find.byType(ProviderBadge), findsNWidgets(2));
     });
 

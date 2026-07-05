@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/i18n/role_labels.dart';
 import '../../domain/entities/membership.dart';
 
-/// Fila de una organización del operador: avatar + nombre + pill de rol, con
-/// un badge "Activa" cuando es la org de la sesión vigente.
+/// Fila de una organización del operador: glifo de entidad + nombre + pill de
+/// rol, con un badge "Activa" cuando es la org de la sesión vigente. Una
+/// organización no es una persona: lleva [AppEntityIcon], nunca el avatar
+/// circular con inicial (reservado a miembros/contactos).
 ///
 /// Es tappable sólo cuando recibe [onTap] Y NO es la org activa: la lista de
 /// `/memberships` la monta sin `onTap` (solo lectura), mientras la selección
@@ -34,7 +36,7 @@ class OrgMembershipTile extends StatelessWidget {
       onTap: isActive ? null : onTap,
       child: Row(
         children: <Widget>[
-          AppAvatar(name: membership.orgName, colorKey: membership.orgId),
+          const AppEntityIcon(icon: Icons.apartment_outlined),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(

@@ -1,5 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
-import 'package:ataulfo/core/design/widgets/app_avatar.dart';
+import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
@@ -15,14 +15,16 @@ Widget _host(Widget child) => MaterialApp(
 );
 
 void main() {
-  testWidgets('pinta avatar, nombre y pill de rol (look del tile)', (
+  testWidgets('pinta glifo de entidad, nombre y pill de rol (look del tile)', (
     tester,
   ) async {
     await tester.pumpWidget(
       _host(const OrgMembershipTile(membership: _membership, isActive: false)),
     );
 
-    expect(find.byType(AppAvatar), findsOneWidget);
+    // Una organización no es una persona: glifo de entidad, nunca avatar.
+    expect(find.byType(AppEntityIcon), findsOneWidget);
+    expect(find.byIcon(Icons.apartment_outlined), findsOneWidget);
     expect(find.text('Acme'), findsOneWidget);
     // El rol se humaniza (roleLabel), como en MemberTile/InvitationTile: antes
     // esta fila pintaba el código crudo 'OWNER'.
