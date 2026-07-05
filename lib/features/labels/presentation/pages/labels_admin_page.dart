@@ -3,9 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_header_card.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_swatch_icon.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/user_greeting.dart';
@@ -147,10 +148,7 @@ class _LabelsAdminPageState extends State<LabelsAdminPage> {
                     if (filtered.isEmpty)
                       const _NoResults()
                     else
-                      for (final label in filtered) ...<Widget>[
-                        _LabelTile(label: label),
-                        const SizedBox(height: AppTokens.cardGap),
-                      ],
+                      _LabelsCard(labels: filtered),
                   ],
                 ],
               ),
@@ -162,8 +160,41 @@ class _LabelsAdminPageState extends State<LabelsAdminPage> {
   }
 }
 
-class _LabelTile extends StatelessWidget {
-  const _LabelTile({required this.label});
+/// Catálogo como UNA card que apila las etiquetas separadas por divider hairline
+/// (idioma de los hubs y de ajustes), en lugar de una card suelta por item. La
+/// identidad de cada fila la lleva su glifo tintado; el color no se repite en un
+/// fondo de card.
+class _LabelsCard extends StatelessWidget {
+  const _LabelsCard({required this.labels});
+
+  final List<Label> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < labels.length; i++) {
+      if (i > 0) {
+        rows.add(
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+        );
+      }
+      rows.add(_LabelRow(label: labels[i]));
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: rows,
+      ),
+    );
+  }
+}
+
+/// Fila de una etiqueta dentro de la card del catálogo: glifo tintado + nombre +
+/// descripción + chevron. Toda la fila es tap-target hacia la hoja de edición;
+/// el InkWell propio da el ripple al tocar (la card ya no es tappable).
+class _LabelRow extends StatelessWidget {
+  const _LabelRow({required this.label});
 
   final Label label;
 
@@ -171,43 +202,47 @@ class _LabelTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final hasDescription = label.description.trim().isNotEmpty;
-    // onTap nativo del AppCard: ripple/highlight del InkWell interno
-    // (el GestureDetector externo dejaba el tap sin feedback visual).
-    return AppCard(
+    return InkWell(
+      key: Key('labels_admin.tile.${label.id}'),
       onTap: () => LabelEditSheet.openEdit(context, label),
-      child: Row(
-        children: <Widget>[
-          // El color ES la identidad de la etiqueta: glifo tintado con
-          // presencia (no un dot de 16px perdido en la card).
-          AppSwatchIcon(color: parseLabelHex(label.color)),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  label.name,
-                  style: textTheme.titleMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (hasDescription) ...<Widget>[
-                  const SizedBox(height: AppTokens.sp1),
+      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        child: Row(
+          children: <Widget>[
+            // El color ES la identidad de la etiqueta: glifo tintado con
+            // presencia (no un dot de 16px perdido en la fila).
+            AppSwatchIcon(color: parseLabelHex(label.color)),
+            const SizedBox(width: AppTokens.sp4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
                   Text(
-                    label.description,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: AppTokens.text2,
-                    ),
-                    maxLines: 2,
+                    label.name,
+                    style: textTheme.titleMedium,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (hasDescription) ...<Widget>[
+                    const SizedBox(height: AppTokens.sp1),
+                    Text(
+                      label.description,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppTokens.text2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
-        ],
+            const SizedBox(width: AppTokens.sp2),
+            const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
+          ],
+        ),
       ),
     );
   }
@@ -217,11 +252,8 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      const AppLoadingIndicator(label: 'Cargando etiquetas…');
 }
 
 /// La búsqueda no dejó etiquetas visibles (pero sí las hay en la org).
@@ -283,28 +315,15 @@ class _FailedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Center(
-      key: const Key('labels_admin.error'),
       child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              _message(failure),
-              textAlign: TextAlign.center,
-              style: textTheme.bodyLarge,
-            ),
-            const SizedBox(height: AppTokens.sp3),
-            AppButton.tonal(
-              key: const Key('labels_admin.retry'),
-              label: 'Reintentar',
-              onPressed: () => context.read<LabelsAdminBloc>().add(
-                const LabelsAdminLoadRequested(),
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.all(AppTokens.sp5),
+        child: AppErrorState(
+          key: const Key('labels_admin.error'),
+          message: _message(failure),
+          onRetry: () => context.read<LabelsAdminBloc>().add(
+            const LabelsAdminLoadRequested(),
+          ),
         ),
       ),
     );

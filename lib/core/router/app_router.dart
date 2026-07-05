@@ -36,6 +36,7 @@ import '../../features/bots/presentation/bloc/bot_connect_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_detail_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_maintenance_bloc.dart';
 import '../../features/bots/presentation/bloc/bot_session_status_bloc.dart';
+import '../../features/bots/presentation/bloc/bot_sessions_cubit.dart';
 import '../../features/bots/presentation/bloc/bot_variables_bloc.dart';
 import '../../features/bots/presentation/bloc/bots_bloc.dart';
 import '../../features/bots/presentation/bot_create_draft.dart';
@@ -600,6 +601,13 @@ class AppRouter {
                           create: (_) =>
                               BotsBloc(_botsRepo)
                                 ..add(const BotsLoadRequested()),
+                        ),
+                        // Compañero del listado de bots: al asentarse la lista,
+                        // la page le pide abanicar el estado de sesión por bot.
+                        // Scoped al shell, como BotsBloc, para preservar los
+                        // indicadores entre cambios de tab.
+                        BlocProvider<BotSessionsCubit>(
+                          create: (_) => BotSessionsCubit(_botSessionRepo),
                         ),
                         BlocProvider<TemplatesBloc>(
                           create: (_) =>

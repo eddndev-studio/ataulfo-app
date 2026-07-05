@@ -1,6 +1,10 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_header_card.dart';
+import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/core/design/widgets/app_swatch_icon.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -65,10 +69,11 @@ void main() {
     isRefreshing: false,
   );
 
-  testWidgets('Loading → spinner', (tester) async {
+  testWidgets('Loading → spinner canónico del kit', (tester) async {
     seed(const LabelsAdminLoading());
     await tester.pumpWidget(host());
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(AppLoadingIndicator), findsOneWidget);
   });
 
   testWidgets('Loaded monta el header rico de sección (paridad con tabs)', (
@@ -95,6 +100,19 @@ void main() {
     expect(find.byType(AppSwatchIcon), findsNWidgets(2));
   });
 
+  testWidgets('el listado es UNA sola card con filas separadas por divider', (
+    tester,
+  ) async {
+    seed(twoLabels);
+    await tester.pumpWidget(host());
+    // Idioma de hubs/ajustes: una card apila las filas, no una card por item.
+    expect(find.byType(AppCard), findsOneWidget);
+    // 2 etiquetas ⇒ 1 divider hairline del kit entre filas.
+    final dividers = tester.widgetList<Divider>(find.byType(Divider)).toList();
+    expect(dividers.length, 1);
+    expect(dividers.first.color, AppTokens.divider);
+  });
+
   testWidgets('buscador filtra por nombre (client-side)', (tester) async {
     seed(twoLabels);
     await tester.pumpWidget(host());
@@ -116,7 +134,7 @@ void main() {
     expect(find.byKey(const Key('labels_admin.no_results')), findsOneWidget);
   });
 
-  testWidgets('el tile usa el onTap del AppCard (ripple del DS)', (
+  testWidgets('cada fila tiene ripple propio (InkWell con onTap)', (
     tester,
   ) async {
     seed(
@@ -129,10 +147,12 @@ void main() {
     );
     await tester.pumpWidget(host());
 
-    // El feedback táctil viene del InkWell interno del AppCard; un
-    // GestureDetector externo no da ripple y deja el tap "muerto" al ojo.
-    final card = tester.widget<AppCard>(find.byType(AppCard).first);
-    expect(card.onTap, isNotNull);
+    // El feedback táctil vive por fila: al colapsar las etiquetas en una card,
+    // cada fila es su propio InkWell tap-target (la card ya no es tappable).
+    final row = tester.widget<InkWell>(
+      find.byKey(const Key('labels_admin.tile.1')),
+    );
+    expect(row.onTap, isNotNull);
   });
 
   testWidgets('Loaded vacío → empty state SIN perder el header ni el refresh', (
@@ -147,15 +167,28 @@ void main() {
     expect(find.byKey(const Key('labels_admin.search')), findsNothing);
   });
 
-  testWidgets('Failed → error + reintentar despacha LoadRequested', (
+  testWidgets('Failed → AppErrorState + reintentar despacha LoadRequested', (
     tester,
   ) async {
     seed(const LabelsAdminFailed(LabelsServerFailure()));
     await tester.pumpWidget(host());
+    // El error es el primitivo canónico del kit (misma anatomía sobria).
+    expect(find.byType(AppErrorState), findsOneWidget);
     expect(find.byKey(const Key('labels_admin.error')), findsOneWidget);
+    // El copy por tipo de fallo se conserva.
+    expect(find.text('No pudimos cargar las etiquetas.'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('labels_admin.retry')));
+    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     verify(() => bloc.add(const LabelsAdminLoadRequested())).called(1);
+  });
+
+  testWidgets('Failed de red → copy honesto de conexión', (tester) async {
+    seed(const LabelsAdminFailed(LabelsNetworkFailure()));
+    await tester.pumpWidget(host());
+    expect(
+      find.text('Sin conexión. Revisa tu red e inténtalo de nuevo.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('tocar una etiqueta abre la hoja de edición', (tester) async {

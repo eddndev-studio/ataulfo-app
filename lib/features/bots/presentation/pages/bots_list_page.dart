@@ -1,9 +1,7 @@
-// Pesa >400 LOC porque agrupa el shell del listado de Bots (header, CTA de
-// creación, buscador, filtros, tile, pills de estado y los estados vacío/
-// carga/error) con sus helpers cohesivos. Los widgets viven solo aquí; un split
-// compartiría estructuras privadas entre archivos hermanos sin reuso real. Si
-// crece más, el primer corte es extraer _BotTile + _StatusPill a
-// `widgets/bot_tile.dart`.
+// Agrupa el shell del listado de Bots (header, CTA de creación, buscador,
+// filtros y los estados vacío/carga/error) con sus helpers cohesivos. El tile y
+// sus pills de estado viven aparte en `widgets/bot_tile.dart` porque los
+// consume también su propio test de widget.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,20 +10,19 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
-import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
-import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
+import '../bloc/bot_sessions_cubit.dart';
 import '../bloc/bots_bloc.dart';
 import '../widgets/bot_create_sheet.dart';
+import '../widgets/bot_tile.dart';
 
 /// Filtro por estado del listado. Es estado de UI local (client-side sobre la
 /// lista ya cargada), no del bloc: el backend devuelve todos los bots y el
@@ -102,7 +99,7 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
       final matchesQuery =
           q.isEmpty ||
           b.name.toLowerCase().contains(q) ||
-          _channelLabel(b.channel).toLowerCase().contains(q);
+          channelLabel(b.channel).toLowerCase().contains(q);
       final matchesFilter = switch (_filter) {
         _BotFilter.all => true,
         _BotFilter.active => !b.paused,
@@ -124,15 +121,29 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<BotsBloc, BotsState>(
-      builder: (context, state) => switch (state) {
-        BotsInitial() || BotsLoading() => const _LoadingView(),
-        BotsLoaded(items: final items) =>
-          items.isEmpty
-              ? _EmptyView(onRefresh: () => _refresh(context))
-              : _buildLoaded(context, items),
-        BotsFailed() => const _FailedView(),
+    // Cada vez que el listado se asienta (carga inicial, pull-to-refresh o
+    // vuelta de una sub-ruta), se re-consultan las sesiones de sus bots: el
+    // dato de sesión no viene en `GET /bots` y se abanica aparte.
+    return BlocListener<BotsBloc, BotsState>(
+      listenWhen: (previous, current) =>
+          current is BotsLoaded && !current.isRefreshing,
+      listener: (context, state) {
+        if (state is BotsLoaded) {
+          context.read<BotSessionsCubit>().load(
+            state.items.map((b) => b.id).toList(),
+          );
+        }
       },
+      child: BlocBuilder<BotsBloc, BotsState>(
+        builder: (context, state) => switch (state) {
+          BotsInitial() || BotsLoading() => const _LoadingView(),
+          BotsLoaded(items: final items) =>
+            items.isEmpty
+                ? _EmptyView(onRefresh: () => _refresh(context))
+                : _buildLoaded(context, items),
+          BotsFailed() => const _FailedView(),
+        },
+      ),
     );
   }
 
@@ -187,10 +198,22 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
                   if (filtered.isEmpty)
                     const _NoResults()
                   else
-                    for (final bot in filtered) ...<Widget>[
-                      _BotTile(bot: bot),
-                      const SizedBox(height: AppTokens.cardGap),
-                    ],
+                    // El estado de sesión por bot lo aporta el cubit compañero;
+                    // el tile lo pinta conforme llega (o lo omite si no hay dato).
+                    BlocBuilder<BotSessionsCubit, BotSessionsState>(
+                      builder: (context, sessions) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          for (final bot in filtered) ...<Widget>[
+                            BotTile(
+                              bot: bot,
+                              sessionState: sessions.stateFor(bot.id),
+                            ),
+                            const SizedBox(height: AppTokens.cardGap),
+                          ],
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -246,69 +269,6 @@ class _FilterChips extends StatelessWidget {
     selected: selected == value,
     onSelected: (_) => onSelected(value),
   );
-}
-
-/// Card tappable de un bot. Glifo de entidad + nombre + canal + pill de estado.
-/// Sin sombra; la jerarquía la da `surface2` + padding + separación.
-class _BotTile extends StatelessWidget {
-  const _BotTile({required this.bot});
-
-  final Bot bot;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final subtitle = bot.identifier == null || bot.identifier!.trim().isEmpty
-        ? _channelLabel(bot.channel)
-        : '${_channelLabel(bot.channel)} · ${bot.identifier!.trim()}';
-    return AppCard(
-      key: Key('bots.tile.${bot.id}'),
-      // push (no go): el detalle se apila sobre el listado para que el back
-      // físico y la flecha del AppBar vuelvan al shell con la tab Bots activa.
-      onTap: () => context.push('/bots/${bot.id}'),
-      child: Row(
-        children: <Widget>[
-          const AppEntityIcon(icon: Icons.smart_toy_outlined),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(bot.name, style: textTheme.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppTokens.sp3),
-          _StatusPill(paused: bot.paused),
-        ],
-      ),
-    );
-  }
-}
-
-/// Pill de estado discreta (no compite con el nombre). Activo → neutral con dot
-/// `accent`; pausado → outline con dot neutro. No se usa fill primary ni
-/// `success`: el dot cálido basta para comunicar "encendido".
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.paused});
-
-  final bool paused;
-
-  @override
-  Widget build(BuildContext context) {
-    if (paused) {
-      return const AppPill.outline(label: 'Pausado', dot: AppPillDot.paused);
-    }
-    return const AppPill.neutral(label: 'Activo', dot: AppPillDot.active);
-  }
 }
 
 /// La búsqueda/filtro no dejó bots visibles (pero sí los hay en la org).
@@ -404,8 +364,3 @@ class _FailedView extends StatelessWidget {
     );
   }
 }
-
-String _channelLabel(BotChannel c) => switch (c) {
-  BotChannel.waUnofficial => 'WhatsApp',
-  BotChannel.waba => 'WhatsApp Business',
-};

@@ -13,9 +13,11 @@ import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/bot_create_draft.dart';
+import 'package:ataulfo/features/bots/presentation/bloc/bot_sessions_cubit.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -29,6 +31,9 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
     implements BotsBloc {}
+
+class _MockBotSessionsCubit extends MockCubit<BotSessionsState>
+    implements BotSessionsCubit {}
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
@@ -72,14 +77,19 @@ const _b2 = Bot(
 void main() {
   setUpAll(() {
     registerFallbackValue(const BotsLoadRequested());
+    registerFallbackValue(<String>[]);
   });
 
   late _MockBotsBloc bloc;
+  late _MockBotSessionsCubit sessionsCubit;
   late _MockAuthBloc authBloc;
 
   setUp(() {
     bloc = _MockBotsBloc();
     when(() => bloc.state).thenReturn(const BotsInitial());
+    sessionsCubit = _MockBotSessionsCubit();
+    when(() => sessionsCubit.state).thenReturn(const BotSessionsState.empty());
+    when(() => sessionsCubit.load(any())).thenAnswer((_) async {});
     authBloc = _MockAuthBloc();
     // El header rico saluda con el nombre derivado del email de la sesión.
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
@@ -101,6 +111,7 @@ void main() {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<AuthBloc>.value(value: authBloc),
         BlocProvider<BotsBloc>.value(value: bloc),
+        BlocProvider<BotSessionsCubit>.value(value: sessionsCubit),
       ],
       // BotsListPage es content-only; el shell aporta Scaffold/AppBar/FAB.
       // En aislamiento envolvemos en Scaffold para tener Material upstream.
@@ -250,6 +261,60 @@ void main() {
     expect(find.widgetWithText(AppPill, 'Activo'), findsOneWidget);
   });
 
+  testWidgets('el estado de sesión del cubit se pinta en el tile', (
+    tester,
+  ) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+    when(() => sessionsCubit.state).thenReturn(
+      const BotSessionsState(<String, SessionState>{
+        'b1': SessionState.connected,
+      }),
+    );
+
+    await tester.pumpWidget(host());
+
+    expect(find.widgetWithText(AppPill, 'Enlazado'), findsOneWidget);
+  });
+
+  testWidgets('sin dato de sesión, el tile no inventa indicador', (
+    tester,
+  ) async {
+    tall(tester);
+    when(
+      () => bloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_b1], isRefreshing: false));
+    // Estado de sesiones vacío (fetch en vuelo o fallido): sin pill de sesión.
+    await tester.pumpWidget(host());
+
+    expect(find.widgetWithText(AppPill, 'Enlazado'), findsNothing);
+    expect(find.widgetWithText(AppPill, 'Sin enlazar'), findsNothing);
+  });
+
+  testWidgets('al asentarse el listado, abanica las sesiones por id', (
+    tester,
+  ) async {
+    tall(tester);
+    // El listado transiciona Loading → Loaded(settled): el listener re-consulta
+    // las sesiones de los ids cargados.
+    whenListen(
+      bloc,
+      Stream<BotsState>.fromIterable(const <BotsState>[
+        BotsLoaded(items: <Bot>[_b1, _b2], isRefreshing: false),
+      ]),
+      initialState: const BotsLoading(),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    verify(
+      () => sessionsCubit.load(any(that: equals(<String>['b1', 'b2']))),
+    ).called(1);
+  });
+
   testWidgets('Loaded vacío muestra empty state glass con CTA "Crear bot"', (
     tester,
   ) async {
@@ -362,6 +427,7 @@ void main() {
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<AuthBloc>.value(value: authBloc),
                 BlocProvider<BotsBloc>.value(value: bloc),
+                BlocProvider<BotSessionsCubit>.value(value: sessionsCubit),
               ],
               child: const Scaffold(body: BotsListPage()),
             ),
@@ -418,6 +484,7 @@ void main() {
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<AuthBloc>.value(value: authBloc),
                 BlocProvider<BotsBloc>.value(value: bloc),
+                BlocProvider<BotSessionsCubit>.value(value: sessionsCubit),
               ],
               child: Scaffold(body: BotsListPage(routeObserver: observer)),
             ),
