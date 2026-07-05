@@ -4,14 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Widget host({void Function(AttachMenuAction?)? onResult}) => MaterialApp(
+  Widget host({
+    void Function(AttachMenuAction?)? onResult,
+    bool showCamera = false,
+  }) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: Scaffold(
       body: Builder(
         builder: (context) => Center(
           child: ElevatedButton(
             onPressed: () async {
-              final r = await AttachMenuSheet.open(context);
+              final r = await AttachMenuSheet.open(
+                context,
+                showCamera: showCamera,
+              );
               onResult?.call(r);
             },
             child: const Text('abrir'),
@@ -26,7 +32,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('muestra EXACTAMENTE los destinos Documento y Medios', (
+  testWidgets('sin cámara soportada muestra SOLO Documento y Medios', (
     tester,
   ) async {
     await tester.pumpWidget(host());
@@ -36,9 +42,34 @@ void main() {
     expect(find.byKey(const Key('attach_menu.media')), findsOneWidget);
     expect(find.text('Documento'), findsOneWidget);
     expect(find.text('Medios'), findsOneWidget);
-    // Sin botones muertos: cámara/galería llegan cuando existan de verdad.
+    // Sin botones muertos: cámara sólo con soporte real; galería cuando exista.
     expect(find.byKey(const Key('attach_menu.camera')), findsNothing);
     expect(find.byKey(const Key('attach_menu.gallery')), findsNothing);
+  });
+
+  testWidgets('con cámara soportada muestra el destino Cámara', (tester) async {
+    await tester.pumpWidget(host(showCamera: true));
+    await openSheet(tester);
+
+    expect(find.byKey(const Key('attach_menu.document')), findsOneWidget);
+    expect(find.byKey(const Key('attach_menu.media')), findsOneWidget);
+    expect(find.byKey(const Key('attach_menu.camera')), findsOneWidget);
+    expect(find.text('Cámara'), findsOneWidget);
+  });
+
+  testWidgets('tocar Cámara cierra el sheet devolviendo camera', (
+    tester,
+  ) async {
+    AttachMenuAction? result;
+    await tester.pumpWidget(
+      host(showCamera: true, onResult: (r) => result = r),
+    );
+    await openSheet(tester);
+    await tester.tap(find.byKey(const Key('attach_menu.camera')));
+    await tester.pumpAndSettle();
+
+    expect(result, AttachMenuAction.camera);
+    expect(find.byKey(const Key('attach_menu_sheet')), findsNothing);
   });
 
   testWidgets('tocar Documento cierra el sheet devolviendo document', (

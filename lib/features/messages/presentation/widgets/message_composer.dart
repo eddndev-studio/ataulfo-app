@@ -9,6 +9,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../media/domain/entities/media_asset.dart';
 import '../../../media/domain/failures/media_failure.dart';
+import '../../../media/domain/repositories/camera_capture.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../../media/domain/repositories/media_repository.dart';
 import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
@@ -20,6 +21,7 @@ import '../../domain/entities/message.dart';
 import '../../../../core/audio/audio_recorder.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/reply_draft_cubit.dart';
+import 'attach_camera_sheet.dart';
 import 'attach_menu_sheet.dart';
 import 'attachment_tray.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
@@ -343,15 +345,69 @@ class _MessageComposerState extends State<MessageComposer> {
 
   /// Abre el menú de adjuntar (el sheet sólo DECIDE el destino) y ejecuta el
   /// flujo elegido: "Documento" es el picker múltiple de siempre; "Medios" es
-  /// la galería de la organización en modo picker.
+  /// la galería de la organización en modo picker; "Cámara" captura contenido
+  /// nuevo. El soporte de cámara se resuelve AL ABRIR (no en `initState`,
+  /// como el mic): el sheet se construye bajo demanda, así el destino sólo
+  /// se ofrece donde hay cámara real sin cargar estado al composer.
   Future<void> _openAttachMenu() async {
-    final action = await AttachMenuSheet.open(context);
+    final camera = context.read<CameraCapture>();
+    final canUseCamera = await camera.isSupported();
+    if (!mounted) return;
+    final action = await AttachMenuSheet.open(
+      context,
+      showCamera: canUseCamera,
+    );
     if (!mounted || action == null) return;
     switch (action) {
       case AttachMenuAction.document:
         await _pickAttachments();
       case AttachMenuAction.media:
         await _pickFromMediaLibrary();
+      case AttachMenuAction.camera:
+        await _captureFromCamera(camera);
+    }
+  }
+
+  /// Pregunta el modo (foto/video) en el sub-sheet, invoca la cámara y suma
+  /// lo capturado a la bandeja por el MISMO camino que un archivo elegido:
+  /// bytes locales (se subirá al enviar), tipo inferido por extensión y topes
+  /// client-side del lote. Cancelar el sub-sheet o la captura no agrega nada.
+  Future<void> _captureFromCamera(CameraCapture camera) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final mode = await AttachCameraSheet.open(context);
+    if (!mounted || mode == null) return;
+    final media = switch (mode) {
+      CameraCaptureMode.photo => await camera.takePhoto(),
+      CameraCaptureMode.video => await camera.takeVideo(),
+    };
+    if (!mounted || media == null) return;
+
+    final plan = planAttachmentBatch(
+      picked: <({String filename, int sizeBytes})>[
+        (filename: media.filename, sizeBytes: media.bytes.length),
+      ],
+      currentCount: _attachments.length,
+    );
+    if (plan.acceptedIndexes.isNotEmpty) {
+      setState(() {
+        _attachments.add(
+          PendingAttachment(
+            bytes: media.bytes,
+            filename: media.filename,
+            type: messageTypeForFilename(media.filename),
+          ),
+        );
+      });
+    }
+    if (plan.tooLarge.isNotEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(_tooLargeCopy(plan.tooLarge))),
+      );
+    }
+    if (plan.overflow) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Máximo 10 archivos por envío')),
+      );
     }
   }
 

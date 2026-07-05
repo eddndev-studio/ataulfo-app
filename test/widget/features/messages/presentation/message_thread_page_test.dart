@@ -7,7 +7,9 @@ import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_chat_composer.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/media/data/repositories/noop_camera_capture.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
+import 'package:ataulfo/features/media/domain/repositories/camera_capture.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/messages/data/cache/message_media_cache.dart';
@@ -1751,6 +1753,9 @@ void main() {
           RepositoryProvider<MediaFilePicker>.value(value: picker),
           RepositoryProvider<MediaRepository>.value(value: mediaRepo),
           RepositoryProvider<MediaOpener>.value(value: opener),
+          RepositoryProvider<CameraCapture>.value(
+            value: const NoopCameraCapture(),
+          ),
           RepositoryProvider<AudioRecorder>.value(
             value: const NoopAudioRecorder(),
           ),

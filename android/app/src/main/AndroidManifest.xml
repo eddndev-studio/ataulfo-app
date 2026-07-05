@@ -5,8 +5,13 @@
          pendiente del lado cliente. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Grabación de notas de voz (Opus-en-Ogg). El permiso en runtime lo
-         solicita el grabador (record.hasPermission) al primer uso. -->
+         solicita el grabador (record.hasPermission) al primer uso. También
+         cubre el audio de un video grabado con la cámara. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Captura de foto/video desde el menú de adjuntar. Declarado el
+         permiso, image_picker lo solicita en runtime antes de abrir la
+         cámara del SO. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
         android:label="Ataúlfo"
         android:name="${applicationName}"

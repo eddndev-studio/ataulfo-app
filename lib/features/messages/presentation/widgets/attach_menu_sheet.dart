@@ -13,6 +13,10 @@ enum AttachMenuAction {
 
   /// Elegir un asset ya subido del catálogo de media de la organización.
   media,
+
+  /// Capturar contenido nuevo con la cámara (foto o video; el llamador abre
+  /// el sub-sheet que decide cuál).
+  camera,
 }
 
 /// Menú de adjuntar del composer del hilo (estilo WhatsApp): una fila de
@@ -23,15 +27,23 @@ enum AttachMenuAction {
 /// Ejecutar cada flujo queda en el llamador, que sí tiene los repos y el
 /// router a mano — así el sheet no arrastra providers a la ruta modal.
 class AttachMenuSheet extends StatelessWidget {
-  const AttachMenuSheet({super.key});
+  const AttachMenuSheet({super.key, this.showCamera = false});
+
+  /// Ofrecer el destino Cámara. El llamador lo resuelve con
+  /// `CameraCapture.isSupported()` ANTES de abrir: así el sheet sigue
+  /// stateless y sin dependencias (sin botón muerto donde no hay cámara).
+  final bool showCamera;
 
   /// Abre el menú y resuelve con el destino elegido, o `null` si se cierra
   /// sin elegir.
-  static Future<AttachMenuAction?> open(BuildContext context) {
+  static Future<AttachMenuAction?> open(
+    BuildContext context, {
+    bool showCamera = false,
+  }) {
     return showAppBottomSheet<AttachMenuAction>(
       context,
       backgroundColor: AppTokens.surface1,
-      builder: (_) => const AttachMenuSheet(),
+      builder: (_) => AttachMenuSheet(showCamera: showCamera),
     );
   }
 
@@ -52,21 +64,30 @@ class AttachMenuSheet extends StatelessWidget {
         children: <Widget>[
           Text('Adjuntar', style: textTheme.titleLarge),
           const SizedBox(height: AppTokens.sp4),
-          const Row(
+          Row(
             children: <Widget>[
-              _AttachMenuItem(
+              const _AttachMenuItem(
                 key: Key('attach_menu.document'),
                 action: AttachMenuAction.document,
                 icon: Icons.insert_drive_file_outlined,
                 label: 'Documento',
               ),
-              SizedBox(width: AppTokens.sp4),
-              _AttachMenuItem(
+              const SizedBox(width: AppTokens.sp4),
+              const _AttachMenuItem(
                 key: Key('attach_menu.media'),
                 action: AttachMenuAction.media,
                 icon: Icons.perm_media_outlined,
                 label: 'Medios',
               ),
+              if (showCamera) ...const <Widget>[
+                SizedBox(width: AppTokens.sp4),
+                _AttachMenuItem(
+                  key: Key('attach_menu.camera'),
+                  action: AttachMenuAction.camera,
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Cámara',
+                ),
+              ],
             ],
           ),
         ],
