@@ -40,7 +40,7 @@ class _ShellPageState extends State<ShellPage> {
   int _index = 0;
 
   /// Índice de la tab Ajustes: destino del avatar de los headers de sección.
-  static const int _settingsIndex = 3;
+  static const int _settingsIndex = 4;
 
   /// Punto ÚNICO de verdad de las tabs: por entrada viven juntos la etiqueta
   /// e ícono del navegador, la página del IndexedStack y el FAB contextual.
@@ -73,13 +73,7 @@ class _ShellPageState extends State<ShellPage> {
       page: LabelsAdminPage(onOpenSettings: () => _select(_settingsIndex)),
       fab: _labelCreateFab,
     ),
-    const _TabSpec(
-      label: 'Ajustes',
-      icon: Icons.settings_outlined,
-      page: SettingsPage(),
-    ),
-    // El asistente va al final (los índices previos son contrato de los
-    // onOpenSettings) y lazy: su chat (que lee PlatformAgentChatBloc y
+    // El asistente es lazy: su chat (que lee PlatformAgentChatBloc y
     // muestra un spinner mientras carga) no debe vivir offstage en el
     // IndexedStack — evita el spinner oculto que colgaría pumpAndSettle y
     // difiere la carga hasta abrir la tab.
@@ -88,6 +82,14 @@ class _ShellPageState extends State<ShellPage> {
       icon: Icons.auto_awesome,
       page: PlatformAgentPage(),
       lazy: true,
+    ),
+    // Ajustes cierra la barra: es la tab de menor frecuencia y el rincón
+    // final es donde el pulgar la busca en el resto de apps. Su índice es
+    // contrato de los onOpenSettings de los headers (_settingsIndex).
+    const _TabSpec(
+      label: 'Ajustes',
+      icon: Icons.settings_outlined,
+      page: SettingsPage(),
     ),
   ];
 

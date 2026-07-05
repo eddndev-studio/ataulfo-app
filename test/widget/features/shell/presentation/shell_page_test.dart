@@ -159,6 +159,36 @@ void main() {
       expect(inNav('Ajustes'), findsOneWidget);
     });
 
+    testWidgets('Ajustes es la última tab y Asistente la penúltima (phone)', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+
+      final nav = tester.widget<BottomNavigationBar>(
+        find.byType(BottomNavigationBar),
+      );
+      final labels = nav.items.map((i) => i.label).toList();
+      expect(labels.last, 'Ajustes');
+      expect(labels[labels.length - 2], 'Asistente');
+    });
+
+    testWidgets('Ajustes es la última tab y Asistente la penúltima (rail)', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 800);
+
+      await tester.pumpWidget(host());
+
+      final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      final labels = rail.destinations
+          .map((d) => (d.label as Text).data)
+          .toList();
+      expect(labels.last, 'Ajustes');
+      expect(labels[labels.length - 2], 'Asistente');
+    });
+
     testWidgets('tap Plantillas (phone) muestra TemplatesListPage', (
       tester,
     ) async {
