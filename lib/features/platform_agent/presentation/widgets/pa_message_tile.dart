@@ -74,10 +74,11 @@ class PaMessageTile extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 // Adjuntos con el renderer compartido de media (miniatura de
-                // imagen, audio reproducible, tarjetas de video/documento). El
-                // wire del asistente no trae URL firmada: la fuente es la copia
-                // local que la subida sembró en caché; sin ella degrada a la
-                // tarjeta con nombre.
+                // imagen, audio reproducible, tarjetas de video/documento). La
+                // fuente primaria es la copia local en caché (la subida la
+                // siembra); la URL firmada de preview del wire es el respaldo
+                // para adjuntos de otro dispositivo o de historial previo. Sin
+                // ninguna de las dos degrada a la tarjeta con nombre.
                 for (final att in message.attachments)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppTokens.sp1),
@@ -86,6 +87,7 @@ class PaMessageTile extends StatelessWidget {
                       mediaRef: att.ref,
                       mime: att.mime,
                       name: att.name,
+                      url: att.url,
                     ),
                   ),
                 // Una nota de voz reproduce inline (la copia local grabada en
@@ -112,11 +114,12 @@ class PaMessageTile extends StatelessWidget {
 }
 
 /// Nota de voz del operador: burbuja de audio reproducible inline (la fuente
-/// es la copia local grabada en este dispositivo, sembrada en caché al enviar;
-/// el wire no trae URL firmada) y, cuando el server la transcribió
-/// (`transcriptStatus` done y texto no vacío), el transcrito debajo. Nunca
-/// pinta el `content` crudo, que es el marcador de audio o una copia del
-/// transcrito.
+/// primaria es la copia local en caché —la grabación de este dispositivo—;
+/// la URL firmada de preview del wire es el respaldo de streaming para notas
+/// de otro dispositivo o de historial previo) y, cuando el server la
+/// transcribió (`transcriptStatus` done y texto no vacío), el transcrito
+/// debajo. Nunca pinta el `content` crudo, que es el marcador de audio o una
+/// copia del transcrito.
 class _VoiceNote extends StatelessWidget {
   const _VoiceNote({required this.message});
 
@@ -134,7 +137,7 @@ class _VoiceNote extends StatelessWidget {
         AudioMessageContent(
           id: message.id,
           mediaRef: message.audioRef,
-          url: null,
+          url: message.audioUrl.isEmpty ? null : message.audioUrl,
           ptt: true,
         ),
         if (hasTranscript) ...<Widget>[

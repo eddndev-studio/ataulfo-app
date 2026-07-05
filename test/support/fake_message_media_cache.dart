@@ -16,9 +16,12 @@ class _MemByteStore implements MediaByteStore {
 }
 
 /// [MessageMediaCache] para tests: store en memoria + descarga configurable
-/// ([downloadResult], por defecto `null` = no hay bytes / offline).
-MessageMediaCache fakeMessageMediaCache({Uint8List? downloadResult}) =>
-    MessageMediaCache(
-      store: _MemByteStore(),
-      download: (_) async => downloadResult,
-    );
+/// ([downloadResult], por defecto `null` = no hay bytes / offline). Para
+/// observar los intentos de descarga, pasar un [download] propio.
+MessageMediaCache fakeMessageMediaCache({
+  Uint8List? downloadResult,
+  MediaDownloader? download,
+}) => MessageMediaCache(
+  store: _MemByteStore(),
+  download: download ?? (_) async => downloadResult,
+);

@@ -119,6 +119,63 @@ void main() {
     });
   });
 
+  group('PaMessageDto url firmada de preview', () {
+    test('parsea la url del adjunto; ausente/vacía/tipo raro ⇒ null', () {
+      final m = PaMessageDto.fromJson(<String, dynamic>{
+        'id': 'm1',
+        'conversation_id': 'c1',
+        'role': 'user',
+        'content': 'mira',
+        'created_at': '2026-06-10T10:00:00.000Z',
+        'attachments': <dynamic>[
+          <String, dynamic>{
+            'ref': 'tenant/org/media/a1.png',
+            'url': 'https://cdn.example/a1.png?sig=abc',
+            'mime': 'image/png',
+            'name': 'a.png',
+            'sizeBytes': 1,
+          },
+          <String, dynamic>{
+            'ref': 'tenant/org/media/a2.png',
+            'mime': 'image/png',
+            'name': 'b.png',
+            'sizeBytes': 1,
+          },
+          <String, dynamic>{
+            'ref': 'tenant/org/media/a3.png',
+            'url': 42,
+            'mime': 'image/png',
+            'name': 'c.png',
+            'sizeBytes': 1,
+          },
+        ],
+      }).toEntity();
+      expect(m.attachments, hasLength(3));
+      expect(m.attachments[0].url, 'https://cdn.example/a1.png?sig=abc');
+      expect(m.attachments[1].url, isNull);
+      expect(m.attachments[2].url, isNull);
+    });
+
+    test('parsea la audio_url de la nota de voz; ausente ⇒ vacía', () {
+      final base = <String, dynamic>{
+        'id': 'm1',
+        'conversation_id': 'c1',
+        'role': 'user',
+        'content': '',
+        'created_at': '2026-06-10T10:00:00.000Z',
+        'audio_ref': 'tenant/org/media/v1.ogg',
+      };
+      expect(
+        PaMessageDto.fromJson(<String, dynamic>{
+          ...base,
+          'audio_url': 'https://cdn.example/v1.ogg?sig=abc',
+        }).toEntity().audioUrl,
+        'https://cdn.example/v1.ogg?sig=abc',
+      );
+      expect(PaMessageDto.fromJson(base).toEntity().audioUrl, '');
+    });
+  });
+
   group('PaMessageDto nota de voz', () {
     test('parsea audio_ref/transcript_status/transcript del user de voz', () {
       final m = PaMessageDto.fromJson(<String, dynamic>{

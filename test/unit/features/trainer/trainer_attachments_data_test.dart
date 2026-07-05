@@ -43,6 +43,65 @@ void main() {
       expect(m.attachments.single.mime, 'image/png');
     });
 
+    test('parsea la url firmada de preview del adjunto', () {
+      final dto = TrainerMessageDto.fromJson(<String, dynamic>{
+        'id': 'm1',
+        'conversation_id': 'c1',
+        'role': 'user',
+        'content': 'mira',
+        'created_at': '2026-06-12T10:00:00.000Z',
+        'attachments': <dynamic>[
+          <String, dynamic>{
+            'ref': 'tenant/org/media/a1.png',
+            'url': 'https://cdn.example/a1.png?sig=abc',
+            'mime': 'image/png',
+            'name': 'catalogo.png',
+            'sizeBytes': 2048,
+          },
+        ],
+      });
+      expect(
+        dto.toEntity().attachments.single.url,
+        'https://cdn.example/a1.png?sig=abc',
+      );
+    });
+
+    test('url ausente, vacía o de tipo raro ⇒ null sin descartar el '
+        'adjunto (best-effort)', () {
+      final dto = TrainerMessageDto.fromJson(<String, dynamic>{
+        'id': 'm1',
+        'conversation_id': 'c1',
+        'role': 'user',
+        'content': 'mira',
+        'created_at': '2026-06-12T10:00:00.000Z',
+        'attachments': <dynamic>[
+          <String, dynamic>{
+            'ref': 'tenant/org/media/a1.png',
+            'mime': 'image/png',
+            'name': 'a.png',
+            'sizeBytes': 1,
+          },
+          <String, dynamic>{
+            'ref': 'tenant/org/media/a2.png',
+            'url': '',
+            'mime': 'image/png',
+            'name': 'b.png',
+            'sizeBytes': 1,
+          },
+          <String, dynamic>{
+            'ref': 'tenant/org/media/a3.png',
+            'url': 42,
+            'mime': 'image/png',
+            'name': 'c.png',
+            'sizeBytes': 1,
+          },
+        ],
+      });
+      final m = dto.toEntity();
+      expect(m.attachments, hasLength(3));
+      expect(m.attachments.map((a) => a.url), everyElement(isNull));
+    });
+
     test('sin attachments en el wire la lista queda vacía (wire viejo)', () {
       final dto = TrainerMessageDto.fromJson(<String, dynamic>{
         'id': 'm1',

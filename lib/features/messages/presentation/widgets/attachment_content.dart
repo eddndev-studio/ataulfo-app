@@ -51,8 +51,9 @@ class AttachmentContent extends StatelessWidget {
   /// de documento.
   final String name;
 
-  /// URL firmada de descarga/streaming; `null` cuando el wire no la trae (los
-  /// hilos de agentes): solo sirve la copia local ya cacheada.
+  /// URL firmada de descarga/streaming; `null` cuando el wire no la trae
+  /// (es best-effort: la firma puede fallar u omitirse): entonces solo sirve
+  /// la copia local ya cacheada.
   final String? url;
 
   @override

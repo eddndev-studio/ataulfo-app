@@ -27,6 +27,7 @@ PaMessage _userMsg({
   List<PaAttachment> attachments = const <PaAttachment>[],
   String content = '',
   String audioRef = '',
+  String audioUrl = '',
   String transcriptStatus = '',
   String transcript = '',
 }) => PaMessage(
@@ -36,6 +37,7 @@ PaMessage _userMsg({
   content: content,
   attachments: attachments,
   audioRef: audioRef,
+  audioUrl: audioUrl,
   transcriptStatus: transcriptStatus,
   transcript: transcript,
   createdAt: DateTime.utc(2026, 6, 10, 10),
@@ -228,5 +230,59 @@ void main() {
     await tester.tap(find.byKey(const Key('message.audio.m1.toggle')));
     await tester.pumpAndSettle();
     expect(audio.state.sourceKey, 'org/media/nota.ogg');
+  });
+
+  testWidgets('adjunto video con URL firmada pinta burbuja reproducible', (
+    tester,
+  ) async {
+    const att = PaAttachment(
+      ref: 'org/media/clip.mp4',
+      mime: 'video/mp4',
+      name: 'clip.mp4',
+      sizeBytes: 4,
+      url: 'https://cdn.example/clip.mp4?sig=abc',
+    );
+    await _pump(tester, _userMsg(attachments: const <PaAttachment>[att]));
+    expect(
+      find.byKey(const Key('message.video.m1.org/media/clip.mp4')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('adjunto imagen sin caché con URL firmada descarga y pinta '
+      'la miniatura', (tester) async {
+    const att = PaAttachment(
+      ref: 'org/media/foto.png',
+      mime: 'image/png',
+      name: 'foto.png',
+      sizeBytes: 4,
+      url: 'https://cdn.example/foto.png?sig=abc',
+    );
+    final cache = fakeMessageMediaCache(downloadResult: _pngBytes);
+    await _pump(
+      tester,
+      _userMsg(attachments: const <PaAttachment>[att]),
+      cache: cache,
+    );
+    expect(
+      find.byKey(const Key('message.image.m1.org/media/foto.png')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('nota de voz sin caché con URL firmada reproduce por streaming '
+      '(sin aviso de fallo)', (tester) async {
+    final audio = await _pump(
+      tester,
+      _userMsg(
+        content: '[audio]',
+        audioRef: 'org/media/nota.ogg',
+        audioUrl: 'https://cdn.example/nota.ogg?sig=abc',
+      ),
+    );
+    await tester.tap(find.byKey(const Key('message.audio.m1.toggle')));
+    await tester.pumpAndSettle();
+    expect(audio.state.sourceKey, 'org/media/nota.ogg');
+    expect(find.text('No se pudo reproducir el audio'), findsNothing);
   });
 }

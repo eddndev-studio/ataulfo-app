@@ -18,6 +18,7 @@ class TrainerMessage {
     this.thinking = '',
     this.attachments = const <TrainerAttachment>[],
     this.audioRef = '',
+    this.audioUrl = '',
     this.transcriptStatus = '',
     this.transcript = '',
   });
@@ -33,6 +34,11 @@ class TrainerMessage {
 
   /// Ref del audio de una nota de voz del operador (vacío = no es de voz).
   final String audioRef;
+
+  /// URL firmada de preview del audio, best-effort del wire (vacía si no
+  /// viajó). Efímera —la firma expira—: respaldo de streaming cuando la nota
+  /// no tiene copia local en caché (otro dispositivo / historial previo).
+  final String audioUrl;
 
   /// Estado de la transcripción del audio: `done` | `pending` | `unavailable`
   /// (vacío cuando no aplica). Solo con `done` viaja [transcript].
@@ -62,6 +68,7 @@ class TrainerMessage {
       other.thinking == thinking &&
       listEquals(other.attachments, attachments) &&
       other.audioRef == audioRef &&
+      other.audioUrl == audioUrl &&
       other.transcriptStatus == transcriptStatus &&
       other.transcript == transcript &&
       other.createdAt == createdAt;
@@ -77,6 +84,7 @@ class TrainerMessage {
     thinking,
     Object.hashAll(attachments),
     audioRef,
+    audioUrl,
     transcriptStatus,
     transcript,
     createdAt,

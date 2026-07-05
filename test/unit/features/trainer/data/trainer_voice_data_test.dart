@@ -52,6 +52,39 @@ void main() {
       expect(m.isVoiceNote, isTrue);
     });
 
+    test('parsea la audio_url firmada de preview de la nota de voz', () {
+      final m = TrainerMessageDto.fromJson(<String, dynamic>{
+        'id': 'm1',
+        'conversation_id': 'c1',
+        'role': 'user',
+        'content': '',
+        'created_at': '2026-06-10T10:00:00.000Z',
+        'audio_ref': 'tenant/org/media/v1.ogg',
+        'audio_url': 'https://cdn.example/v1.ogg?sig=abc',
+        'transcript_status': 'pending',
+      }).toEntity();
+      expect(m.audioUrl, 'https://cdn.example/v1.ogg?sig=abc');
+    });
+
+    test('audio_url ausente o de tipo raro degrada a vacía (best-effort)', () {
+      final base = <String, dynamic>{
+        'id': 'm1',
+        'conversation_id': 'c1',
+        'role': 'user',
+        'content': '',
+        'created_at': '2026-06-10T10:00:00.000Z',
+        'audio_ref': 'tenant/org/media/v1.ogg',
+      };
+      expect(TrainerMessageDto.fromJson(base).toEntity().audioUrl, '');
+      expect(
+        TrainerMessageDto.fromJson(<String, dynamic>{
+          ...base,
+          'audio_url': 42,
+        }).toEntity().audioUrl,
+        '',
+      );
+    });
+
     test('sin campos de audio (wire viejo/turno normal) degradan a vacío', () {
       final m = TrainerMessageDto.fromJson(<String, dynamic>{
         'id': 'm2',

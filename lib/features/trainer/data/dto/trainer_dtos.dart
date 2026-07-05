@@ -64,6 +64,7 @@ class TrainerMessageDto {
     this.thinking = '',
     this.attachments = const <TrainerAttachmentDto>[],
     this.audioRef = '',
+    this.audioUrl = '',
     this.transcriptStatus = '',
     this.transcript = '',
   });
@@ -105,6 +106,7 @@ class TrainerMessageDto {
       thinking: json['thinking'] is String ? json['thinking'] as String : '',
       attachments: atts,
       audioRef: str(json['audio_ref']),
+      audioUrl: str(json['audio_url']),
       transcriptStatus: str(json['transcript_status']),
       transcript: str(json['transcript']),
       createdAt: DateTime.parse(createdAt).toUtc(),
@@ -120,6 +122,7 @@ class TrainerMessageDto {
   final String thinking;
   final List<TrainerAttachmentDto> attachments;
   final String audioRef;
+  final String audioUrl;
   final String transcriptStatus;
   final String transcript;
   final DateTime createdAt;
@@ -134,6 +137,7 @@ class TrainerMessageDto {
     thinking: thinking,
     attachments: attachments.map((a) => a.toEntity()).toList(growable: false),
     audioRef: audioRef,
+    audioUrl: audioUrl,
     transcriptStatus: transcriptStatus,
     transcript: transcript,
     createdAt: createdAt,
@@ -147,6 +151,7 @@ class TrainerAttachmentDto {
     required this.mime,
     required this.name,
     required this.sizeBytes,
+    this.url,
   });
 
   /// Canónico para la respuesta de la SUBIDA (shape garantizado).
@@ -167,11 +172,16 @@ class TrainerAttachmentDto {
     if (ref is! String || mime is! String || name is! String || size is! num) {
       return null;
     }
+    // La url firmada de preview es best-effort del wire: ausente, vacía o de
+    // tipo inesperado degrada a null (el adjunto se conserva; sólo pierde la
+    // fuente de respaldo).
+    final url = json['url'];
     return TrainerAttachmentDto(
       ref: ref,
       mime: mime,
       name: name,
       sizeBytes: size.toInt(),
+      url: url is String && url.isNotEmpty ? url : null,
     );
   }
 
@@ -179,9 +189,15 @@ class TrainerAttachmentDto {
   final String mime;
   final String name;
   final int sizeBytes;
+  final String? url;
 
-  TrainerAttachment toEntity() =>
-      TrainerAttachment(ref: ref, mime: mime, name: name, sizeBytes: sizeBytes);
+  TrainerAttachment toEntity() => TrainerAttachment(
+    ref: ref,
+    mime: mime,
+    name: name,
+    sizeBytes: sizeBytes,
+    url: url,
+  );
 }
 
 /// DTO de GET `/templates/{id}/trainer/models`. TOLERANTE de punta a punta
