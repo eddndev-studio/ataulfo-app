@@ -58,7 +58,8 @@ typedef MediaRefPicker =
 ///
 /// El sheet escucha el `FlowStepsBloc`:
 /// - Mutating ⇒ submit bloqueado con loading.
-/// - Loaded post-submit ⇒ auto-pop del sheet (flag `_didSubmit` evita
+/// - Refreshing/Loaded post-submit ⇒ auto-pop del sheet: la mutación ya
+///   persistió aunque el refetch posterior falle (flag `_didSubmit` evita
 ///   cerrar por rebuilds incidentales sin haber disparado nada).
 /// - MutationFailed ⇒ sigue montado; copy específico por cubo permite
 ///   al operador corregir y reintentar.
@@ -482,7 +483,17 @@ class _StepEditSheetState extends State<StepEditSheet> {
     final textTheme = Theme.of(context).textTheme;
     return BlocListener<FlowStepsBloc, FlowStepsState>(
       listener: (context, state) {
-        if (_didSubmit && state is FlowStepsLoaded) {
+        // El pop llega en cuanto la mutación PERSISTIÓ: Refreshing es esa
+        // señal (el refetch posterior puede fallar y el cambio ya existe
+        // en el backend — dejar el sheet abierto ofrecería un Guardar que
+        // lo duplicaría). Loaded queda como respaldo por si el bloc
+        // entregara el listado fresco sin pasar por Refreshing. El gate
+        // `isCurrent` evita el doble pop: el listener sigue montado durante
+        // la animación de salida, y sin él un Loaded veloz volvería a
+        // popear — comiéndose la página que abrió el sheet.
+        if (_didSubmit &&
+            (state is FlowStepsRefreshing || state is FlowStepsLoaded) &&
+            (ModalRoute.of(context)?.isCurrent ?? false)) {
           Navigator.of(context).maybePop();
         }
       },

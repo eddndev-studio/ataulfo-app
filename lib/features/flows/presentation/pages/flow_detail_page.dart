@@ -235,6 +235,8 @@ class _StepsList extends StatelessWidget {
         }
       },
       builder: (context, state) => switch (state) {
+        // Solo la carga inicial (o el retry de un Failed terminal) muestra
+        // spinner puro: todavía no hay lista que conservar.
         FlowStepsLoading() => const Padding(
           padding: EdgeInsets.symmetric(vertical: AppTokens.sp4),
           child: Center(
@@ -247,13 +249,26 @@ class _StepsList extends StatelessWidget {
           steps: ss,
           textTheme: textTheme,
         ),
-        // Mutating y MutationFailed mantienen la lista visible (snapshot
-        // preservado) para que el operador no pierda contexto mientras la
-        // mutación está en curso o tras un fallo recuperable.
+        // Todo estado con lista la mantiene en pantalla — la mutación en
+        // vuelo y el refetch posterior solo agregan el progreso inline;
+        // el operador nunca pierde contexto ni scroll.
         FlowStepsMutating(steps: final ss) => _StepsListView(
           steps: ss,
           textTheme: textTheme,
-          isMutating: true,
+          notice: const _MutatingInlineSpinner(),
+        ),
+        FlowStepsRefreshing(steps: final ss) => _StepsListView(
+          steps: ss,
+          textTheme: textTheme,
+          notice: const _MutatingInlineSpinner(),
+        ),
+        // La mutación persistió pero el listado no se pudo refrescar: la
+        // lista visible puede estar desactualizada; el aviso lo dice y
+        // ofrece reintentar el refetch conservándola.
+        FlowStepsRefreshFailed(steps: final ss) => _StepsListView(
+          steps: ss,
+          textTheme: textTheme,
+          notice: const _RefreshFailedNotice(),
         ),
         FlowStepsMutationFailed(steps: final ss) => _StepsListView(
           steps: ss,
@@ -265,9 +280,9 @@ class _StepsList extends StatelessWidget {
   }
 }
 
-/// Renderiza la lista de StepCards o el empty state. `isMutating` agrega
-/// un spinner inline al inicio (no overlay) para indicar que una
-/// mutación está en curso sin tapar la lista existente.
+/// Renderiza la lista de StepCards o el empty state. `notice` es el aviso
+/// inline que el estado del bloc quiera anteponer (progreso de mutación,
+/// refetch fallido) SIN tapar la lista existente — nunca un overlay.
 ///
 /// Con ≥2 steps usa `ReorderableListView.builder` para soportar drag&drop.
 /// Con 0 o 1 step usa un layout simple — no tiene sentido pagar el costo
@@ -276,12 +291,12 @@ class _StepsListView extends StatelessWidget {
   const _StepsListView({
     required this.steps,
     required this.textTheme,
-    this.isMutating = false,
+    this.notice,
   });
 
   final List<sdom.Step> steps;
   final TextTheme textTheme;
-  final bool isMutating;
+  final Widget? notice;
 
   @override
   Widget build(BuildContext context) {
@@ -312,14 +327,15 @@ class _StepsListView extends StatelessWidget {
       for (final s in steps) s.id: (order: s.order, label: _stepRefLabel(s)),
     };
 
+    final topNotice = notice;
     if (steps.isEmpty) {
       return SingleChildScrollView(
         padding: listPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            if (isMutating) ...<Widget>[
-              const _MutatingInlineSpinner(),
+            if (topNotice != null) ...<Widget>[
+              topNotice,
               const SizedBox(height: AppTokens.sp3),
             ],
             Text(
@@ -341,8 +357,8 @@ class _StepsListView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            if (isMutating) ...<Widget>[
-              const _MutatingInlineSpinner(),
+            if (topNotice != null) ...<Widget>[
+              topNotice,
               const SizedBox(height: AppTokens.sp3),
             ],
             _StepCard(
@@ -359,10 +375,10 @@ class _StepsListView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        if (isMutating) ...<Widget>[
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: AppTokens.sp6),
-            child: _MutatingInlineSpinner(),
+        if (topNotice != null) ...<Widget>[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp6),
+            child: topNotice,
           ),
           const SizedBox(height: AppTokens.sp3),
         ],
@@ -411,6 +427,37 @@ class _MutatingInlineSpinner extends StatelessWidget {
       valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
     ),
   );
+}
+
+/// Aviso inline de refetch fallido tras una mutación que SÍ persistió:
+/// la lista en pantalla puede estar desactualizada, y Reintentar vuelve
+/// a pedir el listado conservándola (RefreshRequested — nunca Loading).
+class _RefreshFailedNotice extends StatelessWidget {
+  const _RefreshFailedNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      key: const Key('flow_detail.steps.refresh_failed'),
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            'El cambio se guardó, pero no pudimos actualizar la lista.',
+            style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+          ),
+        ),
+        const SizedBox(width: AppTokens.sp3),
+        AppButton.tonal(
+          key: const Key('flow_detail.steps.refresh_retry'),
+          label: 'Reintentar',
+          onPressed: () => context.read<FlowStepsBloc>().add(
+            const FlowStepsRefreshRequested(),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _StepsFailedView extends StatelessWidget {

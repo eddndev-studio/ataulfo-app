@@ -155,7 +155,8 @@ void main() {
     const afterAdd = <fdom.Step>[..._steps, newStep];
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'AddRequested ok desde Loaded → Mutating + Loading + Loaded(refrescado)',
+      'AddRequested ok desde Loaded → Mutating + Refreshing + Loaded '
+      '(el refetch corre con la lista visible, nunca con Loading)',
       build: () {
         when(() => repo.listSteps('f1')).thenAnswer((_) async => afterAdd);
         when(
@@ -183,7 +184,7 @@ void main() {
       ),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(_steps),
-        FlowStepsLoading(),
+        FlowStepsRefreshing(_steps),
         FlowStepsLoaded(afterAdd),
       ],
       verify: (_) {
@@ -359,7 +360,42 @@ void main() {
       ),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(_steps),
-        FlowStepsLoading(),
+        FlowStepsRefreshing(_steps),
+        FlowStepsLoaded(afterAdd),
+      ],
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'AddRequested desde RefreshFailed (recovery) → consume el snapshot '
+      'visible (la lista rancia sigue siendo operable)',
+      build: () {
+        when(
+          () => repo.createStep(
+            flowId: any(named: 'flowId'),
+            type: any(named: 'type'),
+            order: any(named: 'order'),
+            content: any(named: 'content'),
+            mediaRef: any(named: 'mediaRef'),
+            delayMs: any(named: 'delayMs'),
+            jitterPct: any(named: 'jitterPct'),
+            aiOnly: any(named: 'aiOnly'),
+          ),
+        ).thenAnswer((_) async => newStep);
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => afterAdd);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsRefreshFailed(_steps, FlowsServerFailure()),
+      act: (bloc) => bloc.add(
+        const FlowStepsAddRequested(
+          content: 'Bienvenida v2',
+          delayMs: 0,
+          jitterPct: 0,
+          aiOnly: false,
+        ),
+      ),
+      expect: () => const <FlowStepsState>[
+        FlowStepsMutating(_steps),
+        FlowStepsRefreshing(_steps),
         FlowStepsLoaded(afterAdd),
       ],
     );
@@ -394,7 +430,8 @@ void main() {
     );
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'AddRequested éxito + listSteps falla → Failed (no enmascarar mutación)',
+      'AddRequested éxito + listSteps falla → RefreshFailed(lista visible) — '
+      'la mutación persistió, así que ni MutationFailed ni Failed terminal',
       build: () {
         when(
           () => repo.createStep(
@@ -424,8 +461,8 @@ void main() {
       ),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(_steps),
-        FlowStepsLoading(),
-        FlowStepsFailed(FlowsServerFailure()),
+        FlowStepsRefreshing(_steps),
+        FlowStepsRefreshFailed(_steps, FlowsServerFailure()),
       ],
     );
 
@@ -588,7 +625,8 @@ void main() {
     ];
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'UpdateRequested ok desde Loaded → Mutating + Loading + Loaded(refrescado)',
+      'UpdateRequested ok desde Loaded → Mutating + Refreshing + Loaded '
+      '(sin Loading intermedio)',
       build: () {
         when(
           () => repo.patchStep(stepId: 's1', content: 'Hola edited'),
@@ -602,7 +640,7 @@ void main() {
       ),
       expect: () => const <FlowStepsState>[
         FlowStepsMutating(_steps),
-        FlowStepsLoading(),
+        FlowStepsRefreshing(_steps),
         FlowStepsLoaded(afterPatch),
       ],
       verify: (_) {
@@ -842,7 +880,8 @@ void main() {
     ];
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'ReorderRequested ok → UNA llamada atómica + Loading + Loaded',
+      'ReorderRequested ok → optimista: Mutating ya lleva el orden NUEVO '
+      '(renumerado 0..n-1) + Refreshing + Loaded',
       build: () {
         when(
           () => repo.reorderSteps(
@@ -857,8 +896,10 @@ void main() {
       act: (bloc) =>
           bloc.add(const FlowStepsReorderRequested(<String>['s1', 's3', 's2'])),
       expect: () => const <FlowStepsState>[
-        FlowStepsMutating(seedSteps),
-        FlowStepsLoading(),
+        // El snapshot optimista es idéntico al resultado del backend: el
+        // item se queda donde el operador lo soltó, sin snap-back.
+        FlowStepsMutating(afterReorder),
+        FlowStepsRefreshing(afterReorder),
         FlowStepsLoaded(afterReorder),
       ],
       verify: (_) {
@@ -880,19 +921,13 @@ void main() {
     );
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'ReorderRequested sin cambios reales → sin llamada, igual refetch',
-      build: () {
-        when(() => repo.listSteps('f1')).thenAnswer((_) async => seedSteps);
-        return FlowStepsBloc(repo: repo, flowId: 'f1');
-      },
+      'ReorderRequested sin cambios reales → no-op total (ni request, ni '
+      'refetch, ni cambio de estado)',
+      build: () => FlowStepsBloc(repo: repo, flowId: 'f1'),
       seed: () => const FlowStepsLoaded(seedSteps),
       act: (bloc) =>
           bloc.add(const FlowStepsReorderRequested(<String>['s1', 's2', 's3'])),
-      expect: () => const <FlowStepsState>[
-        FlowStepsMutating(seedSteps),
-        FlowStepsLoading(),
-        FlowStepsLoaded(seedSteps),
-      ],
+      expect: () => const <FlowStepsState>[],
       verify: (_) {
         verifyNever(
           () => repo.reorderSteps(
@@ -900,14 +935,16 @@ void main() {
             ids: any(named: 'ids'),
           ),
         );
+        verifyNever(() => repo.listSteps('f1'));
       },
     );
 
     blocTest<FlowStepsBloc, FlowStepsState>(
-      'ReorderRequested falla → MutationFailed(snapshot intacto), sin refetch',
+      'ReorderRequested falla → revierte: MutationFailed lleva el orden '
+      'PREVIO al drag, sin refetch',
       build: () {
         // Atómico: el fallo deja el backend EXACTAMENTE como estaba; el
-        // snapshot en pantalla sigue siendo verdad y no hay refetch.
+        // orden previo sigue siendo verdad y no hay refetch.
         when(
           () => repo.reorderSteps(
             flowId: 'f1',
@@ -920,7 +957,46 @@ void main() {
       act: (bloc) =>
           bloc.add(const FlowStepsReorderRequested(<String>['s3', 's1', 's2'])),
       expect: () => const <FlowStepsState>[
-        FlowStepsMutating(seedSteps),
+        // Optimista mientras el request vuela…
+        FlowStepsMutating(<fdom.Step>[
+          fdom.Step(
+            id: 's3',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 0,
+            content: 'C',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 's1',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 1,
+            content: 'A',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+          fdom.Step(
+            id: 's2',
+            flowId: 'f1',
+            type: fdom.StepType.text,
+            order: 2,
+            content: 'B',
+            mediaRef: '',
+            metadataJson: '{}',
+            delayMs: 0,
+            jitterPct: 0,
+            aiOnly: false,
+          ),
+        ]),
+        // …y el rechazo restaura el orden que el backend conserva.
         FlowStepsMutationFailed(seedSteps, FlowsInvalidReorderFailure()),
       ],
       verify: (_) {
@@ -952,6 +1028,82 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, b.hashCode);
       expect(a, isNot(equals(c)));
+    });
+  });
+
+  group('FlowStepsBloc.RefreshRequested', () {
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'desde Loaded → Refreshing(lista visible) + Loaded(fresco)',
+      build: () {
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => _steps);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsLoaded(<fdom.Step>[]),
+      act: (bloc) => bloc.add(const FlowStepsRefreshRequested()),
+      expect: () => const <FlowStepsState>[
+        FlowStepsRefreshing(<fdom.Step>[]),
+        FlowStepsLoaded(_steps),
+      ],
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'retry desde RefreshFailed → Refreshing(misma lista) + Loaded(fresco)',
+      build: () {
+        when(() => repo.listSteps('f1')).thenAnswer((_) async => _steps);
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsRefreshFailed(_steps, FlowsServerFailure()),
+      act: (bloc) => bloc.add(const FlowStepsRefreshRequested()),
+      expect: () => const <FlowStepsState>[
+        FlowStepsRefreshing(_steps),
+        FlowStepsLoaded(_steps),
+      ],
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'retry que vuelve a fallar → RefreshFailed conserva la lista visible',
+      build: () {
+        when(() => repo.listSteps('f1')).thenAnswer(
+          (_) => Future<List<fdom.Step>>.error(const FlowsNetworkFailure()),
+        );
+        return FlowStepsBloc(repo: repo, flowId: 'f1');
+      },
+      seed: () => const FlowStepsRefreshFailed(_steps, FlowsServerFailure()),
+      act: (bloc) => bloc.add(const FlowStepsRefreshRequested()),
+      expect: () => const <FlowStepsState>[
+        FlowStepsRefreshing(_steps),
+        FlowStepsRefreshFailed(_steps, FlowsNetworkFailure()),
+      ],
+    );
+
+    blocTest<FlowStepsBloc, FlowStepsState>(
+      'desde Loading → no-op (sin lista que conservar, eso es LoadRequested)',
+      build: () => FlowStepsBloc(repo: repo, flowId: 'f1'),
+      seed: () => const FlowStepsLoading(),
+      act: (bloc) => bloc.add(const FlowStepsRefreshRequested()),
+      expect: () => const <FlowStepsState>[],
+      verify: (_) {
+        verifyNever(() => repo.listSteps('f1'));
+      },
+    );
+
+    test('Refreshing + RefreshFailed value-equality', () {
+      const a = FlowStepsRefreshing(_steps);
+      const b = FlowStepsRefreshing(_steps);
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+      expect(a, isNot(equals(const FlowStepsRefreshing(<fdom.Step>[]))));
+
+      const f1 = FlowStepsRefreshFailed(_steps, FlowsServerFailure());
+      const f2 = FlowStepsRefreshFailed(_steps, FlowsServerFailure());
+      expect(f1, equals(f2));
+      expect(f1.hashCode, f2.hashCode);
+      expect(
+        f1,
+        isNot(
+          equals(const FlowStepsRefreshFailed(_steps, FlowsNetworkFailure())),
+        ),
+      );
     });
   });
 

@@ -1034,6 +1034,114 @@ void main() {
       );
     });
 
+    testWidgets('FlowStepsRefreshing conserva las cards con progreso inline '
+        '(el refetch post-mutación nunca sustituye la lista por un spinner)', (
+      tester,
+    ) async {
+      when(() => stepsBloc.state).thenReturn(
+        FlowStepsRefreshing(<fdom.Step>[
+          textStep(),
+          labelStep(id: 's1', order: 1),
+        ]),
+      );
+
+      await tester.pumpWidget(host());
+
+      expect(find.byKey(const Key('flow_detail.step_card.s0')), findsOneWidget);
+      expect(find.byKey(const Key('flow_detail.step_card.s1')), findsOneWidget);
+      expect(
+        find.byKey(const Key('flow_detail.steps.mutating')),
+        findsOneWidget,
+      );
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets(
+      'FlowStepsRefreshFailed conserva las cards + aviso con Reintentar que '
+      'dispatcha RefreshRequested (el cambio persistió; nada de Failed '
+      'terminal)',
+      (tester) async {
+        when(() => stepsBloc.state).thenReturn(
+          FlowStepsRefreshFailed(<fdom.Step>[
+            textStep(),
+            labelStep(id: 's1', order: 1),
+          ], const FlowsServerFailure()),
+        );
+
+        await tester.pumpWidget(host());
+
+        // La lista sigue en pantalla…
+        expect(
+          find.byKey(const Key('flow_detail.step_card.s0')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('flow_detail.step_card.s1')),
+          findsOneWidget,
+        );
+        // …con el aviso honesto (el cambio se guardó, el listado no cargó).
+        expect(
+          find.byKey(const Key('flow_detail.steps.refresh_failed')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const Key('flow_detail.steps.refresh_retry')),
+        );
+        await tester.pump();
+        verify(
+          () => stepsBloc.add(const FlowStepsRefreshRequested()),
+        ).called(1);
+      },
+    );
+
+    testWidgets(
+      'el scroll de la lista sobrevive el ciclo completo de una mutación '
+      '(Loaded → Mutating → Refreshing → Loaded)',
+      (tester) async {
+        final many = <fdom.Step>[
+          for (var i = 0; i < 15; i++) textStep(id: 's$i', order: i),
+        ];
+        final states = StreamController<FlowStepsState>();
+        addTearDown(states.close);
+        whenListen(
+          stepsBloc,
+          states.stream,
+          initialState: FlowStepsLoaded(many),
+        );
+
+        await tester.pumpWidget(host());
+        await tester.drag(
+          find.byType(ReorderableListView),
+          const Offset(0, -400),
+        );
+        await tester.pumpAndSettle();
+
+        final scrollable = find.descendant(
+          of: find.byType(ReorderableListView),
+          matching: find.byType(Scrollable),
+        );
+        final before = tester
+            .state<ScrollableState>(scrollable.first)
+            .position
+            .pixels;
+        expect(before, greaterThan(0));
+
+        // El ciclo entero de una mutación exitosa, con la lista visible.
+        states.add(FlowStepsMutating(many));
+        await tester.pump();
+        states.add(FlowStepsRefreshing(many));
+        await tester.pump();
+        states.add(FlowStepsLoaded(many));
+        await tester.pump();
+
+        final after = tester
+            .state<ScrollableState>(scrollable.first)
+            .position
+            .pixels;
+        expect(after, before);
+      },
+    );
+
     testWidgets('el drag handle ofrece área táctil ≥48 y Semantics', (
       tester,
     ) async {

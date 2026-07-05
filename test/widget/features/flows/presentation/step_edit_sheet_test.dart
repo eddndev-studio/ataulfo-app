@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
@@ -1320,6 +1321,163 @@ void main() {
       expect(sheet.backgroundColor, AppTokens.surface1);
       expect(find.byKey(const Key('step_edit.submit')), findsOneWidget);
     });
+
+    testWidgets(
+      'el sheet cierra en cuanto la mutación PERSISTIÓ (Refreshing), aunque '
+      'el refetch posterior falle — no queda un sheet zombi con un Guardar '
+      'que re-enviaría el cambio',
+      (tester) async {
+        final states = StreamController<FlowStepsState>();
+        addTearDown(states.close);
+        whenListen(
+          bloc,
+          states.stream,
+          initialState: const FlowStepsLoaded(<fdom.Step>[]),
+        );
+
+        tester.view.physicalSize = const Size(800, 2000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            home: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<FlowStepsBloc>.value(value: bloc),
+              ],
+              child: RepositoryProvider<LabelsRepository>.value(
+                value: _FakeLabelsRepository(),
+                child: Scaffold(
+                  body: Builder(
+                    builder: (ctx) => Center(
+                      child: ElevatedButton(
+                        onPressed: () => StepEditSheet.open(ctx),
+                        child: const Text('open'),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        states.add(const FlowStepsMutating(<fdom.Step>[]));
+        await tester.pump();
+        // La mutación ya persistió: el refetch corre con la lista visible…
+        states.add(const FlowStepsRefreshing(<fdom.Step>[]));
+        await tester.pumpAndSettle();
+        // …y aunque el refetch falle, el sheet ya se fue: el cambio existe
+        // en el backend y reintentar desde el sheet lo duplicaría.
+        states.add(
+          const FlowStepsRefreshFailed(<fdom.Step>[], FlowsServerFailure()),
+        );
+        await tester.pump();
+
+        expect(find.byKey(const Key('step_edit.content')), findsNothing);
+        expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'el pop post-submit ocurre UNA sola vez: el Loaded que llega durante '
+      'la animación de salida del sheet no vuelve a popear (la página que '
+      'abrió el sheet sobrevive)',
+      (tester) async {
+        final states = StreamController<FlowStepsState>();
+        addTearDown(states.close);
+        whenListen(
+          bloc,
+          states.stream,
+          initialState: const FlowStepsLoaded(<fdom.Step>[]),
+        );
+
+        tester.view.physicalSize = const Size(800, 2000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppDesignTheme.dark(),
+            home: Scaffold(
+              body: Builder(
+                builder: (baseCtx) => Center(
+                  child: ElevatedButton(
+                    key: const Key('probe.push'),
+                    onPressed: () => Navigator.of(baseCtx).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => MultiBlocProvider(
+                          providers: <BlocProvider<dynamic>>[
+                            BlocProvider<FlowStepsBloc>.value(value: bloc),
+                          ],
+                          child: RepositoryProvider<LabelsRepository>.value(
+                            value: _FakeLabelsRepository(),
+                            child: Scaffold(
+                              body: Builder(
+                                builder: (ctx) => Center(
+                                  child: ElevatedButton(
+                                    key: const Key('probe.open'),
+                                    onPressed: () => StepEditSheet.open(ctx),
+                                    child: const Text('open'),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    child: const Text('push'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.byKey(const Key('probe.push')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('probe.open')));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byKey(const Key('step_edit.content')),
+          'Hola',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('step_edit.submit')));
+        await tester.pump();
+
+        states.add(const FlowStepsMutating(<fdom.Step>[]));
+        await tester.pump();
+        states.add(const FlowStepsRefreshing(<fdom.Step>[]));
+        // Un frame: el pop del sheet arranca y su animación de salida corre.
+        await tester.pump(const Duration(milliseconds: 32));
+        // Refetch veloz: Loaded llega con el sheet todavía animando hacia
+        // afuera — el listener sigue montado y NO debe volver a popear.
+        states.add(const FlowStepsLoaded(<fdom.Step>[]));
+        await tester.pump(const Duration(milliseconds: 32));
+        await tester.pumpAndSettle();
+
+        // El sheet se fue…
+        expect(find.byKey(const Key('step_edit.submit')), findsNothing);
+        // …pero la página que lo abrió DEBE seguir en pantalla.
+        expect(find.byKey(const Key('probe.open')), findsOneWidget);
+      },
+    );
   });
 }
 
