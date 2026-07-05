@@ -10,6 +10,7 @@ import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../media/domain/entities/media_asset.dart';
 import '../../../media/domain/failures/media_failure.dart';
 import '../../../media/domain/repositories/camera_capture.dart';
+import '../../../media/domain/repositories/device_gallery_port.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../../media/domain/repositories/media_repository.dart';
 import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
@@ -343,28 +344,109 @@ class _MessageComposerState extends State<MessageComposer> {
     }
   }
 
-  /// Abre el menú de adjuntar (el sheet sólo DECIDE el destino) y ejecuta el
-  /// flujo elegido: "Documento" es el picker múltiple de siempre; "Medios" es
-  /// la galería de la organización en modo picker; "Cámara" captura contenido
-  /// nuevo. El soporte de cámara se resuelve AL ABRIR (no en `initState`,
-  /// como el mic): el sheet se construye bajo demanda, así el destino sólo
-  /// se ofrece donde hay cámara real sin cargar estado al composer.
+  /// Abre el menú de adjuntar (el sheet sólo DECIDE) y ejecuta lo elegido:
+  /// "Documento" es el picker múltiple de siempre; "Medios" es la galería de
+  /// la organización en modo picker; "Cámara" captura contenido nuevo; una
+  /// selección del carrete se materializa a la bandeja. El soporte de
+  /// cámara/carrete se resuelve AL ABRIR (no en `initState`, como el mic):
+  /// el sheet se construye bajo demanda, así cada destino sólo se ofrece
+  /// donde existe sin cargar estado al composer. Con carrete accesible, la
+  /// previsualización de recientes viene embebida en el propio sheet.
   Future<void> _openAttachMenu() async {
     final camera = context.read<CameraCapture>();
+    final gallery = context.read<DeviceGalleryPort>();
     final canUseCamera = await camera.isSupported();
     if (!mounted) return;
-    final action = await AttachMenuSheet.open(
+    final canUseGallery = await gallery.isSupported();
+    if (!mounted) return;
+    final result = await AttachMenuSheet.open(
       context,
       showCamera: canUseCamera,
+      gallery: canUseGallery ? gallery : null,
     );
-    if (!mounted || action == null) return;
-    switch (action) {
-      case AttachMenuAction.document:
-        await _pickAttachments();
-      case AttachMenuAction.media:
-        await _pickFromMediaLibrary();
-      case AttachMenuAction.camera:
-        await _captureFromCamera(camera);
+    if (!mounted || result == null) return;
+    switch (result) {
+      case AttachMenuDestination(:final action):
+        switch (action) {
+          case AttachMenuAction.document:
+            await _pickAttachments();
+          case AttachMenuAction.media:
+            await _pickFromMediaLibrary();
+          case AttachMenuAction.camera:
+            await _captureFromCamera(camera);
+        }
+      case AttachMenuGalleryPick(:final assets):
+        await _attachFromGallery(gallery, assets);
+    }
+  }
+
+  /// Materializa una selección del carrete a la bandeja: pide los bytes de
+  /// cada asset BAJO DEMANDA (`bytesFor`, uno por uno — nunca el carrete en
+  /// memoria), aplica los topes client-side del lote y suma los aceptados
+  /// como adjuntos locales (bytes que se subirán al enviar, tipo por
+  /// extensión con el video autoritativo del carrete). Un asset que ya no se
+  /// puede leer (borrado entre la selección y la lectura) se omite con
+  /// aviso; no aborta el resto.
+  Future<void> _attachFromGallery(
+    DeviceGalleryPort gallery,
+    List<DeviceMediaAsset> assets,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final picked = <PickedMedia>[];
+    final isVideo = <bool>[];
+    var unreadable = 0;
+    for (final asset in assets) {
+      final media = await gallery.bytesFor(asset);
+      if (!mounted) return;
+      if (media == null) {
+        unreadable++;
+        continue;
+      }
+      picked.add(media);
+      isVideo.add(asset.isVideo);
+    }
+    if (picked.isNotEmpty) {
+      final plan = planAttachmentBatch(
+        picked: <({String filename, int sizeBytes})>[
+          for (final p in picked)
+            (filename: p.filename, sizeBytes: p.bytes.length),
+        ],
+        currentCount: _attachments.length,
+      );
+      setState(() {
+        for (final i in plan.acceptedIndexes) {
+          _attachments.add(
+            PendingAttachment(
+              bytes: picked[i].bytes,
+              filename: picked[i].filename,
+              type: isVideo[i]
+                  ? 'video'
+                  : messageTypeForFilename(picked[i].filename),
+            ),
+          );
+        }
+      });
+      if (plan.tooLarge.isNotEmpty) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(_tooLargeCopy(plan.tooLarge))),
+        );
+      }
+      if (plan.overflow) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Máximo 10 archivos por envío')),
+        );
+      }
+    }
+    if (unreadable > 0) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            unreadable == 1
+                ? '1 archivo del carrete ya no está disponible'
+                : '$unreadable archivos del carrete ya no están disponibles',
+          ),
+        ),
+      );
     }
   }
 

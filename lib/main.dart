@@ -56,6 +56,7 @@ import 'features/media/data/cache/dio_thumbnail_downloader.dart';
 import 'features/media/data/cache/file_media_byte_store.dart';
 import 'features/media/data/cache/file_media_page_store.dart';
 import 'features/media/application/camera_capture_resolver.dart';
+import 'features/media/application/device_gallery_resolver.dart';
 import 'features/media/data/datasources/media_datasource.dart';
 import 'features/media/data/repositories/caching_media_repository.dart';
 import 'features/media/data/repositories/file_picker_media_file_picker.dart';
@@ -132,6 +133,13 @@ Future<void> main() async {
   // Cámara del composer: real (vía `image_picker`) solo en Android; Noop en
   // escritorio/web para que el menú de adjuntar no ofrezca un destino muerto.
   final cameraCapture = CameraCaptureResolver(
+    isAndroid: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+  ).resolve();
+
+  // Carrete del teléfono (previsualización de Galería del menú de adjuntar):
+  // real (vía `photo_manager`) solo en Android; Noop en escritorio/web para
+  // que el destino simplemente no aparezca.
+  final deviceGallery = DeviceGalleryResolver(
     isAndroid: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
   ).resolve();
 
@@ -455,6 +463,7 @@ Future<void> main() async {
     mediaRepository: mediaRepository,
     mediaFilePicker: mediaFilePicker,
     cameraCapture: cameraCapture,
+    deviceGallery: deviceGallery,
     mediaThumbnailLoader: mediaThumbnailLoader,
     // Media del hilo: descarga-y-abre con app externa (URL firmada pública,
     // Dio propio sin Authorization) y player de audio nuevo por visita.

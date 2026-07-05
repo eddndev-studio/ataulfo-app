@@ -12,6 +12,17 @@
          permiso, image_picker lo solicita en runtime antes de abrir la
          cámara del SO. -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Carrete del teléfono (previsualización de Galería del menú de
+         adjuntar, vía photo_manager). Android 13+ divide el permiso de
+         lectura por familia (imágenes/video, ambos requeridos aunque se pida
+         una sola); Android 14 agrega el acceso parcial "seleccionadas";
+         hasta Android 12 rige READ_EXTERNAL_STORAGE. La solicitud en runtime
+         la hace photo_manager al abrir el menú. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
     <application
         android:label="Ataúlfo"
         android:name="${applicationName}"

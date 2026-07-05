@@ -38,6 +38,7 @@ import 'package:ataulfo/features/triggers/domain/repositories/triggers_repositor
 import 'package:ataulfo/features/quick_replies/domain/repositories/quick_replies_repository.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:ataulfo/features/media/data/repositories/noop_camera_capture.dart';
+import 'package:ataulfo/features/media/data/repositories/noop_device_gallery.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/invitations/domain/entities/invitation.dart';
@@ -248,6 +249,7 @@ void main() {
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       cameraCapture: const NoopCameraCapture(),
+      deviceGallery: const NoopDeviceGallery(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,

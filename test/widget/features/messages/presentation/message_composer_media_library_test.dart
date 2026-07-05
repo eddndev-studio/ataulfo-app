@@ -2,8 +2,10 @@ import 'dart:typed_data';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/media/data/repositories/noop_camera_capture.dart';
+import 'package:ataulfo/features/media/data/repositories/noop_device_gallery.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/camera_capture.dart';
+import 'package:ataulfo/features/media/domain/repositories/device_gallery_port.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
@@ -113,6 +115,9 @@ void main() {
               RepositoryProvider<MediaRepository>.value(value: mediaRepo),
               RepositoryProvider<CameraCapture>.value(
                 value: const NoopCameraCapture(),
+              ),
+              RepositoryProvider<DeviceGalleryPort>.value(
+                value: const NoopDeviceGallery(),
               ),
               RepositoryProvider<AudioRecorder>.value(
                 value: const NoopAudioRecorder(),

@@ -40,6 +40,7 @@ import 'package:ataulfo/features/flow_run/domain/repositories/flow_run_repositor
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/media/data/repositories/noop_camera_capture.dart';
+import 'package:ataulfo/features/media/data/repositories/noop_device_gallery.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
@@ -454,6 +455,7 @@ void main() {
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       cameraCapture: const NoopCameraCapture(),
+      deviceGallery: const NoopDeviceGallery(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
@@ -902,6 +904,7 @@ void main() {
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       cameraCapture: const NoopCameraCapture(),
+      deviceGallery: const NoopDeviceGallery(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
@@ -998,6 +1001,7 @@ void main() {
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       cameraCapture: const NoopCameraCapture(),
+      deviceGallery: const NoopDeviceGallery(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
@@ -1296,6 +1300,7 @@ void main() {
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       cameraCapture: const NoopCameraCapture(),
+      deviceGallery: const NoopDeviceGallery(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,
@@ -1549,6 +1554,7 @@ void main() {
       mediaRepository: _MockMediaRepo(),
       mediaFilePicker: _FakeMediaFilePicker(),
       cameraCapture: const NoopCameraCapture(),
+      deviceGallery: const NoopDeviceGallery(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
       audioEngineFactory: FakeAudioEngine.new,

@@ -80,6 +80,7 @@ import '../../features/notes/domain/repositories/notes_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/labels/presentation/bloc/labels_bloc.dart';
 import '../../features/media/domain/repositories/camera_capture.dart';
+import '../../features/media/domain/repositories/device_gallery_port.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
 import '../../features/media/data/repositories/file_picker_media_file_picker.dart';
 import '../../features/media/domain/repositories/media_repository.dart';
@@ -197,6 +198,7 @@ class AppRouter {
     required MediaRepository mediaRepository,
     required MediaFilePicker mediaFilePicker,
     required CameraCapture cameraCapture,
+    required DeviceGalleryPort deviceGallery,
     required MediaThumbnailLoader mediaThumbnailLoader,
     required MediaOpener mediaOpener,
     required AudioEngine Function() audioEngineFactory,
@@ -238,6 +240,7 @@ class AppRouter {
        _mediaRepo = mediaRepository,
        _mediaFilePicker = mediaFilePicker,
        _cameraCapture = cameraCapture,
+       _deviceGallery = deviceGallery,
        _mediaThumbnailLoader = mediaThumbnailLoader,
        _mediaOpener = mediaOpener,
        _audioEngineFactory = audioEngineFactory,
@@ -298,6 +301,7 @@ class AppRouter {
   /// Android): el menú de adjuntar sólo ofrece el destino si la plataforma
   /// la soporta.
   final CameraCapture _cameraCapture;
+  final DeviceGalleryPort _deviceGallery;
   final MediaThumbnailLoader _mediaThumbnailLoader;
   final MediaOpener _mediaOpener;
 
@@ -862,6 +866,11 @@ class AppRouter {
               // Cámara para el destino "Cámara" del menú de adjuntar (Noop
               // fuera de Android: el destino no se ofrece si no hay soporte).
               RepositoryProvider<CameraCapture>.value(value: _cameraCapture),
+              // Carrete del teléfono para la previsualización de Galería del
+              // menú de adjuntar (Noop fuera de Android: se oculta).
+              RepositoryProvider<DeviceGalleryPort>.value(
+                value: _deviceGallery,
+              ),
               // Grabador de notas de voz para el composer (Noop fuera de
               // Android: el botón 🎤 no se ofrece si no está soportado).
               RepositoryProvider<AudioRecorder>.value(value: _audioRecorder),
