@@ -1,4 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_dot_label.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_swatch_icon.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
@@ -83,13 +86,70 @@ void main() {
       // La etiqueta WA mapeada muestra el nombre del label interno.
       expect(find.text('VIP'), findsOneWidget);
       expect(find.text('Clientes top'), findsOneWidget);
-      // La no mapeada muestra "Sin vincular" como pill (estado, no texto suelto).
+      // La no mapeada muestra "Sin vincular" quieto (ambiental, no una pill
+      // que grite en cada fila pendiente).
       expect(find.text('Soporte'), findsOneWidget);
-      expect(find.widgetWithText(AppPill, 'Sin vincular'), findsOneWidget);
+      expect(find.widgetWithText(AppPill, 'Sin vincular'), findsNothing);
+      expect(find.widgetWithText(AppDotLabel, 'Sin vincular'), findsOneWidget);
       // Cada etiqueta WA lleva su glifo tintado (identidad cromática).
       expect(find.byType(AppSwatchIcon), findsNWidgets(2));
     },
   );
+
+  testWidgets('los estados por fila hablan con dos voces quietas: '
+      'vinculada dot success, pendiente dot neutro', (tester) async {
+    stub(WaMappingLoaded(data));
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    Color dotColorIn(Finder scope) {
+      final dot = tester.widget<Container>(
+        find.descendant(
+          of: scope,
+          matching: find.byKey(const ValueKey<String>('app_dot_label.dot')),
+        ),
+      );
+      return (dot.decoration as BoxDecoration).color!;
+    }
+
+    // El vínculo resuelto va quieto en verde de éxito con el nombre del
+    // label interno como caption.
+    expect(
+      dotColorIn(find.widgetWithText(AppDotLabel, 'Clientes top')),
+      AppTokens.success,
+    );
+    // "Sin vincular" es ambiental (todavía sin configurar), no excepcional:
+    // dot neutro.
+    expect(
+      dotColorIn(find.widgetWithText(AppDotLabel, 'Sin vincular')),
+      AppTokens.text2,
+    );
+  });
+
+  testWidgets('las filas de mapeo viven en UNA card con dividers, '
+      'no en cards sueltas', (tester) async {
+    stub(WaMappingLoaded(data));
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    // Una sola card contiene ambas filas; entre filas hay divider hairline.
+    final cardWithRows = find.ancestor(
+      of: find.byKey(const Key('wa_mapping.tile.1000')),
+      matching: find.byType(AppCard),
+    );
+    expect(cardWithRows, findsOneWidget);
+    expect(
+      find.descendant(
+        of: cardWithRows,
+        matching: find.byKey(const Key('wa_mapping.tile.1001')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: cardWithRows, matching: find.byType(Divider)),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('Loaded resume cuántas etiquetas están vinculadas', (
     tester,

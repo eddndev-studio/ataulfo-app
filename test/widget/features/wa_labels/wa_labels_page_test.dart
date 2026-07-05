@@ -1,4 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_swatch_icon.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
 import 'package:ataulfo/features/wa_labels/domain/failures/wa_labels_failure.dart';
@@ -137,6 +139,61 @@ void main() {
     await tester.tap(find.byKey(const Key('wa_labels.create')));
     await tester.pumpAndSettle();
     expect(find.text('Nueva etiqueta'), findsOneWidget);
+  });
+
+  testWidgets(
+    'las etiquetas viven en UNA card con dividers; el launcher conserva '
+    'su card propia',
+    (tester) async {
+      stub(
+        WaLabelsLoaded(
+          labels: <WaLabel>[
+            _label(name: 'Cliente VIP', color: 3),
+            _label(id: '1001', name: 'Spam', color: 0),
+          ],
+          isRefreshing: false,
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.pump();
+
+      // Una sola card contiene ambas filas; entre filas hay divider hairline.
+      final cardWithTiles = find.ancestor(
+        of: find.byKey(const Key('wa_labels.tile.1000')),
+        matching: find.byType(AppCard),
+      );
+      expect(cardWithTiles, findsOneWidget);
+      expect(
+        find.descendant(
+          of: cardWithTiles,
+          matching: find.byKey(const Key('wa_labels.tile.1001')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cardWithTiles, matching: find.byType(Divider)),
+        findsOneWidget,
+      );
+      // El launcher de vínculos es un destino de navegación, no un item del
+      // catálogo: NO se apila dentro de la card de etiquetas.
+      expect(
+        find.descendant(
+          of: cardWithTiles,
+          matching: find.byKey(const Key('wa_labels.mappings')),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('el scroll despeja el FAB de crear al fondo', (tester) async {
+    stub(WaLabelsLoaded(labels: <WaLabel>[_label()], isRefreshing: false));
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    final resolved = list.padding!.resolve(TextDirection.ltr);
+    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   testWidgets('tap en una etiqueta abre el sheet de edición de esa etiqueta', (

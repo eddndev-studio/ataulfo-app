@@ -106,24 +106,54 @@ class _LoadedView extends StatelessWidget {
                 AppTokens.sp4,
                 AppTokens.sp4,
                 AppTokens.sp4,
-                AppTokens.sp4 + context.safeBottomInset,
+                // fabClearance: la última fila debe poder quedar por encima
+                // del FAB de crear que flota sobre esta página.
+                AppTokens.fabClearance + context.safeBottomInset,
               ),
               children: <Widget>[
                 const _MappingsLauncher(),
                 const SizedBox(height: AppTokens.sp5),
-                for (final label in active) ...<Widget>[
-                  _WaLabelTile(label: label),
-                  const SizedBox(height: AppTokens.cardGap),
-                ],
+                _WaLabelsCard(labels: active),
               ],
             ),
     );
   }
 }
 
+/// Catálogo como UNA card que apila las etiquetas separadas por divider
+/// hairline (idioma de los hubs y de ajustes), en lugar de una card suelta por
+/// item. La identidad de cada fila la lleva su glifo tintado.
+class _WaLabelsCard extends StatelessWidget {
+  const _WaLabelsCard({required this.labels});
+
+  final List<WaLabel> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < labels.length; i++) {
+      if (i > 0) {
+        rows.add(
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+        );
+      }
+      rows.add(_WaLabelTile(label: labels[i]));
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: rows,
+      ),
+    );
+  }
+}
+
 /// Card launcher hacia el mapeo WA ↔ Label interno: LA acción que convierte
 /// "etiqueté un chat en WhatsApp" en una automatización merece una affordance
-/// visible, no un icono de AppBar.
+/// visible, no un icono de AppBar. Conserva su card propia porque es un
+/// destino de navegación, no un item del catálogo: apilarlo dentro de la card
+/// de etiquetas lo camuflaría como una etiqueta más.
 class _MappingsLauncher extends StatelessWidget {
   const _MappingsLauncher();
 
@@ -144,6 +174,9 @@ class _MappingsLauncher extends StatelessWidget {
   }
 }
 
+/// Fila de una etiqueta dentro de la card del catálogo: glifo tintado + nombre
+/// + chevron. Toda la fila es tap-target hacia el sheet de edición; el InkWell
+/// propio da el ripple (la card contenedora no es tappable).
 class _WaLabelTile extends StatelessWidget {
   const _WaLabelTile({required this.label});
 
@@ -152,29 +185,32 @@ class _WaLabelTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    // onTap nativo del AppCard: ripple/highlight del InkWell interno
-    // (el GestureDetector externo dejaba el tap sin feedback visual).
-    return AppCard(
+    return InkWell(
+      key: Key('wa_labels.tile.${label.waLabelId}'),
       onTap: () => WaLabelEditSheet.openEdit(context, label),
-      child: Row(
-        children: <Widget>[
-          // El color ES la identidad de la etiqueta: glifo tintado con el
-          // color resuelto de la paleta WhatsApp (no un dot pequeño).
-          AppSwatchIcon(
-            color: WaLabelPalette.resolve(label.color),
-            icon: Icons.sell_outlined,
-          ),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Text(
-              label.name,
-              style: textTheme.titleMedium,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        child: Row(
+          children: <Widget>[
+            // El color ES la identidad de la etiqueta: glifo tintado con el
+            // color resuelto de la paleta WhatsApp (no un dot pequeño).
+            AppSwatchIcon(
+              color: WaLabelPalette.resolve(label.color),
+              icon: Icons.sell_outlined,
             ),
-          ),
-          const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
-        ],
+            const SizedBox(width: AppTokens.sp4),
+            Expanded(
+              child: Text(
+                label.name,
+                style: textTheme.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
+          ],
+        ),
       ),
     );
   }

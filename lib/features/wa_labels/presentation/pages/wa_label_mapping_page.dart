@@ -5,10 +5,10 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_dot_label.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_swatch_icon.dart';
 import '../../../labels/domain/entities/label.dart';
-import '../../../labels/presentation/widgets/label_dot.dart';
 import '../../domain/entities/wa_label.dart';
 import '../bloc/wa_label_mapping_bloc.dart';
 import '../widgets/wa_label_palette.dart';
@@ -121,21 +121,56 @@ class _LoadedView extends StatelessWidget {
               ),
             )
           else
-            for (final wa in waLabels) ...<Widget>[
-              _MappingRow(
-                waLabel: wa,
-                hasMapping: data.mappings.containsKey(wa.waLabelId),
-                mapped: data.mappedLabel(wa.waLabelId),
-              ),
-              const SizedBox(height: AppTokens.cardGap),
-            ],
+            _MappingsCard(data: data),
         ],
       ),
     );
   }
 }
 
+/// El mapeo como UNA card que apila las filas separadas por divider hairline
+/// (idioma de los hubs y de ajustes), en lugar de una card suelta por item.
+class _MappingsCard extends StatelessWidget {
+  const _MappingsCard({required this.data});
+
+  final WaMappingData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < data.waLabels.length; i++) {
+      if (i > 0) {
+        rows.add(
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+        );
+      }
+      final wa = data.waLabels[i];
+      rows.add(
+        _MappingRow(
+          waLabel: wa,
+          hasMapping: data.mappings.containsKey(wa.waLabelId),
+          mapped: data.mappedLabel(wa.waLabelId),
+        ),
+      );
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: rows,
+      ),
+    );
+  }
+}
+
 /// Una fila: etiqueta WhatsApp (swatch + nombre) y su vínculo interno actual.
+/// Toda la fila es tap-target hacia el selector; el InkWell propio da el
+/// ripple (la card contenedora no es tappable).
+///
+/// El estado del vínculo habla con dos voces: el resuelto y el pendiente son
+/// ambientales (se repiten por fila) y van quietos como [AppDotLabel] — verde
+/// el vinculado, neutro el "Sin vincular" —; solo el vínculo roto es
+/// excepcional y accionable, y conserva su pill danger.
 class _MappingRow extends StatelessWidget {
   const _MappingRow({
     required this.waLabel,
@@ -156,60 +191,55 @@ class _MappingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final m = mapped;
-    // onTap nativo del AppCard: ripple/highlight del InkWell interno
-    // (el GestureDetector externo dejaba el tap sin feedback visual).
-    return AppCard(
+    return InkWell(
+      key: Key('wa_mapping.tile.${waLabel.waLabelId}'),
       onTap: () => WaMappingSelectorSheet.open(context, waLabel),
-      child: Row(
-        children: <Widget>[
-          // Identidad cromática de la etiqueta WA con presencia (paridad con
-          // el catálogo).
-          AppSwatchIcon(
-            color: WaLabelPalette.resolve(waLabel.color),
-            icon: Icons.sell_outlined,
-          ),
-          const SizedBox(width: AppTokens.sp4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  waLabel.name,
-                  style: textTheme.titleMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: AppTokens.sp1),
-                if (m == null && !hasMapping)
-                  const AppPill.outline(label: 'Sin vincular')
-                else if (m == null)
-                  // Hay un mapeo pero el Label interno fue borrado de la org:
-                  // roto. El operador toca la fila y "Quitar vínculo" limpia.
-                  const AppPill.danger(label: 'Vínculo roto')
-                else
-                  Row(
-                    children: <Widget>[
-                      const Icon(Icons.link, color: AppTokens.text2, size: 16),
-                      const SizedBox(width: AppTokens.sp2),
-                      LabelDot(hex: m.color, size: 14),
-                      const SizedBox(width: AppTokens.sp2),
-                      Flexible(
-                        child: Text(
-                          m.name,
-                          style: textTheme.bodyMedium,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
+      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+        child: Row(
+          children: <Widget>[
+            // Identidad cromática de la etiqueta WA con presencia (paridad con
+            // el catálogo).
+            AppSwatchIcon(
+              color: WaLabelPalette.resolve(waLabel.color),
+              icon: Icons.sell_outlined,
             ),
-          ),
-          const SizedBox(width: AppTokens.sp2),
-          const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
-        ],
+            const SizedBox(width: AppTokens.sp4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    waLabel.name,
+                    style: textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: AppTokens.sp1),
+                  if (m == null && !hasMapping)
+                    const AppDotLabel(
+                      color: AppTokens.text2,
+                      label: 'Sin vincular',
+                    )
+                  else if (m == null)
+                    // Hay un mapeo pero el Label interno fue borrado de la
+                    // org: roto. El operador toca la fila y "Quitar vínculo"
+                    // limpia.
+                    const AppPill.danger(label: 'Vínculo roto')
+                  else
+                    // El dot verde dice "vinculada y sana"; el caption dice a
+                    // qué label interno. El color propio del label vive en el
+                    // selector, no compite aquí con la semántica del estado.
+                    AppDotLabel(color: AppTokens.success, label: m.name),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppTokens.sp2),
+            const Icon(Icons.chevron_right, color: AppTokens.text2, size: 20),
+          ],
+        ),
       ),
     );
   }
