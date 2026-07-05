@@ -20,10 +20,9 @@ import '../../domain/attachment_intake.dart';
 import '../../domain/attachment_type.dart';
 import '../../domain/entities/message.dart';
 import '../../../../core/audio/audio_recorder.dart';
+import '../bloc/attach_panel_cubit.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/reply_draft_cubit.dart';
-import 'attach_camera_sheet.dart';
-import 'attach_menu_sheet.dart';
 import 'attachment_tray.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
 
@@ -68,6 +67,15 @@ class MessageComposer extends StatefulWidget {
 
 class _MessageComposerState extends State<MessageComposer> {
   final TextEditingController _ctrl = TextEditingController();
+
+  /// Foco del campo de texto. Se observa para intercambiar teclado por panel de
+  /// adjuntar: enfocar el campo cierra el panel (nunca conviven).
+  final FocusNode _fieldFocus = FocusNode();
+
+  /// Suscripción a las intenciones del panel de adjuntar: el panel sólo DECIDE
+  /// el destino; este composer ejecuta el flujo con sus dependencias y su
+  /// bandeja.
+  StreamSubscription<AttachIntent>? _attachIntents;
 
   /// Subida del lote en vuelo: deshabilita el adjuntar/enviar y muestra
   /// progreso en la bandeja.
@@ -140,6 +148,10 @@ class _MessageComposerState extends State<MessageComposer> {
     _recorder.isSupported().then((ok) {
       if (mounted) setState(() => _canRecord = ok);
     });
+    _fieldFocus.addListener(_onFieldFocus);
+    _attachIntents = context.read<AttachPanelCubit>().intents.listen(
+      _onAttachIntent,
+    );
   }
 
   @override
@@ -147,8 +159,41 @@ class _MessageComposerState extends State<MessageComposer> {
     // Si el hilo se cierra mientras graba, aborta la grabación huérfana (el
     // recorder es compartido, no se dispone aquí).
     if (_recording || _starting) unawaited(_recorder.cancel());
+    unawaited(_attachIntents?.cancel());
+    _fieldFocus.removeListener(_onFieldFocus);
+    _fieldFocus.dispose();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  /// Enfocar el campo cierra el panel de adjuntar: el teclado toma su lugar. El
+  /// intercambio es de ida y vuelta —abrir el panel suelta el foco—, así nunca
+  /// conviven teclado y panel (ni queda un hueco entre ambos).
+  void _onFieldFocus() {
+    if (_fieldFocus.hasFocus && mounted) {
+      context.read<AttachPanelCubit>().dismiss();
+    }
+  }
+
+  /// Ejecuta la intención elegida en el panel. El panel ya se cerró al emitirla;
+  /// aquí se corre el flujo con las dependencias del composer (picker, cámara,
+  /// carrete) y se suma lo elegido a la bandeja.
+  void _onAttachIntent(AttachIntent intent) {
+    if (!mounted) return;
+    switch (intent) {
+      case AttachDocumentIntent():
+        unawaited(_pickAttachments());
+      case AttachMediaIntent():
+        unawaited(_pickFromMediaLibrary());
+      case AttachPhotoIntent():
+        unawaited(_capturePhoto());
+      case AttachVideoIntent():
+        unawaited(_captureVideo());
+      case AttachGalleryIntent(:final assets):
+        unawaited(
+          _attachFromGallery(context.read<DeviceGalleryPort>(), assets),
+        );
+    }
   }
 
   void _send(String text) {
@@ -344,21 +389,19 @@ class _MessageComposerState extends State<MessageComposer> {
     }
   }
 
-  /// Abre el menú de adjuntar (el sheet sólo DECIDE) y ejecuta lo elegido:
-  /// "Documento" es el picker múltiple de siempre; "Medios" es la galería de
-  /// la organización en modo picker; "Cámara" captura contenido nuevo; una
-  /// selección del carrete se materializa a la bandeja. El soporte de
-  /// cámara/carrete se resuelve AL ABRIR (no en `initState`, como el mic):
-  /// el sheet se construye bajo demanda, así cada destino sólo se ofrece
-  /// donde existe sin cargar estado al composer. Con carrete accesible, la
-  /// previsualización de recientes viene embebida en el propio sheet.
-  Future<void> _openAttachMenu() async {
-    // Suelta el foco del campo YA, en el instante del tap: el teclado virtual
-    // empieza a cerrarse de inmediato y el Scaffold reacomoda. Sin esto, el
-    // foco sólo se perdería como efecto colateral de que el sheet modal lo roba
-    // al abrir — retrasado por los isSupported() de abajo (el del carrete es
-    // un round-trip real a la plataforma), dejando un hueco del alto del
-    // teclado entre el composer y el sheet.
+  /// Abre o cierra el panel de adjuntar inline (estilo WhatsApp). Al ABRIR
+  /// intercambia teclado por panel: suelta el foco del campo YA, en el instante
+  /// del tap, para que el teclado empiece a cerrarse y el panel ocupe su lugar
+  /// sin dejar un hueco (nunca conviven). El soporte de cámara/carrete se
+  /// resuelve AQUÍ, antes de abrir, para no ofrecer un destino donde no existe:
+  /// con eso el panel es una función pura de su estado (Documento y Medios
+  /// siempre; Cámara/Galería sólo con soporte real).
+  Future<void> _toggleAttachPanel() async {
+    final panel = context.read<AttachPanelCubit>();
+    if (panel.isOpen) {
+      panel.dismiss();
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     final camera = context.read<CameraCapture>();
     final gallery = context.read<DeviceGalleryPort>();
@@ -366,25 +409,11 @@ class _MessageComposerState extends State<MessageComposer> {
     if (!mounted) return;
     final canUseGallery = await gallery.isSupported();
     if (!mounted) return;
-    final result = await AttachMenuSheet.open(
-      context,
-      showCamera: canUseCamera,
-      gallery: canUseGallery ? gallery : null,
-    );
-    if (!mounted || result == null) return;
-    switch (result) {
-      case AttachMenuDestination(:final action):
-        switch (action) {
-          case AttachMenuAction.document:
-            await _pickAttachments();
-          case AttachMenuAction.media:
-            await _pickFromMediaLibrary();
-          case AttachMenuAction.camera:
-            await _captureFromCamera(camera);
-        }
-      case AttachMenuGalleryPick(:final assets):
-        await _attachFromGallery(gallery, assets);
-    }
+    // Si el operador volvió a enfocar el campo mientras se resolvía el soporte,
+    // el teclado ya está de vuelta: abrir el panel ahora los haría convivir.
+    // El intercambio es excluyente, así que se cancela la apertura.
+    if (_fieldFocus.hasFocus) return;
+    panel.open(showCamera: canUseCamera, showGallery: canUseGallery);
   }
 
   /// Materializa una selección del carrete a la bandeja: pide los bytes de
@@ -457,20 +486,28 @@ class _MessageComposerState extends State<MessageComposer> {
     }
   }
 
-  /// Pregunta el modo (foto/video) en el sub-sheet, invoca la cámara y suma
-  /// lo capturado a la bandeja por el MISMO camino que un archivo elegido:
-  /// bytes locales (se subirá al enviar), tipo inferido por extensión y topes
-  /// client-side del lote. Cancelar el sub-sheet o la captura no agrega nada.
-  Future<void> _captureFromCamera(CameraCapture camera) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final mode = await AttachCameraSheet.open(context);
-    if (!mounted || mode == null) return;
-    final media = switch (mode) {
-      CameraCaptureMode.photo => await camera.takePhoto(),
-      CameraCaptureMode.video => await camera.takeVideo(),
-    };
-    if (!mounted || media == null) return;
+  /// Captura una foto y la suma a la bandeja. La sub-elección foto/video vive
+  /// en el propio panel (no hay sub-sheet): al llegar aquí el modo ya está
+  /// decidido.
+  Future<void> _capturePhoto() async {
+    final media = await context.read<CameraCapture>().takePhoto();
+    if (!mounted) return;
+    _addCaptured(media);
+  }
 
+  /// Graba un video y lo suma a la bandeja (mismo camino que la foto).
+  Future<void> _captureVideo() async {
+    final media = await context.read<CameraCapture>().takeVideo();
+    if (!mounted) return;
+    _addCaptured(media);
+  }
+
+  /// Suma lo capturado a la bandeja por el MISMO camino que un archivo elegido:
+  /// bytes locales (se subirá al enviar), tipo inferido por extensión y topes
+  /// client-side del lote. Una captura cancelada (`null`) no agrega nada.
+  void _addCaptured(PickedMedia? media) {
+    if (media == null) return;
+    final messenger = ScaffoldMessenger.of(context);
     final plan = planAttachmentBatch(
       picked: <({String filename, int sizeBytes})>[
         (filename: media.filename, sizeBytes: media.bytes.length),
@@ -920,6 +957,7 @@ class _MessageComposerState extends State<MessageComposer> {
           : (_canRecord ? _micButton(active: false) : null);
       body = AppChatComposer(
         controller: _ctrl,
+        focusNode: _fieldFocus,
         fieldKey: const Key('composer.input'),
         sendKey: const Key('composer.send'),
         enabled: !_uploading,
@@ -930,7 +968,7 @@ class _MessageComposerState extends State<MessageComposer> {
             key: const Key('composer.attach'),
             tooltip: 'Adjuntar',
             color: AppTokens.text2,
-            onPressed: _uploading ? null : _openAttachMenu,
+            onPressed: _uploading ? null : _toggleAttachPanel,
             icon: const Icon(Icons.attach_file),
           ),
           IconButton(

@@ -8,6 +8,7 @@ import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dar
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
+import 'package:ataulfo/features/messages/presentation/bloc/attach_panel_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/reply_draft_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
@@ -32,10 +33,10 @@ class _MockMediaRepo extends Mock implements MediaRepository {}
 /// Reacomodo del Scaffold del hilo ante el teclado virtual, simulado a nivel
 /// de la vista (`tester.view.viewInsets`, en píxeles FÍSICOS): el mismo canal
 /// por el que Android reporta el teclado real. Documenta que el Scaffold
-/// (resizeToAvoidBottomInset default) SÍ baja el composer cuando el inset
-/// vuelve a 0 — incluso con el sheet modal de adjuntar abierto encima — y que
-/// por tanto el hueco visual del bug era sólo el unfocus tardío, no un
-/// problema de reflow.
+/// (resizeToAvoidBottomInset default) empuja el composer sobre el teclado y lo
+/// baja cuando el inset vuelve a 0. El panel de adjuntar reusa ese reflow: al
+/// abrirse suelta el foco (teclado a 0) y reserva su propio alto, sin depender
+/// del inset del teclado.
 void main() {
   late _MockMessagesBloc msgBloc;
   late _MockQuickRepliesBloc qrBloc;
@@ -76,6 +77,7 @@ void main() {
           BlocProvider<MessagesBloc>.value(value: msgBloc),
           BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
           BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
+          BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
         ],
         child: const Scaffold(
           body: Column(
@@ -117,43 +119,6 @@ void main() {
         tester.getRect(composer()).bottom,
         moreOrLessEquals(screenHeight),
         reason: 'al cerrarse el teclado el composer baja al fondo',
-      );
-    },
-  );
-
-  testWidgets(
-    'con el sheet de adjuntar abierto ENCIMA, el Scaffold de atrás sigue '
-    'reaccionando al cierre del teclado (el composer baja, no queda congelado)',
-    (tester) async {
-      addTearDown(tester.view.reset);
-      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
-      await tester.pumpWidget(host());
-
-      expect(
-        tester.getRect(composer()).bottom,
-        moreOrLessEquals(screenHeight - keyboardLogical),
-      );
-
-      // Abre el menú de adjuntar por el flujo real (el clip del composer).
-      await tester.tap(
-        find.byKey(const Key('composer.attach')),
-        warnIfMissed: false,
-      );
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('attach_menu_sheet')), findsOneWidget);
-
-      // El teclado se cierra con el sheet aún activo (exactamente la secuencia
-      // del bug reportado).
-      tester.view.viewInsets = FakeViewPadding.zero;
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('attach_menu_sheet')), findsOneWidget);
-      expect(
-        tester.getRect(composer()).bottom,
-        moreOrLessEquals(screenHeight),
-        reason:
-            'la ruta base detrás del sheet modal reconstruye con el nuevo '
-            'MediaQuery: el composer baja aunque el sheet siga abierto',
       );
     },
   );

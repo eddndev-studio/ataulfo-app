@@ -12,15 +12,17 @@ import 'package:ataulfo/features/media/domain/repositories/media_repository.dart
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/core/audio/audio_recorder.dart';
+import 'package:ataulfo/features/messages/presentation/bloc/attach_panel_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/reply_draft_cubit.dart';
-import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
 import 'package:ataulfo/features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../../../support/attach_thread_harness.dart';
 
 class _MockMessagesBloc extends MockBloc<MessagesEvent, MessagesState>
     implements MessagesBloc {}
@@ -92,8 +94,9 @@ void main() {
           BlocProvider<MessagesBloc>.value(value: msgBloc),
           BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
           BlocProvider<ReplyDraftCubit>.value(value: replyDraft),
+          BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
         ],
-        child: const Scaffold(body: MessageComposer()),
+        child: const Scaffold(body: AttachThreadHarness()),
       ),
     ),
   );

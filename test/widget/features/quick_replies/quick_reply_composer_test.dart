@@ -2,6 +2,7 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/core/audio/audio_recorder.dart';
+import 'package:ataulfo/features/messages/presentation/bloc/attach_panel_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/reply_draft_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
@@ -57,6 +58,7 @@ void main() {
           BlocProvider<MessagesBloc>.value(value: msgBloc),
           BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
           BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
+          BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
         ],
         child: const Scaffold(body: MessageComposer()),
       ),

@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_swatch_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,4 +44,37 @@ void main() {
     expect(size.width, 44);
     expect(size.height, 44);
   });
+
+  testWidgets(
+    'la vía neutra pinta relleno surface3 opaco + glifo text2 (sin color)',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          const AppSwatchIcon.neutral(
+            icon: Icons.insert_drive_file_outlined,
+            size: 56,
+          ),
+        ),
+      );
+
+      final icon = tester.widget<Icon>(
+        find.byIcon(Icons.insert_drive_file_outlined),
+      );
+      expect(icon.color, AppTokens.text2);
+
+      final box = tester.widget<Container>(
+        find.byKey(const Key('app_swatch_icon.tile')),
+      );
+      final deco = box.decoration! as BoxDecoration;
+      expect(deco.shape, BoxShape.circle);
+      // Fondo neutro opaco (no un velo tintado): el círculo del kit para
+      // destinos sin identidad cromática propia.
+      expect(deco.color, AppTokens.surface3);
+
+      final size = tester.getSize(
+        find.byKey(const Key('app_swatch_icon.tile')),
+      );
+      expect(size.width, 56);
+    },
+  );
 }

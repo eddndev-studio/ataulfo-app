@@ -8,6 +8,7 @@ import 'package:ataulfo/features/media/domain/repositories/media_repository.dart
 import 'package:ataulfo/features/messages/data/cache/message_media_cache.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/core/audio/audio_recorder.dart';
+import 'package:ataulfo/features/messages/presentation/bloc/attach_panel_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/reply_draft_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
@@ -133,6 +134,7 @@ void main() {
                 BlocProvider<ReplyDraftCubit>.value(value: replyDraft)
               else
                 BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
+              BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
             ],
             child: Scaffold(body: MessageComposer(now: () => fakeNow)),
           ),

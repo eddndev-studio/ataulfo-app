@@ -21,11 +21,13 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/failures/messages_failure.dart';
 import '../../domain/reactions.dart';
+import '../bloc/attach_panel_cubit.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/reply_draft_cubit.dart';
 import '../bloc/thread_audio_cubit.dart';
 import '../../../monitor/presentation/widgets/alert_banner.dart';
 import '../../../monitor/presentation/widgets/live_activity.dart';
+import '../widgets/attach_panel.dart';
 import '../widgets/message_composer.dart';
 import '../widgets/message_media.dart';
 
@@ -44,53 +46,79 @@ class MessageThreadPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // El borrador de respuesta vive en el scope del hilo: lo fija la hoja de
-    // acciones de un mensaje y lo consume el composer (barra de cita + quotedId).
-    return BlocProvider<ReplyDraftCubit>(
-      create: (_) => ReplyDraftCubit(),
+    return MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        // El borrador de respuesta vive en el scope del hilo: lo fija la hoja de
+        // acciones de un mensaje y lo consume el composer (barra de cita +
+        // quotedId).
+        BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
+        // El panel de adjuntar vive en el scope del hilo: lo alterna el clip del
+        // composer y lo pinta esta página bajo el composer (no es ruta).
+        BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
+      ],
       child: _AudioFailuresListener(
         child: _ReactFailuresListener(
           child: _CorrectionFailuresListener(
             child: BlocBuilder<MessagesBloc, MessagesState>(
-              builder: (context, state) => Column(
-                children: <Widget>[
-                  Expanded(
-                    child: switch (state) {
-                      MessagesInitial() ||
-                      MessagesLoading() => const _LoadingView(),
-                      MessagesLoaded(
-                        items: final items,
-                        prevCursor: final prevCursor,
-                        isLoadingOlder: final isLoadingOlder,
-                        pending: final pending,
-                      ) =>
-                        (items.isEmpty && pending.isEmpty)
-                            ? const _EmptyView()
-                            : _ThreadView(
-                                items: items,
-                                pending: pending,
-                                hasMore: prevCursor != null,
-                                isLoadingOlder: isLoadingOlder,
-                              ),
-                      MessagesFailed(failure: final f) => _FailedView(
-                        failure: f,
-                      ),
-                    },
-                  ),
-                  // Alerta crítica del bot (desconexión, etc.) y actividad EN VIVO
-                  // entre el hilo y el composer. Inertes para no-admin (cubit sin
-                  // observar) ⇒ no pintan.
-                  const AlertBanner(),
-                  const LiveActivity(),
-                  // El composer sólo con hilo cargado: enviar exige una conversación
-                  // abierta (en Loading/Failed no hay a dónde escribir).
-                  if (state is MessagesLoaded) const MessageComposer(),
-                ],
+              builder: (context, state) => _ThreadContent(
+                // El composer sólo con hilo cargado: enviar exige una
+                // conversación abierta (en Loading/Failed no hay a dónde
+                // escribir).
+                showComposer: state is MessagesLoaded,
+                child: Expanded(
+                  child: switch (state) {
+                    MessagesInitial() ||
+                    MessagesLoading() => const _LoadingView(),
+                    MessagesLoaded(
+                      items: final items,
+                      prevCursor: final prevCursor,
+                      isLoadingOlder: final isLoadingOlder,
+                      pending: final pending,
+                    ) =>
+                      (items.isEmpty && pending.isEmpty)
+                          ? const _EmptyView()
+                          : _ThreadView(
+                              items: items,
+                              pending: pending,
+                              hasMore: prevCursor != null,
+                              isLoadingOlder: isLoadingOlder,
+                            ),
+                    MessagesFailed(failure: final f) => _FailedView(failure: f),
+                  },
+                ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Cuerpo del hilo: compone las filas de la columna (lista + banners +
+/// composer) y las entrega al [AttachPanelScaffold], que ancla el panel de
+/// adjuntar inline abajo (reserva de espacio, expansión y back). El layout del
+/// panel vive en ese contenedor canónico —compartido con los tests— para que
+/// una deriva lo rompa en un solo lugar.
+class _ThreadContent extends StatelessWidget {
+  const _ThreadContent({required this.child, required this.showComposer});
+
+  /// El `Expanded` con la lista/estado del hilo.
+  final Widget child;
+  final bool showComposer;
+
+  @override
+  Widget build(BuildContext context) {
+    return AttachPanelScaffold(
+      children: <Widget>[
+        child,
+        // Alerta crítica del bot (desconexión, etc.) y actividad EN VIVO entre
+        // el hilo y el composer. Inertes para no-admin (cubit sin observar) ⇒
+        // no pintan.
+        const AlertBanner(),
+        const LiveActivity(),
+        if (showComposer) const MessageComposer(),
+      ],
     );
   }
 }

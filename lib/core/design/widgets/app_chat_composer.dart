@@ -24,6 +24,7 @@ class AppChatComposer extends StatefulWidget {
     this.leading = const <Widget>[],
     this.emptyTrailing,
     this.controller,
+    this.focusNode,
     this.fieldKey,
     this.sendKey,
   });
@@ -50,6 +51,11 @@ class AppChatComposer extends StatefulWidget {
   /// composer NO lo dispone (su dueño es el caller).
   final TextEditingController? controller;
 
+  /// FocusNode externo opcional — para callers que observan el foco del campo
+  /// (p. ej. intercambiar teclado por otra superficie al enfocar). El composer
+  /// NO lo dispone (su dueño es el caller).
+  final FocusNode? focusNode;
+
   /// Keys del campo y del botón, para que cada superficie conserve las
   /// suyas en tests.
   final Key? fieldKey;
@@ -65,16 +71,18 @@ class _AppChatComposerState extends State<AppChatComposer> {
   static const double _touchTarget = 48.0;
 
   TextEditingController? _owned;
-  final FocusNode _focusNode = FocusNode();
+  FocusNode? _ownedFocus;
 
   TextEditingController get _ctrl =>
       widget.controller ?? (_owned ??= TextEditingController());
+
+  FocusNode get _focus => widget.focusNode ?? (_ownedFocus ??= FocusNode());
 
   @override
   void initState() {
     super.initState();
     _ctrl.addListener(_onChanged);
-    _focusNode.addListener(_onChanged);
+    _focus.addListener(_onChanged);
   }
 
   @override
@@ -84,6 +92,10 @@ class _AppChatComposerState extends State<AppChatComposer> {
       (old.controller ?? _owned)?.removeListener(_onChanged);
       _ctrl.addListener(_onChanged);
     }
+    if (old.focusNode != widget.focusNode) {
+      (old.focusNode ?? _ownedFocus)?.removeListener(_onChanged);
+      _focus.addListener(_onChanged);
+    }
   }
 
   void _onChanged() => setState(() {});
@@ -92,8 +104,8 @@ class _AppChatComposerState extends State<AppChatComposer> {
   void dispose() {
     _ctrl.removeListener(_onChanged);
     _owned?.dispose();
-    _focusNode.removeListener(_onChanged);
-    _focusNode.dispose();
+    _focus.removeListener(_onChanged);
+    _ownedFocus?.dispose();
     super.dispose();
   }
 
@@ -108,7 +120,7 @@ class _AppChatComposerState extends State<AppChatComposer> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final canSend = widget.enabled && _ctrl.text.trim().isNotEmpty;
-    final focused = _focusNode.hasFocus;
+    final focused = _focus.hasFocus;
     final radius = BorderRadius.circular(_touchTarget / 2);
 
     // Idioma de foco de AppTextField: borde primary + glow, fill compactado
@@ -144,7 +156,7 @@ class _AppChatComposerState extends State<AppChatComposer> {
       child: TextField(
         key: widget.fieldKey,
         controller: _ctrl,
-        focusNode: _focusNode,
+        focusNode: _focus,
         enabled: widget.enabled,
         minLines: 1,
         maxLines: 5,

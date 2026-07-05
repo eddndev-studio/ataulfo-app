@@ -110,6 +110,29 @@ void main() {
     expect(sent, <String>['desde fuera']);
   });
 
+  testWidgets('acepta un focusNode externo que refleja el foco del campo', (
+    tester,
+  ) async {
+    final focus = FocusNode();
+    addTearDown(focus.dispose);
+    await tester.pumpWidget(
+      host(
+        AppChatComposer(
+          onSend: (_) {},
+          focusNode: focus,
+          fieldKey: const Key('c.field'),
+        ),
+      ),
+    );
+
+    expect(focus.hasFocus, isFalse);
+    await tester.tap(find.byKey(const Key('c.field')));
+    await tester.pump();
+    // El caller observa el foco por su propio nodo (para intercambiar teclado
+    // por otra superficie, p. ej.).
+    expect(focus.hasFocus, isTrue);
+  });
+
   testWidgets('la barra usa surface1 con divisor superior (idioma del kit)', (
     tester,
   ) async {

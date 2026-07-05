@@ -9,15 +9,17 @@ import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dar
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
+import 'package:ataulfo/features/messages/presentation/bloc/attach_panel_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/reply_draft_cubit.dart';
-import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
 import 'package:ataulfo/features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../../../support/attach_thread_harness.dart';
 
 class _MockMessagesBloc extends MockBloc<MessagesEvent, MessagesState>
     implements MessagesBloc {}
@@ -74,8 +76,9 @@ void main() {
           BlocProvider<MessagesBloc>.value(value: msgBloc),
           BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
           BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
+          BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
         ],
-        child: const Scaffold(body: MessageComposer()),
+        child: const Scaffold(body: AttachThreadHarness()),
       ),
     ),
   );
@@ -85,32 +88,37 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('sin soporte de cámara el menú NO ofrece Cámara', (tester) async {
+  testWidgets('sin soporte de cámara el panel NO ofrece Cámara', (
+    tester,
+  ) async {
     when(camera.isSupported).thenAnswer((_) async => false);
 
     await tester.pumpWidget(host());
     await openAttachMenu(tester);
 
-    expect(find.byKey(const Key('attach_menu_sheet')), findsOneWidget);
+    expect(find.byKey(const Key('attach_panel.fixed')), findsOneWidget);
+    expect(find.byKey(const Key('attach_menu.document')), findsOneWidget);
     expect(find.byKey(const Key('attach_menu.camera')), findsNothing);
   });
 
-  testWidgets('con soporte, tocar Cámara abre el sub-sheet de 2 filas', (
-    tester,
-  ) async {
-    when(camera.isSupported).thenAnswer((_) async => true);
+  testWidgets(
+    'con soporte, tocar Cámara cambia a la vista de cámara (sin ruta)',
+    (tester) async {
+      when(camera.isSupported).thenAnswer((_) async => true);
 
-    await tester.pumpWidget(host());
-    await openAttachMenu(tester);
+      await tester.pumpWidget(host());
+      await openAttachMenu(tester);
 
-    expect(find.byKey(const Key('attach_menu.camera')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('attach_menu.camera')));
-    await tester.pumpAndSettle();
+      expect(find.byKey(const Key('attach_menu.camera')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('attach_menu.camera')));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('attach_menu_sheet')), findsNothing);
-    expect(find.byKey(const Key('attach_menu.camera.photo')), findsOneWidget);
-    expect(find.byKey(const Key('attach_menu.camera.video')), findsOneWidget);
-  });
+      // El mismo panel ahora muestra Foto/Video; la fila de destinos se fue.
+      expect(find.byKey(const Key('attach_menu.document')), findsNothing);
+      expect(find.byKey(const Key('attach_menu.camera.photo')), findsOneWidget);
+      expect(find.byKey(const Key('attach_menu.camera.video')), findsOneWidget);
+    },
+  );
 
   testWidgets('Tomar foto invoca takePhoto y agrega el adjunto a la bandeja', (
     tester,
