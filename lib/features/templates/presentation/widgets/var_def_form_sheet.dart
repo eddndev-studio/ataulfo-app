@@ -182,12 +182,18 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
                       ),
                     ),
                   const SizedBox(height: AppTokens.sp4),
+                  // Default y descripción admiten párrafos (un default puede
+                  // ser un mensaje completo): piso de 3 líneas, techo de 8 y
+                  // scroll interno más allá. El name sigue single-line — un
+                  // identificador no es un párrafo.
                   AppTextField(
                     key: const Key('var_def_form.default'),
                     label: 'Valor por defecto',
                     hint: 'Usado cuando el bot no recibe valor',
                     controller: _defaultCtrl,
                     enabled: !isMutating,
+                    minLines: 3,
+                    maxLines: 8,
                   ),
                   const SizedBox(height: AppTokens.sp4),
                   AppTextField(
@@ -196,6 +202,8 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
                     hint: 'Qué representa esta variable (opcional)',
                     controller: _descCtrl,
                     enabled: !isMutating,
+                    minLines: 3,
+                    maxLines: 8,
                   ),
                   const SizedBox(height: AppTokens.sp6),
                   AppButton.filled(

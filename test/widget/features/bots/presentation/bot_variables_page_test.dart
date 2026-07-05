@@ -162,6 +162,50 @@ void main() {
     ).called(1);
   });
 
+  testWidgets(
+    'el campo de valor es multilínea: crece desde 3 líneas con techo de 8',
+    (tester) async {
+      await tester.pumpWidget(
+        host(state: const BotVariablesLoaded(defs: _defs, botVersion: 5)),
+      );
+
+      final tono = tester.widget<AppTextField>(
+        find.byKey(const Key('bot_variables.field.tono')),
+      );
+      expect(tono.minLines, 3);
+      expect(tono.maxLines, 8);
+      // Sin textInputAction explícito: Enter inserta salto de línea (el
+      // default multiline de TextField), no un submit accidental.
+      expect(tono.textInputAction, isNull);
+    },
+  );
+
+  testWidgets(
+    'un valor con saltos de línea viaja INTACTO al submit (trim solo extremos)',
+    (tester) async {
+      await tester.pumpWidget(
+        host(state: const BotVariablesLoaded(defs: _defs, botVersion: 5)),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('bot_variables.field.tono')),
+        '  Saludo inicial.\n\nDespedida cordial.  ',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('bot_variables.submit')));
+
+      // Los saltos internos (incluida la línea en blanco) sobreviven; el
+      // trim solo pela los extremos.
+      verify(
+        () => bloc.add(
+          const BotVariablesSaveRequested(<String, String>{
+            'tono': 'Saludo inicial.\n\nDespedida cordial.',
+          }),
+        ),
+      ).called(1);
+    },
+  );
+
   testWidgets('Empty muestra copy de plantilla sin variables', (tester) async {
     await tester.pumpWidget(host(state: const BotVariablesEmpty()));
     expect(find.textContaining('no declara variables'), findsOneWidget);

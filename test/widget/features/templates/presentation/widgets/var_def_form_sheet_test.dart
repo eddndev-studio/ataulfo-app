@@ -139,6 +139,65 @@ void main() {
     });
   });
 
+  group('VarDefFormSheet — multilínea', () {
+    testWidgets(
+      'default y description son multilínea (3..8); name sigue single-line',
+      (tester) async {
+        await tester.pumpWidget(host(existingNames: <String>{}));
+
+        final name = tester.widget<AppTextField>(
+          find.byKey(const Key('var_def_form.name')),
+        );
+        expect(name.maxLines, 1, reason: 'un nombre no es un párrafo');
+
+        for (final key in const <String>[
+          'var_def_form.default',
+          'var_def_form.description',
+        ]) {
+          final field = tester.widget<AppTextField>(find.byKey(Key(key)));
+          expect(field.minLines, 3, reason: '$key arranca con piso de 3');
+          expect(field.maxLines, 8, reason: '$key scrollea más allá de 8');
+          // Enter debe insertar salto de línea (default multiline), no
+          // disparar un submit.
+          expect(field.textInputAction, isNull);
+        }
+      },
+    );
+
+    testWidgets(
+      'saltos de línea en default y description viajan intactos al dispatch',
+      (tester) async {
+        await tester.pumpWidget(host(existingNames: <String>{}));
+
+        await tester.enterText(
+          find.byKey(const Key('var_def_form.name')),
+          'saludo',
+        );
+        await tester.enterText(
+          find.byKey(const Key('var_def_form.default')),
+          'Hola.\n\n¿En qué te ayudo?',
+        );
+        await tester.enterText(
+          find.byKey(const Key('var_def_form.description')),
+          'Primera línea.\nSegunda línea.',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('var_def_form.submit')));
+        await tester.pump();
+
+        verify(
+          () => bloc.add(
+            const VarDefsAddRequested(
+              name: 'saludo',
+              defaultValue: 'Hola.\n\n¿En qué te ayudo?',
+              description: 'Primera línea.\nSegunda línea.',
+            ),
+          ),
+        ).called(1);
+      },
+    );
+  });
+
   group('VarDefFormSheet — pre-flight nombre duplicado', () {
     testWidgets(
       'mostrar hint inline cuando el name existe en defs (no bloquea submit)',

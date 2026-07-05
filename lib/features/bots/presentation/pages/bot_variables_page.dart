@@ -9,6 +9,7 @@ import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../templates/domain/entities/variable_def.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_variables_bloc.dart';
+import '../widgets/bot_variable_card.dart';
 
 /// Editor de `variable_values` de un Bot (S04), sub-página ruteada
 /// (`/bots/:id/variables`). Content-only: el Scaffold/AppBar los aporta la ruta.
@@ -142,6 +143,12 @@ class _FailedView extends StatelessWidget {
 /// controllers, keyeados por `def.id`. Cada uno se PRECARGA con el override
 /// guardado (`currentValues[def.name]`) si existe; si no, arranca vacío y el
 /// default del template va de placeholder (referencia).
+///
+/// Hasta 5 defs: todos los campos expandidos en un Column plano (caso
+/// simple). Con más, modo compacto: buscador por nombre + una tarjeta
+/// colapsable por variable. Colapsar o filtrar es PURAMENTE presentacional:
+/// los controllers existen para TODOS los defs durante toda la vida del form
+/// y el submit incluye cualquier valor no vacío, visible o no.
 class _VariablesForm extends StatefulWidget {
   const _VariablesForm({
     required this.defs,
@@ -160,7 +167,19 @@ class _VariablesForm extends StatefulWidget {
 }
 
 class _VariablesFormState extends State<_VariablesForm> {
+  /// Umbral del modo compacto: hasta este número de defs, Column plano con
+  /// todos los campos a la vista; con más, buscador + tarjetas colapsables.
+  static const int _flatMax = 5;
+
   late final Map<String, TextEditingController> _controllers;
+  final TextEditingController _search = TextEditingController();
+
+  /// Ids de defs con tarjeta expandida. SOLO presentación: los controllers
+  /// existen para todos los defs y el submit los lee todos.
+  final Set<String> _expanded = <String>{};
+
+  bool get _isCompact => widget.defs.length > _flatMax;
+  String get _query => _search.text.trim().toLowerCase();
 
   @override
   void initState() {
@@ -171,10 +190,35 @@ class _VariablesFormState extends State<_VariablesForm> {
       for (final d in widget.defs)
         d.id: TextEditingController(text: widget.currentValues[d.name] ?? ''),
     };
+    // Auto-expandir lo ya configurado: el operador quiere ver de entrada
+    // qué overrides existen. El resto arranca colapsado.
+    for (final d in widget.defs) {
+      if ((widget.currentValues[d.name] ?? '').isNotEmpty) {
+        _expanded.add(d.id);
+      }
+    }
+    _search.addListener(_onSearchChanged);
+  }
+
+  /// Buscar AUTO-EXPANDE los matches además de filtrarlos: quien busca una
+  /// variable la busca para editarla, sin tap extra. La expansión persiste
+  /// al limpiar la búsqueda (el operador sigue editando donde lo dejó) y un
+  /// tap en la tarjeta puede recolapsarla en cualquier momento.
+  void _onSearchChanged() {
+    final q = _query;
+    if (q.isNotEmpty) {
+      for (final d in widget.defs) {
+        if (d.name.toLowerCase().contains(q)) {
+          _expanded.add(d.id);
+        }
+      }
+    }
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _search.dispose();
     for (final c in _controllers.values) {
       c.dispose();
     }
@@ -218,16 +262,22 @@ class _VariablesFormState extends State<_VariablesForm> {
             ),
           ),
           const SizedBox(height: AppTokens.sp5),
-          for (final d in widget.defs) ...<Widget>[
+          if (!_isCompact)
+            // Caso simple: todos los campos a la vista, con el nombre y la
+            // descripción en el propio campo.
+            for (final d in widget.defs) ...<Widget>[
+              _valueField(d, label: d.name, helper: d.description),
+              const SizedBox(height: AppTokens.sp4),
+            ]
+          else ...<Widget>[
             AppTextField(
-              key: Key('bot_variables.field.${d.name}'),
-              label: d.name,
-              hint: d.defaultValue,
-              helperText: d.description,
-              controller: _controllers[d.id]!,
-              enabled: !widget.isSaving,
+              key: const Key('bot_variables.search'),
+              label: 'Buscar',
+              hint: 'Nombre de la variable',
+              controller: _search,
             ),
             const SizedBox(height: AppTokens.sp4),
+            ..._cards(textTheme),
           ],
           if (failure != null) ...<Widget>[
             Text(
@@ -246,6 +296,65 @@ class _VariablesFormState extends State<_VariablesForm> {
         ],
       ),
     );
+  }
+
+  /// Campo de override multilínea. El valor puede ser un párrafo completo
+  /// (p.ej. un mensaje entero): piso de 3 líneas para invitar a escribir,
+  /// techo de 8 para que un valor enorme scrollee dentro del campo en vez de
+  /// comerse la pantalla. Sin textInputAction: Enter inserta salto de línea.
+  Widget _valueField(VariableDef d, {required String label, String? helper}) =>
+      AppTextField(
+        key: Key('bot_variables.field.${d.name}'),
+        label: label,
+        hint: d.defaultValue,
+        helperText: helper,
+        controller: _controllers[d.id]!,
+        enabled: !widget.isSaving,
+        minLines: 3,
+        maxLines: 8,
+      );
+
+  /// Tarjetas del modo compacto, ya filtradas por la búsqueda (contains
+  /// case-insensitive sobre el nombre). Dentro de la tarjeta el campo se
+  /// llama «Valor»: nombre y descripción ya viven en el header.
+  List<Widget> _cards(TextTheme textTheme) {
+    final q = _query;
+    final visible = q.isEmpty
+        ? widget.defs
+        : widget.defs
+              .where((d) => d.name.toLowerCase().contains(q))
+              .toList(growable: false);
+    if (visible.isEmpty) {
+      return <Widget>[
+        Text(
+          'Sin resultados para "${_search.text.trim()}".',
+          key: const Key('bot_variables.no_results'),
+          style: textTheme.bodyMedium?.copyWith(
+            fontStyle: FontStyle.italic,
+            color: AppTokens.text2,
+          ),
+        ),
+        const SizedBox(height: AppTokens.sp4),
+      ];
+    }
+    return <Widget>[
+      for (final d in visible) ...<Widget>[
+        BotVariableCard(
+          key: Key('bot_variables.card.${d.name}'),
+          name: d.name,
+          description: d.description,
+          valueText: _controllers[d.id]!.text,
+          expanded: _expanded.contains(d.id),
+          onToggle: () => setState(() {
+            if (!_expanded.remove(d.id)) {
+              _expanded.add(d.id);
+            }
+          }),
+          field: _valueField(d, label: 'Valor'),
+        ),
+        const SizedBox(height: AppTokens.cardGap),
+      ],
+    ];
   }
 
   static String _failureMessage(BotsFailure f) => switch (f) {
