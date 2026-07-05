@@ -44,6 +44,7 @@ class StepEditSheet extends StatefulWidget {
     this.editing,
     this.createType,
     this.pickMediaRef,
+    this.insertOrder,
   }) : assert(
          (editing == null) != (createType == null),
          'crear exige createType; editar toma el tipo del step',
@@ -61,6 +62,10 @@ class StepEditSheet extends StatefulWidget {
   /// de un step en edición. `null` ⇒ el selector queda read-only: no abre
   /// nada, lo que mantiene el sheet testeable aislado.
   final MediaRefPicker? pickMediaRef;
+
+  /// Posición que ocupará el paso nuevo (inserción posicional: el backend
+  /// desplaza los siguientes); null = append. Solo aplica al crear.
+  final int? insertOrder;
 
   @override
   State<StepEditSheet> createState() => StepEditSheetState();
@@ -272,7 +277,14 @@ class StepEditSheetState extends State<StepEditSheet> {
     final bloc = context.read<FlowStepsBloc>();
     if (ed == null) {
       _didSubmit = true;
-      bloc.add(stepAddEvent(_type, _draft, stepsFromState(bloc.state)));
+      bloc.add(
+        stepAddEvent(
+          _type,
+          _draft,
+          stepsFromState(bloc.state),
+          insertAt: widget.insertOrder,
+        ),
+      );
       return;
     }
     final event = stepUpdateEvent(_draft, ed);

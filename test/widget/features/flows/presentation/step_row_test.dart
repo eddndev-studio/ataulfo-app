@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
-import 'package:ataulfo/features/flows/presentation/widgets/step_card.dart';
+import 'package:ataulfo/features/flows/presentation/widgets/step_row.dart';
 import 'package:ataulfo/features/flows/presentation/widgets/step_media_field.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:flutter/material.dart';
@@ -61,7 +61,7 @@ void main() {
     MaterialApp(
       theme: AppDesignTheme.dark(),
       home: Scaffold(
-        body: StepCard(
+        body: StepRow(
           step: step,
           onTap: () {},
           resolvedMediaName: resolvedMediaName,
@@ -71,7 +71,7 @@ void main() {
     ),
   );
 
-  group('StepCard — miniatura del paso multimedia', () {
+  group('StepRow — miniatura del paso multimedia', () {
     testWidgets(
       'paso IMAGE con bytes cacheados: miniatura junto al resumen, resuelta '
       'SOLO por el ref BARE',

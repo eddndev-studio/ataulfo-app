@@ -203,16 +203,27 @@ bool stepDraftHasUnsavedWork(
 
 /// Evento de ALTA construido del draft: zeroing por tipo (LABEL y END no
 /// envían al wire, así que el piso de 1 s no aplica), metadata por familia
-/// y la inserción posicional del condicional — se INSERTA antes de su
-/// destino más temprano; los demás tipos conservan el append clásico.
+/// y el `order` de inserción — [insertAt] es la posición pedida por el
+/// operador ("+" entre filas); null conserva el append clásico. El
+/// condicional además se ACOTA a quedar antes de su destino más temprano
+/// (la posición pedida gana solo si ya cumple forward-only; si no, la
+/// auto-inserción evita el 422 por construcción).
 FlowStepsAddRequested stepAddEvent(
   fdom.StepType type,
   StepDraft d,
-  List<fdom.Step> steps,
-) {
+  List<fdom.Step> steps, {
+  int? insertAt,
+}) {
   final isCt = type == fdom.StepType.conditionalTime;
   final isLabel = type == fdom.StepType.label;
   final isEnd = type == fdom.StepType.end;
+  int? order = insertAt;
+  if (isCt) {
+    final ctOrder = ctInsertOrder(d.ctMetadataJson, steps);
+    if (ctOrder != null && (insertAt == null || ctOrder < insertAt)) {
+      order = ctOrder;
+    }
+  }
   return FlowStepsAddRequested(
     type: type,
     mediaRef: d.isMultimedia ? d.mediaRef : '',
@@ -226,7 +237,7 @@ FlowStepsAddRequested stepAddEvent(
         : isLabel
         ? d.labelMetadataJson
         : d.mediaMetadataJson,
-    order: isCt ? ctInsertOrder(d.ctMetadataJson, steps) : null,
+    order: order,
   );
 }
 

@@ -1,38 +1,178 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
-import '../../../labels/presentation/bloc/labels_bloc.dart';
-import '../../../media/domain/entities/media_asset.dart';
 import '../../domain/entities/step.dart' as sdom;
 import '../../domain/failures/flows_failure.dart';
 import '../bloc/flow_steps_bloc.dart';
-import '../bloc/media_names_cubit.dart';
-import 'step_card.dart';
-import 'step_editor_launcher.dart';
 import 'step_reorder_rules.dart';
+import 'step_timeline_view.dart';
 
-/// Cuerpo principal del hub del editor: la lista de pasos atada al
+/// Cuerpo principal del hub del editor: el timeline de pasos atado al
 /// `FlowStepsBloc`, con [header] (identidad excepcional del flujo) por
 /// encima y [footer] (launchers a subpáginas + zona peligrosa) al fondo,
 /// AMBOS dentro del mismo scroll — la página completa se desplaza como
-/// una sola superficie, y con ≥2 pasos ese scroll es el
-/// `ReorderableListView` que el drag&drop necesita.
+/// una sola superficie, y con ≥2 pasos ese scroll es el del timeline
+/// reordenable.
 ///
 /// El footer se monta en TODOS los estados de los pasos: aunque el
 /// listado cargue o falle, el operador puede seguir operando el flujo
 /// (disparadores, configuración, borrado).
-class FlowStepsSection extends StatelessWidget {
+///
+/// La sección además ANUNCIA el paso recién creado/insertado: detecta el
+/// id nuevo al llegar el listado refrescado, hace scroll hasta su fila y
+/// la enciende con el glow one-shot del timeline — con inserción a media
+/// lista, el paso ya no aparece sin aviso.
+class FlowStepsSection extends StatefulWidget {
   const FlowStepsSection({super.key, this.header, this.footer});
 
   final Widget? header;
   final Widget? footer;
+
+  @override
+  State<FlowStepsSection> createState() => _FlowStepsSectionState();
+}
+
+class _FlowStepsSectionState extends State<FlowStepsSection> {
+  final ScrollController _scroll = ScrollController();
+
+  /// Identidad estable por step id: key de item del timeline Y ancla del
+  /// scroll-to (su `currentContext` localiza la fila ya construida).
+  final Map<String, GlobalKey> _rowKeys = <String, GlobalKey>{};
+
+  /// Ids del último listado CONFIRMADO (Loaded); contra ellos se detecta
+  /// el paso recién creado. Null hasta el primer listado.
+  List<String>? _knownIds;
+
+  /// Paso a anunciar (highlight one-shot). Persiste hasta el siguiente
+  /// anuncio: el glow del timeline solo re-anima en la transición.
+  String? _highlightId;
+
+  @override
+  void initState() {
+    super.initState();
+    // La sección puede montarse con el listado ya cargado (regreso de una
+    // subpágina): ese snapshot es la línea base, no un lote "nuevo".
+    final state = context.read<FlowStepsBloc>().state;
+    if (state is FlowStepsLoaded) {
+      _knownIds = <String>[for (final s in state.steps) s.id];
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Detecta el paso recién creado comparando el Loaded entrante contra el
+  /// último listado conocido: EXACTAMENTE un id nuevo = un alta que
+  /// anunciar (reorder/edición conservan ids; el refetch inicial no tiene
+  /// baseline). Corre en el listener del consumer — antes del rebuild, así
+  /// el highlight ya viaja en ese mismo frame.
+  void _trackNewStep(FlowStepsState state) {
+    if (state is! FlowStepsLoaded) return;
+    final ids = <String>[for (final s in state.steps) s.id];
+    final known = _knownIds;
+    _knownIds = ids;
+    _rowKeys.removeWhere((id, _) => !ids.contains(id));
+    if (known == null) return;
+    final added = <String>[
+      for (final id in ids)
+        if (!known.contains(id)) id,
+    ];
+    if (added.length != 1) return;
+    _highlightId = added.single;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _revealStep(added.single);
+    });
+  }
+
+  /// Scroll hasta la fila del paso [id]. Si la fila aún no se construyó
+  /// (lista larga, alta al final), se acerca al extremo y reintenta una
+  /// vez ya con el item en el viewport.
+  void _revealStep(String id) {
+    final ctx = _rowKeys[id]?.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.35,
+        duration: AppTokens.durationSlow,
+        curve: AppTokens.ease,
+      );
+      return;
+    }
+    if (!_scroll.hasClients) return;
+    _scroll
+        .animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: AppTokens.durationSlow,
+          curve: AppTokens.ease,
+        )
+        .then((_) {
+          if (!mounted) return;
+          final lateCtx = _rowKeys[id]?.currentContext;
+          if (lateCtx == null || !lateCtx.mounted) return;
+          Scrollable.ensureVisible(
+            lateCtx,
+            alignment: 0.35,
+            duration: AppTokens.durationFast,
+            curve: AppTokens.ease,
+          );
+        });
+  }
+
+  /// Timeline con lista o empty state, según haya pasos. `notice` es el
+  /// aviso inline que el estado del bloc quiera anteponer (progreso de
+  /// mutación, refetch fallido) SIN tapar la lista — nunca un overlay.
+  Widget _listOrEmpty(List<sdom.Step> steps, {Widget? notice}) {
+    if (steps.isEmpty) {
+      return _Static(
+        header: widget.header,
+        footer: widget.footer,
+        notice: notice,
+        child: AppEmptyState(
+          key: const Key('flow_detail.steps.empty'),
+          icon: Icons.forum_outlined,
+          title: 'Este flujo aún no tiene pasos',
+          description:
+              'Los pasos son los mensajes y acciones que el flujo '
+              'ejecuta en orden.',
+          ctaLabel: 'Crear el primer paso',
+          ctaIcon: Icons.add,
+          onCta: () => openStepSheet(context, null),
+        ),
+      );
+    }
+    final h = widget.header;
+    final n = notice;
+    return StepsTimelineView(
+      steps: steps,
+      rowKeys: _rowKeys,
+      controller: _scroll,
+      highlightId: _highlightId,
+      header: (h == null && n == null)
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                if (h != null) ...<Widget>[
+                  h,
+                  const SizedBox(height: AppTokens.sp4),
+                ],
+                if (n != null) ...<Widget>[
+                  n,
+                  const SizedBox(height: AppTokens.sp3),
+                ],
+              ],
+            ),
+      footer: widget.footer == null ? null : stepsFooterBlock(widget.footer!),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +181,7 @@ class FlowStepsSection extends StatelessWidget {
       // su fallo inline dentro del sheet abierto. El gate `isCurrent` evita
       // duplicar el aviso cuando el fallo ocurre con un modal encima.
       listener: (context, state) {
+        _trackNewStep(state);
         if (state is FlowStepsMutationFailed &&
             (ModalRoute.of(context)?.isCurrent ?? true)) {
           final copy = state.failure is FlowsInvalidReorderFailure
@@ -56,50 +197,36 @@ class FlowStepsSection extends StatelessWidget {
         // Solo la carga inicial (o el retry de un Failed terminal) muestra
         // spinner puro: todavía no hay lista que conservar.
         FlowStepsLoading() => _Static(
-          header: header,
-          footer: footer,
+          header: widget.header,
+          footer: widget.footer,
           child: const Padding(
             padding: EdgeInsets.symmetric(vertical: AppTokens.sp6),
             child: AppLoadingIndicator(),
           ),
         ),
-        FlowStepsLoaded(steps: final ss) => _StepsListView(
-          steps: ss,
-          header: header,
-          footer: footer,
-        ),
+        FlowStepsLoaded(steps: final ss) => _listOrEmpty(ss),
         // Todo estado con lista la mantiene en pantalla — la mutación en
         // vuelo y el refetch posterior solo agregan el progreso inline;
         // el operador nunca pierde contexto ni scroll.
-        FlowStepsMutating(steps: final ss) => _StepsListView(
-          steps: ss,
-          header: header,
-          footer: footer,
+        FlowStepsMutating(steps: final ss) => _listOrEmpty(
+          ss,
           notice: const _MutatingInlineSpinner(),
         ),
-        FlowStepsRefreshing(steps: final ss) => _StepsListView(
-          steps: ss,
-          header: header,
-          footer: footer,
+        FlowStepsRefreshing(steps: final ss) => _listOrEmpty(
+          ss,
           notice: const _MutatingInlineSpinner(),
         ),
         // La mutación persistió pero el listado no se pudo refrescar: la
         // lista visible puede estar desactualizada; el aviso lo dice y
         // ofrece reintentar el refetch conservándola.
-        FlowStepsRefreshFailed(steps: final ss) => _StepsListView(
-          steps: ss,
-          header: header,
-          footer: footer,
+        FlowStepsRefreshFailed(steps: final ss) => _listOrEmpty(
+          ss,
           notice: const _RefreshFailedNotice(),
         ),
-        FlowStepsMutationFailed(steps: final ss) => _StepsListView(
-          steps: ss,
-          header: header,
-          footer: footer,
-        ),
+        FlowStepsMutationFailed(steps: final ss) => _listOrEmpty(ss),
         FlowStepsFailed(failure: final f) => _Static(
-          header: header,
-          footer: footer,
+          header: widget.header,
+          footer: widget.footer,
           child: _StepsFailedView(failure: f),
         ),
       },
@@ -107,226 +234,35 @@ class FlowStepsSection extends StatelessWidget {
   }
 }
 
-/// Padding común de la superficie scrolleable del hub.
-EdgeInsets _pagePadding(BuildContext context) => EdgeInsets.fromLTRB(
-  AppTokens.sp6,
-  AppTokens.sp6,
-  AppTokens.sp6,
-  AppTokens.sp6 + context.safeBottomInset,
-);
-
-/// Separación entre el final del contenido de pasos y el footer.
-Widget _footerBlock(Widget footer) => Padding(
-  padding: const EdgeInsets.only(top: AppTokens.sp6),
-  child: footer,
-);
-
-/// Layout scrolleable simple para los estados sin lista reordenable
-/// (carga inicial, fallo terminal): header + contenido + footer.
+/// Layout scrolleable simple para los estados sin timeline (carga
+/// inicial, fallo terminal, flujo sin pasos): header + aviso + contenido
+/// + footer.
 class _Static extends StatelessWidget {
-  const _Static({required this.child, this.header, this.footer});
+  const _Static({required this.child, this.header, this.footer, this.notice});
 
   final Widget child;
   final Widget? header;
   final Widget? footer;
+  final Widget? notice;
 
   @override
   Widget build(BuildContext context) {
     final h = header;
+    final n = notice;
     final f = footer;
     return SingleChildScrollView(
-      padding: _pagePadding(context),
+      padding: stepsPagePadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           if (h != null) ...<Widget>[h, const SizedBox(height: AppTokens.sp4)],
+          if (n != null) ...<Widget>[n, const SizedBox(height: AppTokens.sp3)],
           child,
-          if (f != null) _footerBlock(f),
+          if (f != null) stepsFooterBlock(f),
         ],
       ),
     );
   }
-}
-
-/// Renderiza la lista de StepCards o el empty state. `notice` es el aviso
-/// inline que el estado del bloc quiera anteponer (progreso de mutación,
-/// refetch fallido) SIN tapar la lista existente — nunca un overlay.
-///
-/// Con ≥2 steps usa `ReorderableListView.builder` (con el header y footer
-/// dentro del mismo scroll) para soportar drag&drop. Con 0 o 1 step usa
-/// un layout simple — no tiene sentido pagar el costo del scroll de
-/// reorder cuando no hay nada que reordenar.
-class _StepsListView extends StatelessWidget {
-  const _StepsListView({
-    required this.steps,
-    this.header,
-    this.footer,
-    this.notice,
-  });
-
-  final List<sdom.Step> steps;
-  final Widget? header;
-  final Widget? footer;
-  final Widget? notice;
-
-  /// Encabezado de la sección de pasos: la identidad excepcional que el
-  /// hub aporte + el aviso inline + la CTA de alta (solo con pasos; el
-  /// vacío ofrece la suya en el empty state).
-  List<Widget> _sectionHeader(BuildContext context) {
-    final h = header;
-    final n = notice;
-    return <Widget>[
-      if (h != null) ...<Widget>[h, const SizedBox(height: AppTokens.sp4)],
-      if (n != null) ...<Widget>[n, const SizedBox(height: AppTokens.sp3)],
-      if (steps.isNotEmpty) ...<Widget>[
-        Align(
-          alignment: Alignment.centerLeft,
-          child: AppButton.text(
-            key: const Key('flow_detail.steps.add_button'),
-            label: 'Nuevo paso',
-            icon: Icons.add,
-            onPressed: () => openStepSheet(context, null),
-          ),
-        ),
-        const SizedBox(height: AppTokens.sp3),
-      ],
-    ];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bloc = context.read<FlowStepsBloc>();
-    // Resuelve los nombres EN VIVO del catálogo UNA vez, POR ENCIMA del
-    // ReorderableListView, y se los pasa a cada tarjeta como dato plano. Si el
-    // lookup del cubit viviera dentro del item reordenable, al arrastrarlo el
-    // item se eleva al overlay del Navigator (fuera del scope del provider) y
-    // el lookup lanzaría ProviderNotFound → RenderErrorBox gris estirado.
-    final namesState = context.watch<MediaNamesCubit>().state;
-    // Mismo patrón para el catálogo de labels: mapa plano id→nombre para que
-    // el paso LABEL muestre el nombre y no el UUID.
-    final labelsState = context.watch<LabelsBloc>().state;
-    final labelNames = labelsState is LabelsLoaded
-        ? <String, String>{for (final l in labelsState.labels) l.id: l.name}
-        : const <String, String>{};
-    // Índice id → (posición, etiqueta) de los steps vigentes, para que la
-    // tarjeta del condicional resuelva sus destinos por NOMBRE y marque
-    // colgantes/hacia-atrás. Plano y calculado aquí arriba por el mismo
-    // motivo overlay-safe que labelNames/mediaNames.
-    final stepRefs = <String, ({int order, String label})>{
-      for (final s in steps) s.id: (order: s.order, label: stepRefLabel(s)),
-    };
-    final f = footer;
-
-    if (steps.isEmpty) {
-      return _Static(
-        header: header,
-        footer: footer,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (notice != null) ...<Widget>[
-              notice!,
-              const SizedBox(height: AppTokens.sp3),
-            ],
-            AppEmptyState(
-              key: const Key('flow_detail.steps.empty'),
-              icon: Icons.forum_outlined,
-              title: 'Este flujo aún no tiene pasos',
-              description:
-                  'Los pasos son los mensajes y acciones que el flujo '
-                  'ejecuta en orden.',
-              ctaLabel: 'Crear el primer paso',
-              ctaIcon: Icons.add,
-              onCta: () => openStepSheet(context, null),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (steps.length == 1) {
-      return SingleChildScrollView(
-        padding: _pagePadding(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            ..._sectionHeader(context),
-            StepCard(
-              step: steps.first,
-              onTap: () => openStepSheet(context, steps.first),
-              resolvedMediaName: namesState.nameFor(steps.first.mediaRef),
-              labelNames: labelNames,
-              stepRefs: stepRefs,
-            ),
-            if (f != null) _footerBlock(f),
-          ],
-        ),
-      );
-    }
-
-    return ReorderableListView.builder(
-      padding: _pagePadding(context),
-      header: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: _sectionHeader(context),
-      ),
-      footer: f == null ? null : _footerBlock(f),
-      itemCount: steps.length,
-      buildDefaultDragHandles: false,
-      itemBuilder: (_, i) {
-        final s = steps[i];
-        return Padding(
-          key: ValueKey<String>('flow_detail.step_card.row.${s.id}'),
-          padding: const EdgeInsets.only(bottom: AppTokens.sp3),
-          child: StepCard(
-            step: s,
-            dragIndex: i,
-            onTap: () => openStepSheet(context, s),
-            resolvedMediaName: namesState.nameFor(s.mediaRef),
-            labelNames: labelNames,
-            stepRefs: stepRefs,
-          ),
-        );
-      },
-      onReorderItem: (oldIdx, newIdx) {
-        // onReorderItem entrega newIdx ya ajustado sin el elemento movido.
-        final reordered = List<sdom.Step>.of(steps);
-        reordered.insert(newIdx, reordered.removeAt(oldIdx));
-        // Forward-only se previene ANTES del request: el drop inválido no
-        // se dispatcha (estado igual ⇒ la lista rebota); backend = red final.
-        if (!conditionalTargetsStayForward(reordered)) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              const SnackBar(content: Text(forwardOnlyReorderCopy)),
-            );
-          return;
-        }
-        bloc.add(
-          FlowStepsReorderRequested(<String>[for (final s in reordered) s.id]),
-        );
-      },
-    );
-  }
-}
-
-/// Abre el editor de pasos en dos tiempos: sin `step`, primero el selector
-/// de tipo y luego la composición del tipo elegido (cancelar el selector no
-/// abre nada); con `step`, directo a la composición en modo edición. Lo usan
-/// la CTA de alta (botón / empty state) y el tap de cada card.
-/// `openStepEditor` re-provee los blocs del scope y aplica el fondo canónico.
-///
-/// Al crear o reemplazar el recurso de un step multimedia, el selector abre
-/// la galería en modo picker (`/media/pick?type=<familia>`, filtrada por el
-/// tipo del paso) que devuelve el MediaAsset completo vía pop.
-void openStepSheet(BuildContext context, sdom.Step? step) {
-  openStepEditor(
-    context,
-    editing: step,
-    pickMediaRef: (ctx, family) => ctx.push<MediaAsset>(
-      family == null ? '/media/pick' : '/media/pick?type=$family',
-    ),
-  );
 }
 
 class _MutatingInlineSpinner extends StatelessWidget {

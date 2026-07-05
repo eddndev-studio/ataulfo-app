@@ -678,7 +678,7 @@ void main() {
     );
 
     testWidgets(
-      'StepCard de un paso manualOnly muestra pill "Solo disparadores"',
+      'StepRow de un paso manualOnly muestra pill "Solo disparadores"',
       (tester) async {
         when(() => stepsBloc.state).thenReturn(
           const FlowStepsLoaded(<fdom.Step>[
@@ -709,7 +709,7 @@ void main() {
     );
 
     testWidgets(
-      'StepCard multimedia muestra el alias EN VIVO del catálogo (resuelto '
+      'StepRow multimedia muestra el alias EN VIVO del catálogo (resuelto '
       'por ref), por encima del ref y del media_filename guardado',
       (tester) async {
         when(() => stepsBloc.state).thenReturn(
@@ -894,7 +894,7 @@ void main() {
     );
 
     testWidgets(
-      'Tap en StepCard abre el StepEditSheet en modo Edit (prefilled)',
+      'Tap en StepRow abre el StepEditSheet en modo Edit (prefilled)',
       (tester) async {
         when(() => stepsBloc.state).thenReturn(
           FlowStepsLoaded(<fdom.Step>[textStep(content: 'Hola original')]),
@@ -916,7 +916,7 @@ void main() {
     );
 
     testWidgets(
-      'Tap en StepCard multimedia abre el sheet con "Cambiar" interactivo '
+      'Tap en StepRow multimedia abre el sheet con "Cambiar" interactivo '
       '(el host de producción cablea el picker también al editar)',
       (tester) async {
         when(() => stepsBloc.state).thenReturn(

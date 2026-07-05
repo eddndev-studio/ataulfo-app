@@ -14,10 +14,15 @@ import 'step_type_selector.dart';
 /// primero el selector de tipo agrupado y —solo si el operador eligió—
 /// el sheet de composición de ese tipo; cancelar el selector no abre nada.
 /// Al editar, directo a la composición (el tipo ya existe y es inmutable).
+///
+/// [insertOrder] es la posición que ocupará el paso nuevo (inserción
+/// posicional: el backend desplaza los siguientes); null = append. Solo
+/// aplica al crear.
 Future<void> openStepEditor(
   BuildContext context, {
   fdom.Step? editing,
   MediaRefPicker? pickMediaRef,
+  int? insertOrder,
 }) async {
   if (editing != null) {
     return showStepEditSheet(
@@ -32,6 +37,7 @@ Future<void> openStepEditor(
     context,
     createType: type,
     pickMediaRef: pickMediaRef,
+    insertOrder: insertOrder,
   );
 }
 
@@ -47,6 +53,7 @@ Future<void> showStepEditSheet(
   fdom.Step? editing,
   fdom.StepType? createType,
   MediaRefPicker? pickMediaRef,
+  int? insertOrder,
 }) {
   final bloc = context.read<FlowStepsBloc>();
   final labelsRepo = context.read<LabelsRepository>();
@@ -69,6 +76,7 @@ Future<void> showStepEditSheet(
         editing: editing,
         createType: createType,
         pickMediaRef: pickMediaRef,
+        insertOrder: insertOrder,
       ),
     ),
   );

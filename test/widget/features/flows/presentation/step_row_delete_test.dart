@@ -1,7 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/flows/domain/entities/step.dart' as fdom;
 import 'package:ataulfo/features/flows/presentation/bloc/flow_steps_bloc.dart';
-import 'package:ataulfo/features/flows/presentation/widgets/step_card.dart';
+import 'package:ataulfo/features/flows/presentation/widgets/step_row.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -60,7 +60,7 @@ void main() {
         home: BlocProvider<FlowStepsBloc>.value(
           value: bloc,
           child: Scaffold(
-            body: StepCard(step: step, onTap: () {}),
+            body: StepRow(step: step, onTap: () {}),
           ),
         ),
       ),
