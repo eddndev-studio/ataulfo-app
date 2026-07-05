@@ -1,25 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../domain/entities/flow.dart' as fdom;
 import '../../domain/failures/flows_failure.dart';
+import '../../domain/repositories/flows_repository.dart';
 import '../bloc/flow_create_bloc.dart';
 
-/// Página para crear un Flow dentro de una Template (S11). Consume el
-/// `FlowCreateBloc` del scope; el cableado del provider y del
-/// templateId lo hace el router en `/templates/:templateId/flows/new`.
-/// Es content-only: el Scaffold + AppBar los aporta la ruta.
-class FlowCreatePage extends StatefulWidget {
-  const FlowCreatePage({super.key});
+/// Hoja de creación de un Flow dentro de una Template. Reemplaza a la
+/// pantalla dedicada: el mismo formulario (nombre + crear) vive ahora en un
+/// bottom sheet. Al crear con éxito CIERRA devolviendo el Flow creado vía
+/// `Navigator.pop`; quien la abre decide la navegación (típicamente empujar
+/// el editor), lo que evita el footgun de navegar desde un contexto que
+/// muere al cerrar la hoja.
+///
+/// Un modal vive en otro subárbol del Navigator —fuera de los providers de
+/// la ruta—, así que el repositorio se LEE en el call site y se inyecta al
+/// bloc de la hoja con `create:`.
+class FlowCreateSheet extends StatefulWidget {
+  const FlowCreateSheet({super.key});
+
+  /// Abre la hoja y resuelve con el Flow creado, o `null` si se descartó
+  /// sin crear. El llamador (FAB) navega con el resultado.
+  static Future<fdom.Flow?> open(
+    BuildContext context, {
+    required String templateId,
+  }) {
+    final repo = context.read<FlowsRepository>();
+    return showAppBottomSheet<fdom.Flow>(
+      context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (_) => BlocProvider<FlowCreateBloc>(
+        create: (_) => FlowCreateBloc(repo: repo, templateId: templateId),
+        child: const FlowCreateSheet(),
+      ),
+    );
+  }
 
   @override
-  State<FlowCreatePage> createState() => _FlowCreatePageState();
+  State<FlowCreateSheet> createState() => _FlowCreateSheetState();
 }
 
-class _FlowCreatePageState extends State<FlowCreatePage> {
+class _FlowCreateSheetState extends State<FlowCreateSheet> {
   final TextEditingController _ctrl = TextEditingController();
   bool _canSubmit = false;
 
@@ -51,23 +78,28 @@ class _FlowCreatePageState extends State<FlowCreatePage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return BlocConsumer<FlowCreateBloc, FlowCreateState>(
       listener: (context, state) {
         if (state is FlowCreateSucceeded) {
-          // pushReplacement: reemplaza /flows/new con el detalle del
-          // flujo recién creado. Back físico vuelve al TemplateDetailPage
-          // (el frame del form ya cumplió su función). go() aplastaría
-          // la pila completa.
-          context.pushReplacement('/flows/${state.flow.id}');
+          Navigator.of(context).pop(state.flow);
         }
       },
       builder: (context, state) {
         final submitting = state is FlowCreateSubmitting;
-        return Padding(
-          padding: const EdgeInsets.all(AppTokens.sp6),
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            AppTokens.sp6,
+            AppTokens.sp6,
+            AppTokens.sp6,
+            AppTokens.sp6 + context.sheetBottomInset,
+          ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
+              Text('Nuevo flujo', style: textTheme.titleLarge),
+              const SizedBox(height: AppTokens.sp4),
               AppTextField(
                 key: const Key('flow_create.field.name'),
                 label: 'Nombre del flujo',
@@ -84,6 +116,7 @@ class _FlowCreatePageState extends State<FlowCreatePage> {
               AppButton.filled(
                 key: const Key('flow_create.submit'),
                 label: 'Crear',
+                fullWidth: true,
                 onPressed: _canSubmit ? _submit : null,
                 loading: submitting,
               ),

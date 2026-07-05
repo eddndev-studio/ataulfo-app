@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +14,7 @@ import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../../flows/presentation/bloc/flows_bloc.dart';
+import '../../../flows/presentation/widgets/flow_create_sheet.dart';
 import '../../../triggers/presentation/bloc/triggers_bloc.dart';
 
 /// Lista de flujos de una plantilla (`/templates/:id/flows`), con buscador
@@ -55,10 +58,17 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
       floatingActionButton: FloatingActionButton(
         key: const Key('template_flows.fab'),
         tooltip: 'Nuevo flujo',
-        // push apila el form sobre esta lista; back físico vuelve aquí
-        // (Succeeded usa pushReplacement a /flows/:id).
-        onPressed: () =>
-            context.push('/templates/${widget.templateId}/flows/new'),
+        // El alta vive en un form-sheet sobre esta lista; al crear se apila
+        // el editor del flujo nuevo (back físico vuelve aquí).
+        onPressed: () async {
+          final flow = await FlowCreateSheet.open(
+            context,
+            templateId: widget.templateId,
+          );
+          if (flow != null && context.mounted) {
+            unawaited(context.push('/flows/${flow.id}'));
+          }
+        },
         child: const Icon(Icons.add),
       ),
       body: BlocListener<FlowsBloc, FlowsState>(

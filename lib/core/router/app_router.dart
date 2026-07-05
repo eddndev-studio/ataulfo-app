@@ -50,12 +50,10 @@ import '../../features/conversations/presentation/cubit/inbox_labels_cubit.dart'
 import '../../features/conversations/presentation/pages/conversations_list_page.dart';
 import '../../features/flow_run/domain/repositories/flow_run_repository.dart';
 import '../../features/flows/domain/repositories/flows_repository.dart';
-import '../../features/flows/presentation/bloc/flow_create_bloc.dart';
 import '../../features/flows/presentation/bloc/flow_detail_bloc.dart';
 import '../../features/flows/presentation/bloc/flow_steps_bloc.dart';
 import '../../features/flows/presentation/bloc/flows_bloc.dart';
 import '../../features/flows/presentation/bloc/media_names_cubit.dart';
-import '../../features/flows/presentation/pages/flow_create_page.dart';
 import '../../features/flows/presentation/pages/flow_detail_page.dart';
 import '../../features/labels/domain/repositories/chat_labels_repository.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
@@ -1100,23 +1098,27 @@ class AppRouter {
         path: '/templates/:id/flows',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          // La página posee su Scaffold (AppBar + FAB); la ruta solo provee
-          // blocs. TriggersBloc alimenta el count de disparadores por
-          // tarjeta (un GET por template, no por flujo).
-          return MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<FlowsBloc>(
-                create: (_) =>
-                    FlowsBloc(repo: _flowsRepo, templateId: id)
-                      ..add(const FlowsLoadRequested()),
-              ),
-              BlocProvider<TriggersBloc>(
-                create: (_) =>
-                    TriggersBloc(repo: _triggersRepo, templateId: id)
-                      ..add(const TriggersLoadRequested()),
-              ),
-            ],
-            child: TemplateFlowsPage(templateId: id),
+          // La página posee su Scaffold (AppBar + FAB); la ruta provee los
+          // blocs y el repo que el form-sheet de alta lee en el call site.
+          // TriggersBloc alimenta el count de disparadores por tarjeta
+          // (un GET por template, no por flujo).
+          return RepositoryProvider<FlowsRepository>.value(
+            value: _flowsRepo,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<FlowsBloc>(
+                  create: (_) =>
+                      FlowsBloc(repo: _flowsRepo, templateId: id)
+                        ..add(const FlowsLoadRequested()),
+                ),
+                BlocProvider<TriggersBloc>(
+                  create: (_) =>
+                      TriggersBloc(repo: _triggersRepo, templateId: id)
+                        ..add(const TriggersLoadRequested()),
+                ),
+              ],
+              child: TemplateFlowsPage(templateId: id),
+            ),
           );
         },
       ),
@@ -1255,26 +1257,6 @@ class AppRouter {
               picker: FilePickerMediaFilePicker(),
             )..add(const PreviewStarted()),
             child: PreviewPage(templateId: id),
-          );
-        },
-      ),
-      GoRoute(
-        // Crear flow desde el TemplateDetailPage (S11 F4). Subruta del
-        // template (`/templates/:templateId/flows/new`) — no compite
-        // con `/templates/:id` por orden de match. Page-scoped:
-        // `FlowCreateBloc` se construye con el templateId; Succeeded
-        // hace `pushReplacement('/flows/:id')` para sacar el form de
-        // la pila (back físico vuelve al detalle de plantilla).
-        path: '/templates/:templateId/flows/new',
-        builder: (context, state) {
-          final templateId = state.pathParameters['templateId']!;
-          return BlocProvider<FlowCreateBloc>(
-            create: (_) =>
-                FlowCreateBloc(repo: _flowsRepo, templateId: templateId),
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Crear flujo')),
-              body: const FlowCreatePage(),
-            ),
           );
         },
       ),

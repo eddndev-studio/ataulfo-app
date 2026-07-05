@@ -7,6 +7,7 @@ import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
+import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/flows/presentation/bloc/flows_bloc.dart';
 import 'package:ataulfo/features/templates/presentation/pages/template_flows_page.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
@@ -23,6 +24,8 @@ class _MockFlowsBloc extends MockBloc<FlowsEvent, FlowsState>
 
 class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
     implements TriggersBloc {}
+
+class _MockFlowsRepository extends Mock implements FlowsRepository {}
 
 flows.Flow _flow({
   required String id,
@@ -395,15 +398,18 @@ void main() {
   });
 
   group('navegación', () {
-    testWidgets('tap del FAB apila /templates/:id/flows/new', (tester) async {
+    testWidgets('tap del FAB abre el form-sheet de nuevo flujo', (
+      tester,
+    ) async {
       when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
-      String? destinationUri;
-      final router = GoRouter(
-        initialLocation: '/',
-        routes: <RouteBase>[
-          GoRoute(
-            path: '/',
-            builder: (_, _) => MultiBlocProvider(
+      final repo = _MockFlowsRepository();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: RepositoryProvider<FlowsRepository>.value(
+            value: repo,
+            child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<FlowsBloc>.value(value: flowsBloc),
                 BlocProvider<TriggersBloc>.value(value: triggersBloc),
@@ -411,8 +417,43 @@ void main() {
               child: const TemplateFlowsPage(templateId: 't1'),
             ),
           ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('template_flows.fab')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nuevo flujo'), findsOneWidget);
+      expect(find.byKey(const Key('flow_create.field.name')), findsOneWidget);
+    });
+
+    testWidgets('crear desde el sheet navega al editor del flujo nuevo', (
+      tester,
+    ) async {
+      when(() => flowsBloc.state).thenReturn(const FlowsLoaded(<flows.Flow>[]));
+      final repo = _MockFlowsRepository();
+      when(
+        () => repo.createFlow(templateId: 't1', name: 'Bienvenida'),
+      ).thenAnswer((_) async => _flow(id: 'f-new', name: 'Bienvenida'));
+
+      String? destinationUri;
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
           GoRoute(
-            path: '/templates/:templateId/flows/new',
+            path: '/',
+            builder: (_, _) => RepositoryProvider<FlowsRepository>.value(
+              value: repo,
+              child: MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
+                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
+                ],
+                child: const TemplateFlowsPage(templateId: 't1'),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/flows/:id',
             builder: (_, st) {
               destinationUri = st.uri.toString();
               return const Scaffold(body: SizedBox.shrink());
@@ -427,8 +468,20 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('template_flows.fab')));
       await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('flow_create.field.name')),
+        'Bienvenida',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('flow_create.submit')));
+      await tester.pumpAndSettle();
 
-      expect(destinationUri, '/templates/t1/flows/new');
+      expect(destinationUri, '/flows/f-new');
+      expect(
+        find.text('Nuevo flujo'),
+        findsNothing,
+        reason: 'el sheet cerró antes de navegar al editor',
+      );
     });
 
     testWidgets('tap del row apila /flows/:id', (tester) async {
