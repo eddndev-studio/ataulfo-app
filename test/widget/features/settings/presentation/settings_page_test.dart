@@ -171,15 +171,15 @@ void main() {
     );
   });
 
-  testWidgets('Authenticated expone tile "Galería de multimedia"', (
-    tester,
-  ) async {
+  testWidgets('Authenticated expone tile "Medios"', (tester) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(host());
 
+    // Mismo término que el destino "Medios" del menú de adjuntar del chat:
+    // ambos abren el MISMO catálogo de la organización.
     expect(find.byKey(const Key('settings.media_tile')), findsOneWidget);
-    expect(find.text('Galería de multimedia'), findsOneWidget);
+    expect(find.text('Medios'), findsOneWidget);
   });
 
   testWidgets('Authenticated expone tile "Notificaciones"', (tester) async {
@@ -236,9 +236,7 @@ void main() {
     expect(canPopAtDestination, <bool>[true]);
   });
 
-  testWidgets('tap "Galería de multimedia" apila /media (push, no go)', (
-    tester,
-  ) async {
+  testWidgets('tap "Medios" apila /media (push, no go)', (tester) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     final navigated = <String>[];

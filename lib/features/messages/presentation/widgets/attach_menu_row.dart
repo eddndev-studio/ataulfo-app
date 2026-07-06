@@ -107,7 +107,9 @@ class AttachMenuRow extends StatelessWidget {
             child: AttachTile(
               key: const Key('attach_menu.gallery'),
               icon: Icons.photo_library_outlined,
-              label: 'Galería',
+              // Carrete LOCAL del dispositivo — distinto del catálogo de la
+              // org ("Medios"); "Galería" a secas confundía ambos destinos.
+              label: 'Fotos del dispositivo',
               onTap: onGallery,
             ),
           ),

@@ -31,6 +31,7 @@ class MediaDetailPage extends StatelessWidget {
     super.key,
     required this.loader,
     required this.launcher,
+    this.readOnly = false,
   });
 
   final MediaThumbnailLoader loader;
@@ -38,6 +39,10 @@ class MediaDetailPage extends StatelessWidget {
   /// Abre en el visor del sistema lo que no se renderiza inline (video, audio,
   /// documentos). La imagen se previsualiza inline; el resto delega aquí.
   final MediaPreviewLauncher launcher;
+
+  /// Sólo mirar: oculta renombrar y borrar. Es el modo del PREVIEW desde el
+  /// picker (long-press), donde el operador está eligiendo, no administrando.
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -75,19 +80,23 @@ class MediaDetailPage extends StatelessWidget {
             appBar: AppBar(
               title: Text(asset.displayName, overflow: TextOverflow.ellipsis),
               actions: <Widget>[
-                IconButton(
-                  key: const Key('media_detail.edit_alias'),
-                  tooltip: 'Renombrar',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: state.busy ? null : () => _editAlias(context),
-                ),
-                IconButton(
-                  key: const Key('media_detail.delete'),
-                  tooltip: 'Borrar',
-                  icon: const Icon(Icons.delete_outline),
-                  color: AppTokens.danger,
-                  onPressed: state.busy ? null : () => _confirmDelete(context),
-                ),
+                if (!readOnly) ...<Widget>[
+                  IconButton(
+                    key: const Key('media_detail.edit_alias'),
+                    tooltip: 'Renombrar',
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: state.busy ? null : () => _editAlias(context),
+                  ),
+                  IconButton(
+                    key: const Key('media_detail.delete'),
+                    tooltip: 'Borrar',
+                    icon: const Icon(Icons.delete_outline),
+                    color: AppTokens.danger,
+                    onPressed: state.busy
+                        ? null
+                        : () => _confirmDelete(context),
+                  ),
+                ],
               ],
             ),
             body: Stack(
@@ -198,7 +207,36 @@ class _Preview extends StatefulWidget {
 }
 
 class _PreviewState extends State<_Preview> {
+  /// Escala del doble-tap: suficiente para leer detalle fino sin perderse; el
+  /// pinch cubre el rango completo hasta el maxScale del InteractiveViewer.
+  static const double _doubleTapScale = 2.5;
+
   late final Future<Uint8List?> _bytes = widget.loader.load(widget.asset);
+  final TransformationController _zoom = TransformationController();
+
+  @override
+  void dispose() {
+    _zoom.dispose();
+    super.dispose();
+  }
+
+  /// Doble tap: alterna entre 1x y [_doubleTapScale] centrado en el punto
+  /// tocado (acercar donde se miró, no la esquina superior izquierda).
+  void _toggleZoom(TapDownDetails details) {
+    if (_zoom.value.getMaxScaleOnAxis() > 1.01) {
+      _zoom.value = Matrix4.identity();
+      return;
+    }
+    final p = details.localPosition;
+    _zoom.value = Matrix4.identity()
+      ..translateByDouble(
+        -p.dx * (_doubleTapScale - 1),
+        -p.dy * (_doubleTapScale - 1),
+        0,
+        1,
+      )
+      ..scaleByDouble(_doubleTapScale, _doubleTapScale, _doubleTapScale, 1);
+  }
 
   /// Hay una imagen renderable que pintar: la imagen misma, o el poster/forma
   /// de onda derivado de un video/audio. Sin fuente (documento, o video/audio
@@ -234,12 +272,16 @@ class _PreviewState extends State<_Preview> {
       }
       final bytes = snapshot.data;
       if (bytes == null) return _typeIcon();
-      return InteractiveViewer(
-        maxScale: 5,
-        child: Image.memory(
-          bytes,
-          fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => _typeIcon(),
+      return GestureDetector(
+        onDoubleTapDown: _toggleZoom,
+        child: InteractiveViewer(
+          maxScale: 5,
+          transformationController: _zoom,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => _typeIcon(),
+          ),
         ),
       );
     },

@@ -1565,7 +1565,9 @@ class AppRouter {
               MediaGalleryBloc(repo: _mediaRepo, picker: _mediaFilePicker)
                 ..add(const MediaGalleryLoadRequested()),
           child: Scaffold(
-            appBar: AppBar(title: const Text('Galería de multimedia')),
+            // "Medios": el mismo término con el que el menú de adjuntar del
+            // chat nombra este catálogo de la organización.
+            appBar: AppBar(title: const Text('Medios')),
             // En modo browse, tocar un asset abre su detalle; si el detalle
             // reporta un cambio (borrado/renombrado) al hacer pop, la página se
             // refresca. El picker usa onSelect (pop con el ref); aquí onOpenDetail.
@@ -1592,11 +1594,14 @@ class AppRouter {
               body: Center(child: Text('Archivo no disponible')),
             );
           }
+          // `?readOnly=1` = PREVIEW desde el picker: mirar sin mutar (oculta
+          // renombrar/borrar). Browse abre sin el flag y conserva las acciones.
           return BlocProvider<MediaDetailCubit>(
             create: (_) => MediaDetailCubit(repo: _mediaRepo, asset: asset),
             child: MediaDetailPage(
               loader: _mediaThumbnailLoader,
               launcher: const UrlLauncherMediaPreviewLauncher(),
+              readOnly: state.uri.queryParameters['readOnly'] == '1',
             ),
           );
         },
@@ -1612,9 +1617,14 @@ class AppRouter {
         builder: (context, state) {
           // `?type=` filtra la galería-picker por familia (image|video|audio|
           // document) según el tipo del paso de flujo que la abrió; ausente ⇒
-          // galería completa. El asset elegido vuelve por `pop` ENTERO (ref +
-          // content_type + filename); el caller persiste sólo el ref BARE.
+          // galería completa CON tabs de familia (no hay restricción que
+          // proteger). `?multi=1` activa la multi-selección: el pop devuelve
+          // List<MediaAsset> (composer del chat); sin él, un solo MediaAsset
+          // (pasos de flujo). En ambos, el asset vuelve ENTERO (ref +
+          // content_type + filename) y el caller persiste sólo el ref BARE.
+          // El long-press abre el detalle como preview de solo lectura.
           final type = state.uri.queryParameters['type'];
+          final multi = state.uri.queryParameters['multi'] == '1';
           return BlocProvider<MediaGalleryBloc>(
             create: (_) => MediaGalleryBloc(
               repo: _mediaRepo,
@@ -1624,8 +1634,18 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Elegir multimedia')),
               body: MediaGalleryPage(
-                onSelect: (asset) => context.pop(asset),
+                onSelect: multi ? null : (asset) => context.pop(asset),
+                onConfirmSelection: multi
+                    ? (assets) => context.pop(assets)
+                    : null,
+                onOpenDetail: (asset) async =>
+                    (await context.push<bool>(
+                      '/media/detail?readOnly=1',
+                      extra: asset,
+                    )) ??
+                    false,
                 loader: _mediaThumbnailLoader,
+                showTypeTabs: type == null,
               ),
             ),
           );

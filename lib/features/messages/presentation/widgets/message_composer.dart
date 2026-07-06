@@ -537,32 +537,39 @@ class _MessageComposerState extends State<MessageComposer> {
     }
   }
 
-  /// Abre la galería de la organización (`/media/pick`) y suma el asset
-  /// elegido a la bandeja como adjunto YA SUBIDO: sin bytes locales, con su
-  /// ref BARE (el envío lo reusa sin volver a subir), la miniatura firmada y
-  /// el peso reportado por el servidor. Respeta el tope del lote; el tope de
-  /// peso no aplica (el archivo ya vive en el servidor).
+  /// Abre la galería de la organización (`/media/pick?multi=1`, selección
+  /// múltiple) y suma los assets elegidos a la bandeja como adjuntos YA
+  /// SUBIDOS: sin bytes locales, con su ref BARE (el envío los reusa sin
+  /// volver a subir), la miniatura firmada y el peso reportado por el
+  /// servidor. Respeta el tope del lote (lo que exceda se recorta con aviso);
+  /// el tope de peso no aplica (los archivos ya viven en el servidor).
   Future<void> _pickFromMediaLibrary() async {
     final messenger = ScaffoldMessenger.of(context);
-    final asset = await context.push<MediaAsset>('/media/pick');
-    if (!mounted || asset == null) return;
-    if (_attachments.length >= kMaxAttachmentsPerBatch) {
+    final assets = await context.push<List<MediaAsset>>('/media/pick?multi=1');
+    if (!mounted || assets == null || assets.isEmpty) return;
+    var overflow = false;
+    setState(() {
+      for (final asset in assets) {
+        if (_attachments.length >= kMaxAttachmentsPerBatch) {
+          overflow = true;
+          break;
+        }
+        _attachments.add(
+          PendingAttachment(
+            filename: asset.filename,
+            type: messageTypeForFilename(asset.filename),
+            existingRef: asset.ref,
+            previewUrl: asset.thumbnailSourceUrl,
+            sizeBytesOverride: asset.size,
+          ),
+        );
+      }
+    });
+    if (overflow) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Máximo 10 archivos por envío')),
       );
-      return;
     }
-    setState(() {
-      _attachments.add(
-        PendingAttachment(
-          filename: asset.filename,
-          type: messageTypeForFilename(asset.filename),
-          existingRef: asset.ref,
-          previewUrl: asset.thumbnailSourceUrl,
-          sizeBytesOverride: asset.size,
-        ),
-      );
-    });
   }
 
   /// Abre el selector múltiple y suma lo elegido a la bandeja aplicando los

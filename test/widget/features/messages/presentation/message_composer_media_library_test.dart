@@ -36,10 +36,10 @@ class _MockFilePicker extends Mock implements MediaFilePicker {}
 class _MockMediaRepo extends Mock implements MediaRepository {}
 
 /// El destino "Medios" del menú de adjuntar a nivel de RUTA: el composer hace
-/// `context.push('/media/pick')` y el picker devuelve un [MediaAsset] entero
-/// vía pop. El asset entra a la bandeja como adjunto YA SUBIDO: al enviar, ese
-/// ítem NO pasa por `upload` y despacha su ref BARE tal cual (nunca la
-/// previewUrl efímera).
+/// `context.push('/media/pick?multi=1')` y el picker devuelve una LISTA de
+/// [MediaAsset] enteros vía pop (multi-selección). Cada asset entra a la
+/// bandeja como adjunto YA SUBIDO: al enviar, esos ítems NO pasan por `upload`
+/// y despachan su ref BARE tal cual (nunca la previewUrl efímera).
 void main() {
   setUpAll(() {
     registerFallbackValue(Uint8List(0));
@@ -74,15 +74,20 @@ void main() {
   late _MockFilePicker picker;
   late _MockMediaRepo mediaRepo;
 
-  /// Asset que la ruta fake `/media/pick` devuelve por pop al "elegir".
-  late MediaAsset assetToPick;
+  /// Assets que la ruta fake `/media/pick` devuelve por pop al "elegir"
+  /// (lista: el picker real es multi-selección).
+  late List<MediaAsset> assetsToPick;
+
+  /// URI con la que el composer abrió el picker (para asertar `multi=1`).
+  Uri? pickedUri;
 
   setUp(() {
     msgBloc = _MockMessagesBloc();
     qrBloc = _MockQuickRepliesBloc();
     picker = _MockFilePicker();
     mediaRepo = _MockMediaRepo();
-    assetToPick = docAsset;
+    assetsToPick = <MediaAsset>[docAsset];
+    pickedUri = null;
     when(() => msgBloc.state).thenReturn(
       const MessagesLoaded(
         items: <Message>[],
@@ -140,25 +145,28 @@ void main() {
         ),
         GoRoute(
           path: '/media/pick',
-          builder: (context, state) => Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  ElevatedButton(
-                    key: const Key('fake_media_pick.pick'),
-                    onPressed: () => context.pop(assetToPick),
-                    child: const Text('elegir'),
-                  ),
-                  ElevatedButton(
-                    key: const Key('fake_media_pick.cancel'),
-                    onPressed: () => context.pop(),
-                    child: const Text('cancelar'),
-                  ),
-                ],
+          builder: (context, state) {
+            pickedUri = state.uri;
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    ElevatedButton(
+                      key: const Key('fake_media_pick.pick'),
+                      onPressed: () => context.pop(assetsToPick),
+                      child: const Text('elegir'),
+                    ),
+                    ElevatedButton(
+                      key: const Key('fake_media_pick.cancel'),
+                      onPressed: () => context.pop(),
+                      child: const Text('cancelar'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ],
     );
@@ -188,8 +196,10 @@ void main() {
       await pumpHost(tester);
       await tapMedios(tester);
 
-      // Estamos en la ruta pusheada, no en el hilo.
+      // Estamos en la ruta pusheada, no en el hilo, y el composer pidió el
+      // picker MULTI (su bandeja acepta hasta 10 adjuntos).
       expect(find.byKey(const Key('fake_media_pick.pick')), findsOneWidget);
+      expect(pickedUri?.queryParameters['multi'], '1');
       await tester.tap(find.byKey(const Key('fake_media_pick.pick')));
       await tester.pumpAndSettle();
 
@@ -200,6 +210,49 @@ void main() {
       expect(find.text('2 KB'), findsOneWidget);
     },
   );
+
+  testWidgets('multi: varios assets del catálogo entran juntos a la bandeja', (
+    tester,
+  ) async {
+    assetsToPick = <MediaAsset>[docAsset, imageAsset];
+    await pumpHost(tester);
+    await tapMedios(tester);
+    await tester.tap(find.byKey(const Key('fake_media_pick.pick')));
+    await tester.pumpAndSettle();
+
+    // Ambos ítems en la bandeja, en el orden elegido.
+    expect(find.text('2 archivos'), findsOneWidget);
+    expect(find.text('contrato.pdf'), findsOneWidget);
+    expect(
+      find.byKey(const Key('composer.attachment_tray.item.1')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('multi: los que exceden el tope de 10 se recortan con aviso', (
+    tester,
+  ) async {
+    // Bandeja con 9 locales; el picker devuelve 2 → entra 1 y avisa.
+    when(picker.pickMultiple).thenAnswer(
+      (_) async => <PickedMedia>[
+        for (var i = 0; i < 9; i++)
+          PickedMedia(bytes: Uint8List(1), filename: 'f$i.pdf'),
+      ],
+    );
+    assetsToPick = <MediaAsset>[docAsset, imageAsset];
+    await pumpHost(tester);
+    await openMenu(tester);
+    await tester.tap(find.byKey(const Key('attach_menu.document')));
+    await tester.pumpAndSettle();
+    expect(find.text('9 archivos'), findsOneWidget);
+
+    await tapMedios(tester);
+    await tester.tap(find.byKey(const Key('fake_media_pick.pick')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('10 archivos'), findsOneWidget);
+    expect(find.textContaining('Máximo 10'), findsOneWidget);
+  });
 
   testWidgets('cancelar el picker (pop null) no agrega nada', (tester) async {
     await pumpHost(tester);
@@ -242,7 +295,7 @@ void main() {
   testWidgets(
     'una imagen del catálogo despacha type image con el ref, sin fileName',
     (tester) async {
-      assetToPick = imageAsset;
+      assetsToPick = <MediaAsset>[imageAsset];
       await pumpHost(tester);
       await tapMedios(tester);
       await tester.tap(find.byKey(const Key('fake_media_pick.pick')));
@@ -282,15 +335,17 @@ void main() {
       // pero al no ser imagen la tarjeta jamás pinta la miniatura: cae a la
       // cara de archivo, igual que un video local.
       const videoBareRef = 'tenant/org1/media/clip.mp4';
-      assetToPick = MediaAsset(
-        ref: videoBareRef,
-        previewUrl: 'https://signed.example/clip.mp4?sig=ephemeral',
-        thumbnailUrl: 'https://signed.example/clip-poster.jpg?sig=ephemeral',
-        filename: 'clip.mp4',
-        contentType: 'video/mp4',
-        size: 4096,
-        createdAt: DateTime.utc(2026, 1, 1),
-      );
+      assetsToPick = <MediaAsset>[
+        MediaAsset(
+          ref: videoBareRef,
+          previewUrl: 'https://signed.example/clip.mp4?sig=ephemeral',
+          thumbnailUrl: 'https://signed.example/clip-poster.jpg?sig=ephemeral',
+          filename: 'clip.mp4',
+          contentType: 'video/mp4',
+          size: 4096,
+          createdAt: DateTime.utc(2026, 1, 1),
+        ),
+      ];
       await pumpHost(tester);
       await tapMedios(tester);
       await tester.tap(find.byKey(const Key('fake_media_pick.pick')));

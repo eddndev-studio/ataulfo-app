@@ -539,15 +539,22 @@ void main() {
     );
   });
 
-  testWidgets('uploadError emite snackbar sin tumbar la lista', (tester) async {
-    // Estado previo sin error, luego transición a uploadError → snackbar.
+  testWidgets('fallo de subida emite snackbar sin tumbar la lista', (
+    tester,
+  ) async {
+    // Estado previo sin outcome, luego transición a un outcome con fallo →
+    // snackbar singular (era un solo archivo).
     whenListen(
       bloc,
       Stream<MediaGalleryState>.fromIterable(<MediaGalleryState>[
         MediaGalleryLoaded(
           items: <MediaAsset>[_asset('media/a', previewUrl: null)],
           nextCursor: '',
-          uploadError: const MediaTooLargeFailure(),
+          uploadOutcome: const MediaUploadOutcome(
+            total: 1,
+            failed: 1,
+            lastError: MediaTooLargeFailure(),
+          ),
         ),
       ]),
       initialState: MediaGalleryLoaded(
@@ -558,9 +565,246 @@ void main() {
     await tester.pumpWidget(host());
     await tester.pump();
     expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('No pudimos subir el archivo'), findsOneWidget);
     // La lista sigue visible (no colapsó a un estado de error terminal).
     expect(find.byType(MediaThumbnail), findsOneWidget);
   });
+
+  testWidgets('fallo PARCIAL del lote: el snackbar dice cuántos fallaron', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      Stream<MediaGalleryState>.fromIterable(<MediaGalleryState>[
+        MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+          nextCursor: '',
+          uploadOutcome: const MediaUploadOutcome(
+            total: 5,
+            failed: 2,
+            lastError: MediaTooLargeFailure(),
+          ),
+        ),
+      ]),
+      initialState: MediaGalleryLoaded(
+        items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+        nextCursor: '',
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+    // Conteo real, no el copy singular que esconde el resto del lote.
+    expect(find.text('No pudimos subir 2 de 5 archivos'), findsOneWidget);
+  });
+
+  testWidgets(
+    'subida OCULTA por el filtro: aviso con "Ver todo" que limpia filtros',
+    (tester) async {
+      whenListen(
+        bloc,
+        Stream<MediaGalleryState>.fromIterable(<MediaGalleryState>[
+          MediaGalleryLoaded(
+            items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+            nextCursor: '',
+            query: 'logo',
+            uploadOutcome: const MediaUploadOutcome(
+              total: 1,
+              failed: 0,
+              hiddenByFilter: true,
+            ),
+          ),
+        ]),
+        initialState: MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a', previewUrl: null)],
+          nextCursor: '',
+          query: 'logo',
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.pump();
+      // Deja terminar la animación de entrada del snackbar antes de tocar.
+      await tester.pump(const Duration(seconds: 1));
+
+      // El archivo subió pero el filtro activo lo esconde: la UI lo dice en
+      // vez de dejar que "desaparezca" en silencio.
+      expect(
+        find.text('Subido, pero oculto por el filtro activo'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Ver todo'));
+      await tester.pump();
+      verify(() => bloc.add(const MediaGalleryFiltersCleared())).called(1);
+    },
+  );
+
+  testWidgets('el scrim de borrado en lote ofrece Cancelar', (tester) async {
+    when(() => bloc.state).thenReturn(
+      MediaGalleryLoaded(
+        items: <MediaAsset>[_asset('media/a')],
+        nextCursor: '',
+        isDeleting: true,
+        deleteTotal: 3,
+        deleteDone: 1,
+      ),
+    );
+    await tester.pumpWidget(host());
+
+    await tester.tap(find.byKey(const Key('media_gallery.delete_cancel')));
+    await tester.pump();
+    verify(() => bloc.add(const MediaGalleryDeleteCancelRequested())).called(1);
+  });
+
+  group('picker multi-selección (onConfirmSelection)', () {
+    Widget multiHost({
+      required ValueChanged<List<MediaAsset>> onConfirm,
+      Future<bool> Function(MediaAsset asset)? onOpenDetail,
+    }) => MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: BlocProvider<MediaGalleryBloc>.value(
+        value: bloc,
+        child: Scaffold(
+          body: MediaGalleryPage(
+            loader: const FakeThumbnailLoader(),
+            onConfirmSelection: onConfirm,
+            onOpenDetail: onOpenDetail,
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('tap alterna selección y confirmar devuelve los assets', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a'), _asset('media/b')],
+          nextCursor: '',
+        ),
+      );
+      List<MediaAsset>? confirmed;
+      await tester.pumpWidget(multiHost(onConfirm: (a) => confirmed = a));
+      await tester.pump();
+
+      // Sin selección no hay barra de confirmar.
+      expect(
+        find.byKey(const Key('media_gallery.multi_confirm')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byType(MediaThumbnail).at(0));
+      await tester.pump();
+      await tester.tap(find.byType(MediaThumbnail).at(1));
+      await tester.pump();
+
+      // Ambas miniaturas marcadas y la barra muestra el conteo.
+      expect(find.byIcon(Icons.check_circle), findsNWidgets(2));
+      expect(find.text('2 seleccionados'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('media_gallery.multi_confirm')));
+      await tester.pump();
+
+      // Devuelve los MediaAsset completos en el orden en que se tocaron.
+      expect(confirmed, isNotNull);
+      expect(confirmed!.map((a) => a.ref).toList(), <String>[
+        'media/a',
+        'media/b',
+      ]);
+    });
+
+    testWidgets('re-tap deselecciona y la barra desaparece al quedar vacía', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a')],
+          nextCursor: '',
+        ),
+      );
+      await tester.pumpWidget(multiHost(onConfirm: (_) {}));
+      await tester.pump();
+
+      await tester.tap(find.byType(MediaThumbnail));
+      await tester.pump();
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+
+      await tester.tap(find.byType(MediaThumbnail));
+      await tester.pump();
+      expect(find.byIcon(Icons.check_circle), findsNothing);
+      expect(
+        find.byKey(const Key('media_gallery.multi_confirm')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('long-press en multi-picker abre el detalle (preview)', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a')],
+          nextCursor: '',
+        ),
+      );
+      String? previewed;
+      await tester.pumpWidget(
+        multiHost(
+          onConfirm: (_) {},
+          onOpenDetail: (asset) async {
+            previewed = asset.ref;
+            return false;
+          },
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.byType(MediaThumbnail));
+      await tester.pump();
+
+      expect(previewed, 'media/a');
+      // El long-press NO seleccionó (preview ≠ elegir).
+      expect(find.byIcon(Icons.check_circle), findsNothing);
+    });
+  });
+
+  testWidgets(
+    'picker single: long-press abre el detalle SIN seleccionar (preview)',
+    (tester) async {
+      when(() => bloc.state).thenReturn(
+        MediaGalleryLoaded(
+          items: <MediaAsset>[_asset('media/a')],
+          nextCursor: '',
+        ),
+      );
+      String? selected;
+      String? previewed;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: BlocProvider<MediaGalleryBloc>.value(
+            value: bloc,
+            child: Scaffold(
+              body: MediaGalleryPage(
+                loader: const FakeThumbnailLoader(),
+                onSelect: (asset) => selected = asset.ref,
+                onOpenDetail: (asset) async {
+                  previewed = asset.ref;
+                  return false;
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.byType(MediaThumbnail));
+      await tester.pump();
+
+      // Preview sin comprometer la selección: el tap sigue siendo elegir.
+      expect(previewed, 'media/a');
+      expect(selected, isNull);
+    },
+  );
 
   group('barrido UX galería', () {
     testWidgets('las tabs de tipo usan AppChoiceChip del design system', (
@@ -646,8 +890,8 @@ void main() {
 
         await tester.tap(find.text('Limpiar filtros'));
         await tester.pump();
-        verify(() => bloc.add(const MediaGallerySearchChanged(''))).called(1);
-        verify(() => bloc.add(const MediaGalleryTypeChanged(null))).called(1);
+        // UN solo evento (una recarga), no un evento por filtro.
+        verify(() => bloc.add(const MediaGalleryFiltersCleared())).called(1);
       },
     );
 

@@ -68,6 +68,7 @@ Widget _host(
   MediaThumbnailLoader? loader,
   MediaRepository? repo,
   MediaPreviewLauncher? launcher,
+  bool readOnly = false,
 }) => MaterialApp(
   theme: AppDesignTheme.dark(),
   home: BlocProvider<MediaDetailCubit>(
@@ -75,6 +76,7 @@ Widget _host(
     child: MediaDetailPage(
       loader: loader ?? _FakeLoader(Future<Uint8List?>.value(_png1x1)),
       launcher: launcher ?? _FakeLauncher(),
+      readOnly: readOnly,
     ),
   ),
 );
@@ -424,6 +426,63 @@ void main() {
 
     final list = tester.widget<ListView>(find.byType(ListView));
     expect(list.padding?.resolve(TextDirection.ltr).bottom, AppTokens.sp4 + 34);
+  });
+
+  group('readOnly (preview desde el picker)', () {
+    testWidgets('oculta renombrar y borrar; la metadata sigue visible', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_host(_asset(), readOnly: true));
+      await tester.pump();
+
+      // Sin mutaciones: el preview del picker sólo mira.
+      expect(find.byKey(const Key('media_detail.edit_alias')), findsNothing);
+      expect(find.byKey(const Key('media_detail.delete')), findsNothing);
+      // La metadata y el ref (copiar) siguen ahí.
+      expect(find.text('image/png'), findsOneWidget);
+      expect(find.byKey(const Key('media_detail.copy_ref')), findsOneWidget);
+    });
+
+    testWidgets('por defecto (browse) sí ofrece renombrar y borrar', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_host(_asset()));
+      await tester.pump();
+      expect(find.byKey(const Key('media_detail.edit_alias')), findsOneWidget);
+      expect(find.byKey(const Key('media_detail.delete')), findsOneWidget);
+    });
+  });
+
+  group('doble-tap para hacer zoom', () {
+    Future<void> doubleTapPreview(WidgetTester tester) async {
+      final target = find.byType(InteractiveViewer);
+      await tester.tap(target);
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.tap(target);
+      // Deja resolver el reconocedor de doble tap.
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    testWidgets('doble tap acerca la imagen y otro doble tap vuelve a 1x', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_host(_asset(contentType: 'image/png')));
+      await tester.pump();
+
+      double scale() => tester
+          .widget<InteractiveViewer>(find.byType(InteractiveViewer))
+          .transformationController!
+          .value
+          .getMaxScaleOnAxis();
+
+      expect(scale(), moreOrLessEquals(1.0));
+
+      await doubleTapPreview(tester);
+      expect(scale(), greaterThan(1.5));
+
+      await doubleTapPreview(tester);
+      expect(scale(), moreOrLessEquals(1.0));
+    });
   });
 }
 

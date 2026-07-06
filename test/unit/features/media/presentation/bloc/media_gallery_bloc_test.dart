@@ -462,7 +462,12 @@ void main() {
             uploadTotal: 1,
             uploadDone: 1,
           ),
-          MediaGalleryLoaded(items: <MediaAsset>[_c, _a], nextCursor: ''),
+          // El estado final trae el outcome del lote (todo subió, visible).
+          MediaGalleryLoaded(
+            items: <MediaAsset>[_c, _a],
+            nextCursor: '',
+            uploadOutcome: const MediaUploadOutcome(total: 1, failed: 0),
+          ),
         ],
       );
 
@@ -504,7 +509,7 @@ void main() {
       );
 
       blocTest<MediaGalleryBloc, MediaGalleryState>(
-        'fallo de subida: re-lista (verdad) y uploadError transitorio, NO Failed',
+        'fallo de subida: re-lista (verdad) y uploadOutcome transitorio, NO Failed',
         build: () {
           _lastRepo = _MockRepo();
           final picker = _MockPicker();
@@ -542,11 +547,149 @@ void main() {
               .having((s) => s.isUploading, 'isUploading', isTrue)
               .having((s) => s.uploadDone, 'uploadDone', 1),
           isA<MediaGalleryLoaded>().having(
-            (s) => s.uploadError,
-            'uploadError',
+            (s) => s.uploadOutcome?.lastError,
+            'uploadOutcome.lastError',
             isA<MediaTooLargeFailure>(),
           ),
         ],
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'lote con fallos ACUMULA el conteo: 2 de 3 fallan ⇒ outcome(3, 2)',
+        build: () {
+          _lastRepo = _MockRepo();
+          final picker = _MockPicker();
+          final malo1 = PickedMedia(
+            bytes: Uint8List.fromList(<int>[1]),
+            filename: 'malo1.png',
+          );
+          final malo2 = PickedMedia(
+            bytes: Uint8List.fromList(<int>[2]),
+            filename: 'malo2.png',
+          );
+          when(
+            () => picker.pickMultiple(),
+          ).thenAnswer((_) async => <PickedMedia>[malo1, _picked, malo2]);
+          when(
+            () => _lastRepo.upload(
+              bytes: any(named: 'bytes'),
+              filename: any(named: 'filename'),
+            ),
+          ).thenAnswer((inv) async {
+            final name = inv.namedArguments[#filename] as String;
+            if (name.startsWith('malo')) throw const MediaTooLargeFailure();
+            return const UploadedMedia(ref: 'media/c', previewUrl: null);
+          });
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async =>
+                MediaPage(assets: <MediaAsset>[_c, _a], nextCursor: ''),
+          );
+          return build(_lastRepo, picker);
+        },
+        seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: ''),
+        act: (b) => b.add(const MediaGalleryUploadRequested()),
+        verify: (b) {
+          final s = b.state as MediaGalleryLoaded;
+          // El outcome del lote conserva CUÁNTOS fallaron, no sólo el último
+          // error: la UI puede decir "2 de 3 no se subieron".
+          expect(s.uploadOutcome, isNotNull);
+          expect(s.uploadOutcome!.total, 3);
+          expect(s.uploadOutcome!.failed, 2);
+          expect(s.uploadOutcome!.lastError, isA<MediaTooLargeFailure>());
+          expect(s.uploadOutcome!.hiddenByFilter, isFalse);
+        },
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'subida exitosa que NO aparece en el re-list filtrado ⇒ hiddenByFilter',
+        build: () {
+          _lastRepo = _MockRepo();
+          final picker = _MockPicker();
+          when(
+            () => picker.pickMultiple(),
+          ).thenAnswer((_) async => <PickedMedia>[_picked]);
+          when(
+            () => _lastRepo.upload(
+              bytes: any(named: 'bytes'),
+              filename: any(named: 'filename'),
+            ),
+          ).thenAnswer(
+            (_) async =>
+                const UploadedMedia(ref: 'media/nuevo', previewUrl: null),
+          );
+          // El re-list (con la búsqueda activa) NO contiene el ref subido:
+          // el archivo quedó oculto por el filtro.
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
+          );
+          return build(_lastRepo, picker);
+        },
+        act: (b) async {
+          b.add(const MediaGallerySearchChanged('logo'));
+          await b.stream.firstWhere((s) => s is MediaGalleryLoaded);
+          b.add(const MediaGalleryUploadRequested());
+        },
+        verify: (b) {
+          final s = b.state as MediaGalleryLoaded;
+          expect(s.uploadOutcome, isNotNull);
+          expect(s.uploadOutcome!.failed, 0);
+          expect(s.uploadOutcome!.hiddenByFilter, isTrue);
+          // El estado final espeja los filtros activos (no los pierde).
+          expect(s.query, 'logo');
+        },
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'subida visible sin filtros ⇒ hiddenByFilter false',
+        build: () {
+          _lastRepo = _MockRepo();
+          final picker = _MockPicker();
+          when(
+            () => picker.pickMultiple(),
+          ).thenAnswer((_) async => <PickedMedia>[_picked]);
+          when(
+            () => _lastRepo.upload(
+              bytes: any(named: 'bytes'),
+              filename: any(named: 'filename'),
+            ),
+          ).thenAnswer(
+            (_) async => const UploadedMedia(ref: 'media/c', previewUrl: null),
+          );
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async =>
+                MediaPage(assets: <MediaAsset>[_c, _a], nextCursor: ''),
+          );
+          return build(_lastRepo, picker);
+        },
+        seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: ''),
+        act: (b) => b.add(const MediaGalleryUploadRequested()),
+        verify: (b) {
+          final s = b.state as MediaGalleryLoaded;
+          expect(s.uploadOutcome, isNotNull);
+          expect(s.uploadOutcome!.failed, 0);
+          expect(s.uploadOutcome!.hiddenByFilter, isFalse);
+        },
       );
 
       blocTest<MediaGalleryBloc, MediaGalleryState>(
@@ -793,6 +936,189 @@ void main() {
       );
     });
 
+    group('MediaGalleryFiltersCleared', () {
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'limpia búsqueda y tipo en UNA recarga (no una por filtro)',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
+          );
+          return build(_lastRepo, _MockPicker());
+        },
+        act: (b) async {
+          b.add(const MediaGallerySearchChanged('logo'));
+          await b.stream.firstWhere((s) => s is MediaGalleryLoaded);
+          b.add(const MediaGalleryTypeChanged('image'));
+          await b.stream.firstWhere((s) => s is MediaGalleryLoaded);
+          b.add(const MediaGalleryFiltersCleared());
+        },
+        verify: (b) {
+          final s = b.state as MediaGalleryLoaded;
+          expect(s.query, '');
+          expect(s.type, isNull);
+          // Exactamente UNA recarga sin filtros (no una por cada filtro).
+          verify(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+            ),
+          ).called(1);
+        },
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'con tipo FIJO del constructor (picker), limpiar conserva el tipo',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_a], nextCursor: ''),
+          );
+          return MediaGalleryBloc(
+            repo: _lastRepo,
+            picker: _MockPicker(),
+            type: 'video',
+          );
+        },
+        act: (b) async {
+          b.add(const MediaGallerySearchChanged('logo'));
+          await b.stream.firstWhere((s) => s is MediaGalleryLoaded);
+          b.add(const MediaGalleryFiltersCleared());
+        },
+        verify: (b) {
+          final s = b.state as MediaGalleryLoaded;
+          expect(s.query, '');
+          // El tipo del paso de flujo NO se pierde al limpiar filtros.
+          expect(s.type, 'video');
+          verify(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: 'video',
+            ),
+          ).called(1);
+        },
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'sin filtros activos ⇒ no-op (no recarga)',
+        build: () {
+          _lastRepo = _MockRepo();
+          return build(_lastRepo, _MockPicker());
+        },
+        seed: () => MediaGalleryLoaded(items: <MediaAsset>[_a], nextCursor: ''),
+        act: (b) => b.add(const MediaGalleryFiltersCleared()),
+        expect: () => <MediaGalleryState>[],
+        verify: (_) {
+          verifyNever(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          );
+        },
+      );
+    });
+
+    group('cancelación del borrado en lote', () {
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'cancelar detiene los deletes restantes, re-lista y cierra el scrim',
+        build: () {
+          _lastRepo = _MockRepo();
+          _deleteGate = Completer<void>();
+          // El primer delete queda retenido en vuelo; el cancel llega mientras
+          // tanto y el segundo delete NO debe dispararse.
+          when(
+            () => _lastRepo.delete('media/a'),
+          ).thenAnswer((_) => _deleteGate.future);
+          when(() => _lastRepo.delete('media/b')).thenAnswer((_) async {});
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async => MediaPage(assets: <MediaAsset>[_b], nextCursor: ''),
+          );
+          return build(_lastRepo, _MockPicker());
+        },
+        seed: () => MediaGalleryLoaded(
+          items: <MediaAsset>[_a, _b],
+          nextCursor: '',
+          selectedRefs: const <String>{'media/a', 'media/b'},
+        ),
+        act: (b) async {
+          b.add(const MediaGalleryDeleteSelectedRequested());
+          await Future<void>.delayed(Duration.zero);
+          b.add(const MediaGalleryDeleteCancelRequested());
+          await Future<void>.delayed(Duration.zero);
+          _deleteGate.complete();
+        },
+        verify: (b) {
+          // El delete en vuelo terminó, pero el resto del lote NO se emitió.
+          verify(() => _lastRepo.delete('media/a')).called(1);
+          verifyNever(() => _lastRepo.delete('media/b'));
+          // Re-lista igual (verdad de lo que sobrevivió) y sale del modo.
+          verify(() => _lastRepo.invalidate()).called(1);
+          final s = b.state as MediaGalleryLoaded;
+          expect(s.isDeleting, isFalse);
+          expect(s.selectedRefs, isEmpty);
+        },
+      );
+
+      blocTest<MediaGalleryBloc, MediaGalleryState>(
+        'un cancel viejo NO contamina el siguiente lote',
+        build: () {
+          _lastRepo = _MockRepo();
+          when(() => _lastRepo.delete(any())).thenAnswer((_) async {});
+          when(
+            () => _lastRepo.listAssets(
+              cursor: any(named: 'cursor'),
+              limit: any(named: 'limit'),
+              type: any(named: 'type'),
+              q: any(named: 'q'),
+            ),
+          ).thenAnswer(
+            (_) async =>
+                const MediaPage(assets: <MediaAsset>[], nextCursor: ''),
+          );
+          return build(_lastRepo, _MockPicker());
+        },
+        seed: () => MediaGalleryLoaded(
+          items: <MediaAsset>[_a],
+          nextCursor: '',
+          selectedRefs: const <String>{'media/a'},
+        ),
+        act: (b) async {
+          // Cancel sin lote en curso: bandera que NO debe sobrevivir.
+          b.add(const MediaGalleryDeleteCancelRequested());
+          await Future<void>.delayed(Duration.zero);
+          b.add(const MediaGalleryDeleteSelectedRequested());
+        },
+        verify: (_) {
+          verify(() => _lastRepo.delete('media/a')).called(1);
+        },
+      );
+    });
+
     group('fallo de paginación con feedback (barrido UX)', () {
       blocTest<MediaGalleryBloc, MediaGalleryState>(
         'fallo de load-more expone loadMoreError y conserva la lista',
@@ -863,3 +1189,6 @@ late _MockRepo _lastRepo;
 /// Compuerta para retener una petición de listado en vuelo (guarda de
 /// concurrencia de load-more).
 late Completer<MediaPage> _gate;
+
+/// Compuerta para retener un delete en vuelo (cancelación del lote).
+late Completer<void> _deleteGate;

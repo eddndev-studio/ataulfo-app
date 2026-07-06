@@ -207,8 +207,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Fila de íconos (con Galería) + grilla del carrete, expandible.
+      // Fila de íconos (con el carrete) + grilla del carrete, expandible. El
+      // label distingue el carrete del CATÁLOGO de la org ("Medios"): son
+      // destinos distintos y "Galería" a secas los confundía.
       expect(find.byKey(const Key('attach_menu.gallery')), findsOneWidget);
+      expect(find.text('Fotos del dispositivo'), findsOneWidget);
       expect(find.byType(DraggableScrollableSheet), findsOneWidget);
       expect(find.byKey(const Key('attach_gallery.grid')), findsOneWidget);
       expect(find.byKey(const Key('attach_gallery.item.a1')), findsOneWidget);

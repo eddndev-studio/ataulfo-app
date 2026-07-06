@@ -41,8 +41,10 @@ import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
 import 'package:ataulfo/features/media/data/repositories/noop_camera_capture.dart';
 import 'package:ataulfo/features/media/data/repositories/noop_device_gallery.dart';
+import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_repository.dart';
+import 'package:ataulfo/features/media/presentation/widgets/media_thumbnail.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/invitations/domain/entities/invitation.dart';
 import 'package:ataulfo/features/invitations/domain/repositories/invitations_repository.dart';
@@ -1588,5 +1590,142 @@ void main() {
       find.text('Contraseña restablecida. Inicia sesión con la nueva.'),
       findsOneWidget,
     );
+  });
+
+  group('galería como picker (/media/pick)', () {
+    final asset = MediaAsset(
+      ref: 'tenant/o1/media/foto.png',
+      previewUrl: null,
+      filename: 'foto.png',
+      contentType: 'image/png',
+      size: 10,
+      createdAt: DateTime.utc(2026, 1, 1),
+    );
+
+    AppRouter pickerRouter() {
+      final mediaRepo = _MockMediaRepo();
+      when(
+        () => mediaRepo.listAssets(
+          cursor: any(named: 'cursor'),
+          limit: any(named: 'limit'),
+          type: any(named: 'type'),
+          q: any(named: 'q'),
+        ),
+      ).thenAnswer(
+        (_) async => MediaPage(assets: <MediaAsset>[asset], nextCursor: ''),
+      );
+      return AppRouter(
+        authBloc: authBloc,
+        authRepository: authRepo,
+        botsRepository: botsRepo,
+        botSessionRepository: botSessionRepo,
+        conversationsRepository: conversationsRepo,
+        messagesRepository: messagesRepo,
+        templatesRepository: templatesRepo,
+        flowsRepository: flowsRepo,
+        flowRunRepository: flowRunRepo,
+        triggersRepository: triggersRepo,
+        waLabelsRepository: _waLabelsRepo(),
+        quickRepliesRepository: _quickRepliesRepo(),
+        labelsRepository: labelsRepo,
+        chatLabelsRepository: _MockChatLabelsRepo(),
+        notesRepository: _MockNotesRepo(),
+        aiLogRepository: _MockAiLogRepo(),
+        executionsRepository: _FakeExecutionsRepo(),
+        trainerRepository: _MockTrainerRepo(),
+        trainerEvents: _MockTrainerEvents(),
+        monitorActivity: _FakeMonitorActivity(),
+        monitorBotActivity: _FakeMonitorActivity(),
+        workspaceRepository: _MockWorkspaceRepo(),
+        previewRepository: _MockPreviewRepo(),
+        platformAgentRepository: _MockPlatformAgentRepo(),
+        platformAgentEvents: _MockPlatformAgentEvents(),
+        membershipsRepository: membershipsRepo,
+        membersRepository: membersRepo,
+        invitationsRepository: invitationsRepo,
+        catalogRepository: catalogRepo,
+        orgAiConfigRepository: orgAiConfigRepo,
+        notificationsRepository: notificationsRepo,
+        mediaRepository: mediaRepo,
+        mediaFilePicker: _FakeMediaFilePicker(),
+        cameraCapture: const NoopCameraCapture(),
+        deviceGallery: const NoopDeviceGallery(),
+        mediaThumbnailLoader: const FakeThumbnailLoader(),
+        mediaOpener: const FakeMediaOpener(),
+        audioEngineFactory: FakeAudioEngine.new,
+        audioRecorder: const NoopAudioRecorder(),
+        profileRepository: profileRepo,
+      );
+    }
+
+    testWidgets('sin type fijo el picker muestra las tabs de familia', (
+      tester,
+    ) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      final localRouter = pickerRouter();
+      await tester.pumpWidget(_host(localRouter, authBloc));
+      await tester.pumpAndSettle();
+      localRouter.router.go('/media/pick');
+      await tester.pumpAndSettle();
+
+      // No hay tipo que proteger: filtrar por familia es útil y seguro.
+      expect(
+        find.byKey(const Key('media_gallery.type_chip.all')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('con type fijo del paso de flujo NO hay tabs', (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      final localRouter = pickerRouter();
+      await tester.pumpWidget(_host(localRouter, authBloc));
+      await tester.pumpAndSettle();
+      localRouter.router.go('/media/pick?type=video');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('media_gallery.type_chip.all')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('multi=1: el tap selecciona (barra Agregar), no popea', (
+      tester,
+    ) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      final localRouter = pickerRouter();
+      await tester.pumpWidget(_host(localRouter, authBloc));
+      await tester.pumpAndSettle();
+      localRouter.router.go('/media/pick?multi=1');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(MediaThumbnail));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 seleccionado'), findsOneWidget);
+      expect(
+        find.byKey(const Key('media_gallery.multi_confirm')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('long-press en el picker abre el detalle SOLO LECTURA', (
+      tester,
+    ) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      final localRouter = pickerRouter();
+      await tester.pumpWidget(_host(localRouter, authBloc));
+      await tester.pumpAndSettle();
+      localRouter.router.go('/media/pick');
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.byType(MediaThumbnail));
+      await tester.pumpAndSettle();
+
+      // Detalle como PREVIEW: metadata/ref sí, mutaciones no.
+      expect(find.byKey(const Key('media_detail.copy_ref')), findsOneWidget);
+      expect(find.byKey(const Key('media_detail.edit_alias')), findsNothing);
+      expect(find.byKey(const Key('media_detail.delete')), findsNothing);
+    });
   });
 }

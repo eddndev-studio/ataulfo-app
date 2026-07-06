@@ -202,7 +202,9 @@ class _SectionsCard extends StatelessWidget {
           AppSectionLink(
             rowKey: const Key('settings.media_tile'),
             icon: Icons.perm_media_outlined,
-            title: 'Galería de multimedia',
+            // Mismo término que el destino "Medios" del menú de adjuntar del
+            // chat: ambos abren el MISMO catálogo de la organización.
+            title: 'Medios',
             caption: 'Imágenes, videos y audios para tus flujos',
             onTap: () => context.push('/media'),
           ),

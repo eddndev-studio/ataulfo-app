@@ -5,6 +5,14 @@ import '../../domain/failures/media_failure.dart';
 import '../../domain/repositories/media_file_picker.dart';
 import '../../domain/repositories/media_repository.dart';
 
+part 'media_gallery_event.dart';
+part 'media_gallery_state.dart';
+
+// Nota (~410 líneas): este archivo contiene SOLO la máquina de estados de la
+// galería — paginación, subida, filtros, selección y borrado son transiciones
+// del mismo estado y se guardan entre sí, así que partirla la rompería.
+// Events y states ya viven en los parts hermanos.
+
 /// Bloc de la galería de media de la organización. Es la máquina de estados de
 /// la paginación load-more: el scroll de la página es un disparador delgado, la
 /// verdad (qué páginas hay, si se está cargando otra) vive aquí.
@@ -19,6 +27,7 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
   }) : _repo = repo,
        _picker = picker,
        _type = type,
+       _fixedType = type,
        super(const MediaGalleryInitial()) {
     on<MediaGalleryLoadRequested>(_onLoad);
     on<MediaGalleryLoadMoreRequested>(_onLoadMore);
@@ -26,9 +35,11 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     on<MediaGalleryUploadRequested>(_onUpload);
     on<MediaGallerySearchChanged>(_onSearchChanged);
     on<MediaGalleryTypeChanged>(_onTypeChanged);
+    on<MediaGalleryFiltersCleared>(_onFiltersCleared);
     on<MediaGallerySelectionToggled>(_onSelectionToggled);
     on<MediaGallerySelectionCleared>(_onSelectionCleared);
     on<MediaGalleryDeleteSelectedRequested>(_onDeleteSelected);
+    on<MediaGalleryDeleteCancelRequested>(_onDeleteCancel);
   }
 
   final MediaRepository _repo;
@@ -50,6 +61,18 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
   /// en browse arranca null y lo cambian las tabs vía [MediaGalleryTypeChanged].
   /// Se aplica a TODAS las páginas para que la paginación no mezcle familias.
   String? _type;
+
+  /// Familia FIJA con la que se construyó el bloc (picker abierto por un paso
+  /// de flujo con tipo). Limpiar filtros vuelve aquí, nunca más abajo: el tipo
+  /// del paso es una restricción del caller, no un filtro del usuario. null ⇒
+  /// no hay restricción (browse o picker libre) y limpiar deja la galería
+  /// completa.
+  final String? _fixedType;
+
+  /// Cancelación cooperativa del borrado en lote: la bandera se arma con
+  /// [MediaGalleryDeleteCancelRequested] (handler concurrente) y el loop de
+  /// deletes la consulta antes de cada llamada. Se desarma al arrancar un lote.
+  bool _deleteCancelRequested = false;
 
   Future<void> _onLoad(
     MediaGalleryLoadRequested event,
@@ -139,19 +162,27 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
         isUploading: true,
         uploadTotal: total,
         uploadDone: 0,
-        clearUploadError: true,
+        clearUploadOutcome: true,
       ),
     );
     // Subida secuencial con progreso. Un archivo que falla NO aborta el lote:
-    // guardamos el último error y seguimos; el re-list final muestra la verdad
-    // (lo que sí subió) y el error transitorio dispara el snackbar.
+    // acumulamos cuántos fallaron (y el último error como muestra) y seguimos;
+    // el re-list final muestra la verdad (lo que sí subió) y el outcome
+    // transitorio alimenta el feedback de la UI con el conteo real.
     MediaFailure? lastError;
+    var failed = 0;
+    final uploadedRefs = <String>[];
     var done = 0;
     for (final p in picked) {
       try {
-        await _repo.upload(bytes: p.bytes, filename: p.filename);
+        final uploaded = await _repo.upload(
+          bytes: p.bytes,
+          filename: p.filename,
+        );
+        uploadedRefs.add(uploaded.ref);
       } on MediaFailure catch (f) {
         lastError = f;
+        failed++;
       }
       done++;
       emit(
@@ -159,19 +190,33 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
           isUploading: true,
           uploadTotal: total,
           uploadDone: done,
-          clearUploadError: true,
+          clearUploadOutcome: true,
         ),
       );
     }
     // Re-listamos para mostrar los assets con la verdad del servidor (no
-    // fabricamos MediaAsset desde UploadedMedia). Respetamos familia + búsqueda.
+    // fabricamos MediaAsset desde UploadedMedia). Respetamos familia + búsqueda;
+    // si algún ref recién subido NO aparece en la primera página re-traída con
+    // filtros activos, quedó oculto por el filtro y el outcome lo señala para
+    // que la UI ofrezca "Ver todo" en vez de desaparecerlo en silencio.
     try {
       final page = await _repo.listAssets(type: _type, q: _queryParam);
+      final visibleRefs = <String>{for (final a in page.assets) a.ref};
+      final hiddenByFilter =
+          (_query.isNotEmpty || _type != null) &&
+          uploadedRefs.any((ref) => !visibleRefs.contains(ref));
       emit(
         MediaGalleryLoaded(
           items: page.assets,
           nextCursor: page.nextCursor,
-          uploadError: lastError,
+          query: _query,
+          type: _type,
+          uploadOutcome: MediaUploadOutcome(
+            total: total,
+            failed: failed,
+            lastError: lastError,
+            hiddenByFilter: hiddenByFilter,
+          ),
         ),
       );
     } on MediaFailure catch (f) {
@@ -180,7 +225,11 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
           isUploading: false,
           uploadTotal: 0,
           uploadDone: 0,
-          uploadError: lastError ?? f,
+          uploadOutcome: MediaUploadOutcome(
+            total: total,
+            failed: failed,
+            lastError: lastError ?? f,
+          ),
         ),
       );
     }
@@ -262,6 +311,20 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     }
   }
 
+  /// Limpia búsqueda y familia en UNA sola recarga. La familia vuelve al
+  /// [_fixedType] del constructor (restricción del caller en el picker), no
+  /// necesariamente a null. No-op si no hay nada que limpiar.
+  Future<void> _onFiltersCleared(
+    MediaGalleryFiltersCleared event,
+    Emitter<MediaGalleryState> emit,
+  ) async {
+    if (_query.isEmpty && _type == _fixedType) return;
+    _query = '';
+    _type = _fixedType;
+    emit(const MediaGalleryLoading());
+    await _fetchFirstPage(emit);
+  }
+
   /// Alterna un ref en la selección (long-press entra al modo; tap alterna). No
   /// toca la red. Bloqueado durante un borrado en lote.
   void _onSelectionToggled(
@@ -302,8 +365,12 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
     }
     final total = current.selectedRefs.length;
     var done = 0;
+    _deleteCancelRequested = false;
     emit(current.copyWith(isDeleting: true, deleteTotal: total, deleteDone: 0));
     for (final ref in current.selectedRefs) {
+      // Cancelación cooperativa: no se emiten MÁS deletes (el que está en
+      // vuelo ya salió); el re-list final refleja lo que alcanzó a borrarse.
+      if (_deleteCancelRequested) break;
       try {
         await _repo.delete(ref);
       } on MediaFailure {
@@ -333,306 +400,15 @@ class MediaGalleryBloc extends Bloc<MediaGalleryEvent, MediaGalleryState> {
       emit(current.copyWith(isDeleting: false, selectedRefs: const <String>{}));
     }
   }
-}
 
-// Events --------------------------------------------------------------------
-
-sealed class MediaGalleryEvent {
-  const MediaGalleryEvent();
-}
-
-/// Pide la primera página (reemplaza cualquier contenido).
-class MediaGalleryLoadRequested extends MediaGalleryEvent {
-  const MediaGalleryLoadRequested();
-  @override
-  bool operator ==(Object other) => other is MediaGalleryLoadRequested;
-  @override
-  int get hashCode => (MediaGalleryLoadRequested).hashCode;
-}
-
-/// Pide la siguiente página usando el `nextCursor` actual. No-op si no hay más
-/// páginas o si ya hay una carga en curso.
-class MediaGalleryLoadMoreRequested extends MediaGalleryEvent {
-  const MediaGalleryLoadMoreRequested();
-  @override
-  bool operator ==(Object other) => other is MediaGalleryLoadMoreRequested;
-  @override
-  int get hashCode => (MediaGalleryLoadMoreRequested).hashCode;
-}
-
-/// Recarga la primera página manteniendo la lista visible (pull-to-refresh).
-class MediaGalleryRefreshRequested extends MediaGalleryEvent {
-  const MediaGalleryRefreshRequested();
-  @override
-  bool operator ==(Object other) => other is MediaGalleryRefreshRequested;
-  @override
-  int get hashCode => (MediaGalleryRefreshRequested).hashCode;
-}
-
-/// Elige un archivo (puerto FilePicker), lo sube y re-lista para mostrarlo con
-/// metadata completa del servidor.
-class MediaGalleryUploadRequested extends MediaGalleryEvent {
-  const MediaGalleryUploadRequested();
-  @override
-  bool operator ==(Object other) => other is MediaGalleryUploadRequested;
-  @override
-  int get hashCode => (MediaGalleryUploadRequested).hashCode;
-}
-
-/// Cambia el término de búsqueda (filename/alias) y recarga la primera página.
-/// La UI lo despacha con debounce; el bloc descarta resultados obsoletos.
-class MediaGallerySearchChanged extends MediaGalleryEvent {
-  const MediaGallerySearchChanged(this.query);
-
-  final String query;
-
-  @override
-  bool operator ==(Object other) =>
-      other is MediaGallerySearchChanged && other.query == query;
-  @override
-  int get hashCode => Object.hash(MediaGallerySearchChanged, query);
-}
-
-/// Cambia la familia filtrada (image|video|audio|document, o null = todas) y
-/// recarga la primera página. Sólo lo despachan las tabs de browse.
-class MediaGalleryTypeChanged extends MediaGalleryEvent {
-  const MediaGalleryTypeChanged(this.type);
-
-  final String? type;
-
-  @override
-  bool operator ==(Object other) =>
-      other is MediaGalleryTypeChanged && other.type == type;
-  @override
-  int get hashCode => Object.hash(MediaGalleryTypeChanged, type);
-}
-
-/// Alterna la selección de un asset por su ref BARE (modo selección múltiple).
-class MediaGallerySelectionToggled extends MediaGalleryEvent {
-  const MediaGallerySelectionToggled(this.ref);
-
-  final String ref;
-
-  @override
-  bool operator ==(Object other) =>
-      other is MediaGallerySelectionToggled && other.ref == ref;
-  @override
-  int get hashCode => Object.hash(MediaGallerySelectionToggled, ref);
-}
-
-/// Vacía la selección (sale del modo selección).
-class MediaGallerySelectionCleared extends MediaGalleryEvent {
-  const MediaGallerySelectionCleared();
-  @override
-  bool operator ==(Object other) => other is MediaGallerySelectionCleared;
-  @override
-  int get hashCode => (MediaGallerySelectionCleared).hashCode;
-}
-
-/// Borra en lote los assets seleccionados y re-lista.
-class MediaGalleryDeleteSelectedRequested extends MediaGalleryEvent {
-  const MediaGalleryDeleteSelectedRequested();
-  @override
-  bool operator ==(Object other) =>
-      other is MediaGalleryDeleteSelectedRequested;
-  @override
-  int get hashCode => (MediaGalleryDeleteSelectedRequested).hashCode;
-}
-
-// States --------------------------------------------------------------------
-
-sealed class MediaGalleryState {
-  const MediaGalleryState();
-}
-
-class MediaGalleryInitial extends MediaGalleryState {
-  const MediaGalleryInitial();
-  @override
-  bool operator ==(Object other) => other is MediaGalleryInitial;
-  @override
-  int get hashCode => (MediaGalleryInitial).hashCode;
-}
-
-/// Primera carga (no hay lista que mostrar todavía).
-class MediaGalleryLoading extends MediaGalleryState {
-  const MediaGalleryLoading();
-  @override
-  bool operator ==(Object other) => other is MediaGalleryLoading;
-  @override
-  int get hashCode => (MediaGalleryLoading).hashCode;
-}
-
-/// Catálogo cargado. [nextCursor] vacío ⇒ no hay más páginas ([hasMore] lo
-/// deriva). [isLoadingMore] marca una página en vuelo; [isUploading] una
-/// subida en curso. [isRefreshing] marca un pull-to-refresh en vuelo: existe
-/// para garantizar una emisión distinguible aun cuando los datos no cambien
-/// (sin ella, refrescar a los mismos datos no emitiría y el spinner del
-/// RefreshIndicator quedaría colgado). [uploadError] es un error TRANSITORIO de
-/// la última subida: se muestra sin tumbar la lista y no es un estado terminal.
-class MediaGalleryLoaded extends MediaGalleryState {
-  const MediaGalleryLoaded({
-    required this.items,
-    required this.nextCursor,
-    this.isLoadingMore = false,
-    this.isUploading = false,
-    this.isRefreshing = false,
-    this.uploadError,
-    this.selectedRefs = const <String>{},
-    this.isDeleting = false,
-    this.uploadTotal = 0,
-    this.uploadDone = 0,
-    this.deleteTotal = 0,
-    this.deleteDone = 0,
-    this.loadMoreError,
-    this.query = '',
-    this.type,
-  });
-
-  final List<MediaAsset> items;
-  final String nextCursor;
-  final bool isLoadingMore;
-  final bool isUploading;
-  final bool isRefreshing;
-  final MediaFailure? uploadError;
-
-  /// Progreso de una subida en lote: [uploadDone] de [uploadTotal] archivos
-  /// completados. [uploadTotal] 0 ⇒ no hay subida en lote en curso. La UI
-  /// muestra "Subiendo done/total" cuando total > 0.
-  final int uploadTotal;
-  final int uploadDone;
-
-  /// Refs BARE seleccionados (modo selección múltiple). Vacío ⇒ no hay selección
-  /// activa. [selectionMode] lo deriva.
-  final Set<String> selectedRefs;
-
-  /// Un borrado en lote en curso (bloquea acciones y muestra progreso).
-  final bool isDeleting;
-
-  /// Progreso del borrado en lote: [deleteDone] de [deleteTotal]. 0 ⇒ sin
-  /// borrado en curso; la UI muestra "Borrando done de total…".
-  final int deleteTotal;
-  final int deleteDone;
-
-  /// Error TRANSITORIO de paginación: la lista visible queda intacta y la UI
-  /// ofrece reintentar al pie del grid. Se limpia al arrancar el retry.
-  final MediaFailure? loadMoreError;
-
-  /// Filtros activos de esta vista (espejo de los internos del bloc): le
-  /// permiten a la UI distinguir "galería vacía" de "búsqueda sin resultados".
-  final String query;
-  final String? type;
-
-  /// Hay filtros activos (búsqueda o tipo).
-  bool get isFiltered => query.isNotEmpty || type != null;
-
-  /// Hay más páginas sii el cursor no está vacío. Derivado, nunca un flag.
-  bool get hasMore => nextCursor.isNotEmpty;
-
-  /// El modo selección está activo sii hay al menos un ref seleccionado.
-  /// Derivado: vaciar la selección sale del modo.
-  bool get selectionMode => selectedRefs.isNotEmpty;
-
-  MediaGalleryLoaded copyWith({
-    List<MediaAsset>? items,
-    String? nextCursor,
-    bool? isLoadingMore,
-    bool? isUploading,
-    bool? isRefreshing,
-    MediaFailure? uploadError,
-    bool clearUploadError = false,
-    Set<String>? selectedRefs,
-    bool? isDeleting,
-    int? uploadTotal,
-    int? uploadDone,
-    int? deleteTotal,
-    int? deleteDone,
-    MediaFailure? loadMoreError,
-    bool clearLoadMoreError = false,
-    String? query,
-    String? type,
-    bool clearType = false,
-  }) => MediaGalleryLoaded(
-    items: items ?? this.items,
-    nextCursor: nextCursor ?? this.nextCursor,
-    isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-    isUploading: isUploading ?? this.isUploading,
-    isRefreshing: isRefreshing ?? this.isRefreshing,
-    uploadError: clearUploadError ? null : (uploadError ?? this.uploadError),
-    selectedRefs: selectedRefs ?? this.selectedRefs,
-    isDeleting: isDeleting ?? this.isDeleting,
-    uploadTotal: uploadTotal ?? this.uploadTotal,
-    uploadDone: uploadDone ?? this.uploadDone,
-    deleteTotal: deleteTotal ?? this.deleteTotal,
-    deleteDone: deleteDone ?? this.deleteDone,
-    loadMoreError: clearLoadMoreError
-        ? null
-        : (loadMoreError ?? this.loadMoreError),
-    query: query ?? this.query,
-    type: clearType ? null : (type ?? this.type),
-  );
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! MediaGalleryLoaded) return false;
-    if (other.nextCursor != nextCursor ||
-        other.isLoadingMore != isLoadingMore ||
-        other.isUploading != isUploading ||
-        other.isRefreshing != isRefreshing ||
-        other.uploadError != uploadError ||
-        other.isDeleting != isDeleting ||
-        other.uploadTotal != uploadTotal ||
-        other.uploadDone != uploadDone ||
-        other.deleteTotal != deleteTotal ||
-        other.deleteDone != deleteDone ||
-        other.loadMoreError != loadMoreError ||
-        other.query != query ||
-        other.type != type) {
-      return false;
-    }
-    if (other.selectedRefs.length != selectedRefs.length ||
-        !other.selectedRefs.containsAll(selectedRefs)) {
-      return false;
-    }
-    if (other.items.length != items.length) return false;
-    for (var i = 0; i < items.length; i++) {
-      if (other.items[i] != items[i]) return false;
-    }
-    return true;
+  /// Arma la bandera de cancelación del lote de borrado en curso. Handler
+  /// aparte (concurrente) para que llegue MIENTRAS [_onDeleteSelected] espera
+  /// un delete en vuelo. Sin lote en curso es inocuo: la bandera se desarma al
+  /// arrancar el siguiente.
+  void _onDeleteCancel(
+    MediaGalleryDeleteCancelRequested event,
+    Emitter<MediaGalleryState> emit,
+  ) {
+    _deleteCancelRequested = true;
   }
-
-  @override
-  int get hashCode => Object.hash(
-    Object.hashAll(items),
-    nextCursor,
-    isLoadingMore,
-    isUploading,
-    isRefreshing,
-    uploadError,
-    Object.hashAllUnordered(selectedRefs),
-    isDeleting,
-    uploadTotal,
-    uploadDone,
-    deleteTotal,
-    deleteDone,
-    loadMoreError,
-    query,
-    type,
-  );
-}
-
-/// Falla de la PRIMERA carga (terminal: no hay lista que preservar). Las fallas
-/// de load-more y de subida NO colapsan aquí — viven en [MediaGalleryLoaded]
-/// para no tumbar el contenido ya visible.
-class MediaGalleryFailed extends MediaGalleryState {
-  const MediaGalleryFailed(this.failure);
-
-  final MediaFailure failure;
-
-  @override
-  bool operator ==(Object other) =>
-      other is MediaGalleryFailed && other.failure == failure;
-
-  @override
-  int get hashCode => failure.hashCode;
 }
