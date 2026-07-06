@@ -183,4 +183,27 @@ void main() {
     expect(await cache.bytesFor('ref', 'https://cdn/x.jpg'), bytes);
     expect(downloads, 2);
   });
+
+  test(
+    'retry() ignora el TTL de fallo: el reintento explícito re-descarga',
+    () async {
+      var downloads = 0;
+      final cache = make(
+        download: (_) async {
+          downloads++;
+          return downloads == 1 ? null : bytes;
+        },
+      );
+
+      expect(await cache.bytesFor('ref', 'https://cdn/x.jpg'), isNull);
+      // Dentro del TTL el fallo cacheado no reintenta (anti-martilleo)…
+      expect(await cache.bytesFor('ref', 'https://cdn/x.jpg'), isNull);
+      expect(downloads, 1);
+
+      // …pero el usuario que toca "Reintentar" no debe esperar al TTL.
+      cache.retry('ref');
+      expect(await cache.bytesFor('ref', 'https://cdn/x.jpg'), bytes);
+      expect(downloads, 2);
+    },
+  );
 }

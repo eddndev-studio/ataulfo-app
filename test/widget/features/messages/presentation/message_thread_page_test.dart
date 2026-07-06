@@ -21,6 +21,7 @@ import 'package:ataulfo/core/audio/audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/failures/messages_failure.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
+import 'package:ataulfo/features/messages/domain/repositories/media_sharer.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_media.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/video_playback.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/thread_audio_cubit.dart';
@@ -60,8 +61,29 @@ class _FakeVideoPlayback implements VideoPlayback {
   final List<String> calls = <String>[];
 
   @override
-  Future<void> open(BuildContext context, {required String url}) async {
-    calls.add(url);
+  Future<void> open(
+    BuildContext context, {
+    String? url,
+    Uint8List? bytes,
+    String? cacheKey,
+  }) async {
+    calls.add(url ?? '<bytes>');
+  }
+}
+
+/// Fake de compartir media: registra bytes+nombre; opcionalmente falla.
+class _FakeMediaSharer implements MediaSharer {
+  final List<({Uint8List bytes, String filename})> calls =
+      <({Uint8List bytes, String filename})>[];
+  bool throwOnShare = false;
+
+  @override
+  Future<void> share({
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    if (throwOnShare) throw const MediaShareException('sin app');
+    calls.add((bytes: bytes, filename: filename));
   }
 }
 
@@ -134,6 +156,7 @@ void main() {
   late _MockMessagesBloc bloc;
   late _MockThreadAudioCubit audio;
   late _MockMediaOpener opener;
+  late _FakeMediaSharer sharer;
   late _FakeVideoPlayback videoPlayback;
   late _MockAuthBloc authBloc;
 
@@ -141,6 +164,7 @@ void main() {
     bloc = _MockMessagesBloc();
     audio = _MockThreadAudioCubit();
     opener = _MockMediaOpener();
+    sharer = _FakeMediaSharer();
     videoPlayback = _FakeVideoPlayback();
     authBloc = _MockAuthBloc();
     when(() => bloc.state).thenReturn(const MessagesInitial());
@@ -164,20 +188,23 @@ void main() {
         value: const NoopAudioRecorder(),
         child: RepositoryProvider<MediaOpener>.value(
           value: opener,
-          child: RepositoryProvider<VideoPlayback>.value(
-            value: videoPlayback,
-            child: MultiBlocProvider(
-              providers: <BlocProvider<dynamic>>[
-                BlocProvider<MessagesBloc>.value(value: bloc),
-                BlocProvider<ThreadAudioCubit>.value(value: audio),
-                BlocProvider<AuthBloc>.value(value: authBloc),
-                // El footer de actividad live lo lee del scope; inerte aquí (sin
-                // observar) ⇒ no pinta nada.
-                BlocProvider<MonitorLiveCubit>(
-                  create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
-                ),
-              ],
-              child: const Scaffold(body: MessageThreadPage()),
+          child: RepositoryProvider<MediaSharer>.value(
+            value: sharer,
+            child: RepositoryProvider<VideoPlayback>.value(
+              value: videoPlayback,
+              child: MultiBlocProvider(
+                providers: <BlocProvider<dynamic>>[
+                  BlocProvider<MessagesBloc>.value(value: bloc),
+                  BlocProvider<ThreadAudioCubit>.value(value: audio),
+                  BlocProvider<AuthBloc>.value(value: authBloc),
+                  // El footer de actividad live lo lee del scope; inerte aquí (sin
+                  // observar) ⇒ no pinta nada.
+                  BlocProvider<MonitorLiveCubit>(
+                    create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+                  ),
+                ],
+                child: const Scaffold(body: MessageThreadPage()),
+              ),
             ),
           ),
         ),
@@ -2152,7 +2179,9 @@ void main() {
       expect(find.byKey(const Key('media_viewer')), findsOneWidget);
       expect(find.byType(InteractiveViewer), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('media_viewer.dismiss')));
+      // El descarte por tap aplica al FONDO del visor (tocar la foto ya no
+      // cierra): se toca una esquina, lejos de la imagen centrada.
+      await tester.tapAt(const Offset(8, 300));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('media_viewer')), findsNothing);
     });
@@ -2455,9 +2484,76 @@ void main() {
       );
     });
   });
-}
 
-// ===========================================================================
-// Corrección y tipos ricos (S25): revocado, editado, encuesta, ubicación,
-// contacto y voto. Se registran desde main() vía _richTypesGroup.
-// ===========================================================================
+  group('compartir media (long-press)', () {
+    void seedOne(Message m) {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[m],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+    }
+
+    Future<void> openActions(WidgetTester tester, String ext) async {
+      await tester.longPress(
+        find
+            .descendant(
+              of: find.byKey(Key('message.$ext')),
+              matching: find.byType(GestureDetector),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Compartir comparte los bytes cacheados de la media', (
+      tester,
+    ) async {
+      seedOne(
+        msg(externalId: 'img1', type: 'image', content: '', mediaRef: 'r/x'),
+      );
+      final cache = fakeMessageMediaCache();
+      await cache.cache('r/x', _pngBytes);
+      await tester.pumpWidget(host(mediaCache: cache));
+      await tester.pumpAndSettle();
+      await openActions(tester, 'img1');
+
+      await tester.tap(find.byKey(const Key('message.share.img1')));
+      await tester.pumpAndSettle();
+
+      expect(sharer.calls, hasLength(1));
+      expect(sharer.calls.single.bytes, _pngBytes);
+      expect(sharer.calls.single.filename, isNotEmpty);
+    });
+
+    testWidgets('sin bytes ni URL viva anuncia el fallo honesto', (
+      tester,
+    ) async {
+      seedOne(
+        msg(externalId: 'img2', type: 'image', content: '', mediaRef: 'r/y'),
+      );
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      await openActions(tester, 'img2');
+
+      await tester.tap(find.byKey(const Key('message.share.img2')));
+      await tester.pumpAndSettle();
+
+      expect(sharer.calls, isEmpty);
+      expect(find.text('No pudimos compartir el archivo'), findsOneWidget);
+    });
+
+    testWidgets('un mensaje de texto no ofrece Compartir', (tester) async {
+      seedOne(msg(externalId: 't1', type: 'text', content: 'hola'));
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('hola'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('message.share.t1')), findsNothing);
+      expect(find.byKey(const Key('reaction.pick.t1.👍')), findsOneWidget);
+    });
+  });
+}

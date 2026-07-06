@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:ataulfo/features/messages/data/cache/message_media_cache.dart';
 import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/thread_audio_cubit.dart';
@@ -8,14 +10,20 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'fake_chat_media.dart';
 import 'fake_message_media_cache.dart';
 
-/// [VideoPlayback] inerte que registra las URLs abiertas (el puerto recibe el
+/// [VideoPlayback] inerte que registra las fuentes abiertas (URL o, en su
+/// defecto, la clave de caché de la copia local; el puerto recibe el
 /// BuildContext, así que no se presta a un mock).
 class RecordingVideoPlayback implements VideoPlayback {
   final List<String> calls = <String>[];
 
   @override
-  Future<void> open(BuildContext context, {required String url}) async {
-    calls.add(url);
+  Future<void> open(
+    BuildContext context, {
+    String? url,
+    Uint8List? bytes,
+    String? cacheKey,
+  }) async {
+    calls.add(url ?? cacheKey ?? '');
   }
 }
 

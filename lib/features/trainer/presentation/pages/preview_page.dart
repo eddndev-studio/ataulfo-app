@@ -1,3 +1,7 @@
+// Nota de tamaño (>400 LOC): la página del emulador concentra transcript
+// (burbujas user/bot/acción/media), bandeja de adjuntos y composer del
+// sandbox — piezas acopladas por el mismo layout; partirlas dispersaría la
+// presentación sin ganar claridad.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -188,9 +192,30 @@ class _PreviewThreadState extends State<_PreviewThread> {
               separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
               itemBuilder: (context, i) {
                 final att = s.pendingAttachments[i];
+                final isImage = _looksLikeImage(att.name);
                 return InputChip(
                   key: Key('preview.pending_att.${att.name}'),
-                  avatar: const Icon(Icons.attach_file, size: 16),
+                  // Miniatura real para imágenes (los bytes ya están en
+                  // memoria); ícono por tipo para el resto — el mismo trato
+                  // que la bandeja del entrenador/asistente.
+                  avatar: isImage
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppTokens.radiusSm,
+                          ),
+                          child: Image.memory(
+                            att.bytes,
+                            key: Key('preview.pending_thumb.${att.name}'),
+                            width: 20,
+                            height: 20,
+                            fit: BoxFit.cover,
+                            // Bytes que no decodifican caen al ícono en vez
+                            // de tumbar la fila.
+                            errorBuilder: (_, _, _) =>
+                                Icon(_pendingIcon(att.name), size: 16),
+                          ),
+                        )
+                      : Icon(_pendingIcon(att.name), size: 16),
                   deleteIcon: const Icon(Icons.close, size: 16),
                   label: Text(att.name, overflow: TextOverflow.ellipsis),
                   onDeleted: () => context.read<PreviewBloc>().add(
@@ -209,7 +234,7 @@ class _PreviewThreadState extends State<_PreviewThread> {
           leading: <Widget>[
             IconButton(
               key: const Key('preview.attach'),
-              tooltip: 'Adjuntar imagen, PDF o audio',
+              tooltip: 'Adjuntar imagen o PDF',
               icon: const Icon(Icons.attach_file, color: AppTokens.text2),
               onPressed: s.sending
                   ? null
@@ -222,6 +247,24 @@ class _PreviewThreadState extends State<_PreviewThread> {
       ],
     );
   }
+}
+
+/// El adjunto pendiente parece imagen por su extensión (el sandbox no conoce
+/// el MIME: el server lo sniffea al recibirlo).
+bool _looksLikeImage(String name) {
+  final dot = name.lastIndexOf('.');
+  final ext = dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
+  return ext == 'png' || ext == 'jpg' || ext == 'jpeg' || ext == 'webp';
+}
+
+/// Ícono del adjunto pendiente por extensión (imagen/PDF; resto genérico) —
+/// espejo del `attachmentIcon` por MIME de los chats reales.
+IconData _pendingIcon(String name) {
+  if (_looksLikeImage(name)) return Icons.image_outlined;
+  final dot = name.lastIndexOf('.');
+  final ext = dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
+  if (ext == 'pdf') return Icons.description_outlined;
+  return Icons.attach_file;
 }
 
 /// Pill sobre el composer mientras la ventana de acumulación está viva: el

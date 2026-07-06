@@ -1,8 +1,12 @@
+// Nota de tamaño (>400 LOC): eventos+estado+bloc del preview viven juntos
+// (mismo patrón que trainer_chat_bloc); separar los eventos del handler que
+// los consume dispersaría un protocolo pequeño y cerrado.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/attachment_limits.dart';
 import '../../domain/entities/preview_attachment.dart';
 import '../../domain/entities/preview_item.dart';
 import '../../domain/failures/trainer_failure.dart';
@@ -391,11 +395,50 @@ class PreviewBloc extends Bloc<PreviewEvent, PreviewState> {
     if (picked == null) return;
     final cur = state;
     if (cur is! PreviewLoaded) return;
+    // Misma validación client-side que los chats reales (entrenador/
+    // asistente): tipo, peso y cupo se cortan ANTES de aceptar el adjunto,
+    // con el mismo copy de fallo. El tipo pesa más que el peso y el peso
+    // más que el cupo.
+    if (!isSupportedTurnAttachmentName(picked.filename)) {
+      emit(
+        PreviewLoaded(
+          items: cur.items,
+          sending: cur.sending,
+          failure: const TrainerAttachmentUnsupportedFailure(),
+          accumulatingUntil: cur.accumulatingUntil,
+          pendingAttachments: cur.pendingAttachments,
+        ),
+      );
+      return;
+    }
+    if (picked.bytes.length > maxTurnAttachmentBytes) {
+      emit(
+        PreviewLoaded(
+          items: cur.items,
+          sending: cur.sending,
+          failure: const TrainerAttachmentTooLargeFailure(),
+          accumulatingUntil: cur.accumulatingUntil,
+          pendingAttachments: cur.pendingAttachments,
+        ),
+      );
+      return;
+    }
+    if (cur.pendingAttachments.length >= maxTurnAttachments) {
+      emit(
+        PreviewLoaded(
+          items: cur.items,
+          sending: cur.sending,
+          failure: const TrainerAttachmentLimitFailure(),
+          accumulatingUntil: cur.accumulatingUntil,
+          pendingAttachments: cur.pendingAttachments,
+        ),
+      );
+      return;
+    }
     emit(
       PreviewLoaded(
         items: cur.items,
         sending: cur.sending,
-        failure: cur.failure,
         accumulatingUntil: cur.accumulatingUntil,
         pendingAttachments: <PreviewAttachment>[
           ...cur.pendingAttachments,

@@ -110,6 +110,7 @@ import '../../features/messages/domain/repositories/audio_engine.dart';
 import '../audio/audio_recorder.dart';
 import '../../features/messages/data/cache/message_media_cache.dart';
 import '../../features/messages/domain/repositories/media_opener.dart';
+import '../../features/messages/domain/repositories/media_sharer.dart';
 import '../../features/messages/presentation/widgets/video_playback.dart';
 import '../../features/messages/domain/repositories/messages_repository.dart';
 import '../../features/messages/presentation/bloc/messages_bloc.dart';
@@ -204,6 +205,7 @@ class AppRouter {
     required DeviceGalleryPort deviceGallery,
     required MediaThumbnailLoader mediaThumbnailLoader,
     required MediaOpener mediaOpener,
+    required MediaSharer mediaSharer,
     required AudioEngine Function() audioEngineFactory,
     required AudioRecorder audioRecorder,
   }) : _authBloc = authBloc,
@@ -246,6 +248,7 @@ class AppRouter {
        _deviceGallery = deviceGallery,
        _mediaThumbnailLoader = mediaThumbnailLoader,
        _mediaOpener = mediaOpener,
+       _mediaSharer = mediaSharer,
        _audioEngineFactory = audioEngineFactory,
        _audioRecorder = audioRecorder;
 
@@ -307,6 +310,7 @@ class AppRouter {
   final DeviceGalleryPort _deviceGallery;
   final MediaThumbnailLoader _mediaThumbnailLoader;
   final MediaOpener _mediaOpener;
+  final MediaSharer _mediaSharer;
 
   /// Fabrica el motor de audio del hilo: un engine NUEVO por visita (el
   /// cubit lo dispone al cerrar la ruta; un singleton quedaría dispuesto).
@@ -917,6 +921,8 @@ class AppRouter {
               RepositoryProvider<NotesRepository>.value(value: _notesRepo),
               // Abre documentos del hilo con una app externa.
               RepositoryProvider<MediaOpener>.value(value: _mediaOpener),
+              // Comparte media del hilo con otras apps (share sheet).
+              RepositoryProvider<MediaSharer>.value(value: _mediaSharer),
               // Reproduce videos del hilo a pantalla completa dentro de la app.
               RepositoryProvider<VideoPlayback>.value(
                 value: const InAppVideoPlayback(),

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:ataulfo/features/messages/domain/repositories/audio_engine.dart';
 import 'package:ataulfo/features/messages/domain/repositories/media_opener.dart';
+import 'package:ataulfo/features/messages/domain/repositories/media_sharer.dart';
 
 /// Engine de audio inerte: deja montar el hilo (y su `ThreadAudioCubit`)
 /// en tests sin plugin de plataforma. Los streams vacíos nunca emiten, así
@@ -49,4 +50,15 @@ class FakeMediaOpener implements MediaOpener {
 
   @override
   Future<void> open({required String url}) async {}
+}
+
+/// Compartidor de media no-op para el wiring de rutas en tests.
+class FakeMediaSharer implements MediaSharer {
+  const FakeMediaSharer();
+
+  @override
+  Future<void> share({
+    required Uint8List bytes,
+    required String filename,
+  }) async {}
 }

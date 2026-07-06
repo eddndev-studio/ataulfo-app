@@ -73,6 +73,7 @@ import 'features/messages/data/datasources/messages_events_datasource.dart';
 import 'features/messages/data/cache/message_media_cache.dart';
 import 'features/messages/data/datasources/outbox_dao.dart';
 import 'features/messages/data/media/dio_media_opener.dart';
+import 'features/messages/data/media/share_plus_media_sharer.dart';
 import 'features/messages/application/audio_recorder_resolver.dart';
 import 'features/messages/data/media/just_audio_engine.dart';
 import 'features/messages/data/repositories/messages_repository_impl.dart';
@@ -468,6 +469,7 @@ Future<void> main() async {
     // Media del hilo: descarga-y-abre con app externa (URL firmada pública,
     // Dio propio sin Authorization) y player de audio nuevo por visita.
     mediaOpener: DioMediaOpener(),
+    mediaSharer: SharePlusMediaSharer(),
     audioEngineFactory: JustAudioEngine.new,
     audioRecorder: audioRecorder,
   );

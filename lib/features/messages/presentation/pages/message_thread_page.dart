@@ -19,8 +19,10 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/util/smart_timestamp.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../data/cache/message_media_cache.dart';
 import '../../domain/entities/message.dart';
 import '../../domain/failures/messages_failure.dart';
+import '../../domain/repositories/media_sharer.dart';
 import '../../domain/reactions.dart';
 import '../bloc/attach_panel_cubit.dart';
 import '../bloc/messages_bloc.dart';
@@ -679,6 +681,11 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
   final replyDraft = context.read<ReplyDraftCubit>();
   final messenger = ScaffoldMessenger.of(context);
   final messageId = message.externalId;
+  // Compartir sólo aplica a mensajes con media; el scope se lee ANTES del
+  // await del sheet (y sólo si hará falta).
+  final hasMedia = message.mediaRef != null;
+  final mediaCache = hasMedia ? context.read<MessageMediaCache>() : null;
+  final mediaSharer = hasMedia ? context.read<MediaSharer>() : null;
   final isOutbound = message.direction == MessageDirection.outbound;
   // Copiar/seleccionar sólo tienen sentido sobre texto con cuerpo; la media
   // y los mensajes vacíos no los ofrecen.
@@ -752,6 +759,17 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
                   replyDraft.setReply(message);
                 },
               ),
+              if (hasMedia)
+                ListTile(
+                  key: Key('message.share.$messageId'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.share_outlined),
+                  title: const Text('Compartir'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _shareMedia(mediaCache!, mediaSharer!, messenger, message);
+                  },
+                ),
               if (isText) ...<Widget>[
                 const Divider(height: AppTokens.sp6),
                 ListTile(
@@ -836,6 +854,66 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
   if (emoji != null) {
     bloc.add(MessagesReactRequested(messageId: messageId, emoji: emoji));
   }
+}
+
+/// Comparte la media del mensaje: resuelve los BYTES por `mediaRef` desde la
+/// caché en disco (la URL firmada sólo es respaldo de descarga — compartir
+/// funciona offline igual que ver) y los entrega al share sheet del sistema.
+/// Cualquier fallo (sin bytes, sin app receptora) anuncia con copy honesto.
+Future<void> _shareMedia(
+  MessageMediaCache cache,
+  MediaSharer sharer,
+  ScaffoldMessengerState messenger,
+  Message message,
+) async {
+  final ref = message.mediaRef;
+  if (ref == null) return;
+  Uint8List? bytes;
+  try {
+    bytes = await cache.bytesFor(ref, message.mediaUrl);
+  } catch (_) {
+    bytes = null;
+  }
+  if (bytes == null) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('No pudimos compartir el archivo')),
+      );
+    return;
+  }
+  try {
+    await sharer.share(bytes: bytes, filename: _shareFilename(message));
+  } catch (_) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('No pudimos compartir el archivo')),
+      );
+  }
+}
+
+/// Nombre de archivo para compartir: el real del documento (viaja en
+/// `content`), el del path de la URL firmada si trae extensión, o un
+/// genérico por tipo (la extensión decide cómo lo trata la app receptora).
+String _shareFilename(Message message) {
+  if (message.type == 'document' && message.content.trim().isNotEmpty) {
+    return message.content.trim();
+  }
+  final url = message.mediaUrl;
+  if (url != null) {
+    final segments = Uri.tryParse(url)?.pathSegments ?? const <String>[];
+    if (segments.isNotEmpty && segments.last.contains('.')) {
+      return segments.last;
+    }
+  }
+  return switch (message.type) {
+    'image' => 'imagen.jpg',
+    'sticker' => 'sticker.webp',
+    'video' => 'video.mp4',
+    'audio' || 'ptt' => 'audio.ogg',
+    _ => 'archivo',
+  };
 }
 
 /// Diálogo de edición de un saliente propio: campo prellenado con el texto

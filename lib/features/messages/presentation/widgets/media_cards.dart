@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../data/cache/message_media_cache.dart';
 import '../../domain/repositories/media_opener.dart';
 import 'video_playback.dart';
 
@@ -10,59 +13,134 @@ const double _videoWidth = 240;
 const double _videoHeight = 135;
 
 /// Burbuja de video: póster oscuro con un botón de play centrado y una etiqueta
-/// "Video". Al tocarla abre el reproductor a pantalla completa DENTRO de la app
-/// ([VideoPlayback]). No muestra el primer fotograma real (extraerlo por cada
-/// ítem de la lista sería costoso): el fotograma se ve en el reproductor.
-class VideoCard extends StatelessWidget {
-  const VideoCard({required this.id, required this.url, super.key});
+/// "Video". Al tocarla resuelve los bytes por `mediaRef` desde la caché en disco
+/// ([MessageMediaCache], cache-first: descarga UNA vez y persiste — el mismo
+/// patrón de imagen/audio) y abre el reproductor a pantalla completa DENTRO de
+/// la app ([VideoPlayback]); sin bytes cae al streaming de la URL firmada. No
+/// muestra el primer fotograma real (extraerlo por cada ítem de la lista sería
+/// costoso): el fotograma se ve en el reproductor.
+class VideoCard extends StatefulWidget {
+  const VideoCard({
+    required this.cache,
+    required this.id,
+    required this.mediaRef,
+    required this.url,
+    super.key,
+  });
 
+  final MessageMediaCache cache;
   final String id;
-  final String url;
+
+  /// Identidad estable del video (clave de la caché en disco); `null` en filas
+  /// viejas sin ref — sólo queda el streaming por URL.
+  final String? mediaRef;
+
+  /// URL firmada de respaldo (descarga/streaming). `null` con la firma caída:
+  /// la copia local igual reproduce.
+  final String? url;
+
+  @override
+  State<VideoCard> createState() => VideoCardState();
+}
+
+class VideoCardState extends State<VideoCard> {
+  /// Resolviendo bytes (descarga de un video aún sin caché): spinner sobre el
+  /// play en vez de un toque muerto.
+  bool _resolving = false;
+
+  /// Resuelve la copia local (o cae a la URL) y abre el reproductor. Sin
+  /// fuente alguna (offline sin caché y sin firma) avisa en vez de callar.
+  Future<void> _onTap() async {
+    if (_resolving) return;
+    final playback = context.read<VideoPlayback>();
+    final messenger = ScaffoldMessenger.of(context);
+    final ref = widget.mediaRef;
+    Uint8List? bytes;
+    if (ref != null) {
+      setState(() => _resolving = true);
+      try {
+        bytes = await widget.cache.bytesFor(ref, widget.url);
+      } catch (_) {
+        bytes = null;
+      }
+      if (!mounted) return;
+      setState(() => _resolving = false);
+    }
+    if (bytes == null && widget.url == null) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('No se pudo reproducir el video')),
+        );
+      return;
+    }
+    if (!mounted) return;
+    await playback.open(context, url: widget.url, bytes: bytes, cacheKey: ref);
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-      child: GestureDetector(
-        key: Key('message.video.$id'),
-        behavior: HitTestBehavior.opaque,
-        onTap: () => context.read<VideoPlayback>().open(context, url: url),
-        child: Container(
-          width: _videoWidth,
-          height: _videoHeight,
-          color: AppTokens.surface2,
-          child: Stack(
-            children: <Widget>[
-              const Center(
-                child: Icon(
-                  Icons.play_circle_fill,
-                  size: 56,
-                  color: Colors.white70,
+    // Semantics inline (misma convención que app_button): el área de tap del
+    // video se anuncia como botón con acción legible.
+    return Semantics(
+      button: true,
+      label: 'Reproducir video',
+      // El rótulo interno "Video" es decorativo (duplicaría el anuncio).
+      excludeSemantics: true,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+        child: GestureDetector(
+          key: Key('message.video.${widget.id}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: _onTap,
+          child: Container(
+            width: _videoWidth,
+            height: _videoHeight,
+            color: AppTokens.surface2,
+            child: Stack(
+              children: <Widget>[
+                Center(
+                  child: _resolving
+                      ? const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppTokens.primary,
+                            ),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.play_circle_fill,
+                          size: 56,
+                          color: Colors.white70,
+                        ),
                 ),
-              ),
-              Positioned(
-                left: AppTokens.sp2,
-                bottom: AppTokens.sp2,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    const Icon(
-                      Icons.videocam_outlined,
-                      size: 16,
-                      color: AppTokens.text1,
-                    ),
-                    const SizedBox(width: AppTokens.sp1),
-                    Text(
-                      'Video',
-                      style: textTheme.labelSmall?.copyWith(
+                Positioned(
+                  left: AppTokens.sp2,
+                  bottom: AppTokens.sp2,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      const Icon(
+                        Icons.videocam_outlined,
+                        size: 16,
                         color: AppTokens.text1,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: AppTokens.sp1),
+                      Text(
+                        'Video',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: AppTokens.text1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

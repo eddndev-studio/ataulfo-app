@@ -229,6 +229,7 @@ void main() {
       deviceGallery: const NoopDeviceGallery(),
       mediaThumbnailLoader: const FakeThumbnailLoader(),
       mediaOpener: const FakeMediaOpener(),
+      mediaSharer: const FakeMediaSharer(),
       audioEngineFactory: FakeAudioEngine.new,
       audioRecorder: const NoopAudioRecorder(),
     );

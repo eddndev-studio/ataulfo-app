@@ -1,4 +1,6 @@
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
+import 'package:ataulfo/features/trainer/domain/attachment_limits.dart';
+import 'package:ataulfo/features/trainer/domain/failures/trainer_failure.dart';
 import 'package:ataulfo/features/trainer/domain/entities/preview_attachment.dart';
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
@@ -121,6 +123,58 @@ void main() {
     wait: const Duration(milliseconds: 10),
     verify: (b) {
       expect((b.state as PreviewLoaded).pendingAttachments, isEmpty);
+    },
+  );
+
+  blocTest<PreviewBloc, PreviewState>(
+    'un archivo sobre el tope de peso NO se adjunta y anuncia el fallo',
+    build: build,
+    setUp: () {
+      when(() => picker.pick()).thenAnswer(
+        (_) async => PickedMedia(
+          bytes: Uint8List(maxTurnAttachmentBytes + 1),
+          filename: 'gigante.pdf',
+        ),
+      );
+    },
+    act: (b) async {
+      b.add(const PreviewStarted());
+      await Future<void>.delayed(Duration.zero);
+      b.add(const PreviewAttachRequested());
+    },
+    wait: const Duration(milliseconds: 10),
+    verify: (b) {
+      final s = b.state as PreviewLoaded;
+      expect(s.pendingAttachments, isEmpty);
+      expect(s.failure, isA<TrainerAttachmentTooLargeFailure>());
+    },
+  );
+
+  blocTest<PreviewBloc, PreviewState>(
+    'con el cupo lleno (5) el sexto adjunto se rechaza con el fallo de cupo',
+    build: build,
+    setUp: () {
+      var n = 0;
+      when(() => picker.pick()).thenAnswer(
+        (_) async => PickedMedia(
+          bytes: Uint8List.fromList(<int>[1]),
+          filename: 'f${n++}.png',
+        ),
+      );
+    },
+    act: (b) async {
+      b.add(const PreviewStarted());
+      await Future<void>.delayed(Duration.zero);
+      for (var i = 0; i <= maxTurnAttachments; i++) {
+        b.add(const PreviewAttachRequested());
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+      }
+    },
+    wait: const Duration(milliseconds: 20),
+    verify: (b) {
+      final s = b.state as PreviewLoaded;
+      expect(s.pendingAttachments, hasLength(maxTurnAttachments));
+      expect(s.failure, isA<TrainerAttachmentLimitFailure>());
     },
   );
 }

@@ -21,7 +21,8 @@ import 'media_cards.dart';
 ///   - sticker: se pinta transparente a tamaño natural, sin burbuja ni tap
 ///     (es un glifo del mensaje, no una foto que se amplíe).
 ///   - audio/ptt: burbuja reproducible inline ([AudioMessageContent]).
-///   - video: burbuja con play; reproduce a pantalla completa DENTRO de la app.
+///   - video: burbuja con play (cache-first por `mediaRef`, como imagen/audio);
+///     reproduce a pantalla completa DENTRO de la app.
 ///   - documento: tarjeta con el nombre de archivo; con URL firmada abre con
 ///     una app externa.
 ///
@@ -68,9 +69,16 @@ class MessageMediaContent extends StatelessWidget {
       // nota de voz se nombra como tal; el audio genérico como archivo.
       'ptt' => mediaTypedCard(context, Icons.mic_none_outlined, 'Nota de voz'),
       'audio' => mediaTypedCard(context, Icons.mic_none_outlined, 'Audio'),
-      // El video con URL firmada se pinta como burbuja con play y reproduce
-      // DENTRO de la app; sin URL cae a la tarjeta de tipo (no reproducible).
-      'video' when url != null => VideoCard(id: m.externalId, url: url),
+      // El video se sirve cache-first por `mediaRef` (como imagen/audio): la
+      // copia local reproduce offline y con la firma caída; `url` sólo es la
+      // fuente de descarga/streaming de respaldo. Sin ref ni URL cae a la
+      // tarjeta de tipo (no reproducible).
+      'video' when mediaRef != null || url != null => VideoCard(
+        cache: context.read<MessageMediaCache>(),
+        id: m.externalId,
+        mediaRef: mediaRef,
+        url: url,
+      ),
       'video' => mediaTypedCard(context, Icons.videocam_outlined, 'Video'),
       // El documento se pinta como tarjeta con su nombre de archivo real (el
       // wire lo manda en `content`) + ícono por extensión; con URL firmada la

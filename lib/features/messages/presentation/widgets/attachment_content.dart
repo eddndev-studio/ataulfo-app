@@ -76,7 +76,15 @@ class AttachmentContent extends StatelessWidget {
         ptt: false,
         contentType: mime,
       ),
-      AttachmentKind.video when u != null => VideoCard(id: id, url: u),
+      // Con URL firmada la burbuja es reproducible; el playback igual
+      // resuelve cache-first por ref (la copia local sembrada al subir
+      // reproduce sin red). Sin URL degrada a la tarjeta con su nombre.
+      AttachmentKind.video when u != null => VideoCard(
+        cache: context.read<MessageMediaCache>(),
+        id: id,
+        mediaRef: mediaRef,
+        url: u,
+      ),
       AttachmentKind.video => mediaTypedCard(
         context,
         Icons.videocam_outlined,
@@ -248,7 +256,29 @@ class _AttachmentImageState extends State<AttachmentImage> {
         ),
       );
     }
-    return _unavailableCard(context);
+    final card = _unavailableCard(context);
+    if (widget.sticker) return card;
+    // Reintento manual (mismo patrón que el pendiente fallido del hilo): el
+    // usuario no espera el TTL anti-martilleo ni el reciclado del widget.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        card,
+        TextButton(
+          key: Key('message.image.${widget.id}.retry'),
+          onPressed: _retry,
+          child: const Text('Reintentar'),
+        ),
+      ],
+    );
+  }
+
+  /// Olvida el fallo cacheado y vuelve a resolver de verdad.
+  void _retry() {
+    widget.cache.retry(widget.mediaRef);
+    setState(() => _resolved = false);
+    _load();
   }
 
   /// El sticker se pinta transparente y a tamaño natural dentro de un cuadro
@@ -289,12 +319,18 @@ class _AttachmentImageState extends State<AttachmentImage> {
               child: image,
             ),
           );
-    return GestureDetector(
-      key: Key('message.image.${widget.id}'),
-      onTap: () => showMediaViewer(context, bytes: b, url: widget.mediaUrl),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-        child: sized,
+    // Semantics inline (misma convención que app_button): el área de tap de
+    // la foto se anuncia como botón con acción legible.
+    return Semantics(
+      button: true,
+      label: 'Ver imagen',
+      child: GestureDetector(
+        key: Key('message.image.${widget.id}'),
+        onTap: () => showMediaViewer(context, bytes: b, url: widget.mediaUrl),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppTokens.radiusChip),
+          child: sized,
+        ),
       ),
     );
   }

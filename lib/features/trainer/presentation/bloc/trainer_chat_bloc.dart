@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/media/media_byte_sink.dart';
+import '../../domain/attachment_limits.dart';
 import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_conversation.dart';
 import '../../domain/entities/trainer_message.dart';
@@ -586,34 +587,6 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     emit(s.copyWith(messages: reloaded));
   }
 
-  /// Máximo de adjuntos por turno (server-side) y peso por archivo. Se aplican
-  /// client-side ANTES de subir para no gastar red en lo que el server rechaza.
-  static const int _maxAttachments = 5;
-  static const int _maxAttachmentBytes = 25 * 1024 * 1024;
-
-  /// Espejo client-side de la allowlist de content-types del servidor
-  /// (imagen JPG/PNG/WebP, PDF y video MP4), expresada como extensiones porque
-  /// el picker solo entrega bytes + filename. Gate rápido para no subir lo que
-  /// el server contestaría 415; el server sigue siendo la autoridad (sniffea
-  /// los bytes reales).
-  static const Set<String> _allowedAttachmentExtensions = <String>{
-    'jpg',
-    'jpeg',
-    'png',
-    'webp',
-    'pdf',
-    'mp4',
-  };
-
-  static bool _isSupportedAttachment(PickedMedia p) {
-    final name = p.filename;
-    final dot = name.lastIndexOf('.');
-    if (dot < 0 || dot == name.length - 1) return false;
-    return _allowedAttachmentExtensions.contains(
-      name.substring(dot + 1).toLowerCase(),
-    );
-  }
-
   Future<void> _onAttachRequested(
     TrainerChatAttachRequested event,
     Emitter<TrainerChatState> emit,
@@ -635,15 +608,15 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     var anyUnsupported = false;
     var anyTooLarge = false;
     for (final p in picked) {
-      if (!_isSupportedAttachment(p)) {
+      if (!isSupportedTurnAttachmentName(p.filename)) {
         anyUnsupported = true;
-      } else if (p.bytes.length > _maxAttachmentBytes) {
+      } else if (p.bytes.length > maxTurnAttachmentBytes) {
         anyTooLarge = true;
       } else {
         withinSize.add(p);
       }
     }
-    final remaining = _maxAttachments - afterPick.pendingAttachments.length;
+    final remaining = maxTurnAttachments - afterPick.pendingAttachments.length;
     final toUpload = remaining > 0
         ? withinSize.take(remaining).toList(growable: false)
         : const <PickedMedia>[];

@@ -47,8 +47,13 @@ class _FakeVideoPlayback implements VideoPlayback {
   final List<String> calls = <String>[];
 
   @override
-  Future<void> open(BuildContext context, {required String url}) async {
-    calls.add(url);
+  Future<void> open(
+    BuildContext context, {
+    String? url,
+    Uint8List? bytes,
+    String? cacheKey,
+  }) async {
+    calls.add(url ?? cacheKey ?? '');
   }
 }
 

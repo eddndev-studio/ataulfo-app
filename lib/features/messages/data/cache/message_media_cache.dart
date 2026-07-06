@@ -114,6 +114,13 @@ class MessageMediaCache implements MediaByteSink {
     _failedAt.remove(mediaRef);
   }
 
+  /// Olvida un fallo de descarga cacheado para `mediaRef`: el reintento
+  /// EXPLÍCITO del usuario (botón "Reintentar") no debe esperar el TTL
+  /// anti-martilleo — la siguiente [bytesFor] vuelve a resolver de verdad.
+  void retry(String mediaRef) {
+    _failedAt.remove(mediaRef);
+  }
+
   /// Limpia la memoria (logout). Los bytes en disco se conservan: el ref embebe
   /// el tenant (sin colisión entre cuentas) y son inmutables. Incrementa la
   /// generación para fencear una resolución en vuelo (no repuebla L1 tras logout).
