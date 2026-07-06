@@ -194,6 +194,67 @@ void main() {
     expect(find.text('Notificaciones'), findsOneWidget);
   });
 
+  testWidgets('Authenticated expone tile "Apariencia" (visible para todo rol: '
+      'la preferencia es del dispositivo)', (tester) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_worker));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('settings.appearance_tile')), findsOneWidget);
+    expect(find.text('Apariencia'), findsOneWidget);
+  });
+
+  testWidgets('tap "Apariencia" apila /appearance (push, no go)', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    final navigated = <String>[];
+    final canPopAtDestination = <bool>[];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => BlocProvider<AuthBloc>.value(
+            value: authBloc,
+            child: const Scaffold(body: SettingsPage()),
+          ),
+        ),
+        GoRoute(
+          path: '/appearance',
+          builder: (_, _) {
+            navigated.add('/appearance');
+            return Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  canPopAtDestination.add(Navigator.of(ctx).canPop());
+                  return const SizedBox.shrink();
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.ensureVisible(
+      find.byKey(const Key('settings.appearance_tile')),
+    );
+    await tester.tap(find.byKey(const Key('settings.appearance_tile')));
+    await tester.pumpAndSettle();
+
+    expect(navigated, <String>['/appearance']);
+    expect(
+      canPopAtDestination,
+      <bool>[true],
+      reason:
+          'Apariencia debe quedar apilada sobre Settings para que el back '
+          'físico vuelva al shell',
+    );
+  });
+
   testWidgets('tap "Notificaciones" apila /notifications (push, no go)', (
     tester,
   ) async {
@@ -461,12 +522,12 @@ void main() {
       final card = find.byKey(const Key('settings.card.sections'));
       expect(card, findsOneWidget);
       expect(tester.widget(card), isA<AppCard>());
-      // OWNER: las 6 áreas como filas (organizaciones, aceptar invitación,
-      // miembros, config de IA, galería, notificaciones) — muere la pila de
-      // cards sueltas sin jerarquía.
+      // OWNER: las 7 áreas como filas (organizaciones, aceptar invitación,
+      // miembros, config de IA, galería, notificaciones, apariencia) — muere
+      // la pila de cards sueltas sin jerarquía.
       expect(
         find.descendant(of: card, matching: find.byType(AppSectionLink)),
-        findsNWidgets(6),
+        findsNWidgets(7),
       );
       // Captions: cada fila dice qué hay detrás, no solo el título.
       expect(find.text('Bandeja y preferencias de avisos'), findsOneWidget);

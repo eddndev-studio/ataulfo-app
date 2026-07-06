@@ -83,6 +83,41 @@ void main() {
     });
   });
 
+  group(
+    'AppDesignTheme.dark — motion apagado (preferencia de animaciones)',
+    () {
+      final theme = AppDesignTheme.dark(motion: false);
+
+      test('las transiciones de ruta son instantáneas en TODAS las plataformas '
+          '(Android, iOS y desktop)', () {
+        for (final platform in TargetPlatform.values) {
+          expect(
+            theme.pageTransitionsTheme.builders[platform],
+            isA<AppInstantPageTransitionsBuilder>(),
+            reason: 'la plataforma $platform debe quedar sin transición',
+          );
+        }
+      });
+
+      test('el resto del theme queda intacto (solo cambia el motion)', () {
+        expect(theme.scaffoldBackgroundColor, Colors.transparent);
+        expect(theme.colorScheme.primary, AppTokens.primary);
+        expect(theme.useMaterial3, isTrue);
+      });
+
+      test(
+        'el default sigue siendo motion encendido (FadeForwards en Android)',
+        () {
+          final theme = AppDesignTheme.dark();
+          expect(
+            theme.pageTransitionsTheme.builders[TargetPlatform.android],
+            isA<FadeForwardsPageTransitionsBuilder>(),
+          );
+        },
+      );
+    },
+  );
+
   group('AppDesignTheme.dark — ColorScheme', () {
     final scheme = AppDesignTheme.dark().colorScheme;
 

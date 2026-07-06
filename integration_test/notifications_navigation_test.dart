@@ -2,7 +2,9 @@ import 'package:ataulfo/app.dart';
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/core/network/connectivity_cubit.dart';
 import 'package:ataulfo/core/network/connectivity_monitor.dart';
+import 'package:ataulfo/core/prefs/motion_settings_cubit.dart';
 import 'package:ataulfo/core/router/app_router.dart';
+import 'package:ataulfo/core/storage/secure_kv_store.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
 import 'package:ataulfo/features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
@@ -64,6 +66,23 @@ class _StubConnMonitor implements ConnectivityMonitor {
   Future<bool> isOnline() async => true;
   @override
   Stream<bool> get onlineChanges => const Stream<bool>.empty();
+}
+
+/// KV en memoria: el flujo bajo prueba no toca la preferencia de animaciones,
+/// pero AtaulfoApp exige el cubit — hermético, sin Keystore real.
+class _MemKv implements SecureKvStore {
+  final Map<String, String> data = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => data[key];
+
+  @override
+  Future<void> write(String key, String value) async => data[key] = value;
+
+  @override
+  Future<void> delete(String key) async {
+    data.remove(key);
+  }
 }
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
@@ -239,6 +258,7 @@ void main() {
         router: router,
         authBloc: authBloc,
         connectivityCubit: ConnectivityCubit(_StubConnMonitor()),
+        motionSettings: MotionSettingsCubit(_MemKv()),
         profilePhotoCache: ProfilePhotoCache(
           profileRepo: _MockProfileRepo(),
           download: (_) async => null,

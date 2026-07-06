@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/design/app_design_theme.dart';
+import 'core/design/motion.dart';
 import 'core/design/widgets/app_background.dart';
 import 'core/design/widgets/app_content_width.dart';
 import 'core/network/connectivity_banner.dart';
 import 'core/network/connectivity_cubit.dart';
+import 'core/prefs/motion_settings_cubit.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/messages/data/cache/message_media_cache.dart';
@@ -37,6 +39,7 @@ class AtaulfoApp extends StatelessWidget {
     required this.router,
     required this.authBloc,
     required this.connectivityCubit,
+    required this.motionSettings,
     required this.profilePhotoCache,
     required this.messageMediaCache,
     required this.onSignedOut,
@@ -59,6 +62,12 @@ class AtaulfoApp extends StatelessWidget {
   /// Señal de conectividad global (online/offline) que la UI (banner) y los
   /// consumidores leen sin depender del router.
   final ConnectivityCubit connectivityCubit;
+
+  /// Preferencia de animaciones (Ajustes → Apariencia). Gobierna dos capas:
+  /// el theme (apagada, las transiciones de ruta son instantáneas) y la señal
+  /// ambiental [AppMotion] que consumen las micro-animaciones del kit. Global
+  /// para que Apariencia la mute y toda la app reaccione al instante.
+  final MotionSettingsCubit motionSettings;
 
   /// Se invoca cuando la sesión cae a [AuthUnauthenticated] (logout explícito o
   /// purga por refresh agotado). La composición lo enchufa a la limpieza de
@@ -83,6 +92,7 @@ class AtaulfoApp extends StatelessWidget {
         providers: [
           BlocProvider<AuthBloc>.value(value: authBloc),
           BlocProvider<ConnectivityCubit>.value(value: connectivityCubit),
+          BlocProvider<MotionSettingsCubit>.value(value: motionSettings),
         ],
         child: BlocListener<AuthBloc, AuthState>(
           // Dos fronteras de sesión: el logout purga TODO; el cambio de org
@@ -97,20 +107,31 @@ class AtaulfoApp extends StatelessWidget {
               onOrgChanged();
             }
           },
-          child: MaterialApp.router(
-            title: 'Ataúlfo',
-            debugShowCheckedModeBanner: false,
-            theme: AppDesignTheme.dark(),
-            routerConfig: router.router,
-            // El glow radial es el fondo absoluto de la app: se pinta una sola
-            // vez detrás del navigator y queda fijo mientras las rutas (con
-            // scaffolds transparentes) transicionan encima. El contenido se
-            // restringe al ancho máximo (centrado en desktop) POR DENTRO del
-            // glow, para que el fondo llene los costados libres.
-            builder: (context, child) => AppBackground(
-              child: AppContentWidth(
-                child: ConnectivityBanner(
-                  child: child ?? const SizedBox.shrink(),
+          // El rebuild por preferencia de animaciones es seguro: routerConfig
+          // es la MISMA instancia entre builds (el estado de navegación vive
+          // en el GoRouter, no en el MaterialApp).
+          child: BlocBuilder<MotionSettingsCubit, bool>(
+            builder: (context, animationsOn) => MaterialApp.router(
+              title: 'Ataúlfo',
+              debugShowCheckedModeBanner: false,
+              theme: AppDesignTheme.dark(motion: animationsOn),
+              routerConfig: router.router,
+              // El glow radial es el fondo absoluto de la app: se pinta una
+              // sola vez detrás del navigator y queda fijo mientras las rutas
+              // (con scaffolds transparentes) transicionan encima. El
+              // contenido se restringe al ancho máximo (centrado en desktop)
+              // POR DENTRO del glow, para que el fondo llene los costados
+              // libres. AppMotion proyecta la preferencia como señal ambiental
+              // sobre el navigator: todas las rutas (y sheets/diálogos, que
+              // viven en él) la ven.
+              builder: (context, child) => AppMotion(
+                enabled: animationsOn,
+                child: AppBackground(
+                  child: AppContentWidth(
+                    child: ConnectivityBanner(
+                      child: child ?? const SizedBox.shrink(),
+                    ),
+                  ),
                 ),
               ),
             ),

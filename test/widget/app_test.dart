@@ -4,10 +4,14 @@ import 'package:ataulfo/features/executions/domain/entities/execution.dart';
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/executions/domain/execution_repository.dart';
 import 'package:ataulfo/app.dart';
+import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/motion.dart';
 import 'package:ataulfo/core/design/widgets/app_background.dart';
 import 'package:ataulfo/core/network/connectivity_cubit.dart';
 import 'package:ataulfo/core/network/connectivity_monitor.dart';
+import 'package:ataulfo/core/prefs/motion_settings_cubit.dart';
 import 'package:ataulfo/core/router/app_router.dart';
+import 'package:ataulfo/core/storage/secure_kv_store.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/domain/repositories/catalog_repository.dart';
 import 'package:ataulfo/features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
@@ -149,6 +153,21 @@ class _FakeExecutionsRepo implements ExecutionRepository {
   }) async => const <Execution>[];
 }
 
+class _MemKv implements SecureKvStore {
+  final Map<String, String> data = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => data[key];
+
+  @override
+  Future<void> write(String key, String value) async => data[key] = value;
+
+  @override
+  Future<void> delete(String key) async {
+    data.remove(key);
+  }
+}
+
 class _StubConnMonitor implements ConnectivityMonitor {
   @override
   Future<bool> isOnline() async => true;
@@ -176,6 +195,7 @@ void main() {
   late _MockAuthBloc authBloc;
   late AppRouter router;
   late ConnectivityCubit connectivityCubit;
+  late MotionSettingsCubit motionSettings;
   late ProfilePhotoCache profilePhotoCache;
   late MessageMediaCache messageMediaCache;
   late Directory photoTmp;
@@ -184,6 +204,7 @@ void main() {
     authBloc = _MockAuthBloc();
     when(() => authBloc.state).thenReturn(const AuthInitial());
     connectivityCubit = ConnectivityCubit(_StubConnMonitor());
+    motionSettings = MotionSettingsCubit(_MemKv());
     photoTmp = await Directory.systemTemp.createTemp('app_test_photos');
     profilePhotoCache = ProfilePhotoCache(
       profileRepo: _FakeProfileRepoNoPhoto(),
@@ -260,6 +281,7 @@ void main() {
 
   tearDown(() async {
     await connectivityCubit.close();
+    await motionSettings.close();
     if (photoTmp.existsSync()) await photoTmp.delete(recursive: true);
   });
 
@@ -273,6 +295,7 @@ void main() {
         connectivityCubit: connectivityCubit,
         profilePhotoCache: profilePhotoCache,
         messageMediaCache: messageMediaCache,
+        motionSettings: motionSettings,
         onSignedOut: () {},
         onOrgChanged: () {},
       ),
@@ -295,6 +318,7 @@ void main() {
         connectivityCubit: connectivityCubit,
         profilePhotoCache: profilePhotoCache,
         messageMediaCache: messageMediaCache,
+        motionSettings: motionSettings,
         onSignedOut: () {},
         onOrgChanged: () {},
       ),
@@ -320,6 +344,7 @@ void main() {
         connectivityCubit: connectivityCubit,
         profilePhotoCache: profilePhotoCache,
         messageMediaCache: messageMediaCache,
+        motionSettings: motionSettings,
         onSignedOut: () {},
         onOrgChanged: () {},
       ),
@@ -359,6 +384,7 @@ void main() {
           connectivityCubit: connectivityCubit,
           profilePhotoCache: profilePhotoCache,
           messageMediaCache: messageMediaCache,
+          motionSettings: motionSettings,
           onSignedOut: () => signedOut++,
           onOrgChanged: () {},
         ),
@@ -377,4 +403,67 @@ void main() {
   // ese caso o Unauthenticated, así que el `else` del listener es onOrgChanged
   // por construcción. No se renderiza aquí el home autenticado (arrastra deps de
   // bandeja ajenas a esta frontera).
+
+  testWidgets('con animaciones apagadas el theme usa transiciones '
+      'instantáneas y AppMotion apaga el kit bajo el navigator', (
+    tester,
+  ) async {
+    final motionOff = MotionSettingsCubit(_MemKv(), initial: false);
+    addTearDown(motionOff.close);
+
+    await tester.pumpWidget(
+      AtaulfoApp(
+        router: router,
+        authBloc: authBloc,
+        connectivityCubit: connectivityCubit,
+        profilePhotoCache: profilePhotoCache,
+        messageMediaCache: messageMediaCache,
+        motionSettings: motionOff,
+        onSignedOut: () {},
+        onOrgChanged: () {},
+      ),
+    );
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(
+      app.theme?.pageTransitionsTheme.builders[TargetPlatform.android],
+      isA<AppInstantPageTransitionsBuilder>(),
+    );
+    // La señal ambiental envuelve el contenido del builder: cualquier widget
+    // de cualquier ruta la ve apagada.
+    expect(
+      AppMotion.enabledOf(tester.element(find.byType(AppBackground))),
+      isFalse,
+    );
+  });
+
+  testWidgets('apagar animaciones en runtime reconstruye el theme al vuelo '
+      '(apply-inmediato desde Apariencia)', (tester) async {
+    await tester.pumpWidget(
+      AtaulfoApp(
+        router: router,
+        authBloc: authBloc,
+        connectivityCubit: connectivityCubit,
+        profilePhotoCache: profilePhotoCache,
+        messageMediaCache: messageMediaCache,
+        motionSettings: motionSettings,
+        onSignedOut: () {},
+        onOrgChanged: () {},
+      ),
+    );
+
+    MaterialApp app() => tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(
+      app().theme?.pageTransitionsTheme.builders[TargetPlatform.android],
+      isA<FadeForwardsPageTransitionsBuilder>(),
+    );
+
+    await motionSettings.setEnabled(false);
+    await tester.pump();
+
+    expect(
+      app().theme?.pageTransitionsTheme.builders[TargetPlatform.android],
+      isA<AppInstantPageTransitionsBuilder>(),
+    );
+  });
 }

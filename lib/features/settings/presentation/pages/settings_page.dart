@@ -216,6 +216,16 @@ class _SectionsCard extends StatelessWidget {
             caption: 'Bandeja y preferencias de avisos',
             onTap: () => context.push('/notifications'),
           ),
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          // Preferencia del DISPOSITIVO (no de la cuenta ni de la org):
+          // visible para cualquier rol, sin gate.
+          AppSectionLink(
+            rowKey: const Key('settings.appearance_tile'),
+            icon: Icons.palette_outlined,
+            title: 'Apariencia',
+            caption: 'Animaciones de la interfaz',
+            onTap: () => context.push('/appearance'),
+          ),
         ],
       ),
     );

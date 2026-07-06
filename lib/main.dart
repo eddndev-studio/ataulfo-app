@@ -9,6 +9,7 @@ import 'core/db/app_db.dart';
 import 'core/network/connectivity_cubit.dart';
 import 'core/network/connectivity_plus_monitor.dart';
 import 'core/network/dio_client.dart';
+import 'core/prefs/motion_settings_cubit.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/device_id_provider.dart';
 import 'core/storage/secure_kv_store.dart';
@@ -152,6 +153,10 @@ Future<void> main() async {
   final kv = FlutterSecureKvStore();
   final storage = TokenStorage(kv);
   final deviceIds = DeviceIdProvider(kv);
+
+  // Preferencia de animaciones ANTES del primer frame: si el operador la
+  // apagó, la app no debe arrancar animando y "calmarse" después.
+  final motionSettings = await MotionSettingsCubit.load(kv);
 
   final refreshDio = DioClient.create(baseUrl: baseUrl);
   final refreshDs = DioAuthDatasource(refreshDio);
@@ -498,6 +503,7 @@ Future<void> main() async {
       router: router,
       authBloc: authBloc,
       connectivityCubit: connectivityCubit,
+      motionSettings: motionSettings,
       profilePhotoCache: profilePhotoCache,
       messageMediaCache: messageMediaCache,
       // Al cerrar sesión, purga las cachés de sesión (media, respuestas rápidas

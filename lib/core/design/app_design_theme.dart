@@ -13,7 +13,11 @@ import 'tokens.dart';
 class AppDesignTheme {
   const AppDesignTheme._();
 
-  static ThemeData dark() {
+  /// [motion] apagado (preferencia "Animaciones" de Apariencia, o quien
+  /// componga el theme) reemplaza las transiciones de ruta por
+  /// [AppInstantPageTransitionsBuilder] en TODAS las plataformas; el resto
+  /// del theme no cambia.
+  static ThemeData dark({bool motion = true}) {
     const colorScheme = ColorScheme.dark(
       brightness: Brightness.dark,
       primary: AppTokens.primary,
@@ -85,14 +89,23 @@ class AppDesignTheme {
       // un gris en los frames de la animación. Con scrim transparente el glow
       // fijo (detrás del navigator) se ve durante toda la transición. iOS usa
       // su transición nativa, que no pinta scrim opaco.
-      pageTransitionsTheme: const PageTransitionsTheme(
-        builders: <TargetPlatform, PageTransitionsBuilder>{
-          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(
-            backgroundColor: Colors.transparent,
-          ),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        },
-      ),
+      pageTransitionsTheme: motion
+          ? const PageTransitionsTheme(
+              builders: <TargetPlatform, PageTransitionsBuilder>{
+                TargetPlatform.android: FadeForwardsPageTransitionsBuilder(
+                  backgroundColor: Colors.transparent,
+                ),
+                TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+              },
+            )
+          // Apagado cubre también desktop (que animando usa el default de su
+          // plataforma): ninguna ruta transiciona.
+          : PageTransitionsTheme(
+              builders: <TargetPlatform, PageTransitionsBuilder>{
+                for (final platform in TargetPlatform.values)
+                  platform: const AppInstantPageTransitionsBuilder(),
+              },
+            ),
     );
   }
 
@@ -151,4 +164,21 @@ class AppDesignTheme {
       ),
     );
   }
+}
+
+/// Transición de ruta NULA: la página entrante aparece en su estado final y
+/// la saliente desaparece, sin frames intermedios. Es el builder que usa el
+/// theme cuando las animaciones están apagadas (preferencia de Apariencia o
+/// reduce-motion) — público para que los tests afirmen el contrato por tipo.
+class AppInstantPageTransitionsBuilder extends PageTransitionsBuilder {
+  const AppInstantPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => child;
 }

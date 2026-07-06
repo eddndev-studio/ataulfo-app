@@ -127,6 +127,7 @@ import '../../features/notifications/presentation/pages/notification_preferences
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/profile/domain/repositories/profile_repository.dart';
 import '../../features/profile/presentation/bloc/profile_bloc.dart';
+import '../../features/settings/presentation/pages/appearance_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/widgets/chat_thread_app_bar.dart';
 import '../../features/quick_replies/domain/repositories/quick_replies_repository.dart';
@@ -1558,6 +1559,16 @@ class AppRouter {
             appBar: AppBar(title: const Text('Preferencias')),
             body: const NotificationPreferencesPage(),
           ),
+        ),
+      ),
+      GoRoute(
+        // Preferencias visuales del dispositivo (animaciones). Sin bloc
+        // page-scoped: el MotionSettingsCubit es global (lo proyecta
+        // AtaulfoApp sobre toda la app).
+        path: '/appearance',
+        builder: (context, _) => Scaffold(
+          appBar: AppBar(title: const Text('Apariencia')),
+          body: const AppearancePage(),
         ),
       ),
       GoRoute(
