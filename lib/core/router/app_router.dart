@@ -1602,12 +1602,25 @@ class AppRouter {
           }
           // `?readOnly=1` = PREVIEW desde el picker: mirar sin mutar (oculta
           // renombrar/borrar). Browse abre sin el flag y conserva las acciones.
-          return BlocProvider<MediaDetailCubit>(
-            create: (_) => MediaDetailCubit(repo: _mediaRepo, asset: asset),
-            child: MediaDetailPage(
-              loader: _mediaThumbnailLoader,
-              launcher: const UrlLauncherMediaPreviewLauncher(),
-              readOnly: state.uri.queryParameters['readOnly'] == '1',
+          // VideoPlayback + ThreadAudioCubit: el detalle reproduce video/audio
+          // DENTRO de la app (mismo reproductor que los hilos de chat), no vía
+          // el visor externo del sistema.
+          return MultiRepositoryProvider(
+            providers: <RepositoryProvider<dynamic>>[
+              RepositoryProvider<VideoPlayback>.value(
+                value: const InAppVideoPlayback(),
+              ),
+            ],
+            child: BlocProvider<ThreadAudioCubit>(
+              create: (_) => ThreadAudioCubit(engine: _audioEngineFactory()),
+              child: BlocProvider<MediaDetailCubit>(
+                create: (_) => MediaDetailCubit(repo: _mediaRepo, asset: asset),
+                child: MediaDetailPage(
+                  loader: _mediaThumbnailLoader,
+                  launcher: const UrlLauncherMediaPreviewLauncher(),
+                  readOnly: state.uri.queryParameters['readOnly'] == '1',
+                ),
+              ),
             ),
           );
         },

@@ -145,23 +145,6 @@ void main() {
     expect(find.text('Duración'), findsNothing);
   });
 
-  testWidgets('video con poster ⇒ preview pinta Image (no sólo el ícono)', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _host(
-        _asset(
-          contentType: 'video/mp4',
-          filename: 'clip.mp4',
-          thumbnailUrl: 'https://x/poster.jpg',
-        ),
-        loader: _FakeLoader(Future<Uint8List?>.value(_png1x1)),
-      ),
-    );
-    await tester.pump();
-    expect(find.byType(Image), findsOneWidget);
-  });
-
   testWidgets('copiar ref ⇒ Clipboard.setData con el ref BARE + snackbar', (
     tester,
   ) async {
@@ -360,9 +343,7 @@ void main() {
     expect(popResult, isTrue); // devolvió "cambió"
   });
 
-  testWidgets('video ⇒ botón Reproducir abre la previewUrl en el visor', (
-    tester,
-  ) async {
+  testWidgets('video ⇒ sin botón externo (reproduce in-app)', (tester) async {
     final launcher = _FakeLauncher();
     await tester.pumpWidget(
       _host(
@@ -373,11 +354,9 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Reproducir'), findsOneWidget);
-    await tester.tap(find.text('Reproducir'));
-    await tester.pump();
-
-    expect(launcher.opened, <String>['https://x/sig']); // la previewUrl firmada
+    expect(find.text('Reproducir'), findsNothing);
+    expect(find.text('Abrir'), findsNothing);
+    expect(launcher.opened, isEmpty);
   });
 
   testWidgets('documento ⇒ botón Abrir', (tester) async {

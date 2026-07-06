@@ -14,6 +14,7 @@ import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../bloc/media_detail_cubit.dart';
 import '../media_format.dart';
 import '../widgets/alias_edit_sheet.dart';
+import 'media_detail_preview.dart';
 
 /// Detalle de un asset de la galería: previsualización + metadata + copiar la
 /// referencia BARE + borrar. Cubit-driven: el [MediaDetailCubit] (inyectado por
@@ -21,11 +22,10 @@ import '../widgets/alias_edit_sheet.dart';
 /// renombrar se añade aparte) refleja sin recargar. Al borrar con éxito la
 /// página hace pop devolviendo `true` para que la galería se refresque.
 ///
-/// La previsualización de imagen reusa el [MediaThumbnailLoader] (no hay
-/// resolución "full" separada: los mismos bytes que la miniatura son la imagen
-/// completa) dentro de un [InteractiveViewer]. Video/audio/documento muestran el
-/// ícono del tipo. La `previewUrl` efímera NO es identidad; esa es
-/// [MediaAsset.ref].
+/// La previsualización ([MediaDetailPreview]) reproduce imagen/video/audio
+/// DENTRO de la misma pantalla; sólo un documento (sin reproductor propio en
+/// la app) ofrece abrir con el visor externo del sistema. La `previewUrl`
+/// efímera NO es identidad; esa es [MediaAsset.ref].
 class MediaDetailPage extends StatelessWidget {
   const MediaDetailPage({
     super.key,
@@ -109,7 +109,7 @@ class MediaDetailPage extends StatelessWidget {
                     AppTokens.sp4 + context.safeBottomInset,
                   ),
                   children: <Widget>[
-                    _Preview(asset: asset, loader: loader),
+                    MediaDetailPreview(asset: asset, loader: loader),
                     if (_canOpenExternally(asset)) ...<Widget>[
                       const SizedBox(height: AppTokens.sp4),
                       _openButton(context, asset),
@@ -150,21 +150,25 @@ class MediaDetailPage extends StatelessWidget {
     if (result != null) await cubit.setAlias(result);
   }
 
-  /// Se puede abrir en el visor del sistema lo NO renderizado inline (no imagen)
-  /// que tenga una URL de preview firmada.
+  /// Se puede abrir en el visor del sistema SÓLO lo que no tiene reproductor
+  /// propio dentro de la app (documentos): imagen se previsualiza inline;
+  /// video y audio reproducen dentro de la misma pantalla ([MediaDetailPreview]).
   bool _canOpenExternally(MediaAsset asset) =>
-      !asset.contentType.startsWith('image/') &&
-      (asset.previewUrl?.isNotEmpty ?? false);
+      _isDocument(asset) && (asset.previewUrl?.isNotEmpty ?? false);
 
-  /// Botón de previsualización externa: "Reproducir" para video/audio, "Abrir"
-  /// para documentos. Lanza la URL firmada en el visor del sistema; si falla,
-  /// avisa con un snackbar.
-  Widget _openButton(BuildContext context, MediaAsset asset) {
+  bool _isDocument(MediaAsset asset) {
     final ct = asset.contentType;
-    final playable = ct.startsWith('video/') || ct.startsWith('audio/');
+    return !ct.startsWith('image/') &&
+        !ct.startsWith('video/') &&
+        !ct.startsWith('audio/');
+  }
+
+  /// Botón de apertura externa (documento sin visor propio en la app). Lanza
+  /// la URL firmada en el visor del sistema; si falla, avisa con un snackbar.
+  Widget _openButton(BuildContext context, MediaAsset asset) {
     return AppButton.filled(
-      label: playable ? 'Reproducir' : 'Abrir',
-      icon: playable ? Icons.play_arrow : Icons.open_in_new,
+      label: 'Abrir',
+      icon: Icons.open_in_new,
       onPressed: () async {
         final ok = await launcher.open(asset.previewUrl!);
         if (!ok && context.mounted) {
@@ -191,107 +195,6 @@ class MediaDetailPage extends StatelessWidget {
     );
     if (ok) await cubit.deleteAsset();
   }
-}
-
-/// Área de previsualización: imagen con zoom/pan, o el ícono del tipo para lo
-/// no renderizable. Carga los bytes una sola vez (StatefulWidget) para no
-/// re-pedirlos en cada rebuild.
-class _Preview extends StatefulWidget {
-  const _Preview({required this.asset, required this.loader});
-
-  final MediaAsset asset;
-  final MediaThumbnailLoader loader;
-
-  @override
-  State<_Preview> createState() => _PreviewState();
-}
-
-class _PreviewState extends State<_Preview> {
-  /// Escala del doble-tap: suficiente para leer detalle fino sin perderse; el
-  /// pinch cubre el rango completo hasta el maxScale del InteractiveViewer.
-  static const double _doubleTapScale = 2.5;
-
-  late final Future<Uint8List?> _bytes = widget.loader.load(widget.asset);
-  final TransformationController _zoom = TransformationController();
-
-  @override
-  void dispose() {
-    _zoom.dispose();
-    super.dispose();
-  }
-
-  /// Doble tap: alterna entre 1x y [_doubleTapScale] centrado en el punto
-  /// tocado (acercar donde se miró, no la esquina superior izquierda).
-  void _toggleZoom(TapDownDetails details) {
-    if (_zoom.value.getMaxScaleOnAxis() > 1.01) {
-      _zoom.value = Matrix4.identity();
-      return;
-    }
-    final p = details.localPosition;
-    _zoom.value = Matrix4.identity()
-      ..translateByDouble(
-        -p.dx * (_doubleTapScale - 1),
-        -p.dy * (_doubleTapScale - 1),
-        0,
-        1,
-      )
-      ..scaleByDouble(_doubleTapScale, _doubleTapScale, _doubleTapScale, 1);
-  }
-
-  /// Hay una imagen renderable que pintar: la imagen misma, o el poster/forma
-  /// de onda derivado de un video/audio. Sin fuente (documento, o video/audio
-  /// aún sin derivar) ⇒ ícono del tipo.
-  bool get _hasRenderable => widget.asset.thumbnailSourceUrl != null;
-
-  @override
-  Widget build(BuildContext context) {
-    // Altura acotada (no AspectRatio a ancho completo, que en pantallas altas
-    // empujaría la metadata fuera de vista): un visor contenido deja ver el
-    // archivo y la metadata juntos. El zoom del InteractiveViewer cubre el
-    // detalle fino de las imágenes.
-    return SizedBox(
-      height: 300,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-        child: Container(
-          color: AppTokens.surface2,
-          alignment: Alignment.center,
-          child: _hasRenderable ? _image() : _typeIcon(),
-        ),
-      ),
-    );
-  }
-
-  Widget _image() => FutureBuilder<Uint8List?>(
-    future: _bytes,
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return const CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(AppTokens.text2),
-        );
-      }
-      final bytes = snapshot.data;
-      if (bytes == null) return _typeIcon();
-      return GestureDetector(
-        onDoubleTapDown: _toggleZoom,
-        child: InteractiveViewer(
-          maxScale: 5,
-          transformationController: _zoom,
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => _typeIcon(),
-          ),
-        ),
-      );
-    },
-  );
-
-  Widget _typeIcon() => Icon(
-    mediaTypeIcon(widget.asset.contentType),
-    color: AppTokens.text2,
-    size: 64,
-  );
 }
 
 /// Tarjeta de metadata: nombre, alias (si hay), tipo, tamaño, fecha y el ref
