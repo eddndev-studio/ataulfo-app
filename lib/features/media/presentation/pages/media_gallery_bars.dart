@@ -104,7 +104,7 @@ class MediaGallerySelectionBar extends StatelessWidget {
   ) async {
     final ok = await showAppConfirmDialog(
       context,
-      title: 'Borrar $count archivo${count == 1 ? '' : 's'}',
+      title: '¿Borrar $count archivo${count == 1 ? '' : 's'}?',
       message:
           'Se quitarán de la galería y de cualquier flujo que los use. Esta '
           'acción no se puede deshacer.',

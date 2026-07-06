@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/app_confirm_dialog.dart';
@@ -7,6 +6,8 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_danger_zone.dart';
+import '../../../../core/design/widgets/app_section_header.dart';
 import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../domain/entities/media_asset.dart';
 import '../../domain/repositories/media_preview_launcher.dart';
@@ -16,11 +17,28 @@ import '../media_format.dart';
 import '../widgets/alias_edit_sheet.dart';
 import 'media_detail_preview.dart';
 
+/// Título del AppBar de `/media/detail`: el nombre amistoso del asset, vivo
+/// desde el [MediaDetailCubit] (un renombrado se refleja sin recargar). El
+/// chrome lo monta la ruta; la página es content-only.
+class MediaDetailTitle extends StatelessWidget {
+  const MediaDetailTitle({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<MediaDetailCubit, MediaDetailState>(
+      builder: (context, state) =>
+          Text(state.asset.displayName, overflow: TextOverflow.ellipsis),
+    );
+  }
+}
+
 /// Detalle de un asset de la galería: previsualización + metadata + copiar la
-/// referencia BARE + borrar. Cubit-driven: el [MediaDetailCubit] (inyectado por
-/// la ruta con el asset abierto) es la verdad mostrada, así una mutación (borrar;
-/// renombrar se añade aparte) refleja sin recargar. Al borrar con éxito la
-/// página hace pop devolviendo `true` para que la galería se refresque.
+/// referencia BARE + borrar. Content-only: la ruta monta Scaffold + AppBar
+/// (con [MediaDetailTitle]); las mutaciones viven en la superficie — el alias
+/// se edita desde su propia fila y el borrado cierra la página como
+/// [AppDangerZone]. Cubit-driven: el [MediaDetailCubit] (inyectado por la ruta
+/// con el asset abierto) es la verdad mostrada. Al borrar con éxito la página
+/// hace pop devolviendo `true` para que la galería se refresque.
 ///
 /// La previsualización ([MediaDetailPreview]) reproduce imagen/video/audio
 /// DENTRO de la misma pantalla; sólo un documento (sin reproductor propio en
@@ -36,12 +54,11 @@ class MediaDetailPage extends StatelessWidget {
 
   final MediaThumbnailLoader loader;
 
-  /// Abre en el visor del sistema lo que no se renderiza inline (video, audio,
-  /// documentos). La imagen se previsualiza inline; el resto delega aquí.
+  /// Abre en el visor del sistema lo que no se renderiza inline (documentos).
   final MediaPreviewLauncher launcher;
 
-  /// Sólo mirar: oculta renombrar y borrar. Es el modo del PREVIEW desde el
-  /// picker (long-press), donde el operador está eligiendo, no administrando.
+  /// Sólo mirar: oculta renombrar y la zona peligrosa. Es el modo del PREVIEW
+  /// desde el picker (long-press), donde el operador elige, no administra.
   final bool readOnly;
 
   @override
@@ -74,65 +91,50 @@ class MediaDetailPage extends StatelessWidget {
               );
           }
         },
+        // Mutación en vuelo = controles inertes (el snapshot sigue pintado);
+        // nunca un velo sobre la página.
         builder: (context, state) {
           final asset = state.asset;
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(asset.displayName, overflow: TextOverflow.ellipsis),
-              actions: <Widget>[
-                if (!readOnly) ...<Widget>[
-                  IconButton(
-                    key: const Key('media_detail.edit_alias'),
-                    tooltip: 'Renombrar',
-                    icon: const Icon(Icons.edit_outlined),
-                    onPressed: state.busy ? null : () => _editAlias(context),
-                  ),
-                  IconButton(
-                    key: const Key('media_detail.delete'),
-                    tooltip: 'Borrar',
-                    icon: const Icon(Icons.delete_outline),
-                    color: AppTokens.danger,
-                    onPressed: state.busy
-                        ? null
-                        : () => _confirmDelete(context),
-                  ),
-                ],
-              ],
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+              AppTokens.sp4,
+              AppTokens.sp4,
+              AppTokens.sp4,
+              AppTokens.sp4 + context.safeBottomInset,
             ),
-            body: Stack(
-              children: <Widget>[
-                ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    AppTokens.sp4,
-                    AppTokens.sp4,
-                    AppTokens.sp4,
-                    AppTokens.sp4 + context.safeBottomInset,
-                  ),
-                  children: <Widget>[
-                    MediaDetailPreview(asset: asset, loader: loader),
-                    if (_canOpenExternally(asset)) ...<Widget>[
-                      const SizedBox(height: AppTokens.sp4),
-                      _openButton(context, asset),
-                    ],
-                    const SizedBox(height: AppTokens.sp5),
-                    _MetadataCard(asset: asset),
+            children: <Widget>[
+              MediaDetailPreview(asset: asset, loader: loader),
+              if (_canOpenExternally(asset)) ...<Widget>[
+                const SizedBox(height: AppTokens.sp4),
+                _openButton(context, asset),
+              ],
+              const SizedBox(height: AppTokens.sp5),
+              _MetadataCard(
+                asset: asset,
+                onEditAlias: readOnly || state.busy
+                    ? null
+                    : () => _editAlias(context),
+              ),
+              if (!readOnly) ...<Widget>[
+                const SizedBox(height: AppTokens.sp7),
+                AppDangerZone(
+                  caption:
+                      'Se quitará de la galería y de cualquier flujo que lo '
+                      'use. No se puede deshacer.',
+                  actions: <Widget>[
+                    AppButton.danger(
+                      key: const Key('media_detail.delete'),
+                      label: 'Borrar archivo',
+                      fullWidth: true,
+                      loading: state.deleting,
+                      onPressed: state.busy
+                          ? null
+                          : () => _confirmDelete(context),
+                    ),
                   ],
                 ),
-                if (state.busy)
-                  const Positioned.fill(
-                    child: ColoredBox(
-                      color: AppTokens.scrim,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppTokens.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
               ],
-            ),
+            ],
           );
         },
       ),
@@ -187,7 +189,7 @@ class MediaDetailPage extends StatelessWidget {
     final cubit = context.read<MediaDetailCubit>();
     final ok = await showAppConfirmDialog(
       context,
-      title: 'Borrar archivo',
+      title: '¿Borrar este archivo?',
       message:
           'Se quitará de la galería y de cualquier flujo que lo use. Esta '
           'acción no se puede deshacer.',
@@ -197,13 +199,21 @@ class MediaDetailPage extends StatelessWidget {
   }
 }
 
-/// Tarjeta de metadata: nombre, alias (si hay), tipo, tamaño, fecha y el ref
-/// con botón de copiar. El ref es lo que se persiste en flujos, así que copiarlo
-/// es de primera clase.
+/// Ancho de la columna de labels de la metadata: alinea los valores de todas
+/// las filas (incluida la de referencia) en una sola vertical.
+const double _labelWidth = 88;
+
+/// Tarjeta de metadata: nombre, alias (fila viva: tocarla renombra), tipo,
+/// tamaño, fecha y el ref con botón de copiar. El ref es lo que se persiste en
+/// flujos, así que copiarlo es de primera clase.
 class _MetadataCard extends StatelessWidget {
-  const _MetadataCard({required this.asset});
+  const _MetadataCard({required this.asset, required this.onEditAlias});
 
   final MediaAsset asset;
+
+  /// Abre el form-sheet de renombrar. Null = fila de alias inerte (readOnly o
+  /// mutación en vuelo).
+  final VoidCallback? onEditAlias;
 
   @override
   Widget build(BuildContext context) {
@@ -212,8 +222,10 @@ class _MetadataCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          const AppSectionHeader(title: 'Detalles'),
+          const SizedBox(height: AppTokens.sp2),
           _row(textTheme, 'Nombre', asset.filename),
-          if (asset.alias.isNotEmpty) _row(textTheme, 'Alias', asset.alias),
+          _AliasRow(alias: asset.alias, onEdit: onEditAlias),
           _row(textTheme, 'Tipo', asset.contentType),
           _row(textTheme, 'Tamaño', formatBytes(asset.size)),
           if ((asset.durationMs ?? 0) > 0)
@@ -232,7 +244,7 @@ class _MetadataCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         SizedBox(
-          width: 88,
+          width: _labelWidth,
           child: Text(
             label,
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
@@ -242,6 +254,57 @@ class _MetadataCard extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// Fila del alias: el único campo editable del asset se edita DONDE se ve.
+/// Siempre visible — sin alias es la affordance para ponerle uno («Sin
+/// alias»). Con [onEdit] la fila entera es tocable y remata con el lápiz;
+/// inerte (readOnly / mutación en vuelo) pinta solo el valor.
+class _AliasRow extends StatelessWidget {
+  const _AliasRow({required this.alias, required this.onEdit});
+
+  final String alias;
+  final VoidCallback? onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: _labelWidth,
+            child: Text(
+              'Alias',
+              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            ),
+          ),
+          Expanded(
+            child: alias.isEmpty
+                ? Text(
+                    'Sin alias',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppTokens.text2,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                : Text(alias, style: textTheme.bodyMedium),
+          ),
+          if (onEdit != null)
+            const Icon(Icons.edit_outlined, size: 18, color: AppTokens.text2),
+        ],
+      ),
+    );
+    if (onEdit == null) return row;
+    return InkWell(
+      key: const Key('media_detail.edit_alias'),
+      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      onTap: onEdit,
+      child: row,
+    );
+  }
 }
 
 /// Fila del ref con botón de copiar. Copia el ref BARE (identidad permanente)
@@ -258,7 +321,7 @@ class _RefRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         SizedBox(
-          width: 88,
+          width: _labelWidth,
           child: Text(
             'Referencia',
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),

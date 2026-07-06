@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
@@ -57,14 +58,22 @@ class _FakeVideoPlayback implements VideoPlayback {
   }
 }
 
-final _png1x1 = Uint8List.fromList(<int>[
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, //
-  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, //
-  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, //
-  0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0x00, 0x01, 0x00, 0x00, //
-  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, //
-  0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
-]);
+/// PNG real de [w]x[h] generado con el engine: el visor decodifica de verdad
+/// (un fixture de bytes a mano no sobrevive al codec).
+Future<Uint8List> _pngBytes(WidgetTester tester, int w, int h) async {
+  final bytes = await tester.runAsync(() async {
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder).drawRect(
+      Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+      Paint()..color = const Color(0xFF336699),
+    );
+    final image = await recorder.endRecording().toImage(w, h);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    return data!.buffer.asUint8List();
+  });
+  return bytes!;
+}
 
 MediaAsset _asset({
   required String contentType,
@@ -101,14 +110,32 @@ Widget _host(
       create: (_) => ThreadAudioCubit(engine: const FakeAudioEngine()),
       child: BlocProvider<MediaDetailCubit>(
         create: (_) => MediaDetailCubit(repo: _MockRepo(), asset: asset),
-        child: MediaDetailPage(
-          loader: loader ?? _FakeLoader(Future<Uint8List?>.value(null)),
-          launcher: launcher ?? _FakeLauncher(),
+        child: Scaffold(
+          body: MediaDetailPage(
+            loader: loader ?? _FakeLoader(Future<Uint8List?>.value(null)),
+            launcher: launcher ?? _FakeLauncher(),
+          ),
         ),
       ),
     ),
   ),
 );
+
+/// Tamaño pintado del lienzo del preview (la superficie redondeada que
+/// enmarca el contenido).
+Size _canvasSize(WidgetTester tester) =>
+    tester.getSize(find.byKey(const Key('media_detail.preview_canvas')));
+
+/// Monta [widget] con async REAL (el decode de imagen corre fuera del
+/// fake-async del tester), espera a que el bitmap decodifique y pinta el
+/// resultado.
+Future<void> _pumpWithImage(WidgetTester tester, Widget widget) async {
+  await tester.runAsync(() async {
+    await tester.pumpWidget(widget);
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+  });
+  await tester.pump();
+}
 
 void main() {
   group('video: reproduce in-app, nunca url_launcher', () {
@@ -186,16 +213,17 @@ void main() {
 
     testWidgets('con poster derivado: el preview pinta el poster, no sólo el '
         'ícono', (tester) async {
-      await tester.pumpWidget(
+      final png = await _pngBytes(tester, 8, 8);
+      await _pumpWithImage(
+        tester,
         _host(
           _asset(
             contentType: 'video/mp4',
             thumbnailUrl: 'https://x/poster.jpg',
           ),
-          loader: _FakeLoader(Future<Uint8List?>.value(_png1x1)),
+          loader: _FakeLoader(Future<Uint8List?>.value(png)),
         ),
       );
-      await tester.pump();
       expect(find.byType(Image), findsOneWidget);
     });
   });
@@ -235,6 +263,71 @@ void main() {
 
       final cubit = _findAudioCubit(tester);
       expect(cubit.state.sourceKey, 'tenant/orgA/media/clip');
+    });
+  });
+
+  group('el lienzo abraza el contenido (no 300px fijos para todo)', () {
+    testWidgets('audio: altura intrínseca del reproductor, sin mar vacío', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          _asset(contentType: 'audio/mpeg'),
+          loader: _FakeLoader(Future<Uint8List?>.value(null)),
+        ),
+      );
+      await tester.pump();
+
+      expect(_canvasSize(tester).height, lessThan(200));
+    });
+
+    testWidgets('documento: tile compacto de ícono, no un lienzo de 300', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          _asset(contentType: 'application/pdf'),
+          loader: _FakeLoader(Future<Uint8List?>.value(null)),
+        ),
+      );
+      await tester.pump();
+
+      expect(_canvasSize(tester).height, lessThan(250));
+    });
+
+    testWidgets('video sin poster: tile compacto con play superpuesto', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          _asset(contentType: 'video/mp4'),
+          loader: _FakeLoader(Future<Uint8List?>.value(null)),
+        ),
+      );
+      await tester.pump();
+
+      expect(_canvasSize(tester).height, lessThan(250));
+      expect(find.byKey(const Key('media_detail.play_video')), findsOneWidget);
+    });
+
+    testWidgets('imagen: el aspecto del bitmap dicta el lienzo '
+        '(cuadrada ⇒ lienzo cuadrado al tope, no franja a lo ancho)', (
+      tester,
+    ) async {
+      final png = await _pngBytes(tester, 8, 8);
+      await _pumpWithImage(
+        tester,
+        _host(
+          _asset(contentType: 'image/png', thumbnailUrl: 'https://x/t.png'),
+          loader: _FakeLoader(Future<Uint8List?>.value(png)),
+        ),
+      );
+
+      final size = _canvasSize(tester);
+      // PNG cuadrado (aspecto 1): el lienzo es cuadrado, acotado al tope de
+      // 300 — NO la franja full-width de 300 del layout viejo.
+      expect(size.height, moreOrLessEquals(300));
+      expect(size.width, moreOrLessEquals(size.height));
     });
   });
 

@@ -11,6 +11,10 @@ import '../../domain/entities/media_asset.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../media_format.dart';
 
+/// Bytes de una imagen junto con su relación de aspecto ya decodificada: el
+/// lienzo del visor se dimensiona ANTES de pintar, con la forma real del bitmap.
+typedef _DecodedImage = ({Uint8List bytes, double aspect});
+
 /// Área de previsualización del detalle de un asset: imagen con zoom/pan,
 /// video/audio reproducibles DENTRO de la misma pantalla (nunca el visor
 /// externo del sistema), o el ícono del tipo para lo que no tiene reproductor
@@ -18,6 +22,13 @@ import '../media_format.dart';
 /// sirve a los hilos de chat ([VideoPlayback]/[MessageMediaCache]/
 /// [AudioMessageContent]): el catálogo de media y los adjuntos de un mensaje
 /// comparten un solo espacio de caché por `ref`.
+///
+/// El lienzo abraza el contenido en vez de imponer una caja fija: imagen y
+/// poster de video toman la forma real del bitmap hasta [_maxViewerHeight]
+/// (tope para no empujar la metadata fuera de vista; el zoom del
+/// InteractiveViewer cubre el detalle fino), mientras audio y documento son
+/// bloques a altura intrínseca — un reproductor de una línea o un ícono no
+/// justifican un lienzo de 300px.
 class MediaDetailPreview extends StatelessWidget {
   const MediaDetailPreview({
     super.key,
@@ -30,19 +41,11 @@ class MediaDetailPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Altura acotada (no AspectRatio a ancho completo, que en pantallas altas
-    // empujaría la metadata fuera de vista): un visor contenido deja ver el
-    // archivo y la metadata juntos. El zoom del InteractiveViewer cubre el
-    // detalle fino de las imágenes.
-    return SizedBox(
-      height: 300,
+    return Align(
       child: ClipRRect(
+        key: const Key('media_detail.preview_canvas'),
         borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-        child: Container(
-          color: AppTokens.surface2,
-          alignment: Alignment.center,
-          child: _content(),
-        ),
+        child: ColoredBox(color: AppTokens.surface2, child: _content()),
       ),
     );
   }
@@ -56,12 +59,56 @@ class MediaDetailPreview extends StatelessWidget {
     if (asset.thumbnailSourceUrl != null) {
       return _Image(asset: asset, loader: loader);
     }
-    return _typeIcon(asset);
+    return _typeIconTile(asset);
   }
 }
 
-Widget _typeIcon(MediaAsset asset) =>
-    Icon(mediaTypeIcon(asset.contentType), color: AppTokens.text2, size: 64);
+/// Alto máximo del lienzo de imagen/poster: acota para que el archivo y su
+/// metadata se vean juntos; la forma dentro del tope la dicta el bitmap.
+const double _maxViewerHeight = 300;
+
+/// Tile compacto del tipo (documento, o media sin miniatura): presencia a
+/// altura intrínseca, no un lienzo vacío.
+Widget _typeIconTile(MediaAsset asset) => SizedBox(
+  width: double.infinity,
+  child: Padding(
+    padding: const EdgeInsets.symmetric(vertical: AppTokens.sp7),
+    child: Center(
+      heightFactor: 1,
+      child: Icon(
+        mediaTypeIcon(asset.contentType),
+        color: AppTokens.text2,
+        size: 64,
+      ),
+    ),
+  ),
+);
+
+/// Caja con la forma real del bitmap, acotada al tope del visor: el aspecto
+/// decodificado dimensiona el lienzo (sin franjas muertas alrededor).
+Widget _aspectBox({required double aspect, required Widget child}) =>
+    ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: _maxViewerHeight),
+      child: AspectRatio(aspectRatio: aspect, child: child),
+    );
+
+/// Carga los bytes por el loader y decodifica su relación de aspecto. Null si
+/// no hay bytes o el bitmap no decodifica (el caller cae al tile del tipo).
+Future<_DecodedImage?> _decode(
+  MediaThumbnailLoader loader,
+  MediaAsset asset,
+) async {
+  final bytes = await loader.load(asset);
+  if (bytes == null) return null;
+  try {
+    final image = await decodeImageFromList(bytes);
+    final aspect = image.width / image.height;
+    image.dispose();
+    return (bytes: bytes, aspect: aspect);
+  } catch (_) {
+    return null;
+  }
+}
 
 /// Previsualización de imagen con zoom/pan (doble-tap alterna 1x ⇄ acercado).
 class _Image extends StatefulWidget {
@@ -79,7 +126,10 @@ class _ImageState extends State<_Image> {
   /// pinch cubre el rango completo hasta el maxScale del InteractiveViewer.
   static const double _doubleTapScale = 2.5;
 
-  late final Future<Uint8List?> _bytes = widget.loader.load(widget.asset);
+  late final Future<_DecodedImage?> _decoded = _decode(
+    widget.loader,
+    widget.asset,
+  );
   final TransformationController _zoom = TransformationController();
 
   @override
@@ -107,25 +157,36 @@ class _ImageState extends State<_Image> {
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<Uint8List?>(
-    future: _bytes,
+  Widget build(BuildContext context) => FutureBuilder<_DecodedImage?>(
+    future: _decoded,
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
-        return const CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(AppTokens.text2),
+        // Placeholder al tope del visor: la imagen entrante suele llenarlo y
+        // así el lienzo no salta hacia arriba al resolver.
+        return const SizedBox(
+          width: double.infinity,
+          height: _maxViewerHeight,
+          child: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+            ),
+          ),
         );
       }
-      final bytes = snapshot.data;
-      if (bytes == null) return _typeIcon(widget.asset);
-      return GestureDetector(
-        onDoubleTapDown: _toggleZoom,
-        child: InteractiveViewer(
-          maxScale: 5,
-          transformationController: _zoom,
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => _typeIcon(widget.asset),
+      final decoded = snapshot.data;
+      if (decoded == null) return _typeIconTile(widget.asset);
+      return _aspectBox(
+        aspect: decoded.aspect,
+        child: GestureDetector(
+          onDoubleTapDown: _toggleZoom,
+          child: InteractiveViewer(
+            maxScale: 5,
+            transformationController: _zoom,
+            child: Image.memory(
+              decoded.bytes,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => _typeIconTile(widget.asset),
+            ),
           ),
         ),
       );
@@ -133,11 +194,11 @@ class _ImageState extends State<_Image> {
   );
 }
 
-/// Previsualización de video: el poster derivado por el backend (si existe) o
-/// el ícono del tipo, con un botón de reproducir superpuesto. Tocar resuelve
-/// la copia cacheada por [MediaAsset.ref] (mismo espacio de caché que los
-/// adjuntos de chat) y abre el reproductor DENTRO de la app — nunca el visor
-/// externo del sistema.
+/// Previsualización de video: el poster derivado por el backend (si existe,
+/// con el lienzo en su aspecto real) o el tile del tipo, con un botón de
+/// reproducir superpuesto. Tocar resuelve la copia cacheada por
+/// [MediaAsset.ref] (mismo espacio de caché que los adjuntos de chat) y abre
+/// el reproductor DENTRO de la app — nunca el visor externo del sistema.
 class _VideoPreview extends StatefulWidget {
   const _VideoPreview({required this.asset, required this.loader});
 
@@ -149,10 +210,10 @@ class _VideoPreview extends StatefulWidget {
 }
 
 class _VideoPreviewState extends State<_VideoPreview> {
-  late final Future<Uint8List?> _poster =
+  late final Future<_DecodedImage?> _poster =
       widget.asset.thumbnailSourceUrl != null
-      ? widget.loader.load(widget.asset)
-      : Future<Uint8List?>.value(null);
+      ? _decode(widget.loader, widget.asset)
+      : Future<_DecodedImage?>.value(null);
 
   /// Resolviendo bytes (descarga de un video aún sin caché): spinner sobre el
   /// play en vez de un toque muerto.
@@ -203,40 +264,40 @@ class _VideoPreviewState extends State<_VideoPreview> {
         behavior: HitTestBehavior.opaque,
         onTap: _play,
         child: Stack(
-          fit: StackFit.expand,
+          alignment: Alignment.center,
           children: <Widget>[
-            FutureBuilder<Uint8List?>(
+            FutureBuilder<_DecodedImage?>(
               future: _poster,
               builder: (context, snapshot) {
-                final bytes = snapshot.data;
-                if (bytes == null) return _typeIcon(widget.asset);
-                return Image.memory(
-                  bytes,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => _typeIcon(widget.asset),
+                final poster = snapshot.data;
+                if (poster == null) return _typeIconTile(widget.asset);
+                return _aspectBox(
+                  aspect: poster.aspect,
+                  child: Image.memory(
+                    poster.bytes,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => _typeIconTile(widget.asset),
+                  ),
                 );
               },
             ),
-            Center(
-              child: _resolving
-                  ? const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppTokens.primary,
-                      ),
-                    )
-                  : Container(
-                      padding: const EdgeInsets.all(AppTokens.sp2),
-                      decoration: const BoxDecoration(
-                        color: Colors.black45,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
-            ),
+            if (_resolving)
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(AppTokens.sp2),
+                decoration: const BoxDecoration(
+                  color: AppTokens.scrim,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow,
+                  color: AppTokens.text1,
+                  size: 40,
+                ),
+              ),
           ],
         ),
       ),
@@ -245,7 +306,8 @@ class _VideoPreviewState extends State<_VideoPreview> {
 }
 
 /// Previsualización de audio: reproductor inline (mismo widget que la burbuja
-/// de nota de voz del hilo), cache-first por [MediaAsset.ref].
+/// de nota de voz del hilo) a su altura intrínseca, cache-first por
+/// [MediaAsset.ref].
 class _AudioPreview extends StatelessWidget {
   const _AudioPreview({required this.asset});
 
@@ -253,14 +315,17 @@ class _AudioPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      child: AudioMessageContent(
-        id: asset.ref,
-        mediaRef: asset.ref,
-        url: asset.previewUrl,
-        ptt: false,
-        contentType: asset.contentType,
+    return SizedBox(
+      width: double.infinity,
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.sp4),
+        child: AudioMessageContent(
+          id: asset.ref,
+          mediaRef: asset.ref,
+          url: asset.previewUrl,
+          ptt: false,
+          contentType: asset.contentType,
+        ),
       ),
     );
   }

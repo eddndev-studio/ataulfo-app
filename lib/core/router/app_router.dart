@@ -1604,7 +1604,10 @@ class AppRouter {
           // renombrar/borrar). Browse abre sin el flag y conserva las acciones.
           // VideoPlayback + ThreadAudioCubit: el detalle reproduce video/audio
           // DENTRO de la app (mismo reproductor que los hilos de chat), no vía
-          // el visor externo del sistema.
+          // el visor externo del sistema. El chrome (Scaffold + AppBar con el
+          // título vivo del cubit) lo monta la ruta; la página es content-only
+          // y las mutaciones viven en su superficie (fila de alias + zona
+          // peligrosa), así que el AppBar no carga acciones.
           return MultiRepositoryProvider(
             providers: <RepositoryProvider<dynamic>>[
               RepositoryProvider<VideoPlayback>.value(
@@ -1615,10 +1618,13 @@ class AppRouter {
               create: (_) => ThreadAudioCubit(engine: _audioEngineFactory()),
               child: BlocProvider<MediaDetailCubit>(
                 create: (_) => MediaDetailCubit(repo: _mediaRepo, asset: asset),
-                child: MediaDetailPage(
-                  loader: _mediaThumbnailLoader,
-                  launcher: const UrlLauncherMediaPreviewLauncher(),
-                  readOnly: state.uri.queryParameters['readOnly'] == '1',
+                child: Scaffold(
+                  appBar: AppBar(title: const MediaDetailTitle()),
+                  body: MediaDetailPage(
+                    loader: _mediaThumbnailLoader,
+                    launcher: const UrlLauncherMediaPreviewLauncher(),
+                    readOnly: state.uri.queryParameters['readOnly'] == '1',
+                  ),
                 ),
               ),
             ),

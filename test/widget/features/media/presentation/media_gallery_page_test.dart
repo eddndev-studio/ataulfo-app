@@ -465,7 +465,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('media_gallery.selection_delete')));
     await tester.pumpAndSettle();
-    expect(find.text('Borrar 1 archivo'), findsOneWidget);
+    expect(find.text('¿Borrar 1 archivo?'), findsOneWidget);
 
     await tester.tap(find.text('Borrar'));
     await tester.pumpAndSettle();
