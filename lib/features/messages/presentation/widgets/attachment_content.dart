@@ -20,8 +20,8 @@ import 'media_viewer.dart';
 ///   - imagen: miniatura desde la caché por ref (tap → visor fullscreen);
 ///     sin bytes ni URL degrada a la tarjeta con su nombre.
 ///   - audio: burbuja reproducible inline ([AudioMessageContent]).
-///   - video: con URL firmada, burbuja con play ([VideoCard]); sin ella,
-///     tarjeta con su nombre.
+///   - video: burbuja con play ([VideoCard]), cache-first por ref como
+///     imagen/audio; sin bytes ni URL avisa recién al tocar.
 ///   - documento: tarjeta con nombre ([DocumentCard]); abre externo solo
 ///     con URL.
 ///
@@ -76,19 +76,14 @@ class AttachmentContent extends StatelessWidget {
         ptt: false,
         contentType: mime,
       ),
-      // Con URL firmada la burbuja es reproducible; el playback igual
-      // resuelve cache-first por ref (la copia local sembrada al subir
-      // reproduce sin red). Sin URL degrada a la tarjeta con su nombre.
-      AttachmentKind.video when u != null => VideoCard(
+      // Cache-first por ref, como imagen/audio: la burbuja es reproducible
+      // aunque la URL firmada esté ausente o expirada, mientras haya una
+      // copia local; sin ninguna fuente, VideoCard avisa recién al tocar.
+      AttachmentKind.video => VideoCard(
         cache: context.read<MessageMediaCache>(),
         id: id,
         mediaRef: mediaRef,
         url: u,
-      ),
-      AttachmentKind.video => mediaTypedCard(
-        context,
-        Icons.videocam_outlined,
-        name,
       ),
       AttachmentKind.document => DocumentCard(id: id, url: u, filename: name),
     };

@@ -128,19 +128,44 @@ void main() {
     );
   });
 
-  testWidgets('adjunto video sin URL degrada a tarjeta con su nombre', (
-    tester,
-  ) async {
-    const att = TrainerAttachment(
-      ref: 'org/media/clip.mp4',
-      mime: 'video/mp4',
-      name: 'clip.mp4',
-      sizeBytes: 4,
-    );
-    await _pump(tester, _userMsg(att));
-    expect(find.text('clip.mp4'), findsOneWidget);
-    expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
-  });
+  testWidgets(
+    'adjunto video sin URL ni caché pinta burbuja reproducible que avisa '
+    'al tocar sin nada que reproducir',
+    (tester) async {
+      const att = TrainerAttachment(
+        ref: 'org/media/clip.mp4',
+        mime: 'video/mp4',
+        name: 'clip.mp4',
+        sizeBytes: 4,
+      );
+      await _pump(tester, _userMsg(att));
+      final key = find.byKey(const Key('message.video.m1.org/media/clip.mp4'));
+      expect(key, findsOneWidget);
+      await tester.tap(key);
+      await tester.pumpAndSettle();
+      expect(find.text('No se pudo reproducir el video'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'adjunto video con bytes en caché pinta burbuja reproducible aunque no '
+    'haya URL firmada',
+    (tester) async {
+      const att = TrainerAttachment(
+        ref: 'org/media/clip.mp4',
+        mime: 'video/mp4',
+        name: 'clip.mp4',
+        sizeBytes: 4,
+      );
+      final cache = fakeMessageMediaCache();
+      await cache.cache(att.ref, Uint8List.fromList(<int>[1, 2, 3]));
+      await _pump(tester, _userMsg(att), cache: cache);
+      expect(
+        find.byKey(const Key('message.video.m1.org/media/clip.mp4')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('adjunto documento pinta tarjeta con nombre de archivo', (
     tester,
