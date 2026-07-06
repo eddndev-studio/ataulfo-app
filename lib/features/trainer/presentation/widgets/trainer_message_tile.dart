@@ -6,8 +6,11 @@ import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
+import '../../../../core/media/attachment_kind.dart';
 import '../../../messages/presentation/widgets/attachment_content.dart';
 import '../../../messages/presentation/widgets/audio_message_content.dart';
+import '../../../messages/presentation/widgets/media_viewer.dart';
+import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/entities/trainer_message.dart';
 import 'trainer_change_card.dart';
 import 'trainer_inspect_flow_card.dart';
@@ -56,6 +59,9 @@ class TrainerMessageTile extends StatelessWidget {
       // result; una burbuja vacía solo mete ruido.
       return const SizedBox.shrink();
     }
+    // Adjuntos-imagen del mensaje, en orden: con más de uno, tocar cualquiera
+    // abre un visor deslizable entre ellos en vez del visor de una sola foto.
+    final imageGallery = _imageGallery(message.attachments);
     final rawBubble = ChatBubble(
       mine: message.isUser,
       child: Column(
@@ -78,6 +84,10 @@ class TrainerMessageTile extends StatelessWidget {
                   mime: att.mime,
                   name: att.name,
                   url: att.url,
+                  gallery: imageGallery,
+                  galleryIndex: imageGallery?.indexWhere(
+                    (g) => g.mediaRef == att.ref,
+                  ),
                 ),
               ),
           ],
@@ -163,4 +173,17 @@ class _VoiceNote extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Adjuntos-imagen de [attachments], en orden, listos para el visor
+/// deslizable; `null` con menos de dos (el visor de una sola imagen ya cubre
+/// ese caso, sin cambio de comportamiento).
+List<GalleryMediaItem>? _imageGallery(List<TrainerAttachment> attachments) {
+  final images = attachments
+      .where((a) => attachmentKindForMime(a.mime) == AttachmentKind.image)
+      .toList();
+  if (images.length < 2) return null;
+  return images
+      .map((a) => GalleryMediaItem(mediaRef: a.ref, url: a.url))
+      .toList();
 }

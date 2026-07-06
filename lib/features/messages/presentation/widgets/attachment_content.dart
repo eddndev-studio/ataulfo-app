@@ -35,6 +35,8 @@ class AttachmentContent extends StatelessWidget {
     required this.mime,
     required this.name,
     this.url,
+    this.gallery,
+    this.galleryIndex,
     super.key,
   });
 
@@ -56,6 +58,17 @@ class AttachmentContent extends StatelessWidget {
   /// la copia local ya cacheada.
   final String? url;
 
+  /// Adjuntos-imagen hermanos del MISMO mensaje (incluida esta imagen), en
+  /// orden: con más de uno, tocar la foto abre un visor deslizable entre
+  /// ellos en vez del visor de una sola imagen. `null`/un solo ítem ⇒
+  /// comportamiento de siempre (sin cambios para el hilo cliente, que no
+  /// tiene mensajes con más de un adjunto).
+  final List<GalleryMediaItem>? gallery;
+
+  /// Posición de ESTA imagen dentro de [gallery]; ignorado si [gallery] es
+  /// `null` o tiene un solo ítem.
+  final int? galleryIndex;
+
   @override
   Widget build(BuildContext context) {
     final u = url;
@@ -68,6 +81,8 @@ class AttachmentContent extends StatelessWidget {
         sticker: false,
         unavailableIcon: Icons.image_outlined,
         unavailableLabel: name,
+        gallery: gallery,
+        galleryIndex: galleryIndex,
       ),
       AttachmentKind.audio => AudioMessageContent(
         id: id,
@@ -153,6 +168,8 @@ class AttachmentImage extends StatefulWidget {
     required this.sticker,
     this.unavailableIcon = Icons.broken_image_outlined,
     this.unavailableLabel,
+    this.gallery,
+    this.galleryIndex,
     super.key,
   });
 
@@ -167,6 +184,10 @@ class AttachmentImage extends StatefulWidget {
 
   /// Etiqueta de la degradación; `null` cae a la copy genérica por tipo.
   final String? unavailableLabel;
+
+  /// Ver [AttachmentContent.gallery]/[AttachmentContent.galleryIndex].
+  final List<GalleryMediaItem>? gallery;
+  final int? galleryIndex;
 
   @override
   State<AttachmentImage> createState() => _AttachmentImageState();
@@ -321,7 +342,18 @@ class _AttachmentImageState extends State<AttachmentImage> {
       label: 'Ver imagen',
       child: GestureDetector(
         key: Key('message.image.${widget.id}'),
-        onTap: () => showMediaViewer(context, bytes: b, url: widget.mediaUrl),
+        onTap: () {
+          final g = widget.gallery;
+          if (g != null && g.length > 1) {
+            showMediaViewer(
+              context,
+              gallery: g,
+              initialIndex: widget.galleryIndex ?? 0,
+            );
+          } else {
+            showMediaViewer(context, bytes: b, url: widget.mediaUrl);
+          }
+        },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppTokens.radiusChip),
           child: sized,

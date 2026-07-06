@@ -6,8 +6,11 @@ import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/copy_text_actions.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../../../core/design/widgets/reasoning_disclosure.dart';
+import '../../../../core/media/attachment_kind.dart';
 import '../../../messages/presentation/widgets/attachment_content.dart';
 import '../../../messages/presentation/widgets/audio_message_content.dart';
+import '../../../messages/presentation/widgets/media_viewer.dart';
+import '../../domain/entities/pa_attachment.dart';
 import '../../domain/entities/pa_message.dart';
 import 'pa_tool_cards.dart';
 
@@ -60,6 +63,9 @@ class PaMessageTile extends StatelessWidget {
         ],
       );
     }
+    // Adjuntos-imagen del mensaje, en orden: con más de uno, tocar cualquiera
+    // abre un visor deslizable entre ellos en vez del visor de una sola foto.
+    final imageGallery = _imageGallery(message.attachments);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
@@ -88,6 +94,10 @@ class PaMessageTile extends StatelessWidget {
                       mime: att.mime,
                       name: att.name,
                       url: att.url,
+                      gallery: imageGallery,
+                      galleryIndex: imageGallery?.indexWhere(
+                        (g) => g.mediaRef == att.ref,
+                      ),
                     ),
                   ),
                 // Una nota de voz reproduce inline (la copia local grabada en
@@ -157,4 +167,17 @@ IconData paAttachmentIcon(String mime) {
   if (mime.startsWith('image/')) return Icons.image_outlined;
   if (mime == 'application/pdf') return Icons.description_outlined;
   return Icons.attach_file;
+}
+
+/// Adjuntos-imagen de [attachments], en orden, listos para el visor
+/// deslizable; `null` con menos de dos (el visor de una sola imagen ya cubre
+/// ese caso, sin cambio de comportamiento).
+List<GalleryMediaItem>? _imageGallery(List<PaAttachment> attachments) {
+  final images = attachments
+      .where((a) => attachmentKindForMime(a.mime) == AttachmentKind.image)
+      .toList();
+  if (images.length < 2) return null;
+  return images
+      .map((a) => GalleryMediaItem(mediaRef: a.ref, url: a.url))
+      .toList();
 }

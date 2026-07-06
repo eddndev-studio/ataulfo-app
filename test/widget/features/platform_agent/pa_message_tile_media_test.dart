@@ -64,21 +64,21 @@ Future<ThreadAudioCubit> _pump(
 }) async {
   final audio = ThreadAudioCubit(engine: const FakeAudioEngine());
   await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: MultiRepositoryProvider(
-          providers: <RepositoryProvider<dynamic>>[
-            RepositoryProvider<MessageMediaCache>.value(
-              value: cache ?? fakeMessageMediaCache(),
-            ),
-            RepositoryProvider<MediaOpener>.value(
-              value: const FakeMediaOpener(),
-            ),
-            RepositoryProvider<VideoPlayback>.value(
-              value: _FakeVideoPlayback(),
-            ),
-          ],
-          child: BlocProvider<ThreadAudioCubit>.value(
+    // Los providers van SOBRE el MaterialApp (no dentro de `home`): el visor
+    // de galería, al abrirse en una ruta empujada, necesita seguir viendo
+    // MessageMediaCache — las rutas empujadas no heredan providers montados
+    // dentro de la ruta inicial.
+    MultiRepositoryProvider(
+      providers: <RepositoryProvider<dynamic>>[
+        RepositoryProvider<MessageMediaCache>.value(
+          value: cache ?? fakeMessageMediaCache(),
+        ),
+        RepositoryProvider<MediaOpener>.value(value: const FakeMediaOpener()),
+        RepositoryProvider<VideoPlayback>.value(value: _FakeVideoPlayback()),
+      ],
+      child: MaterialApp(
+        home: Scaffold(
+          body: BlocProvider<ThreadAudioCubit>.value(
             value: audio,
             child: AudioFailuresListener(
               child: SingleChildScrollView(
@@ -319,4 +319,63 @@ void main() {
     expect(audio.state.sourceKey, 'org/media/nota.ogg');
     expect(find.text('No se pudo reproducir el audio'), findsNothing);
   });
+
+  testWidgets(
+    'mensaje con varias fotos: tocar una abre galería deslizable entre ellas',
+    (tester) async {
+      const att1 = PaAttachment(
+        ref: 'org/media/foto1.png',
+        mime: 'image/png',
+        name: 'foto1.png',
+        sizeBytes: 4,
+      );
+      const att2 = PaAttachment(
+        ref: 'org/media/foto2.png',
+        mime: 'image/png',
+        name: 'foto2.png',
+        sizeBytes: 4,
+      );
+      final cache = fakeMessageMediaCache();
+      await cache.cache(att1.ref, _pngBytes);
+      await cache.cache(att2.ref, _pngBytes);
+      await _pump(
+        tester,
+        _userMsg(attachments: const <PaAttachment>[att1, att2]),
+        cache: cache,
+      );
+      await tester.tap(
+        find.byKey(const Key('message.image.m1.org/media/foto1.png')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('1/2'), findsOneWidget);
+
+      await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+      await tester.pumpAndSettle();
+      expect(find.text('2/2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'mensaje con una sola foto abre el visor de siempre (sin índice)',
+    (tester) async {
+      const att = PaAttachment(
+        ref: 'org/media/foto.png',
+        mime: 'image/png',
+        name: 'foto.png',
+        sizeBytes: 4,
+      );
+      final cache = fakeMessageMediaCache();
+      await cache.cache(att.ref, _pngBytes);
+      await _pump(
+        tester,
+        _userMsg(attachments: const <PaAttachment>[att]),
+        cache: cache,
+      );
+      await tester.tap(
+        find.byKey(const Key('message.image.m1.org/media/foto.png')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(PageView), findsNothing);
+    },
+  );
 }
