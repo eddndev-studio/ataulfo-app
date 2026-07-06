@@ -13,11 +13,17 @@ class _FakeGallery implements DeviceGalleryPort {
   final Map<String, Uint8List> bytesById;
 
   @override
-  Future<bool> isSupported() async => true;
+  Future<DeviceGalleryAvailability> availability() async =>
+      DeviceGalleryAvailability.available;
 
   @override
-  Future<List<DeviceMediaAsset>> recentMedia({int limit = 60}) async =>
-      assets.take(limit).toList(growable: false);
+  Future<void> openSettings() async {}
+
+  @override
+  Future<List<DeviceMediaAsset>> recentMedia({
+    int limit = 60,
+    int page = 0,
+  }) async => assets.take(limit).toList(growable: false);
 
   @override
   Future<Uint8List?> thumbnailFor(DeviceMediaAsset asset, {int size = 256}) =>

@@ -34,6 +34,54 @@ void main() {
       },
     );
 
+    test('open lleva galleryBlocked (permiso denegado) y el swap de vista lo '
+        'conserva', () {
+      final cubit = AttachPanelCubit();
+      addTearDown(cubit.close);
+      cubit.open(showCamera: true, showGallery: false, galleryBlocked: true);
+      expect(cubit.state?.galleryBlocked, isTrue);
+      cubit.showCameraView();
+      cubit.showDestinations();
+      expect(cubit.state?.galleryBlocked, isTrue);
+    });
+
+    test('galleryBlocked es false por defecto', () {
+      final cubit = AttachPanelCubit();
+      addTearDown(cubit.close);
+      cubit.open(showCamera: false, showGallery: true);
+      expect(cubit.state?.galleryBlocked, isFalse);
+    });
+
+    test('open lleva attachmentCount (bandeja actual) y syncAttachmentCount lo '
+        'actualiza con el panel abierto', () {
+      final cubit = AttachPanelCubit();
+      addTearDown(cubit.close);
+      cubit.open(showCamera: false, showGallery: true, attachmentCount: 3);
+      expect(cubit.state?.attachmentCount, 3);
+
+      cubit.syncAttachmentCount(2);
+      expect(cubit.state?.attachmentCount, 2);
+
+      // El swap de vista lo conserva.
+      cubit.showCameraView();
+      cubit.showDestinations();
+      expect(cubit.state?.attachmentCount, 2);
+    });
+
+    test('syncAttachmentCount es no-op con el panel cerrado', () {
+      final cubit = AttachPanelCubit();
+      addTearDown(cubit.close);
+      cubit.syncAttachmentCount(5);
+      expect(cubit.state, isNull);
+    });
+
+    test('attachmentCount es 0 por defecto', () {
+      final cubit = AttachPanelCubit();
+      addTearDown(cubit.close);
+      cubit.open(showCamera: false, showGallery: true);
+      expect(cubit.state?.attachmentCount, 0);
+    });
+
     test('showDestinations vuelve a la vista de destinos', () {
       final cubit = AttachPanelCubit();
       addTearDown(cubit.close);

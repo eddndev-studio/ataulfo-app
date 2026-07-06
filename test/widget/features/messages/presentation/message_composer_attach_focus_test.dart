@@ -102,9 +102,9 @@ void main() {
       // plataforma. Mientras no resuelva, el panel NO puede abrir — si el foco
       // sólo se soltara como efecto colateral del panel, seguiría puesto.
       final cameraSupport = Completer<bool>();
-      final gallerySupport = Completer<bool>();
+      final gallerySupport = Completer<DeviceGalleryAvailability>();
       when(camera.isSupported).thenAnswer((_) => cameraSupport.future);
-      when(gallery.isSupported).thenAnswer((_) => gallerySupport.future);
+      when(gallery.availability).thenAnswer((_) => gallerySupport.future);
 
       await tester.pumpWidget(host());
 
@@ -124,7 +124,7 @@ void main() {
 
       // Al resolver el soporte, el panel abre con normalidad.
       cameraSupport.complete(false);
-      gallerySupport.complete(false);
+      gallerySupport.complete(DeviceGalleryAvailability.unsupported);
       await tester.pumpAndSettle();
       expect(panelCubit.isOpen, isTrue);
       expect(find.byKey(const Key('attach_menu.document')), findsOneWidget);
@@ -135,7 +135,9 @@ void main() {
     tester,
   ) async {
     when(camera.isSupported).thenAnswer((_) async => false);
-    when(gallery.isSupported).thenAnswer((_) async => false);
+    when(
+      gallery.availability,
+    ).thenAnswer((_) async => DeviceGalleryAvailability.unsupported);
 
     await tester.pumpWidget(host());
 
@@ -155,7 +157,9 @@ void main() {
     tester,
   ) async {
     when(camera.isSupported).thenAnswer((_) async => false);
-    when(gallery.isSupported).thenAnswer((_) async => false);
+    when(
+      gallery.availability,
+    ).thenAnswer((_) async => DeviceGalleryAvailability.unsupported);
 
     await tester.pumpWidget(host());
     await tester.tap(find.byKey(const Key('composer.attach')));
@@ -173,9 +177,9 @@ void main() {
     (tester) async {
       // Soporte PENDIENTE: `open()` llega tras dos awaits de isSupported().
       final cameraSupport = Completer<bool>();
-      final gallerySupport = Completer<bool>();
+      final gallerySupport = Completer<DeviceGalleryAvailability>();
       when(camera.isSupported).thenAnswer((_) => cameraSupport.future);
-      when(gallery.isSupported).thenAnswer((_) => gallerySupport.future);
+      when(gallery.availability).thenAnswer((_) => gallerySupport.future);
 
       await tester.pumpWidget(host());
 
@@ -192,7 +196,7 @@ void main() {
       expect(fieldFocused(tester), isTrue);
 
       cameraSupport.complete(true);
-      gallerySupport.complete(true);
+      gallerySupport.complete(DeviceGalleryAvailability.available);
       await tester.pumpAndSettle();
 
       expect(

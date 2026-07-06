@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_expandable_panel.dart';
 import '../../../media/domain/repositories/device_gallery_port.dart';
+import '../../domain/attachment_intake.dart';
 import '../bloc/attach_panel_cubit.dart';
 import 'attach_gallery_picker.dart';
 import 'attach_menu_row.dart';
@@ -103,7 +105,15 @@ class AttachPanelScaffold extends StatelessWidget {
     return PopScope<Object?>(
       canPop: panel == null,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) context.read<AttachPanelCubit>().dismiss();
+        if (didPop) return;
+        // El back deshace UN nivel, como el botón «Volver»: desde la
+        // sub-vista de cámara regresa a destinos; desde destinos cierra.
+        final cubit = context.read<AttachPanelCubit>();
+        if (cubit.state?.view == AttachPanelView.camera) {
+          cubit.showDestinations();
+        } else {
+          cubit.dismiss();
+        }
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -148,10 +158,32 @@ class AttachPanelScaffold extends StatelessWidget {
 /// Cada destino habla con el cubit; el composer (que escucha las intenciones)
 /// ejecuta el flujo con sus dependencias. Elegir un destino cierra el panel;
 /// Cámara y Galería NO cierran (cambian de vista / expanden).
-class AttachPanel extends StatelessWidget {
+///
+/// Stateful por dos detalles de continuidad: el swap destinos↔cámara se
+/// ANIMA (cross-fade, nunca un salto seco de altura) y la fracción arrastrada
+/// de la hoja se recuerda mientras el panel viva, para que volver de Cámara
+/// restaure la hoja donde el operador la dejó.
+class AttachPanel extends StatefulWidget {
   const AttachPanel({super.key, required this.metrics});
 
   final AttachPanelMetrics metrics;
+
+  @override
+  State<AttachPanel> createState() => _AttachPanelState();
+}
+
+class _AttachPanelState extends State<AttachPanel> {
+  AttachPanelMetrics get metrics => widget.metrics;
+
+  /// Última fracción a la que se arrastró la hoja expandible, capturada de
+  /// las notificaciones del sheet. Vive con el panel: cerrar y reabrir
+  /// arranca de nuevo en la fracción inicial.
+  double? _lastFraction;
+
+  bool _captureFraction(DraggableScrollableNotification notification) {
+    _lastFraction = notification.extent;
+    return false; // Deja subir la notificación (el auto-descarte la usa).
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,22 +191,69 @@ class AttachPanel extends StatelessWidget {
       builder: (context, state) {
         if (state == null) return const SizedBox.shrink();
         final cubit = context.read<AttachPanelCubit>();
+        final Widget view;
         if (state.view == AttachPanelView.camera) {
-          return _fixedShell(context, child: _CameraView(cubit: cubit));
+          view = KeyedSubtree(
+            key: const ValueKey<String>('attach_panel.view.camera'),
+            child: _fixedShell(context, child: _CameraView(cubit: cubit)),
+          );
+        } else if (metrics.expandable) {
+          view = KeyedSubtree(
+            key: const ValueKey<String>('attach_panel.view.gallery'),
+            child: _expandable(context, state, cubit),
+          );
+        } else {
+          view = KeyedSubtree(
+            key: const ValueKey<String>('attach_panel.view.destinations'),
+            child: _fixedShell(
+              context,
+              child: AttachMenuRow(
+                onDocument: cubit.chooseDocument,
+                onMedia: cubit.chooseMedia,
+                onCamera: state.showCamera ? cubit.showCameraView : null,
+                // Permiso del carrete denegado: el destino sigue visible y
+                // tocarlo explica el bloqueo con la vía a Ajustes (no
+                // desaparece en silencio).
+                onGallery: state.galleryBlocked
+                    ? () => _explainBlockedGallery(context)
+                    : null,
+              ),
+            ),
+          );
         }
-        if (metrics.expandable) {
-          return _expandable(context, state, cubit);
-        }
-        return _fixedShell(
-          context,
-          child: AttachMenuRow(
-            onDocument: cubit.chooseDocument,
-            onMedia: cubit.chooseMedia,
-            onCamera: state.showCamera ? cubit.showCameraView : null,
+        // El swap de vista se anima (cross-fade con la curva del kit) en vez
+        // de saltar de golpe entre la hoja y el cascarón fijo.
+        return AnimatedSwitcher(
+          duration: AppTokens.durationBase,
+          switchInCurve: AppTokens.ease,
+          switchOutCurve: AppTokens.ease,
+          layoutBuilder: (current, previous) => Stack(
+            fit: StackFit.expand,
+            children: <Widget>[...previous, ?current],
           ),
+          child: view,
         );
       },
     );
+  }
+
+  /// Aviso del destino Galería bloqueado: por qué no hay carrete y la acción
+  /// para conceder el permiso en los Ajustes del sistema.
+  void _explainBlockedGallery(BuildContext context) {
+    final gallery = context.read<DeviceGalleryPort>();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Permite el acceso a tus fotos para adjuntar del carrete',
+          ),
+          action: SnackBarAction(
+            label: 'Ajustes',
+            onPressed: () => unawaited(gallery.openSettings()),
+          ),
+        ),
+      );
   }
 
   /// La forma expandible: la hoja del kit con la fila de destinos fija arriba y
@@ -186,30 +265,45 @@ class AttachPanel extends StatelessWidget {
     AttachPanelCubit cubit,
   ) {
     final gallery = context.read<DeviceGalleryPort>();
-    return AppExpandablePanel(
-      handleKey: const Key('attach_panel.handle'),
-      initialSize: metrics.initialFraction,
-      minSize: metrics.minFraction,
-      maxSize: metrics.maxFraction,
-      onDismissed: cubit.dismiss,
-      headerBuilder: (context, expand) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppTokens.sp6,
-          0,
-          AppTokens.sp6,
-          AppTokens.sp3,
+    // Restaura la última fracción arrastrada (volver de Cámara no resetea);
+    // el listener la captura de las notificaciones del sheet.
+    final initial = (_lastFraction ?? metrics.initialFraction).clamp(
+      metrics.minFraction,
+      metrics.maxFraction,
+    );
+    return NotificationListener<DraggableScrollableNotification>(
+      onNotification: _captureFraction,
+      child: AppExpandablePanel(
+        handleKey: const Key('attach_panel.handle'),
+        initialSize: initial,
+        minSize: metrics.minFraction,
+        maxSize: metrics.maxFraction,
+        onDismissed: cubit.dismiss,
+        headerBuilder: (context, expand) => Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppTokens.sp6,
+            0,
+            AppTokens.sp6,
+            AppTokens.sp3,
+          ),
+          child: AttachMenuRow(
+            onDocument: cubit.chooseDocument,
+            onMedia: cubit.chooseMedia,
+            onCamera: state.showCamera ? cubit.showCameraView : null,
+            onGallery: expand,
+          ),
         ),
-        child: AttachMenuRow(
-          onDocument: cubit.chooseDocument,
-          onMedia: cubit.chooseMedia,
-          onCamera: state.showCamera ? cubit.showCameraView : null,
-          onGallery: expand,
+        builder: (context, scrollController) => AttachGalleryPicker(
+          gallery: gallery,
+          scrollController: scrollController,
+          onConfirm: cubit.confirmGallery,
+          // Sólo el cupo restante del lote: lo ya acumulado en la bandeja
+          // del composer descuenta del tope de envío.
+          maxSelection: math.max(
+            0,
+            kMaxAttachmentsPerBatch - state.attachmentCount,
+          ),
         ),
-      ),
-      builder: (context, scrollController) => AttachGalleryPicker(
-        gallery: gallery,
-        scrollController: scrollController,
-        onConfirm: cubit.confirmGallery,
       ),
     );
   }

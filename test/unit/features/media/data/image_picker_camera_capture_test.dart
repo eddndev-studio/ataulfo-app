@@ -1,6 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:ataulfo/features/media/data/repositories/image_picker_camera_capture.dart';
+import 'package:ataulfo/features/media/domain/repositories/camera_capture.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mocktail/mocktail.dart';
@@ -81,5 +81,25 @@ void main() {
       expect(await capture.takePhoto(), isNull);
       expect(await capture.takeVideo(), isNull);
     });
+
+    test('un fallo del plugin en foto degrada a CameraCaptureFailure (nunca la '
+        'excepción cruda de plataforma)', () async {
+      when(
+        () => picker.pickImage(source: ImageSource.camera),
+      ).thenThrow(PlatformException(code: 'already_active'));
+
+      expect(capture.takePhoto(), throwsA(isA<CameraCaptureFailure>()));
+    });
+
+    test(
+      'un fallo del plugin en video degrada a CameraCaptureFailure',
+      () async {
+        when(
+          () => picker.pickVideo(source: ImageSource.camera),
+        ).thenThrow(PlatformException(code: 'camera_access_denied'));
+
+        expect(capture.takeVideo(), throwsA(isA<CameraCaptureFailure>()));
+      },
+    );
   });
 }

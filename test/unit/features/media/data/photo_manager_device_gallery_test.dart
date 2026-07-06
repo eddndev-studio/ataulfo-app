@@ -1,4 +1,5 @@
 import 'package:ataulfo/features/media/data/repositories/photo_manager_device_gallery.dart';
+import 'package:ataulfo/features/media/domain/repositories/device_gallery_port.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photo_manager/photo_manager.dart';
 
@@ -7,6 +8,37 @@ import 'package:photo_manager/photo_manager.dart';
 /// canales de plataforma y se validan en smoke device. `AssetEntity` es
 /// construible en Dart puro, así que el mapeo se prueba sin plataforma.
 void main() {
+  group('availabilityFromPermission', () {
+    test('acceso total o limitado ⇒ disponible', () {
+      expect(
+        availabilityFromPermission(PermissionState.authorized),
+        DeviceGalleryAvailability.available,
+      );
+      expect(
+        availabilityFromPermission(PermissionState.limited),
+        DeviceGalleryAvailability.available,
+      );
+    });
+
+    test(
+      'denegado/restringido/sin decidir ⇒ denegado (la UI ofrece Ajustes)',
+      () {
+        expect(
+          availabilityFromPermission(PermissionState.denied),
+          DeviceGalleryAvailability.denied,
+        );
+        expect(
+          availabilityFromPermission(PermissionState.restricted),
+          DeviceGalleryAvailability.denied,
+        );
+        expect(
+          availabilityFromPermission(PermissionState.notDetermined),
+          DeviceGalleryAvailability.denied,
+        );
+      },
+    );
+  });
+
   test('una imagen mapea id + título como filename, sin duración', () {
     final entity = AssetEntity(
       id: '42',

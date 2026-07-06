@@ -407,13 +407,19 @@ class _MessageComposerState extends State<MessageComposer> {
     final gallery = context.read<DeviceGalleryPort>();
     final canUseCamera = await camera.isSupported();
     if (!mounted) return;
-    final canUseGallery = await gallery.isSupported();
+    final galleryAvailability = await gallery.availability();
     if (!mounted) return;
     // Si el operador volvió a enfocar el campo mientras se resolvía el soporte,
     // el teclado ya está de vuelta: abrir el panel ahora los haría convivir.
     // El intercambio es excluyente, así que se cancela la apertura.
     if (_fieldFocus.hasFocus) return;
-    panel.open(showCamera: canUseCamera, showGallery: canUseGallery);
+    panel.open(
+      showCamera: canUseCamera,
+      showGallery: galleryAvailability == DeviceGalleryAvailability.available,
+      galleryBlocked: galleryAvailability == DeviceGalleryAvailability.denied,
+      // El picker del carrete sólo ofrece el cupo restante del lote.
+      attachmentCount: _attachments.length,
+    );
   }
 
   /// Materializa una selección del carrete a la bandeja: pide los bytes de
@@ -488,16 +494,43 @@ class _MessageComposerState extends State<MessageComposer> {
 
   /// Captura una foto y la suma a la bandeja. La sub-elección foto/video vive
   /// en el propio panel (no hay sub-sheet): al llegar aquí el modo ya está
-  /// decidido.
+  /// decidido. Un fallo de la cámara ([CameraCaptureFailure] o cualquier otro)
+  /// avisa con SnackBar; cancelar (`null`) queda en silencio.
   Future<void> _capturePhoto() async {
-    final media = await context.read<CameraCapture>().takePhoto();
+    final camera = context.read<CameraCapture>();
+    final messenger = ScaffoldMessenger.of(context);
+    final PickedMedia? media;
+    try {
+      media = await camera.takePhoto();
+    } catch (_) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('No pudimos abrir la cámara')),
+        );
+      return;
+    }
     if (!mounted) return;
     _addCaptured(media);
   }
 
   /// Graba un video y lo suma a la bandeja (mismo camino que la foto).
   Future<void> _captureVideo() async {
-    final media = await context.read<CameraCapture>().takeVideo();
+    final camera = context.read<CameraCapture>();
+    final messenger = ScaffoldMessenger.of(context);
+    final PickedMedia? media;
+    try {
+      media = await camera.takeVideo();
+    } catch (_) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('No pudimos abrir la cámara')),
+        );
+      return;
+    }
     if (!mounted) return;
     _addCaptured(media);
   }
@@ -620,6 +653,8 @@ class _MessageComposerState extends State<MessageComposer> {
   void _removeAttachment(int index) {
     if (_uploading || index < 0 || index >= _attachments.length) return;
     setState(() => _attachments.removeAt(index));
+    // Con el panel abierto, el cupo restante del picker se recalcula.
+    context.read<AttachPanelCubit>().syncAttachmentCount(_attachments.length);
   }
 
   /// Sube los adjuntos de la bandeja de a uno (secuencial) y despacha un

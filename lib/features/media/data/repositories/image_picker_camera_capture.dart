@@ -26,13 +26,30 @@ class ImagePickerCameraCapture implements CameraCapture {
   @override
   Future<bool> isSupported() async => true;
 
+  /// Cancelar resuelve `null`; cualquier error del plugin (cámara ocupada,
+  /// permiso revocado, activity destruida…) degrada a la falla TIPADA del
+  /// puerto — nunca la excepción cruda de plataforma hacia la UI.
   @override
-  Future<PickedMedia?> takePhoto() async =>
-      pickedFromXFile(await _picker.pickImage(source: ImageSource.camera));
+  Future<PickedMedia?> takePhoto() async {
+    try {
+      return await pickedFromXFile(
+        await _picker.pickImage(source: ImageSource.camera),
+      );
+    } catch (_) {
+      throw const CameraCaptureFailure();
+    }
+  }
 
   @override
-  Future<PickedMedia?> takeVideo() async =>
-      pickedFromXFile(await _picker.pickVideo(source: ImageSource.camera));
+  Future<PickedMedia?> takeVideo() async {
+    try {
+      return await pickedFromXFile(
+        await _picker.pickVideo(source: ImageSource.camera),
+      );
+    } catch (_) {
+      throw const CameraCaptureFailure();
+    }
+  }
 }
 
 /// Mapea el resultado de `image_picker` al puerto. Devuelve null cuando el

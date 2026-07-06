@@ -10,10 +10,16 @@ import 'package:flutter_test/flutter_test.dart';
 /// el plugin real (que necesitaría canales de plataforma).
 class _StubGallery implements DeviceGalleryPort {
   @override
-  Future<bool> isSupported() async => true;
+  Future<DeviceGalleryAvailability> availability() async =>
+      DeviceGalleryAvailability.available;
+
   @override
-  Future<List<DeviceMediaAsset>> recentMedia({int limit = 60}) async =>
-      const <DeviceMediaAsset>[];
+  Future<void> openSettings() async {}
+  @override
+  Future<List<DeviceMediaAsset>> recentMedia({
+    int limit = 60,
+    int page = 0,
+  }) async => const <DeviceMediaAsset>[];
   @override
   Future<Uint8List?> thumbnailFor(DeviceMediaAsset asset, {int size = 256}) =>
       Future<Uint8List?>.value();

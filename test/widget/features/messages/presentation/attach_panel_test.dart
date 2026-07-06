@@ -10,16 +10,24 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Carrete falso con N assets fijos, suficiente para pintar la grilla.
+/// Registra las aperturas de Ajustes (destino Galería bloqueado).
 class _FakeGallery implements DeviceGalleryPort {
   _FakeGallery(this.assets);
   final List<DeviceMediaAsset> assets;
+  int openSettingsCalls = 0;
 
   @override
-  Future<bool> isSupported() async => true;
+  Future<DeviceGalleryAvailability> availability() async =>
+      DeviceGalleryAvailability.available;
 
   @override
-  Future<List<DeviceMediaAsset>> recentMedia({int limit = 60}) async =>
-      assets.take(limit).toList(growable: false);
+  Future<void> openSettings() async => openSettingsCalls++;
+
+  @override
+  Future<List<DeviceMediaAsset>> recentMedia({
+    int limit = 60,
+    int page = 0,
+  }) async => assets.take(limit).toList(growable: false);
 
   @override
   Future<Uint8List?> thumbnailFor(DeviceMediaAsset asset, {int size = 256}) =>
@@ -149,7 +157,8 @@ void main() {
 
       expect(find.byKey(const Key('attach_menu.camera')), findsOneWidget);
       await tester.tap(find.byKey(const Key('attach_menu.camera')));
-      await tester.pump();
+      // La transición se anima: se asienta antes de verificar el resultado.
+      await tester.pumpAndSettle();
 
       // Sin ruta: el mismo panel ahora muestra Foto/Video.
       expect(cubit.state?.view, AttachPanelView.camera);
@@ -185,6 +194,138 @@ void main() {
       await tester.tap(find.byKey(const Key('attach_menu.camera.photo')));
       await tester.pump();
       expect(intents.single, isA<AttachPhotoIntent>());
+    },
+  );
+
+  testWidgets(
+    'el cambio destinos↔cámara se ANIMA (ambas vistas conviven durante la '
+    'transición) en vez de saltar de golpe',
+    (tester) async {
+      final cubit = AttachPanelCubit()
+        ..open(showCamera: true, showGallery: false);
+      addTearDown(cubit.close);
+      await tester.pumpWidget(host(cubit: cubit, metrics: _fixed));
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('attach_menu.camera')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+
+      // A media transición, la vista que entra Y la que sale están montadas.
+      expect(find.byKey(const Key('attach_menu.camera.photo')), findsOneWidget);
+      expect(find.byKey(const Key('attach_menu.document')), findsOneWidget);
+
+      // Al asentarse queda sólo la vista de cámara.
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('attach_menu.camera.photo')), findsOneWidget);
+      expect(find.byKey(const Key('attach_menu.document')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'volver de Cámara restaura la fracción arrastrada de la hoja (no la '
+    'resetea al tamaño inicial)',
+    (tester) async {
+      final cubit = AttachPanelCubit()
+        ..open(showCamera: true, showGallery: true);
+      addTearDown(cubit.close);
+      await tester.pumpWidget(
+        host(
+          cubit: cubit,
+          metrics: _expandable,
+          gallery: _FakeGallery(_assets),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final initialTop = tester
+          .getTopLeft(find.byKey(const Key('attach_panel.handle')))
+          .dy;
+
+      // Expandir al máximo con el gesto del destino Galería.
+      await tester.tap(find.byKey(const Key('attach_menu.gallery')));
+      await tester.pumpAndSettle();
+      final expandedTop = tester
+          .getTopLeft(find.byKey(const Key('attach_panel.handle')))
+          .dy;
+      expect(expandedTop, lessThan(initialTop - 100));
+
+      // Ir a Cámara y volver: la hoja regresa a la fracción expandida.
+      await tester.tap(find.byKey(const Key('attach_menu.camera')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('attach_panel.camera_back')));
+      await tester.pumpAndSettle();
+
+      final restoredTop = tester
+          .getTopLeft(find.byKey(const Key('attach_panel.handle')))
+          .dy;
+      expect(
+        (restoredTop - expandedTop).abs(),
+        lessThan(24),
+        reason: 'la hoja debe volver a donde el operador la dejó',
+      );
+    },
+  );
+
+  testWidgets(
+    'la bandeja ya llevaba adjuntos: el picker sólo ofrece el CUPO RESTANTE '
+    'del lote',
+    (tester) async {
+      // 9 en la bandeja ⇒ sólo cabe 1 más.
+      final cubit = AttachPanelCubit()
+        ..open(showCamera: false, showGallery: true, attachmentCount: 9);
+      addTearDown(cubit.close);
+      await tester.pumpWidget(
+        host(
+          cubit: cubit,
+          metrics: _expandable,
+          gallery: _FakeGallery(_assets),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('attach_gallery.item.a1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('attach_gallery.check.a1')), findsOneWidget);
+
+      // El segundo excede 9+1: aviso y sin badge.
+      await tester.tap(find.byKey(const Key('attach_gallery.item.a2')));
+      await tester.pumpAndSettle();
+      expect(find.text('Máximo 10 archivos por envío'), findsOneWidget);
+      expect(find.byKey(const Key('attach_gallery.check.a2')), findsNothing);
+      expect(find.text('Adjuntar (1)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'galería BLOQUEADA (permiso denegado): el destino sigue visible y tocarlo '
+    'explica el bloqueo con acción para abrir Ajustes',
+    (tester) async {
+      final gallery = _FakeGallery(const <DeviceMediaAsset>[]);
+      final cubit = AttachPanelCubit()
+        ..open(showCamera: false, showGallery: false, galleryBlocked: true);
+      addTearDown(cubit.close);
+      await tester.pumpWidget(
+        host(cubit: cubit, metrics: _fixed, gallery: gallery),
+      );
+      await tester.pump();
+
+      // El destino NO desaparece; sin carrete accesible no hay hoja expandible.
+      expect(find.byKey(const Key('attach_menu.gallery')), findsOneWidget);
+      expect(find.byType(DraggableScrollableSheet), findsNothing);
+
+      // Tocarlo explica el bloqueo y ofrece Ajustes; el panel no se cierra.
+      await tester.tap(find.byKey(const Key('attach_menu.gallery')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Permite el acceso a tus fotos para adjuntar del carrete'),
+        findsOneWidget,
+      );
+      expect(cubit.isOpen, isTrue);
+
+      await tester.tap(find.text('Ajustes'));
+      await tester.pumpAndSettle();
+      expect(gallery.openSettingsCalls, 1);
     },
   );
 

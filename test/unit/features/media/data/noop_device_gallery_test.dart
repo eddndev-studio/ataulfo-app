@@ -7,8 +7,12 @@ void main() {
   const gallery = NoopDeviceGallery();
   const asset = DeviceMediaAsset(id: 'x', filename: 'x.jpg');
 
-  test('isSupported responde false (la UI no ofrece Galería)', () async {
-    expect(await gallery.isSupported(), isFalse);
+  test('availability responde unsupported (la UI no ofrece Galería)', () async {
+    expect(await gallery.availability(), DeviceGalleryAvailability.unsupported);
+  });
+
+  test('openSettings es un no-op que no lanza', () async {
+    await gallery.openSettings();
   });
 
   test('recentMedia responde lista vacía sin lanzar', () async {

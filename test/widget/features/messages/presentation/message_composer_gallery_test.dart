@@ -37,22 +37,28 @@ class _MockCamera extends Mock implements CameraCapture {}
 /// un asset borrado entre la selección y la lectura (bytesFor → null).
 class _FakeGallery implements DeviceGalleryPort {
   _FakeGallery({
-    required this.supported,
+    required DeviceGalleryAvailability availability,
     this.assets = const <DeviceMediaAsset>[],
     this.unreadable = const <String>{},
-  });
+  }) : _availability = availability;
 
-  final bool supported;
+  final DeviceGalleryAvailability _availability;
   final List<DeviceMediaAsset> assets;
   final Set<String> unreadable;
   int bytesForCalls = 0;
+  int openSettingsCalls = 0;
 
   @override
-  Future<bool> isSupported() async => supported;
+  Future<DeviceGalleryAvailability> availability() async => _availability;
 
   @override
-  Future<List<DeviceMediaAsset>> recentMedia({int limit = 60}) async =>
-      assets.take(limit).toList(growable: false);
+  Future<void> openSettings() async => openSettingsCalls++;
+
+  @override
+  Future<List<DeviceMediaAsset>> recentMedia({
+    int limit = 60,
+    int page = 0,
+  }) async => assets.take(limit).toList(growable: false);
 
   @override
   Future<Uint8List?> thumbnailFor(DeviceMediaAsset asset, {int size = 256}) =>
@@ -99,29 +105,35 @@ void main() {
     when(camera.isSupported).thenAnswer((_) async => false);
   });
 
-  Widget host(DeviceGalleryPort gallery) => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: MultiRepositoryProvider(
-      providers: <RepositoryProvider<dynamic>>[
-        RepositoryProvider<MediaFilePicker>.value(value: picker),
-        RepositoryProvider<MediaRepository>.value(value: mediaRepo),
-        RepositoryProvider<CameraCapture>.value(value: camera),
-        RepositoryProvider<DeviceGalleryPort>.value(value: gallery),
-        RepositoryProvider<AudioRecorder>.value(
-          value: const NoopAudioRecorder(),
+  Widget host(DeviceGalleryPort gallery, {AttachPanelCubit? panelCubit}) =>
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: MultiRepositoryProvider(
+          providers: <RepositoryProvider<dynamic>>[
+            RepositoryProvider<MediaFilePicker>.value(value: picker),
+            RepositoryProvider<MediaRepository>.value(value: mediaRepo),
+            RepositoryProvider<CameraCapture>.value(value: camera),
+            RepositoryProvider<DeviceGalleryPort>.value(value: gallery),
+            RepositoryProvider<AudioRecorder>.value(
+              value: const NoopAudioRecorder(),
+            ),
+          ],
+          child: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<MessagesBloc>.value(value: msgBloc),
+              BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
+              BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
+              if (panelCubit != null)
+                BlocProvider<AttachPanelCubit>.value(value: panelCubit)
+              else
+                BlocProvider<AttachPanelCubit>(
+                  create: (_) => AttachPanelCubit(),
+                ),
+            ],
+            child: const Scaffold(body: AttachThreadHarness()),
+          ),
         ),
-      ],
-      child: MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<MessagesBloc>.value(value: msgBloc),
-          BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
-          BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
-          BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
-        ],
-        child: const Scaffold(body: AttachThreadHarness()),
-      ),
-    ),
-  );
+      );
 
   Future<void> pumpPhone(WidgetTester tester, Widget widget) async {
     tester.view.physicalSize = const Size(1080, 2340);
@@ -138,7 +150,10 @@ void main() {
   testWidgets('sin soporte de carrete el menú NO ofrece Galería ni grilla', (
     tester,
   ) async {
-    await pumpPhone(tester, host(_FakeGallery(supported: false)));
+    await pumpPhone(
+      tester,
+      host(_FakeGallery(availability: DeviceGalleryAvailability.unsupported)),
+    );
     await openAttachMenu(tester);
 
     // Sin carrete el panel es la forma fija (sin manija ni grilla).
@@ -148,12 +163,44 @@ void main() {
     expect(find.byType(DraggableScrollableSheet), findsNothing);
   });
 
+  testWidgets(
+    'permiso DENEGADO: el destino Galería sigue visible y explica el bloqueo '
+    'con acción de Ajustes',
+    (tester) async {
+      final gallery = _FakeGallery(
+        availability: DeviceGalleryAvailability.denied,
+      );
+      await pumpPhone(tester, host(gallery));
+      await openAttachMenu(tester);
+
+      // El destino no desaparece, pero no hay grilla (sin acceso al carrete).
+      expect(find.byKey(const Key('attach_panel.fixed')), findsOneWidget);
+      expect(find.byKey(const Key('attach_menu.gallery')), findsOneWidget);
+      expect(find.byKey(const Key('attach_gallery.grid')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('attach_menu.gallery')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Permite el acceso a tus fotos para adjuntar del carrete'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Ajustes'));
+      await tester.pumpAndSettle();
+      expect(gallery.openSettingsCalls, 1);
+    },
+  );
+
   testWidgets('con soporte, el menú abre con la grilla de recientes embebida', (
     tester,
   ) async {
     await pumpPhone(
       tester,
-      host(_FakeGallery(supported: true, assets: _assets)),
+      host(
+        _FakeGallery(
+          availability: DeviceGalleryAvailability.available,
+          assets: _assets,
+        ),
+      ),
     );
     await openAttachMenu(tester);
 
@@ -166,7 +213,10 @@ void main() {
   testWidgets('Adjuntar (2) agrega exactamente 2 adjuntos a la bandeja', (
     tester,
   ) async {
-    final gallery = _FakeGallery(supported: true, assets: _assets);
+    final gallery = _FakeGallery(
+      availability: DeviceGalleryAvailability.available,
+      assets: _assets,
+    );
     await pumpPhone(tester, host(gallery));
     await openAttachMenu(tester);
 
@@ -187,9 +237,44 @@ void main() {
     expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
   });
 
+  testWidgets(
+    'reabrir el panel con bandeja poblada informa el conteo al cubit y '
+    'quitar un adjunto lo sincroniza',
+    (tester) async {
+      final gallery = _FakeGallery(
+        availability: DeviceGalleryAvailability.available,
+        assets: _assets,
+      );
+      final panelCubit = AttachPanelCubit();
+      addTearDown(panelCubit.close);
+      await pumpPhone(tester, host(gallery, panelCubit: panelCubit));
+
+      // Adjunta 2 del carrete (la bandeja queda con 2).
+      await openAttachMenu(tester);
+      await tester.tap(find.byKey(const Key('attach_gallery.item.a1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('attach_gallery.item.a2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('attach_gallery.confirm')));
+      await tester.pumpAndSettle();
+      expect(find.text('2 archivos'), findsOneWidget);
+
+      // Reabrir el panel lleva el conteo actual de la bandeja.
+      await openAttachMenu(tester);
+      expect(panelCubit.state?.attachmentCount, 2);
+
+      // Quitar un adjunto con el panel abierto sincroniza el conteo.
+      await tester.tap(
+        find.byKey(const Key('composer.attachment_tray.item.0.remove')),
+      );
+      await tester.pumpAndSettle();
+      expect(panelCubit.state?.attachmentCount, 1);
+    },
+  );
+
   testWidgets('un asset ilegible se omite del lote con aviso', (tester) async {
     final gallery = _FakeGallery(
-      supported: true,
+      availability: DeviceGalleryAvailability.available,
       assets: _assets,
       unreadable: <String>{'a1'},
     );

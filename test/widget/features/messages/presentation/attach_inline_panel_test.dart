@@ -146,6 +146,33 @@ void main() {
   );
 
   testWidgets(
+    'el back del sistema en la sub-vista de Cámara vuelve a destinos (un '
+    'nivel), y desde destinos recién cierra el panel',
+    (tester) async {
+      await tester.pumpWidget(host());
+      await openPanel(tester);
+      await tester.tap(find.byKey(const Key('attach_menu.camera')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('attach_menu.camera.photo')), findsOneWidget);
+
+      // Primer back: un nivel atrás (destinos), el panel sigue abierto.
+      final first = await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(first, isTrue);
+      expect(panelCubit.isOpen, isTrue);
+      expect(panelCubit.state?.view, AttachPanelView.destinations);
+      expect(find.byKey(const Key('attach_menu.document')), findsOneWidget);
+
+      // Segundo back: ahora sí cierra el panel (sin navegar).
+      final second = await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(second, isTrue);
+      expect(panelCubit.isOpen, isFalse);
+      expect(find.byKey(const Key('composer.input')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'el back del sistema con panel abierto lo cierra sin navegar (I6)',
     (tester) async {
       await tester.pumpWidget(host());

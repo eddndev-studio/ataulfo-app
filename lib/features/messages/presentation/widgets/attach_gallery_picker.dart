@@ -1,18 +1,22 @@
-import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../media/domain/repositories/device_gallery_port.dart';
 import '../../domain/attachment_intake.dart';
+import 'attach_gallery_preview.dart';
+import 'attach_gallery_tile.dart';
 
 /// La previsualización del carrete embebida en la hoja de adjuntar: grilla de
 /// miniaturas de las fotos/videos recientes con selección múltiple (badge
 /// numerado en orden de tap, estilo WhatsApp) y el botón «Adjuntar (n)» que
 /// confirma. Elegir assets del carrete es lo ÚNICO que hace: los bytes los
-/// pide el composer después, bajo demanda.
+/// pide el composer después, bajo demanda. La miniatura ([GalleryTile]) y la
+/// previsualización de mantener presionado viven en archivos hermanos.
 ///
 /// La grilla usa el [scrollController] que entrega el
 /// `DraggableScrollableSheet` anfitrión: así arrastrarla acopla scroll y
@@ -35,11 +39,13 @@ class AttachGalleryPicker extends StatefulWidget {
   /// Recibe la selección confirmada, en orden de tap.
   final void Function(List<DeviceMediaAsset> assets) onConfirm;
 
-  /// Cuántos recientes enumerar (una sola página del carrete).
+  /// Tamaño de página del carrete: se enumeran los [limit] más recientes y
+  /// scrollear cerca del final carga la siguiente página (scroll infinito).
   final int limit;
 
-  /// Tope de selección: espeja el tope del lote de envío para no ofrecer
-  /// una selección que el composer recortaría igual.
+  /// Tope de selección: espeja el CUPO RESTANTE del lote de envío (tope del
+  /// lote menos lo ya acumulado en la bandeja) para no ofrecer una selección
+  /// que el composer recortaría igual.
   final int maxSelection;
 
   @override
@@ -47,20 +53,76 @@ class AttachGalleryPicker extends StatefulWidget {
 }
 
 class _AttachGalleryPickerState extends State<AttachGalleryPicker> {
-  /// Enumeración única por apertura del sheet (no se re-lista en cada
-  /// rebuild de la selección).
-  late final Future<List<DeviceMediaAsset>> _recent = widget.gallery
-      .recentMedia(limit: widget.limit);
+  /// Assets acumulados página a página; `null` mientras la primera carga.
+  List<DeviceMediaAsset>? _assets;
+
+  /// Próxima página a pedir, si hay una carga en vuelo y si la última página
+  /// vino corta (carrete agotado: no se pide más).
+  int _nextPage = 0;
+  bool _loadingPage = false;
+  bool _exhausted = false;
 
   /// Selección en orden de tap; el índice+1 es el número del badge.
   final List<DeviceMediaAsset> _selection = <DeviceMediaAsset>[];
 
-  void _toggle(DeviceMediaAsset asset) {
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_maybeLoadNextPage);
+    unawaited(_loadNextPage());
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_maybeLoadNextPage);
+    super.dispose();
+  }
+
+  /// Scroll cerca del final de la grilla ⇒ pide la siguiente página. El
+  /// controller es el del sheet anfitrión, así que sólo mira su posición si
+  /// existe (estados de carga/vacío también lo usan).
+  void _maybeLoadNextPage() {
+    if (_loadingPage || _exhausted || _assets == null) return;
+    if (widget.scrollController.positions.length != 1) return;
+    final position = widget.scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      unawaited(_loadNextPage());
+    }
+  }
+
+  Future<void> _loadNextPage() async {
+    if (_loadingPage || _exhausted) return;
+    _loadingPage = true;
+    final page = await widget.gallery.recentMedia(
+      limit: widget.limit,
+      page: _nextPage,
+    );
+    if (!mounted) return;
     setState(() {
-      final index = _selection.indexWhere((a) => a.id == asset.id);
+      _loadingPage = false;
+      _nextPage++;
+      _exhausted = page.length < widget.limit;
+      (_assets ??= <DeviceMediaAsset>[]).addAll(page);
+    });
+  }
+
+  void _toggle(DeviceMediaAsset asset) {
+    final index = _selection.indexWhere((a) => a.id == asset.id);
+    if (index < 0 && _selection.length >= widget.maxSelection) {
+      // El tope del lote: mismo aviso que el destino Documento, para que
+      // tocar de más nunca sea un no-op invisible.
+      unawaited(HapticFeedback.selectionClick());
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Máximo 10 archivos por envío')),
+        );
+      return;
+    }
+    setState(() {
       if (index >= 0) {
         _selection.removeAt(index);
-      } else if (_selection.length < widget.maxSelection) {
+      } else {
         _selection.add(asset);
       }
     });
@@ -73,36 +135,35 @@ class _AttachGalleryPickerState extends State<AttachGalleryPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final assets = _assets;
+    final Widget body;
+    if (assets == null) {
+      body = _Scrollable(widget.scrollController);
+    } else if (assets.isEmpty) {
+      body = _Scrollable(
+        widget.scrollController,
+        child: Text(
+          'Sin fotos recientes',
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+        ),
+      );
+    } else {
+      body = _grid(assets);
+    }
     return Column(
       children: <Widget>[
-        Expanded(
-          child: FutureBuilder<List<DeviceMediaAsset>>(
-            future: _recent,
-            builder: (context, snapshot) {
-              final assets = snapshot.data;
-              if (assets == null) return _Scrollable(widget.scrollController);
-              if (assets.isEmpty) {
-                return _Scrollable(
-                  widget.scrollController,
-                  child: Text(
-                    'Sin fotos recientes',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-                  ),
-                );
-              }
-              return _grid(assets);
-            },
-          ),
-        ),
+        Expanded(child: body),
         if (_selection.isNotEmpty) _confirmBar(context),
       ],
     );
   }
 
   Widget _grid(List<DeviceMediaAsset> assets) {
+    // Con una página en vuelo, una celda extra de spinner al final.
+    final loadingCell = _loadingPage ? 1 : 0;
     return GridView.builder(
       key: const Key('attach_gallery.grid'),
       controller: widget.scrollController,
@@ -112,15 +173,32 @@ class _AttachGalleryPickerState extends State<AttachGalleryPicker> {
         mainAxisSpacing: 2,
         crossAxisSpacing: 2,
       ),
-      itemCount: assets.length,
+      itemCount: assets.length + loadingCell,
       itemBuilder: (context, index) {
+        if (index >= assets.length) {
+          return const Center(
+            key: Key('attach_gallery.loading_page'),
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
         final asset = assets[index];
-        return _GalleryTile(
+        return GalleryTile(
           key: Key('attach_gallery.item.${asset.id}'),
           asset: asset,
           gallery: widget.gallery,
           order: _orderOf(asset),
           onTap: () => _toggle(asset),
+          onLongPress: () => unawaited(
+            showGalleryAssetPreview(
+              context,
+              gallery: widget.gallery,
+              asset: asset,
+            ),
+          ),
         );
       },
     );
@@ -165,151 +243,4 @@ class _Scrollable extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Una miniatura del carrete: imagen cuadrada (o placeholder si la miniatura
-/// no se pudo generar), overlay de duración para videos y badge numerado
-/// cuando está seleccionada. Tocar alterna la selección.
-class _GalleryTile extends StatefulWidget {
-  const _GalleryTile({
-    super.key,
-    required this.asset,
-    required this.gallery,
-    required this.order,
-    required this.onTap,
-  });
-
-  final DeviceMediaAsset asset;
-  final DeviceGalleryPort gallery;
-
-  /// Posición 1-based en la selección, o `null` si no está seleccionada.
-  final int? order;
-  final VoidCallback onTap;
-
-  @override
-  State<_GalleryTile> createState() => _GalleryTileState();
-}
-
-class _GalleryTileState extends State<_GalleryTile> {
-  /// Miniatura pedida UNA vez por tile (no en cada rebuild de selección).
-  late final Future<Uint8List?> _thumb = widget.gallery.thumbnailFor(
-    widget.asset,
-    size: 256,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = widget.order != null;
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          FutureBuilder<Uint8List?>(
-            future: _thumb,
-            builder: (context, snapshot) {
-              final bytes = snapshot.data;
-              if (bytes == null) return _placeholder();
-              return Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-                errorBuilder: (_, _, _) => _placeholder(),
-              );
-            },
-          ),
-          if (widget.asset.isVideo)
-            Positioned(
-              left: AppTokens.sp1,
-              bottom: AppTokens.sp1,
-              child: _VideoBadge(durationMs: widget.asset.durationMs),
-            ),
-          if (selected)
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  border: Border.all(color: AppTokens.primary, width: 2),
-                ),
-              ),
-            ),
-          if (selected)
-            Positioned(
-              top: AppTokens.sp1,
-              right: AppTokens.sp1,
-              child: Container(
-                key: Key('attach_gallery.check.${widget.asset.id}'),
-                width: 22,
-                height: 22,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: AppTokens.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  '${widget.order}',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppTokens.onPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _placeholder() => Container(
-    color: AppTokens.surface3,
-    child: Icon(
-      widget.asset.isVideo ? Icons.videocam_outlined : Icons.image_outlined,
-      color: AppTokens.text2,
-    ),
-  );
-}
-
-/// Señal de video sobre la miniatura: ícono + duración legible (m:ss).
-class _VideoBadge extends StatelessWidget {
-  const _VideoBadge({required this.durationMs});
-
-  final int? durationMs;
-
-  @override
-  Widget build(BuildContext context) {
-    final ms = durationMs;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp1),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(AppTokens.radiusChip),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Icon(Icons.videocam, size: 12, color: AppTokens.text1),
-          if (ms != null) ...<Widget>[
-            const SizedBox(width: 2),
-            Text(
-              _formatDuration(ms),
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: AppTokens.text1),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// `m:ss` (o `h:mm:ss` para clips largos), estilo carrete.
-String _formatDuration(int ms) {
-  String two(int n) => n.toString().padLeft(2, '0');
-  final total = ms ~/ 1000;
-  final hours = total ~/ 3600;
-  final minutes = (total % 3600) ~/ 60;
-  final seconds = total % 60;
-  if (hours > 0) return '$hours:${two(minutes)}:${two(seconds)}';
-  return '$minutes:${two(seconds)}';
 }

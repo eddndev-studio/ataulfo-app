@@ -18,27 +18,50 @@ class AttachPanelState {
     required this.view,
     required this.showCamera,
     required this.showGallery,
+    this.galleryBlocked = false,
+    this.attachmentCount = 0,
   });
 
   final AttachPanelView view;
   final bool showCamera;
   final bool showGallery;
 
-  AttachPanelState _withView(AttachPanelView next) => AttachPanelState(
-    view: next,
-    showCamera: showCamera,
-    showGallery: showGallery,
-  );
+  /// El carrete existe pero el permiso está DENEGADO: el destino Galería se
+  /// muestra bloqueado (explica el porqué y ofrece Ajustes) en vez de
+  /// desaparecer en silencio. Excluyente con [showGallery].
+  final bool galleryBlocked;
+
+  /// Cuántos adjuntos ya lleva la bandeja del composer al abrir: el picker
+  /// del carrete sólo ofrece el CUPO RESTANTE del lote, para que
+  /// «Adjuntar (n)» nunca prometa más de lo que cabe.
+  final int attachmentCount;
+
+  AttachPanelState _copyWith({AttachPanelView? view, int? attachmentCount}) =>
+      AttachPanelState(
+        view: view ?? this.view,
+        showCamera: showCamera,
+        showGallery: showGallery,
+        galleryBlocked: galleryBlocked,
+        attachmentCount: attachmentCount ?? this.attachmentCount,
+      );
 
   @override
   bool operator ==(Object other) =>
       other is AttachPanelState &&
       other.view == view &&
       other.showCamera == showCamera &&
-      other.showGallery == showGallery;
+      other.showGallery == showGallery &&
+      other.galleryBlocked == galleryBlocked &&
+      other.attachmentCount == attachmentCount;
 
   @override
-  int get hashCode => Object.hash(view, showCamera, showGallery);
+  int get hashCode => Object.hash(
+    view,
+    showCamera,
+    showGallery,
+    galleryBlocked,
+    attachmentCount,
+  );
 }
 
 /// Intención elegida en el panel. El panel sólo DECIDE; ejecutar el flujo
@@ -96,12 +119,21 @@ class AttachPanelCubit extends Cubit<AttachPanelState?> {
   bool get isOpen => state != null;
 
   /// Abre el panel en la vista de destinos con los flags de soporte ya
-  /// resueltos por el llamador.
-  void open({required bool showCamera, required bool showGallery}) => emit(
+  /// resueltos por el llamador. [galleryBlocked] = carrete con permiso
+  /// denegado (el destino se muestra bloqueado, no desaparece);
+  /// [attachmentCount] = adjuntos ya presentes en la bandeja del composer.
+  void open({
+    required bool showCamera,
+    required bool showGallery,
+    bool galleryBlocked = false,
+    int attachmentCount = 0,
+  }) => emit(
     AttachPanelState(
       view: AttachPanelView.destinations,
       showCamera: showCamera,
       showGallery: showGallery,
+      galleryBlocked: galleryBlocked,
+      attachmentCount: attachmentCount,
     ),
   );
 
@@ -109,14 +141,25 @@ class AttachPanelCubit extends Cubit<AttachPanelState?> {
   /// No-op con el panel cerrado.
   void showCameraView() {
     final current = state;
-    if (current != null) emit(current._withView(AttachPanelView.camera));
+    if (current != null) {
+      emit(current._copyWith(view: AttachPanelView.camera));
+    }
   }
 
   /// Vuelve a la fila de destinos desde la vista de cámara. No-op con el panel
   /// cerrado.
   void showDestinations() {
     final current = state;
-    if (current != null) emit(current._withView(AttachPanelView.destinations));
+    if (current != null) {
+      emit(current._copyWith(view: AttachPanelView.destinations));
+    }
+  }
+
+  /// La bandeja del composer cambió con el panel abierto (quitar un adjunto):
+  /// el cupo restante del picker se recalcula. No-op con el panel cerrado.
+  void syncAttachmentCount(int count) {
+    final current = state;
+    if (current != null) emit(current._copyWith(attachmentCount: count));
   }
 
   /// Cierra el panel (back, tocar el clip de nuevo, o enfocar el campo).

@@ -165,6 +165,42 @@ void main() {
     expect(find.text('v.mp4'), findsOneWidget);
   });
 
+  testWidgets(
+    'un fallo de la cámara avisa con SnackBar y no agrega nada a la bandeja',
+    (tester) async {
+      when(camera.isSupported).thenAnswer((_) async => true);
+      when(camera.takePhoto).thenThrow(const CameraCaptureFailure());
+
+      await tester.pumpWidget(host());
+      await openAttachMenu(tester);
+      await tester.tap(find.byKey(const Key('attach_menu.camera')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('attach_menu.camera.photo')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos abrir la cámara'), findsOneWidget);
+      expect(find.byKey(const Key('composer.attachment_tray')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'un fallo de la cámara de video avisa con SnackBar sin agregar nada',
+    (tester) async {
+      when(camera.isSupported).thenAnswer((_) async => true);
+      when(camera.takeVideo).thenThrow(const CameraCaptureFailure());
+
+      await tester.pumpWidget(host());
+      await openAttachMenu(tester);
+      await tester.tap(find.byKey(const Key('attach_menu.camera')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('attach_menu.camera.video')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos abrir la cámara'), findsOneWidget);
+      expect(find.byKey(const Key('composer.attachment_tray')), findsNothing);
+    },
+  );
+
   testWidgets('cancelar la captura (null) no agrega nada a la bandeja', (
     tester,
   ) async {

@@ -7,30 +7,42 @@ import '../../domain/repositories/media_file_picker.dart';
 /// Adaptador del puerto [DeviceGalleryPort] sobre el plugin `photo_manager`
 /// (headless: sólo da acceso a los assets del carrete; la grilla es propia).
 ///
-/// `isSupported()` pide el permiso de fotos en runtime
-/// (`requestPermissionExtend`): con acceso total o limitado responde true;
-/// denegado responde false y la UI simplemente no ofrece el destino — nunca
-/// un estado de error dentro del sheet. Cualquier fallo del plugin degrada a
-/// false/vacío/null, jamás lanza hacia la UI.
+/// `availability()` pide el permiso de fotos en runtime
+/// (`requestPermissionExtend`): acceso total o limitado ⇒ `available`;
+/// permiso denegado ⇒ `denied` (la UI muestra el destino bloqueado con la
+/// vía a Ajustes, no lo esconde). Cualquier fallo del plugin degrada a
+/// `unsupported`/vacío/null, jamás lanza hacia la UI.
 ///
 /// Las llamadas nativas NO se unit-testean (exigen canales de plataforma; se
-/// validan en smoke device); el MAPEO del asset sí — extraído a
-/// [deviceAssetFromEntity].
+/// validan en smoke device); los MAPEOS sí — extraídos a
+/// [deviceAssetFromEntity] y [availabilityFromPermission].
 class PhotoManagerDeviceGallery implements DeviceGalleryPort {
   const PhotoManagerDeviceGallery();
 
   @override
-  Future<bool> isSupported() async {
+  Future<DeviceGalleryAvailability> availability() async {
     try {
       final state = await PhotoManager.requestPermissionExtend();
-      return state.hasAccess;
+      return availabilityFromPermission(state);
     } catch (_) {
-      return false;
+      return DeviceGalleryAvailability.unsupported;
     }
   }
 
   @override
-  Future<List<DeviceMediaAsset>> recentMedia({int limit = 60}) async {
+  Future<void> openSettings() async {
+    try {
+      await PhotoManager.openSetting();
+    } catch (_) {
+      // Best-effort: sin ajustes accesibles no hay nada que degradar.
+    }
+  }
+
+  @override
+  Future<List<DeviceMediaAsset>> recentMedia({
+    int limit = 60,
+    int page = 0,
+  }) async {
     try {
       // El álbum virtual "todo" (onlyAll) ordenado por fecha de creación
       // descendente ES el carrete de recientes. `needTitle` materializa el
@@ -49,7 +61,7 @@ class PhotoManagerDeviceGallery implements DeviceGalleryPort {
       );
       if (paths.isEmpty) return const <DeviceMediaAsset>[];
       final entities = await paths.first.getAssetListPaged(
-        page: 0,
+        page: page,
         size: limit,
       );
       return entities.map(deviceAssetFromEntity).toList(growable: false);
@@ -83,6 +95,16 @@ class PhotoManagerDeviceGallery implements DeviceGalleryPort {
     }
   }
 }
+
+/// Mapea el estado de permiso del plugin a la disponibilidad del puerto:
+/// con acceso (total o limitado) el carrete está disponible; cualquier otro
+/// estado tras PEDIR el permiso significa que el usuario lo negó (o el
+/// sistema lo restringe), y la vía de rescate son los Ajustes.
+@visibleForTesting
+DeviceGalleryAvailability availabilityFromPermission(PermissionState state) =>
+    state.hasAccess
+    ? DeviceGalleryAvailability.available
+    : DeviceGalleryAvailability.denied;
 
 /// Mapea un [AssetEntity] del plugin al asset del dominio. Sin título en el
 /// MediaStore (display name ausente) cae a un nombre de respaldo `id.ext`
