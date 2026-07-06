@@ -10,16 +10,20 @@ import '../../../../core/design/widgets/app_slider.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import 'thinking_label.dart';
 
-/// Slider de temperatura 0.0–2.0 con Guardar explícito.
+/// Slider de temperatura 0.0–2.0 con confirmación explícita. [confirmLabel]
+/// lo inyecta el consumidor: 'Guardar' cuando elegir persiste al momento
+/// (plantilla), 'Aplicar' cuando solo acumula en un borrador (org).
 class AiConfigTemperatureSheet extends StatefulWidget {
   const AiConfigTemperatureSheet({
     super.key,
     required this.keyPrefix,
     required this.initial,
+    this.confirmLabel = 'Guardar',
   });
 
   final String keyPrefix;
   final double initial;
+  final String confirmLabel;
 
   @override
   State<AiConfigTemperatureSheet> createState() =>
@@ -75,7 +79,7 @@ class _AiConfigTemperatureSheetState extends State<AiConfigTemperatureSheet> {
             const SizedBox(height: AppTokens.sp4),
             AppButton.filled(
               key: Key('${widget.keyPrefix}.sheet.temperature.save'),
-              label: 'Guardar',
+              label: widget.confirmLabel,
               fullWidth: true,
               onPressed: () => Navigator.of(context).pop(_value),
             ),
@@ -128,16 +132,19 @@ class AiConfigThinkingSheet extends StatelessWidget {
   }
 }
 
-/// Campo numérico de mensajes de contexto con Guardar explícito.
+/// Campo numérico de mensajes de contexto con confirmación explícita.
+/// [confirmLabel]: 'Guardar' (persiste al momento) o 'Aplicar' (acumula).
 class AiConfigContextSheet extends StatefulWidget {
   const AiConfigContextSheet({
     super.key,
     required this.keyPrefix,
     required this.initial,
+    this.confirmLabel = 'Guardar',
   });
 
   final String keyPrefix;
   final int initial;
+  final String confirmLabel;
 
   @override
   State<AiConfigContextSheet> createState() => _AiConfigContextSheetState();
@@ -202,7 +209,7 @@ class _AiConfigContextSheetState extends State<AiConfigContextSheet> {
             const SizedBox(height: AppTokens.sp4),
             AppButton.filled(
               key: Key('${widget.keyPrefix}.sheet.context.save'),
-              label: 'Guardar',
+              label: widget.confirmLabel,
               fullWidth: true,
               // _parsed se evalúa AL TAP (no al build): el closure no debe
               // congelar el valor de un frame anterior.
@@ -217,17 +224,20 @@ class _AiConfigContextSheetState extends State<AiConfigContextSheet> {
   }
 }
 
-/// Campo numérico de la ventana de acumulación (0..120 s) con Guardar
-/// explícito. 0 = responder de inmediato (comportamiento histórico).
+/// Campo numérico de la ventana de acumulación (0..120 s) con confirmación
+/// explícita ([confirmLabel]: 'Guardar' persiste / 'Aplicar' acumula).
+/// 0 = responder de inmediato (comportamiento histórico).
 class AiConfigDelaySheet extends StatefulWidget {
   const AiConfigDelaySheet({
     super.key,
     required this.keyPrefix,
     required this.initial,
+    this.confirmLabel = 'Guardar',
   });
 
   final String keyPrefix;
   final int initial;
+  final String confirmLabel;
 
   @override
   State<AiConfigDelaySheet> createState() => _AiConfigDelaySheetState();
@@ -295,7 +305,7 @@ class _AiConfigDelaySheetState extends State<AiConfigDelaySheet> {
             const SizedBox(height: AppTokens.sp4),
             AppButton.filled(
               key: Key('${widget.keyPrefix}.sheet.delay.save'),
-              label: 'Guardar',
+              label: widget.confirmLabel,
               fullWidth: true,
               // _parsed se evalúa AL TAP (no al build): el closure no debe
               // congelar el valor de un frame anterior.

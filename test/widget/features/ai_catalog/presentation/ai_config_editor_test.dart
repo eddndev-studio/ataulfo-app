@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/widgets/ai_config_editor.dart';
@@ -65,6 +66,7 @@ void main() {
     Catalog? catalog = _catalog,
     Set<AiConfigField> fields = _coreFields,
     bool editable = true,
+    bool deferredSave = false,
     required ValueChanged<AIConfig> onChanged,
   }) => MaterialApp(
     theme: AppDesignTheme.dark(),
@@ -76,6 +78,7 @@ void main() {
           catalog: catalog,
           fields: fields,
           editable: editable,
+          deferredSave: deferredSave,
           enabledLabel: 'IA activa',
           enabledCaption: 'Enciende o apaga el motor.',
           onChanged: onChanged,
@@ -121,7 +124,10 @@ void main() {
     await tester.tap(find.byKey(const Key('cfg.tile.model')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('cfg.sheet.model')), findsOneWidget);
+    // El picker es el selector rico del kit: secciones por proveedor.
+    expect(find.byKey(const Key('cfg.model.gpt-5.5')), findsOneWidget);
+    expect(find.text('GEMINI'), findsOneWidget);
+    expect(find.text('OPENAI'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('cfg.model.gpt-5.5')));
     await tester.pumpAndSettle();
@@ -130,7 +136,7 @@ void main() {
       emitted,
       _ai.copyWith(provider: AIProvider.openai, model: 'gpt-5.5'),
     );
-    expect(find.byKey(const Key('cfg.sheet.model')), findsNothing);
+    expect(find.byKey(const Key('cfg.model.gpt-5.5')), findsNothing);
   });
 
   testWidgets(
@@ -184,16 +190,22 @@ void main() {
     expect(find.text('Inmediato'), findsOneWidget);
   });
 
-  testWidgets('editable=false deja los controles inertes', (tester) async {
+  testWidgets('editable=false deja los controles inertes SIN quitar las '
+      'affordances (idioma disabled: se atenúan, no parpadean)', (
+    tester,
+  ) async {
     await tester.pumpWidget(host(editable: false, onChanged: (_) {}));
 
     expect(
       tester.widget<AppSwitch>(find.byKey(const Key('cfg.enabled'))).onChanged,
       isNull,
     );
+    // Los 5 tiles del set conservan su chevron mientras están inertes.
+    expect(find.byIcon(Icons.expand_more), findsNWidgets(5));
+
     await tester.tap(find.byKey(const Key('cfg.tile.model')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('cfg.sheet.model')), findsNothing);
+    expect(find.byKey(const Key('cfg.model.gpt-5.5')), findsNothing);
   });
 
   testWidgets('sin catálogo el tile de modelo no abre picker', (tester) async {
@@ -201,6 +213,53 @@ void main() {
 
     await tester.tap(find.byKey(const Key('cfg.tile.model')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('cfg.sheet.model')), findsNothing);
+    expect(find.byKey(const Key('cfg.model.gpt-5.5')), findsNothing);
+  });
+
+  testWidgets('los tiles apilan a lo ancho: muere el mosaico 2-col', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(onChanged: (_) {}));
+
+    expect(
+      find.descendant(
+        of: find.byType(AiConfigEditor),
+        matching: find.byType(IntrinsicHeight),
+      ),
+      findsNothing,
+    );
+    final editorWidth = tester.getSize(find.byType(AiConfigEditor)).width;
+    expect(
+      tester.getSize(find.byKey(const Key('cfg.tile.model'))).width,
+      editorWidth,
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('cfg.tile.temperature'))).width,
+      editorWidth,
+    );
+  });
+
+  testWidgets('deferredSave: los sheets de valor rematan en Aplicar '
+      '(aquí elegir NO persiste; el Guardar real vive en la pantalla)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(deferredSave: true, onChanged: (_) {}));
+
+    await tester.tap(find.byKey(const Key('cfg.tile.temperature')));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppButton, 'Aplicar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Guardar'), findsNothing);
+  });
+
+  testWidgets('sin deferredSave el remate sigue siendo Guardar (persiste '
+      'de verdad)', (tester) async {
+    await tester.pumpWidget(host(onChanged: (_) {}));
+
+    await tester.tap(find.byKey(const Key('cfg.tile.temperature')));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppButton, 'Guardar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Aplicar'), findsNothing);
   });
 }

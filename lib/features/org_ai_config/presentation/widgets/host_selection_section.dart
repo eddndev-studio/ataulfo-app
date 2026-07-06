@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_option_row.dart';
 import '../../../../core/design/widgets/app_section_header.dart';
 import '../../../ai_catalog/domain/entities/catalog.dart';
+import '../../../ai_catalog/presentation/widgets/ai_config_stat_tile.dart';
 import '../../domain/entities/org_ai_config.dart';
 
 /// Etiqueta legible de un host (el wire viaja en MAYÚSCULAS). Un host
@@ -17,13 +20,14 @@ String hostLabel(String host) => switch (host) {
   _ => host,
 };
 
-/// Selección de host POR MODELO. Por cada modelo del catálogo con hosts:
+/// Selección de host POR MODELO, en el mismo idioma tile+hoja que la card de
+/// defaults de al lado. Por cada modelo del catálogo con hosts:
 ///
-///   - un solo host ⇒ fila informativa de solo-lectura ("corre en X"): la org
-///     no elige.
-///   - dos o más ⇒ chips de elección; el seleccionado = host fijado por la org.
-///     Tocar un chip lo fija; tocar el ya fijado lo quita (vuelve al default
-///     del backend, fila "Automático").
+///   - un solo host ⇒ tile de solo-lectura (valor = el host, nota "Único
+///     proveedor disponible"): la org no elige.
+///   - dos o más ⇒ tile vivo cuyo valor es el host fijado (o "Automático");
+///     tocarlo abre una hoja de opciones — "Automático" quita el pin (vuelve
+///     al default del backend).
 ///
 /// Los modelos sin hosts en el catálogo (wire viejo) se omiten.
 class HostSelectionSection extends StatelessWidget {
@@ -38,7 +42,7 @@ class HostSelectionSection extends StatelessWidget {
   final Catalog catalog;
   final OrgAiConfig config;
 
-  /// false durante un guardado en vuelo: los chips no responden.
+  /// false durante un guardado en vuelo: los tiles quedan inertes-atenuados.
   final bool enabled;
 
   /// host == null ⇒ quitar el pin (volver al default).
@@ -46,22 +50,15 @@ class HostSelectionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = <Widget>[];
+    final tiles = <Widget>[];
     for (final p in catalog.providers) {
       for (final m in p.models) {
         if (m.hosts.isEmpty) continue;
-        rows.add(
-          _ModelHostRow(
-            model: m,
-            selected: config.hostFor(m.id),
-            enabled: enabled,
-            onHostChanged: onHostChanged,
-          ),
-        );
+        tiles.add(_tile(context, m));
       }
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         const AppSectionHeader(
           title: 'Proveedor por modelo',
@@ -69,80 +66,85 @@ class HostSelectionSection extends StatelessWidget {
               'Elige en qué proveedor corre cada modelo. Los de un solo '
               'proveedor quedan fijos.',
         ),
-        const SizedBox(height: AppTokens.sp3),
-        ...rows,
+        const SizedBox(height: AppTokens.sp4),
+        for (var i = 0; i < tiles.length; i++) ...<Widget>[
+          if (i > 0) const SizedBox(height: AppTokens.cardGap),
+          tiles[i],
+        ],
       ],
     );
   }
-}
 
-class _ModelHostRow extends StatelessWidget {
-  const _ModelHostRow({
-    required this.model,
-    required this.selected,
-    required this.enabled,
-    required this.onHostChanged,
-  });
+  Widget _tile(BuildContext context, AIModel model) {
+    final selected = config.hostFor(model.id);
+    if (model.hosts.length < 2) {
+      // Un solo host: informativo, mismo idioma de solo-lectura que el resto
+      // de tiles del editor.
+      return AiConfigStatTile(
+        tileKey: Key('org_ai.host.${model.id}'),
+        label: model.id,
+        value: hostLabel(model.hosts.first),
+        note: 'Único proveedor disponible',
+      );
+    }
+    return AiConfigStatTile(
+      tileKey: Key('org_ai.host.${model.id}'),
+      label: model.id,
+      value: selected == null ? 'Automático' : hostLabel(selected),
+      enabled: enabled,
+      onTap: () => _pickHost(context, model, selected),
+    );
+  }
 
-  final AIModel model;
-  final String? selected;
-  final bool enabled;
-  final void Function(String model, String? host) onHostChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final locked = model.hosts.length < 2;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppTokens.sp2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(model.id, style: textTheme.bodyLarge),
-          const SizedBox(height: AppTokens.sp1),
-          if (locked)
-            // Un solo host: informativo, sin elección.
-            Row(
-              children: <Widget>[
-                const Icon(
-                  Icons.lock_outline,
-                  size: 16,
-                  color: AppTokens.text2,
+  Future<void> _pickHost(
+    BuildContext context,
+    AIModel model,
+    String? current,
+  ) async {
+    // Record: distingue "cerrar sin elegir" (null) de "elegir Automático"
+    // (host: null).
+    final picked = await showAppBottomSheet<({String? host})>(
+      context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            AppTokens.sp6,
+            AppTokens.sp6,
+            AppTokens.sp6,
+            AppTokens.sp6 + sheetContext.sheetBottomInset,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                model.id,
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppTokens.sp3),
+              AppOptionRow(
+                key: Key('org_ai.host.${model.id}.auto'),
+                title: 'Automático',
+                selected: current == null,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop((host: null as String?)),
+              ),
+              for (final h in model.hosts)
+                AppOptionRow(
+                  key: Key('org_ai.host.${model.id}.$h'),
+                  title: hostLabel(h),
+                  selected: current == h,
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop((host: h as String?)),
                 ),
-                const SizedBox(width: AppTokens.sp1),
-                Text(
-                  'Corre en ${hostLabel(model.hosts.first)}',
-                  style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-                ),
-              ],
-            )
-          else
-            Wrap(
-              spacing: AppTokens.sp2,
-              children: <Widget>[
-                for (final h in model.hosts)
-                  AppChoiceChip(
-                    key: Key('org_ai.host.${model.id}.$h'),
-                    label: hostLabel(h),
-                    selected: selected == h,
-                    onSelected: enabled
-                        ? (isSel) => onHostChanged(model.id, isSel ? h : null)
-                        : null,
-                  ),
-                // Chip "Automático": refleja "sin fijar" y permite volver al
-                // default tocándolo.
-                AppChoiceChip(
-                  key: Key('org_ai.host.${model.id}.auto'),
-                  label: 'Automático',
-                  selected: selected == null,
-                  onSelected: enabled
-                      ? (_) => onHostChanged(model.id, null)
-                      : null,
-                ),
-              ],
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
+    if (picked == null) return;
+    onHostChanged(model.id, picked.host);
   }
 }

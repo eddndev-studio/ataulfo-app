@@ -100,9 +100,8 @@ void main() {
     ),
   );
 
-  testWidgets('Loaded + catálogo: secciones, chips multi-host y lock single', (
-    tester,
-  ) async {
+  testWidgets('Loaded + catálogo: secciones, tile por modelo multi-host y '
+      'solo-lectura single-host', (tester) async {
     when(
       () => bloc.state,
     ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
@@ -111,7 +110,32 @@ void main() {
 
     expect(find.text('Proveedor por modelo'), findsOneWidget);
     expect(find.text('Valores por defecto'), findsOneWidget);
-    // MiniMax-M3 es multi-host ⇒ chips MINIMAX/FIREWORKS/Automático.
+    // MiniMax-M3 es multi-host ⇒ tile vivo (idioma tile+hoja, como la card
+    // de defaults de al lado); sin pin se lee 'Automático'.
+    expect(find.byKey(const Key('org_ai.host.MiniMax-M3')), findsOneWidget);
+    expect(find.text('Automático'), findsOneWidget);
+    // gpt-5.5 es single-host ⇒ tile solo-lectura con nota, sin candado ad-hoc.
+    expect(find.byKey(const Key('org_ai.host.gpt-5.5')), findsOneWidget);
+    expect(find.text('OpenAI'), findsOneWidget);
+    expect(find.text('Único proveedor disponible'), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline), findsNothing);
+  });
+
+  testWidgets('el tile de un modelo multi-host abre la hoja de hosts', (
+    tester,
+  ) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.byKey(const Key('org_ai.host.MiniMax-M3')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('org_ai.host.MiniMax-M3.auto')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const Key('org_ai.host.MiniMax-M3.MINIMAX')),
       findsOneWidget,
@@ -120,13 +144,6 @@ void main() {
       find.byKey(const Key('org_ai.host.MiniMax-M3.FIREWORKS')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const Key('org_ai.host.MiniMax-M3.auto')),
-      findsOneWidget,
-    );
-    // gpt-5.5 es single-host ⇒ fila bloqueada, sin chips.
-    expect(find.byKey(const Key('org_ai.host.gpt-5.5.OPENAI')), findsNothing);
-    expect(find.text('Corre en OpenAI'), findsOneWidget);
   });
 
   testWidgets('una caption hace legible que el guardado es explícito', (
@@ -175,7 +192,7 @@ void main() {
     expect((listView.padding! as EdgeInsets).bottom, AppTokens.sp4 + 34);
   });
 
-  testWidgets('tocar un chip de host dispatcha OrgAiConfigHostChanged', (
+  testWidgets('elegir un host en la hoja dispatcha OrgAiConfigHostChanged', (
     tester,
   ) async {
     when(
@@ -183,12 +200,41 @@ void main() {
     ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
 
     await tester.pumpWidget(host());
+    await tester.tap(find.byKey(const Key('org_ai.host.MiniMax-M3')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('org_ai.host.MiniMax-M3.FIREWORKS')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     verify(
       () => bloc.add(
         const OrgAiConfigHostChanged(model: 'MiniMax-M3', host: 'FIREWORKS'),
+      ),
+    ).called(1);
+    // Tap = elegir y cerrar: la hoja se despide sola.
+    expect(
+      find.byKey(const Key('org_ai.host.MiniMax-M3.FIREWORKS')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('elegir Automático dispatcha HostChanged con host null', (
+    tester,
+  ) async {
+    // Con FIREWORKS fijado, la hoja marca ese host y "Automático" lo quita.
+    final pinned = _saved.withHost('MiniMax-M3', 'FIREWORKS');
+    when(
+      () => bloc.state,
+    ).thenReturn(OrgAiConfigLoaded(saved: pinned, working: pinned));
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.byKey(const Key('org_ai.host.MiniMax-M3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('org_ai.host.MiniMax-M3.auto')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => bloc.add(
+        const OrgAiConfigHostChanged(model: 'MiniMax-M3', host: null),
       ),
     ).called(1);
   });
@@ -230,7 +276,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const Key('org_ai.defaults.sheet.model')),
+        find.byKey(const Key('org_ai.defaults.model.MiniMax-M3')),
         findsOneWidget,
       );
 
@@ -341,5 +387,114 @@ void main() {
     await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
     verify(() => bloc.add(const OrgAiConfigLoadRequested())).called(1);
+  });
+
+  testWidgets('los sheets de valor de la org rematan en Aplicar: elegir '
+      'solo acumula, el Guardar real vive en el AppBar', (tester) async {
+    when(
+      () => bloc.state,
+    ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+
+    await tester.pumpWidget(host());
+
+    final tile = find.byKey(const Key('org_ai.defaults.tile.temperature'));
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppButton, 'Aplicar'), findsOneWidget);
+    // El único 'Guardar' visible sigue siendo el del AppBar.
+    expect(find.widgetWithText(AppButton, 'Guardar'), findsOneWidget);
+    expect(find.byKey(const Key('org_ai.save')), findsOneWidget);
+  });
+
+  group('guard de descarte (borrador dirty)', () {
+    // Empuja la pantalla sobre una pila para observar el pop, con el mismo
+    // chrome que monta la ruta real.
+    Future<void> pushPage(WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => MultiBlocProvider(
+                        providers: <BlocProvider<dynamic>>[
+                          BlocProvider<OrgAiConfigBloc>.value(value: bloc),
+                          BlocProvider<CatalogBloc>.value(value: catalogBloc),
+                        ],
+                        child: Scaffold(
+                          appBar: AppBar(
+                            title: const Text('Configuración de IA'),
+                            actions: const <Widget>[OrgAiConfigSaveAction()],
+                          ),
+                          body: const OrgAiConfigPage(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('back con cambios sin guardar pide confirmación; Cancelar '
+        'se queda', (tester) async {
+      final working = _saved.withHost('MiniMax-M3', 'FIREWORKS');
+      when(
+        () => bloc.state,
+      ).thenReturn(OrgAiConfigLoaded(saved: _saved, working: working));
+
+      await pushPage(tester);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrgAiConfigPage), findsOneWidget); // sigue aquí
+    });
+
+    testWidgets('back con cambios + Descartar sale de la pantalla', (
+      tester,
+    ) async {
+      final working = _saved.withHost('MiniMax-M3', 'FIREWORKS');
+      when(
+        () => bloc.state,
+      ).thenReturn(OrgAiConfigLoaded(saved: _saved, working: working));
+
+      await pushPage(tester);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(AppButton, 'Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrgAiConfigPage), findsNothing);
+    });
+
+    testWidgets('back sin cambios sale directo, sin diálogo', (tester) async {
+      when(
+        () => bloc.state,
+      ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+
+      await pushPage(tester);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.byType(OrgAiConfigPage), findsNothing);
+    });
   });
 }

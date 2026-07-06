@@ -57,6 +57,9 @@ class OrgDefaultsSection extends StatelessWidget {
           catalog: catalog,
           fields: _fields,
           editable: enabled,
+          // Aquí elegir NO persiste: acumula en el borrador del bloc y el
+          // Guardar real vive en el AppBar — los sheets rematan en 'Aplicar'.
+          deferredSave: true,
           enabledLabel: 'IA activa por defecto',
           enabledCaption:
               'Las plantillas nuevas nacen con la IA encendida o apagada '

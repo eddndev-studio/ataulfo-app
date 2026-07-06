@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/widgets/ai_config_stat_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,5 +64,62 @@ void main() {
 
     await tester.tap(find.byKey(const Key('t')));
     expect(tapped, isTrue);
+  });
+
+  testWidgets('inerte por mutación (enabled:false): conserva el chevron, '
+      'se atenúa con el idioma disabled del kit y no dispara onTap', (
+    tester,
+  ) async {
+    var tapped = false;
+    await tester.pumpWidget(
+      host(
+        AiConfigStatTile(
+          tileKey: const Key('t'),
+          label: 'Modelo',
+          value: 'gemini-3.1-pro',
+          enabled: false,
+          onTap: () => tapped = true,
+        ),
+      ),
+    );
+
+    // La affordance NO parpadea: el chevron sigue; el tile solo se atenúa.
+    expect(find.byIcon(Icons.expand_more), findsOneWidget);
+    final opacity = tester.widget<Opacity>(
+      find
+          .ancestor(
+            of: find.byKey(const Key('t')),
+            matching: find.byType(Opacity),
+          )
+          .first,
+    );
+    expect(opacity.opacity, 0.4);
+
+    await tester.tap(find.byKey(const Key('t')));
+    expect(tapped, isFalse);
+  });
+
+  testWidgets('pinta surface3: bloque anidado perceptible sobre una card '
+      'surface2', (tester) async {
+    await tester.pumpWidget(
+      host(
+        AiConfigStatTile(
+          tileKey: const Key('t'),
+          label: 'Modelo',
+          value: 'gemini-3.1-pro',
+          onTap: () {},
+        ),
+      ),
+    );
+
+    final box = tester.widget<Container>(
+      find
+          .descendant(
+            of: find.byKey(const Key('t')),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
+    expect((box.decoration! as BoxDecoration).color, AppTokens.surface3);
   });
 }

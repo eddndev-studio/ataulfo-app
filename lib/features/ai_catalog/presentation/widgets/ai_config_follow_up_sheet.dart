@@ -6,37 +6,31 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_select_field.dart';
 import '../../../../core/design/widgets/app_toggle_row.dart';
+import 'ai_config_summaries.dart';
 
 /// Sheet del seguimiento por inactividad: toggle + espera + intentos. La
-/// espera se elige de un set cerrado (el backend valida 30 min..30 días) y
-/// los intentos 1..3. Devuelve el AIConfig completo ya copiado.
+/// espera se elige de un set cerrado (el backend valida 30 min..30 días; los
+/// rótulos salen de [followUpDelayLabels], la misma fuente que el resumen del
+/// tile) y los intentos 1..3. Devuelve el AIConfig completo ya copiado.
+/// [confirmLabel]: 'Guardar' cuando elegir persiste al momento (plantilla) o
+/// 'Aplicar' cuando solo acumula en un borrador (org).
 class AiConfigFollowUpSheet extends StatefulWidget {
   const AiConfigFollowUpSheet({
     super.key,
     required this.keyPrefix,
     required this.initial,
+    this.confirmLabel = 'Guardar',
   });
 
   final String keyPrefix;
   final AIConfig initial;
+  final String confirmLabel;
 
   @override
   State<AiConfigFollowUpSheet> createState() => _AiConfigFollowUpSheetState();
 }
 
 class _AiConfigFollowUpSheetState extends State<AiConfigFollowUpSheet> {
-  static const Map<String, int> _delays = <String, int>{
-    '30 minutos': 30,
-    '1 hora': 60,
-    '3 horas': 180,
-    '6 horas': 360,
-    '12 horas': 720,
-    '24 horas': 1440,
-    '2 días': 2880,
-    '3 días': 4320,
-    '7 días': 10080,
-  };
-
   late bool _enabled = widget.initial.followUpEnabled;
   late int _delay = widget.initial.followUpDelayMinutes > 0
       ? widget.initial.followUpDelayMinutes
@@ -82,10 +76,10 @@ class _AiConfigFollowUpSheetState extends State<AiConfigFollowUpSheet> {
                 // de plataforma) se muestra como entrada propia: el sheet
                 // JAMÁS aparenta un valor distinto del que Guardar persiste.
                 options: <AppSelectOption<int>>[
-                  if (!_delays.containsValue(_delay))
+                  if (!followUpDelayLabels.containsKey(_delay))
                     AppSelectOption<int>(_delay, '$_delay min (personalizado)'),
-                  for (final e in _delays.entries)
-                    AppSelectOption<int>(e.value, e.key),
+                  for (final e in followUpDelayLabels.entries)
+                    AppSelectOption<int>(e.key, e.value),
                 ],
                 onChanged: (v) => setState(() => _delay = v ?? 1440),
               ),
@@ -105,7 +99,8 @@ class _AiConfigFollowUpSheetState extends State<AiConfigFollowUpSheet> {
             const SizedBox(height: AppTokens.sp4),
             AppButton.filled(
               key: Key('${widget.keyPrefix}.sheet.follow_up.save'),
-              label: 'Guardar',
+              label: widget.confirmLabel,
+              fullWidth: true,
               onPressed: () => Navigator.of(context).pop(
                 widget.initial.copyWith(
                   followUpEnabled: _enabled,

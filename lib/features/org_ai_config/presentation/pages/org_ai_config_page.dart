@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
@@ -21,9 +22,38 @@ import '../widgets/org_defaults_section.dart';
 /// A diferencia del apply-inmediato del resto de la app, aquí el guardado es
 /// explícito (dirty + Guardar): la pantalla edita VARIOS campos que viajan
 /// juntos en UN solo PUT del contrato org/ai-config, así que las ediciones se
-/// acumulan en `working` y se persisten de un golpe.
-class OrgAiConfigPage extends StatelessWidget {
+/// acumulan en `working` y se persisten de un golpe. Ese borrador está
+/// protegido: salir con cambios sin guardar pasa por el guard de descarte
+/// canónico («¿Descartar los cambios?»), el mismo idioma que los form-sheets.
+class OrgAiConfigPage extends StatefulWidget {
   const OrgAiConfigPage({super.key});
+
+  @override
+  State<OrgAiConfigPage> createState() => _OrgAiConfigPageState();
+}
+
+class _OrgAiConfigPageState extends State<OrgAiConfigPage> {
+  /// Evita apilar diálogos si llegan varios intentos de descarte mientras la
+  /// confirmación sigue abierta (back físico repetido).
+  bool _confirmingDiscard = false;
+
+  Future<void> _onPopInvoked(bool didPop, Object? result) async {
+    if (didPop || _confirmingDiscard) return;
+    _confirmingDiscard = true;
+    try {
+      final discard = await showAppConfirmDialog(
+        context,
+        title: '¿Descartar los cambios?',
+        message: 'Tienes ajustes sin guardar. Si sales, se perderán.',
+        confirmLabel: 'Descartar',
+      );
+      if (discard && mounted) {
+        Navigator.of(context).pop(result);
+      }
+    } finally {
+      _confirmingDiscard = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,11 +69,20 @@ class OrgAiConfigPage extends StatelessWidget {
             );
         }
       },
-      builder: (context, state) => switch (state) {
-        OrgAiConfigInitial() ||
-        OrgAiConfigLoading() => const AppLoadingIndicator(),
-        OrgAiConfigLoadFailed(:final failure) => _LoadError(failure: failure),
-        OrgAiConfigLoaded() => _LoadedBody(state: state),
+      builder: (context, state) {
+        final dirty = state is OrgAiConfigLoaded && state.dirty;
+        return PopScope<Object?>(
+          canPop: !dirty,
+          onPopInvokedWithResult: _onPopInvoked,
+          child: switch (state) {
+            OrgAiConfigInitial() ||
+            OrgAiConfigLoading() => const AppLoadingIndicator(),
+            OrgAiConfigLoadFailed(:final failure) => _LoadError(
+              failure: failure,
+            ),
+            OrgAiConfigLoaded() => _LoadedBody(state: state),
+          },
+        );
       },
     );
   }

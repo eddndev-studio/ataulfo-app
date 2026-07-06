@@ -216,7 +216,10 @@ void main() {
       await tester.tap(find.byKey(const Key('template_ai.tile.model')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('template_ai.sheet.model')), findsOneWidget);
+      expect(
+        find.byKey(const Key('template_ai.model.gemini-3-flash')),
+        findsOneWidget,
+      );
 
       await tester.tap(
         find.byKey(const Key('template_ai.model.gemini-3-flash')),
@@ -230,10 +233,13 @@ void main() {
           ),
         ),
       ).called(1);
-      expect(find.byKey(const Key('template_ai.sheet.model')), findsNothing);
+      expect(
+        find.byKey(const Key('template_ai.model.gemini-3-flash')),
+        findsNothing,
+      );
     });
 
-    testWidgets('el picker muestra badges de modalidad por modelo', (
+    testWidgets('el picker explica las modalidades por modelo en su caption', (
       tester,
     ) async {
       await tester.pumpWidget(host());
@@ -247,28 +253,14 @@ void main() {
       expect(
         find.descendant(
           of: richRow,
-          matching: find.byIcon(Icons.image_outlined),
+          matching: find.text('Ve: imagen · audio · documentos'),
         ),
         findsOneWidget,
       );
-      expect(
-        find.descendant(of: richRow, matching: find.byIcon(Icons.mic_none)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: richRow,
-          matching: find.byIcon(Icons.description_outlined),
-        ),
-        findsOneWidget,
-      );
-      // gpt-5-pro: solo texto — sin badges.
+      // gpt-5-pro: solo texto — sin caption de modalidades.
       final plainRow = find.byKey(const Key('template_ai.model.gpt-5-pro'));
       expect(
-        find.descendant(
-          of: plainRow,
-          matching: find.byIcon(Icons.image_outlined),
-        ),
+        find.descendant(of: plainRow, matching: find.textContaining('Ve:')),
         findsNothing,
       );
     });
@@ -302,7 +294,10 @@ void main() {
       await tester.tap(find.byKey(const Key('template_ai.tile.model')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('template_ai.sheet.model')), findsNothing);
+      expect(
+        find.byKey(const Key('template_ai.model.gemini-3-flash')),
+        findsNothing,
+      );
     });
   });
 
@@ -417,6 +412,9 @@ void main() {
     ) async {
       await tester.pumpWidget(host());
 
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.delay')),
+      );
       await tester.tap(find.byKey(const Key('template_ai.tile.delay')));
       await tester.pumpAndSettle();
 
@@ -441,6 +439,9 @@ void main() {
     ) async {
       await tester.pumpWidget(host());
 
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.delay')),
+      );
       await tester.tap(find.byKey(const Key('template_ai.tile.delay')));
       await tester.pumpAndSettle();
 
@@ -510,6 +511,9 @@ void main() {
     ) async {
       await tester.pumpWidget(host());
 
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
       await tester.tap(
         find.byKey(const Key('template_ai.tile.silence_labels')),
       );
@@ -546,6 +550,9 @@ void main() {
 
       await tester.pumpWidget(host());
 
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
       await tester.tap(
         find.byKey(const Key('template_ai.tile.silence_labels')),
       );
@@ -577,6 +584,9 @@ void main() {
       when(() => bloc.state).thenReturn(const TemplateDetailMutating(_tpl));
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
       await tester.tap(
         find.byKey(const Key('template_ai.tile.silence_labels')),
       );
@@ -612,6 +622,9 @@ void main() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(tplOrphan));
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
       await tester.tap(
         find.byKey(const Key('template_ai.tile.silence_labels')),
       );
@@ -640,6 +653,9 @@ void main() {
       when(() => labelsBloc.state).thenReturn(const LabelsLoaded(<Label>[]));
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
       await tester.tap(
         find.byKey(const Key('template_ai.tile.silence_labels')),
       );
@@ -659,6 +675,9 @@ void main() {
       ).thenReturn(const LabelsFailed(LabelsServerFailure()));
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
       await tester.tap(
         find.byKey(const Key('template_ai.tile.silence_labels')),
       );
@@ -686,6 +705,9 @@ void main() {
       ).thenReturn(const LabelsFailed(LabelsServerFailure()));
 
       await tester.pumpWidget(host());
+      await tester.ensureVisible(
+        find.byKey(const Key('template_ai.tile.silence_labels')),
+      );
       await tester.tap(
         find.byKey(const Key('template_ai.tile.silence_labels')),
       );
@@ -750,7 +772,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const Key('template_ai.sheet.subagent')),
+        find.byKey(const Key('template_ai.subagent.inherit')),
         findsOneWidget,
       );
 
@@ -828,7 +850,10 @@ void main() {
       await tester.tap(find.byKey(const Key('template_ai.tile.subagent')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('template_ai.sheet.subagent')), findsNothing);
+      expect(
+        find.byKey(const Key('template_ai.subagent.inherit')),
+        findsNothing,
+      );
     });
   });
 

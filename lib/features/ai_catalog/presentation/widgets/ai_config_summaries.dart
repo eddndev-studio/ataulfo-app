@@ -22,14 +22,31 @@ String toolGroupsSummary(List<String> disabled) {
   return enabled == total ? 'Todos habilitados' : '$enabled/$total grupos';
 }
 
-/// Resumen del tile de seguimiento: apagado, o "cada X · N intentos".
+/// Set cerrado de esperas del seguimiento, con su rótulo legible. Es LA fuente
+/// de esos rótulos: el sheet arma sus opciones de aquí y el resumen del tile
+/// los reutiliza — tile y sheet siempre dicen lo mismo.
+const Map<int, String> followUpDelayLabels = <int, String>{
+  30: '30 minutos',
+  60: '1 hora',
+  180: '3 horas',
+  360: '6 horas',
+  720: '12 horas',
+  1440: '24 horas',
+  2880: '2 días',
+  4320: '3 días',
+  10080: '7 días',
+};
+
+/// Rótulo de una espera: el del set cerrado, o los minutos crudos para un
+/// valor fuera del set (p. ej. fijado por el agente de plataforma).
+String followUpDelayLabel(int minutes) =>
+    followUpDelayLabels[minutes] ?? '$minutes minutos';
+
+/// Resumen del tile de seguimiento: apagado, o "Cada X · N intentos" con el
+/// mismo tono capitalizado del resto de valores de tile.
 String followUpSummary(AIConfig ai) {
   if (!ai.followUpEnabled) return 'Apagado';
-  final m = ai.followUpDelayMinutes;
-  final delay = m >= 1440 && m % 1440 == 0
-      ? '${m ~/ 1440} d'
-      : m >= 60 && m % 60 == 0
-      ? '${m ~/ 60} h'
-      : '$m min';
-  return 'cada $delay · ${ai.followUpMaxAttempts} intento(s)';
+  final attempts = ai.followUpMaxAttempts;
+  final tries = attempts == 1 ? '1 intento' : '$attempts intentos';
+  return 'Cada ${followUpDelayLabel(ai.followUpDelayMinutes)} · $tries';
 }

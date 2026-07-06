@@ -1,6 +1,7 @@
 import 'package:ataulfo/core/ai/ai_config.dart';
 import 'package:ataulfo/core/design/app_bottom_sheet.dart';
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_select_field.dart';
 import 'package:ataulfo/core/design/widgets/app_toggle_row.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/widgets/ai_config_follow_up_sheet.dart';
@@ -122,5 +123,56 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AppSelectField<int>), findsNWidgets(2));
+  });
+
+  testWidgets('el remate es fullWidth, como todos los Guardar de sheets', (
+    tester,
+  ) async {
+    final read = pumpHost(tester, _ai());
+    await read();
+
+    final save = tester.widget<AppButton>(
+      find.byKey(const Key('cfg.sheet.follow_up.save')),
+    );
+    expect(save.fullWidth, isTrue);
+  });
+
+  testWidgets('confirmLabel inyectado: el remate dice Aplicar (superficies '
+      'de guardado diferido)', (tester) async {
+    AIConfig? captured;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  captured = await showAppBottomSheet<AIConfig>(
+                    ctx,
+                    isScrollControlled: true,
+                    builder: (_) => AiConfigFollowUpSheet(
+                      keyPrefix: 'cfg',
+                      initial: _ai(),
+                      confirmLabel: 'Aplicar',
+                    ),
+                  );
+                },
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppButton, 'Aplicar'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Guardar'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('cfg.sheet.follow_up.save')));
+    await tester.pumpAndSettle();
+    expect(captured, isNotNull);
   });
 }
