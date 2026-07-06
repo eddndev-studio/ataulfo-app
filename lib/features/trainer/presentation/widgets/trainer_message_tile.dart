@@ -17,13 +17,6 @@ import 'trainer_inspect_flow_card.dart';
 import 'trainer_prompt_history_card.dart';
 import 'trainer_tool_error_card.dart';
 
-/// Ícono por MIME del adjunto (imagen/PDF; resto genérico).
-IconData attachmentIcon(String mime) {
-  if (mime.startsWith('image/')) return Icons.image_outlined;
-  if (mime == 'application/pdf') return Icons.description_outlined;
-  return Icons.attach_file;
-}
-
 /// Renderiza un turno del hilo del entrenador. Un turno `tool` se proyecta a la
 /// tarjeta que corresponda (inspección, historial, error o cambio); las
 /// lecturas sin efecto no rinden nada. user/assistant con texto ⇒ burbuja; un

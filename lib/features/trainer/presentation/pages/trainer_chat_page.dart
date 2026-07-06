@@ -14,7 +14,10 @@ import '../../../../core/design/widgets/app_thread_list_sheet.dart';
 import '../../../../core/design/widgets/live_typing_progress.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
 import '../../../../core/design/widgets/voice_recording_mixin.dart';
+import '../../../../core/media/attachment_kind.dart';
+import '../../../messages/presentation/widgets/attachment_tray.dart';
 import '../../../messages/presentation/widgets/audio_failures_listener.dart';
+import '../../domain/entities/trainer_attachment.dart';
 import '../../domain/failures/trainer_failure.dart';
 import '../bloc/trainer_chat_bloc.dart';
 import '../widgets/trainer_chat_empty_state.dart';
@@ -347,46 +350,18 @@ class _ChatViewState extends State<_ChatView>
               ],
             ),
           ),
+        // Misma bandeja de adjuntos pendientes que el chat de clientes: tarjetas
+        // cuadradas con miniatura real (no el chip angosto con nombre de antes).
         if (s.pendingAttachments.isNotEmpty)
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              key: const Key('trainer.pending_attachments'),
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
-              itemCount: s.pendingAttachments.length,
-              separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
-              itemBuilder: (context, i) {
-                final att = s.pendingAttachments[i];
-                final thumb = s.pendingThumbnails[att.ref];
-                return InputChip(
-                  key: Key('trainer.pending_att.${att.ref}'),
-                  avatar: thumb != null
-                      // Miniatura real desde los bytes locales del pendiente.
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            AppTokens.radiusSm,
-                          ),
-                          child: Image.memory(
-                            thumb,
-                            key: Key('trainer.pending_thumb.${att.ref}'),
-                            width: 20,
-                            height: 20,
-                            fit: BoxFit.cover,
-                            // Bytes que no decodifican (archivo corrupto) caen
-                            // al ícono en vez de tumbar la fila.
-                            errorBuilder: (_, _, _) =>
-                                Icon(attachmentIcon(att.mime), size: 16),
-                          ),
-                        )
-                      : Icon(attachmentIcon(att.mime), size: 16),
-                  deleteIcon: const Icon(Icons.close, size: 16),
-                  label: Text(att.name, overflow: TextOverflow.ellipsis),
-                  onDeleted: () => context.read<TrainerChatBloc>().add(
-                    TrainerChatAttachmentRemoved(att.ref),
-                  ),
-                );
-              },
+          AttachmentTray(
+            items: s.pendingAttachments
+                .map(
+                  (att) =>
+                      _pendingAttachmentFor(att, s.pendingThumbnails[att.ref]),
+                )
+                .toList(growable: false),
+            onRemove: (i) => context.read<TrainerChatBloc>().add(
+              TrainerChatAttachmentRemoved(s.pendingAttachments[i].ref),
             ),
           ),
         // Grabando: la barra de nota de voz reemplaza al composer (una cosa a
@@ -448,3 +423,17 @@ class _ChatViewState extends State<_ChatView>
     );
   }
 }
+
+/// Adapta un adjunto ya subido (el entrenador sube al elegir, no al enviar) a
+/// la bandeja compartida: [PendingAttachment.existingRef] es el ref BARE,
+/// [PendingAttachment.bytes] la miniatura local ya resuelta (si la hay).
+PendingAttachment _pendingAttachmentFor(
+  TrainerAttachment att,
+  Uint8List? thumb,
+) => PendingAttachment(
+  bytes: thumb,
+  filename: att.name,
+  type: attachmentKindForMime(att.mime).name,
+  existingRef: att.ref,
+  sizeBytesOverride: att.sizeBytes,
+);

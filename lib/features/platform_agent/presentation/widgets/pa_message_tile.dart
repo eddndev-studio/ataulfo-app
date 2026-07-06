@@ -162,13 +162,6 @@ class _VoiceNote extends StatelessWidget {
   }
 }
 
-/// Ícono por MIME del adjunto (imagen/PDF; resto genérico).
-IconData paAttachmentIcon(String mime) {
-  if (mime.startsWith('image/')) return Icons.image_outlined;
-  if (mime == 'application/pdf') return Icons.description_outlined;
-  return Icons.attach_file;
-}
-
 /// Adjuntos-imagen de [attachments], en orden, listos para el visor
 /// deslizable; `null` con menos de dos (el visor de una sola imagen ya cubre
 /// ese caso, sin cambio de comportamiento).

@@ -9,7 +9,10 @@ import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/live_typing_progress.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
 import '../../../../core/design/widgets/voice_recording_mixin.dart';
+import '../../../../core/media/attachment_kind.dart';
+import '../../../messages/presentation/widgets/attachment_tray.dart';
 import '../../../messages/presentation/widgets/audio_failures_listener.dart';
+import '../../domain/entities/pa_attachment.dart';
 import '../bloc/platform_agent_chat_bloc.dart';
 import 'pa_chat_empty_state.dart';
 import 'pa_failure_copy.dart';
@@ -231,47 +234,20 @@ class _PaChatViewState extends State<PaChatView>
                 ],
               ),
             ),
+          // Misma bandeja de adjuntos pendientes que el chat de clientes: tarjetas
+          // cuadradas con miniatura real (no el chip angosto con nombre de antes).
           if (s.pendingAttachments.isNotEmpty)
-            SizedBox(
-              height: 40,
-              child: ListView.separated(
-                key: const Key('pa.pending_attachments'),
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp3),
-                itemCount: s.pendingAttachments.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(width: AppTokens.sp2),
-                itemBuilder: (context, i) {
-                  final att = s.pendingAttachments[i];
-                  final thumb = s.pendingThumbnails[att.ref];
-                  return InputChip(
-                    key: Key('pa.pending_att.${att.ref}'),
-                    avatar: thumb != null
-                        // Miniatura real desde los bytes locales del pendiente.
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              AppTokens.radiusSm,
-                            ),
-                            child: Image.memory(
-                              thumb,
-                              key: Key('pa.pending_thumb.${att.ref}'),
-                              width: 20,
-                              height: 20,
-                              fit: BoxFit.cover,
-                              // Bytes que no decodifican caen al ícono en vez de
-                              // tumbar la fila.
-                              errorBuilder: (_, _, _) =>
-                                  Icon(paAttachmentIcon(att.mime), size: 16),
-                            ),
-                          )
-                        : Icon(paAttachmentIcon(att.mime), size: 16),
-                    deleteIcon: const Icon(Icons.close, size: 16),
-                    label: Text(att.name, overflow: TextOverflow.ellipsis),
-                    onDeleted: () => context.read<PlatformAgentChatBloc>().add(
-                      PaChatAttachmentRemoved(att.ref),
+            AttachmentTray(
+              items: s.pendingAttachments
+                  .map(
+                    (att) => _pendingAttachmentFor(
+                      att,
+                      s.pendingThumbnails[att.ref],
                     ),
-                  );
-                },
+                  )
+                  .toList(growable: false),
+              onRemove: (i) => context.read<PlatformAgentChatBloc>().add(
+                PaChatAttachmentRemoved(s.pendingAttachments[i].ref),
               ),
             ),
           // Grabando: la barra de nota de voz reemplaza al composer (una cosa a la
@@ -365,3 +341,15 @@ class _LoadMoreButton extends StatelessWidget {
     );
   }
 }
+
+/// Adapta un adjunto ya subido (el asistente sube al elegir, no al enviar) a
+/// la bandeja compartida: [PendingAttachment.existingRef] es el ref BARE,
+/// [PendingAttachment.bytes] la miniatura local ya resuelta (si la hay).
+PendingAttachment _pendingAttachmentFor(PaAttachment att, Uint8List? thumb) =>
+    PendingAttachment(
+      bytes: thumb,
+      filename: att.name,
+      type: attachmentKindForMime(att.mime).name,
+      existingRef: att.ref,
+      sizeBytesOverride: att.sizeBytes,
+    );

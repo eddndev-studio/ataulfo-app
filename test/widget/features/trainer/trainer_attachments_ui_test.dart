@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/trainer/domain/entities/trainer_attachment.dart';
@@ -33,6 +34,14 @@ const _att = TrainerAttachment(
   mime: 'image/png',
   name: 'catalogo.png',
   sizeBytes: 4,
+);
+
+/// PNG 1x1 válido: la miniatura del pendiente decodifica de verdad (bytes
+/// arbitrarios caerían al placeholder de archivo en vez de la imagen).
+final _pngBytes = Uint8List.fromList(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  ),
 );
 
 void main() {
@@ -97,7 +106,7 @@ void main() {
     (tester) async {
       when(() => picker.pickMultiple()).thenAnswer(
         (_) async => <PickedMedia>[
-          PickedMedia(bytes: Uint8List(4), filename: 'catalogo.png'),
+          PickedMedia(bytes: _pngBytes, filename: 'catalogo.png'),
         ],
       );
       when(
@@ -114,24 +123,23 @@ void main() {
       await tester.tap(find.byKey(const Key('trainer.attach')));
       await tester.pumpAndSettle();
 
+      // Misma bandeja de adjuntos pendientes que el chat de clientes (AttachmentTray):
+      // tarjeta cuadrada con la miniatura real (imagen ⇒ sin nombre encima, se
+      // identifica por la foto, igual que en clientes).
+      expect(find.byKey(const Key('composer.attachment_tray')), findsOneWidget);
       expect(
-        find.byKey(const Key('trainer.pending_att.tenant/org/media/a1.png')),
+        find.byKey(const Key('composer.attachment_tray.item.0')),
         findsOneWidget,
       );
-      expect(find.text('catalogo.png'), findsOneWidget);
-      // Miniatura real del pendiente (bytes locales, sin red).
-      expect(
-        find.byKey(const Key('trainer.pending_thumb.tenant/org/media/a1.png')),
-        findsOneWidget,
-      );
+      expect(find.text('catalogo.png'), findsNothing);
+      expect(find.byType(Image), findsOneWidget);
 
-      // El ✕ del chip lo quita.
-      await tester.tap(find.byIcon(Icons.close).first);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('trainer.pending_att.tenant/org/media/a1.png')),
-        findsNothing,
+      // El ✕ de la tarjeta lo quita.
+      await tester.tap(
+        find.byKey(const Key('composer.attachment_tray.item.0.remove')),
       );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('composer.attachment_tray')), findsNothing);
     },
   );
 
