@@ -239,4 +239,8 @@ class AppTokens {
   static const Duration durationSlow = Duration(milliseconds: 320);
 
   static const Cubic ease = Cubic(0.2, 0.0, 0.0, 1.0);
+
+  /// Curva con rebase (back-out): sobrepasa ~10% el destino y asienta. Para
+  /// pops de selección (íconos que "saltan" al activarse), no para layout.
+  static const Cubic easeSpring = Cubic(0.34, 1.56, 0.64, 1.0);
 }

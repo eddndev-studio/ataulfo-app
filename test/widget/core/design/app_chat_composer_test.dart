@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/motion.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_chat_composer.dart';
 import 'package:flutter/material.dart';
@@ -131,6 +132,120 @@ void main() {
     // El caller observa el foco por su propio nodo (para intercambiar teclado
     // por otra superficie, p. ej.).
     expect(focus.hasFocus, isTrue);
+  });
+
+  group('micro-animaciones del slot final', () {
+    Widget composerWithMic({bool motion = true}) => AppMotion(
+      enabled: motion,
+      child: host(
+        AppChatComposer(
+          onSend: (_) {},
+          fieldKey: const Key('c.field'),
+          sendKey: const Key('c.send'),
+          emptyTrailing: IconButton(
+            key: const Key('c.mic'),
+            icon: const Icon(Icons.mic_none),
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('mic↔send transiciona con el switcher del kit y asienta en '
+        'el estado correcto', (tester) async {
+      await tester.pumpWidget(composerWithMic());
+
+      expect(find.byKey(const Key('c.mic')), findsOneWidget);
+      expect(find.byKey(const Key('c.send')), findsNothing);
+
+      await tester.enterText(find.byKey(const Key('c.field')), 'hola');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('c.send')), findsOneWidget);
+      expect(find.byKey(const Key('c.mic')), findsNothing);
+      // El intercambio lo conduce el switcher del kit (scale+fade), no un
+      // swap seco de subárboles.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('app_chat_composer.bar')),
+          matching: find.byType(AnimatedSwitcher),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('con AppMotion apagado el intercambio es instantáneo '
+        '(un frame, sin transición)', (tester) async {
+      await tester.pumpWidget(composerWithMic(motion: false));
+
+      await tester.enterText(find.byKey(const Key('c.field')), 'hola');
+      await tester.pump();
+
+      expect(find.byKey(const Key('c.send')), findsOneWidget);
+      expect(find.byKey(const Key('c.mic')), findsNothing);
+    });
+
+    testWidgets('el fill del botón enviar hace bloom animado: surface3 sin '
+        'texto, primary con texto', (tester) async {
+      await tester.pumpWidget(
+        host(
+          AppChatComposer(
+            onSend: (_) {},
+            fieldKey: const Key('c.field'),
+            sendKey: const Key('c.send'),
+          ),
+        ),
+      );
+
+      AnimatedContainer fill() => tester.widget<AnimatedContainer>(
+        find.descendant(
+          of: find.byKey(const Key('app_chat_composer.bar')),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      // AnimatedContainer pliega `color:` dentro de su decoration.
+      Color? colorOf(AnimatedContainer c) =>
+          (c.decoration as BoxDecoration?)?.color;
+
+      expect(colorOf(fill()), AppTokens.surface3);
+
+      await tester.enterText(find.byKey(const Key('c.field')), 'hola');
+      await tester.pumpAndSettle();
+
+      expect(colorOf(fill()), AppTokens.primary);
+    });
+
+    testWidgets('el botón enviar encoge al presionarse (press-scale)', (
+      tester,
+    ) async {
+      final sent = <String>[];
+      await tester.pumpWidget(
+        host(
+          AppChatComposer(
+            onSend: sent.add,
+            fieldKey: const Key('c.field'),
+            sendKey: const Key('c.send'),
+          ),
+        ),
+      );
+      await tester.enterText(find.byKey(const Key('c.field')), 'hola');
+      await tester.pumpAndSettle();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('c.send'))),
+      );
+      await tester.pump();
+      final scale = tester.widget<AnimatedScale>(
+        find.descendant(
+          of: find.byKey(const Key('app_chat_composer.bar')),
+          matching: find.byType(AnimatedScale),
+        ),
+      );
+      expect(scale.scale, 0.97);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(sent, <String>['hola']);
+    });
   });
 
   testWidgets('la barra usa surface1 con divisor superior (idioma del kit)', (

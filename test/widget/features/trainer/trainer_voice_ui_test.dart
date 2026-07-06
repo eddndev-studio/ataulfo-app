@@ -132,6 +132,9 @@ void main() {
   ) async {
     final rec = _FakeRecorder();
     await pump(tester, _loaded(), rec);
+    // El mic entra al slot con el switcher del kit: dejarlo asentar antes
+    // de tapear (a mitad de fade la opacity 0 no es hitteable).
+    await tester.pump(const Duration(milliseconds: 150));
     await tester.tap(find.byKey(const Key('trainer.voice.mic')));
     await tester.pump();
     expect(rec.startCalls, 1);

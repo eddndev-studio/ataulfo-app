@@ -519,6 +519,9 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(host(_FakeRecorder()));
       await tester.pump();
+      // El mic entra al slot con el switcher del kit (scale+fade): un frame
+      // más allá de durationFast para que la semántica ya sea alcanzable.
+      await tester.pump(const Duration(milliseconds: 150));
 
       final data = tester
           .getSemantics(find.byKey(const Key('composer.mic')))

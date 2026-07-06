@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/widgets/app_icon_pop.dart';
 import '../../../bots/presentation/pages/bots_list_page.dart';
 import '../../../bots/presentation/widgets/bot_create_sheet.dart';
 import '../../../labels/presentation/pages/labels_admin_page.dart';
@@ -52,6 +53,7 @@ class _ShellPageState extends State<ShellPage> {
     _TabSpec(
       label: 'Bots',
       icon: Icons.smart_toy_outlined,
+      activeIcon: Icons.smart_toy,
       page: BotsListPage(
         routeObserver: widget.routeObserver,
         onOpenSettings: () => _select(_settingsIndex),
@@ -61,6 +63,7 @@ class _ShellPageState extends State<ShellPage> {
     _TabSpec(
       label: 'Plantillas',
       icon: Icons.description_outlined,
+      activeIcon: Icons.description,
       page: TemplatesListPage(
         routeObserver: widget.routeObserver,
         onOpenSettings: () => _select(_settingsIndex),
@@ -70,13 +73,15 @@ class _ShellPageState extends State<ShellPage> {
     _TabSpec(
       label: 'Etiquetas',
       icon: Icons.label_outline,
+      activeIcon: Icons.label,
       page: LabelsAdminPage(onOpenSettings: () => _select(_settingsIndex)),
       fab: _labelCreateFab,
     ),
     // El asistente es lazy: su chat (que lee PlatformAgentChatBloc y
     // muestra un spinner mientras carga) no debe vivir offstage en el
     // IndexedStack — evita el spinner oculto que colgaría pumpAndSettle y
-    // difiere la carga hasta abrir la tab.
+    // difiere la carga hasta abrir la tab. Su glifo no tiene par
+    // outlined/filled: activa repite el mismo (con el pop de selección).
     const _TabSpec(
       label: 'Asistente',
       icon: Icons.auto_awesome,
@@ -89,6 +94,7 @@ class _ShellPageState extends State<ShellPage> {
     const _TabSpec(
       label: 'Ajustes',
       icon: Icons.settings_outlined,
+      activeIcon: Icons.settings,
       page: SettingsPage(),
     ),
   ];
@@ -135,6 +141,9 @@ class _ShellPageState extends State<ShellPage> {
                         for (final t in _tabs)
                           NavigationRailDestination(
                             icon: Icon(t.icon),
+                            // La selección monta un widget nuevo: el pop del
+                            // kit corre en cada activación de la tab.
+                            selectedIcon: AppIconPop(icon: t.selectedIcon),
                             label: Text(t.label),
                           ),
                       ],
@@ -154,6 +163,9 @@ class _ShellPageState extends State<ShellPage> {
                     for (final t in _tabs)
                       BottomNavigationBarItem(
                         icon: Icon(t.icon),
+                        // Ídem rail: el activeIcon monta al seleccionarse y
+                        // el pop del kit corre en cada activación.
+                        activeIcon: AppIconPop(icon: t.selectedIcon),
                         label: t.label,
                       ),
                   ],
@@ -164,13 +176,15 @@ class _ShellPageState extends State<ShellPage> {
   }
 }
 
-/// Una tab del shell: etiqueta + ícono del navegador, la página que monta el
-/// IndexedStack, su FAB contextual (null ⇒ la tab no crea nada) y si la
-/// página se materializa solo con la tab activa.
+/// Una tab del shell: etiqueta + ícono del navegador (con su variante filled
+/// para el estado activo), la página que monta el IndexedStack, su FAB
+/// contextual (null ⇒ la tab no crea nada) y si la página se materializa
+/// solo con la tab activa.
 class _TabSpec {
   const _TabSpec({
     required this.label,
     required this.icon,
+    this.activeIcon,
     required this.page,
     this.fab,
     this.lazy = false,
@@ -178,6 +192,13 @@ class _TabSpec {
 
   final String label;
   final IconData icon;
+
+  /// Variante filled del glifo para la tab activa. Nulo ⇒ el glifo no tiene
+  /// par outlined/filled y la selección repite [icon].
+  final IconData? activeIcon;
+
+  IconData get selectedIcon => activeIcon ?? icon;
+
   final Widget page;
   final Widget Function(BuildContext context)? fab;
   final bool lazy;

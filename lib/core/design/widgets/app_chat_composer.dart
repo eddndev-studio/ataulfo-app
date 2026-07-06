@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../motion.dart';
 import '../safe_bottom.dart';
 import '../tokens.dart';
+import 'app_press_scale.dart';
 
 /// Composer de chat del design system: la caja de redacción canónica de
 /// TODAS las superficies conversacionales (hilo real, entrenador, probar
@@ -72,6 +74,9 @@ class _AppChatComposerState extends State<AppChatComposer> {
 
   TextEditingController? _owned;
   FocusNode? _ownedFocus;
+
+  /// Highlight del botón de enviar (press-scale).
+  bool _sendPressed = false;
 
   TextEditingController get _ctrl =>
       widget.controller ?? (_owned ??= TextEditingController());
@@ -176,34 +181,61 @@ class _AppChatComposerState extends State<AppChatComposer> {
     );
 
     // Botón circular de enviar: relleno primary con glifo oscuro (idioma de
-    // AppButton.filled), atenuado cuando no hay nada que enviar.
-    final send = SizedBox(
-      width: _touchTarget,
-      height: _touchTarget,
-      child: Material(
-        color: canSend ? AppTokens.primary : AppTokens.surface3,
-        shape: const CircleBorder(),
-        child: InkWell(
-          key: widget.sendKey,
-          customBorder: const CircleBorder(),
-          onTap: canSend ? _send : null,
-          child: Icon(
-            Icons.send_rounded,
-            size: 22,
-            color: canSend ? AppTokens.onPrimary : AppTokens.text2,
-            semanticLabel: 'Enviar',
+    // AppButton.filled), atenuado cuando no hay nada que enviar. El fill hace
+    // "bloom" (surface3→primary animado) al aparecer texto, y el botón encoge
+    // al presionarse — ambos respetan AppMotion.
+    final send = AppPressScale(
+      pressed: _sendPressed,
+      child: SizedBox(
+        width: _touchTarget,
+        height: _touchTarget,
+        child: ClipOval(
+          child: AnimatedContainer(
+            duration: AppMotion.durationOf(context, AppTokens.durationFast),
+            curve: AppTokens.ease,
+            color: canSend ? AppTokens.primary : AppTokens.surface3,
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                key: widget.sendKey,
+                customBorder: const CircleBorder(),
+                onTap: canSend ? _send : null,
+                onHighlightChanged: (pressed) =>
+                    setState(() => _sendPressed = pressed),
+                child: Icon(
+                  Icons.send_rounded,
+                  size: 22,
+                  color: canSend ? AppTokens.onPrimary : AppTokens.text2,
+                  semanticLabel: 'Enviar',
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
 
     // Slot final: el micrófono mientras el campo está vacío (si el caller lo
-    // ofrece), o el botón de enviar en cuanto hay texto que mandar.
+    // ofrece), o el botón de enviar en cuanto hay texto que mandar. El
+    // intercambio transiciona con scale+fade; sin [emptyTrailing] la
+    // identidad (key) nunca cambia y el switcher no transiciona nada.
     final showMic =
         widget.emptyTrailing != null &&
         widget.enabled &&
         _ctrl.text.trim().isEmpty;
-    final trailing = showMic ? widget.emptyTrailing! : send;
+    final trailing = AnimatedSwitcher(
+      duration: AppMotion.durationOf(context, AppTokens.durationFast),
+      switchInCurve: AppTokens.ease,
+      switchOutCurve: AppTokens.ease,
+      transitionBuilder: (child, animation) => ScaleTransition(
+        scale: animation,
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child: KeyedSubtree(
+        key: ValueKey<bool>(showMic),
+        child: showMic ? widget.emptyTrailing! : send,
+      ),
+    );
 
     final bar = Container(
       key: const Key('app_chat_composer.bar'),

@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/motion.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/widgets/ai_config_stat_tile.dart';
 import 'package:flutter/material.dart';
@@ -97,6 +98,84 @@ void main() {
 
     await tester.tap(find.byKey(const Key('t')));
     expect(tapped, isFalse);
+  });
+
+  group('press-scale (feedback táctil)', () {
+    AnimatedScale scaleWidget(WidgetTester tester) =>
+        tester.widget<AnimatedScale>(
+          find.descendant(
+            of: find.byType(AiConfigStatTile),
+            matching: find.byType(AnimatedScale),
+          ),
+        );
+
+    testWidgets('presionado encoge sutil (0.98: superficie grande) y '
+        'regresa al soltar', (tester) async {
+      await tester.pumpWidget(
+        host(
+          AiConfigStatTile(
+            tileKey: const Key('t'),
+            label: 'Modelo',
+            value: 'gemini-3.1-pro',
+            onTap: () {},
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('t'))),
+      );
+      await tester.pump();
+      expect(scaleWidget(tester).scale, 0.98);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(scaleWidget(tester).scale, 1.0);
+    });
+
+    testWidgets('solo-lectura (onTap null) no encoge', (tester) async {
+      await tester.pumpWidget(
+        host(
+          const AiConfigStatTile(
+            tileKey: Key('t'),
+            label: 'Temperatura',
+            value: '1.0',
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('t'))),
+      );
+      await tester.pump();
+      expect(scaleWidget(tester).scale, 1.0);
+      await gesture.up();
+      await tester.pump();
+    });
+
+    testWidgets('con AppMotion apagado no encoge', (tester) async {
+      await tester.pumpWidget(
+        AppMotion(
+          enabled: false,
+          child: host(
+            AiConfigStatTile(
+              tileKey: const Key('t'),
+              label: 'Modelo',
+              value: 'gemini-3.1-pro',
+              onTap: () {},
+            ),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('t'))),
+      );
+      await tester.pump();
+      expect(scaleWidget(tester).scale, 1.0);
+      await gesture.up();
+      await tester.pump();
+    });
   });
 
   testWidgets('pinta surface3: bloque anidado perceptible sobre una card '

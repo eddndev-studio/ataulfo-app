@@ -1,3 +1,4 @@
+import 'package:ataulfo/core/design/widgets/app_icon_pop.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
@@ -99,6 +100,66 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
   }
+
+  group('íconos de tabs (variante filled + pop en la selección)', () {
+    Finder inNav(Finder matching) => find.descendant(
+      of: find.byType(BottomNavigationBar),
+      matching: matching,
+    );
+
+    testWidgets('la tab activa pinta filled con AppIconPop; las inactivas, '
+        'outline plano', (tester) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      // Bots activa: variante filled envuelta en el pop del kit.
+      expect(inNav(find.byIcon(Icons.smart_toy)), findsOneWidget);
+      expect(inNav(find.byType(AppIconPop)), findsOneWidget);
+      expect(inNav(find.byIcon(Icons.smart_toy_outlined)), findsNothing);
+      // Plantillas inactiva: outline, sin pop.
+      expect(inNav(find.byIcon(Icons.description_outlined)), findsOneWidget);
+      expect(inNav(find.byIcon(Icons.description)), findsNothing);
+    });
+
+    testWidgets('cambiar de tab mueve el filled+pop a la nueva selección', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 420);
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plantillas'));
+      await tester.pumpAndSettle();
+
+      expect(inNav(find.byIcon(Icons.description)), findsOneWidget);
+      expect(inNav(find.byIcon(Icons.smart_toy_outlined)), findsOneWidget);
+      expect(inNav(find.byIcon(Icons.smart_toy)), findsNothing);
+    });
+
+    testWidgets('el rail (≥600dp) también pinta filled+pop en la selección', (
+      tester,
+    ) async {
+      useViewport(tester, widthDp: 800);
+
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final inRail = find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.byType(AppIconPop),
+      );
+      expect(inRail, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(NavigationRail),
+          matching: find.byIcon(Icons.smart_toy),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
 
   group('layout adaptable (breakpoint 600dp M3)', () {
     testWidgets('phone (<600dp) usa BottomNavigationBar, no NavigationRail', (

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_press_scale.dart';
 
 /// Tile información+control del editor de AIConfig: label + valor sobre
 /// `surface3` (bloque anidado perceptible dentro de una card `surface2`).
@@ -14,7 +15,11 @@ import '../../../../core/design/tokens.dart';
 /// - [enabled] falso = inerte transitorio (mutación en vuelo, catálogo aún
 ///   cargando): conserva el chevron y se atenúa con el `Opacity 0.4` del kit —
 ///   las affordances no parpadean en cada guardado.
-class AiConfigStatTile extends StatelessWidget {
+///
+/// Feedback táctil: presionado encoge sutil ([AppPressScale] a 0.98 — la
+/// superficie es grande, un 0.97 se sentiría exagerado), por highlight del
+/// InkWell. Solo-lectura e inerte no encogen (sin onTap no hay highlight).
+class AiConfigStatTile extends StatefulWidget {
   const AiConfigStatTile({
     super.key,
     required this.tileKey,
@@ -35,50 +40,64 @@ class AiConfigStatTile extends StatelessWidget {
   final bool enabled;
 
   @override
+  State<AiConfigStatTile> createState() => _AiConfigStatTileState();
+}
+
+class _AiConfigStatTileState extends State<AiConfigStatTile> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final dimmed = onTap != null && !enabled;
+    final dimmed = widget.onTap != null && !widget.enabled;
     return Opacity(
       opacity: dimmed ? 0.4 : 1.0,
-      child: InkWell(
-        key: tileKey,
-        onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-        child: Container(
-          padding: const EdgeInsets.all(AppTokens.sp4),
-          decoration: BoxDecoration(
-            color: AppTokens.surface3,
-            borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Expanded(child: Text(label, style: textTheme.labelSmall)),
-                  if (onTap != null)
-                    const Icon(
-                      Icons.expand_more,
-                      size: 20,
-                      color: AppTokens.text2,
+      child: AppPressScale(
+        pressed: _pressed,
+        scale: 0.98,
+        child: InkWell(
+          key: widget.tileKey,
+          onTap: widget.enabled ? widget.onTap : null,
+          onHighlightChanged: (pressed) => setState(() => _pressed = pressed),
+          borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+          child: Container(
+            padding: const EdgeInsets.all(AppTokens.sp4),
+            decoration: BoxDecoration(
+              color: AppTokens.surface3,
+              borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(widget.label, style: textTheme.labelSmall),
                     ),
-                ],
-              ),
-              const SizedBox(height: AppTokens.sp1),
-              Text(value, style: textTheme.titleMedium),
-              if (note != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    note!,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: AppTokens.text2,
-                      fontStyle: FontStyle.italic,
+                    if (widget.onTap != null)
+                      const Icon(
+                        Icons.expand_more,
+                        size: 20,
+                        color: AppTokens.text2,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppTokens.sp1),
+                Text(widget.value, style: textTheme.titleMedium),
+                if (widget.note != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      widget.note!,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppTokens.text2,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ataulfo/core/design/motion.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 
@@ -258,6 +259,72 @@ void main() {
         expect(opacity.opacity, 1.0);
       },
     );
+  });
+
+  group('AppButton — press-scale (feedback táctil)', () {
+    AnimatedScale scaleWidget(WidgetTester tester) =>
+        tester.widget<AnimatedScale>(
+          find.descendant(
+            of: find.byType(AppButton),
+            matching: find.byType(AnimatedScale),
+          ),
+        );
+
+    testWidgets('mientras está presionado encoge (0.97) y al soltar regresa', (
+      tester,
+    ) async {
+      await pumpButton(tester, AppButton.filled(label: 'X', onPressed: () {}));
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(AppButton)),
+      );
+      await tester.pump();
+      expect(scaleWidget(tester).scale, 0.97);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(scaleWidget(tester).scale, 1.0);
+    });
+
+    testWidgets('deshabilitado (onPressed null) no encoge al presionar', (
+      tester,
+    ) async {
+      await pumpButton(
+        tester,
+        const AppButton.filled(label: 'X', onPressed: null),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(AppButton)),
+      );
+      await tester.pump();
+      expect(scaleWidget(tester).scale, 1.0);
+      await gesture.up();
+      await tester.pump();
+    });
+
+    testWidgets('con AppMotion apagado no encoge aunque esté presionado', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        AppMotion(
+          enabled: false,
+          child: MaterialApp(
+            home: Scaffold(
+              body: AppButton.filled(label: 'X', onPressed: () {}),
+            ),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(AppButton)),
+      );
+      await tester.pump();
+      expect(scaleWidget(tester).scale, 1.0);
+      await gesture.up();
+      await tester.pump();
+    });
   });
 
   group('AppButton — semántica', () {
