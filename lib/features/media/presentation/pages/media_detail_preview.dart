@@ -53,8 +53,9 @@ class MediaDetailPreview extends StatelessWidget {
       return _VideoPreview(asset: asset, loader: loader);
     }
     if (ct.startsWith('audio/')) return _AudioPreview(asset: asset);
-    if (asset.thumbnailSourceUrl != null)
+    if (asset.thumbnailSourceUrl != null) {
       return _Image(asset: asset, loader: loader);
+    }
     return _typeIcon(asset);
   }
 }
