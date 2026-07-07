@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../tokens.dart';
 
@@ -15,13 +16,32 @@ import '../tokens.dart';
 /// WhatsApp verbatim NO lo usan: ahí el texto debe verse igual que lo recibió
 /// el cliente, no reinterpretado como CommonMark.
 class AssistantMarkdown extends StatelessWidget {
-  const AssistantMarkdown({required this.data, super.key});
+  const AssistantMarkdown({required this.data, this.onLinkTap, super.key});
 
   final String data;
 
+  /// Manejador de taps en links con la URI ya parseada; por default abre la
+  /// URL en la app externa del SO (navegador / visor del tipo), igual que el
+  /// preview de la galería. Inyectable para tests — la llamada nativa a
+  /// url_launcher no se unit-testea.
+  final Future<void> Function(Uri uri)? onLinkTap;
+
   @override
   Widget build(BuildContext context) {
-    return MarkdownBody(data: data, styleSheet: _styleSheet(context));
+    return MarkdownBody(
+      data: data,
+      styleSheet: _styleSheet(context),
+      onTapLink: (text, href, title) {
+        final uri = href == null ? null : Uri.tryParse(href);
+        if (uri == null) return;
+        final handler = onLinkTap;
+        if (handler != null) {
+          handler(uri);
+          return;
+        }
+        launchUrl(uri, mode: LaunchMode.externalApplication);
+      },
+    );
   }
 
   MarkdownStyleSheet _styleSheet(BuildContext context) {

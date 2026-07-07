@@ -41,22 +41,50 @@ class PaMessageTile extends StatelessWidget {
     }
     if (message.isAssistant) {
       final hasThinking = message.thinking.isNotEmpty;
-      if (message.content.isEmpty && !hasThinking) {
+      final hasBody =
+          message.content.isNotEmpty || message.attachments.isNotEmpty;
+      if (!hasBody && !hasThinking) {
         return const SizedBox.shrink();
       }
+      // Los documentos que el turno ENTREGÓ (deliver_document) viajan
+      // adjuntos en la respuesta: mismo renderer compartido que los adjuntos
+      // del operador, dentro de la misma burbuja que el texto.
+      final assistantGallery = _imageGallery(message.attachments);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           if (hasThinking)
             ReasoningDisclosure(reasoning: message.thinking, keyId: message.id),
-          if (message.content.isNotEmpty)
+          if (hasBody)
             CopyableBubble(
               text: message.content,
               keyId: 'pa.${message.id}',
               child: ChatBubble(
                 mine: false,
-                child: AssistantMarkdown(data: message.content),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    for (final att in message.attachments)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppTokens.sp1),
+                        child: AttachmentContent(
+                          id: '${message.id}.${att.ref}',
+                          mediaRef: att.ref,
+                          mime: att.mime,
+                          name: att.name,
+                          url: att.url,
+                          gallery: assistantGallery,
+                          galleryIndex: assistantGallery?.indexWhere(
+                            (g) => g.mediaRef == att.ref,
+                          ),
+                        ),
+                      ),
+                    if (message.content.isNotEmpty)
+                      AssistantMarkdown(data: message.content),
+                  ],
+                ),
               ),
             ),
           MessageTimestamp(at: message.createdAt),

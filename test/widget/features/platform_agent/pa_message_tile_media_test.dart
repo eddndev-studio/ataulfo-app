@@ -43,6 +43,18 @@ PaMessage _userMsg({
   createdAt: DateTime.utc(2026, 6, 10, 10),
 );
 
+PaMessage _assistantMsg({
+  List<PaAttachment> attachments = const <PaAttachment>[],
+  String content = '',
+}) => PaMessage(
+  id: 'm1',
+  conversationId: 'c1',
+  role: 'assistant',
+  content: content,
+  attachments: attachments,
+  createdAt: DateTime.utc(2026, 6, 10, 10),
+);
+
 class _FakeVideoPlayback implements VideoPlayback {
   final List<String> calls = <String>[];
 
@@ -378,4 +390,38 @@ void main() {
       expect(find.byType(PageView), findsNothing);
     },
   );
+
+  testWidgets('mensaje del ASISTENTE con documento adjunto pinta la tarjeta', (
+    tester,
+  ) async {
+    const att = PaAttachment(
+      ref: 'org/media/cotizacion.pdf',
+      mime: 'application/pdf',
+      name: 'cotizacion-enero.pdf',
+      sizeBytes: 4096,
+      url: 'https://cdn.example/firmada',
+    );
+    await _pump(
+      tester,
+      _assistantMsg(
+        content: 'aquí tienes tu cotización',
+        attachments: const <PaAttachment>[att],
+      ),
+    );
+    expect(find.text('cotizacion-enero.pdf'), findsOneWidget);
+    expect(find.text('aquí tienes tu cotización'), findsOneWidget);
+  });
+
+  testWidgets('asistente sin texto pero con adjunto NO colapsa', (
+    tester,
+  ) async {
+    const att = PaAttachment(
+      ref: 'org/media/doc.pdf',
+      mime: 'application/pdf',
+      name: 'doc.pdf',
+      sizeBytes: 10,
+    );
+    await _pump(tester, _assistantMsg(attachments: const <PaAttachment>[att]));
+    expect(find.text('doc.pdf'), findsOneWidget);
+  });
 }
