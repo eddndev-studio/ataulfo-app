@@ -9,6 +9,9 @@ import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
 import '../../features/org_ai_config/presentation/bloc/org_ai_config_bloc.dart';
 import '../../features/org_ai_config/presentation/pages/org_ai_config_page.dart';
+import '../../features/org_customization/domain/repositories/org_branding_repository.dart';
+import '../../features/org_customization/presentation/bloc/org_customization_cubit.dart';
+import '../../features/org_customization/presentation/pages/org_customization_page.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/accept_invitation_cubit.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
@@ -199,6 +202,7 @@ class AppRouter {
     required InvitationsRepository invitationsRepository,
     required CatalogRepository catalogRepository,
     required OrgAiConfigRepository orgAiConfigRepository,
+    OrgBrandingRepository? orgBrandingRepository,
     required NotificationsRepository notificationsRepository,
     required MediaRepository mediaRepository,
     required MediaFilePicker mediaFilePicker,
@@ -242,6 +246,7 @@ class AppRouter {
        _invitationsRepo = invitationsRepository,
        _catalogRepo = catalogRepository,
        _orgAiConfigRepo = orgAiConfigRepository,
+       _orgBrandingRepo = orgBrandingRepository,
        _notificationsRepo = notificationsRepository,
        _mediaRepo = mediaRepository,
        _mediaFilePicker = mediaFilePicker,
@@ -300,6 +305,10 @@ class AppRouter {
   final InvitationsRepository _invitationsRepo;
   final CatalogRepository _catalogRepo;
   final OrgAiConfigRepository _orgAiConfigRepo;
+
+  /// Marca de documentos de la org (opcional): null en tests que no navegan
+  /// a `/org/customization`; main siempre la provee.
+  final OrgBrandingRepository? _orgBrandingRepo;
   final NotificationsRepository _notificationsRepo;
   final MediaRepository _mediaRepo;
   final MediaFilePicker _mediaFilePicker;
@@ -1570,6 +1579,44 @@ class AppRouter {
           appBar: AppBar(title: const Text('Apariencia')),
           body: const AppearancePage(),
         ),
+      ),
+      GoRoute(
+        // Personalización de la organización: nombre + logo de los
+        // documentos del asistente. Entry point: tile admin-gated en
+        // SettingsPage (gate cosmético; el backend 403ea por debajo de
+        // ADMIN). Page-scoped: el cubit carga marca + nombre al montarse;
+        // RenameOrgCubit reusa el mismo flujo de renombrar de memberships.
+        path: '/org/customization',
+        builder: (context, _) {
+          final brandingRepo = _orgBrandingRepo;
+          if (brandingRepo == null) {
+            return const Scaffold(
+              body: Center(child: Text('Personalización no disponible')),
+            );
+          }
+          final auth = _authBloc.state;
+          final activeOrgId = auth is AuthAuthenticated
+              ? auth.identity.orgId
+              : '';
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<OrgCustomizationCubit>(
+                create: (_) => OrgCustomizationCubit(
+                  branding: brandingRepo,
+                  memberships: _membershipsRepo,
+                  activeOrgId: activeOrgId,
+                )..load(),
+              ),
+              BlocProvider<RenameOrgCubit>(
+                create: (_) => RenameOrgCubit(_authRepo),
+              ),
+            ],
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Personalización')),
+              body: const OrgCustomizationPage(),
+            ),
+          );
+        },
       ),
       GoRoute(
         // Galería de media de la org. Entry point: tile en SettingsPage.

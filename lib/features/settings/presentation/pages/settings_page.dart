@@ -197,6 +197,14 @@ class _SectionsCard extends StatelessWidget {
               caption: 'Proveedor por modelo y valores por defecto',
               onTap: () => context.push('/org/ai-config'),
             ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.org_customization_tile'),
+              icon: Icons.workspace_premium_outlined,
+              title: 'Personalización',
+              caption: 'Nombre y logo de los documentos de tu organización',
+              onTap: () => context.push('/org/customization'),
+            ),
           ],
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
           AppSectionLink(

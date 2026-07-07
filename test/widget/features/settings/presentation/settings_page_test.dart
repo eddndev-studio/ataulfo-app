@@ -290,6 +290,11 @@ void main() {
     );
 
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    // El tile vive abajo del scroll para roles ADMIN+ (más filas arriba):
+    // asegurar visibilidad antes de tocarlo.
+    await tester.ensureVisible(
+      find.byKey(const Key('settings.notifications_tile')),
+    );
     await tester.tap(find.byKey(const Key('settings.notifications_tile')));
     await tester.pumpAndSettle();
 
@@ -350,9 +355,13 @@ void main() {
 
     expect(find.byKey(const Key('settings.members_tile')), findsOneWidget);
     expect(find.text('Miembros'), findsOneWidget);
-    // Mismo gate ADMIN+: la config de IA de la org.
+    // Mismo gate ADMIN+: la config de IA y la personalización de la org.
     expect(
       find.byKey(const Key('settings.org_ai_config_tile')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('settings.org_customization_tile')),
       findsOneWidget,
     );
   });
@@ -381,6 +390,10 @@ void main() {
     expect(find.byKey(const Key('settings.members_tile')), findsNothing);
     expect(find.text('Miembros'), findsNothing);
     expect(find.byKey(const Key('settings.org_ai_config_tile')), findsNothing);
+    expect(
+      find.byKey(const Key('settings.org_customization_tile')),
+      findsNothing,
+    );
   });
 
   testWidgets('WORKER NO ve el tile "Miembros"', (tester) async {
@@ -522,12 +535,12 @@ void main() {
       final card = find.byKey(const Key('settings.card.sections'));
       expect(card, findsOneWidget);
       expect(tester.widget(card), isA<AppCard>());
-      // OWNER: las 7 áreas como filas (organizaciones, aceptar invitación,
-      // miembros, config de IA, galería, notificaciones, apariencia) — muere
-      // la pila de cards sueltas sin jerarquía.
+      // OWNER: las 8 áreas como filas (organizaciones, aceptar invitación,
+      // miembros, config de IA, personalización, galería, notificaciones,
+      // apariencia) — muere la pila de cards sueltas sin jerarquía.
       expect(
         find.descendant(of: card, matching: find.byType(AppSectionLink)),
-        findsNWidgets(7),
+        findsNWidgets(8),
       );
       // Captions: cada fila dice qué hay detrás, no solo el título.
       expect(find.text('Bandeja y preferencias de avisos'), findsOneWidget);
