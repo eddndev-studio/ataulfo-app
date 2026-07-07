@@ -45,8 +45,8 @@ class DocumentLogoSection extends StatelessWidget {
                   branding.hasLogo
                       ? 'Los documentos nuevos salen con este logo junto '
                             'al nombre de la organización.'
-                      : 'Aún sin logo: los documentos usan el nombre de la '
-                            'organización como marca.',
+                      : 'Aún sin logo: los documentos salen con la marca '
+                            'de Ataúlfo hasta que configures la tuya.',
                   style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
                 ),
               ),

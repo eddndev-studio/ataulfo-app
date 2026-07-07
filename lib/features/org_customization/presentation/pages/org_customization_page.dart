@@ -76,8 +76,7 @@ class OrgCustomizationPage extends StatelessWidget {
       title: '¿Restablecer la marca?',
       message:
           'Se quita el logo (y cualquier plantilla personalizada). Los '
-          'documentos nuevos vuelven al estilo estándar con el nombre de '
-          'la organización.',
+          'documentos nuevos vuelven a la marca de Ataúlfo.',
       confirmLabel: 'Restablecer',
       destructive: true,
       confirmKey: const Key('org_customization.reset_confirm'),

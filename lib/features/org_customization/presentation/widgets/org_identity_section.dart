@@ -43,8 +43,8 @@ class OrgIdentitySection extends StatelessWidget {
           ),
           const SizedBox(height: AppTokens.sp2),
           Text(
-            'Aparece en el membrete y el pie de los documentos que genera '
-            'el asistente.',
+            'Con tu marca configurada, aparece junto al logo en el membrete '
+            'y el pie de los documentos que genera el asistente.',
             style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
           ),
           const SizedBox(height: AppTokens.sp4),
