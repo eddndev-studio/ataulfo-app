@@ -98,6 +98,13 @@ enum ToolGroup {
     'Prometer mensajes futuros: programar, listar y cancelar envíos que se '
         'disparan solos a la hora acordada (recordatorios, seguimientos).',
     Icons.schedule_send_outlined,
+  ),
+  reenvio(
+    'reenvio',
+    'Reenvío a otros chats',
+    'Buscar otros chats del bot por nombre y reenviarles mensajes de esta '
+        'conversación (p. ej. pasar un comprobante a un grupo interno).',
+    Icons.shortcut,
   );
 
   const ToolGroup(this.wire, this.label, this.description, this.icon);

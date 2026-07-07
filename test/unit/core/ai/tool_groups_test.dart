@@ -23,6 +23,7 @@ void main() {
         'historial',
         'analisis',
         'programacion',
+        'reenvio',
       ]);
     });
 
@@ -37,6 +38,7 @@ void main() {
           ToolGroup.fromWireOrNull('programacion'),
           ToolGroup.programacion,
         );
+        expect(ToolGroup.fromWireOrNull('reenvio'), ToolGroup.reenvio);
         expect(ToolGroup.fromWireOrNull('no_existe'), isNull);
       },
     );
