@@ -9,7 +9,7 @@ String planLabel(String planCode) => switch (planCode) {
   'starter' => 'Starter',
   'pro' => 'Pro',
   'business' => 'Business',
-  'cortesia' => 'Cortesía',
+  'cortesia' => 'Fundador',
   '' => 'Plan',
   _ => planCode[0].toUpperCase() + planCode.substring(1),
 };

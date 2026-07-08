@@ -31,7 +31,7 @@ void main() {
       expect(planLabel('starter'), 'Starter');
       expect(planLabel('pro'), 'Pro');
       expect(planLabel('business'), 'Business');
-      expect(planLabel('cortesia'), 'Cortesía');
+      expect(planLabel('cortesia'), 'Fundador');
     });
 
     test('código desconocido ⇒ capitalizado, nunca jerga cruda', () {
