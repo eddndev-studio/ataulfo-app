@@ -19,6 +19,10 @@ import '../../features/calendar/presentation/pages/booking_page.dart';
 import '../../features/calendar/presentation/pages/business_hours_page.dart';
 import '../../features/calendar/presentation/pages/event_types_page.dart';
 import '../../features/calendar/presentation/widgets/chat_appointment_badge.dart';
+import '../../features/product_catalog/domain/repositories/product_catalog_repository.dart';
+import '../../features/product_catalog/presentation/bloc/product_catalog_cubit.dart';
+import '../../features/product_catalog/presentation/pages/product_catalog_page.dart';
+import '../../features/product_catalog/presentation/widgets/product_catalog_fab.dart';
 import '../../features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
 import '../../features/org_ai_config/presentation/bloc/org_ai_config_bloc.dart';
 import '../../features/org_ai_config/presentation/pages/org_ai_config_page.dart';
@@ -215,6 +219,7 @@ class AppRouter {
     required InvitationsRepository invitationsRepository,
     required CatalogRepository catalogRepository,
     required CalendarRepository calendarRepository,
+    ProductCatalogRepository? productCatalogRepository,
     BillingRepository? billingRepository,
     String webBaseUrl = 'https://ataulfo.app',
     required OrgAiConfigRepository orgAiConfigRepository,
@@ -262,6 +267,7 @@ class AppRouter {
        _invitationsRepo = invitationsRepository,
        _catalogRepo = catalogRepository,
        _calendarRepo = calendarRepository,
+       _productCatalogRepo = productCatalogRepository,
        _billingRepo = billingRepository,
        _webBaseUrl = webBaseUrl,
        _orgAiConfigRepo = orgAiConfigRepository,
@@ -327,6 +333,10 @@ class AppRouter {
   /// Calendario (tipos de evento, horario, citas): alimenta la tab Agenda y las
   /// secciones de Ajustes → Agenda. Requerido — la tab Agenda vive en el shell.
   final CalendarRepository _calendarRepo;
+
+  /// Catálogo de productos de la org (opcional): null en tests que no navegan
+  /// a `/catalog/products`; main siempre lo provee.
+  final ProductCatalogRepository? _productCatalogRepo;
 
   /// Entitlement de billing (opcional): null en tests que no lo cablean —
   /// las superficies que filtran por plan degradan a no filtrar; main
@@ -1752,6 +1762,30 @@ class AppRouter {
             body: const BusinessHoursPage(),
           ),
         ),
+      ),
+      GoRoute(
+        // Ajustes → Catálogo de productos (listado + búsqueda + alta/edición).
+        // Entry point: tile para todo miembro en SettingsPage (leer es de
+        // cualquier rol; crear/editar lo autoriza el backend con 403).
+        // Page-scoped: carga productos y categorías al montarse. El FAB de
+        // alta vive en el Scaffold de la ruta, bajo el mismo provider.
+        path: '/catalog/products',
+        builder: (context, _) {
+          final repo = _productCatalogRepo;
+          if (repo == null) {
+            return const Scaffold(
+              body: Center(child: Text('Catálogo no disponible')),
+            );
+          }
+          return BlocProvider<ProductCatalogCubit>(
+            create: (_) => ProductCatalogCubit(repo)..load(),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Catálogo de productos')),
+              body: const ProductCatalogPage(),
+              floatingActionButton: const ProductCatalogFab(),
+            ),
+          );
+        },
       ),
       GoRoute(
         // Galería de media de la org. Entry point: tile en SettingsPage.

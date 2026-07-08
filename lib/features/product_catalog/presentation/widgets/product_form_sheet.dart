@@ -1,0 +1,348 @@
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/safe_bottom.dart';
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_switch.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../media/domain/entities/media_asset.dart';
+import '../../domain/entities/product.dart';
+import '../../domain/failures/product_catalog_failure.dart';
+import '../peso_format.dart';
+import '../product_thumb_resolver.dart';
+import 'product_form_image_section.dart';
+
+/// Persiste el formulario y devuelve la falla o null (éxito). El precio ya
+/// viaja en centavos; el mediaRef es el BARE de la galería ('' = sin imagen).
+typedef ProductFormSubmit =
+    Future<ProductCatalogFailure?> Function({
+      required ProductKind kind,
+      required String name,
+      required String description,
+      required String category,
+      required int priceCents,
+      required String mediaRef,
+      required bool active,
+    });
+
+/// Cómo se elige la imagen de la galería. Default: la galería en modo picker
+/// filtrada a imágenes (`/media/pick?type=image`); los tests inyectan fakes.
+typedef ProductImagePicker = Future<MediaAsset?> Function(BuildContext context);
+
+/// Cómo se resuelven los bytes de la miniatura (ref BARE + asset efímero del
+/// picker si lo hay). Default: `ProductThumbResolver.session`.
+typedef ProductThumbLoader =
+    Future<Uint8List?> Function(String ref, {MediaAsset? asset});
+
+/// Formulario de crear/editar un producto del catálogo como hoja inferior.
+/// En alta [initial] es null (nace activo, sin toggle); en edición trae el
+/// producto y muestra el toggle «Activo». El precio se edita en PESOS
+/// («1,250.00»; vacío = a consultar) y se envía en centavos. [onSubmit]
+/// persiste y devuelve la falla o null.
+class ProductFormSheet extends StatefulWidget {
+  const ProductFormSheet({
+    super.key,
+    this.initial,
+    this.categories = const <String>[],
+    required this.onSubmit,
+    this.pickImage,
+    this.thumbLoader,
+  });
+
+  final Product? initial;
+
+  /// Categorías existentes de la org: sugerencias tappables bajo el campo.
+  final List<String> categories;
+  final ProductFormSubmit onSubmit;
+  final ProductImagePicker? pickImage;
+  final ProductThumbLoader? thumbLoader;
+
+  static Future<void> open(
+    BuildContext context, {
+    Product? initial,
+    List<String> categories = const <String>[],
+    required ProductFormSubmit onSubmit,
+    ProductImagePicker? pickImage,
+    ProductThumbLoader? thumbLoader,
+  }) => showAppBottomSheet<void>(
+    context,
+    backgroundColor: AppTokens.surface1,
+    isScrollControlled: true,
+    builder: (_) => ProductFormSheet(
+      initial: initial,
+      categories: categories,
+      onSubmit: onSubmit,
+      pickImage: pickImage,
+      thumbLoader: thumbLoader,
+    ),
+  );
+
+  @override
+  State<ProductFormSheet> createState() => _ProductFormSheetState();
+}
+
+class _ProductFormSheetState extends State<ProductFormSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _priceCtrl;
+  late final TextEditingController _categoryCtrl;
+  late final TextEditingController _descCtrl;
+  late ProductKind _kind;
+  late bool _active;
+  late String _mediaRef;
+
+  /// Asset efímero de la selección de ESTA sesión: habilita la descarga de
+  /// la miniatura recién elegida. Solo describe a [_mediaRef]; jamás se
+  /// persiste (lo que viaja es el ref BARE).
+  MediaAsset? _pickedAsset;
+  bool _busy = false;
+  String? _error;
+
+  bool get _isEdit => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final it = widget.initial;
+    _nameCtrl = TextEditingController(text: it?.name ?? '');
+    _priceCtrl = TextEditingController(
+      text: formatCentsToPesos(it?.priceCents ?? 0),
+    );
+    _categoryCtrl = TextEditingController(text: it?.category ?? '');
+    _descCtrl = TextEditingController(text: it?.description ?? '');
+    _kind = it?.kind ?? ProductKind.product;
+    _active = it?.active ?? true;
+    _mediaRef = it?.mediaRef ?? '';
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _priceCtrl.dispose();
+    _categoryCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pick() async {
+    final pick = widget.pickImage;
+    final asset = pick != null
+        ? await pick(context)
+        : await context.push<MediaAsset>('/media/pick?type=image');
+    if (asset == null || !mounted) return;
+    setState(() {
+      _mediaRef = asset.ref;
+      _pickedAsset = asset;
+    });
+  }
+
+  Future<void> _save() async {
+    if (_busy) return;
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Ponle un nombre al producto.');
+      return;
+    }
+    final priceCents = parsePesosToCents(_priceCtrl.text);
+    if (priceCents == null) {
+      setState(
+        () => _error =
+            'Escribe un precio válido (p. ej. 1,250.00) o déjalo vacío.',
+      );
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final failure = await widget.onSubmit(
+      kind: _kind,
+      name: name,
+      description: _descCtrl.text.trim(),
+      category: _categoryCtrl.text.trim(),
+      priceCents: priceCents,
+      mediaRef: _mediaRef,
+      active: _active,
+    );
+    if (!mounted) return;
+    if (failure == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _error = _messageFor(failure);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppTokens.sp5,
+          AppTokens.sp2,
+          AppTokens.sp5,
+          AppTokens.sp5 + context.safeBottomInset,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                _isEdit ? 'Editar producto' : 'Nuevo producto',
+                style: textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppTokens.sp5),
+              Wrap(
+                spacing: AppTokens.sp2,
+                children: <Widget>[
+                  AppChoiceChip(
+                    key: const Key('product_form.kind.product'),
+                    label: 'Producto',
+                    selected: _kind == ProductKind.product,
+                    onSelected: (_) =>
+                        setState(() => _kind = ProductKind.product),
+                  ),
+                  AppChoiceChip(
+                    key: const Key('product_form.kind.service'),
+                    label: 'Servicio',
+                    selected: _kind == ProductKind.service,
+                    onSelected: (_) =>
+                        setState(() => _kind = ProductKind.service),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTokens.sp4),
+              AppTextField(
+                key: const Key('product_form.name'),
+                label: 'Nombre',
+                hint: 'Ej. Mango Ataulfo por caja',
+                controller: _nameCtrl,
+                autofocus: !_isEdit,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppTokens.sp4),
+              AppTextField(
+                key: const Key('product_form.price'),
+                label: 'Precio (MXN)',
+                hint: 'Ej. 1,250.00 — vacío = a consultar',
+                controller: _priceCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppTokens.sp4),
+              AppTextField(
+                key: const Key('product_form.category'),
+                label: 'Categoría (opcional)',
+                hint: 'Ej. Fruta, Servicios…',
+                controller: _categoryCtrl,
+                textInputAction: TextInputAction.next,
+              ),
+              if (widget.categories.isNotEmpty) ...<Widget>[
+                const SizedBox(height: AppTokens.sp3),
+                Wrap(
+                  spacing: AppTokens.sp2,
+                  runSpacing: AppTokens.sp2,
+                  children: <Widget>[
+                    for (final cat in widget.categories)
+                      AppChoiceChip(
+                        key: Key('product_form.category_suggestion.$cat'),
+                        label: cat,
+                        selected: _categoryCtrl.text.trim() == cat,
+                        onSelected: (_) =>
+                            setState(() => _categoryCtrl.text = cat),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: AppTokens.sp4),
+              AppTextField(
+                key: const Key('product_form.description'),
+                label: 'Descripción (opcional)',
+                hint: 'Qué incluye, presentaciones, tiempos…',
+                controller: _descCtrl,
+                minLines: 3,
+                maxLines: 6,
+              ),
+              const SizedBox(height: AppTokens.sp5),
+              ProductFormImageSection(
+                mediaRef: _mediaRef,
+                pickedAsset: _pickedAsset,
+                thumbLoader:
+                    widget.thumbLoader ?? ProductThumbResolver.session.load,
+                enabled: !_busy,
+                onPick: _pick,
+                onRemove: () => setState(() {
+                  _mediaRef = '';
+                  _pickedAsset = null;
+                }),
+              ),
+              if (_isEdit) ...<Widget>[
+                const SizedBox(height: AppTokens.sp5),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text('Activo', style: textTheme.bodyLarge),
+                          Text(
+                            'Los inactivos no se ofrecen ni se comparten.',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: AppTokens.text2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AppSwitch(
+                      key: const Key('product_form.active'),
+                      value: _active,
+                      onChanged: (v) => setState(() => _active = v),
+                    ),
+                  ],
+                ),
+              ],
+              if (_error != null) ...<Widget>[
+                const SizedBox(height: AppTokens.sp3),
+                Text(
+                  _error!,
+                  key: const Key('product_form.error'),
+                  style: textTheme.bodySmall?.copyWith(color: AppTokens.danger),
+                ),
+              ],
+              const SizedBox(height: AppTokens.sp5),
+              AppButton.filled(
+                key: const Key('product_form.save'),
+                label: _isEdit ? 'Guardar cambios' : 'Crear producto',
+                fullWidth: true,
+                loading: _busy,
+                onPressed: _busy ? null : _save,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _messageFor(ProductCatalogFailure failure) => switch (failure) {
+    ProductCatalogValidationFailure(:final message) =>
+      message ?? 'Revisa los datos e inténtalo otra vez.',
+    ProductCatalogForbiddenFailure() => 'No tienes permiso para esta acción.',
+    ProductCatalogNetworkFailure() =>
+      'Sin conexión. Revisa tu red e inténtalo otra vez.',
+    ProductCatalogTimeoutFailure() =>
+      'La operación tardó demasiado. Inténtalo otra vez.',
+    _ => 'No se pudo guardar. Inténtalo otra vez.',
+  };
+}

@@ -231,6 +231,16 @@ class _SectionsCard extends StatelessWidget {
             ),
           ],
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          // Visible para todos: el listado del catálogo es de lectura para
+          // cualquier miembro; crear/editar lo autoriza el backend (403).
+          AppSectionLink(
+            rowKey: const Key('settings.product_catalog_tile'),
+            icon: Icons.storefront_outlined,
+            title: 'Catálogo de productos',
+            caption: 'Lo que tu asistente puede ofrecer y compartir',
+            onTap: () => context.push('/catalog/products'),
+          ),
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
           AppSectionLink(
             rowKey: const Key('settings.media_tile'),
             icon: Icons.perm_media_outlined,
