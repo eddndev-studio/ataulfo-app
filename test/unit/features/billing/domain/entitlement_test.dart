@@ -5,9 +5,11 @@ Entitlement _base({
   Set<String> eligibleProviders = const <String>{'MINIMAX', 'NEMOTRON'},
   List<String> features = const <String>['media_gallery'],
   int usedConversations = 12,
+  bool trialExpired = false,
 }) => Entitlement(
   planCode: 'trial',
   status: 'trialing',
+  trialExpired: trialExpired,
   usedConversations: usedConversations,
   conversationCap: 50,
   withinQuota: true,
@@ -46,6 +48,13 @@ void main() {
       expect(
         _base(usedConversations: 12),
         isNot(equals(_base(usedConversations: 13))),
+      );
+    });
+
+    test('difiere por trialExpired', () {
+      expect(
+        _base(trialExpired: true),
+        isNot(equals(_base(trialExpired: false))),
       );
     });
 

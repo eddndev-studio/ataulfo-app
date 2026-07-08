@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/ai_catalog/domain/repositories/catalog_repository.dart';
 import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
+import '../../features/billing/data/repositories/url_launcher_web_link_launcher.dart';
 import '../../features/billing/domain/repositories/billing_repository.dart';
 import '../../features/billing/presentation/bloc/entitlement_bloc.dart';
+import '../../features/billing/presentation/pages/cuenta_page.dart';
 import '../../features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
 import '../../features/org_ai_config/presentation/bloc/org_ai_config_bloc.dart';
 import '../../features/org_ai_config/presentation/pages/org_ai_config_page.dart';
@@ -204,6 +206,7 @@ class AppRouter {
     required InvitationsRepository invitationsRepository,
     required CatalogRepository catalogRepository,
     BillingRepository? billingRepository,
+    String webBaseUrl = 'https://ataulfo.app',
     required OrgAiConfigRepository orgAiConfigRepository,
     OrgBrandingRepository? orgBrandingRepository,
     required NotificationsRepository notificationsRepository,
@@ -249,6 +252,7 @@ class AppRouter {
        _invitationsRepo = invitationsRepository,
        _catalogRepo = catalogRepository,
        _billingRepo = billingRepository,
+       _webBaseUrl = webBaseUrl,
        _orgAiConfigRepo = orgAiConfigRepository,
        _orgBrandingRepo = orgBrandingRepository,
        _notificationsRepo = notificationsRepository,
@@ -313,6 +317,10 @@ class AppRouter {
   /// las superficies que filtran por plan degradan a no filtrar; main
   /// siempre lo provee.
   final BillingRepository? _billingRepo;
+
+  /// Base del sitio web público (gestión de plan). Distinta de la API:
+  /// `AGENTIC_BASE_URL` apunta al backend y no deriva el apex.
+  final String _webBaseUrl;
   final OrgAiConfigRepository _orgAiConfigRepo;
 
   /// Marca de documentos de la org (opcional): null en tests que no navegan
@@ -1641,6 +1649,34 @@ class AppRouter {
             child: Scaffold(
               appBar: AppBar(title: const Text('Personalización')),
               body: const OrgCustomizationPage(),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        // Cuenta y plan de la org, SOLO-LECTURA: gestionar (contratar,
+        // mejorar, pagar) vive en el sitio web y la página solo enlaza.
+        // Entry point: tile admin-gated en SettingsPage (gate cosmético,
+        // como Configuración de IA). Page-scoped: el bloc carga el
+        // entitlement al montarse; un retry desde Failed reusa el load.
+        path: '/cuenta',
+        builder: (context, _) {
+          final billingRepo = _billingRepo;
+          if (billingRepo == null) {
+            return const Scaffold(
+              body: Center(child: Text('Cuenta no disponible')),
+            );
+          }
+          return BlocProvider<EntitlementBloc>(
+            create: (_) =>
+                EntitlementBloc(billingRepo)
+                  ..add(const EntitlementLoadRequested()),
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Cuenta')),
+              body: CuentaPage(
+                webBaseUrl: _webBaseUrl,
+                launcher: const UrlLauncherWebLinkLauncher(),
+              ),
             ),
           );
         },

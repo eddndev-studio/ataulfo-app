@@ -12,6 +12,7 @@ class Entitlement {
   const Entitlement({
     required this.planCode,
     required this.status,
+    required this.trialExpired,
     required this.usedConversations,
     required this.conversationCap,
     required this.withinQuota,
@@ -26,6 +27,11 @@ class Entitlement {
 
   /// Estado de la suscripción tal cual el wire (active/trialing/past_due/…).
   final String status;
+
+  /// Prueba vencida (trialing con el periodo ya cerrado) — llega YA derivado
+  /// del backend, igual que los flags de cuota: `status` sigue diciendo
+  /// 'trialing' y este bool explica por qué la IA está pausada.
+  final bool trialExpired;
 
   /// Conversaciones CON IA consumidas en el periodo vigente del plan.
   final int usedConversations;
@@ -53,6 +59,7 @@ class Entitlement {
     return other is Entitlement &&
         other.planCode == planCode &&
         other.status == status &&
+        other.trialExpired == trialExpired &&
         other.usedConversations == usedConversations &&
         other.conversationCap == conversationCap &&
         other.withinQuota == withinQuota &&
@@ -67,6 +74,7 @@ class Entitlement {
   int get hashCode => Object.hash(
     planCode,
     status,
+    trialExpired,
     usedConversations,
     conversationCap,
     withinQuota,

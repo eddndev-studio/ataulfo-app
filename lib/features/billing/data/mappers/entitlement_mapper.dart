@@ -11,6 +11,7 @@ class EntitlementMapper {
   static Entitlement dtoToEntity(EntitlementDto dto) => Entitlement(
     planCode: dto.planCode,
     status: dto.status,
+    trialExpired: dto.trialExpired,
     usedConversations: dto.usedConversations,
     conversationCap: dto.conversationCap,
     withinQuota: dto.withinQuota,

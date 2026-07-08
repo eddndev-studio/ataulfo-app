@@ -154,6 +154,14 @@ Future<void> main() async {
     defaultValue: 'https://api.ataulfo.app',
   );
 
+  // Sitio web público (gestión del plan de la org). NO se deriva de la API:
+  // `AGENTIC_BASE_URL` apunta al subdominio del backend y el sitio vive en
+  // el apex; la pantalla Cuenta enlaza a `/cuenta` y `/precios` de aquí.
+  const ataulfoWebUrl = String.fromEnvironment(
+    'ATAULFO_WEB_URL',
+    defaultValue: 'https://ataulfo.app',
+  );
+
   final kv = FlutterSecureKvStore();
   final storage = TokenStorage(kv);
   final deviceIds = DeviceIdProvider(kv);
@@ -477,6 +485,7 @@ Future<void> main() async {
     invitationsRepository: invitationsRepository,
     catalogRepository: catalogRepository,
     billingRepository: billingRepository,
+    webBaseUrl: ataulfoWebUrl,
     orgAiConfigRepository: orgAiConfigRepository,
     orgBrandingRepository: orgBrandingRepository,
     notificationsRepository: notificationsRepository,

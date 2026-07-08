@@ -205,6 +205,14 @@ class _SectionsCard extends StatelessWidget {
               caption: 'Nombre y logo de los documentos de tu organización',
               onTap: () => context.push('/org/customization'),
             ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.account_tile'),
+              icon: Icons.credit_card_outlined,
+              title: 'Cuenta y plan',
+              caption: 'Tu plan, consumo y estado de la IA',
+              onTap: () => context.push('/cuenta'),
+            ),
           ],
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
           AppSectionLink(

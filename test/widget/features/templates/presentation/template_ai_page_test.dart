@@ -1005,6 +1005,7 @@ void main() {
     const entitlement = Entitlement(
       planCode: 'trial',
       status: 'trialing',
+      trialExpired: false,
       usedConversations: 0,
       conversationCap: 50,
       withinQuota: true,

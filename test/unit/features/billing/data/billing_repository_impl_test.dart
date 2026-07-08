@@ -10,6 +10,7 @@ class _MockDs extends Mock implements BillingDatasource {}
 const _entitlement = Entitlement(
   planCode: 'trial',
   status: 'trialing',
+  trialExpired: false,
   usedConversations: 12,
   conversationCap: 50,
   withinQuota: true,

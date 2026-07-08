@@ -8,6 +8,7 @@ void main() {
       const dto = EntitlementDto(
         planCode: 'starter',
         status: 'active',
+        trialExpired: true,
         usedConversations: 42,
         conversationCap: 100,
         withinQuota: true,
@@ -22,6 +23,7 @@ void main() {
 
       expect(e.planCode, 'starter');
       expect(e.status, 'active');
+      expect(e.trialExpired, isTrue);
       expect(e.usedConversations, 42);
       expect(e.conversationCap, 100);
       expect(e.withinQuota, isTrue);
@@ -35,6 +37,7 @@ void main() {
       const dto = EntitlementDto(
         planCode: 'trial',
         status: 'trialing',
+        trialExpired: false,
         usedConversations: 0,
         conversationCap: 50,
         withinQuota: true,

@@ -3,11 +3,14 @@
 /// Las claves viajan en snake_case, consistentes con el adaptador Go de
 /// billing. Todos los campos son obligatorios: el backend encoda la foto
 /// completa siempre (los slices como `[]`, nunca null) — un faltante es un
-/// wire roto, no un caso a tolerar. El mapper convierte DTO ⇄ entidad.
+/// wire roto, no un caso a tolerar. Excepción: `trial_expired` es ADITIVO
+/// (un backend anterior no lo encoda) y su ausencia degrada a false; presente
+/// con tipo inválido sigue siendo wire roto. El mapper convierte DTO ⇄ entidad.
 class EntitlementDto {
   const EntitlementDto({
     required this.planCode,
     required this.status,
+    required this.trialExpired,
     required this.usedConversations,
     required this.conversationCap,
     required this.withinQuota,
@@ -21,6 +24,8 @@ class EntitlementDto {
   factory EntitlementDto.fromJson(Map<String, dynamic> json) {
     final planCode = json['plan_code'];
     final status = json['status'];
+    // Aditivo: ausente ⇒ false (backend viejo); presente no-bool ⇒ roto.
+    final trialExpired = json['trial_expired'] ?? false;
     final usedConversations = json['used_conversations'];
     final conversationCap = json['conversation_cap'];
     final withinQuota = json['within_quota'];
@@ -29,6 +34,7 @@ class EntitlementDto {
     final storageQuotaMb = json['storage_quota_mb'];
     if (planCode is! String ||
         status is! String ||
+        trialExpired is! bool ||
         usedConversations is! int ||
         conversationCap is! int ||
         withinQuota is! bool ||
@@ -42,6 +48,7 @@ class EntitlementDto {
     return EntitlementDto(
       planCode: planCode,
       status: status,
+      trialExpired: trialExpired,
       usedConversations: usedConversations,
       conversationCap: conversationCap,
       withinQuota: withinQuota,
@@ -55,6 +62,7 @@ class EntitlementDto {
 
   final String planCode;
   final String status;
+  final bool trialExpired;
   final int usedConversations;
   final int conversationCap;
   final bool withinQuota;

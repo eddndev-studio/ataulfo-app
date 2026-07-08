@@ -3,11 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 Map<String, dynamic> _body({
   Object? planCode = 'trial',
+  Object? trialExpired = false,
   Object? eligibleProviders = const <dynamic>['MINIMAX', 'NEMOTRON'],
   Object? features = const <dynamic>['media_gallery'],
 }) => <String, dynamic>{
   'plan_code': planCode,
   'status': 'trialing',
+  'trial_expired': trialExpired,
   'used_conversations': 12,
   'conversation_cap': 50,
   'within_quota': true,
@@ -25,6 +27,7 @@ void main() {
 
       expect(dto.planCode, 'trial');
       expect(dto.status, 'trialing');
+      expect(dto.trialExpired, isFalse);
       expect(dto.usedConversations, 12);
       expect(dto.conversationCap, 50);
       expect(dto.withinQuota, isTrue);
@@ -45,6 +48,26 @@ void main() {
 
       expect(dto.eligibleProviders, isEmpty);
       expect(dto.features, isEmpty);
+    });
+
+    test('trial_expired=true del wire se parsea', () {
+      final dto = EntitlementDto.fromJson(_body(trialExpired: true));
+      expect(dto.trialExpired, isTrue);
+    });
+
+    test('trial_expired AUSENTE ⇒ false (backend viejo no rompe)', () {
+      // Campo aditivo: un backend anterior al enforcement de trial no lo
+      // encoda todavía; degradar a false conserva el parse estricto del resto.
+      final body = _body()..remove('trial_expired');
+      final dto = EntitlementDto.fromJson(body);
+      expect(dto.trialExpired, isFalse);
+    });
+
+    test('trial_expired presente con tipo inválido ⇒ FormatException', () {
+      expect(
+        () => EntitlementDto.fromJson(_body(trialExpired: 'yes')),
+        throwsFormatException,
+      );
     });
 
     test('clave obligatoria ausente ⇒ FormatException', () {

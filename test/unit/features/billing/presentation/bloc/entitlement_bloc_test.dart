@@ -11,6 +11,7 @@ class _MockRepo extends Mock implements BillingRepository {}
 const _entitlement = Entitlement(
   planCode: 'trial',
   status: 'trialing',
+  trialExpired: false,
   usedConversations: 12,
   conversationCap: 50,
   withinQuota: true,
