@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/ai_catalog/domain/repositories/catalog_repository.dart';
 import '../../features/ai_catalog/presentation/bloc/catalog_bloc.dart';
+import '../../features/billing/domain/repositories/billing_repository.dart';
+import '../../features/billing/presentation/bloc/entitlement_bloc.dart';
 import '../../features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
 import '../../features/org_ai_config/presentation/bloc/org_ai_config_bloc.dart';
 import '../../features/org_ai_config/presentation/pages/org_ai_config_page.dart';
@@ -201,6 +203,7 @@ class AppRouter {
     required MembersRepository membersRepository,
     required InvitationsRepository invitationsRepository,
     required CatalogRepository catalogRepository,
+    BillingRepository? billingRepository,
     required OrgAiConfigRepository orgAiConfigRepository,
     OrgBrandingRepository? orgBrandingRepository,
     required NotificationsRepository notificationsRepository,
@@ -245,6 +248,7 @@ class AppRouter {
        _membersRepo = membersRepository,
        _invitationsRepo = invitationsRepository,
        _catalogRepo = catalogRepository,
+       _billingRepo = billingRepository,
        _orgAiConfigRepo = orgAiConfigRepository,
        _orgBrandingRepo = orgBrandingRepository,
        _notificationsRepo = notificationsRepository,
@@ -304,6 +308,11 @@ class AppRouter {
   final MembersRepository _membersRepo;
   final InvitationsRepository _invitationsRepo;
   final CatalogRepository _catalogRepo;
+
+  /// Entitlement de billing (opcional): null en tests que no lo cablean —
+  /// las superficies que filtran por plan degradan a no filtrar; main
+  /// siempre lo provee.
+  final BillingRepository? _billingRepo;
   final OrgAiConfigRepository _orgAiConfigRepo;
 
   /// Marca de documentos de la org (opcional): null en tests que no navegan
@@ -1187,6 +1196,7 @@ class AppRouter {
         path: '/templates/:id/ai',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
+          final billingRepo = _billingRepo;
           // CatalogBloc alimenta el picker de modelo y las capacidades
           // (temperatura/razonamiento) que gobiernan qué tiles editan.
           return MultiBlocProvider(
@@ -1201,6 +1211,14 @@ class AppRouter {
                     CatalogBloc(_catalogRepo)
                       ..add(const CatalogLoadRequested()),
               ),
+              // Entitlement del plan: filtra el picker de cerebro a los
+              // proveedores elegibles. Sin repo, la página no filtra.
+              if (billingRepo != null)
+                BlocProvider<EntitlementBloc>(
+                  create: (_) =>
+                      EntitlementBloc(billingRepo)
+                        ..add(const EntitlementLoadRequested()),
+                ),
               // Catálogo org-scoped para el multi-select de etiquetas de
               // silencio; carga única, compartida con el sheet por value.
               BlocProvider<LabelsBloc>(
@@ -1226,6 +1244,7 @@ class AppRouter {
         // que viajan juntos en UN PUT, así que el guardado es explícito.
         path: '/org/ai-config',
         builder: (context, state) {
+          final billingRepo = _billingRepo;
           return MultiBlocProvider(
             providers: <BlocProvider<dynamic>>[
               BlocProvider<OrgAiConfigBloc>(
@@ -1238,6 +1257,14 @@ class AppRouter {
                     CatalogBloc(_catalogRepo)
                       ..add(const CatalogLoadRequested()),
               ),
+              // Entitlement del plan: filtra el picker de los defaults a los
+              // proveedores elegibles. Sin repo, la pantalla no filtra.
+              if (billingRepo != null)
+                BlocProvider<EntitlementBloc>(
+                  create: (_) =>
+                      EntitlementBloc(billingRepo)
+                        ..add(const EntitlementLoadRequested()),
+                ),
             ],
             child: Scaffold(
               appBar: AppBar(

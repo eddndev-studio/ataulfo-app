@@ -6,6 +6,8 @@ import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/bloc/catalog_bloc.dart';
+import 'package:ataulfo/features/billing/domain/entities/entitlement.dart';
+import 'package:ataulfo/features/billing/presentation/bloc/entitlement_bloc.dart';
 import 'package:ataulfo/features/org_ai_config/domain/entities/org_ai_config.dart';
 import 'package:ataulfo/features/org_ai_config/domain/failures/org_ai_config_failure.dart';
 import 'package:ataulfo/features/org_ai_config/presentation/bloc/org_ai_config_bloc.dart';
@@ -22,6 +24,9 @@ class _MockBloc extends MockBloc<OrgAiConfigEvent, OrgAiConfigState>
 
 class _MockCatalogBloc extends MockBloc<CatalogEvent, CatalogState>
     implements CatalogBloc {}
+
+class _MockEntitlementBloc extends MockBloc<EntitlementEvent, EntitlementState>
+    implements EntitlementBloc {}
 
 const _defaults = AIConfig(
   enabled: false,
@@ -83,12 +88,16 @@ void main() {
 
   // La página es content-only: el host replica el montaje del router
   // (Scaffold + AppBar planos con la acción Guardar como widget público).
-  Widget host() => MaterialApp(
+  // El EntitlementBloc es opcional como en el router: sin repo de billing
+  // la ruta monta sin él y la página degrada a no filtrar.
+  Widget host({EntitlementBloc? entitlementBloc}) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<OrgAiConfigBloc>.value(value: bloc),
         BlocProvider<CatalogBloc>.value(value: catalogBloc),
+        if (entitlementBloc != null)
+          BlocProvider<EntitlementBloc>.value(value: entitlementBloc),
       ],
       child: Scaffold(
         appBar: AppBar(
@@ -496,5 +505,72 @@ void main() {
       expect(find.text('¿Descartar los cambios?'), findsNothing);
       expect(find.byType(OrgAiConfigPage), findsNothing);
     });
+  });
+
+  group('filtro del picker de defaults por plan (entitlement)', () {
+    const entitlement = Entitlement(
+      planCode: 'trial',
+      status: 'trialing',
+      usedConversations: 0,
+      conversationCap: 50,
+      withinQuota: true,
+      quotaExceeded: false,
+      storageUsedMb: 0,
+      storageQuotaMb: 512,
+      eligibleProviders: <String>{'MINIMAX'},
+      features: <String>[],
+    );
+
+    setUp(() {
+      when(
+        () => bloc.state,
+      ).thenReturn(const OrgAiConfigLoaded(saved: _saved, working: _saved));
+    });
+
+    Future<void> openDefaultsModelPicker(WidgetTester tester) async {
+      final tile = find.byKey(const Key('org_ai.defaults.tile.model'));
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('entitlement cargado: esconde los proveedores fuera del plan', (
+      tester,
+    ) async {
+      final entitlementBloc = _MockEntitlementBloc();
+      when(
+        () => entitlementBloc.state,
+      ).thenReturn(const EntitlementLoaded(entitlement: entitlement));
+
+      await tester.pumpWidget(host(entitlementBloc: entitlementBloc));
+      await openDefaultsModelPicker(tester);
+
+      expect(
+        find.byKey(const Key('org_ai.defaults.model.MiniMax-M3')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('org_ai.defaults.model.gpt-5.5')),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+      'sin EntitlementBloc montado: la pantalla funciona sin filtro',
+      (tester) async {
+        await tester.pumpWidget(host());
+        await openDefaultsModelPicker(tester);
+
+        expect(
+          find.byKey(const Key('org_ai.defaults.model.MiniMax-M3')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('org_ai.defaults.model.gpt-5.5')),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }

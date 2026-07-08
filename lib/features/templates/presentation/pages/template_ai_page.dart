@@ -12,6 +12,7 @@ import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_section_header.dart';
 import '../../../ai_catalog/presentation/bloc/catalog_bloc.dart';
 import '../../../ai_catalog/presentation/widgets/ai_config_editor.dart';
+import '../../../billing/presentation/eligible_providers.dart';
 import '../../../labels/presentation/bloc/labels_bloc.dart';
 import '../../domain/entities/template.dart';
 import '../../domain/failures/templates_failure.dart';
@@ -98,6 +99,9 @@ class _LoadedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ai = template.ai;
+    // Cerebros elegibles del plan: filtra los pickers de modelo/subagente.
+    // null (sin entitlement todavía) ⇒ el editor no filtra.
+    final eligibleProviders = watchEligibleProviders(context);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         AppTokens.sp6,
@@ -130,6 +134,7 @@ class _LoadedView extends StatelessWidget {
                       catalog: catalog,
                       fields: _fields,
                       editable: !isMutating,
+                      eligibleProviders: eligibleProviders,
                       enabledLabel: 'IA habilitada',
                       enabledCaption:
                           'Apagada, los bots de esta plantilla no responden '

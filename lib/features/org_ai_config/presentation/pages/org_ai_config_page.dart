@@ -9,6 +9,7 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../ai_catalog/presentation/bloc/catalog_bloc.dart';
+import '../../../billing/presentation/eligible_providers.dart';
 import '../../domain/failures/org_ai_config_failure.dart';
 import '../bloc/org_ai_config_bloc.dart';
 import '../widgets/host_selection_section.dart';
@@ -125,6 +126,9 @@ class _LoadedBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    // Cerebros elegibles del plan: filtran el picker de modelo de los
+    // defaults. null (sin entitlement todavía) ⇒ el editor no filtra.
+    final eligibleProviders = watchEligibleProviders(context);
     // Las dos secciones necesitan el catálogo (hosts seleccionables + picker de
     // modelo de los defaults). Mientras el catálogo carga/falla, su estado manda.
     return BlocBuilder<CatalogBloc, CatalogState>(
@@ -162,6 +166,7 @@ class _LoadedBody extends StatelessWidget {
                 catalog: catalog,
                 defaults: state.working.defaults,
                 enabled: !state.saving,
+                eligibleProviders: eligibleProviders,
                 onChanged: (cfg) => context.read<OrgAiConfigBloc>().add(
                   OrgAiConfigDefaultsChanged(cfg),
                 ),

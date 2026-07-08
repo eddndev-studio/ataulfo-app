@@ -6,6 +6,8 @@ import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/bloc/catalog_bloc.dart';
+import 'package:ataulfo/features/billing/domain/entities/entitlement.dart';
+import 'package:ataulfo/features/billing/presentation/bloc/entitlement_bloc.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/failures/labels_failure.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_bloc.dart';
@@ -28,6 +30,9 @@ class _MockCatalogBloc extends MockBloc<CatalogEvent, CatalogState>
 
 class _MockLabelsBloc extends MockBloc<LabelsEvent, LabelsState>
     implements LabelsBloc {}
+
+class _MockEntitlementBloc extends MockBloc<EntitlementEvent, EntitlementState>
+    implements EntitlementBloc {}
 
 const _labels = <Label>[
   Label(id: 'l1', name: 'VIP', color: '#FF0000', description: ''),
@@ -126,14 +131,18 @@ void main() {
   });
 
   // La página es content-only: el host replica el montaje del router
-  // (Scaffold + AppBar planos con el título 'Motor IA').
-  Widget host() => MaterialApp(
+  // (Scaffold + AppBar planos con el título 'Motor IA'). El EntitlementBloc
+  // es opcional como en el router: sin repo de billing la ruta monta sin él
+  // y la página degrada a no filtrar.
+  Widget host({EntitlementBloc? entitlementBloc}) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<TemplateDetailBloc>.value(value: bloc),
         BlocProvider<CatalogBloc>.value(value: catalogBloc),
         BlocProvider<LabelsBloc>.value(value: labelsBloc),
+        if (entitlementBloc != null)
+          BlocProvider<EntitlementBloc>.value(value: entitlementBloc),
       ],
       child: Scaffold(
         appBar: AppBar(title: const Text('Motor IA')),
@@ -990,5 +999,89 @@ void main() {
     await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
     verify(() => bloc.add(const TemplateDetailLoadRequested())).called(1);
+  });
+
+  group('filtro del picker por plan (entitlement)', () {
+    const entitlement = Entitlement(
+      planCode: 'trial',
+      status: 'trialing',
+      usedConversations: 0,
+      conversationCap: 50,
+      withinQuota: true,
+      quotaExceeded: false,
+      storageUsedMb: 0,
+      storageQuotaMb: 512,
+      eligibleProviders: <String>{'NEMOTRON'},
+      features: <String>[],
+    );
+
+    testWidgets('entitlement cargado: el picker de modelo esconde los '
+        'proveedores fuera del plan', (tester) async {
+      final entitlementBloc = _MockEntitlementBloc();
+      when(
+        () => entitlementBloc.state,
+      ).thenReturn(const EntitlementLoaded(entitlement: entitlement));
+
+      await tester.pumpWidget(host(entitlementBloc: entitlementBloc));
+
+      await tester.tap(find.byKey(const Key('template_ai.tile.model')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_ai.model.nemotron-3-super')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('template_ai.model.gemini-3.1-pro-preview')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('template_ai.model.gpt-5-pro')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('entitlement aún cargando: sin filtro (el backend valida)', (
+      tester,
+    ) async {
+      final entitlementBloc = _MockEntitlementBloc();
+      when(() => entitlementBloc.state).thenReturn(const EntitlementLoading());
+
+      await tester.pumpWidget(host(entitlementBloc: entitlementBloc));
+
+      await tester.tap(find.byKey(const Key('template_ai.tile.model')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_ai.model.gemini-3.1-pro-preview')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('template_ai.model.gpt-5-pro')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('template_ai.model.nemotron-3-super')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sin EntitlementBloc montado: la página funciona y no filtra', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('template_ai.tile.model')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_ai.model.gemini-3.1-pro-preview')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('template_ai.model.nemotron-3-super')),
+        findsOneWidget,
+      );
+    });
   });
 }

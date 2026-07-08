@@ -23,6 +23,7 @@ class OrgDefaultsSection extends StatelessWidget {
     required this.defaults,
     required this.enabled,
     required this.onChanged,
+    this.eligibleProviders,
   });
 
   static const Set<AiConfigField> _fields = <AiConfigField>{
@@ -38,6 +39,10 @@ class OrgDefaultsSection extends StatelessWidget {
   final AIConfig defaults;
   final bool enabled;
   final void Function(AIConfig) onChanged;
+
+  /// Cerebros elegibles del plan de la org (wire crudo); el editor esconde
+  /// del picker los proveedores fuera del set. `null` ⇒ sin filtro.
+  final Set<String>? eligibleProviders;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +62,7 @@ class OrgDefaultsSection extends StatelessWidget {
           catalog: catalog,
           fields: _fields,
           editable: enabled,
+          eligibleProviders: eligibleProviders,
           // Aquí elegir NO persiste: acumula en el borrador del bloc y el
           // Guardar real vive en el AppBar — los sheets rematan en 'Aplicar'.
           deferredSave: true,

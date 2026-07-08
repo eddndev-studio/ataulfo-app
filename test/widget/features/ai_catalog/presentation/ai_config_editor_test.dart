@@ -67,6 +67,7 @@ void main() {
     Set<AiConfigField> fields = _coreFields,
     bool editable = true,
     bool deferredSave = false,
+    Set<String>? eligibleProviders,
     required ValueChanged<AIConfig> onChanged,
   }) => MaterialApp(
     theme: AppDesignTheme.dark(),
@@ -79,6 +80,7 @@ void main() {
           fields: fields,
           editable: editable,
           deferredSave: deferredSave,
+          eligibleProviders: eligibleProviders,
           enabledLabel: 'IA activa',
           enabledCaption: 'Enciende o apaga el motor.',
           onChanged: onChanged,
@@ -261,5 +263,160 @@ void main() {
 
     expect(find.widgetWithText(AppButton, 'Guardar'), findsOneWidget);
     expect(find.widgetWithText(AppButton, 'Aplicar'), findsNothing);
+  });
+
+  group('filtro por eligibleProviders (entitlement del plan)', () {
+    // Catálogo con frontier + open-weight: el backend lo lista COMPLETO y el
+    // plan decide qué cerebros son elegibles.
+    const fullCatalog = Catalog(
+      providers: <ProviderEntry>[
+        ProviderEntry(
+          provider: 'GEMINI',
+          defaultModel: 'gemini-3.1-pro-preview',
+          models: <AIModel>[
+            AIModel(
+              id: 'gemini-3.1-pro-preview',
+              supportsTemperature: true,
+              supportsThinking: true,
+            ),
+          ],
+        ),
+        ProviderEntry(
+          provider: 'OPENAI',
+          defaultModel: 'gpt-5.5',
+          models: <AIModel>[
+            AIModel(
+              id: 'gpt-5.5',
+              supportsTemperature: false,
+              supportsThinking: true,
+            ),
+          ],
+        ),
+        ProviderEntry(
+          provider: 'MINIMAX',
+          defaultModel: 'MiniMax-M3',
+          models: <AIModel>[
+            AIModel(
+              id: 'MiniMax-M3',
+              supportsTemperature: true,
+              supportsThinking: false,
+            ),
+          ],
+        ),
+        ProviderEntry(
+          provider: 'DEEPSEEK',
+          defaultModel: 'deepseek-v3.2',
+          models: <AIModel>[
+            AIModel(
+              id: 'deepseek-v3.2',
+              supportsTemperature: true,
+              supportsThinking: false,
+            ),
+          ],
+        ),
+        ProviderEntry(
+          provider: 'NEMOTRON',
+          defaultModel: 'nemotron-3-super',
+          models: <AIModel>[
+            AIModel(
+              id: 'nemotron-3-super',
+              supportsTemperature: true,
+              supportsThinking: true,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    testWidgets('picker de modelo: solo los proveedores del set', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          catalog: fullCatalog,
+          eligibleProviders: const <String>{'MINIMAX', 'NEMOTRON'},
+          onChanged: (_) {},
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('cfg.tile.model')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('cfg.model.MiniMax-M3')), findsOneWidget);
+      expect(
+        find.byKey(const Key('cfg.model.nemotron-3-super')),
+        findsOneWidget,
+      );
+      // Frontier y open-weight fuera del plan: ni sección ni modelos —
+      // incluso si el modelo ACTUAL de la config es de un proveedor filtrado
+      // (el tile lo sigue mostrando; el picker ya no lo ofrece).
+      expect(
+        find.byKey(const Key('cfg.model.gemini-3.1-pro-preview')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('cfg.model.gpt-5.5')), findsNothing);
+      expect(find.byKey(const Key('cfg.model.deepseek-v3.2')), findsNothing);
+      expect(find.text('GEMINI'), findsNothing);
+      expect(find.text('OPENAI'), findsNothing);
+      expect(find.text('DEEPSEEK'), findsNothing);
+    });
+
+    testWidgets('picker de subagente: mismo filtro + Heredar visible', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          catalog: fullCatalog,
+          fields: const <AiConfigField>{AiConfigField.subagent},
+          eligibleProviders: const <String>{'MINIMAX', 'NEMOTRON'},
+          onChanged: (_) {},
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('cfg.tile.subagent')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('cfg.subagent.inherit')), findsOneWidget);
+      expect(
+        find.byKey(const Key('cfg.subagent.model.MiniMax-M3')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('cfg.subagent.model.nemotron-3-super')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('cfg.subagent.model.gemini-3.1-pro-preview')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('cfg.subagent.model.gpt-5.5')), findsNothing);
+      expect(
+        find.byKey(const Key('cfg.subagent.model.deepseek-v3.2')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('null (entitlement sin cargar) NO filtra: catálogo completo', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(catalog: fullCatalog, eligibleProviders: null, onChanged: (_) {}),
+      );
+
+      await tester.tap(find.byKey(const Key('cfg.tile.model')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('cfg.model.gemini-3.1-pro-preview')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('cfg.model.gpt-5.5')), findsOneWidget);
+      expect(find.byKey(const Key('cfg.model.MiniMax-M3')), findsOneWidget);
+      expect(find.byKey(const Key('cfg.model.deepseek-v3.2')), findsOneWidget);
+      expect(
+        find.byKey(const Key('cfg.model.nemotron-3-super')),
+        findsOneWidget,
+      );
+    });
   });
 }

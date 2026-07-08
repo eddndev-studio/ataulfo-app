@@ -1,3 +1,9 @@
+// NOTA (>400 LOC): este archivo es el editor por-campo completo de AIConfig —
+// los tiles y UN método _pickX corto y homogéneo por campo. Partir los picks
+// por archivo rompería la cohesión tile↔sheet sin ganar legibilidad; los
+// sheets de valor con estado propio ya viven aparte (ai_config_value_sheets,
+// ai_config_follow_up_sheet, tool_groups_sheet).
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/ai/ai_config.dart';
@@ -63,6 +69,7 @@ class AiConfigEditor extends StatelessWidget {
     required this.enabledLabel,
     required this.enabledCaption,
     this.deferredSave = false,
+    this.eligibleProviders,
     this.pickSilenceLabels,
   });
 
@@ -92,6 +99,15 @@ class AiConfigEditor extends StatelessWidget {
   /// guardado real vive fuera (org): los sheets con confirmación rematan en
   /// 'Aplicar' para no aparentar una persistencia que no ocurre.
   final bool deferredSave;
+
+  /// Proveedores elegibles como cerebro según el plan de la org (valores de
+  /// wire crudos, p.ej. 'MINIMAX' — mismos strings que `ProviderEntry.
+  /// provider`). Los pickers de modelo y subagente esconden los proveedores
+  /// fuera del set: ofrecer un cerebro que el plan no permite termina en 422
+  /// al guardar o en pausa en runtime. `null` = entitlement no disponible
+  /// (cargando o falló) ⇒ SIN filtro — el backend valida de todas formas;
+  /// bloquear a ciegas sería peor que mostrar de más.
+  final Set<String>? eligibleProviders;
 
   /// Requerido si [fields] incluye [AiConfigField.silenceLabels]; sin picker
   /// el tile se pinta inerte.
@@ -241,13 +257,19 @@ class AiConfigEditor extends StatelessWidget {
 
   /// Secciones por proveedor para los pickers de modelo. Un proveedor que
   /// este release no reconoce se omite: no podemos construir el AIProvider
-  /// del PUT (el backend puede ir adelante).
+  /// del PUT (el backend puede ir adelante). Un proveedor fuera de
+  /// [eligibleProviders] también: el plan de la org no lo permite (aplica al
+  /// modelo principal Y al subagente, que comparten estas secciones). El
+  /// modelo ACTUAL de la config no se excepciona — el tile lo sigue
+  /// mostrando; el picker solo ofrece a dónde SÍ se puede mover.
   List<AppSelectionSection<T>> _providerSections<T>(
     T Function(AIProvider provider, AIModel model) valueOf,
     String Function(AIModel model) keyOf,
   ) {
+    final eligible = eligibleProviders;
     final sections = <AppSelectionSection<T>>[];
     for (final entry in catalog?.providers ?? const <ProviderEntry>[]) {
+      if (eligible != null && !eligible.contains(entry.provider)) continue;
       final AIProvider provider;
       try {
         provider = AIProvider.fromWire(entry.provider);
