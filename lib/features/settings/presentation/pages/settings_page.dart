@@ -213,6 +213,22 @@ class _SectionsCard extends StatelessWidget {
               caption: 'Tu plan, consumo y estado de la IA',
               onTap: () => context.push('/cuenta'),
             ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.event_types_tile'),
+              icon: Icons.event_note_outlined,
+              title: 'Tipos de cita',
+              caption: 'Qué se puede reservar y cuánto dura',
+              onTap: () => context.push('/calendar/event-types'),
+            ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.business_hours_tile'),
+              icon: Icons.schedule_outlined,
+              title: 'Horario de atención',
+              caption: 'Los días y horas en que se agendan citas',
+              onTap: () => context.push('/calendar/hours'),
+            ),
           ],
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
           AppSectionLink(

@@ -542,13 +542,13 @@ void main() {
       final card = find.byKey(const Key('settings.card.sections'));
       expect(card, findsOneWidget);
       expect(tester.widget(card), isA<AppCard>());
-      // OWNER: las 9 áreas como filas (organizaciones, aceptar invitación,
-      // miembros, config de IA, personalización, cuenta, galería,
-      // notificaciones, apariencia) — muere la pila de cards sueltas sin
-      // jerarquía.
+      // OWNER: las 11 áreas como filas (organizaciones, aceptar invitación,
+      // miembros, config de IA, personalización, cuenta, tipos de cita,
+      // horario de atención, galería, notificaciones, apariencia) — muere la
+      // pila de cards sueltas sin jerarquía.
       expect(
         find.descendant(of: card, matching: find.byType(AppSectionLink)),
-        findsNWidgets(9),
+        findsNWidgets(11),
       );
       // Captions: cada fila dice qué hay detrás, no solo el título.
       expect(find.text('Bandeja y preferencias de avisos'), findsOneWidget);

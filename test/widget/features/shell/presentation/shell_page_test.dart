@@ -220,7 +220,7 @@ void main() {
       expect(inNav('Ajustes'), findsOneWidget);
     });
 
-    testWidgets('Ajustes es la última tab y Asistente la penúltima (phone)', (
+    testWidgets('Ajustes cierra la barra y Agenda es la penúltima (phone)', (
       tester,
     ) async {
       useViewport(tester, widthDp: 420);
@@ -232,10 +232,12 @@ void main() {
       );
       final labels = nav.items.map((i) => i.label).toList();
       expect(labels.last, 'Ajustes');
-      expect(labels[labels.length - 2], 'Asistente');
+      expect(labels[labels.length - 2], 'Agenda');
+      // El asistente queda antes de Agenda (tras Etiquetas).
+      expect(labels[labels.length - 3], 'Asistente');
     });
 
-    testWidgets('Ajustes es la última tab y Asistente la penúltima (rail)', (
+    testWidgets('Ajustes cierra la barra y Agenda es la penúltima (rail)', (
       tester,
     ) async {
       useViewport(tester, widthDp: 800);
@@ -247,7 +249,8 @@ void main() {
           .map((d) => (d.label as Text).data)
           .toList();
       expect(labels.last, 'Ajustes');
-      expect(labels[labels.length - 2], 'Asistente');
+      expect(labels[labels.length - 2], 'Agenda');
+      expect(labels[labels.length - 3], 'Asistente');
     });
 
     testWidgets('tap Plantillas (phone) muestra TemplatesListPage', (

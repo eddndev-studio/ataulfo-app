@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/widgets/app_icon_pop.dart';
 import '../../../bots/presentation/pages/bots_list_page.dart';
 import '../../../bots/presentation/widgets/bot_create_sheet.dart';
+import '../../../calendar/presentation/bloc/agenda_cubit.dart';
+import '../../../calendar/presentation/pages/agenda_page.dart';
 import '../../../labels/presentation/pages/labels_admin_page.dart';
 import '../../../labels/presentation/widgets/label_edit_sheet.dart';
 import '../../../platform_agent/presentation/pages/platform_agent_page.dart';
@@ -41,7 +44,7 @@ class _ShellPageState extends State<ShellPage> {
   int _index = 0;
 
   /// Índice de la tab Ajustes: destino del avatar de los headers de sección.
-  static const int _settingsIndex = 4;
+  static const int _settingsIndex = 5;
 
   /// Punto ÚNICO de verdad de las tabs: por entrada viven juntos la etiqueta
   /// e ícono del navegador, la página del IndexedStack y el FAB contextual.
@@ -86,6 +89,17 @@ class _ShellPageState extends State<ShellPage> {
       label: 'Asistente',
       icon: Icons.auto_awesome,
       page: PlatformAgentPage(),
+      lazy: true,
+    ),
+    // Agenda: lazy como el asistente (su cubit carga el día al abrir la tab,
+    // sin coste en el arranque). Su FAB abre la reserva manual; al crear con
+    // éxito la agenda recarga.
+    _TabSpec(
+      label: 'Agenda',
+      icon: Icons.event_outlined,
+      activeIcon: Icons.event,
+      page: AgendaPage(onOpenSettings: () => _select(_settingsIndex)),
+      fab: _agendaBookFab,
       lazy: true,
     ),
     // Ajustes cierra la barra: es la tab de menor frecuencia y el rincón
@@ -238,5 +252,21 @@ Widget _labelCreateFab(BuildContext context) => FloatingActionButton(
   key: const Key('shell.fab.label_create'),
   onPressed: () => LabelEditSheet.openCreate(context),
   tooltip: 'Crear etiqueta',
+  child: const Icon(Icons.add),
+);
+
+// La reserva manual vive en su propia pushed route: el back físico vuelve a la
+// agenda sin salir de la app. Al crear con éxito la route hace pop(true) y aquí
+// se recarga el día en foco para que la nueva cita aparezca.
+Widget _agendaBookFab(BuildContext context) => FloatingActionButton(
+  key: const Key('shell.fab.agenda_book'),
+  onPressed: () async {
+    final agenda = context.read<AgendaCubit>();
+    final created = await context.push<bool>('/agenda/book');
+    if (created == true) {
+      await agenda.load();
+    }
+  },
+  tooltip: 'Reservar cita',
   child: const Icon(Icons.add),
 );

@@ -10,6 +10,15 @@ import '../../features/billing/data/repositories/url_launcher_web_link_launcher.
 import '../../features/billing/domain/repositories/billing_repository.dart';
 import '../../features/billing/presentation/bloc/entitlement_bloc.dart';
 import '../../features/billing/presentation/pages/cuenta_page.dart';
+import '../../features/calendar/domain/repositories/calendar_repository.dart';
+import '../../features/calendar/presentation/bloc/agenda_cubit.dart';
+import '../../features/calendar/presentation/bloc/booking_cubit.dart';
+import '../../features/calendar/presentation/bloc/business_hours_cubit.dart';
+import '../../features/calendar/presentation/bloc/event_types_cubit.dart';
+import '../../features/calendar/presentation/pages/booking_page.dart';
+import '../../features/calendar/presentation/pages/business_hours_page.dart';
+import '../../features/calendar/presentation/pages/event_types_page.dart';
+import '../../features/calendar/presentation/widgets/chat_appointment_badge.dart';
 import '../../features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
 import '../../features/org_ai_config/presentation/bloc/org_ai_config_bloc.dart';
 import '../../features/org_ai_config/presentation/pages/org_ai_config_page.dart';
@@ -205,6 +214,7 @@ class AppRouter {
     required MembersRepository membersRepository,
     required InvitationsRepository invitationsRepository,
     required CatalogRepository catalogRepository,
+    required CalendarRepository calendarRepository,
     BillingRepository? billingRepository,
     String webBaseUrl = 'https://ataulfo.app',
     required OrgAiConfigRepository orgAiConfigRepository,
@@ -251,6 +261,7 @@ class AppRouter {
        _membersRepo = membersRepository,
        _invitationsRepo = invitationsRepository,
        _catalogRepo = catalogRepository,
+       _calendarRepo = calendarRepository,
        _billingRepo = billingRepository,
        _webBaseUrl = webBaseUrl,
        _orgAiConfigRepo = orgAiConfigRepository,
@@ -312,6 +323,10 @@ class AppRouter {
   final MembersRepository _membersRepo;
   final InvitationsRepository _invitationsRepo;
   final CatalogRepository _catalogRepo;
+
+  /// Calendario (tipos de evento, horario, citas): alimenta la tab Agenda y las
+  /// secciones de Ajustes → Agenda. Requerido — la tab Agenda vive en el shell.
+  final CalendarRepository _calendarRepo;
 
   /// Entitlement de billing (opcional): null en tests que no lo cablean —
   /// las superficies que filtran por plan degradan a no filtrar; main
@@ -662,6 +677,13 @@ class AppRouter {
                                 LabelsAdminBloc(repo: _labelsRepo)
                                   ..add(const LabelsAdminLoadRequested()),
                           ),
+                          // Agenda del día, scoped al shell: la tab Agenda es
+                          // lazy, así que este create (lazy por defecto) no
+                          // corre —ni consulta la API— hasta la 1ª apertura de
+                          // la tab; la carga del día de hoy va enganchada ahí.
+                          BlocProvider<AgendaCubit>(
+                            create: (_) => AgendaCubit(_calendarRepo)..load(),
+                          ),
                           // Cubit del reenvío de verificación, scoped al shell para que el
                           // aviso "verifica tu correo" lo dispare y reaccione a su
                           // SnackBar.
@@ -1009,7 +1031,19 @@ class AppRouter {
               ],
               child: Scaffold(
                 appBar: ChatThreadAppBar(botId: id, chatLid: chatLid),
-                body: const MessageThreadPage(),
+                // El badge de cita cuelga sobre el hilo: carga perezosa y
+                // silenciosa (si no hay cita futura confirmada, no ocupa
+                // espacio). Se construye su propio cubit desde el repo.
+                body: Column(
+                  children: <Widget>[
+                    ChatAppointmentBadge(
+                      repository: _calendarRepo,
+                      botId: id,
+                      chatLid: chatLid,
+                    ),
+                    const Expanded(child: MessageThreadPage()),
+                  ],
+                ),
               ),
             ),
           );
@@ -1680,6 +1714,44 @@ class AppRouter {
             ),
           );
         },
+      ),
+      GoRoute(
+        // Reserva manual de una cita. Entry point: FAB de la tab Agenda.
+        // Page-scoped: el BookingCubit se construye con el repo y carga los
+        // tipos de evento activos al montarse. Al crear con éxito hace
+        // pop(true) y la agenda recarga.
+        path: '/agenda/book',
+        builder: (context, _) => BlocProvider<BookingCubit>(
+          create: (_) => BookingCubit(_calendarRepo)..loadEventTypes(),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Nueva cita')),
+            body: const BookingPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Ajustes → Agenda → Tipos de cita (CRUD). Entry point: tile ADMIN+ en
+        // SettingsPage. Page-scoped: carga los tipos al montarse.
+        path: '/calendar/event-types',
+        builder: (context, _) => BlocProvider<EventTypesCubit>(
+          create: (_) => EventTypesCubit(_calendarRepo)..load(),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Tipos de cita')),
+            body: const EventTypesPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        // Ajustes → Agenda → Horario de atención (editor semanal). Entry point:
+        // tile ADMIN+ en SettingsPage. Page-scoped: carga el horario al montar.
+        path: '/calendar/hours',
+        builder: (context, _) => BlocProvider<BusinessHoursCubit>(
+          create: (_) => BusinessHoursCubit(_calendarRepo)..load(),
+          child: Scaffold(
+            appBar: AppBar(title: const Text('Horario de atención')),
+            body: const BusinessHoursPage(),
+          ),
+        ),
       ),
       GoRoute(
         // Galería de media de la org. Entry point: tile en SettingsPage.
