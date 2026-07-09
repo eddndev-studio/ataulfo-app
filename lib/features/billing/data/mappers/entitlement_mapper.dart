@@ -22,5 +22,9 @@ class EntitlementMapper {
     // pertenencia ("¿este proveedor es elegible?"), semántica de set.
     eligibleProviders: dto.eligibleProviders.toSet(),
     features: dto.features,
+    imageGen: switch (dto.imageGen) {
+      null => null,
+      final ig => ImageGenUsage(used: ig.used, cap: ig.cap),
+    },
   );
 }

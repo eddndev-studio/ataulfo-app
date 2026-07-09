@@ -248,6 +248,16 @@ class _ConsumoCard extends StatelessWidget {
               value: almacenamientoLabel(e.storageUsedMb, e.storageQuotaMb),
             ),
           ],
+          // El contador de imágenes es ADITIVO en el wire: un backend que
+          // aún no lo emite no pinta la fila (no se inventa "0 de 0").
+          if (e.imageGen case final imageGen?) ...<Widget>[
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            _UsoRow(
+              rowKey: const Key('cuenta.image_gen'),
+              label: 'Imágenes con IA',
+              value: imagenesIaLabel(imageGen.used, imageGen.cap),
+            ),
+          ],
         ],
       ),
     );

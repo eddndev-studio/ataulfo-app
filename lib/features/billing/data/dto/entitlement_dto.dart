@@ -19,6 +19,7 @@ class EntitlementDto {
     required this.storageQuotaMb,
     required this.eligibleProviders,
     required this.features,
+    this.imageGen,
   });
 
   factory EntitlementDto.fromJson(Map<String, dynamic> json) {
@@ -57,6 +58,7 @@ class EntitlementDto {
       storageQuotaMb: storageQuotaMb,
       eligibleProviders: _stringList(json, 'eligible_providers'),
       features: _stringList(json, 'features'),
+      imageGen: _imageGen(json),
     );
   }
 
@@ -71,6 +73,36 @@ class EntitlementDto {
   final int storageQuotaMb;
   final List<String> eligibleProviders;
   final List<String> features;
+
+  /// Consumo de generación de imágenes del periodo. ADITIVO como
+  /// `trial_expired`: null cuando el backend aún no lo encoda. Viaja como dos
+  /// claves planas en snake_case —`image_gen_used` e `image_gen_cap`—,
+  /// consistente con el resto de este wire; el backend emite ambas o ninguna.
+  final ImageGenDto? imageGen;
+}
+
+/// Consumo/tope de imágenes del wire: claves planas `image_gen_used` e
+/// `image_gen_cap` (enteros), al mismo nivel que el resto del entitlement.
+class ImageGenDto {
+  const ImageGenDto({required this.used, required this.cap});
+
+  final int used;
+  final int cap;
+}
+
+/// Aditivo: ambas claves ausentes ⇒ null (backend viejo). Presentes deben ser
+/// enteros; una sola o un tipo inválido es un wire roto (el backend emite el
+/// par completo o nada).
+ImageGenDto? _imageGen(Map<String, dynamic> json) {
+  final used = json['image_gen_used'];
+  final cap = json['image_gen_cap'];
+  if (used == null && cap == null) return null;
+  if (used is! int || cap is! int) {
+    throw const FormatException(
+      'entitlement: "image_gen_used"/"image_gen_cap" a medias o inválido',
+    );
+  }
+  return ImageGenDto(used: used, cap: cap);
 }
 
 /// Lista de strings obligatoria: no-lista o elemento no-string es un wire

@@ -107,3 +107,8 @@ String conversacionesLabel(int used, int cap) =>
 /// Consumo de almacenamiento de la galería. Cuota 0 = ilimitado.
 String almacenamientoLabel(int usedMb, int quotaMb) =>
     quotaMb == 0 ? 'Ilimitado' : '$usedMb MB de $quotaMb MB';
+
+/// Consumo de imágenes generadas con IA. El periodo de imágenes es MENSUAL
+/// (a diferencia de las conversaciones, semanales). Tope 0 = ilimitadas.
+String imagenesIaLabel(int used, int cap) =>
+    cap == 0 ? 'Ilimitadas' : '$used de $cap este mes';

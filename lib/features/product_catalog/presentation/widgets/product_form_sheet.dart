@@ -39,6 +39,13 @@ typedef ProductImagePicker = Future<MediaAsset?> Function(BuildContext context);
 typedef ProductThumbLoader =
     Future<Uint8List?> Function(String ref, {MediaAsset? asset});
 
+/// Abre el flujo «Mejorar foto con IA» del producto y devuelve el ref BARE
+/// del resultado ACEPTADO (la foto nueva del producto) o null si no se
+/// aceptó nada. El wiring real vive en el router (repos de composición y
+/// media); null aquí ⇒ la acción no se ofrece.
+typedef ProductComposePhoto =
+    Future<String?> Function(BuildContext context, Product product);
+
 /// Formulario de crear/editar un producto del catálogo como hoja inferior.
 /// En alta [initial] es null (nace activo, sin toggle); en edición trae el
 /// producto y muestra el toggle «Activo». El precio se edita en PESOS
@@ -52,6 +59,7 @@ class ProductFormSheet extends StatefulWidget {
     required this.onSubmit,
     this.pickImage,
     this.thumbLoader,
+    this.composePhoto,
   });
 
   final Product? initial;
@@ -61,6 +69,7 @@ class ProductFormSheet extends StatefulWidget {
   final ProductFormSubmit onSubmit;
   final ProductImagePicker? pickImage;
   final ProductThumbLoader? thumbLoader;
+  final ProductComposePhoto? composePhoto;
 
   static Future<void> open(
     BuildContext context, {
@@ -69,6 +78,7 @@ class ProductFormSheet extends StatefulWidget {
     required ProductFormSubmit onSubmit,
     ProductImagePicker? pickImage,
     ProductThumbLoader? thumbLoader,
+    ProductComposePhoto? composePhoto,
   }) => showAppBottomSheet<void>(
     context,
     backgroundColor: AppTokens.surface1,
@@ -79,6 +89,7 @@ class ProductFormSheet extends StatefulWidget {
       onSubmit: onSubmit,
       pickImage: pickImage,
       thumbLoader: thumbLoader,
+      composePhoto: composePhoto,
     ),
   );
 
@@ -137,6 +148,26 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
     setState(() {
       _mediaRef = asset.ref;
       _pickedAsset = asset;
+    });
+  }
+
+  /// La acción se ofrece solo editando un producto cuya foto YA vive en el
+  /// servidor: la composición parte de esa imagen persistida, no de una
+  /// selección local sin guardar.
+  bool get _canComposePhoto =>
+      widget.composePhoto != null && (widget.initial?.hasImage ?? false);
+
+  Future<void> _composePhoto() async {
+    final open = widget.composePhoto;
+    final product = widget.initial;
+    if (open == null || product == null || _busy) return;
+    final ref = await open(context, product);
+    if (ref == null || !mounted) return;
+    // El backend ya cambió la foto del producto: el form la refleja (el
+    // asset efímero del picker deja de describir al ref).
+    setState(() {
+      _mediaRef = ref;
+      _pickedAsset = null;
     });
   }
 
@@ -286,6 +317,18 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                   _pickedAsset = null;
                 }),
               ),
+              if (_canComposePhoto) ...<Widget>[
+                const SizedBox(height: AppTokens.sp3),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: AppButton.tonal(
+                    key: const Key('product_form.compose_photo'),
+                    label: 'Mejorar foto con IA',
+                    icon: Icons.auto_awesome_outlined,
+                    onPressed: _busy ? null : _composePhoto,
+                  ),
+                ),
+              ],
               if (_isEdit) ...<Widget>[
                 const SizedBox(height: AppTokens.sp5),
                 Row(

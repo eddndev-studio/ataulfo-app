@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -19,9 +20,12 @@ import '../../features/calendar/presentation/pages/booking_page.dart';
 import '../../features/calendar/presentation/pages/business_hours_page.dart';
 import '../../features/calendar/presentation/pages/event_types_page.dart';
 import '../../features/calendar/presentation/widgets/chat_appointment_badge.dart';
+import '../../features/product_catalog/domain/repositories/composition_repository.dart';
 import '../../features/product_catalog/domain/repositories/product_catalog_repository.dart';
 import '../../features/product_catalog/presentation/bloc/product_catalog_cubit.dart';
 import '../../features/product_catalog/presentation/pages/product_catalog_page.dart';
+import '../../features/product_catalog/presentation/product_thumb_resolver.dart';
+import '../../features/product_catalog/presentation/widgets/compose_photo_sheet.dart';
 import '../../features/product_catalog/presentation/widgets/product_catalog_fab.dart';
 import '../../features/org_ai_config/domain/repositories/org_ai_config_repository.dart';
 import '../../features/org_ai_config/presentation/bloc/org_ai_config_bloc.dart';
@@ -220,6 +224,7 @@ class AppRouter {
     required CatalogRepository catalogRepository,
     required CalendarRepository calendarRepository,
     ProductCatalogRepository? productCatalogRepository,
+    CompositionRepository? compositionRepository,
     BillingRepository? billingRepository,
     String webBaseUrl = 'https://ataulfo.app',
     required OrgAiConfigRepository orgAiConfigRepository,
@@ -268,6 +273,7 @@ class AppRouter {
        _catalogRepo = catalogRepository,
        _calendarRepo = calendarRepository,
        _productCatalogRepo = productCatalogRepository,
+       _compositionRepo = compositionRepository,
        _billingRepo = billingRepository,
        _webBaseUrl = webBaseUrl,
        _orgAiConfigRepo = orgAiConfigRepository,
@@ -337,6 +343,7 @@ class AppRouter {
   /// Catálogo de productos de la org (opcional): null en tests que no navegan
   /// a `/catalog/products`; main siempre lo provee.
   final ProductCatalogRepository? _productCatalogRepo;
+  final CompositionRepository? _compositionRepo;
 
   /// Entitlement de billing (opcional): null en tests que no lo cablean —
   /// las superficies que filtran por plan degradan a no filtrar; main
@@ -387,6 +394,32 @@ class AppRouter {
   static final RegExp _adminOnlyBotRoute = RegExp(
     r'^/bots/[^/]+/(variables|maintenance)$',
   );
+
+  /// Bytes de miniatura para la comparación antes/después de una
+  /// composición. Primero el cache compartido por ref; en un miss busca el
+  /// asset en la primera página de imágenes de la galería (invalidada para
+  /// verla FRESCA: el resultado de un job recién terminado no existe en
+  /// ningún cache local) y descarga con su URL firmada vía el resolver.
+  /// Cualquier fallo ⇒ null (glifo del kit), nunca un error.
+  Future<Uint8List?> _compositionThumbBytes(String ref) async {
+    final cached = await ProductThumbResolver.session.load(ref);
+    if (cached != null) return cached;
+    MediaAsset? asset;
+    try {
+      _mediaRepo.invalidate();
+      final page = await _mediaRepo.listAssets(type: 'image', limit: 100);
+      for (final a in page.assets) {
+        if (a.ref == ref) {
+          asset = a;
+          break;
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+    if (asset == null) return null;
+    return ProductThumbResolver.session.load(ref, asset: asset);
+  }
 
   late final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -1777,11 +1810,23 @@ class AppRouter {
               body: Center(child: Text('Catálogo no disponible')),
             );
           }
+          final compositionRepo = _compositionRepo;
           return BlocProvider<ProductCatalogCubit>(
             create: (_) => ProductCatalogCubit(repo)..load(),
             child: Scaffold(
               appBar: AppBar(title: const Text('Catálogo de productos')),
-              body: const ProductCatalogPage(),
+              body: ProductCatalogPage(
+                // «Mejorar foto con IA» solo si el wiring trae el repo de
+                // composición; sin él la edición no ofrece la acción.
+                composePhoto: compositionRepo == null
+                    ? null
+                    : (context, product) => ComposePhotoSheet.open(
+                        context,
+                        product: product,
+                        repo: compositionRepo,
+                        thumbBytes: _compositionThumbBytes,
+                      ),
+              ),
               floatingActionButton: const ProductCatalogFab(),
             ),
           );

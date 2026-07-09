@@ -30,6 +30,7 @@ Entitlement _ent({
   bool withinQuota = true,
   bool quotaExceeded = false,
   List<String> features = const <String>['media_gallery'],
+  ImageGenUsage? imageGen,
 }) => Entitlement(
   planCode: planCode,
   status: status,
@@ -42,6 +43,7 @@ Entitlement _ent({
   storageQuotaMb: 512,
   eligibleProviders: const <String>{'MINIMAX'},
   features: features,
+  imageGen: imageGen,
 );
 
 void main() {
@@ -181,5 +183,29 @@ void main() {
     await tester.tap(find.byKey(const Key('cuenta.no_plan_cta')));
     await tester.pump();
     expect(launcher.opened, <String>['https://web.test/precios']);
+  });
+
+  testWidgets('snapshot con imageGen → contador de imágenes con IA', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(
+      EntitlementLoaded(
+        entitlement: _ent(imageGen: const ImageGenUsage(used: 3, cap: 150)),
+      ),
+    );
+    await pump(tester);
+
+    expect(find.byKey(const Key('cuenta.image_gen')), findsOneWidget);
+    expect(find.text('Imágenes con IA'), findsOneWidget);
+    expect(find.text('3 de 150 este mes'), findsOneWidget);
+  });
+
+  testWidgets('snapshot SIN imageGen → sin contador (backend viejo no '
+      'inventa ceros)', (tester) async {
+    when(() => bloc.state).thenReturn(EntitlementLoaded(entitlement: _ent()));
+    await pump(tester);
+
+    expect(find.byKey(const Key('cuenta.image_gen')), findsNothing);
+    expect(find.text('Imágenes con IA'), findsNothing);
   });
 }

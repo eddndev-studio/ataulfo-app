@@ -21,6 +21,20 @@ final _initial = Product(
   updatedAt: DateTime.utc(2026, 7, 1),
 );
 
+final _initialConImagen = Product(
+  id: 'p2',
+  kind: ProductKind.product,
+  name: 'Mango Ataulfo',
+  description: 'Caja de 5 kg',
+  category: 'Fruta',
+  priceCents: 125000,
+  priceDisplay: r'$1,250.00 MXN',
+  mediaRef: 'ref/original.png',
+  active: true,
+  createdAt: DateTime.utc(2026, 7, 1),
+  updatedAt: DateTime.utc(2026, 7, 1),
+);
+
 MediaAsset _asset(String ref) => MediaAsset(
   ref: ref,
   previewUrl: null,
@@ -49,6 +63,7 @@ void main() {
     Product? initial,
     List<String> categories = const <String>[],
     Future<MediaAsset?> Function(BuildContext)? pickImage,
+    ProductComposePhoto? composePhoto,
   }) async {
     final submitted = _Submitted();
     await tester.pumpWidget(
@@ -62,6 +77,7 @@ void main() {
                 initial: initial,
                 categories: categories,
                 pickImage: pickImage,
+                composePhoto: composePhoto,
                 thumbLoader: (_, {asset}) async => null,
                 onSubmit:
                     ({
@@ -258,5 +274,86 @@ void main() {
     await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
     await save(tester);
     expect(submitted.mediaRef, '');
+  });
+
+  testWidgets('edición con imagen + seam ⇒ acción «Mejorar foto con IA»', (
+    tester,
+  ) async {
+    await pumpAndOpen(
+      tester,
+      initial: _initialConImagen,
+      composePhoto: (_, _) async => null,
+    );
+    expect(find.byKey(const Key('product_form.compose_photo')), findsOneWidget);
+  });
+
+  testWidgets('sin imagen del servidor, en alta o sin seam ⇒ sin acción', (
+    tester,
+  ) async {
+    // Cada caso arranca de un árbol limpio: reusar el MaterialApp dejaría la
+    // hoja anterior abierta y los asserts mirarían la hoja equivocada.
+    Future<void> reset() async {
+      await tester.pumpWidget(Container());
+      await tester.pumpAndSettle();
+    }
+
+    // Alta (aun con seam).
+    await pumpAndOpen(tester, composePhoto: (_, _) async => null);
+    expect(find.byKey(const Key('product_form.compose_photo')), findsNothing);
+    await reset();
+    // Edición de un producto SIN imagen.
+    await pumpAndOpen(
+      tester,
+      initial: _initial,
+      composePhoto: (_, _) async => null,
+    );
+    expect(find.byKey(const Key('product_form.compose_photo')), findsNothing);
+    await reset();
+    // Edición con imagen pero sin seam cableado.
+    await pumpAndOpen(tester, initial: _initialConImagen);
+    expect(find.byKey(const Key('product_form.compose_photo')), findsNothing);
+    // El resto del form sí está (la hoja abrió de verdad).
+    expect(find.byKey(const Key('product_form.name')), findsOneWidget);
+  });
+
+  testWidgets('aceptar una composición actualiza el ref que viaja al guardar', (
+    tester,
+  ) async {
+    Product? received;
+    final submitted = await pumpAndOpen(
+      tester,
+      initial: _initialConImagen,
+      composePhoto: (_, product) async {
+        received = product;
+        return 'ref/compuesta.png';
+      },
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('product_form.compose_photo')),
+    );
+    await tester.tap(find.byKey(const Key('product_form.compose_photo')));
+    await tester.pumpAndSettle();
+    expect(received, _initialConImagen);
+
+    await save(tester);
+    expect(submitted.calls, 1);
+    expect(submitted.mediaRef, 'ref/compuesta.png');
+  });
+
+  testWidgets('cerrar la hoja de composición sin aceptar no toca el ref', (
+    tester,
+  ) async {
+    final submitted = await pumpAndOpen(
+      tester,
+      initial: _initialConImagen,
+      composePhoto: (_, _) async => null,
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('product_form.compose_photo')),
+    );
+    await tester.tap(find.byKey(const Key('product_form.compose_photo')));
+    await tester.pumpAndSettle();
+    await save(tester);
+    expect(submitted.mediaRef, 'ref/original.png');
   });
 }

@@ -19,7 +19,9 @@ import 'features/billing/data/datasources/billing_datasource.dart';
 import 'features/billing/data/repositories/billing_repository_impl.dart';
 import 'features/calendar/data/datasources/calendar_datasource.dart';
 import 'features/calendar/data/repositories/calendar_repository_impl.dart';
+import 'features/product_catalog/data/datasources/composition_datasource.dart';
 import 'features/product_catalog/data/datasources/product_catalog_datasource.dart';
+import 'features/product_catalog/data/repositories/composition_repository_impl.dart';
 import 'features/product_catalog/data/repositories/product_catalog_repository_impl.dart';
 import 'features/org_ai_config/data/datasources/org_ai_config_datasource.dart';
 import 'features/org_ai_config/data/repositories/org_ai_config_repository_impl.dart';
@@ -395,6 +397,10 @@ Future<void> main() async {
     datasource: DioProductCatalogDatasource(mainDio),
   );
 
+  final compositionRepository = CompositionRepositoryImpl(
+    datasource: DioCompositionDatasource(mainDio),
+  );
+
   final orgAiConfigRepository = OrgAiConfigRepositoryImpl(
     datasource: DioOrgAiConfigDatasource(mainDio),
   );
@@ -498,6 +504,7 @@ Future<void> main() async {
     catalogRepository: catalogRepository,
     calendarRepository: calendarRepository,
     productCatalogRepository: productCatalogRepository,
+    compositionRepository: compositionRepository,
     billingRepository: billingRepository,
     webBaseUrl: ataulfoWebUrl,
     orgAiConfigRepository: orgAiConfigRepository,

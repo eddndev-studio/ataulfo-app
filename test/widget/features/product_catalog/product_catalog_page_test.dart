@@ -5,6 +5,7 @@ import 'package:ataulfo/features/product_catalog/domain/entities/product.dart';
 import 'package:ataulfo/features/product_catalog/presentation/bloc/product_catalog_cubit.dart';
 import 'package:ataulfo/features/product_catalog/presentation/pages/product_catalog_page.dart';
 import 'package:ataulfo/features/product_catalog/presentation/widgets/product_catalog_fab.dart';
+import 'package:ataulfo/features/product_catalog/presentation/widgets/product_form_sheet.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -55,24 +56,26 @@ void main() {
     when(cubit.load).thenAnswer((_) async {});
   });
 
-  Future<void> pump(WidgetTester tester) => tester.pumpWidget(
-    MaterialApp(
-      theme: AppDesignTheme.dark(),
-      home: BlocProvider<ProductCatalogCubit>.value(
-        value: cubit,
-        child: Scaffold(
-          body: ProductCatalogPage(
-            pickImage: (_) async => null,
-            thumbLoader: (_, {asset}) async => null,
-          ),
-          floatingActionButton: ProductCatalogFab(
-            pickImage: (_) async => null,
-            thumbLoader: (_, {asset}) async => null,
+  Future<void> pump(WidgetTester tester, {ProductComposePhoto? composePhoto}) =>
+      tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: BlocProvider<ProductCatalogCubit>.value(
+            value: cubit,
+            child: Scaffold(
+              body: ProductCatalogPage(
+                pickImage: (_) async => null,
+                thumbLoader: (_, {asset}) async => null,
+                composePhoto: composePhoto,
+              ),
+              floatingActionButton: ProductCatalogFab(
+                pickImage: (_) async => null,
+                thumbLoader: (_, {asset}) async => null,
+              ),
+            ),
           ),
         ),
-      ),
-    ),
-  );
+      );
 
   testWidgets('loading → spinner (el buscador sigue montado)', (tester) async {
     when(
@@ -200,5 +203,43 @@ void main() {
     await tester.tap(find.byKey(const Key('product_catalog.fab')));
     await tester.pumpAndSettle();
     expect(find.text('Nuevo producto'), findsOneWidget);
+  });
+
+  testWidgets('aceptar una composición desde la edición recarga el catálogo', (
+    tester,
+  ) async {
+    final conImagen = Product(
+      id: 'p1',
+      kind: ProductKind.product,
+      name: 'Mango Ataulfo',
+      description: '',
+      category: 'Fruta',
+      priceCents: 0,
+      priceDisplay: '',
+      mediaRef: 'ref/original.png',
+      active: true,
+      createdAt: DateTime.utc(2026, 7, 1),
+      updatedAt: DateTime.utc(2026, 7, 1),
+    );
+    when(() => cubit.state).thenReturn(_state(items: <Product>[conImagen]));
+    var seamCalls = 0;
+    await pump(
+      tester,
+      composePhoto: (_, _) async {
+        seamCalls++;
+        return 'ref/compuesta.png';
+      },
+    );
+    await tester.tap(find.byKey(const Key('product_catalog.card.p1')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('product_form.compose_photo')),
+    );
+    await tester.tap(find.byKey(const Key('product_form.compose_photo')));
+    await tester.pumpAndSettle();
+    expect(seamCalls, 1);
+    // La foto del producto ya cambió en el backend: el listado no espera al
+    // guardado del form para refrescarse.
+    verify(cubit.load).called(1);
   });
 }

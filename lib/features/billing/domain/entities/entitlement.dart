@@ -21,6 +21,7 @@ class Entitlement {
     required this.storageQuotaMb,
     required this.eligibleProviders,
     required this.features,
+    this.imageGen,
   });
 
   final String planCode;
@@ -53,10 +54,16 @@ class Entitlement {
   /// Features gateadas del plan (p.ej. 'media_gallery'), orden del backend.
   final List<String> features;
 
+  /// Consumo de imágenes generadas con IA del periodo (mensual). Null cuando
+  /// el backend aún no expone el bloque: la UI omite el contador, no lo
+  /// inventa en cero.
+  final ImageGenUsage? imageGen;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is Entitlement &&
+        other.imageGen == imageGen &&
         other.planCode == planCode &&
         other.status == status &&
         other.trialExpired == trialExpired &&
@@ -85,7 +92,24 @@ class Entitlement {
     // del set (dos órdenes de llegada producen el mismo hash).
     eligibleProviders.fold<int>(0, (acc, p) => acc + p.hashCode),
     Object.hashAll(features),
+    imageGen,
   );
+}
+
+/// Consumo de generación de imágenes del periodo. Cap 0 = ilimitado, misma
+/// convención que los demás topes del entitlement.
+class ImageGenUsage {
+  const ImageGenUsage({required this.used, required this.cap});
+
+  final int used;
+  final int cap;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ImageGenUsage && other.used == used && other.cap == cap;
+
+  @override
+  int get hashCode => Object.hash(used, cap);
 }
 
 bool _setEquals(Set<String> a, Set<String> b) =>

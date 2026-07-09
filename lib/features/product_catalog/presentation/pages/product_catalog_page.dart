@@ -22,12 +22,22 @@ import '../widgets/product_form_sheet.dart';
 /// El buscador y los chips viven FUERA del switch de estado: siguen montados
 /// (y con foco) mientras una búsqueda pone el listado en loading.
 class ProductCatalogPage extends StatelessWidget {
-  const ProductCatalogPage({super.key, this.pickImage, this.thumbLoader});
+  const ProductCatalogPage({
+    super.key,
+    this.pickImage,
+    this.thumbLoader,
+    this.composePhoto,
+  });
 
   /// Seams de test del formulario y las miniaturas; null ⇒ galería picker y
   /// `ProductThumbResolver.session` reales.
   final ProductImagePicker? pickImage;
   final ProductThumbLoader? thumbLoader;
+
+  /// Flujo «Mejorar foto con IA» de la edición. A diferencia de los seams de
+  /// arriba, aquí null significa que la acción NO se ofrece: el wiring real
+  /// (repos de composición y media) lo inyecta el router.
+  final ProductComposePhoto? composePhoto;
 
   ProductThumbLoader get _thumbLoader =>
       thumbLoader ?? ProductThumbResolver.session.load;
@@ -57,6 +67,7 @@ class ProductCatalogPage extends StatelessWidget {
                     p,
                     pickImage: pickImage,
                     thumbLoader: thumbLoader,
+                    composePhoto: composePhoto,
                   ),
                 ),
               },

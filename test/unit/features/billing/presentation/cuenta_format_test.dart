@@ -170,4 +170,17 @@ void main() {
       expect(almacenamientoLabel(100, 0), 'Ilimitado');
     });
   });
+
+  group('imagenesIaLabel', () {
+    test(
+      'con tope ⇒ "X de Y este mes" (el periodo de imágenes es mensual)',
+      () {
+        expect(imagenesIaLabel(3, 150), '3 de 150 este mes');
+      },
+    );
+
+    test('tope 0 ⇒ ilimitadas (convención del backend)', () {
+      expect(imagenesIaLabel(3, 0), 'Ilimitadas');
+    });
+  });
 }

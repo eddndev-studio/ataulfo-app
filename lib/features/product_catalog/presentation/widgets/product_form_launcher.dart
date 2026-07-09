@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -41,12 +43,16 @@ Future<void> openProductCreate(
 }
 
 /// Abre la edición de [product] cableada al cubit del scope (submit contra
-/// `update` con el id del producto). El detalle v1 ES esta edición.
+/// `update` con el id del producto). El detalle v1 ES esta edición. Si llega
+/// [composePhoto], un resultado aceptado recarga el catálogo al instante: la
+/// foto del producto ya cambió en el backend y el listado no debe esperar al
+/// guardado del form.
 Future<void> openProductEdit(
   BuildContext context,
   Product product, {
   ProductImagePicker? pickImage,
   ProductThumbLoader? thumbLoader,
+  ProductComposePhoto? composePhoto,
 }) {
   final cubit = context.read<ProductCatalogCubit>();
   return ProductFormSheet.open(
@@ -55,6 +61,13 @@ Future<void> openProductEdit(
     categories: cubit.state.categories,
     pickImage: pickImage,
     thumbLoader: thumbLoader,
+    composePhoto: composePhoto == null
+        ? null
+        : (ctx, p) async {
+            final ref = await composePhoto(ctx, p);
+            if (ref != null) unawaited(cubit.load());
+            return ref;
+          },
     onSubmit:
         ({
           required ProductKind kind,
