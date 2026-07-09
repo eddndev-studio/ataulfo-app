@@ -17,6 +17,10 @@ import '../peso_format.dart';
 import '../product_thumb_resolver.dart';
 import 'product_form_image_section.dart';
 
+// Supera las 400 LOC a propósito: el wizard (los dos pasos + su navegación,
+// validación y estado compartido) es una sola unidad cohesiva de UI. Partirlo
+// dispersaría los controllers y callbacks que viven y se leen juntos.
+
 /// Persiste el formulario y devuelve la falla o null (éxito). El precio ya
 /// viaja en centavos; el mediaRef es el BARE de la galería ('' = sin imagen).
 typedef ProductFormSubmit =
@@ -46,10 +50,12 @@ typedef ProductThumbLoader =
 typedef ProductComposePhoto =
     Future<String?> Function(BuildContext context, Product product);
 
-/// Formulario de crear/editar un producto del catálogo como hoja inferior.
-/// En alta [initial] es null (nace activo, sin toggle); en edición trae el
-/// producto y muestra el toggle «Activo». El precio se edita en PESOS
-/// («1,250.00»; vacío = a consultar) y se envía en centavos. [onSubmit]
+/// Formulario de crear/editar un producto del catálogo como hoja inferior, en
+/// formato wizard de dos pasos dentro de una sola hoja: (1) lo básico —tipo,
+/// nombre, precio, categoría— y (2) los detalles —descripción, imagen, mejora
+/// con IA y, en edición, el toggle «Activo». En alta [initial] es null (nace
+/// activo, sin toggle); en edición trae el producto. El precio se edita en
+/// PESOS («1,250.00»; vacío = a consultar) y se envía en centavos. [onSubmit]
 /// persiste y devuelve la falla o null.
 class ProductFormSheet extends StatefulWidget {
   const ProductFormSheet({
@@ -105,6 +111,9 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
   late ProductKind _kind;
   late bool _active;
   late String _mediaRef;
+
+  /// Paso visible del wizard: 0 = básicos, 1 = detalles.
+  int _step = 0;
 
   /// Asset efímero de la selección de ESTA sesión: habilita la descarga de
   /// la miniatura recién elegida. Solo describe a [_mediaRef]; jamás se
@@ -171,19 +180,46 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
     });
   }
 
-  Future<void> _save() async {
-    if (_busy) return;
-    final name = _nameCtrl.text.trim();
-    if (name.isEmpty) {
+  /// Valida los básicos (paso 1) y, si están bien, avanza a los detalles.
+  /// Precio vacío = «a consultar» (válido); solo un texto no numérico rebota.
+  void _next() {
+    if (_nameCtrl.text.trim().isEmpty) {
       setState(() => _error = 'Ponle un nombre al producto.');
       return;
     }
-    final priceCents = parsePesosToCents(_priceCtrl.text);
-    if (priceCents == null) {
+    if (parsePesosToCents(_priceCtrl.text) == null) {
       setState(
         () => _error =
             'Escribe un precio válido (p. ej. 1,250.00) o déjalo vacío.',
       );
+      return;
+    }
+    setState(() {
+      _error = null;
+      _step = 1;
+    });
+  }
+
+  void _back() => setState(() => _step = 0);
+
+  Future<void> _save() async {
+    if (_busy) return;
+    final name = _nameCtrl.text.trim();
+    // Los básicos se validan al avanzar; si algo se coló inválido, se regresa
+    // al paso donde vive el campo para que el error sea accionable.
+    if (name.isEmpty) {
+      setState(() {
+        _error = 'Ponle un nombre al producto.';
+        _step = 0;
+      });
+      return;
+    }
+    final priceCents = parsePesosToCents(_priceCtrl.text);
+    if (priceCents == null) {
+      setState(() {
+        _error = 'Escribe un precio válido (p. ej. 1,250.00) o déjalo vacío.';
+        _step = 0;
+      });
       return;
     }
     setState(() {
@@ -212,7 +248,6 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -222,159 +257,188 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
           AppTokens.sp5 + context.sheetBottomInset,
         ),
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: _step == 0 ? _basics(context) : _details(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _basics(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _WizardHeader(
+          title: _isEdit ? 'Editar producto' : 'Nuevo producto',
+          step: 0,
+        ),
+        const SizedBox(height: AppTokens.sp5),
+        Wrap(
+          spacing: AppTokens.sp2,
+          children: <Widget>[
+            AppChoiceChip(
+              key: const Key('product_form.kind.product'),
+              label: 'Producto',
+              selected: _kind == ProductKind.product,
+              onSelected: (_) => setState(() => _kind = ProductKind.product),
+            ),
+            AppChoiceChip(
+              key: const Key('product_form.kind.service'),
+              label: 'Servicio',
+              selected: _kind == ProductKind.service,
+              onSelected: (_) => setState(() => _kind = ProductKind.service),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTokens.sp4),
+        AppTextField(
+          key: const Key('product_form.name'),
+          label: 'Nombre',
+          hint: 'Ej. Mango Ataulfo por caja',
+          controller: _nameCtrl,
+          autofocus: !_isEdit,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: AppTokens.sp4),
+        AppTextField(
+          key: const Key('product_form.price'),
+          label: 'Precio (MXN)',
+          hint: 'Ej. 1,250.00 — vacío = a consultar',
+          controller: _priceCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: AppTokens.sp4),
+        AppTextField(
+          key: const Key('product_form.category'),
+          label: 'Categoría (opcional)',
+          hint: 'Ej. Fruta, Servicios…',
+          controller: _categoryCtrl,
+          textInputAction: TextInputAction.next,
+        ),
+        if (widget.categories.isNotEmpty) ...<Widget>[
+          const SizedBox(height: AppTokens.sp3),
+          Wrap(
+            spacing: AppTokens.sp2,
+            runSpacing: AppTokens.sp2,
             children: <Widget>[
-              Text(
-                _isEdit ? 'Editar producto' : 'Nuevo producto',
-                style: textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppTokens.sp5),
-              Wrap(
-                spacing: AppTokens.sp2,
-                children: <Widget>[
-                  AppChoiceChip(
-                    key: const Key('product_form.kind.product'),
-                    label: 'Producto',
-                    selected: _kind == ProductKind.product,
-                    onSelected: (_) =>
-                        setState(() => _kind = ProductKind.product),
-                  ),
-                  AppChoiceChip(
-                    key: const Key('product_form.kind.service'),
-                    label: 'Servicio',
-                    selected: _kind == ProductKind.service,
-                    onSelected: (_) =>
-                        setState(() => _kind = ProductKind.service),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppTokens.sp4),
-              AppTextField(
-                key: const Key('product_form.name'),
-                label: 'Nombre',
-                hint: 'Ej. Mango Ataulfo por caja',
-                controller: _nameCtrl,
-                autofocus: !_isEdit,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppTokens.sp4),
-              AppTextField(
-                key: const Key('product_form.price'),
-                label: 'Precio (MXN)',
-                hint: 'Ej. 1,250.00 — vacío = a consultar',
-                controller: _priceCtrl,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+              for (final cat in widget.categories)
+                AppChoiceChip(
+                  key: Key('product_form.category_suggestion.$cat'),
+                  label: cat,
+                  selected: _categoryCtrl.text.trim() == cat,
+                  onSelected: (_) => setState(() => _categoryCtrl.text = cat),
                 ),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppTokens.sp4),
-              AppTextField(
-                key: const Key('product_form.category'),
-                label: 'Categoría (opcional)',
-                hint: 'Ej. Fruta, Servicios…',
-                controller: _categoryCtrl,
-                textInputAction: TextInputAction.next,
-              ),
-              if (widget.categories.isNotEmpty) ...<Widget>[
-                const SizedBox(height: AppTokens.sp3),
-                Wrap(
-                  spacing: AppTokens.sp2,
-                  runSpacing: AppTokens.sp2,
+            ],
+          ),
+        ],
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: AppTokens.sp3),
+          Text(
+            _error!,
+            key: const Key('product_form.error'),
+            style: textTheme.bodySmall?.copyWith(color: AppTokens.danger),
+          ),
+        ],
+        const SizedBox(height: AppTokens.sp5),
+        AppButton.filled(
+          key: const Key('product_form.next'),
+          label: 'Siguiente',
+          fullWidth: true,
+          onPressed: _next,
+        ),
+      ],
+    );
+  }
+
+  Widget _details(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _WizardHeader(
+          title: 'Detalles del producto',
+          step: 1,
+          onBack: _busy ? null : _back,
+        ),
+        const SizedBox(height: AppTokens.sp5),
+        AppTextField(
+          key: const Key('product_form.description'),
+          label: 'Descripción (opcional)',
+          hint: 'Qué incluye, presentaciones, tiempos…',
+          controller: _descCtrl,
+          minLines: 3,
+          maxLines: 6,
+        ),
+        const SizedBox(height: AppTokens.sp5),
+        ProductFormImageSection(
+          mediaRef: _mediaRef,
+          pickedAsset: _pickedAsset,
+          thumbLoader: widget.thumbLoader ?? ProductThumbResolver.session.load,
+          enabled: !_busy,
+          onPick: _pick,
+          onRemove: () => setState(() {
+            _mediaRef = '';
+            _pickedAsset = null;
+          }),
+        ),
+        if (_canComposePhoto) ...<Widget>[
+          const SizedBox(height: AppTokens.sp3),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppButton.tonal(
+              key: const Key('product_form.compose_photo'),
+              label: 'Mejorar foto con IA',
+              icon: Icons.auto_awesome_outlined,
+              onPressed: _busy ? null : _composePhoto,
+            ),
+          ),
+        ],
+        if (_isEdit) ...<Widget>[
+          const SizedBox(height: AppTokens.sp5),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    for (final cat in widget.categories)
-                      AppChoiceChip(
-                        key: Key('product_form.category_suggestion.$cat'),
-                        label: cat,
-                        selected: _categoryCtrl.text.trim() == cat,
-                        onSelected: (_) =>
-                            setState(() => _categoryCtrl.text = cat),
+                    Text('Activo', style: textTheme.bodyLarge),
+                    Text(
+                      'Los inactivos no se ofrecen ni se comparten.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppTokens.text2,
                       ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: AppTokens.sp4),
-              AppTextField(
-                key: const Key('product_form.description'),
-                label: 'Descripción (opcional)',
-                hint: 'Qué incluye, presentaciones, tiempos…',
-                controller: _descCtrl,
-                minLines: 3,
-                maxLines: 6,
-              ),
-              const SizedBox(height: AppTokens.sp5),
-              ProductFormImageSection(
-                mediaRef: _mediaRef,
-                pickedAsset: _pickedAsset,
-                thumbLoader:
-                    widget.thumbLoader ?? ProductThumbResolver.session.load,
-                enabled: !_busy,
-                onPick: _pick,
-                onRemove: () => setState(() {
-                  _mediaRef = '';
-                  _pickedAsset = null;
-                }),
-              ),
-              if (_canComposePhoto) ...<Widget>[
-                const SizedBox(height: AppTokens.sp3),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: AppButton.tonal(
-                    key: const Key('product_form.compose_photo'),
-                    label: 'Mejorar foto con IA',
-                    icon: Icons.auto_awesome_outlined,
-                    onPressed: _busy ? null : _composePhoto,
-                  ),
-                ),
-              ],
-              if (_isEdit) ...<Widget>[
-                const SizedBox(height: AppTokens.sp5),
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text('Activo', style: textTheme.bodyLarge),
-                          Text(
-                            'Los inactivos no se ofrecen ni se comparten.',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: AppTokens.text2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    AppSwitch(
-                      key: const Key('product_form.active'),
-                      value: _active,
-                      onChanged: (v) => setState(() => _active = v),
                     ),
                   ],
                 ),
-              ],
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: AppTokens.sp3),
-                Text(
-                  _error!,
-                  key: const Key('product_form.error'),
-                  style: textTheme.bodySmall?.copyWith(color: AppTokens.danger),
-                ),
-              ],
-              const SizedBox(height: AppTokens.sp5),
-              AppButton.filled(
-                key: const Key('product_form.save'),
-                label: _isEdit ? 'Guardar cambios' : 'Crear producto',
-                fullWidth: true,
-                loading: _busy,
-                onPressed: _busy ? null : _save,
+              ),
+              AppSwitch(
+                key: const Key('product_form.active'),
+                value: _active,
+                onChanged: (v) => setState(() => _active = v),
               ),
             ],
           ),
+        ],
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: AppTokens.sp3),
+          Text(
+            _error!,
+            key: const Key('product_form.error'),
+            style: textTheme.bodySmall?.copyWith(color: AppTokens.danger),
+          ),
+        ],
+        const SizedBox(height: AppTokens.sp5),
+        AppButton.filled(
+          key: const Key('product_form.save'),
+          label: _isEdit ? 'Guardar cambios' : 'Crear producto',
+          fullWidth: true,
+          loading: _busy,
+          onPressed: _busy ? null : _save,
         ),
-      ),
+      ],
     );
   }
 
@@ -388,4 +452,64 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
       'La operación tardó demasiado. Inténtalo otra vez.',
     _ => 'No se pudo guardar. Inténtalo otra vez.',
   };
+}
+
+/// Encabezado del paso: título, un botón «volver» opcional (paso 2) y el
+/// indicador de progreso de dos puntos.
+class _WizardHeader extends StatelessWidget {
+  const _WizardHeader({required this.title, required this.step, this.onBack});
+
+  final String title;
+
+  /// Paso activo (0 o 1); ilumina el punto correspondiente.
+  final int step;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: <Widget>[
+        if (onBack != null) ...<Widget>[
+          IconButton(
+            key: const Key('product_form.back'),
+            tooltip: 'Volver',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: onBack,
+          ),
+          const SizedBox(width: AppTokens.sp1),
+        ],
+        Expanded(child: Text(title, style: textTheme.titleLarge)),
+        _StepDots(active: step),
+      ],
+    );
+  }
+}
+
+/// Dos puntos que marcan el paso vigente del wizard.
+class _StepDots extends StatelessWidget {
+  const _StepDots({required this.active});
+
+  final int active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        _dot(active == 0),
+        const SizedBox(width: AppTokens.sp1),
+        _dot(active == 1),
+      ],
+    );
+  }
+
+  Widget _dot(bool on) => Container(
+    width: 8,
+    height: 8,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: on ? AppTokens.primary : AppTokens.surface3,
+    ),
+  );
 }

@@ -113,38 +113,56 @@ void main() {
     return submitted;
   }
 
+  // Paso 1 → paso 2 del wizard.
+  Future<void> next(WidgetTester tester) async {
+    await tester.ensureVisible(find.byKey(const Key('product_form.next')));
+    await tester.tap(find.byKey(const Key('product_form.next')));
+    await tester.pumpAndSettle();
+  }
+
   Future<void> save(WidgetTester tester) async {
     await tester.ensureVisible(find.byKey(const Key('product_form.save')));
     await tester.tap(find.byKey(const Key('product_form.save')));
     await tester.pumpAndSettle();
   }
 
-  testWidgets('alta: campos presentes, sin switch de activo', (tester) async {
+  testWidgets('alta: paso 1 con básicos; paso 2 con detalles, sin switch', (
+    tester,
+  ) async {
     await pumpAndOpen(tester);
+    // Paso 1.
     expect(find.text('Nuevo producto'), findsOneWidget);
     expect(find.byKey(const Key('product_form.name')), findsOneWidget);
     expect(find.byKey(const Key('product_form.price')), findsOneWidget);
     expect(find.byKey(const Key('product_form.category')), findsOneWidget);
-    expect(find.byKey(const Key('product_form.description')), findsOneWidget);
     expect(find.byKey(const Key('product_form.kind.product')), findsOneWidget);
     expect(find.byKey(const Key('product_form.kind.service')), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
+    await next(tester);
+    // Paso 2.
+    expect(find.byKey(const Key('product_form.description')), findsOneWidget);
     expect(find.byKey(const Key('product_form.pick_image')), findsOneWidget);
     expect(find.byType(AppSwitch), findsNothing);
   });
 
-  testWidgets('guardar sin nombre ⇒ error y sin submit', (tester) async {
+  testWidgets('siguiente sin nombre ⇒ error y no avanza', (tester) async {
     final submitted = await pumpAndOpen(tester);
-    await save(tester);
+    await tester.tap(find.byKey(const Key('product_form.next')));
+    await tester.pump();
     expect(find.byKey(const Key('product_form.error')), findsOneWidget);
+    expect(find.byKey(const Key('product_form.next')), findsOneWidget);
     expect(submitted.calls, 0);
   });
 
-  testWidgets('precio inválido ⇒ error y sin submit', (tester) async {
+  testWidgets('precio inválido ⇒ error y no avanza', (tester) async {
     final submitted = await pumpAndOpen(tester);
     await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
     await tester.enterText(find.byKey(const Key('product_form.price')), 'abc');
-    await save(tester);
+    await tester.tap(find.byKey(const Key('product_form.next')));
+    await tester.pump();
     expect(find.byKey(const Key('product_form.error')), findsOneWidget);
+    expect(find.byKey(const Key('product_form.next')), findsOneWidget);
     expect(submitted.calls, 0);
   });
 
@@ -161,6 +179,7 @@ void main() {
       find.byKey(const Key('product_form.category')),
       'Postres',
     );
+    await next(tester);
     await tester.enterText(
       find.byKey(const Key('product_form.description')),
       'De temporada',
@@ -175,7 +194,7 @@ void main() {
     expect(submitted.mediaRef, '');
     expect(submitted.active, isTrue);
     // La hoja se cerró.
-    expect(find.byKey(const Key('product_form.name')), findsNothing);
+    expect(find.byKey(const Key('product_form.save')), findsNothing);
   });
 
   testWidgets('failure del backend ⇒ copy visible y la hoja sigue abierta', (
@@ -186,27 +205,35 @@ void main() {
       'La imagen elegida ya no está en la galería.',
     );
     await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
+    await next(tester);
     await save(tester);
     expect(
       find.text('La imagen elegida ya no está en la galería.'),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('product_form.name')), findsOneWidget);
+    // Sigue en el paso 2 (el botón de guardar sigue presente).
+    expect(find.byKey(const Key('product_form.save')), findsOneWidget);
   });
 
   testWidgets('403 ⇒ copy de permisos', (tester) async {
     final submitted = await pumpAndOpen(tester);
     submitted.result = const ProductCatalogForbiddenFailure();
     await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
+    await next(tester);
     await save(tester);
     expect(find.text('No tienes permiso para esta acción.'), findsOneWidget);
   });
 
-  testWidgets('edición: precarga campos, switch activo y kind', (tester) async {
+  testWidgets('edición: precarga campos; switch activo en el paso 2', (
+    tester,
+  ) async {
     final submitted = await pumpAndOpen(tester, initial: _initial);
     expect(find.text('Editar producto'), findsOneWidget);
     expect(find.text('Asesoría'), findsOneWidget);
     expect(find.text('1,250.00'), findsOneWidget);
+
+    await next(tester);
+    // La descripción y el switch viven en el paso 2.
     expect(find.text('Una hora'), findsOneWidget);
     expect(find.byType(AppSwitch), findsOneWidget);
 
@@ -228,6 +255,7 @@ void main() {
       find.byKey(const Key('product_form.name')),
       'Asesoría',
     );
+    await next(tester);
     await save(tester);
     expect(submitted.kind, ProductKind.service);
   });
@@ -252,11 +280,12 @@ void main() {
       tester,
       pickImage: (_) async => _asset('tenant/org/media/m9.png'),
     );
+    await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
+    await next(tester);
     await tester.tap(find.byKey(const Key('product_form.pick_image')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('product_form.remove_image')), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
     await save(tester);
     expect(submitted.mediaRef, 'tenant/org/media/m9.png');
   });
@@ -266,13 +295,14 @@ void main() {
       tester,
       pickImage: (_) async => _asset('tenant/org/media/m9.png'),
     );
+    await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
+    await next(tester);
     await tester.tap(find.byKey(const Key('product_form.pick_image')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('product_form.remove_image')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('product_form.pick_image')), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
     await save(tester);
     expect(submitted.mediaRef, '');
   });
@@ -285,6 +315,7 @@ void main() {
       initial: _initialConImagen,
       composePhoto: (_, _) async => null,
     );
+    await next(tester);
     expect(find.byKey(const Key('product_form.compose_photo')), findsOneWidget);
   });
 
@@ -300,6 +331,8 @@ void main() {
 
     // Alta (aun con seam).
     await pumpAndOpen(tester, composePhoto: (_, _) async => null);
+    await tester.enterText(find.byKey(const Key('product_form.name')), 'Tarta');
+    await next(tester);
     expect(find.byKey(const Key('product_form.compose_photo')), findsNothing);
     await reset();
     // Edición de un producto SIN imagen.
@@ -308,13 +341,15 @@ void main() {
       initial: _initial,
       composePhoto: (_, _) async => null,
     );
+    await next(tester);
     expect(find.byKey(const Key('product_form.compose_photo')), findsNothing);
     await reset();
     // Edición con imagen pero sin seam cableado.
     await pumpAndOpen(tester, initial: _initialConImagen);
+    await next(tester);
     expect(find.byKey(const Key('product_form.compose_photo')), findsNothing);
-    // El resto del form sí está (la hoja abrió de verdad).
-    expect(find.byKey(const Key('product_form.name')), findsOneWidget);
+    // Llegó al paso 2 (la hoja abrió de verdad).
+    expect(find.byKey(const Key('product_form.description')), findsOneWidget);
   });
 
   testWidgets('aceptar una composición actualiza el ref que viaja al guardar', (
@@ -329,6 +364,7 @@ void main() {
         return 'ref/compuesta.png';
       },
     );
+    await next(tester);
     await tester.ensureVisible(
       find.byKey(const Key('product_form.compose_photo')),
     );
@@ -349,6 +385,7 @@ void main() {
       initial: _initialConImagen,
       composePhoto: (_, _) async => null,
     );
+    await next(tester);
     await tester.ensureVisible(
       find.byKey(const Key('product_form.compose_photo')),
     );

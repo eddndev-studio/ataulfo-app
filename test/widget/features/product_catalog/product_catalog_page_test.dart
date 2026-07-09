@@ -232,6 +232,9 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('product_catalog.card.p1')));
     await tester.pumpAndSettle();
+    // «Mejorar foto con IA» vive en el paso 2 del wizard.
+    await tester.tap(find.byKey(const Key('product_form.next')));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const Key('product_form.compose_photo')),
     );
