@@ -219,7 +219,7 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
           AppTokens.sp5,
           AppTokens.sp2,
           AppTokens.sp5,
-          AppTokens.sp5 + context.safeBottomInset,
+          AppTokens.sp5 + context.sheetBottomInset,
         ),
         child: SingleChildScrollView(
           child: Column(

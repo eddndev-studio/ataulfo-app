@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/product_catalog/domain/entities/product.dart';
@@ -355,5 +356,54 @@ void main() {
     await tester.pumpAndSettle();
     await save(tester);
     expect(submitted.mediaRef, 'ref/original.png');
+  });
+
+  testWidgets('la hoja reserva el espacio del teclado (sheetBottomInset)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              viewInsets: const EdgeInsets.only(bottom: 300),
+              viewPadding: EdgeInsets.zero,
+              padding: EdgeInsets.zero,
+            ),
+            // Modo edición: sin autofocus, así no hay timer de cursor que
+            // haga time-out el settle.
+            child: Material(
+              child: ProductFormSheet(
+                initial: _initial,
+                thumbLoader: (_, {asset}) async => null,
+                onSubmit:
+                    ({
+                      required ProductKind kind,
+                      required String name,
+                      required String description,
+                      required String category,
+                      required int priceCents,
+                      required String mediaRef,
+                      required bool active,
+                    }) async => null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final padding = tester.widget<Padding>(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Padding &&
+            w.padding is EdgeInsets &&
+            (w.padding as EdgeInsets).left == AppTokens.sp5 &&
+            (w.padding as EdgeInsets).top == AppTokens.sp2,
+      ),
+    );
+    expect((padding.padding as EdgeInsets).bottom, greaterThanOrEqualTo(300));
   });
 }

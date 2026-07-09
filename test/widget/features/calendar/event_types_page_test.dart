@@ -1,8 +1,11 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/calendar/domain/entities/event_type.dart';
+import 'package:ataulfo/features/calendar/domain/failures/calendar_failure.dart';
 import 'package:ataulfo/features/calendar/presentation/bloc/event_types_cubit.dart';
 import 'package:ataulfo/features/calendar/presentation/pages/event_types_page.dart';
+import 'package:ataulfo/features/calendar/presentation/widgets/event_type_form_sheet.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -91,5 +94,48 @@ void main() {
     await pump(tester);
     await tester.tap(find.byType(AppSwitch).first);
     verify(() => cubit.setActive(_et, false)).called(1);
+  });
+
+  testWidgets('la hoja reserva el espacio del teclado (sheetBottomInset)', (
+    tester,
+  ) async {
+    Future<CalendarFailure?> onSubmit({
+      required String name,
+      required String description,
+      required int durationMin,
+      required bool active,
+    }) async => null;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              viewInsets: const EdgeInsets.only(bottom: 300),
+              viewPadding: EdgeInsets.zero,
+              padding: EdgeInsets.zero,
+            ),
+            // Modo edición: sin autofocus, así no hay timer de cursor que
+            // haga time-out el settle.
+            child: Material(
+              child: EventTypeFormSheet(initial: _et, onSubmit: onSubmit),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final padding = tester.widget<Padding>(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Padding &&
+            w.padding is EdgeInsets &&
+            (w.padding as EdgeInsets).left == AppTokens.sp5 &&
+            (w.padding as EdgeInsets).top == AppTokens.sp2,
+      ),
+    );
+    expect((padding.padding as EdgeInsets).bottom, greaterThanOrEqualTo(300));
   });
 }
