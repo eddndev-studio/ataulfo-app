@@ -10,7 +10,9 @@ import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/design/widgets/app_toggle_row.dart';
+import '../../domain/entities/catalog_appearance.dart';
 import '../../domain/entities/public_catalog_settings.dart';
+import '../appearance/appearance_section.dart';
 import '../bloc/public_catalog_cubit.dart';
 import '../public_catalog_copy.dart';
 
@@ -58,6 +60,8 @@ class _SettingsForm extends StatefulWidget {
 
 class _SettingsFormState extends State<_SettingsForm> {
   late bool _enabled = widget.settings.enabled;
+  late CatalogDesign _design = widget.settings.design;
+  late CatalogAccent _accent = widget.settings.accent;
   late final TextEditingController _slug = TextEditingController(
     text: widget.settings.slug ?? '',
   );
@@ -74,6 +78,13 @@ class _SettingsFormState extends State<_SettingsForm> {
     if (old.settings.enabled != widget.settings.enabled) {
       _enabled = widget.settings.enabled;
     }
+    // La apariencia también se reconcilia con lo que devolvió el backend.
+    if (old.settings.design != widget.settings.design) {
+      _design = widget.settings.design;
+    }
+    if (old.settings.accent != widget.settings.accent) {
+      _accent = widget.settings.accent;
+    }
   }
 
   @override
@@ -87,6 +98,8 @@ class _SettingsFormState extends State<_SettingsForm> {
     context.read<PublicCatalogCubit>().save(
       enabled: _enabled,
       slug: _slug.text.trim(),
+      design: _design,
+      accent: _accent,
     );
   }
 
@@ -139,7 +152,15 @@ class _SettingsFormState extends State<_SettingsForm> {
             const SizedBox(height: AppTokens.sp5),
             _UrlCard(url: url),
           ],
-          const SizedBox(height: AppTokens.sp6),
+          const SizedBox(height: AppTokens.sp7),
+          AppearanceSection(
+            design: _design,
+            accent: _accent,
+            onDesignChanged: (d) => setState(() => _design = d),
+            onAccentChanged: (a) => setState(() => _accent = a),
+            showOffHint: !_enabled,
+          ),
+          const SizedBox(height: AppTokens.sp7),
           BlocBuilder<PublicCatalogCubit, PublicCatalogState>(
             buildWhen: (a, b) => a.saving != b.saving,
             builder: (context, state) => AppButton.filled(

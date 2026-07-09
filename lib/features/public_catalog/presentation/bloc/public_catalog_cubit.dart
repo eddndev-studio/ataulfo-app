@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/entities/catalog_appearance.dart';
 import '../../domain/entities/public_catalog_settings.dart';
 import '../../domain/failures/public_catalog_failure.dart';
 import '../../domain/repositories/public_catalog_repository.dart';
@@ -83,13 +84,24 @@ class PublicCatalogCubit extends Cubit<PublicCatalogState> {
     }
   }
 
-  /// Aplica toggle + slug. Éxito ⇒ settings del backend; falla ⇒ saveFailure
-  /// (la vista muestra el copy y conserva lo que ya se veía).
-  Future<void> save({required bool enabled, required String slug}) async {
+  /// Aplica toggle + slug + apariencia (design/accent). Éxito ⇒ settings del
+  /// backend; falla ⇒ saveFailure (la vista muestra el copy y conserva lo que
+  /// ya se veía).
+  Future<void> save({
+    required bool enabled,
+    required String slug,
+    required CatalogDesign design,
+    required CatalogAccent accent,
+  }) async {
     if (state.saving) return;
     emit(state.copyWith(saving: true, clearSaveFailure: true));
     try {
-      final s = await _repo.update(enabled: enabled, slug: slug);
+      final s = await _repo.update(
+        enabled: enabled,
+        slug: slug,
+        design: design,
+        accent: accent,
+      );
       if (isClosed) return;
       emit(
         state.copyWith(

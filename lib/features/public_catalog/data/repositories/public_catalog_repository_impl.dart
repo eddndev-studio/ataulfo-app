@@ -1,3 +1,4 @@
+import '../../domain/entities/catalog_appearance.dart';
 import '../../domain/entities/public_catalog_settings.dart';
 import '../../domain/repositories/public_catalog_repository.dart';
 import '../datasources/public_catalog_datasource.dart';
@@ -16,5 +17,12 @@ class PublicCatalogRepositoryImpl implements PublicCatalogRepository {
   Future<PublicCatalogSettings> update({
     required bool enabled,
     required String slug,
-  }) => datasource.update(enabled: enabled, slug: slug);
+    required CatalogDesign design,
+    required CatalogAccent accent,
+  }) => datasource.update(
+    enabled: enabled,
+    slug: slug,
+    design: design,
+    accent: accent,
+  );
 }

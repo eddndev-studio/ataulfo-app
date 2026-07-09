@@ -20,6 +20,14 @@ class PublicCatalogInvalidSlugFailure extends PublicCatalogFailure {
   const PublicCatalogInvalidSlugFailure();
 }
 
+/// 422 invalid_design / invalid_accent: el diseño o color propuesto no existe
+/// en el backend (app desactualizada frente a un enum que se recortó, o un
+/// valor manipulado). Distinta del slug: el usuario no debe "corregir" el
+/// enlace por un rechazo de apariencia.
+class PublicCatalogInvalidAppearanceFailure extends PublicCatalogFailure {
+  const PublicCatalogInvalidAppearanceFailure();
+}
+
 /// 409 slug_taken: otro negocio ya usa ese enlace.
 class PublicCatalogSlugTakenFailure extends PublicCatalogFailure {
   const PublicCatalogSlugTakenFailure();
