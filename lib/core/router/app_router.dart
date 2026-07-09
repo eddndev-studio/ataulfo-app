@@ -36,6 +36,9 @@ import '../../features/org_customization/presentation/pages/org_customization_pa
 import '../../features/public_catalog/domain/repositories/public_catalog_repository.dart';
 import '../../features/public_catalog/presentation/bloc/public_catalog_cubit.dart';
 import '../../features/public_catalog/presentation/pages/public_catalog_page.dart';
+import '../../features/stickers/domain/repositories/sticker_repository.dart';
+import '../../features/stickers/presentation/bloc/sticker_cubit.dart';
+import '../../features/stickers/presentation/pages/stickers_page.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/accept_invitation_cubit.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
@@ -233,6 +236,7 @@ class AppRouter {
     required OrgAiConfigRepository orgAiConfigRepository,
     OrgBrandingRepository? orgBrandingRepository,
     PublicCatalogRepository? publicCatalogRepository,
+    StickerRepository? stickerRepository,
     required NotificationsRepository notificationsRepository,
     required MediaRepository mediaRepository,
     required MediaFilePicker mediaFilePicker,
@@ -283,6 +287,7 @@ class AppRouter {
        _orgAiConfigRepo = orgAiConfigRepository,
        _orgBrandingRepo = orgBrandingRepository,
        _publicCatalogRepo = publicCatalogRepository,
+       _stickerRepo = stickerRepository,
        _notificationsRepo = notificationsRepository,
        _mediaRepo = mediaRepository,
        _mediaFilePicker = mediaFilePicker,
@@ -367,6 +372,10 @@ class AppRouter {
   /// Ajustes del catálogo público (opcional): null en tests que no navegan a
   /// `/org/public-catalog`; main siempre la provee.
   final PublicCatalogRepository? _publicCatalogRepo;
+
+  /// Stickers de la org (opcional): null en tests que no navegan a
+  /// `/org/stickers`; main siempre la provee.
+  final StickerRepository? _stickerRepo;
   final NotificationsRepository _notificationsRepo;
   final MediaRepository _mediaRepo;
   final MediaFilePicker _mediaFilePicker;
@@ -1754,6 +1763,25 @@ class AppRouter {
           return BlocProvider<PublicCatalogCubit>(
             create: (_) => PublicCatalogCubit(repo)..load(),
             child: const PublicCatalogPage(),
+          );
+        },
+      ),
+      GoRoute(
+        // Stickers corporativos (Arco E): generar stickers de motivos curados y
+        // ver la galería. ADMIN+ (el backend lo hace cumplir). Los thumbnails
+        // se resuelven por el mismo camino que el «después» de la composición
+        // (galería fresca + URL firmada).
+        path: '/org/stickers',
+        builder: (context, _) {
+          final repo = _stickerRepo;
+          if (repo == null) {
+            return const Scaffold(
+              body: Center(child: Text('Stickers no disponible')),
+            );
+          }
+          return BlocProvider<StickerCubit>(
+            create: (_) => StickerCubit(repo)..load(),
+            child: StickersPage(resolveThumb: _compositionThumbBytes),
           );
         },
       ),

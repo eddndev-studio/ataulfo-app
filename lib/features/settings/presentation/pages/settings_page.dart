@@ -215,6 +215,14 @@ class _SectionsCard extends StatelessWidget {
             ),
             const Divider(height: AppTokens.sp5, color: AppTokens.divider),
             AppSectionLink(
+              rowKey: const Key('settings.stickers_tile'),
+              icon: Icons.emoji_emotions_outlined,
+              title: 'Stickers',
+              caption: 'Crea stickers de tu negocio con IA para el chat',
+              onTap: () => context.push('/org/stickers'),
+            ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
               rowKey: const Key('settings.account_tile'),
               icon: Icons.credit_card_outlined,
               title: 'Cuenta y plan',
