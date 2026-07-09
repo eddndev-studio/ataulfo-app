@@ -33,6 +33,9 @@ import '../../features/org_ai_config/presentation/pages/org_ai_config_page.dart'
 import '../../features/org_customization/domain/repositories/org_branding_repository.dart';
 import '../../features/org_customization/presentation/bloc/org_customization_cubit.dart';
 import '../../features/org_customization/presentation/pages/org_customization_page.dart';
+import '../../features/public_catalog/domain/repositories/public_catalog_repository.dart';
+import '../../features/public_catalog/presentation/bloc/public_catalog_cubit.dart';
+import '../../features/public_catalog/presentation/pages/public_catalog_page.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/accept_invitation_cubit.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
@@ -229,6 +232,7 @@ class AppRouter {
     String webBaseUrl = 'https://ataulfo.app',
     required OrgAiConfigRepository orgAiConfigRepository,
     OrgBrandingRepository? orgBrandingRepository,
+    PublicCatalogRepository? publicCatalogRepository,
     required NotificationsRepository notificationsRepository,
     required MediaRepository mediaRepository,
     required MediaFilePicker mediaFilePicker,
@@ -278,6 +282,7 @@ class AppRouter {
        _webBaseUrl = webBaseUrl,
        _orgAiConfigRepo = orgAiConfigRepository,
        _orgBrandingRepo = orgBrandingRepository,
+       _publicCatalogRepo = publicCatalogRepository,
        _notificationsRepo = notificationsRepository,
        _mediaRepo = mediaRepository,
        _mediaFilePicker = mediaFilePicker,
@@ -358,6 +363,10 @@ class AppRouter {
   /// Marca de documentos de la org (opcional): null en tests que no navegan
   /// a `/org/customization`; main siempre la provee.
   final OrgBrandingRepository? _orgBrandingRepo;
+
+  /// Ajustes del catálogo público (opcional): null en tests que no navegan a
+  /// `/org/public-catalog`; main siempre la provee.
+  final PublicCatalogRepository? _publicCatalogRepo;
   final NotificationsRepository _notificationsRepo;
   final MediaRepository _mediaRepo;
   final MediaFilePicker _mediaFilePicker;
@@ -1727,6 +1736,24 @@ class AppRouter {
               appBar: AppBar(title: const Text('Personalización')),
               body: const OrgCustomizationPage(),
             ),
+          );
+        },
+      ),
+      GoRoute(
+        // Catálogo público de la org (Arco D): encender la vitrina, elegir el
+        // enlace y copiar la URL. ADMIN+ (el backend lo hace cumplir).
+        // Page-scoped: el cubit carga los ajustes al montarse.
+        path: '/org/public-catalog',
+        builder: (context, _) {
+          final repo = _publicCatalogRepo;
+          if (repo == null) {
+            return const Scaffold(
+              body: Center(child: Text('Catálogo público no disponible')),
+            );
+          }
+          return BlocProvider<PublicCatalogCubit>(
+            create: (_) => PublicCatalogCubit(repo)..load(),
+            child: const PublicCatalogPage(),
           );
         },
       ),

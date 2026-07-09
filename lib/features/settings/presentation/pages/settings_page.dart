@@ -207,6 +207,14 @@ class _SectionsCard extends StatelessWidget {
             ),
             const Divider(height: AppTokens.sp5, color: AppTokens.divider),
             AppSectionLink(
+              rowKey: const Key('settings.public_catalog_tile'),
+              icon: Icons.storefront_outlined,
+              title: 'Catálogo público',
+              caption: 'Una página web con tus productos para compartir',
+              onTap: () => context.push('/org/public-catalog'),
+            ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
               rowKey: const Key('settings.account_tile'),
               icon: Icons.credit_card_outlined,
               title: 'Cuenta y plan',

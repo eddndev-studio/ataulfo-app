@@ -27,6 +27,8 @@ import 'features/org_ai_config/data/datasources/org_ai_config_datasource.dart';
 import 'features/org_ai_config/data/repositories/org_ai_config_repository_impl.dart';
 import 'features/org_customization/data/datasources/org_branding_datasource.dart';
 import 'features/org_customization/data/repositories/org_branding_repository_impl.dart';
+import 'features/public_catalog/data/datasources/public_catalog_datasource.dart';
+import 'features/public_catalog/data/repositories/public_catalog_repository_impl.dart';
 import 'features/auth/data/datasources/auth_datasource.dart';
 import 'features/auth/data/interceptors/auth_interceptor.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
@@ -409,6 +411,10 @@ Future<void> main() async {
     datasource: DioOrgBrandingDatasource(mainDio),
   );
 
+  final publicCatalogRepository = PublicCatalogRepositoryImpl(
+    datasource: DioPublicCatalogDatasource(mainDio),
+  );
+
   final notificationsRepository = NotificationsRepositoryImpl(
     datasource: DioNotificationsDatasource(mainDio),
   );
@@ -509,6 +515,7 @@ Future<void> main() async {
     webBaseUrl: ataulfoWebUrl,
     orgAiConfigRepository: orgAiConfigRepository,
     orgBrandingRepository: orgBrandingRepository,
+    publicCatalogRepository: publicCatalogRepository,
     notificationsRepository: notificationsRepository,
     mediaRepository: mediaRepository,
     mediaFilePicker: mediaFilePicker,
