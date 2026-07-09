@@ -81,6 +81,12 @@ class AttachMediaIntent extends AttachIntent {
   const AttachMediaIntent();
 }
 
+/// Elegir un sticker corporativo YA generado de la organización para enviarlo
+/// al instante (a diferencia de un adjunto, no pasa por la bandeja).
+class AttachStickersIntent extends AttachIntent {
+  const AttachStickersIntent();
+}
+
 /// Capturar una foto con la cámara.
 class AttachPhotoIntent extends AttachIntent {
   const AttachPhotoIntent();
@@ -167,6 +173,7 @@ class AttachPanelCubit extends Cubit<AttachPanelState?> {
 
   void chooseDocument() => _choose(const AttachDocumentIntent());
   void chooseMedia() => _choose(const AttachMediaIntent());
+  void chooseStickers() => _choose(const AttachStickersIntent());
   void choosePhoto() => _choose(const AttachPhotoIntent());
   void chooseVideo() => _choose(const AttachVideoIntent());
   void confirmGallery(List<DeviceMediaAsset> assets) =>

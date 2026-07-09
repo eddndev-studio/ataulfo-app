@@ -140,6 +140,21 @@ void main() {
       expect(cubit.state, isNull);
     });
 
+    test('chooseStickers publica AttachStickersIntent y cierra', () async {
+      final cubit = AttachPanelCubit();
+      addTearDown(cubit.close);
+      cubit.open(showCamera: false, showGallery: false);
+      final intents = <AttachIntent>[];
+      final sub = cubit.intents.listen(intents.add);
+      addTearDown(sub.cancel);
+
+      cubit.chooseStickers();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(intents.single, isA<AttachStickersIntent>());
+      expect(cubit.state, isNull);
+    });
+
     test(
       'choosePhoto/chooseVideo publican sus intenciones de cámara',
       () async {

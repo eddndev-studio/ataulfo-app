@@ -210,6 +210,7 @@ class _AttachPanelState extends State<AttachPanel> {
               child: AttachMenuRow(
                 onDocument: cubit.chooseDocument,
                 onMedia: cubit.chooseMedia,
+                onStickers: cubit.chooseStickers,
                 onCamera: state.showCamera ? cubit.showCameraView : null,
                 // Permiso del carrete denegado: el destino sigue visible y
                 // tocarlo explica el bloqueo con la vía a Ajustes (no
@@ -289,6 +290,7 @@ class _AttachPanelState extends State<AttachPanel> {
           child: AttachMenuRow(
             onDocument: cubit.chooseDocument,
             onMedia: cubit.chooseMedia,
+            onStickers: cubit.chooseStickers,
             onCamera: state.showCamera ? cubit.showCameraView : null,
             onGallery: expand,
           ),

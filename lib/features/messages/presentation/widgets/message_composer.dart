@@ -185,6 +185,8 @@ class _MessageComposerState extends State<MessageComposer> {
         unawaited(_pickAttachments());
       case AttachMediaIntent():
         unawaited(_pickFromMediaLibrary());
+      case AttachStickersIntent():
+        unawaited(_pickAndSendSticker());
       case AttachPhotoIntent():
         unawaited(_capturePhoto());
       case AttachVideoIntent():
@@ -576,6 +578,27 @@ class _MessageComposerState extends State<MessageComposer> {
   /// volver a subir), la miniatura firmada y el peso reportado por el
   /// servidor. Respeta el tope del lote (lo que exceda se recorta con aviso);
   /// el tope de peso no aplica (los archivos ya viven en el servidor).
+  /// Abre el selector de stickers corporativos y, al elegir uno, lo envía al
+  /// instante: un sticker no pasa por la bandeja de adjuntos (no lleva caption
+  /// ni se agrupa). Si hay una respuesta en curso, el sticker la cita (el wire
+  /// lo soporta) y se limpia el borrador. Captura bloc/borrador ANTES del await
+  /// y verifica `mounted` después.
+  Future<void> _pickAndSendSticker() async {
+    final bloc = context.read<MessagesBloc>();
+    final replyDraft = context.read<ReplyDraftCubit>();
+    final ref = await context.push<String>('/stickers/pick');
+    if (!mounted || ref == null) return;
+    bloc.add(
+      MessagesSendRequested(
+        type: 'sticker',
+        content: '',
+        mediaRef: ref,
+        quotedId: replyDraft.state?.externalId,
+      ),
+    );
+    replyDraft.clear();
+  }
+
   Future<void> _pickFromMediaLibrary() async {
     final messenger = ScaffoldMessenger.of(context);
     final assets = await context.push<List<MediaAsset>>('/media/pick?multi=1');

@@ -38,6 +38,7 @@ import '../../features/public_catalog/presentation/bloc/public_catalog_cubit.dar
 import '../../features/public_catalog/presentation/pages/public_catalog_page.dart';
 import '../../features/stickers/domain/repositories/sticker_repository.dart';
 import '../../features/stickers/presentation/bloc/sticker_cubit.dart';
+import '../../features/stickers/presentation/pages/sticker_picker_page.dart';
 import '../../features/stickers/presentation/pages/stickers_page.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/bloc/accept_invitation_cubit.dart';
@@ -1782,6 +1783,24 @@ class AppRouter {
           return BlocProvider<StickerCubit>(
             create: (_) => StickerCubit(repo)..load(),
             child: StickersPage(resolveThumb: _compositionThumbBytes),
+          );
+        },
+      ),
+      GoRoute(
+        // Selector de stickers para el chat (Arco E): elige un sticker LISTO y
+        // devuelve su ref al composer, que lo envía al instante. Mismo repo y
+        // resolutor de thumbnails que la pantalla de Ajustes; sin generar aquí.
+        path: '/stickers/pick',
+        builder: (context, _) {
+          final repo = _stickerRepo;
+          if (repo == null) {
+            return const Scaffold(
+              body: Center(child: Text('Stickers no disponible')),
+            );
+          }
+          return BlocProvider<StickerCubit>(
+            create: (_) => StickerCubit(repo)..load(),
+            child: StickerPickerPage(resolveThumb: _compositionThumbBytes),
           );
         },
       ),

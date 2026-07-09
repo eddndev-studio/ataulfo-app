@@ -58,12 +58,16 @@ class AttachMenuRow extends StatelessWidget {
     super.key,
     required this.onDocument,
     required this.onMedia,
+    this.onStickers,
     this.onCamera,
     this.onGallery,
   });
 
   final VoidCallback onDocument;
   final VoidCallback onMedia;
+
+  /// Destino Stickers (corporativos de la org); `null` ⇒ no se ofrece.
+  final VoidCallback? onStickers;
 
   /// Destino Cámara; `null` ⇒ no se ofrece (plataforma sin cámara).
   final VoidCallback? onCamera;
@@ -93,6 +97,15 @@ class AttachMenuRow extends StatelessWidget {
             onTap: onMedia,
           ),
         ),
+        if (onStickers != null)
+          Expanded(
+            child: AttachTile(
+              key: const Key('attach_menu.stickers'),
+              icon: Icons.emoji_emotions_outlined,
+              label: 'Stickers',
+              onTap: onStickers,
+            ),
+          ),
         if (onCamera != null)
           Expanded(
             child: AttachTile(
