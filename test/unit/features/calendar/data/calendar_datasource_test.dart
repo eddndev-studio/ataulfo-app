@@ -226,6 +226,42 @@ void main() {
       expect(query['eventTypeId'], 'et1');
       expect(query['date'], '2026-07-05');
     });
+
+    test('422 too_far_ahead ⇒ Validation con copy es-MX (la lectura valida la '
+        'fecha pedida)', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenThrow(
+        badResponse(422, data: <String, dynamic>{'error': 'too_far_ahead'}),
+      );
+      await expectLater(
+        ds.availability(eventTypeId: 'et1', date: DateTime(2027, 1, 1)),
+        throwsA(
+          isA<CalendarValidationFailure>().having(
+            (f) => f.message,
+            'message',
+            'La fecha es demasiado lejana. Elige una más cercana.',
+          ),
+        ),
+      );
+    });
+
+    test('500 ⇒ CalendarServerFailure (la falla transitoria sigue siendo '
+        'genérica)', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenThrow(badResponse(500));
+      await expectLater(
+        ds.availability(eventTypeId: 'et1', date: DateTime(2026, 7, 5)),
+        throwsA(isA<CalendarServerFailure>()),
+      );
+    });
   });
 
   group('appointments', () {

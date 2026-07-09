@@ -22,15 +22,19 @@ BookingState _base({
   BookingTypesStatus typesStatus = BookingTypesStatus.loaded,
   List<EventType> eventTypes = const <EventType>[_et],
   EventType? selectedEventType,
+  DateTime? date,
+  SlotsStatus slotsStatus = SlotsStatus.idle,
+  String? slotsErrorMessage,
 }) => BookingState(
   typesStatus: typesStatus,
   eventTypes: eventTypes,
   selectedEventType: selectedEventType,
-  date: null,
-  slotsStatus: SlotsStatus.idle,
+  date: date,
+  slotsStatus: slotsStatus,
   slots: const <DateTime>[],
   selectedSlot: null,
   submitting: false,
+  slotsErrorMessage: slotsErrorMessage,
 );
 
 void main() {
@@ -79,5 +83,38 @@ void main() {
     when(() => cubit.state).thenReturn(_base(selectedEventType: _et));
     await pump(tester);
     expect(find.byKey(const Key('booking.pick_date')), findsOneWidget);
+  });
+
+  testWidgets('fecha rechazada → mensaje específico, sin reintentar', (
+    tester,
+  ) async {
+    const rejected = 'La fecha es demasiado lejana. Elige una más cercana.';
+    when(() => cubit.state).thenReturn(
+      _base(
+        selectedEventType: _et,
+        date: DateTime(2027, 1, 1),
+        slotsStatus: SlotsStatus.error,
+        slotsErrorMessage: rejected,
+      ),
+    );
+    await pump(tester);
+    expect(find.text(rejected), findsOneWidget);
+    expect(find.text('No se pudo cargar la disponibilidad.'), findsNothing);
+    expect(find.text('Reintentar'), findsNothing);
+  });
+
+  testWidgets('error transitorio de disponibilidad → genérico con reintentar', (
+    tester,
+  ) async {
+    when(() => cubit.state).thenReturn(
+      _base(
+        selectedEventType: _et,
+        date: DateTime(2026, 7, 15),
+        slotsStatus: SlotsStatus.error,
+      ),
+    );
+    await pump(tester);
+    expect(find.text('No se pudo cargar la disponibilidad.'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
   });
 }

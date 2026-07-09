@@ -237,6 +237,17 @@ class _Slots extends StatelessWidget {
           child: AppLoadingIndicator(),
         );
       case SlotsStatus.error:
+        final rejected = state.slotsErrorMessage;
+        if (rejected != null) {
+          // El backend rechazó la fecha en sí (p. ej. demasiado lejana):
+          // reintentarla daría el mismo rechazo, así que se muestra el motivo
+          // sin botón y se guía a elegir otra fecha arriba.
+          return AppErrorState(
+            key: const Key('booking.slots_rejected'),
+            message: rejected,
+            description: 'Elige otra fecha para ver horarios.',
+          );
+        }
         return AppErrorState(
           message: 'No se pudo cargar la disponibilidad.',
           onRetry: () => context.read<BookingCubit>().reloadAvailability(),

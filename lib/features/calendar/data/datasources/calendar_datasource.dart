@@ -132,7 +132,7 @@ class DioCalendarDatasource implements CalendarDatasource {
       },
     );
     return _parseSlots(body);
-  });
+  }, validating: true);
 
   @override
   Future<List<Appointment>> appointments({
@@ -249,19 +249,38 @@ class DioCalendarDatasource implements CalendarDatasource {
   // ── Traducción de errores ───────────────────────────────────────────────
 
   /// Envuelve una lectura: DioException/parse rotos ⇒ CalendarFailure de
-  /// lectura (sin 409/422 propios, que son de las mutaciones).
-  Future<T> _guardRead<T>(Future<T> Function() op) async {
+  /// lectura. Las lecturas no tienen 409 propio (es de las mutaciones). El 422
+  /// tampoco, salvo que la lectura valide su entrada: `validating` lo activa
+  /// para la disponibilidad, que rechaza la fecha pedida (pasada o demasiado
+  /// lejana) con el mismo copy es-MX por código que las mutaciones.
+  Future<T> _guardRead<T>(
+    Future<T> Function() op, {
+    bool validating = false,
+  }) async {
     try {
       return await op();
     } on CalendarFailure {
       rethrow;
     } on DioException catch (e) {
-      throw _mapDioException(e);
+      throw validating
+          ? _mapValidatingReadDioException(e)
+          : _mapDioException(e);
     } on FormatException {
       throw const UnknownCalendarFailure();
     } on TypeError {
       throw const UnknownCalendarFailure();
     }
+  }
+
+  /// Como [_mapDioException] pero traduce además el 422 de una lectura que
+  /// valida su entrada al copy es-MX del código; el resto de fallas siguen
+  /// siendo genéricas (red/timeout/servidor).
+  CalendarFailure _mapValidatingReadDioException(DioException e) {
+    if (e.type == DioExceptionType.badResponse &&
+        e.response?.statusCode == 422) {
+      return CalendarValidationFailure(_validationMessage(e.response?.data));
+    }
+    return _mapDioException(e);
   }
 
   /// Envuelve una mutación: añade 409 (hueco tomado / tramos cruzados) y 422

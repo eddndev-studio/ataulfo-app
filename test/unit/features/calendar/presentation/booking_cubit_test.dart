@@ -110,6 +110,79 @@ void main() {
     ).called(1);
   });
 
+  test(
+    'disponibilidad rechazada por la fecha ⇒ error con mensaje específico',
+    () async {
+      when(
+        () => repo.availability(
+          eventTypeId: any(named: 'eventTypeId'),
+          date: any(named: 'date'),
+        ),
+      ).thenThrow(
+        const CalendarValidationFailure(
+          'La fecha es demasiado lejana. Elige una más cercana.',
+        ),
+      );
+
+      cubit.selectEventType(_active);
+      await cubit.selectDate(DateTime(2027, 1, 1));
+
+      expect(cubit.state.slotsStatus, SlotsStatus.error);
+      expect(
+        cubit.state.slotsErrorMessage,
+        'La fecha es demasiado lejana. Elige una más cercana.',
+      );
+    },
+  );
+
+  test(
+    'disponibilidad con falla transitoria ⇒ error genérico sin mensaje',
+    () async {
+      when(
+        () => repo.availability(
+          eventTypeId: any(named: 'eventTypeId'),
+          date: any(named: 'date'),
+        ),
+      ).thenThrow(const CalendarNetworkFailure());
+
+      cubit.selectEventType(_active);
+      await cubit.selectDate(DateTime(2026, 7, 15));
+
+      expect(cubit.state.slotsStatus, SlotsStatus.error);
+      expect(cubit.state.slotsErrorMessage, isNull);
+    },
+  );
+
+  test(
+    'rechazo por fecha y luego recarga exitosa ⇒ el mensaje se limpia',
+    () async {
+      when(
+        () => repo.availability(
+          eventTypeId: any(named: 'eventTypeId'),
+          date: any(named: 'date'),
+        ),
+      ).thenThrow(
+        const CalendarValidationFailure(
+          'La fecha es demasiado lejana. Elige una más cercana.',
+        ),
+      );
+      cubit.selectEventType(_active);
+      await cubit.selectDate(DateTime(2027, 1, 1));
+      expect(cubit.state.slotsErrorMessage, isNotNull);
+
+      when(
+        () => repo.availability(
+          eventTypeId: any(named: 'eventTypeId'),
+          date: any(named: 'date'),
+        ),
+      ).thenAnswer((_) async => <DateTime>[DateTime.utc(2026, 7, 15, 16, 0)]);
+      await cubit.selectDate(DateTime(2026, 7, 15));
+
+      expect(cubit.state.slotsStatus, SlotsStatus.loaded);
+      expect(cubit.state.slotsErrorMessage, isNull);
+    },
+  );
+
   test('book con 409 ⇒ devuelve Conflict', () async {
     when(
       () => repo.createAppointment(

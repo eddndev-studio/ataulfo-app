@@ -25,6 +25,7 @@ class BookingState {
     required this.slots,
     required this.selectedSlot,
     required this.submitting,
+    this.slotsErrorMessage,
   });
 
   const BookingState.loading()
@@ -35,7 +36,8 @@ class BookingState {
       slotsStatus = SlotsStatus.idle,
       slots = const <DateTime>[],
       selectedSlot = null,
-      submitting = false;
+      submitting = false,
+      slotsErrorMessage = null;
 
   final BookingTypesStatus typesStatus;
 
@@ -52,6 +54,12 @@ class BookingState {
   final DateTime? selectedSlot;
   final bool submitting;
 
+  /// Mensaje específico cuando la disponibilidad se rechaza por la fecha en sí
+  /// (p. ej. demasiado lejana): reintentarla no ayuda, se guía a elegir otra.
+  /// Null cuando el error es transitorio (red/servidor) y la UI cae a su copy
+  /// genérico con reintentar. Solo es relevante con [slotsStatus] en error.
+  final String? slotsErrorMessage;
+
   bool get canPickDate => selectedEventType != null;
   bool get canPickSlot => selectedSlot != null;
 
@@ -64,8 +72,10 @@ class BookingState {
     List<DateTime>? slots,
     DateTime? selectedSlot,
     bool? submitting,
+    String? slotsErrorMessage,
     bool clearSelectedSlot = false,
     bool clearDate = false,
+    bool clearSlotsError = false,
   }) => BookingState(
     typesStatus: typesStatus ?? this.typesStatus,
     eventTypes: eventTypes ?? this.eventTypes,
@@ -77,6 +87,9 @@ class BookingState {
         ? null
         : (selectedSlot ?? this.selectedSlot),
     submitting: submitting ?? this.submitting,
+    slotsErrorMessage: clearSlotsError
+        ? null
+        : (slotsErrorMessage ?? this.slotsErrorMessage),
   );
 
   @override
@@ -89,6 +102,7 @@ class BookingState {
         other.slotsStatus == slotsStatus &&
         other.selectedSlot == selectedSlot &&
         other.submitting == submitting &&
+        other.slotsErrorMessage == slotsErrorMessage &&
         _listEquals<EventType>(other.eventTypes, eventTypes) &&
         _listEquals<DateTime>(other.slots, slots);
   }
@@ -101,6 +115,7 @@ class BookingState {
     slotsStatus,
     selectedSlot,
     submitting,
+    slotsErrorMessage,
     Object.hashAll(eventTypes),
     Object.hashAll(slots),
   );
@@ -136,6 +151,7 @@ class BookingCubit extends Cubit<BookingState> {
         slots: const <DateTime>[],
         slotsStatus: SlotsStatus.idle,
         clearSelectedSlot: true,
+        clearSlotsError: true,
       ),
     );
   }
@@ -151,6 +167,7 @@ class BookingCubit extends Cubit<BookingState> {
         slotsStatus: SlotsStatus.loading,
         slots: const <DateTime>[],
         clearSelectedSlot: true,
+        clearSlotsError: true,
       ),
     );
     await _loadAvailability(et.id, day);
@@ -162,7 +179,11 @@ class BookingCubit extends Cubit<BookingState> {
     final day = state.date;
     if (et == null || day == null) return;
     emit(
-      state.copyWith(slotsStatus: SlotsStatus.loading, clearSelectedSlot: true),
+      state.copyWith(
+        slotsStatus: SlotsStatus.loading,
+        clearSelectedSlot: true,
+        clearSlotsError: true,
+      ),
     );
     await _loadAvailability(et.id, day);
   }
@@ -200,6 +221,16 @@ class BookingCubit extends Cubit<BookingState> {
         date: day,
       );
       emit(state.copyWith(slotsStatus: SlotsStatus.loaded, slots: slots));
+    } on CalendarValidationFailure catch (f) {
+      // El rechazo es por la fecha pedida (p. ej. demasiado lejana): se expone
+      // el mensaje para guiar a elegir otra en vez de reintentar la misma. Un
+      // código desconocido llega sin mensaje y degrada al error genérico.
+      emit(
+        state.copyWith(
+          slotsStatus: SlotsStatus.error,
+          slotsErrorMessage: f.message,
+        ),
+      );
     } on CalendarFailure {
       emit(state.copyWith(slotsStatus: SlotsStatus.error));
     }
