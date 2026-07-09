@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_time_wheel_field.dart';
 import 'package:ataulfo/features/calendar/domain/entities/business_hours.dart';
 import 'package:ataulfo/features/calendar/presentation/bloc/business_hours_cubit.dart';
 import 'package:ataulfo/features/calendar/presentation/pages/business_hours_page.dart';
@@ -68,13 +69,61 @@ void main() {
     expect(btn.onPressed, isNull);
   });
 
-  testWidgets('agregar tramo dispara addSlot del día', (tester) async {
+  testWidgets('abrir un día cerrado (toggle) dispara addSlot', (tester) async {
     when(() => cubit.state).thenReturn(_loaded(const <BusinessHoursSlot>[]));
     await pump(tester);
-    // Lunes = índice de wire 1.
+    // Lunes = índice de wire 1; cerrado ⇒ el toggle está en off.
+    await tester.ensureVisible(find.byKey(const Key('hours.toggle.1')));
+    await tester.tap(find.byKey(const Key('hours.toggle.1')));
+    verify(() => cubit.addSlot(1)).called(1);
+  });
+
+  testWidgets('cerrar un día abierto (toggle) dispara clearDay', (
+    tester,
+  ) async {
+    when(() => cubit.state).thenReturn(
+      _loaded(const <BusinessHoursSlot>[
+        BusinessHoursSlot(weekday: 1, openMin: 540, closeMin: 1020),
+      ]),
+    );
+    await pump(tester);
+    await tester.ensureVisible(find.byKey(const Key('hours.toggle.1')));
+    await tester.tap(find.byKey(const Key('hours.toggle.1')));
+    verify(() => cubit.clearDay(1)).called(1);
+  });
+
+  testWidgets('agregar tramo en un día abierto dispara addSlot', (
+    tester,
+  ) async {
+    when(() => cubit.state).thenReturn(
+      _loaded(const <BusinessHoursSlot>[
+        BusinessHoursSlot(weekday: 1, openMin: 540, closeMin: 1020),
+      ]),
+    );
+    await pump(tester);
     await tester.ensureVisible(find.byKey(const Key('hours.add.1')));
     await tester.tap(find.byKey(const Key('hours.add.1')));
     verify(() => cubit.addSlot(1)).called(1);
+  });
+
+  testWidgets('día cerrado se colapsa: sin ruedas y muestra «Cerrado»', (
+    tester,
+  ) async {
+    when(() => cubit.state).thenReturn(_loaded(const <BusinessHoursSlot>[]));
+    await pump(tester);
+    expect(find.byType(AppTimeWheelField), findsNothing);
+    expect(find.text('Cerrado'), findsWidgets);
+  });
+
+  testWidgets('día abierto muestra las ruedas Desde/Hasta', (tester) async {
+    when(() => cubit.state).thenReturn(
+      _loaded(const <BusinessHoursSlot>[
+        BusinessHoursSlot(weekday: 1, openMin: 540, closeMin: 1020),
+      ]),
+    );
+    await pump(tester);
+    // Un tramo ⇒ dos campos de rueda (apertura y cierre).
+    expect(find.byType(AppTimeWheelField), findsNWidgets(2));
   });
 
   testWidgets('tramos inválidos muestran el aviso', (tester) async {

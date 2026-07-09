@@ -9,7 +9,8 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_day_chips.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
-import '../../../../core/design/widgets/app_time_range_field.dart';
+import '../../../../core/design/widgets/app_switch.dart';
+import '../../../../core/design/widgets/app_time_wheel_field.dart';
 import '../../domain/entities/business_hours.dart';
 import '../../domain/failures/calendar_failure.dart';
 import '../bloc/business_hours_cubit.dart';
@@ -129,6 +130,7 @@ class _DayCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final cubit = context.read<BusinessHoursCubit>();
     final name = weekdayFull(weekday);
+    final open = slots.isNotEmpty;
     return AppCard(
       key: Key('hours.day.$weekday'),
       child: Column(
@@ -142,38 +144,62 @@ class _DayCard extends StatelessWidget {
                   style: textTheme.titleMedium,
                 ),
               ),
-              if (slots.isNotEmpty)
+              if (open)
                 IconButton(
                   key: Key('hours.copy.$weekday'),
                   tooltip: 'Copiar a otros días',
                   icon: const Icon(Icons.copy_all_outlined, size: 20),
                   onPressed: () => _copyTo(context),
                 ),
+              // El toggle abre (tramo por defecto) o cierra (limpia el día) sin
+              // que el operador tenga que agregar/quitar tramos a mano.
+              AppSwitch(
+                key: Key('hours.toggle.$weekday'),
+                value: open,
+                onChanged: (v) =>
+                    v ? cubit.addSlot(weekday) : cubit.clearDay(weekday),
+              ),
             ],
           ),
-          if (slots.isEmpty)
+          // Los días cerrados se colapsan a la fila del toggle: nada de campos
+          // que estiren la lista y obliguen a un scroll largo.
+          if (!open)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppTokens.sp2),
+              padding: const EdgeInsets.only(top: AppTokens.sp1),
               child: Text(
                 'Cerrado',
                 style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
               ),
             )
-          else
+          else ...<Widget>[
             for (var i = 0; i < slots.length; i++)
               Padding(
                 padding: const EdgeInsets.only(top: AppTokens.sp3),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: <Widget>[
                     Expanded(
-                      child: AppTimeRangeField(
-                        keyPrefix: 'hours.range.$weekday.$i',
-                        value: _toRange(slots[i]),
-                        onChanged: (r) => cubit.updateSlotAt(
+                      child: AppTimeWheelField(
+                        key: Key('hours.open.$weekday.$i'),
+                        label: 'Desde',
+                        value: _timeOf(slots[i].openMin),
+                        onChanged: (t) => cubit.updateSlotAt(
                           weekday,
                           i,
-                          openMin: _minutes(r.start),
-                          closeMin: _minutes(r.end),
+                          openMin: _minutes(t),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppTokens.sp2),
+                    Expanded(
+                      child: AppTimeWheelField(
+                        key: Key('hours.close.$weekday.$i'),
+                        label: 'Hasta',
+                        value: _timeOf(slots[i].closeMin),
+                        onChanged: (t) => cubit.updateSlotAt(
+                          weekday,
+                          i,
+                          closeMin: _minutes(t),
                         ),
                       ),
                     ),
@@ -189,22 +215,21 @@ class _DayCard extends StatelessWidget {
                   ],
                 ),
               ),
-          const SizedBox(height: AppTokens.sp2),
-          AppButton.text(
-            key: Key('hours.add.$weekday'),
-            label: 'Agregar tramo',
-            icon: Icons.add,
-            onPressed: () => cubit.addSlot(weekday),
-          ),
+            const SizedBox(height: AppTokens.sp2),
+            AppButton.text(
+              key: Key('hours.add.$weekday'),
+              label: 'Agregar tramo',
+              icon: Icons.add,
+              onPressed: () => cubit.addSlot(weekday),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  static AppTimeRange _toRange(BusinessHoursSlot s) => AppTimeRange(
-    start: TimeOfDay(hour: s.openMin ~/ 60, minute: s.openMin % 60),
-    end: TimeOfDay(hour: s.closeMin ~/ 60, minute: s.closeMin % 60),
-  );
+  static TimeOfDay _timeOf(int minutes) =>
+      TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
 
   static int _minutes(TimeOfDay t) => t.hour * 60 + t.minute;
 }

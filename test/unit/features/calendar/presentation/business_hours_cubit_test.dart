@@ -111,6 +111,20 @@ void main() {
     verify(() => repo.putHours(cubit.state.working)).called(1);
   });
 
+  test('clearDay quita todos los tramos del día y deja los demás', () async {
+    when(repo.getHours).thenAnswer((_) async => const <BusinessHoursSlot>[]);
+    await cubit.load();
+    cubit.addSlot(1);
+    cubit.addSlot(1);
+    cubit.addSlot(2);
+
+    cubit.clearDay(1);
+
+    expect(cubit.state.slotsFor(1), isEmpty);
+    expect(cubit.state.slotsFor(2), hasLength(1));
+    expect(cubit.state.dirty, isTrue);
+  });
+
   test('save con 422 ⇒ devuelve Validation y conserva dirty', () async {
     when(repo.getHours).thenAnswer((_) async => const <BusinessHoursSlot>[]);
     when(

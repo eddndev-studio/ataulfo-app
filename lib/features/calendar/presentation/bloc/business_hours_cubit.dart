@@ -138,6 +138,10 @@ class BusinessHoursCubit extends Cubit<BusinessHoursState> {
     ),
   ]);
 
+  /// Cierra el día [weekday]: quita todos sus tramos de una sola vez.
+  void clearDay(int weekday) =>
+      _setWorking(state.working.where((s) => s.weekday != weekday).toList());
+
   void removeSlotAt(int weekday, int indexInDay) {
     final next = <BusinessHoursSlot>[];
     var seen = 0;
