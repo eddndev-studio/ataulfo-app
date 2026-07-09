@@ -104,12 +104,20 @@ class _PickCell extends StatefulWidget {
 class _PickCellState extends State<_PickCell> {
   Uint8List? _bytes;
 
+  /// El thumbnail ya terminó de resolver (con bytes o con null). Sin esta
+  /// marca, una resolución a null dejaría el spinner girando para siempre: hay
+  /// que distinguir «aún cargando» de «resolvió y no hay imagen».
+  bool _tried = false;
+
   @override
   void initState() {
     super.initState();
     widget.resolveThumb(widget.ref).then((b) {
       if (!mounted) return;
-      setState(() => _bytes = b);
+      setState(() {
+        _bytes = b;
+        _tried = true;
+      });
     });
   }
 
@@ -130,12 +138,18 @@ class _PickCellState extends State<_PickCell> {
                 padding: const EdgeInsets.all(6),
                 child: Image.memory(bytes, fit: BoxFit.contain),
               )
-            : const Center(
-                child: SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+            : Center(
+                child: _tried
+                    ? Icon(
+                        Icons.emoji_emotions_outlined,
+                        size: 22,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      )
+                    : const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
               ),
       ),
     );

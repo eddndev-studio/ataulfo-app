@@ -154,25 +154,26 @@ void main() {
     () => msgBloc.add(captureAny()),
   ).captured.whereType<MessagesSendRequested>().toList();
 
-  testWidgets('Stickers: push a /stickers/pick y el ref se despacha al instante', (
-    tester,
-  ) async {
-    await pumpHost(tester);
-    await tapStickers(tester);
+  testWidgets(
+    'Stickers: push a /stickers/pick y el ref se despacha al instante',
+    (tester) async {
+      await pumpHost(tester);
+      await tapStickers(tester);
 
-    // Estamos en la ruta pusheada del picker.
-    expect(find.byKey(const Key('fake_sticker_pick.pick')), findsOneWidget);
-    expect(pickedUri?.path, '/stickers/pick');
-    await tester.tap(find.byKey(const Key('fake_sticker_pick.pick')));
-    await tester.pumpAndSettle();
+      // Estamos en la ruta pusheada del picker.
+      expect(find.byKey(const Key('fake_sticker_pick.pick')), findsOneWidget);
+      expect(pickedUri?.path, '/stickers/pick');
+      await tester.tap(find.byKey(const Key('fake_sticker_pick.pick')));
+      await tester.pumpAndSettle();
 
-    final events = sentEvents();
-    expect(events.length, 1);
-    expect(events[0].type, 'sticker');
-    expect(events[0].mediaRef, stickerRef);
-    expect(events[0].content, '');
-    expect(events[0].quotedId, isNull);
-  });
+      final events = sentEvents();
+      expect(events.length, 1);
+      expect(events[0].type, 'sticker');
+      expect(events[0].mediaRef, stickerRef);
+      expect(events[0].content, '');
+      expect(events[0].quotedId, isNull);
+    },
+  );
 
   testWidgets('cancelar el picker (pop null) no despacha nada', (tester) async {
     refToPick = null;
@@ -184,21 +185,22 @@ void main() {
     verifyNever(() => msgBloc.add(any(that: isA<MessagesSendRequested>())));
   });
 
-  testWidgets('con una respuesta en curso, el sticker la cita y limpia el borrador', (
-    tester,
-  ) async {
-    await pumpHost(tester);
-    replyDraft.setReply(_reply('wamid-42'));
+  testWidgets(
+    'con una respuesta en curso, el sticker la cita y limpia el borrador',
+    (tester) async {
+      await pumpHost(tester);
+      replyDraft.setReply(_reply('wamid-42'));
 
-    await tapStickers(tester);
-    await tester.tap(find.byKey(const Key('fake_sticker_pick.pick')));
-    await tester.pumpAndSettle();
+      await tapStickers(tester);
+      await tester.tap(find.byKey(const Key('fake_sticker_pick.pick')));
+      await tester.pumpAndSettle();
 
-    final events = sentEvents();
-    expect(events.length, 1);
-    expect(events[0].type, 'sticker');
-    expect(events[0].quotedId, 'wamid-42');
-    // El borrador de respuesta se limpió tras enviar.
-    expect(replyDraft.state, isNull);
-  });
+      final events = sentEvents();
+      expect(events.length, 1);
+      expect(events[0].type, 'sticker');
+      expect(events[0].quotedId, 'wamid-42');
+      // El borrador de respuesta se limpió tras enviar.
+      expect(replyDraft.state, isNull);
+    },
+  );
 }

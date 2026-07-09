@@ -65,8 +65,9 @@ void main() {
     await tester.pumpWidget(host(repo, onResult: (r) => result = r));
 
     await tester.tap(find.text('abrir'));
-    // Sin pumpAndSettle: la celda muestra un spinner mientras resuelve el
-    // thumbnail (aquí siempre null), que anima sin fin y nunca «settlea».
+    // Frames explícitos (no pumpAndSettle): basta avanzar el push y la
+    // resolución del thumbnail (aquí null → glifo de respaldo) para tocar la
+    // celda; no dependemos de asentar las animaciones de ruta.
     await tester.pump(); // inicia el push
     await tester.pump(const Duration(milliseconds: 400)); // transición de ruta
     await tester.pump(); // resuelve el load() del cubit
@@ -81,6 +82,27 @@ void main() {
 
     expect(result, 'org/media/s1.webp');
   });
+
+  testWidgets(
+    'un thumbnail que resuelve a null cae a un glifo, no gira sin fin',
+    (tester) async {
+      final repo = _FakeRepo([_ready('s1', 'org/media/s1.webp')]);
+      await tester.pumpWidget(host(repo, onResult: (_) {}));
+
+      await tester.tap(find.text('abrir'));
+      await tester.pump(); // inicia el push
+      await tester.pump(
+        const Duration(milliseconds: 400),
+      ); // transición de ruta
+      await tester.pump(); // resuelve el load() del cubit → grid + celdas
+      await tester.pump(); // resuelve resolveThumb (null) → marca el intento
+
+      // La celda cuyo thumbnail resolvió a null muestra el glifo de respaldo, no
+      // un spinner girando para siempre (paridad con la pantalla de Ajustes).
+      expect(find.byIcon(Icons.emoji_emotions_outlined), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    },
+  );
 
   testWidgets('sin stickers listos ofrece el estado vacío', (tester) async {
     final repo = _FakeRepo(const []);
