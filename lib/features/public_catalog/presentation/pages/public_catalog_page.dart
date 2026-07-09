@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/safe_bottom.dart';
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../domain/entities/public_catalog_settings.dart';
 import '../bloc/public_catalog_cubit.dart';
 import '../public_catalog_copy.dart';
@@ -20,9 +28,9 @@ class PublicCatalogPage extends StatelessWidget {
         builder: (context, state) {
           return switch (state.status) {
             PublicCatalogStatus.loading => const Center(
-              child: CircularProgressIndicator(),
+              child: AppLoadingIndicator(),
             ),
-            PublicCatalogStatus.error => _ErrorView(
+            PublicCatalogStatus.error => AppErrorState(
               message: publicCatalogFailureCopy(state.loadFailure),
               onRetry: () => context.read<PublicCatalogCubit>().load(),
             ),
@@ -31,30 +39,6 @@ class PublicCatalogPage extends StatelessWidget {
             ),
           };
         },
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Reintentar')),
-          ],
-        ),
       ),
     );
   }
@@ -126,45 +110,44 @@ class _SettingsFormState extends State<_SettingsForm> {
         }
       },
       child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Catálogo público'),
-            subtitle: const Text(
-              'Muestra tus productos activos en una página web que puedes '
-              'compartir con tus clientes.',
-            ),
+        padding: EdgeInsets.fromLTRB(
+          AppTokens.sp5,
+          AppTokens.sp5,
+          AppTokens.sp5,
+          AppTokens.sp5 + context.safeBottomInset,
+        ),
+        children: <Widget>[
+          AppToggleRow(
+            switchKey: const Key('public_catalog.enabled'),
+            label: 'Catálogo público',
+            caption:
+                'Muestra tus productos activos en una página web que puedes '
+                'compartir con tus clientes.',
             value: _enabled,
             onChanged: (v) => setState(() => _enabled = v),
           ),
-          const SizedBox(height: 8),
-          TextField(
+          const SizedBox(height: AppTokens.sp5),
+          AppTextField(
+            key: const Key('public_catalog.slug'),
+            label: 'Enlace (opcional)',
+            hint: 'tacos-dona-mary',
             controller: _slug,
-            decoration: const InputDecoration(
-              labelText: 'Enlace (opcional)',
-              helperText: 'Minúsculas, números y guiones. Ej.: tacos-dona-mary',
-              border: OutlineInputBorder(),
-            ),
+            helperText: 'Minúsculas, números y guiones.',
             autocorrect: false,
-            enableSuggestions: false,
           ),
-          if (_enabled && url != null && url.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _UrlRow(url: url),
+          if (_enabled && url != null && url.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppTokens.sp5),
+            _UrlCard(url: url),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: AppTokens.sp6),
           BlocBuilder<PublicCatalogCubit, PublicCatalogState>(
             buildWhen: (a, b) => a.saving != b.saving,
-            builder: (context, state) => FilledButton(
-              onPressed: state.saving ? null : _save,
-              child: state.saving
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Guardar'),
+            builder: (context, state) => AppButton.filled(
+              key: const Key('public_catalog.save'),
+              label: 'Guardar',
+              fullWidth: true,
+              loading: state.saving,
+              onPressed: _save,
             ),
           ),
         ],
@@ -173,32 +156,39 @@ class _SettingsFormState extends State<_SettingsForm> {
   }
 }
 
-/// La URL pública con un botón para copiarla al portapapeles.
-class _UrlRow extends StatelessWidget {
-  const _UrlRow({required this.url});
+/// La URL pública en una tarjeta, con un botón para copiarla al portapapeles.
+class _UrlCard extends StatelessWidget {
+  const _UrlCard({required this.url});
 
   final String url;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: SelectableText(url, style: const TextStyle(fontSize: 14)),
-        ),
-        IconButton(
-          tooltip: 'Copiar enlace',
-          icon: const Icon(Icons.copy),
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: url));
-            if (context.mounted) {
-              ScaffoldMessenger.of(
+    return AppCard(
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: SelectableText(
+              url,
+              style: Theme.of(
                 context,
-              ).showSnackBar(const SnackBar(content: Text('Enlace copiado.')));
-            }
-          },
-        ),
-      ],
+              ).textTheme.bodyMedium?.copyWith(color: AppTokens.text1),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Copiar enlace',
+            icon: const Icon(Icons.copy, color: AppTokens.text2),
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: url));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Enlace copiado.')),
+                );
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }
