@@ -3,6 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_starter_chip.dart';
 import '../../domain/entities/sticker_job.dart';
 import '../bloc/sticker_cubit.dart';
 import '../sticker_copy.dart';
@@ -24,10 +27,9 @@ class StickersPage extends StatelessWidget {
       body: BlocBuilder<StickerCubit, StickerState>(
         builder: (context, state) {
           return switch (state.status) {
-            StickerListStatus.loading => const Center(
-              child: CircularProgressIndicator(),
-            ),
-            StickerListStatus.error => _ErrorView(
+            StickerListStatus.loading => const AppLoadingIndicator(),
+            StickerListStatus.error => AppErrorState(
+              message: 'No se pudieron cargar tus stickers.',
               onRetry: () => context.read<StickerCubit>().load(),
             ),
             StickerListStatus.loaded => _Loaded(
@@ -36,25 +38,6 @@ class StickersPage extends StatelessWidget {
             ),
           };
         },
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('No se pudieron cargar tus stickers.'),
-          const SizedBox(height: 16),
-          FilledButton(onPressed: onRetry, child: const Text('Reintentar')),
-        ],
       ),
     );
   }
@@ -92,19 +75,26 @@ class _Loaded extends StatelessWidget {
           'para el chat.',
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final m in stickerMotifs)
-              ActionChip(
-                avatar: Icon(m.icon, size: 18),
-                label: Text(m.label),
-                onPressed: state.generating
-                    ? null
-                    : () => _generate(context, m.id),
-              ),
-          ],
+        // Chips de sugerencia del kit (mismo idioma que el chat de
+        // asistente/entrenador). Mientras se encola, se atenúan y no responden
+        // al tap en vez de nullificar el callback de cada uno.
+        Opacity(
+          opacity: state.generating ? 0.4 : 1,
+          child: IgnorePointer(
+            ignoring: state.generating,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final m in stickerMotifs)
+                  AppStarterChip(
+                    icon: m.icon,
+                    label: m.label,
+                    onTap: () => _generate(context, m.id),
+                  ),
+              ],
+            ),
+          ),
         ),
         if (state.generating) ...[
           const SizedBox(height: 12),

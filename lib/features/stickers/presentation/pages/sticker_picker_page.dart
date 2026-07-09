@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../bloc/sticker_cubit.dart';
 
 /// Selector de stickers para el chat: muestra los stickers corporativos LISTOS
@@ -22,10 +24,9 @@ class StickerPickerPage extends StatelessWidget {
       body: BlocBuilder<StickerCubit, StickerState>(
         builder: (context, state) {
           return switch (state.status) {
-            StickerListStatus.loading => const Center(
-              child: CircularProgressIndicator(),
-            ),
-            StickerListStatus.error => _ErrorView(
+            StickerListStatus.loading => const AppLoadingIndicator(),
+            StickerListStatus.error => AppErrorState(
+              message: 'No se pudieron cargar tus stickers.',
               onRetry: () => context.read<StickerCubit>().load(),
             ),
             StickerListStatus.loaded => _Grid(
@@ -34,25 +35,6 @@ class StickerPickerPage extends StatelessWidget {
             ),
           };
         },
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('No se pudieron cargar tus stickers.'),
-          const SizedBox(height: 16),
-          FilledButton(onPressed: onRetry, child: const Text('Reintentar')),
-        ],
       ),
     );
   }
