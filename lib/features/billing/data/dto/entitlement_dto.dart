@@ -3,16 +3,19 @@
 /// Las claves viajan en snake_case, consistentes con el adaptador Go de
 /// billing. Todos los campos son obligatorios: el backend encoda la foto
 /// completa siempre (los slices como `[]`, nunca null) — un faltante es un
-/// wire roto, no un caso a tolerar. Excepción: `trial_expired` es ADITIVO
-/// (un backend anterior no lo encoda) y su ausencia degrada a false; presente
-/// con tipo inválido sigue siendo wire roto. El mapper convierte DTO ⇄ entidad.
+/// wire roto, no un caso a tolerar. Excepciones: `trial_expired` es ADITIVO
+/// (un backend anterior no lo encoda) y su ausencia degrada a false; y el
+/// consumo del plan lee `credits_used`/`credit_cap` canónicos con fallback al
+/// espejo legacy `used_conversations`/`conversation_cap` (métrica anterior).
+/// Presente con tipo inválido sigue siendo wire roto. El mapper convierte
+/// DTO ⇄ entidad.
 class EntitlementDto {
   const EntitlementDto({
     required this.planCode,
     required this.status,
     required this.trialExpired,
-    required this.usedConversations,
-    required this.conversationCap,
+    required this.creditsUsed,
+    required this.creditCap,
     required this.withinQuota,
     required this.quotaExceeded,
     required this.storageUsedMb,
@@ -27,8 +30,11 @@ class EntitlementDto {
     final status = json['status'];
     // Aditivo: ausente ⇒ false (backend viejo); presente no-bool ⇒ roto.
     final trialExpired = json['trial_expired'] ?? false;
-    final usedConversations = json['used_conversations'];
-    final conversationCap = json['conversation_cap'];
+    // Consumo del plan: claves canónicas de créditos con fallback al espejo
+    // legacy de conversaciones (un backend anterior a la métrica solo encoda
+    // el espejo; el nuevo emite ambos pares con los mismos valores).
+    final creditsUsed = json['credits_used'] ?? json['used_conversations'];
+    final creditCap = json['credit_cap'] ?? json['conversation_cap'];
     final withinQuota = json['within_quota'];
     final quotaExceeded = json['quota_exceeded'];
     final storageUsedMb = json['storage_used_mb'];
@@ -36,8 +42,8 @@ class EntitlementDto {
     if (planCode is! String ||
         status is! String ||
         trialExpired is! bool ||
-        usedConversations is! int ||
-        conversationCap is! int ||
+        creditsUsed is! int ||
+        creditCap is! int ||
         withinQuota is! bool ||
         quotaExceeded is! bool ||
         storageUsedMb is! int ||
@@ -50,8 +56,8 @@ class EntitlementDto {
       planCode: planCode,
       status: status,
       trialExpired: trialExpired,
-      usedConversations: usedConversations,
-      conversationCap: conversationCap,
+      creditsUsed: creditsUsed,
+      creditCap: creditCap,
       withinQuota: withinQuota,
       quotaExceeded: quotaExceeded,
       storageUsedMb: storageUsedMb,
@@ -65,8 +71,8 @@ class EntitlementDto {
   final String planCode;
   final String status;
   final bool trialExpired;
-  final int usedConversations;
-  final int conversationCap;
+  final int creditsUsed;
+  final int creditCap;
   final bool withinQuota;
   final bool quotaExceeded;
   final int storageUsedMb;

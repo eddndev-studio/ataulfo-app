@@ -6,16 +6,16 @@ Entitlement _ent({
   String planCode = 'trial',
   String status = 'trialing',
   bool trialExpired = false,
-  int usedConversations = 12,
-  int conversationCap = 50,
+  int creditsUsed = 12,
+  int creditCap = 800,
   bool withinQuota = true,
   bool quotaExceeded = false,
 }) => Entitlement(
   planCode: planCode,
   status: status,
   trialExpired: trialExpired,
-  usedConversations: usedConversations,
-  conversationCap: conversationCap,
+  creditsUsed: creditsUsed,
+  creditCap: creditCap,
   withinQuota: withinQuota,
   quotaExceeded: quotaExceeded,
   storageUsedMb: 100,
@@ -102,7 +102,7 @@ void main() {
       final estado = estadoIA(
         _ent(
           status: 'active',
-          usedConversations: 50,
+          creditsUsed: 800,
           withinQuota: false,
           quotaExceeded: true,
         ),
@@ -113,8 +113,8 @@ void main() {
       expect(estado.titulo, 'Límite alcanzado');
       expect(
         estado.cuerpo,
-        'Alcanzaste tu límite de conversaciones con IA esta semana. '
-        'Se reinicia el próximo periodo.',
+        'Alcanzaste tu límite de créditos de IA de este mes. '
+        'Se reinicia el próximo mes.',
       );
       expect(estado.ctaLabel, 'Mejora tu plan');
       expect(estado.webPath, '/precios');
@@ -151,13 +151,16 @@ void main() {
     });
   });
 
-  group('conversacionesLabel', () {
-    test('con tope ⇒ "X de Y esta semana"', () {
-      expect(conversacionesLabel(12, 50), '12 de 50 esta semana');
-    });
+  group('creditosLabel', () {
+    test(
+      'con tope ⇒ "X de Y este mes" (el periodo de créditos es mensual)',
+      () {
+        expect(creditosLabel(120, 800), '120 de 800 este mes');
+      },
+    );
 
-    test('tope 0 ⇒ ilimitadas (convención del backend)', () {
-      expect(conversacionesLabel(12, 0), 'Ilimitadas');
+    test('tope 0 ⇒ ilimitados (convención del backend)', () {
+      expect(creditosLabel(120, 0), 'Ilimitados');
     });
   });
 

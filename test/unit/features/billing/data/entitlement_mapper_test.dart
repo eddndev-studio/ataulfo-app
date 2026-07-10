@@ -9,8 +9,8 @@ void main() {
         planCode: 'starter',
         status: 'active',
         trialExpired: true,
-        usedConversations: 42,
-        conversationCap: 100,
+        creditsUsed: 42,
+        creditCap: 4000,
         withinQuota: true,
         quotaExceeded: false,
         storageUsedMb: 900,
@@ -24,8 +24,8 @@ void main() {
       expect(e.planCode, 'starter');
       expect(e.status, 'active');
       expect(e.trialExpired, isTrue);
-      expect(e.usedConversations, 42);
-      expect(e.conversationCap, 100);
+      expect(e.creditsUsed, 42);
+      expect(e.creditCap, 4000);
       expect(e.withinQuota, isTrue);
       expect(e.quotaExceeded, isFalse);
       expect(e.storageUsedMb, 900);
@@ -38,8 +38,8 @@ void main() {
         planCode: 'trial',
         status: 'trialing',
         trialExpired: false,
-        usedConversations: 0,
-        conversationCap: 50,
+        creditsUsed: 0,
+        creditCap: 800,
         withinQuota: true,
         quotaExceeded: false,
         storageUsedMb: 0,

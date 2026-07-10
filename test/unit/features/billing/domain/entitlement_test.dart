@@ -4,14 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 Entitlement _base({
   Set<String> eligibleProviders = const <String>{'MINIMAX', 'NEMOTRON'},
   List<String> features = const <String>['media_gallery'],
-  int usedConversations = 12,
+  int creditsUsed = 12,
   bool trialExpired = false,
 }) => Entitlement(
   planCode: 'trial',
   status: 'trialing',
   trialExpired: trialExpired,
-  usedConversations: usedConversations,
-  conversationCap: 50,
+  creditsUsed: creditsUsed,
+  creditCap: 800,
   withinQuota: true,
   quotaExceeded: false,
   storageUsedMb: 100,
@@ -44,11 +44,8 @@ void main() {
       );
     });
 
-    test('difiere por uso de conversaciones', () {
-      expect(
-        _base(usedConversations: 12),
-        isNot(equals(_base(usedConversations: 13))),
-      );
+    test('difiere por créditos consumidos', () {
+      expect(_base(creditsUsed: 12), isNot(equals(_base(creditsUsed: 13))));
     });
 
     test('difiere por trialExpired', () {

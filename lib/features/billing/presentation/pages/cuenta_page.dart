@@ -234,9 +234,9 @@ class _ConsumoCard extends StatelessWidget {
           ),
           const SizedBox(height: AppTokens.sp3),
           _UsoRow(
-            rowKey: const Key('cuenta.conversations'),
-            label: 'Conversaciones con IA',
-            value: conversacionesLabel(e.usedConversations, e.conversationCap),
+            rowKey: const Key('cuenta.credits'),
+            label: 'Créditos de IA',
+            value: creditosLabel(e.creditsUsed, e.creditCap),
           ),
           // El almacenamiento solo existe en planes con galería de medios;
           // sin la feature la fila sobra (no hay dónde subir).

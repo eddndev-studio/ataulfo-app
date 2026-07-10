@@ -13,8 +13,8 @@ class Entitlement {
     required this.planCode,
     required this.status,
     required this.trialExpired,
-    required this.usedConversations,
-    required this.conversationCap,
+    required this.creditsUsed,
+    required this.creditCap,
     required this.withinQuota,
     required this.quotaExceeded,
     required this.storageUsedMb,
@@ -34,11 +34,12 @@ class Entitlement {
   /// 'trialing' y este bool explica por qué la IA está pausada.
   final bool trialExpired;
 
-  /// Conversaciones CON IA consumidas en el periodo vigente del plan.
-  final int usedConversations;
+  /// Créditos de IA consumidos en el periodo vigente del plan (mensual):
+  /// cada respuesta ENTREGADA por el asistente pesa según su modelo.
+  final int creditsUsed;
 
-  /// Tope de conversaciones del periodo. 0 = ilimitado (flag del backend).
-  final int conversationCap;
+  /// Tope de créditos del periodo. 0 = ilimitado (flag del backend).
+  final int creditCap;
 
   final bool withinQuota;
   final bool quotaExceeded;
@@ -67,8 +68,8 @@ class Entitlement {
         other.planCode == planCode &&
         other.status == status &&
         other.trialExpired == trialExpired &&
-        other.usedConversations == usedConversations &&
-        other.conversationCap == conversationCap &&
+        other.creditsUsed == creditsUsed &&
+        other.creditCap == creditCap &&
         other.withinQuota == withinQuota &&
         other.quotaExceeded == quotaExceeded &&
         other.storageUsedMb == storageUsedMb &&
@@ -82,8 +83,8 @@ class Entitlement {
     planCode,
     status,
     trialExpired,
-    usedConversations,
-    conversationCap,
+    creditsUsed,
+    creditCap,
     withinQuota,
     quotaExceeded,
     storageUsedMb,

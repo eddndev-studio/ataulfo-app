@@ -45,8 +45,8 @@ void main() {
   Map<String, dynamic> body() => <String, dynamic>{
     'plan_code': 'trial',
     'status': 'trialing',
-    'used_conversations': 12,
-    'conversation_cap': 50,
+    'credits_used': 12,
+    'credit_cap': 800,
     'within_quota': true,
     'quota_exceeded': false,
     'storage_used_mb': 100,
@@ -65,7 +65,7 @@ void main() {
 
       expect(e.planCode, 'trial');
       expect(e.eligibleProviders, <String>{'MINIMAX', 'NEMOTRON'});
-      expect(e.conversationCap, 50);
+      expect(e.creditCap, 800);
       expect(e.storageQuotaMb, 512);
     });
 

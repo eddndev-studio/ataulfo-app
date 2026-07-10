@@ -25,8 +25,8 @@ Entitlement _ent({
   String planCode = 'pro',
   String status = 'active',
   bool trialExpired = false,
-  int usedConversations = 12,
-  int conversationCap = 500,
+  int creditsUsed = 12,
+  int creditCap = 10000,
   bool withinQuota = true,
   bool quotaExceeded = false,
   List<String> features = const <String>['media_gallery'],
@@ -35,8 +35,8 @@ Entitlement _ent({
   planCode: planCode,
   status: status,
   trialExpired: trialExpired,
-  usedConversations: usedConversations,
-  conversationCap: conversationCap,
+  creditsUsed: creditsUsed,
+  creditCap: creditCap,
   withinQuota: withinQuota,
   quotaExceeded: quotaExceeded,
   storageUsedMb: 100,
@@ -81,7 +81,8 @@ void main() {
 
     expect(find.text('Pro'), findsOneWidget);
     expect(find.widgetWithText(AppPill, 'Activo'), findsOneWidget);
-    expect(find.text('12 de 500 esta semana'), findsOneWidget);
+    expect(find.text('Créditos de IA'), findsOneWidget);
+    expect(find.text('12 de 10000 este mes'), findsOneWidget);
     expect(find.text('100 MB de 512 MB'), findsOneWidget);
     // La tranquilidad de que los flujos deterministas nunca se pausan.
     expect(
