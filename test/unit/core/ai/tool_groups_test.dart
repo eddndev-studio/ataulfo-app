@@ -24,6 +24,9 @@ void main() {
         'analisis',
         'programacion',
         'reenvio',
+        'agenda',
+        'catalogo',
+        'stickers',
       ]);
     });
 
@@ -39,6 +42,9 @@ void main() {
           ToolGroup.programacion,
         );
         expect(ToolGroup.fromWireOrNull('reenvio'), ToolGroup.reenvio);
+        expect(ToolGroup.fromWireOrNull('agenda'), ToolGroup.agenda);
+        expect(ToolGroup.fromWireOrNull('catalogo'), ToolGroup.catalogo);
+        expect(ToolGroup.fromWireOrNull('stickers'), ToolGroup.stickers);
         expect(ToolGroup.fromWireOrNull('no_existe'), isNull);
       },
     );

@@ -105,6 +105,25 @@ enum ToolGroup {
     'Buscar otros chats del bot por nombre y reenviarles mensajes de esta '
         'conversación (p. ej. pasar un comprobante a un grupo interno).',
     Icons.shortcut,
+  ),
+  agenda(
+    'agenda',
+    'Agenda',
+    'Consultar disponibilidad real y reservar o cancelar citas.',
+    Icons.event_available_outlined,
+  ),
+  catalogo(
+    'catalogo',
+    'Catálogo',
+    'Consultar el catálogo de productos y compartir la tarjeta de un '
+        'producto.',
+    Icons.storefront_outlined,
+  ),
+  stickers(
+    'stickers',
+    'Stickers',
+    'Enviar stickers corporativos ya generados del negocio.',
+    Icons.emoji_emotions_outlined,
   );
 
   const ToolGroup(this.wire, this.label, this.description, this.icon);
