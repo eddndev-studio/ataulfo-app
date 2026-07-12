@@ -170,11 +170,11 @@ void main() {
       },
       act: (b) => b.add(TrainerChatVoiceSent(bytes)),
       expect: () => <dynamic>[
-        // Arranca el turno: recording cae, sending sube, Pensando…
+        // Arranca el turno: recording cae, sending sube, traza viva vacía.
         isA<TrainerChatLoaded>()
             .having((s) => s.recordingVoice, 'recording', false)
             .having((s) => s.sending, 'sending', true)
-            .having((s) => s.liveProgress, 'progress', 'Pensando…'),
+            .having((s) => s.liveEvents, 'sin eventos aún', isEmpty),
         // Cierra con el assistant que devolvió el POST.
         isA<TrainerChatLoaded>()
             .having((s) => s.sending, 'sending', false)

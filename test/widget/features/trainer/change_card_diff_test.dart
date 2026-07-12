@@ -97,6 +97,12 @@ void main() {
       ),
     ]);
 
+    // El proceso vive plegado en la traza del turno; expandirla revela la
+    // tarjeta como cuerpo del nodo.
+    expect(find.byKey(const Key('trainer.change_card.m2')), findsNothing);
+    await tester.tap(find.text('Usó herramientas'));
+    await tester.pumpAndSettle();
+
     // Colapsada: título + affordance de expandir; el diff aún no se pinta.
     expect(find.byKey(const Key('trainer.change_card.m2')), findsOneWidget);
     expect(
@@ -119,9 +125,8 @@ void main() {
     expect(find.textContaining('envíos en 48h'), findsNothing);
   });
 
-  testWidgets('un envelope viejo SIN diff degrada a la tarjeta plana', (
-    tester,
-  ) async {
+  testWidgets('un envelope viejo SIN diff no rinde tarjeta: el nodo de la '
+      'traza ya registra el cambio', (tester) async {
     await pump(tester, <TrainerMessage>[
       _toolMsg(
         'm2',
@@ -129,14 +134,13 @@ void main() {
       ),
     ]);
 
-    expect(find.byKey(const Key('trainer.change_card.m2')), findsOneWidget);
-    expect(
-      find.byKey(const Key('trainer.change_card.m2.expand')),
-      findsNothing,
-    );
-    // Tap no debe romper nada (no hay nada que expandir).
-    await tester.tap(find.byKey(const Key('trainer.change_card.m2')));
+    await tester.tap(find.text('Usó herramientas'));
     await tester.pumpAndSettle();
+
+    // El nodo del paso lleva el título de la tarjeta; una tarjeta plana como
+    // cuerpo solo lo duplicaría.
+    expect(find.text('Prompt actualizado'), findsOneWidget);
+    expect(find.byKey(const Key('trainer.change_card.m2')), findsNothing);
   });
 
   testWidgets('write_doc sin diff muestra el nombre creado al expandir', (
@@ -152,6 +156,9 @@ void main() {
         }),
       ),
     ]);
+
+    await tester.tap(find.text('Usó herramientas'));
+    await tester.pumpAndSettle();
 
     expect(
       find.byKey(const Key('trainer.change_card.m2.expand')),

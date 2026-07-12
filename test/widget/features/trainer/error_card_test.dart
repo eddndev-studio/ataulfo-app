@@ -88,6 +88,11 @@ void main() {
         }),
       ),
     ]);
+    // El proceso vive plegado en la traza del turno; el nodo del paso queda
+    // en error y la tarjeta es su cuerpo al expandir.
+    expect(find.byKey(const Key('trainer.error_card.m4')), findsNothing);
+    await tester.tap(find.text('Usó herramientas'));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('trainer.error_card.m4')), findsOneWidget);
     // Copy legible en español para anchor_not_found (menciona el ancla).
     expect(find.textContaining('ancla'), findsOneWidget);
@@ -102,6 +107,8 @@ void main() {
         }),
       ),
     ]);
+    await tester.tap(find.text('Usó herramientas'));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('trainer.error_card.m5')), findsOneWidget);
     expect(find.textContaining('en uso'), findsOneWidget);
   });

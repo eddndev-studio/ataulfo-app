@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/tool_glyphs.dart';
 import '../../../../core/design/widgets/app_thread_event_card.dart';
 import '../../domain/entities/trainer_message.dart';
 
@@ -44,7 +45,8 @@ class TrainerChangeCardData {
       return null;
     }
     if (decoded is! Map<String, dynamic>) return null;
-    final tool = decoded['toolName'];
+    final rawTool = decoded['toolName'];
+    final tool = rawTool is String ? rawTool : '';
     final content = decoded['content'];
     final failed = content is String && content.contains('"error_kind"');
     if (failed) return null; // los envelopes de error no son cambios
@@ -70,43 +72,22 @@ class TrainerChangeCardData {
         // Content no-JSON: la tarjeta queda plana.
       }
     }
+    // Título e ícono salen del mapa central (tool_glyphs): la tarjeta y el
+    // nodo de la traza deben leer idéntico. Solo el diff distingue a las
+    // escrituras con texto (prompt/docs) de las de archivos (solo nombre).
     return switch (tool) {
-      'edit_prompt' => TrainerChangeCardData(
-        icon: Icons.edit_note,
-        title: 'Prompt actualizado',
+      'edit_prompt' || 'write_doc' || 'edit_doc' => TrainerChangeCardData(
+        icon: toolIconFor(tool),
+        title: toolTitleFor(tool),
         name: name,
         diff: diff,
       ),
-      'write_doc' => TrainerChangeCardData(
-        icon: Icons.note_add_outlined,
-        title: 'Documento creado',
-        name: name,
-        diff: diff,
-      ),
-      'edit_doc' => TrainerChangeCardData(
-        icon: Icons.edit_document,
-        title: 'Documento actualizado',
-        name: name,
-        diff: diff,
-      ),
-      'delete_doc' => TrainerChangeCardData(
-        icon: Icons.delete_outline,
-        title: 'Documento borrado',
-        name: name,
-      ),
-      'save_file' => TrainerChangeCardData(
-        icon: Icons.attach_file,
-        title: 'Archivo guardado',
-        name: name,
-      ),
-      'update_file_meta' => TrainerChangeCardData(
-        icon: Icons.edit_attributes_outlined,
-        title: 'Archivo actualizado',
-        name: name,
-      ),
+      'delete_doc' ||
+      'save_file' ||
+      'update_file_meta' ||
       'delete_file' => TrainerChangeCardData(
-        icon: Icons.delete_outline,
-        title: 'Archivo borrado',
+        icon: toolIconFor(tool),
+        title: toolTitleFor(tool),
         name: name,
       ),
       _ => null,

@@ -113,6 +113,12 @@ void main() {
         _toolMsg('m3', _toolResults('inspect_flow', inspectEnvelope())),
       ]);
 
+      // El proceso vive plegado en la traza del turno; expandirla revela la
+      // tarjeta como cuerpo del nodo.
+      expect(find.byKey(const Key('trainer.inspect_card.m3')), findsNothing);
+      await tester.tap(find.text('Usó herramientas'));
+      await tester.pumpAndSettle();
+
       expect(find.byKey(const Key('trainer.inspect_card.m3')), findsOneWidget);
       expect(find.textContaining('Bienvenida'), findsOneWidget);
       // Colapsado: el contenido de los pasos aún no se ve.

@@ -1,20 +1,29 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart' show Icons;
 
 import '../../../core/design/tool_glyphs.dart';
 import '../../../core/trace/trace.dart';
-import 'entities/pa_message.dart';
-import 'entities/pa_progress.dart';
-import 'entities/pa_tool_result.dart';
+import 'entities/trainer_message.dart';
+import 'entities/trainer_progress.dart';
 
 // Reexporta el núcleo feature-agnóstico (Trace, TraceNode, summarizeTrace,
 // capNodes/capNodesLive, runFailureCopy, traceStoppedSummary) para que las
-// superficies que arman la traza del asistente importen un solo módulo.
+// superficies que arman la traza del entrenador importen un solo módulo.
 export '../../../core/trace/trace.dart';
+
+/// Gramática de la traza del entrenador — calco de pa_trace sobre sus
+/// entidades. El proceso del turno (razonamiento + tools) se agrupa en una
+/// [Trace]; las tarjetas ricas (diff, inspect_flow, historial, error) NO se
+/// arman aquí: quien pinta alinea [TrainerTurn.toolMessages] con los nodos
+/// tool e inyecta la tarjeta como cuerpo. Los resúmenes y caps vienen del
+/// núcleo — este módulo no define propios.
 
 /// Gramática VIVA: un frame de progreso del SSE a un nodo etiqueta. thinking ⇒
 /// nodo sin texto; tool ⇒ nodo con el título humano (jamás args); terminales
-/// (completed/failed) ⇒ `null` (el cierre lo da el POST, no el SSE).
-TraceNode? nodeFromProgress(PaProgressEvent e) {
+/// (completed/failed) ⇒ `null` (el cierre lo da el POST, no el SSE; failed
+/// solo aporta la causa al resumen vía [liveTrace]).
+TraceNode? nodeFromProgress(TrainerProgressEvent e) {
   if (e.isThinking) {
     return const TraceNode(
       kind: TraceNodeKind.thinking,
@@ -33,36 +42,29 @@ TraceNode? nodeFromProgress(PaProgressEvent e) {
   return null;
 }
 
-/// Un turno agrupado del hilo: la burbuja del operador, el proceso (en la
-/// [Trace] que acompaña), la respuesta final y las confirmaciones —que van
-/// SIEMPRE fuera del colapso—.
-class PaTurn {
-  const PaTurn({
+/// Un turno agrupado del hilo del entrenador: la burbuja del operador, el
+/// proceso (en la [Trace] que acompaña) y las respuestas — SIEMPRE fuera del
+/// colapso. Sin confirmaciones: el catálogo del entrenador no las emite (su
+/// superficie ES el contexto de edición de la plantilla).
+class TrainerTurn {
+  const TrainerTurn({
     this.user,
-    this.responses = const <PaMessage>[],
-    this.confirmations = const <PaMessage>[],
-    this.toolMessages = const <PaMessage>[],
+    this.responses = const <TrainerMessage>[],
+    this.toolMessages = const <TrainerMessage>[],
   });
 
   /// Fila `user` que abrió el turno. `null` cuando la paginación partió el
   /// turno y su fila user quedó en la página anterior.
-  final PaMessage? user;
+  final TrainerMessage? user;
 
   /// TODAS las filas `assistant` con cuerpo (texto/adjuntos), en orden: cada
-  /// una se pinta como burbuja FUERA del colapso. El wire produce intermedios
-  /// con cuerpo («déjame ver…» + tool_calls en la misma fila) y los documentos
-  /// entregados cuelgan del PRIMER assistant-con-contenido — quedarse solo con
-  /// la última fila perdería contenido, y una respuesta que llegue sin su fila
-  /// user (turno de voz antes de la recarga) pisaría a la anterior.
-  final List<PaMessage> responses;
+  /// una se pinta como burbuja FUERA del colapso — quedarse solo con la última
+  /// perdería los preámbulos intermedios («déjame revisar…»).
+  final List<TrainerMessage> responses;
 
-  /// Filas `tool` de requires_confirmation: tarjetas SIEMPRE visibles fuera de
-  /// la traza (posteo del literal, bloqueo del composer).
-  final List<PaMessage> confirmations;
-
-  /// Filas `tool` (no confirmación) que produjeron nodos tool, en orden: quien
-  /// pinta las alinea con los nodos tool para inyectar su tarjeta de detalle.
-  final List<PaMessage> toolMessages;
+  /// Filas `tool` que produjeron nodos tool, en orden: quien pinta las alinea
+  /// con los nodos tool para inyectar su tarjeta rica como cuerpo.
+  final List<TrainerMessage> toolMessages;
 
   /// Identidad estable del turno (id de la primera fila que lo compone): key
   /// para que el estado de expansión de su traza no se cruce al reordenar el
@@ -71,7 +73,6 @@ class PaTurn {
     final u = user;
     if (u != null) return u.id;
     if (responses.isNotEmpty) return responses.first.id;
-    if (confirmations.isNotEmpty) return confirmations.first.id;
     if (toolMessages.isNotEmpty) return toolMessages.first.id;
     return 'turno';
   }
@@ -82,7 +83,7 @@ class PaTurn {
 /// varios frames), toma la causa de un `failed` que llegue antes del cierre y
 /// mide del primer evento a [closedAt] (o al último evento si aún no cierra).
 Trace liveTrace(
-  List<PaProgressEvent> events, {
+  List<TrainerProgressEvent> events, {
   DateTime? closedAt,
   bool parcial = false,
 }) {
@@ -109,12 +110,13 @@ Trace liveTrace(
 
 /// Gramática PERSISTIDA: agrupa el hilo (ASC) en turnos, cada uno con su
 /// [Trace]. Frontera de turno = fila `user`. Las filas `assistant` aportan un
-/// nodo thinking si traen razonamiento y, si traen cuerpo, una burbuja de
-/// respuesta (TODAS, en orden); las `tool` aportan un nodo (o una
-/// confirmación, fuera de la traza). El turno más viejo puede venir sin su
-/// fila user (paginación) ⇒ se marca parcial.
-List<(PaTurn, Trace)> traceFromMessages(List<PaMessage> messages) {
-  final out = <(PaTurn, Trace)>[];
+/// nodo thinking CON su texto como detalle (F0.1 lo persiste; filas viejas
+/// viajan "" y no rinden nodo) y, si traen cuerpo, una burbuja de respuesta
+/// (TODAS, en orden); las `tool` aportan un nodo cuyo cuerpo será su tarjeta
+/// rica. El turno más viejo puede venir sin su fila user (paginación) ⇒ se
+/// marca parcial.
+List<(TrainerTurn, Trace)> traceFromMessages(List<TrainerMessage> messages) {
+  final out = <(TrainerTurn, Trace)>[];
   final n = messages.length;
   var i = 0;
   // Tramo inicial sin fila user: la paginación partió el turno más viejo.
@@ -137,13 +139,15 @@ List<(PaTurn, Trace)> traceFromMessages(List<PaMessage> messages) {
   return out;
 }
 
-(PaTurn, Trace) _buildTurn(List<PaMessage> rows, {required bool hasUser}) {
+(TrainerTurn, Trace) _buildTurn(
+  List<TrainerMessage> rows, {
+  required bool hasUser,
+}) {
   final user = hasUser ? rows.first : null;
   final rest = hasUser ? rows.sublist(1) : rows;
   final nodos = <TraceNode>[];
-  final toolMessages = <PaMessage>[];
-  final confirmations = <PaMessage>[];
-  final responses = <PaMessage>[];
+  final toolMessages = <TrainerMessage>[];
+  final responses = <TrainerMessage>[];
   for (final m in rest) {
     if (m.isAssistant) {
       if (m.thinking.isNotEmpty) {
@@ -158,31 +162,56 @@ List<(PaTurn, Trace)> traceFromMessages(List<PaMessage> messages) {
       }
       if (m.content.isNotEmpty || m.attachments.isNotEmpty) responses.add(m);
     } else if (m.isTool) {
-      final r = PaToolResult.parse(m.toolResultsRaw);
-      if (r.requiresConfirmation) {
-        confirmations.add(m);
-      } else {
-        nodos.add(
-          TraceNode(
-            kind: TraceNodeKind.tool,
-            titulo: toolTitleFor(r.toolName),
-            icon: toolIconFor(r.toolName),
-            isError: r.errorKind.isNotEmpty,
-          ),
-        );
-        toolMessages.add(m);
-      }
+      final r = _parseToolEnvelope(m.toolResultsRaw);
+      nodos.add(
+        TraceNode(
+          kind: TraceNodeKind.tool,
+          titulo: toolTitleFor(r.toolName),
+          icon: toolIconFor(r.toolName),
+          isError: r.errorKind.isNotEmpty,
+        ),
+      );
+      toolMessages.add(m);
     }
   }
   Duration? dur;
   if (rows.length > 1) {
     dur = rows.last.createdAt.difference(rows.first.createdAt);
   }
-  final turn = PaTurn(
+  final turn = TrainerTurn(
     user: user,
     responses: responses,
-    confirmations: confirmations,
     toolMessages: toolMessages,
   );
   return (turn, Trace(nodos: nodos, parcial: !hasUser, duracion: dur));
+}
+
+/// Lectura mínima del envelope del entrenador ({toolName, content} con content
+/// STRING JSON doble-codificado): nombre del tool y error_kind si lo trae.
+/// Cualquier shape ilegible degrada a vacíos (nodo genérico, sin error).
+({String toolName, String errorKind}) _parseToolEnvelope(String? raw) {
+  const empty = (toolName: '', errorKind: '');
+  if (raw == null) return empty;
+  Object? decoded;
+  try {
+    decoded = jsonDecode(raw);
+  } on FormatException {
+    return empty;
+  }
+  if (decoded is! Map<String, dynamic>) return empty;
+  final rawTool = decoded['toolName'];
+  final toolName = rawTool is String ? rawTool : '';
+  var errorKind = '';
+  final content = decoded['content'];
+  if (content is String) {
+    try {
+      final inner = jsonDecode(content);
+      if (inner is Map<String, dynamic> && inner['error_kind'] is String) {
+        errorKind = inner['error_kind'] as String;
+      }
+    } on FormatException {
+      // Content no-JSON: sin error detectable.
+    }
+  }
+  return (toolName: toolName, errorKind: errorKind);
 }

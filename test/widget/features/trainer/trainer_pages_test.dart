@@ -86,9 +86,8 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('renderiza burbujas y la tarjeta de cambio de edit_prompt', (
-      tester,
-    ) async {
+    testWidgets('agrupa el turno: burbujas fuera y la tarjeta de cambio de '
+        'edit_prompt como cuerpo de la traza colapsada', (tester) async {
       await pump(tester, <TrainerMessage>[
         _msg('m1', 'user', 'mejora el tono'),
         _msg(
@@ -96,15 +95,22 @@ void main() {
           'tool',
           '',
           toolResultsRaw:
-              '{"toolName":"edit_prompt","content":"{\\"status\\":\\"updated\\"}"}',
+              '{"toolName":"edit_prompt","content":"{\\"diff\\":{\\"old\\":\\"seco\\",\\"new\\":\\"cálido\\"}}"}',
         ),
         _msg('m3', 'assistant', 'listo, tono cálido'),
       ]);
 
+      // Las burbujas del turno viven FUERA del colapso, siempre visibles.
       expect(find.text('mejora el tono'), findsOneWidget);
       expect(find.text('listo, tono cálido'), findsOneWidget);
+      // El proceso queda plegado en la traza del turno.
+      expect(find.byKey(const Key('trainer.change_card.m2')), findsNothing);
+      expect(find.text('1 paso'), findsOneWidget);
+
+      await tester.tap(find.text('1 paso'));
+      await tester.pump();
+      expect(find.textContaining('Prompt actualizado'), findsWidgets);
       expect(find.byKey(const Key('trainer.change_card.m2')), findsOneWidget);
-      expect(find.textContaining('Prompt actualizado'), findsOneWidget);
     });
 
     testWidgets('hilo nuevo muestra chips de arranque que PREFIJAN el composer', (

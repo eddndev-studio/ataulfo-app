@@ -1,16 +1,18 @@
-import 'package:ataulfo/features/platform_agent/domain/entities/pa_message.dart';
-import 'package:ataulfo/features/platform_agent/domain/entities/pa_progress.dart';
-import 'package:ataulfo/features/platform_agent/domain/pa_trace.dart';
+import 'dart:convert';
+
+import 'package:ataulfo/features/trainer/domain/entities/trainer_message.dart';
+import 'package:ataulfo/features/trainer/domain/entities/trainer_progress.dart';
+import 'package:ataulfo/features/trainer/domain/trainer_trace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-PaProgressEvent _ev(
+TrainerProgressEvent _ev(
   String kind, {
   String toolName = '',
   bool toolError = false,
   String error = '',
   DateTime? at,
-}) => PaProgressEvent(
+}) => TrainerProgressEvent(
   kind: kind,
   conversationId: 'c1',
   at: at ?? DateTime.utc(2026, 1, 1),
@@ -19,14 +21,14 @@ PaProgressEvent _ev(
   error: error,
 );
 
-PaMessage _msg(
+TrainerMessage _msg(
   String role, {
   String content = '',
   String thinking = '',
   String? toolResultsRaw,
   String? toolCallsRaw,
   DateTime? at,
-}) => PaMessage(
+}) => TrainerMessage(
   id: '${role}_${content.hashCode}_${thinking.hashCode}',
   conversationId: 'c1',
   role: role,
@@ -37,40 +39,11 @@ PaMessage _msg(
   createdAt: at ?? DateTime.utc(2026, 1, 1),
 );
 
-String _toolRaw(
-  String tool, {
-  String? errorKind,
-  List<Map<String, String>> changed = const [],
-}) {
-  final inner = <String, Object>{};
-  if (errorKind != null) inner['error_kind'] = errorKind;
-  if (changed.isNotEmpty) inner['changed'] = changed;
-  return '{"tool_name":"$tool","content":${_json(inner)}}';
-}
-
-// Serializa el content interno como un string JSON doble-codificado (como el
-// wire real): un string cuyo valor es JSON.
-String _json(Map<String, Object> m) {
-  final buf = StringBuffer('"{');
-  final parts = <String>[];
-  m.forEach((k, v) {
-    if (v is String) {
-      parts.add('\\"$k\\":\\"$v\\"');
-    } else if (v is List) {
-      final items = v
-          .cast<Map<String, String>>()
-          .map(
-            (c) =>
-                '{\\"field\\":\\"${c['field']}\\",\\"from\\":\\"${c['from']}\\",\\"to\\":\\"${c['to']}\\"}',
-          )
-          .join(',');
-      parts.add('\\"$k\\":[$items]');
-    }
-  });
-  buf.write(parts.join(','));
-  buf.write('}"');
-  return buf.toString();
-}
+/// Envelope del wire del entrenador: camelCase y `content` como STRING JSON
+/// doble-codificado (igual que las tarjetas lo parsean).
+String _toolRaw(String tool, Map<String, dynamic> content) => jsonEncode(
+  <String, dynamic>{'toolName': tool, 'content': jsonEncode(content)},
+);
 
 void main() {
   group('nodeFromProgress (gramática viva)', () {
@@ -82,10 +55,10 @@ void main() {
     });
 
     test('tool ⇒ nodo con el título humano y el ícono del tool', () {
-      final n = nodeFromProgress(_ev('tool', toolName: 'list_bots'))!;
+      final n = nodeFromProgress(_ev('tool', toolName: 'inspect_flow'))!;
       expect(n.kind, TraceNodeKind.tool);
-      expect(n.titulo, 'Consultó los bots');
-      expect(n.icon, Icons.smart_toy_outlined);
+      expect(n.titulo, 'Inspeccionó un flujo');
+      expect(n.icon, Icons.account_tree_outlined);
       expect(n.isError, isFalse);
     });
 
@@ -96,7 +69,7 @@ void main() {
     test('toolError marca el nodo como error', () {
       expect(
         nodeFromProgress(
-          _ev('tool', toolName: 'delete_flow', toolError: true),
+          _ev('tool', toolName: 'edit_doc', toolError: true),
         )!.isError,
         isTrue,
       );
@@ -113,12 +86,12 @@ void main() {
 
   group('liveTrace', () {
     test('mapea eventos a nodos y colapsa thinking adyacente', () {
-      final t = liveTrace(<PaProgressEvent>[
+      final t = liveTrace(<TrainerProgressEvent>[
         _ev('thinking'),
         _ev('thinking'),
-        _ev('tool', toolName: 'list_bots'),
+        _ev('tool', toolName: 'read_prompt'),
         _ev('thinking'),
-        _ev('tool', toolName: 'get_flow'),
+        _ev('tool', toolName: 'edit_prompt'),
       ]);
       expect(t.nodos.map((n) => n.kind).toList(), <TraceNodeKind>[
         TraceNodeKind.thinking,
@@ -129,8 +102,9 @@ void main() {
       expect(t.parcial, isFalse);
     });
 
-    test('un failed antes del cierre aporta la causa es-MX al resumen', () {
-      final t = liveTrace(<PaProgressEvent>[
+    test('un failed antes del cierre aporta la causa es-MX al resumen '
+        '(copy del núcleo, sin resúmenes propios)', () {
+      final t = liveTrace(<TrainerProgressEvent>[
         _ev('thinking'),
         _ev('failed', error: 'context deadline exceeded'),
       ]);
@@ -139,7 +113,7 @@ void main() {
     });
 
     test('duración = del primer evento al cierre', () {
-      final t = liveTrace(<PaProgressEvent>[
+      final t = liveTrace(<TrainerProgressEvent>[
         _ev('thinking', at: DateTime.utc(2026, 1, 1, 0, 0, 0)),
       ], closedAt: DateTime.utc(2026, 1, 1, 0, 0, 5));
       expect(t.duracion, const Duration(seconds: 5));
@@ -148,46 +122,92 @@ void main() {
 
   group('traceFromMessages (gramática persistida)', () {
     test('agrupa un turno completo: user, proceso y respuesta final', () {
-      final turns = traceFromMessages(<PaMessage>[
-        _msg('user', content: 'Hola', at: DateTime.utc(2026, 1, 1, 0, 0, 0)),
+      final turns = traceFromMessages(<TrainerMessage>[
+        _msg(
+          'user',
+          content: 'mejora el tono',
+          at: DateTime.utc(2026, 1, 1, 0, 0, 0),
+        ),
         _msg(
           'assistant',
-          thinking: 'Debo mirar los bots',
+          thinking: 'Debo leer el prompt',
           toolCallsRaw: '[]',
           at: DateTime.utc(2026, 1, 1, 0, 0, 1),
         ),
         _msg(
           'tool',
-          toolResultsRaw: _toolRaw('list_bots'),
+          toolResultsRaw: _toolRaw('edit_prompt', <String, dynamic>{
+            'status': 'updated',
+          }),
           at: DateTime.utc(2026, 1, 1, 0, 0, 2),
         ),
         _msg(
           'assistant',
-          content: 'Tienes 3 bots.',
+          content: 'Listo, tono cálido.',
           at: DateTime.utc(2026, 1, 1, 0, 0, 4),
         ),
       ]);
       expect(turns.length, 1);
       final (turn, trace) = turns.single;
-      expect(turn.user?.content, 'Hola');
-      expect(turn.responses.map((m) => m.content), <String>['Tienes 3 bots.']);
+      expect(turn.user?.content, 'mejora el tono');
+      expect(turn.responses.map((m) => m.content), <String>[
+        'Listo, tono cálido.',
+      ]);
       expect(trace.nodos.map((n) => n.kind).toList(), <TraceNodeKind>[
         TraceNodeKind.thinking,
         TraceNodeKind.tool,
       ]);
+      // El nodo tool lee IGUAL que su tarjeta (mapa central).
+      expect(trace.nodos.last.titulo, 'Prompt actualizado');
+      expect(turn.toolMessages, hasLength(1));
       expect(trace.parcial, isFalse);
       expect(trace.duracion, const Duration(seconds: 4));
+    });
+
+    test('el thinking persistido viaja CON texto como detalle del nodo '
+        '(filas viejas sin texto no rinden nodo)', () {
+      final turns = traceFromMessages(<TrainerMessage>[
+        _msg('user', content: 'hola'),
+        _msg('assistant', thinking: 'razono esto', toolCallsRaw: '[]'),
+        _msg('assistant', thinking: '', toolCallsRaw: '[]'),
+        _msg('assistant', content: 'respuesta'),
+      ]);
+      final (_, trace) = turns.single;
+      final thinkingNodes = trace.nodos
+          .where((n) => n.kind == TraceNodeKind.thinking)
+          .toList();
+      expect(thinkingNodes, hasLength(1));
+      expect(thinkingNodes.single.detalle, 'razono esto');
+    });
+
+    test('una tool con error_kind rinde nodo en error y sigue alineable', () {
+      final turns = traceFromMessages(<TrainerMessage>[
+        _msg('user', content: 'edita el doc'),
+        _msg(
+          'tool',
+          toolResultsRaw: _toolRaw('edit_doc', <String, dynamic>{
+            'error_kind': 'not_found',
+          }),
+        ),
+      ]);
+      final (turn, trace) = turns.single;
+      expect(trace.nodos.single.kind, TraceNodeKind.tool);
+      expect(trace.nodos.single.isError, isTrue);
+      expect(turn.toolMessages, hasLength(1));
     });
 
     test(
       'los assistant intermedios CON cuerpo son respuestas: ninguna se pierde',
       () {
-        // Forma real del wire (conversation_adapter): «déjame ver» + tool_calls
-        // en la MISMA fila, y la final. Ambas burbujas deben sobrevivir.
-        final turns = traceFromMessages(<PaMessage>[
-          _msg('user', content: 'Revisa mis flujos'),
+        final turns = traceFromMessages(<TrainerMessage>[
+          _msg('user', content: 'revisa mis flujos'),
           _msg('assistant', content: 'Déjame revisar…', toolCallsRaw: '[[]]'),
-          _msg('tool', toolResultsRaw: _toolRaw('inspect_flow')),
+          _msg(
+            'tool',
+            toolResultsRaw: _toolRaw('inspect_flow', <String, dynamic>{
+              'name': 'Bienvenida',
+            }),
+          ),
           _msg('assistant', content: 'Listo: hay 3 flujos.'),
         ]);
         final (turn, _) = turns.single;
@@ -198,39 +218,8 @@ void main() {
       },
     );
 
-    test('un assistant sin su fila user (voz antes de la recarga) se ANEXA — '
-        'no pisa la respuesta del turno anterior', () {
-      final turns = traceFromMessages(<PaMessage>[
-        _msg('user', content: 'hola'),
-        _msg('assistant', content: 'resp1'),
-        // El cierre del turno de voz anexa el assistant sin fila user.
-        _msg('assistant', content: 'respuesta de voz'),
-      ]);
-      final (turn, _) = turns.single;
-      expect(turn.responses.map((m) => m.content), <String>[
-        'resp1',
-        'respuesta de voz',
-      ]);
-    });
-
-    test('una fila tool de requires_confirmation va fuera de la traza', () {
-      final turns = traceFromMessages(<PaMessage>[
-        _msg('user', content: 'Borra el bot'),
-        _msg(
-          'tool',
-          toolResultsRaw: _toolRaw(
-            'set_bot_paused',
-            errorKind: 'requires_confirmation',
-          ),
-        ),
-      ]);
-      final (turn, trace) = turns.single;
-      expect(trace.nodos, isEmpty);
-      expect(turn.confirmations, hasLength(1));
-    });
-
     test('parte en la frontera user: dos turnos', () {
-      final turns = traceFromMessages(<PaMessage>[
+      final turns = traceFromMessages(<TrainerMessage>[
         _msg('user', content: 'Uno'),
         _msg('assistant', content: 'Respuesta uno'),
         _msg('user', content: 'Dos'),
@@ -242,8 +231,13 @@ void main() {
     });
 
     test('turno más viejo sin su fila user (paginación) ⇒ parcial', () {
-      final turns = traceFromMessages(<PaMessage>[
-        _msg('tool', toolResultsRaw: _toolRaw('list_bots')),
+      final turns = traceFromMessages(<TrainerMessage>[
+        _msg(
+          'tool',
+          toolResultsRaw: _toolRaw('read_doc', <String, dynamic>{
+            'name': 'menu',
+          }),
+        ),
         _msg('assistant', content: 'Respuesta truncada'),
         _msg('user', content: 'Turno completo'),
         _msg('assistant', content: 'Su respuesta'),
@@ -252,9 +246,17 @@ void main() {
       expect(turns[0].$1.user, isNull);
       expect(turns[0].$2.parcial, isTrue);
       expect(turns[1].$2.parcial, isFalse);
+      expect(summarizeTrace(turns[0].$2), 'Usó herramientas');
+    });
+
+    test('una tool con envelope ilegible degrada a nodo genérico', () {
+      final turns = traceFromMessages(<TrainerMessage>[
+        _msg('user', content: 'x'),
+        _msg('tool', toolResultsRaw: 'no-es-json'),
+      ]);
+      final (turn, trace) = turns.single;
+      expect(trace.nodos.single.titulo, 'Usó una herramienta');
+      expect(turn.toolMessages, hasLength(1));
     });
   });
-
-  // summarizeTrace / capNodes / capNodesLive / runFailureCopy /
-  // traceStoppedSummary se movieron al núcleo: test/unit/core/trace/trace_test.dart.
 }

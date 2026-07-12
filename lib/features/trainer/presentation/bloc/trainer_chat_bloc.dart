@@ -126,8 +126,8 @@ final class TrainerChatDraftChanged extends TrainerChatEvent {
 }
 
 /// Progreso en vivo del turno recibido por SSE. Lo emite la suscripción
-/// per-turn; el handler lo traduce a la etiqueta del indicador
-/// ("Pensando…/Usando {tool}…"). Cosmético: nunca toca el contenido del hilo.
+/// per-turn; el handler lo ACUMULA en la traza viva (thinking/tool → nodos).
+/// Cosmético: nunca toca el contenido del hilo.
 final class TrainerChatProgressReceived extends TrainerChatEvent {
   const TrainerChatProgressReceived(this.event);
 
@@ -167,7 +167,9 @@ final class TrainerChatLoaded extends TrainerChatState {
     required this.messages,
     required this.sending,
     this.conversations = const <TrainerConversation>[],
-    this.liveProgress = '',
+    this.liveEvents = const <TrainerProgressEvent>[],
+    this.livePartial = false,
+    this.liveStopped = false,
     this.sendFailure,
     this.models = const <TrainerModelOption>[],
     this.defaultModelId = '',
@@ -192,9 +194,21 @@ final class TrainerChatLoaded extends TrainerChatState {
   /// true mientras el turno viaja (composer bloqueado + typing indicator).
   final bool sending;
 
-  /// Etiqueta del indicador en vivo del turno ("Pensando…/Usando {tool}…"),
-  /// alimentada por SSE. '' cuando no hay turno o el progreso aún no llega.
-  final String liveProgress;
+  /// Eventos de progreso del SSE acumulados del turno en vuelo, en orden de
+  /// llegada: alimentan la traza viva (thinking/tool → nodos; terminales
+  /// aportan la causa del fallo). Se conservan tras el cierre del POST hasta
+  /// que la recarga triunfa (swap a la gramática persistida) — si la recarga
+  /// falla, son el único registro del proceso y quedan marcados parciales.
+  final List<TrainerProgressEvent> liveEvents;
+
+  /// La recarga post-cierre falló o llegó rezagada: la traza viva se conserva
+  /// pintada con la marca «(traza parcial)» en lugar de descartarse.
+  final bool livePartial;
+
+  /// El operador detuvo el turno: la traza viva queda colapsada al copy
+  /// honesto («Detenido aquí — el servidor pudo continuar») hasta el próximo
+  /// turno o cambio de hilo.
+  final bool liveStopped;
 
   /// Fallo del ÚLTIMO turno (el hilo sigue usable); null si no hubo.
   final TrainerFailure? sendFailure;
@@ -269,7 +283,9 @@ final class TrainerChatLoaded extends TrainerChatState {
     List<TrainerConversation>? conversations,
     List<TrainerMessage>? messages,
     bool? sending,
-    String? liveProgress,
+    List<TrainerProgressEvent>? liveEvents,
+    bool? livePartial,
+    bool? liveStopped,
     TrainerFailure? sendFailure,
     bool clearSendFailure = false,
     String? selectedModelId,
@@ -284,7 +300,9 @@ final class TrainerChatLoaded extends TrainerChatState {
     conversations: conversations ?? this.conversations,
     messages: messages ?? this.messages,
     sending: sending ?? this.sending,
-    liveProgress: liveProgress ?? this.liveProgress,
+    liveEvents: liveEvents ?? this.liveEvents,
+    livePartial: livePartial ?? this.livePartial,
+    liveStopped: liveStopped ?? this.liveStopped,
     sendFailure: clearSendFailure ? null : (sendFailure ?? this.sendFailure),
     models: models,
     defaultModelId: defaultModelId,
@@ -304,7 +322,9 @@ final class TrainerChatLoaded extends TrainerChatState {
       listEquals(other.conversations, conversations) &&
       listEquals(other.messages, messages) &&
       other.sending == sending &&
-      other.liveProgress == liveProgress &&
+      listEquals(other.liveEvents, liveEvents) &&
+      other.livePartial == livePartial &&
+      other.liveStopped == liveStopped &&
       other.sendFailure == sendFailure &&
       listEquals(other.models, models) &&
       other.defaultModelId == defaultModelId &&
@@ -322,7 +342,9 @@ final class TrainerChatLoaded extends TrainerChatState {
     Object.hashAll(conversations),
     Object.hashAll(messages),
     sending,
-    liveProgress,
+    Object.hashAll(liveEvents),
+    livePartial,
+    liveStopped,
     sendFailure,
     Object.hashAll(models),
     defaultModelId,
@@ -479,11 +501,12 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         current.recordingVoice) {
       return;
     }
+    final convId = current.conversation.id;
     _cancelRequested = false;
-    _drafts.remove(current.conversation.id);
+    _drafts.remove(convId);
     final optimistic = TrainerMessage(
       id: 'optimistic',
-      conversationId: current.conversation.id,
+      conversationId: convId,
       role: 'user',
       content: event.content,
       attachments: current.pendingAttachments,
@@ -493,7 +516,9 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       current.copyWith(
         messages: <TrainerMessage>[...current.messages, optimistic],
         sending: true,
-        liveProgress: 'Pensando…',
+        liveEvents: const <TrainerProgressEvent>[],
+        livePartial: false,
+        liveStopped: false,
         clearSendFailure: true,
         lastAttemptedContent: event.content,
         draft: '',
@@ -505,15 +530,13 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     // SSE viva aguarda el desmonte del socket (que el server mantiene abierto) y
     // puede no completar — esperarlo colgaría el cierre del turno en "Pensando…".
     unawaited(_progressSub?.cancel());
-    _progressSub = _events
-        ?.progress(_templateId, current.conversation.id)
-        .listen((e) {
-          if (!isClosed) add(TrainerChatProgressReceived(e));
-        }, onError: (Object _) {});
+    _progressSub = _events?.progress(_templateId, convId).listen((e) {
+      if (!isClosed) add(TrainerChatProgressReceived(e));
+    }, onError: (Object _) {});
     try {
-      await _repo.sendMessage(
+      final assistant = await _repo.sendMessage(
         templateId: _templateId,
-        conversationId: current.conversation.id,
+        conversationId: convId,
         content: event.content,
         model: current.selectedModelId.isEmpty ? null : current.selectedModelId,
         attachments: current.pendingAttachments
@@ -526,20 +549,52 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       // para que "Detener" no siga vivo durante la recarga —si se tocara ahí,
       // revertiría un turno ya guardado y dejaría su texto en el composer. El
       // optimista mantiene visible el mensaje enviado hasta que llega el hilo.
-      emit(
-        current.copyWith(
-          messages: <TrainerMessage>[...current.messages, optimistic],
-          sending: false,
-          liveProgress: '',
-          clearSendFailure: true,
-          pendingAttachments: const <TrainerAttachment>[],
-          pendingThumbnails: const <String, Uint8List>{},
-          lastAttemptedContent: '',
-        ),
-      );
+      //
+      // Cierra releyendo el state actual, no el snapshot pre-turno `current`:
+      // un cambio de modelo (u otra edición sin guarda de sending) ocurrido
+      // mid-turno vive en el state vivo y no debe pisarse. Si el state ya no
+      // es este hilo (arrancó otra conversación), se reconstruye desde `current`.
+      final closing = state;
+      if (closing is TrainerChatLoaded && closing.conversation.id == convId) {
+        // liveEvents se CONSERVA: la traza viva sigue pintada (sin latido)
+        // hasta que la recarga triunfe (swap) o falle (marcada parcial). El
+        // assistant que el POST devolvió se ANEXA de inmediato (como en el
+        // asistente): si la recarga falla, la respuesta ya vive en el hilo —
+        // sin esto el operador quedaría con su burbuja y ninguna respuesta.
+        emit(
+          closing.copyWith(
+            messages: <TrainerMessage>[...closing.messages, assistant],
+            sending: false,
+            livePartial: false,
+            liveStopped: false,
+            clearSendFailure: true,
+            pendingAttachments: const <TrainerAttachment>[],
+            pendingThumbnails: const <String, Uint8List>{},
+            lastAttemptedContent: '',
+          ),
+        );
+      } else {
+        emit(
+          current.copyWith(
+            messages: <TrainerMessage>[
+              ...current.messages,
+              optimistic,
+              assistant,
+            ],
+            sending: false,
+            liveEvents: const <TrainerProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            clearSendFailure: true,
+            pendingAttachments: const <TrainerAttachment>[],
+            pendingThumbnails: const <String, Uint8List>{},
+            lastAttemptedContent: '',
+          ),
+        );
+      }
       // Recarga best-effort (turno ya cerrado): trae el hilo real del server,
-      // incl. la respuesta y los tool results que el POST no devuelve.
-      await _reloadThread(emit, current.conversation.id);
+      // incl. los tool results que el POST no devuelve.
+      await _reloadThread(emit, convId, assistant.id);
     } on TrainerFailure catch (f) {
       unawaited(_progressSub?.cancel());
       _progressSub = null;
@@ -550,31 +605,77 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         return;
       }
       // Revertir el optimista: el server no persistió el turno (502 del motor
-      // deja el user message fuera del hilo — reintentable). `current` conserva
-      // los adjuntos pendientes y guardamos el texto para "Reintentar".
-      emit(
-        current.copyWith(
-          sending: false,
-          liveProgress: '',
-          sendFailure: f,
-          lastAttemptedContent: event.content,
-        ),
-      );
+      // deja el user message fuera del hilo — reintentable) y guardamos el
+      // texto para "Reintentar". Igual que el cierre exitoso, se relee el
+      // state actual (un cambio de modelo mid-turno no debe pisarse); si ya
+      // es otro hilo, se reconstruye desde el snapshot pre-optimista `current`.
+      final failing = state;
+      if (failing is TrainerChatLoaded && failing.conversation.id == convId) {
+        emit(
+          failing.copyWith(
+            messages: failing.messages
+                .where((m) => m.id != 'optimistic')
+                .toList(growable: false),
+            sending: false,
+            liveEvents: const <TrainerProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            sendFailure: f,
+            lastAttemptedContent: event.content,
+          ),
+        );
+      } else {
+        emit(
+          current.copyWith(
+            sending: false,
+            liveEvents: const <TrainerProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            sendFailure: f,
+            lastAttemptedContent: event.content,
+          ),
+        );
+      }
     }
   }
 
+  /// Marca parcial la traza viva del turno recién cerrado: la recarga falló o
+  /// llegó rezagada y esos eventos son el único registro del proceso. Solo si
+  /// el hilo pintado sigue siendo el mismo y no arrancó un turno nuevo — una
+  /// recarga vieja no puede estampar «parcial» a la traza de un turno ajeno.
+  void _markLivePartial(Emitter<TrainerChatState> emit, String conversationId) {
+    if (isClosed) return;
+    final s = state;
+    if (s is! TrainerChatLoaded ||
+        s.conversation.id != conversationId ||
+        s.sending ||
+        s.liveEvents.isEmpty) {
+      return;
+    }
+    emit(s.copyWith(livePartial: true));
+  }
+
   /// Recarga el hilo tras cerrar un turno (se llama DESPUÉS de emitir
-  /// sending=false). Best-effort y no bloqueante del cierre: si falla, el
-  /// optimista ya deja visible el mensaje enviado; si el operador cambió de hilo
-  /// o arrancó otro envío, no se aplica —nunca pisa un hilo que ya tiene abierto.
+  /// sending=false), para traer la respuesta y los tool results que el POST
+  /// no devuelve. Best-effort y no bloqueante del cierre: si triunfa hace el
+  /// swap (descarta la traza viva); si falla o llega rezagada (sin ver el
+  /// turno recién escrito) deja la viva marcada parcial; si el operador ya
+  /// cambió de hilo o arrancó otro envío, no se aplica — nunca pisa un hilo
+  /// que ya tiene abierto.
   Future<void> _reloadThread(
     Emitter<TrainerChatState> emit,
     String conversationId,
+    String assistantId,
   ) async {
     List<TrainerMessage> reloaded;
     try {
       reloaded = await _loadMessages(conversationId);
     } on TrainerFailure {
+      _markLivePartial(emit, conversationId);
+      return;
+    }
+    if (!reloaded.any((m) => m.id == assistantId)) {
+      _markLivePartial(emit, conversationId); // recarga rezagada
       return;
     }
     if (isClosed) return;
@@ -584,7 +685,14 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         s.sending) {
       return;
     }
-    emit(s.copyWith(messages: reloaded));
+    // Swap: llegó la verdad persistida; la traza viva ya no hace falta.
+    emit(
+      s.copyWith(
+        messages: reloaded,
+        liveEvents: const <TrainerProgressEvent>[],
+        livePartial: false,
+      ),
+    );
   }
 
   Future<void> _onAttachRequested(
@@ -733,13 +841,16 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     if (cancelled.isNotEmpty) {
       _drafts[current.conversation.id] = cancelled;
     }
+    // liveEvents se CONSERVA y liveStopped ancla la traza en pantalla,
+    // colapsada al copy honesto: el cancel es solo del cliente y el servidor
+    // pudo continuar — desaparecerla afirmaría que el turno nunca ocurrió.
     emit(
       current.copyWith(
         messages: current.messages
             .where((m) => m.id != 'optimistic')
             .toList(growable: false),
         sending: false,
-        liveProgress: '',
+        liveStopped: true,
         clearSendFailure: true,
         draft: cancelled,
       ),
@@ -796,7 +907,9 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       current.copyWith(
         recordingVoice: false,
         sending: true,
-        liveProgress: 'Pensando…',
+        liveEvents: const <TrainerProgressEvent>[],
+        livePartial: false,
+        liveStopped: false,
         clearSendFailure: true,
         lastAttemptedContent: '',
       ),
@@ -814,18 +927,37 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
       );
       unawaited(_progressSub?.cancel());
       _progressSub = null;
-      emit(
-        current.copyWith(
-          messages: <TrainerMessage>[...current.messages, assistant],
-          recordingVoice: false,
-          sending: false,
-          liveProgress: '',
-          clearSendFailure: true,
-        ),
-      );
+      // Cierre releyendo el state actual (cambio de modelo mid-turno no se
+      // pisa); liveEvents se conserva hasta el swap de la recarga — igual que
+      // el turno de texto.
+      final closing = state;
+      if (closing is TrainerChatLoaded && closing.conversation.id == convId) {
+        emit(
+          closing.copyWith(
+            messages: <TrainerMessage>[...closing.messages, assistant],
+            recordingVoice: false,
+            sending: false,
+            livePartial: false,
+            liveStopped: false,
+            clearSendFailure: true,
+          ),
+        );
+      } else {
+        emit(
+          current.copyWith(
+            messages: <TrainerMessage>[...current.messages, assistant],
+            recordingVoice: false,
+            sending: false,
+            liveEvents: const <TrainerProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            clearSendFailure: true,
+          ),
+        );
+      }
       // Recarga best-effort: trae el user de voz (con su transcript) y los
       // tool results que el POST no devuelve.
-      await _reloadThread(emit, convId);
+      await _reloadThread(emit, convId, assistant.id);
       _seedVoiceBytes(event.bytes);
     } on TrainerFailure catch (f) {
       unawaited(_progressSub?.cancel());
@@ -835,14 +967,31 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
         _cancelRequested = false;
         return;
       }
-      emit(
-        current.copyWith(
-          recordingVoice: false,
-          sending: false,
-          liveProgress: '',
-          sendFailure: f,
-        ),
-      );
+      // Igual que el turno de texto: el cierre fallido también relee el state.
+      final failing = state;
+      if (failing is TrainerChatLoaded && failing.conversation.id == convId) {
+        emit(
+          failing.copyWith(
+            recordingVoice: false,
+            sending: false,
+            liveEvents: const <TrainerProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            sendFailure: f,
+          ),
+        );
+      } else {
+        emit(
+          current.copyWith(
+            recordingVoice: false,
+            sending: false,
+            liveEvents: const <TrainerProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            sendFailure: f,
+          ),
+        );
+      }
     }
   }
 
@@ -890,10 +1039,15 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     }
     if (target == null) return;
     try {
+      // La traza viva sobreviviente (post-cierre o detenida) es del hilo que
+      // se abandona: cambiar de hilo la descarta.
       emit(
         current.copyWith(
           conversation: target,
           messages: await _loadMessages(target.id),
+          liveEvents: const <TrainerProgressEvent>[],
+          livePartial: false,
+          liveStopped: false,
           clearSendFailure: true,
           draft: _drafts[target.id] ?? '',
         ),
@@ -910,17 +1064,14 @@ class TrainerChatBloc extends Bloc<TrainerChatEvent, TrainerChatState> {
     final current = state;
     if (current is! TrainerChatLoaded || !current.sending) return;
     if (event.event.conversationId != current.conversation.id) return;
-    final label = _progressLabel(event.event);
-    if (label.isEmpty || label == current.liveProgress) return;
-    emit(current.copyWith(liveProgress: label));
-  }
-
-  String _progressLabel(TrainerProgressEvent e) {
-    if (e.isTool) {
-      return e.toolName.isNotEmpty ? 'Usando ${e.toolName}…' : 'Trabajando…';
-    }
-    if (e.isThinking) return 'Pensando…';
-    return ''; // terminal: el cierre del POST limpia el indicador.
+    // Acumula el frame crudo: la traza viva lo interpreta (nodeFromProgress).
+    // Los terminales también se guardan —el `failed` aporta la causa del
+    // fallo al resumen—; el swap de la recarga descarta toda la lista.
+    emit(
+      current.copyWith(
+        liveEvents: <TrainerProgressEvent>[...current.liveEvents, event.event],
+      ),
+    );
   }
 
   Future<void> _onNewConversation(

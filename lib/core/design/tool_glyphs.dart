@@ -125,6 +125,55 @@ String toolTitleFor(String tool) {
       return 'Guardó una memoria';
     case 'recall_memory':
       return 'Recordó del historial';
+    // Entrenador — lecturas del catálogo (trainertools).
+    case 'get_template_overview':
+      return 'Consultó la plantilla';
+    case 'inspect_flow':
+      return 'Inspeccionó un flujo';
+    case 'list_labels':
+      return 'Consultó las etiquetas';
+    case 'read_bot_runs':
+      return 'Revisó corridas de los bots';
+    case 'list_recent_attachments':
+      return 'Consultó los adjuntos recientes';
+    case 'read_attachment':
+      return 'Revisó un adjunto';
+    case 'get_current_time':
+      return 'Consultó la hora';
+    // Entrenador — prompt.
+    case 'read_prompt':
+      return 'Leyó el prompt';
+    case 'validate_prompt':
+      return 'Validó el prompt';
+    case 'check_prompt_capabilities':
+      return 'Verificó las capacidades del prompt';
+    case 'list_prompt_history':
+      return 'Consultó el historial del prompt';
+    case 'restore_prompt_version':
+      return 'Restauró una versión del prompt';
+    // Entrenador — escrituras del workspace. Títulos LITERALES de las tarjetas
+    // de cambio (trainer_change_card): la tarjeta y el nodo de la traza deben
+    // leer idéntico.
+    case 'edit_prompt':
+      return 'Prompt actualizado';
+    case 'list_docs':
+      return 'Consultó los documentos';
+    case 'read_doc':
+      return 'Leyó un documento';
+    case 'write_doc':
+      return 'Documento creado';
+    case 'edit_doc':
+      return 'Documento actualizado';
+    case 'delete_doc':
+      return 'Documento borrado';
+    case 'list_files':
+      return 'Consultó los archivos';
+    case 'save_file':
+      return 'Archivo guardado';
+    case 'update_file_meta':
+      return 'Archivo actualizado';
+    case 'delete_file':
+      return 'Archivo borrado';
     // Delegación.
     case 'spawn_agent':
       return 'Delegó a un subagente';
@@ -165,6 +214,7 @@ IconData toolIconFor(String tool) {
     case 'check_template_integrity':
       return Icons.dashboard_customize_outlined;
     // Flujos, pasos y disparadores.
+    case 'inspect_flow':
     case 'list_flows':
     case 'get_flow':
     case 'create_flow':
@@ -210,6 +260,45 @@ IconData toolIconFor(String tool) {
     case 'remember':
     case 'recall_memory':
       return Icons.bookmark_outline;
+    // Entrenador — lecturas y prompt.
+    case 'get_template_overview':
+      return Icons.dashboard_customize_outlined;
+    case 'list_labels':
+      return Icons.label_outline;
+    case 'read_bot_runs':
+      return Icons.troubleshoot;
+    case 'list_recent_attachments':
+    case 'read_attachment':
+      return Icons.attach_file;
+    case 'get_current_time':
+      return Icons.schedule_outlined;
+    case 'read_prompt':
+    case 'validate_prompt':
+    case 'check_prompt_capabilities':
+      return Icons.menu_book_outlined;
+    case 'list_prompt_history':
+    case 'restore_prompt_version':
+      return Icons.history_outlined;
+    // Entrenador — escrituras del workspace. Íconos LITERALES de las tarjetas
+    // de cambio (trainer_change_card).
+    case 'edit_prompt':
+      return Icons.edit_note;
+    case 'list_docs':
+    case 'read_doc':
+      return Icons.description_outlined;
+    case 'write_doc':
+      return Icons.note_add_outlined;
+    case 'edit_doc':
+      return Icons.edit_document;
+    case 'delete_doc':
+    case 'delete_file':
+      return Icons.delete_outline;
+    case 'list_files':
+      return Icons.folder_open_outlined;
+    case 'save_file':
+      return Icons.attach_file;
+    case 'update_file_meta':
+      return Icons.edit_attributes_outlined;
     // Delegación.
     case 'spawn_agent':
       return Icons.hub_outlined;

@@ -22,9 +22,17 @@ import 'trainer_tool_error_card.dart';
 /// lecturas sin efecto no rinden nada. user/assistant con texto ⇒ burbuja; un
 /// assistant puro tool_calls (sin texto) ⇒ nada (la acción la cuenta la tarjeta).
 class TrainerMessageTile extends StatelessWidget {
-  const TrainerMessageTile({required this.message, super.key});
+  const TrainerMessageTile({
+    required this.message,
+    this.showReasoning = true,
+    super.key,
+  });
 
   final TrainerMessage message;
+
+  /// false ⇒ omite el [ReasoningDisclosure] del assistant: el turno agrupado
+  /// ya pinta el razonamiento como nodo de su traza y duplicarlo estorba.
+  final bool showReasoning;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +125,7 @@ class TrainerMessageTile extends StatelessWidget {
           : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        if (message.isAssistant && message.thinking.isNotEmpty)
+        if (showReasoning && message.isAssistant && message.thinking.isNotEmpty)
           ReasoningDisclosure(reasoning: message.thinking, keyId: message.id),
         if (message.content.isNotEmpty ||
             message.attachments.isNotEmpty ||

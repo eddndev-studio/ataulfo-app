@@ -96,6 +96,10 @@ void main() {
         }),
       ),
     ]);
+    // El proceso vive plegado en la traza del turno; expandirla revela la
+    // tarjeta como cuerpo del nodo.
+    await tester.tap(find.text('Usó herramientas'));
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('trainer.prompt_history_card.m1')),
       findsOneWidget,
@@ -121,10 +125,13 @@ void main() {
         ),
       ]);
       // Un fallo del tool debe caer a la tarjeta de error, no a la de historial.
+      await tester.tap(find.text('Usó herramientas'));
+      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('trainer.prompt_history_card.m1')),
         findsNothing,
       );
+      expect(find.byKey(const Key('trainer.error_card.m1')), findsOneWidget);
       expect(find.textContaining('sin versiones'), findsNothing);
     },
   );

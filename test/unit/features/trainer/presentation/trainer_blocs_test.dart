@@ -181,14 +181,15 @@ void main() {
               'optimista',
               'mejora el prompt',
             ),
-        // Cierre inmediato (sending=false) con el optimista visible: "Detener"
-        // ya no queda vivo durante la recarga.
+        // Cierre inmediato (sending=false) con el assistant del POST anexado:
+        // "Detener" ya no queda vivo durante la recarga y la respuesta
+        // sobrevive aunque la recarga falle.
         isA<TrainerChatLoaded>()
             .having((s) => s.sending, 'cierre inmediato', false)
             .having(
               (s) => s.messages.last.content,
-              'optimista visible',
-              'mejora el prompt',
+              'assistant anexado',
+              'hecho',
             ),
         isA<TrainerChatLoaded>()
             .having((s) => s.sending, 'sending off', false)
