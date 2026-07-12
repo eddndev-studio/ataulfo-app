@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_conversation.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_message.dart';
 import 'package:ataulfo/features/platform_agent/domain/entities/pa_models.dart';
+import 'package:ataulfo/features/platform_agent/domain/entities/pa_progress.dart';
 import 'package:ataulfo/features/platform_agent/domain/failures/pa_failure.dart';
 import 'package:ataulfo/features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
 import 'package:ataulfo/features/platform_agent/presentation/pages/platform_agent_page.dart';
+import 'package:ataulfo/features/platform_agent/presentation/widgets/pa_turn_group.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -33,9 +35,16 @@ PaMessage _msg(String id, String role, String content) => PaMessage(
   createdAt: DateTime.utc(2026, 6, 10, 10),
 );
 
+PaProgressEvent _prog(String kind, {String tool = ''}) => PaProgressEvent(
+  kind: kind,
+  conversationId: 'c1',
+  at: DateTime.utc(2026, 6, 10, 10),
+  toolName: tool,
+);
+
 PaChatLoaded _loaded({
   bool sending = false,
-  String liveProgress = '',
+  List<PaProgressEvent> liveEvents = const <PaProgressEvent>[],
   PaFailure? sendFailure,
   List<PaMessage>? messages,
   List<PaConversation>? conversations,
@@ -49,7 +58,7 @@ PaChatLoaded _loaded({
   activeConversation: active ?? _conv(),
   messages: messages ?? <PaMessage>[_msg('m1', 'assistant', 'tienes 3 bots')],
   sending: sending,
-  liveProgress: liveProgress,
+  liveEvents: liveEvents,
   sendFailure: sendFailure,
   models: models,
   selectedModelId: selectedModelId,
@@ -112,13 +121,18 @@ void main() {
     },
   );
 
-  testWidgets('sending muestra el indicador en vivo', (tester) async {
+  testWidgets('sending muestra la traza viva con el paso en curso', (
+    tester,
+  ) async {
     await pump(
       tester,
-      _loaded(sending: true, liveProgress: 'Usando list_bots…'),
+      _loaded(
+        sending: true,
+        liveEvents: <PaProgressEvent>[_prog('tool', tool: 'list_bots')],
+      ),
     );
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Usando list_bots…'), findsOneWidget);
+    expect(find.text('Consultó los bots'), findsOneWidget);
   });
 
   testWidgets('Failed muestra copy + reintentar dispara Started', (
@@ -270,12 +284,37 @@ void main() {
     verify(() => bloc.add(const PaChatMessageSent('cuántos bots'))).called(1);
   });
 
+  testWidgets('cada turno se pinta con su propia key estable y distinta', (
+    tester,
+  ) async {
+    // Dos turnos: cada PaTurnGroup lleva una key propia para que el estado de
+    // expansión de su traza no se cruce cuando la lista se reordena.
+    await pump(
+      tester,
+      _loaded(
+        messages: <PaMessage>[
+          _msg('u1', 'user', 'uno'),
+          _msg('a1', 'assistant', 'respuesta uno'),
+          _msg('u2', 'user', 'dos'),
+          _msg('a2', 'assistant', 'respuesta dos'),
+        ],
+      ),
+    );
+    final groups = tester
+        .widgetList<PaTurnGroup>(find.byType(PaTurnGroup))
+        .toList();
+    expect(groups.length, 2);
+    expect(groups.every((g) => g.key is ValueKey), isTrue);
+    expect(groups.map((g) => g.key).toSet().length, 2);
+  });
+
   testWidgets('turno en vuelo: "Detener" dispara TurnCancelRequested', (
     tester,
   ) async {
-    await pump(tester, _loaded(sending: true, liveProgress: 'Pensando…'));
+    await pump(tester, _loaded(sending: true));
     expect(find.byKey(const Key('pa.turn_cancel')), findsOneWidget);
     await tester.tap(find.byKey(const Key('pa.turn_cancel')));
+    await tester.pump();
     verify(() => bloc.add(const PaChatTurnCancelRequested())).called(1);
   });
 

@@ -12,6 +12,7 @@ import '../../../messages/presentation/widgets/audio_message_content.dart';
 import '../../../messages/presentation/widgets/media_viewer.dart';
 import '../../domain/entities/pa_attachment.dart';
 import '../../domain/entities/pa_message.dart';
+import '../../domain/entities/pa_tool_result.dart';
 import 'pa_tool_cards.dart';
 
 /// Renderiza un turno del hilo. user/assistant con texto ⇒ burbuja. Un turno
@@ -21,7 +22,12 @@ import 'pa_tool_cards.dart';
 /// a mostrarlo. Un resultado `requires_confirmation` con `onConfirm` cableado ⇒
 /// tarjeta interactiva que nombra los bots afectados y ofrece Confirmar/Cancelar.
 class PaMessageTile extends StatelessWidget {
-  const PaMessageTile({required this.message, this.onConfirm, super.key});
+  const PaMessageTile({
+    required this.message,
+    this.onConfirm,
+    this.showReasoning = true,
+    super.key,
+  });
 
   final PaMessage message;
 
@@ -29,6 +35,12 @@ class PaMessageTile extends StatelessWidget {
   /// autorización por MessageSent (el LLM re-llama el tool con confirm=true).
   /// nil ⇒ la tarjeta de confirmación degrada a la de error genérica.
   final VoidCallback? onConfirm;
+
+  /// Muestra el «Razonamiento» plegable sobre la burbuja del assistant. Se
+  /// apaga cuando el turno se pinta agrupado en una traza (el razonamiento ya
+  /// es un nodo de ella): la respuesta queda como burbuja limpia fuera del
+  /// colapso.
+  final bool showReasoning;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +52,7 @@ class PaMessageTile extends StatelessWidget {
       return PaExpandableToolCard(result: result);
     }
     if (message.isAssistant) {
-      final hasThinking = message.thinking.isNotEmpty;
+      final hasThinking = showReasoning && message.thinking.isNotEmpty;
       final hasBody =
           message.content.isNotEmpty || message.attachments.isNotEmpty;
       if (!hasBody && !hasThinking) {

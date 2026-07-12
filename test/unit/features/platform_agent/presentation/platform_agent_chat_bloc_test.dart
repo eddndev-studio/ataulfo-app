@@ -114,7 +114,7 @@ void main() {
 
   PaChatLoaded loaded({
     bool sending = false,
-    String liveProgress = '',
+    List<PaProgressEvent> liveEvents = const <PaProgressEvent>[],
     List<PaMessage>? messages,
     List<PaModelOption> models = const <PaModelOption>[],
     String selectedModelId = '',
@@ -123,7 +123,7 @@ void main() {
     activeConversation: _conv(),
     messages: messages ?? const <PaMessage>[],
     sending: sending,
-    liveProgress: liveProgress,
+    liveEvents: liveEvents,
     models: models,
     selectedModelId: selectedModelId,
   );
@@ -200,7 +200,7 @@ void main() {
   );
 
   blocTest<PlatformAgentChatBloc, PaChatState>(
-    'MessageSent: optimista (sending+Pensando…) y luego recarga el hilo',
+    'MessageSent: optimista (sending, traza viva vacía) y luego recarga el hilo',
     build: build,
     seed: () => loaded(),
     setUp: () {
@@ -228,16 +228,16 @@ void main() {
     },
     act: (b) => b.add(const PaChatMessageSent('cuántos bots')),
     expect: () => <dynamic>[
-      // 1) optimista: sending + Pensando… + el user en mano.
+      // 1) optimista: sending + traza viva aún vacía + el user en mano.
       isA<PaChatLoaded>()
           .having((s) => s.sending, 'sending', true)
-          .having((s) => s.liveProgress, 'progress', 'Pensando…')
+          .having((s) => s.liveEvents, 'sin eventos aún', isEmpty)
           .having((s) => s.messages.last.content, 'optimista', 'cuántos bots'),
       // 2) cierre INMEDIATO del turno con el assistant que devolvió el POST —
       // NO espera ni el cancel del SSE ni la recarga.
       isA<PaChatLoaded>()
           .having((s) => s.sending, 'sending', false)
-          .having((s) => s.liveProgress, 'progress', '')
+          .having((s) => s.liveEvents, 'traza viva descartada', isEmpty)
           .having(
             (s) => s.messages.any((m) => m.isAssistant),
             'tiene assistant',
@@ -402,16 +402,84 @@ void main() {
   );
 
   blocTest<PlatformAgentChatBloc, PaChatState>(
-    'ProgressReceived(tool) mientras sending actualiza el indicador',
+    'ProgressReceived acumula los eventos del SSE en la traza viva',
     build: build,
-    seed: () => loaded(sending: true, liveProgress: 'Pensando…'),
+    seed: () =>
+        loaded(sending: true, liveEvents: <PaProgressEvent>[_prog('thinking')]),
     act: (b) => b.add(PaChatProgressReceived(_prog('tool', tool: 'list_bots'))),
     expect: () => <dynamic>[
-      isA<PaChatLoaded>().having(
-        (s) => s.liveProgress,
-        'progress',
-        'Usando list_bots…',
-      ),
+      isA<PaChatLoaded>()
+          .having((s) => s.liveEvents.length, 'acumulados', 2)
+          .having(
+            (s) => s.liveEvents.last.toolName,
+            'último tool',
+            'list_bots',
+          ),
+    ],
+  );
+
+  // P1: el cierre del turno NO debe emitir desde el snapshot pre-turno. Un
+  // cambio de modelo mid-turno (mientras el POST viaja) debe sobrevivir al
+  // cierre, que relee el state en vez de pisarlo con `current`.
+  late PlatformAgentChatBloc midTurnBloc;
+  blocTest<PlatformAgentChatBloc, PaChatState>(
+    'MessageSent: un cambio de modelo mid-turno NO se pierde al cerrar el turno',
+    build: () {
+      midTurnBloc = build();
+      return midTurnBloc;
+    },
+    seed: () => loaded(),
+    setUp: () {
+      when(
+        () => repo.sendMessage(
+          conversationId: 'c1',
+          content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
+        ),
+      ).thenAnswer((_) async {
+        // El operador cambia de modelo mientras el POST está en vuelo.
+        midTurnBloc.add(const PaChatModelSelected('m2'));
+        await Future<void>.delayed(Duration.zero);
+        return _msg('m9', 'assistant', 'ok');
+      });
+      when(
+        () => repo.listMessages(
+          conversationId: 'c1',
+          limit: any(named: 'limit'),
+        ),
+      ).thenAnswer(
+        (_) async => PaMessagesPage(
+          messages: <PaMessage>[
+            _msg('m9', 'assistant', 'ok'),
+            _msg('m8', 'user', 'x'),
+          ],
+          nextCursor: '',
+        ),
+      );
+    },
+    act: (b) => b.add(const PaChatMessageSent('x')),
+    expect: () => <dynamic>[
+      // optimista: sending, modelo aún el default.
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', true)
+          .having((s) => s.selectedModelId, 'modelo', ''),
+      // el cambio de modelo mid-turno.
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', true)
+          .having((s) => s.selectedModelId, 'modelo', 'm2'),
+      // cierre: el modelo elegido SOBREVIVE (releer state, no el snapshot).
+      isA<PaChatLoaded>()
+          .having((s) => s.sending, 'sending', false)
+          .having((s) => s.selectedModelId, 'modelo preservado', 'm2')
+          .having(
+            (s) => s.messages.any((m) => m.id == 'm9'),
+            'assistant',
+            true,
+          ),
+      // recarga best-effort: el modelo sigue preservado.
+      isA<PaChatLoaded>()
+          .having((s) => s.selectedModelId, 'modelo preservado', 'm2')
+          .having((s) => s.messages.first.id, 'recarga ASC', 'm8'),
     ],
   );
 
@@ -444,7 +512,6 @@ void main() {
       activeConversation: _conv(),
       messages: const <PaMessage>[],
       sending: false,
-      liveProgress: '',
     ),
     setUp: () {
       when(
@@ -743,6 +810,7 @@ void main() {
       isA<PaChatLoaded>()
           .having((s) => s.sending, 'cancelado', false)
           .having((s) => s.sendFailure, 'sin fallo', isNull)
+          .having((s) => s.liveStopped, 'traza anclada al copy honesto', true)
           .having(
             (s) => s.messages.any((m) => m.id == 'optimistic'),
             'optimista revertido',
@@ -753,6 +821,105 @@ void main() {
       verify(() => repo.cancelSend()).called(1);
     },
   );
+
+  // La traza viva SOBREVIVE al cierre del POST: swap solo cuando la recarga
+  // trae la verdad persistida; si la recarga falla, queda marcada parcial —
+  // jamás se esfuma el proceso que el operador estaba viendo.
+  group('traza viva post-cierre', () {
+    void mockTurno({required bool reloadOk}) {
+      when(() => events.progress('c1')).thenAnswer(
+        (_) => Stream<PaProgressEvent>.fromIterable(<PaProgressEvent>[
+          _prog('tool', tool: 'list_bots'),
+        ]),
+      );
+      when(
+        () => repo.sendMessage(
+          conversationId: 'c1',
+          content: any(named: 'content'),
+          attachments: any(named: 'attachments'),
+        ),
+      ).thenAnswer((_) async {
+        // Deja aterrizar el frame de progreso antes de cerrar el POST.
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        return _msg('m9', 'assistant', 'listo');
+      });
+      if (reloadOk) {
+        when(
+          () => repo.listMessages(
+            conversationId: 'c1',
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => PaMessagesPage(
+            messages: <PaMessage>[
+              _msg('m9', 'assistant', 'listo'),
+              _msg('m8', 'user', 'hola'),
+            ],
+            nextCursor: '',
+          ),
+        );
+      } else {
+        when(
+          () => repo.listMessages(
+            conversationId: 'c1',
+            limit: any(named: 'limit'),
+          ),
+        ).thenThrow(const PaServerFailure());
+      }
+    }
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
+      'recarga exitosa ⇒ swap: la persistida toma el relevo y la viva se va',
+      build: build,
+      seed: () => loaded(),
+      setUp: () => mockTurno(reloadOk: true),
+      act: (b) async {
+        b.add(const PaChatMessageSent('hola'));
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+      },
+      expect: () => <dynamic>[
+        isA<PaChatLoaded>().having((s) => s.sending, 'optimista', true),
+        isA<PaChatLoaded>().having(
+          (s) => s.liveEvents,
+          'frame vivo',
+          hasLength(1),
+        ),
+        isA<PaChatLoaded>()
+            .having((s) => s.sending, 'cierre', false)
+            .having((s) => s.liveEvents, 'viva aún en mano', hasLength(1)),
+        isA<PaChatLoaded>()
+            .having((s) => s.liveEvents, 'swap: viva descartada', isEmpty)
+            .having((s) => s.livePartial, 'sin marca', false)
+            .having((s) => s.messages.first.id, 'reload ASC', 'm8'),
+      ],
+    );
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
+      'recarga fallida ⇒ la viva se CONSERVA marcada parcial',
+      build: build,
+      seed: () => loaded(),
+      setUp: () => mockTurno(reloadOk: false),
+      act: (b) async {
+        b.add(const PaChatMessageSent('hola'));
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+      },
+      expect: () => <dynamic>[
+        isA<PaChatLoaded>().having((s) => s.sending, 'optimista', true),
+        isA<PaChatLoaded>().having(
+          (s) => s.liveEvents,
+          'frame vivo',
+          hasLength(1),
+        ),
+        isA<PaChatLoaded>()
+            .having((s) => s.sending, 'cierre', false)
+            .having((s) => s.liveEvents, 'viva conservada', hasLength(1))
+            .having((s) => s.livePartial, 'aún sin marca', false),
+        isA<PaChatLoaded>()
+            .having((s) => s.livePartial, 'marcada parcial', true)
+            .having((s) => s.liveEvents, 'sigue en mano', hasLength(1)),
+      ],
+    );
+  });
 
   blocTest<PlatformAgentChatBloc, PaChatState>(
     'el draft se guarda por conversación y no se filtra entre hilos',
@@ -868,6 +1035,43 @@ void main() {
     );
 
     blocTest<PlatformAgentChatBloc, PaChatState>(
+      'el cierre del turno de voz NO pisa un cambio de modelo mid-turno',
+      build: build,
+      seed: () => loaded().copyWith(recordingVoice: true),
+      setUp: () {
+        when(
+          () => repo.sendAudio(
+            conversationId: 'c1',
+            bytes: any(named: 'bytes'),
+            filename: any(named: 'filename'),
+          ),
+        ).thenAnswer((_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          return _msg('a1', 'assistant', 'te escuché');
+        });
+        when(
+          () => repo.listMessages(
+            conversationId: 'c1',
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async =>
+              const PaMessagesPage(messages: <PaMessage>[], nextCursor: ''),
+        );
+      },
+      act: (b) async {
+        b.add(PaChatVoiceSent(bytes));
+        await Future<void>.delayed(Duration.zero);
+        b.add(const PaChatModelSelected('m2'));
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+      },
+      verify: (b) {
+        // El cierre relee el state vivo: la elección mid-turno sobrevive.
+        expect((b.state as PaChatLoaded).selectedModelId, 'm2');
+      },
+    );
+
+    blocTest<PlatformAgentChatBloc, PaChatState>(
       'VoiceSent corre el turno vía sendAudio y cierra con el assistant',
       build: build,
       seed: () => loaded().copyWith(recordingVoice: true),
@@ -896,11 +1100,11 @@ void main() {
       },
       act: (b) => b.add(PaChatVoiceSent(bytes)),
       expect: () => <dynamic>[
-        // Arranca el turno: recording cae, sending sube, Pensando…
+        // Arranca el turno: recording cae, sending sube, traza viva vacía.
         isA<PaChatLoaded>()
             .having((s) => s.recordingVoice, 'recording', false)
             .having((s) => s.sending, 'sending', true)
-            .having((s) => s.liveProgress, 'progress', 'Pensando…'),
+            .having((s) => s.liveEvents, 'sin eventos aún', isEmpty),
         // Cierra con el assistant que devolvió el POST.
         isA<PaChatLoaded>()
             .having((s) => s.sending, 'sending', false)

@@ -209,7 +209,9 @@ final class PaChatLoaded extends PaChatState {
     required this.messages,
     required this.sending,
     this.sendFailure,
-    this.liveProgress = '',
+    this.liveEvents = const <PaProgressEvent>[],
+    this.livePartial = false,
+    this.liveStopped = false,
     this.models = const <PaModelOption>[],
     this.defaultModelId = '',
     this.selectedModelId = '',
@@ -238,9 +240,21 @@ final class PaChatLoaded extends PaChatState {
   /// Fallo del ÚLTIMO turno (el hilo sigue usable); null si no hubo.
   final PaFailure? sendFailure;
 
-  /// Etiqueta del indicador en vivo durante el turno ("Pensando…", "Usando
-  /// {tool}…"); vacía cuando no hay turno en vuelo.
-  final String liveProgress;
+  /// Eventos de progreso del SSE acumulados del turno en vuelo, en orden de
+  /// llegada: alimentan la traza viva (thinking/tool → nodos; terminales
+  /// aportan la causa del fallo). Se conservan tras el cierre del POST hasta
+  /// que la recarga triunfa (swap a la gramática persistida) — si la recarga
+  /// falla, son el único registro del proceso y quedan marcados parciales.
+  final List<PaProgressEvent> liveEvents;
+
+  /// La recarga post-cierre falló o llegó rezagada: la traza viva se conserva
+  /// pintada con la marca «(traza parcial)» en lugar de descartarse.
+  final bool livePartial;
+
+  /// El operador detuvo el turno: la traza viva queda colapsada al copy
+  /// honesto («Detenido aquí — el servidor pudo continuar») hasta el próximo
+  /// turno o cambio de hilo.
+  final bool liveStopped;
 
   /// Allowlist de modelos (best-effort: vacía oculta el selector — backend sin
   /// la ruta o fallo de carga).
@@ -320,7 +334,9 @@ final class PaChatLoaded extends PaChatState {
     bool? sending,
     PaFailure? sendFailure,
     bool clearSendFailure = false,
-    String? liveProgress,
+    List<PaProgressEvent>? liveEvents,
+    bool? livePartial,
+    bool? liveStopped,
     String? selectedModelId,
     String? nextCursor,
     bool? loadingMore,
@@ -336,7 +352,9 @@ final class PaChatLoaded extends PaChatState {
     messages: messages ?? this.messages,
     sending: sending ?? this.sending,
     sendFailure: clearSendFailure ? null : (sendFailure ?? this.sendFailure),
-    liveProgress: liveProgress ?? this.liveProgress,
+    liveEvents: liveEvents ?? this.liveEvents,
+    livePartial: livePartial ?? this.livePartial,
+    liveStopped: liveStopped ?? this.liveStopped,
     models: models,
     defaultModelId: defaultModelId,
     selectedModelId: selectedModelId ?? this.selectedModelId,
@@ -358,7 +376,9 @@ final class PaChatLoaded extends PaChatState {
       listEquals(other.messages, messages) &&
       other.sending == sending &&
       other.sendFailure == sendFailure &&
-      other.liveProgress == liveProgress &&
+      listEquals(other.liveEvents, liveEvents) &&
+      other.livePartial == livePartial &&
+      other.liveStopped == liveStopped &&
       listEquals(other.models, models) &&
       other.defaultModelId == defaultModelId &&
       other.selectedModelId == selectedModelId &&
@@ -378,7 +398,9 @@ final class PaChatLoaded extends PaChatState {
     Object.hashAll(messages),
     sending,
     sendFailure,
-    liveProgress,
+    Object.hashAll(liveEvents),
+    livePartial,
+    liveStopped,
     Object.hashAll(models),
     defaultModelId,
     selectedModelId,
@@ -578,7 +600,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       current.copyWith(
         messages: <PaMessage>[...current.messages, optimistic],
         sending: true,
-        liveProgress: 'Pensando…',
+        liveEvents: const <PaProgressEvent>[],
+        livePartial: false,
+        liveStopped: false,
         clearSendFailure: true,
         lastAttemptedContent: event.content,
         draft: '',
@@ -608,17 +632,42 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       // INMEDIATO (sending=false con el hilo en mano). Invariante: una vez que
       // el POST vuelve, NADA — ni el cancel del SSE ni la recarga — puede
       // bloquear este cierre, o el chat se queda en "Pensando…".
-      emit(
-        current.copyWith(
-          messages: <PaMessage>[...current.messages, optimistic, assistant],
-          sending: false,
-          liveProgress: '',
-          clearSendFailure: true,
-          lastAttemptedContent: '',
-          pendingAttachments: const <PaAttachment>[],
-          pendingThumbnails: const <String, Uint8List>{},
-        ),
-      );
+      //
+      // Cierra releyendo el state actual, no el snapshot pre-turno `current`:
+      // un cambio de modelo (u otra edición sin guarda de sending) ocurrido
+      // mid-turno vive en el state vivo y no debe pisarse. Si el state ya no
+      // es este hilo (cambió de conversación), se reconstruye desde `current`.
+      final closing = state;
+      if (closing is PaChatLoaded && closing.activeConversation.id == convId) {
+        // liveEvents se CONSERVA: la traza viva sigue pintada (sin latido)
+        // hasta que la recarga triunfe (swap) o falle (marcada parcial).
+        emit(
+          closing.copyWith(
+            messages: <PaMessage>[...closing.messages, assistant],
+            sending: false,
+            livePartial: false,
+            liveStopped: false,
+            clearSendFailure: true,
+            lastAttemptedContent: '',
+            pendingAttachments: const <PaAttachment>[],
+            pendingThumbnails: const <String, Uint8List>{},
+          ),
+        );
+      } else {
+        emit(
+          current.copyWith(
+            messages: <PaMessage>[...current.messages, optimistic, assistant],
+            sending: false,
+            liveEvents: const <PaProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            clearSendFailure: true,
+            lastAttemptedContent: '',
+            pendingAttachments: const <PaAttachment>[],
+            pendingThumbnails: const <String, Uint8List>{},
+          ),
+        );
+      }
       // Recarga best-effort (follow-up, ya con el turno cerrado): trae el hilo
       // completo del server, incl. los mensajes de tool que el POST no devuelve.
       await _reloadThread(emit, convId, assistant.id);
@@ -633,24 +682,62 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         return;
       }
       // Revertir el optimista: el 502 deja el user message fuera del hilo
-      // (reintentable). `current` es el estado pre-optimista; conservamos el
-      // texto para que "Reintentar" lo recupere.
-      emit(
-        current.copyWith(
-          sending: false,
-          liveProgress: '',
-          sendFailure: f,
-          lastAttemptedContent: event.content,
-        ),
-      );
+      // (reintentable); conservamos el texto para que "Reintentar" lo
+      // recupere. Igual que el cierre exitoso, se relee el state actual (un
+      // cambio de modelo mid-turno no debe pisarse); si ya es otro hilo, se
+      // reconstruye desde el snapshot pre-optimista `current`.
+      final failing = state;
+      if (failing is PaChatLoaded && failing.activeConversation.id == convId) {
+        emit(
+          failing.copyWith(
+            messages: failing.messages
+                .where((m) => m.id != 'optimistic')
+                .toList(growable: false),
+            sending: false,
+            liveEvents: const <PaProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            sendFailure: f,
+            lastAttemptedContent: event.content,
+          ),
+        );
+      } else {
+        emit(
+          current.copyWith(
+            sending: false,
+            liveEvents: const <PaProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            sendFailure: f,
+            lastAttemptedContent: event.content,
+          ),
+        );
+      }
     }
+  }
+
+  /// Marca parcial la traza viva del turno recién cerrado: la recarga falló o
+  /// llegó rezagada y esos eventos son el único registro del proceso. Solo si
+  /// el hilo pintado sigue siendo el mismo y no arrancó un turno nuevo — una
+  /// recarga vieja no puede estampar «parcial» a la traza de un turno ajeno.
+  void _markLivePartial(Emitter<PaChatState> emit, String conversationId) {
+    if (isClosed) return;
+    final s = state;
+    if (s is! PaChatLoaded ||
+        s.activeConversation.id != conversationId ||
+        s.sending ||
+        s.liveEvents.isEmpty) {
+      return;
+    }
+    emit(s.copyWith(livePartial: true));
   }
 
   /// Recarga el hilo tras cerrar un turno, para sumar los mensajes de tool que
   /// el POST síncrono no devuelve. Best-effort y NO bloqueante del cierre (se
-  /// llama DESPUÉS de emitir sending=false): si falla, llega rezagada (sin ver
-  /// el turno recién escrito), o el operador ya cambió de hilo, no se aplica —
-  /// nunca pisa un hilo que el operador ya tiene abierto.
+  /// llama DESPUÉS de emitir sending=false): si triunfa hace el swap (descarta
+  /// la traza viva); si falla, llega rezagada (sin ver el turno recién
+  /// escrito) deja la viva marcada parcial; si el operador ya cambió de hilo,
+  /// no se aplica — nunca pisa un hilo que el operador ya tiene abierto.
   Future<void> _reloadThread(
     Emitter<PaChatState> emit,
     String conversationId,
@@ -660,10 +747,12 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     try {
       reloaded = await _loadMessages(conversationId);
     } on PaFailure {
+      _markLivePartial(emit, conversationId);
       return;
     }
     if (!reloaded.messages.any((m) => m.id == assistantId)) {
-      return; // recarga rezagada
+      _markLivePartial(emit, conversationId); // recarga rezagada
+      return;
     }
     if (isClosed) return;
     final s = state;
@@ -672,8 +761,14 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         s.sending) {
       return;
     }
+    // Swap: llegó la verdad persistida; la traza viva ya no hace falta.
     emit(
-      s.copyWith(messages: reloaded.messages, nextCursor: reloaded.nextCursor),
+      s.copyWith(
+        messages: reloaded.messages,
+        nextCursor: reloaded.nextCursor,
+        liveEvents: const <PaProgressEvent>[],
+        livePartial: false,
+      ),
     );
   }
 
@@ -684,17 +779,14 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     final current = state;
     if (current is! PaChatLoaded || !current.sending) return;
     if (event.event.conversationId != current.activeConversation.id) return;
-    final label = _progressLabel(event.event);
-    if (label.isEmpty || label == current.liveProgress) return;
-    emit(current.copyWith(liveProgress: label));
-  }
-
-  String _progressLabel(PaProgressEvent e) {
-    if (e.isTool) {
-      return e.toolName.isNotEmpty ? 'Usando ${e.toolName}…' : 'Trabajando…';
-    }
-    if (e.isThinking) return 'Pensando…';
-    return ''; // terminal: el cierre del POST limpia el indicador.
+    // Acumula el frame crudo: la traza viva lo interpreta (nodeFromProgress).
+    // Los terminales también se guardan —el `failed` aporta la causa del
+    // fallo al resumen—; el cierre del POST descarta toda la lista.
+    emit(
+      current.copyWith(
+        liveEvents: <PaProgressEvent>[...current.liveEvents, event.event],
+      ),
+    );
   }
 
   Future<void> _onNewConversation(
@@ -756,7 +848,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           activeConversation: target,
           messages: page.messages,
           nextCursor: page.nextCursor,
-          liveProgress: '',
+          liveEvents: const <PaProgressEvent>[],
+          livePartial: false,
+          liveStopped: false,
           clearSendFailure: true,
           draft: _drafts[target.id] ?? '',
           pendingAttachments: const <PaAttachment>[],
@@ -852,7 +946,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
             activeConversation: fresh,
             messages: const <PaMessage>[],
             nextCursor: '',
-            liveProgress: '',
+            liveEvents: const <PaProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
             clearSendFailure: true,
             pendingAttachments: const <PaAttachment>[],
             pendingThumbnails: const <String, Uint8List>{},
@@ -868,7 +964,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           activeConversation: next,
           messages: page.messages,
           nextCursor: page.nextCursor,
-          liveProgress: '',
+          liveEvents: const <PaProgressEvent>[],
+          livePartial: false,
+          liveStopped: false,
           clearSendFailure: true,
           pendingAttachments: const <PaAttachment>[],
           pendingThumbnails: const <String, Uint8List>{},
@@ -1015,13 +1113,16 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     if (cancelled.isNotEmpty) {
       _drafts[current.activeConversation.id] = cancelled;
     }
+    // liveEvents se CONSERVA y liveStopped ancla la traza en pantalla,
+    // colapsada al copy honesto: el cancel es solo del cliente y el servidor
+    // pudo continuar — desaparecerla afirmaría que el turno nunca ocurrió.
     emit(
       current.copyWith(
         messages: current.messages
             .where((m) => m.id != 'optimistic')
             .toList(growable: false),
         sending: false,
-        liveProgress: '',
+        liveStopped: true,
         clearSendFailure: true,
         draft: cancelled,
       ),
@@ -1075,7 +1176,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       current.copyWith(
         recordingVoice: false,
         sending: true,
-        liveProgress: 'Pensando…',
+        liveEvents: const <PaProgressEvent>[],
+        livePartial: false,
+        liveStopped: false,
         clearSendFailure: true,
         lastAttemptedContent: '',
       ),
@@ -1092,15 +1195,34 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       );
       unawaited(_progressSub?.cancel());
       _progressSub = null;
-      emit(
-        current.copyWith(
-          messages: <PaMessage>[...current.messages, assistant],
-          recordingVoice: false,
-          sending: false,
-          liveProgress: '',
-          clearSendFailure: true,
-        ),
-      );
+      // Cierre releyendo el state actual (cambio de modelo mid-turno no se
+      // pisa); liveEvents se conserva hasta el swap de la recarga — igual que
+      // el turno de texto.
+      final closing = state;
+      if (closing is PaChatLoaded && closing.activeConversation.id == convId) {
+        emit(
+          closing.copyWith(
+            messages: <PaMessage>[...closing.messages, assistant],
+            recordingVoice: false,
+            sending: false,
+            livePartial: false,
+            liveStopped: false,
+            clearSendFailure: true,
+          ),
+        );
+      } else {
+        emit(
+          current.copyWith(
+            messages: <PaMessage>[...current.messages, assistant],
+            recordingVoice: false,
+            sending: false,
+            liveEvents: const <PaProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            clearSendFailure: true,
+          ),
+        );
+      }
       // Recarga best-effort: trae el user de voz (con su transcript) y los
       // mensajes de tool que el POST no devuelve.
       await _reloadThread(emit, convId, assistant.id);
@@ -1113,14 +1235,30 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         _cancelRequested = false;
         return;
       }
-      emit(
-        current.copyWith(
-          recordingVoice: false,
-          sending: false,
-          liveProgress: '',
-          sendFailure: f,
-        ),
-      );
+      final failing = state;
+      if (failing is PaChatLoaded && failing.activeConversation.id == convId) {
+        emit(
+          failing.copyWith(
+            recordingVoice: false,
+            sending: false,
+            liveEvents: const <PaProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            sendFailure: f,
+          ),
+        );
+      } else {
+        emit(
+          current.copyWith(
+            recordingVoice: false,
+            sending: false,
+            liveEvents: const <PaProgressEvent>[],
+            livePartial: false,
+            liveStopped: false,
+            sendFailure: f,
+          ),
+        );
+      }
     }
   }
 
