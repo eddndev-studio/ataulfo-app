@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/calendar/domain/entities/event_type.dart';
+import 'package:ataulfo/features/calendar/domain/failures/calendar_failure.dart';
 import 'package:ataulfo/features/calendar/presentation/bloc/booking_cubit.dart';
 import 'package:ataulfo/features/calendar/presentation/pages/booking_page.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -24,6 +25,7 @@ BookingState _base({
   EventType? selectedEventType,
   DateTime? date,
   SlotsStatus slotsStatus = SlotsStatus.idle,
+  DateTime? selectedSlot,
   String? slotsErrorMessage,
 }) => BookingState(
   typesStatus: typesStatus,
@@ -32,7 +34,7 @@ BookingState _base({
   date: date,
   slotsStatus: slotsStatus,
   slots: const <DateTime>[],
-  selectedSlot: null,
+  selectedSlot: selectedSlot,
   submitting: false,
   slotsErrorMessage: slotsErrorMessage,
 );
@@ -101,6 +103,37 @@ void main() {
     expect(find.text(rejected), findsOneWidget);
     expect(find.text('No se pudo cargar la disponibilidad.'), findsNothing);
     expect(find.text('Reintentar'), findsNothing);
+  });
+
+  testWidgets('reservar con plan sin agenda muestra la copy de plan', (
+    tester,
+  ) async {
+    when(() => cubit.state).thenReturn(
+      _base(
+        selectedEventType: _et,
+        date: DateTime(2026, 7, 15),
+        slotsStatus: SlotsStatus.loaded,
+        selectedSlot: DateTime.utc(2026, 7, 15, 16),
+      ),
+    );
+    when(
+      () => cubit.book(
+        customerName: any(named: 'customerName'),
+        note: any(named: 'note'),
+      ),
+    ).thenAnswer((_) async => const CalendarPlanRequiredFailure());
+    await pump(tester);
+    await tester.ensureVisible(find.byKey(const Key('booking.name')));
+    await tester.enterText(find.byKey(const Key('booking.name')), 'Ana');
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('booking.submit')));
+    await tester.tap(find.byKey(const Key('booking.submit')));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.text('Tu plan no incluye la agenda. Mejora tu plan para usarla.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('error transitorio de disponibilidad → genérico con reintentar', (

@@ -123,6 +123,24 @@ void main() {
       );
     });
 
+    test('422 credits_exhausted ⇒ Rejected con la copy de créditos (no la '
+        'genérica de reintento)', () async {
+      whenPostThrows(
+        badResponse(422, data: <String, dynamic>{'error': 'credits_exhausted'}),
+      );
+      await expectLater(
+        ds.generate('gracias'),
+        throwsA(
+          isA<StickerRejectedFailure>().having(
+            (f) => f.message,
+            'message',
+            'Alcanzaste tu límite de créditos de IA de este mes. Se renuevan '
+                'el próximo mes o mejora tu plan.',
+          ),
+        ),
+      );
+    });
+
     test('422 con código desconocido ⇒ Rejected message null', () async {
       whenPostThrows(
         badResponse(422, data: <String, dynamic>{'error': 'algo_nuevo'}),

@@ -182,8 +182,11 @@ void main() {
       },
     );
 
-    test('tope 0 ⇒ ilimitadas (convención del backend)', () {
-      expect(imagenesIaLabel(3, 0), 'Ilimitadas');
+    test('tope 0 ⇒ sin cupo propio: muestra el consumo y aclara que las '
+        'imágenes gastan créditos (NO «Ilimitadas»)', () {
+      // Desde el arco imagen-en-créditos, cap 0 significa que cada imagen
+      // descuenta créditos del pool; solo trial y cortesía traen cap > 0.
+      expect(imagenesIaLabel(3, 0), '3 este mes · usan tus créditos');
     });
   });
 }

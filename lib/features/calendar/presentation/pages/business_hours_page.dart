@@ -64,6 +64,8 @@ class BusinessHoursPage extends StatelessWidget {
     CalendarValidationFailure(:final message) =>
       message ?? 'Hay tramos que se cruzan. Revísalos.',
     CalendarForbiddenFailure() => 'No tienes permiso para esta acción.',
+    CalendarPlanRequiredFailure() =>
+      'Tu plan no incluye la agenda. Mejora tu plan para usarla.',
     CalendarNetworkFailure() =>
       'Sin conexión. Revisa tu red e inténtalo otra vez.',
     _ => 'No se pudo guardar. Inténtalo otra vez.',

@@ -108,6 +108,9 @@ void main() {
             'El producto no tiene foto original. Ponle una imagen primero.',
         'invalid_preset': 'Ese fondo no está disponible. Elige otro.',
         'quota_exceeded': 'Alcanzaste el tope de imágenes de tu plan este mes.',
+        'credits_exhausted':
+            'Alcanzaste tu límite de créditos de IA de este mes. Se renuevan '
+            'el próximo mes o mejora tu plan.',
         'model_not_allowed': 'La calidad premium requiere plan Pro o Business.',
         'subscription_inactive': 'Tu suscripción tiene un pago pendiente.',
         'trial_expired': 'Tu periodo de prueba terminó.',

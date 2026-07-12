@@ -108,7 +108,9 @@ String creditosLabel(int used, int cap) =>
 String almacenamientoLabel(int usedMb, int quotaMb) =>
     quotaMb == 0 ? 'Ilimitado' : '$usedMb MB de $quotaMb MB';
 
-/// Consumo de imágenes generadas con IA, también mensual. Tope 0 =
-/// ilimitadas.
+/// Consumo de imágenes generadas con IA, también mensual. OJO: aquí tope 0
+/// NO es «ilimitadas» (a diferencia de créditos y almacenamiento): significa
+/// «sin cupo propio — cada imagen descuenta créditos del pool». El cupo
+/// propio (cap > 0) solo existe en trial y cortesía.
 String imagenesIaLabel(int used, int cap) =>
-    cap == 0 ? 'Ilimitadas' : '$used de $cap este mes';
+    cap == 0 ? '$used este mes · usan tus créditos' : '$used de $cap este mes';

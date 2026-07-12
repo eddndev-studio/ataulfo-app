@@ -219,6 +219,8 @@ class _EventTypeFormSheetState extends State<EventTypeFormSheet> {
     CalendarValidationFailure(:final message) =>
       message ?? 'Revisa los datos e inténtalo otra vez.',
     CalendarForbiddenFailure() => 'No tienes permiso para esta acción.',
+    CalendarPlanRequiredFailure() =>
+      'Tu plan no incluye la agenda. Mejora tu plan para usarla.',
     CalendarNetworkFailure() =>
       'Sin conexión. Revisa tu red e inténtalo otra vez.',
     CalendarTimeoutFailure() =>

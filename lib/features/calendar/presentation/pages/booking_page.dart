@@ -108,6 +108,8 @@ class _BookingPageState extends State<BookingPage> {
   String _messageFor(CalendarFailure failure) => switch (failure) {
     CalendarValidationFailure(:final message) =>
       message ?? 'No se pudo reservar la cita.',
+    CalendarPlanRequiredFailure() =>
+      'Tu plan no incluye la agenda. Mejora tu plan para usarla.',
     CalendarNetworkFailure() =>
       'Sin conexión. Revisa tu red e inténtalo otra vez.',
     CalendarTimeoutFailure() =>

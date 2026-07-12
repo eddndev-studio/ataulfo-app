@@ -2,6 +2,7 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_time_wheel_field.dart';
 import 'package:ataulfo/features/calendar/domain/entities/business_hours.dart';
+import 'package:ataulfo/features/calendar/domain/failures/calendar_failure.dart';
 import 'package:ataulfo/features/calendar/presentation/bloc/business_hours_cubit.dart';
 import 'package:ataulfo/features/calendar/presentation/pages/business_hours_page.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -124,6 +125,28 @@ void main() {
     await pump(tester);
     // Un tramo ⇒ dos campos de rueda (apertura y cierre).
     expect(find.byType(AppTimeWheelField), findsNWidgets(2));
+  });
+
+  testWidgets('guardar con plan sin agenda muestra la copy de plan (no la de '
+      'rol)', (tester) async {
+    when(() => cubit.state).thenReturn(
+      _loaded(const <BusinessHoursSlot>[
+        BusinessHoursSlot(weekday: 1, openMin: 540, closeMin: 1020),
+      ]),
+    );
+    when(
+      () => cubit.save(),
+    ).thenAnswer((_) async => const CalendarPlanRequiredFailure());
+    await pump(tester);
+    await tester.ensureVisible(find.byKey(const Key('hours.save')));
+    await tester.tap(find.byKey(const Key('hours.save')));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.text('Tu plan no incluye la agenda. Mejora tu plan para usarla.'),
+      findsOneWidget,
+    );
+    expect(find.text('No tienes permiso para esta acción.'), findsNothing);
   });
 
   testWidgets('tramos inválidos muestran el aviso', (tester) async {

@@ -7,6 +7,7 @@ void main() {
       CalendarNetworkFailure(),
       CalendarTimeoutFailure(),
       CalendarForbiddenFailure(),
+      CalendarPlanRequiredFailure(),
       CalendarNotFoundFailure(),
       CalendarConflictFailure(),
       CalendarValidationFailure('x'),

@@ -211,6 +211,8 @@ class _AppointmentDetailSheetState extends State<AppointmentDetailSheet> {
       'La operación tardó demasiado. Inténtalo otra vez.',
     CalendarNotFoundFailure() => 'La cita ya no existe.',
     CalendarForbiddenFailure() => 'No tienes permiso para esta acción.',
+    CalendarPlanRequiredFailure() =>
+      'Tu plan no incluye la agenda. Mejora tu plan para usarla.',
     _ => 'No se pudo aplicar el cambio.',
   };
 }

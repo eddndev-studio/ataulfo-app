@@ -88,7 +88,12 @@ class DioStickerDatasource implements StickerDatasource {
   /// JAMÁS se muestra el código crudo.
   static const Map<String, String> _rejectionCopy = <String, String>{
     'invalid_motif': 'Ese motivo no está disponible. Elige otro.',
+    // OJO: quota_exceeded (tope de IMÁGENES del mes) y credits_exhausted
+    // (pool de créditos de IA agotado) son dimensiones distintas; conviven.
     'quota_exceeded': 'Alcanzaste el tope de imágenes de tu plan este mes.',
+    'credits_exhausted':
+        'Alcanzaste tu límite de créditos de IA de este mes. Se renuevan '
+        'el próximo mes o mejora tu plan.',
     'model_not_allowed': 'Tu plan no permite generar este sticker.',
     'subscription_inactive': 'Tu suscripción tiene un pago pendiente.',
     'trial_expired': 'Tu periodo de prueba terminó.',

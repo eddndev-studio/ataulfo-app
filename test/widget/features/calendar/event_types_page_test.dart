@@ -96,6 +96,39 @@ void main() {
     verify(() => cubit.setActive(_et, false)).called(1);
   });
 
+  testWidgets('guardar tipo con plan sin agenda muestra la copy de plan (no '
+      'la de rol)', (tester) async {
+    Future<CalendarFailure?> onSubmit({
+      required String name,
+      required String description,
+      required int durationMin,
+      required bool active,
+    }) async => const CalendarPlanRequiredFailure();
+
+    // Modo edición (initial != null): sin autofocus, así no hay timer de
+    // cursor que haga time-out el settle.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Material(
+          child: SingleChildScrollView(
+            child: EventTypeFormSheet(initial: _et, onSubmit: onSubmit),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('event_type.save')));
+    await tester.tap(find.byKey(const Key('event_type.save')));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.text('Tu plan no incluye la agenda. Mejora tu plan para usarla.'),
+      findsOneWidget,
+    );
+    expect(find.text('No tienes permiso para esta acción.'), findsNothing);
+  });
+
   testWidgets('la hoja reserva el espacio del teclado (sheetBottomInset)', (
     tester,
   ) async {

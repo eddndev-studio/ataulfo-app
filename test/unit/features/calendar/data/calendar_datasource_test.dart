@@ -432,6 +432,49 @@ void main() {
     });
   });
 
+  group('403 de mutación: plan vs rol', () {
+    void whenPutThrows(DioException e) {
+      when(
+        () => dio.put<dynamic>(any(), data: any(named: 'data')),
+      ).thenThrow(e);
+    }
+
+    const week = <BusinessHoursSlot>[
+      BusinessHoursSlot(weekday: 1, openMin: 540, closeMin: 1080),
+    ];
+
+    test(
+      '403 {"error":"plan_required"} ⇒ CalendarPlanRequiredFailure',
+      () async {
+        whenPutThrows(
+          badResponse(403, data: <String, dynamic>{'error': 'plan_required'}),
+        );
+        await expectLater(
+          ds.putHours(week),
+          throwsA(isA<CalendarPlanRequiredFailure>()),
+        );
+      },
+    );
+
+    test('403 con cuerpo opaco del RBAC ⇒ CalendarForbiddenFailure', () async {
+      whenPutThrows(
+        badResponse(403, data: <String, dynamic>{'error': 'Forbidden'}),
+      );
+      await expectLater(
+        ds.putHours(week),
+        throwsA(isA<CalendarForbiddenFailure>()),
+      );
+    });
+
+    test('403 sin cuerpo ⇒ CalendarForbiddenFailure', () async {
+      whenPutThrows(badResponse(403));
+      await expectLater(
+        ds.putHours(week),
+        throwsA(isA<CalendarForbiddenFailure>()),
+      );
+    });
+  });
+
   group('mapeo genérico de DioException (vía listEventTypes)', () {
     void whenGetThrows(DioException e) {
       when(

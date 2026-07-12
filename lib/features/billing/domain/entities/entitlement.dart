@@ -97,8 +97,11 @@ class Entitlement {
   );
 }
 
-/// Consumo de generación de imágenes del periodo. Cap 0 = ilimitado, misma
-/// convención que los demás topes del entitlement.
+/// Consumo de generación de imágenes del periodo. OJO: cap 0 aquí NO sigue
+/// la convención «0 = ilimitado» de los demás topes — significa «sin cupo
+/// propio: cada imagen descuenta créditos del pool» (arco imagen-en-créditos).
+/// El cupo propio (cap > 0) es solo anti-abuso donde los créditos no acotan
+/// el costo: trial y cortesía.
 class ImageGenUsage {
   const ImageGenUsage({required this.used, required this.cap});
 

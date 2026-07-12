@@ -28,6 +28,15 @@ final class CalendarForbiddenFailure extends CalendarFailure {
   const CalendarForbiddenFailure();
 }
 
+/// 403 con cuerpo `{"error":"plan_required"}`: el plan de la org no incluye
+/// la agenda (feature 'calendar'). Solo lo emiten las mutaciones de
+/// calendario; las lecturas nunca se gatean. Distinto del 403 de rol: aquí
+/// el rol alcanza pero el plan no — la copy invita a mejorar el plan en vez
+/// de mentir sobre los permisos.
+final class CalendarPlanRequiredFailure extends CalendarFailure {
+  const CalendarPlanRequiredFailure();
+}
+
 /// 404: el recurso (tipo de evento, cita) no existe en la org del operador.
 final class CalendarNotFoundFailure extends CalendarFailure {
   const CalendarNotFoundFailure();

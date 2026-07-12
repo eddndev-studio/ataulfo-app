@@ -320,7 +320,11 @@ class DioCalendarDatasource implements CalendarDatasource {
         return const CalendarNetworkFailure();
       case DioExceptionType.badResponse:
         final status = e.response?.statusCode ?? 0;
-        if (status == 403) return const CalendarForbiddenFailure();
+        if (status == 403) {
+          return _isPlanRequired(e.response?.data)
+              ? const CalendarPlanRequiredFailure()
+              : const CalendarForbiddenFailure();
+        }
         if (status == 404) return const CalendarNotFoundFailure();
         if (status >= 500 && status < 600) return const CalendarServerFailure();
         return const UnknownCalendarFailure();
@@ -330,6 +334,14 @@ class DioCalendarDatasource implements CalendarDatasource {
         return const UnknownCalendarFailure();
     }
   }
+
+  /// El 403 tiene dos causas con cuerpos distintos: el RBAC responde el
+  /// opaco `{"error":"Forbidden"}` y el gate de plan `{"error":
+  /// "plan_required"}` (solo en mutaciones; las lecturas nunca traen ese
+  /// cuerpo). Se discrimina por el VALOR de `error`, nunca por el status;
+  /// cualquier otro cuerpo sigue siendo el 403 de rol.
+  static bool _isPlanRequired(dynamic data) =>
+      data is Map && data['error'] == 'plan_required';
 
   /// Copy es-MX por código estable de rechazo 422 del backend
   /// (`{"error": code}`). El wire manda códigos, no frases: aquí es la única
