@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_thread_event_card.dart';
 import '../../domain/entities/trainer_message.dart';
+import '../../domain/trainer_trace.dart' show trainerToolErrorCopy;
 
 /// Un fallo de tool (error_kind) que antes se descartaba: ahora el operador lo
 /// ve. `toolName` + el envelope error_kind, traducido a copy legible.
@@ -39,34 +40,6 @@ class TrainerToolErrorData {
       toolName: decoded['toolName']?.toString() ?? '',
       kind: kind,
     );
-  }
-}
-
-/// Traduce un error_kind del entrenador a copy en español para el operador.
-String trainerToolErrorCopy(String kind) {
-  switch (kind) {
-    case 'anchor_not_found':
-      return 'No encontré el ancla en el texto actual; vuelve a leerlo y reintenta.';
-    case 'anchor_not_unique':
-      return 'El ancla aparece varias veces; agrega contexto para que sea única.';
-    case 'empty_anchor':
-      return 'El ancla vacía solo aplica sobre contenido vacío (bootstrap).';
-    case 'no_change':
-      return 'El texto nuevo es igual al anterior: no hubo cambio.';
-    case 'not_found':
-      return 'No se encontró el recurso.';
-    case 'already_exists':
-      return 'Ya existe un recurso con ese nombre.';
-    case 'invalid_input':
-      return 'Dato inválido por las reglas del negocio.';
-    case 'invalid_args':
-      return 'Argumentos inválidos para la herramienta.';
-    case 'version_conflict':
-      return 'Conflicto de versión: algo cambió mientras editabas, reintenta.';
-    case 'variable_in_use':
-      return 'La variable está en uso por algún bot; limpia esos valores primero.';
-    default:
-      return 'La herramienta falló ($kind).';
   }
 }
 

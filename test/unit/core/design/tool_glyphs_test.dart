@@ -103,5 +103,32 @@ void main() {
       expect(toolIconFor('list_prompt_history'), Icons.history_outlined);
       expect(toolIconFor('restore_prompt_version'), Icons.history_outlined);
     });
+
+    // Herramientas del bot en runtime (emulador del preview + hilo real): sus
+    // lecturas y efectos entran al catálogo central para que el emulador deje
+    // su mapa propio y todo lea igual.
+    test('las herramientas del bot en runtime tienen su ícono en el catálogo '
+        'central (ninguna cae al genérico)', () {
+      expect(toolIconFor('read_document'), Icons.description_outlined);
+      expect(toolIconFor('list_documents'), Icons.folder_open_outlined);
+      expect(toolIconFor('read_labels'), Icons.label_outline);
+      expect(toolIconFor('read_notes'), Icons.sticky_note_2_outlined);
+      expect(toolIconFor('list_sendable_files'), Icons.attach_file);
+      expect(toolIconFor('apply_label'), Icons.label_outline);
+      expect(toolIconFor('save_note'), Icons.sticky_note_2_outlined);
+      expect(toolIconFor('run_flow'), Icons.account_tree_outlined);
+      expect(toolIconFor('react'), Icons.add_reaction_outlined);
+      expect(toolIconFor('mark_read'), Icons.done_all);
+      expect(toolIconFor('error'), Icons.error_outline);
+      for (final t in <String>[
+        'read_document',
+        'apply_label',
+        'run_flow',
+        'mark_read',
+        'error',
+      ]) {
+        expect(toolIconFor(t), isNot(Icons.bolt), reason: t);
+      }
+    });
   });
 }

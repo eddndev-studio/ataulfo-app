@@ -32,9 +32,20 @@ TraceNode? nodeFromProgress(TrainerProgressEvent e) {
     );
   }
   if (e.isTool) {
+    // Un tool en error JAMÁS reclama éxito: el frame vivo no trae el
+    // error_kind, así que el registro honesto es el genérico «falló» (el ícono
+    // del tool y el tinte de error conservan la pista de qué corría).
+    final String titulo;
+    if (e.toolError) {
+      titulo = trainerToolErrorCopy('');
+    } else if (e.toolName.isEmpty) {
+      titulo = 'Trabajando…';
+    } else {
+      titulo = toolTitleFor(e.toolName);
+    }
     return TraceNode(
       kind: TraceNodeKind.tool,
-      titulo: e.toolName.isEmpty ? 'Trabajando…' : toolTitleFor(e.toolName),
+      titulo: titulo,
       icon: toolIconFor(e.toolName),
       isError: e.toolError,
     );
@@ -163,12 +174,17 @@ List<(TrainerTurn, Trace)> traceFromMessages(List<TrainerMessage> messages) {
       if (m.content.isNotEmpty || m.attachments.isNotEmpty) responses.add(m);
     } else if (m.isTool) {
       final r = _parseToolEnvelope(m.toolResultsRaw);
+      final failed = r.errorKind.isNotEmpty;
       nodos.add(
         TraceNode(
           kind: TraceNodeKind.tool,
-          titulo: toolTitleFor(r.toolName),
+          // Un tool fallido no reclama éxito: el registro es honesto y genérico
+          // (nunca «Documento actualizado» sobre un edit que falló). El motivo
+          // es-MX específico lo pinta la TrainerToolErrorCard —cuerpo del nodo—,
+          // así el paso no duplica esa frase.
+          titulo: failed ? trainerToolErrorCopy('') : toolTitleFor(r.toolName),
           icon: toolIconFor(r.toolName),
-          isError: r.errorKind.isNotEmpty,
+          isError: failed,
         ),
       );
       toolMessages.add(m);
@@ -184,6 +200,40 @@ List<(TrainerTurn, Trace)> traceFromMessages(List<TrainerMessage> messages) {
     toolMessages: toolMessages,
   );
   return (turn, Trace(nodos: nodos, parcial: !hasUser, duracion: dur));
+}
+
+/// Traduce un error_kind del entrenador a copy en español para el operador.
+/// Vive en el dominio (no en la tarjeta) porque la gramática de la traza lo
+/// usa para titular honestamente un nodo de tool fallido —el mismo motivo que
+/// pinta la TrainerToolErrorCard—. `kind` vacío ⇒ genérico sin paréntesis (el
+/// frame vivo del SSE no trae el error_kind).
+String trainerToolErrorCopy(String kind) {
+  switch (kind) {
+    case '':
+      return 'La herramienta falló.';
+    case 'anchor_not_found':
+      return 'No encontré el ancla en el texto actual; vuelve a leerlo y reintenta.';
+    case 'anchor_not_unique':
+      return 'El ancla aparece varias veces; agrega contexto para que sea única.';
+    case 'empty_anchor':
+      return 'El ancla vacía solo aplica sobre contenido vacío (bootstrap).';
+    case 'no_change':
+      return 'El texto nuevo es igual al anterior: no hubo cambio.';
+    case 'not_found':
+      return 'No se encontró el recurso.';
+    case 'already_exists':
+      return 'Ya existe un recurso con ese nombre.';
+    case 'invalid_input':
+      return 'Dato inválido por las reglas del negocio.';
+    case 'invalid_args':
+      return 'Argumentos inválidos para la herramienta.';
+    case 'version_conflict':
+      return 'Conflicto de versión: algo cambió mientras editabas, reintenta.';
+    case 'variable_in_use':
+      return 'La variable está en uso por algún bot; limpia esos valores primero.';
+    default:
+      return 'La herramienta falló ($kind).';
+  }
 }
 
 /// Lectura mínima del envelope del entrenador ({toolName, content} con content

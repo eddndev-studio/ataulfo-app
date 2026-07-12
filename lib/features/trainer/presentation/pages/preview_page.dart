@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/tool_glyphs.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/typing_bubble.dart';
@@ -357,27 +358,6 @@ class _ItemTile extends StatelessWidget {
 
   final PreviewItem item;
 
-  IconData get _toolIcon => switch (item.tool) {
-    'read_document' => Icons.description_outlined,
-    'list_documents' => Icons.folder_open_outlined,
-    'read_labels' => Icons.label_outline,
-    'read_notes' => Icons.sticky_note_2_outlined,
-    'list_flows' => Icons.account_tree_outlined,
-    'list_sendable_files' => Icons.attach_file,
-    'get_current_time' => Icons.schedule,
-    _ => Icons.manage_search,
-  };
-
-  IconData get _actionIcon => switch (item.tool) {
-    'apply_label' => Icons.label_outline,
-    'save_note' => Icons.sticky_note_2_outlined,
-    'run_flow' => Icons.account_tree_outlined,
-    'react' => Icons.add_reaction_outlined,
-    'mark_read' => Icons.done_all,
-    'error' => Icons.error_outline,
-    _ => Icons.bolt,
-  };
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -400,7 +380,7 @@ class _ItemTile extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(_toolIcon, size: 14, color: AppTokens.text2),
+              Icon(toolIconFor(item.tool), size: 14, color: AppTokens.text2),
               const SizedBox(width: AppTokens.sp2),
               Flexible(
                 child: Text(
@@ -433,7 +413,7 @@ class _ItemTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Icon(
-                _actionIcon,
+                toolIconFor(item.tool),
                 size: 16,
                 // El chip de error es el único con tinte de peligro: anuncia
                 // un flush fallido, no un efecto grabado del bot.

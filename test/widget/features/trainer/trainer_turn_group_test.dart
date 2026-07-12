@@ -104,7 +104,9 @@ void main() {
     await tester.tap(find.textContaining('1 paso'));
     await tester.pump();
     expect(find.byKey(const Key('trainer.error_card.t1')), findsOneWidget);
-    expect(find.text('Documento actualizado'), findsOneWidget);
+    // El nodo NO reclama éxito sobre un edit que falló: registro honesto.
+    expect(find.text('Documento actualizado'), findsNothing);
+    expect(find.text('La herramienta falló.'), findsOneWidget);
   });
 
   testWidgets('TODAS las respuestas con cuerpo se pintan (el preámbulo del '

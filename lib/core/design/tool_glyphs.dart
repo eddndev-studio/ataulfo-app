@@ -304,6 +304,31 @@ IconData toolIconFor(String tool) {
       return Icons.hub_outlined;
     case 'done':
       return Icons.check_circle_outline;
+    // Herramientas del bot en RUNTIME (emulador del preview + hilo real): sus
+    // lecturas y efectos entran al catálogo central para que el emulador deje
+    // su mapa propio y un mismo tool se lea igual en toda la app.
+    case 'read_document':
+      return Icons.description_outlined;
+    case 'list_documents':
+      return Icons.folder_open_outlined;
+    case 'read_labels':
+    case 'apply_label':
+      return Icons.label_outline;
+    case 'read_notes':
+    case 'save_note':
+      return Icons.sticky_note_2_outlined;
+    case 'list_sendable_files':
+      return Icons.attach_file;
+    case 'run_flow':
+      return Icons.account_tree_outlined;
+    case 'react':
+      return Icons.add_reaction_outlined;
+    case 'mark_read':
+      return Icons.done_all;
+    // Efecto sintético de un flush fallido del emulador (no un tool real): su
+    // ícono de peligro delata que algo no se grabó.
+    case 'error':
+      return Icons.error_outline;
     default:
       return Icons.bolt;
   }

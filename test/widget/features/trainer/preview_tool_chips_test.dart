@@ -1,3 +1,4 @@
+import 'package:ataulfo/core/design/tool_glyphs.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_file_picker.dart';
 import 'package:ataulfo/features/trainer/domain/entities/preview_item.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
@@ -74,6 +75,41 @@ void main() {
     await tester.tap(find.byKey(const Key('preview.tools_toggle')));
     await tester.pumpAndSettle();
     expect(find.textContaining('politicas-envio'), findsNothing);
+  });
+
+  testWidgets('el chip de lectura toma el glifo del catálogo CENTRAL, no un '
+      'mapa local del preview', (tester) async {
+    await _pump(tester, <PreviewItem>[
+      PreviewItem(kind: 'user', text: '¿hora?', at: DateTime.utc(2026)),
+      PreviewItem(
+        kind: 'tool',
+        tool: 'get_current_time',
+        summary: 'Consultó la hora',
+        at: DateTime.utc(2026),
+      ),
+    ]);
+    // Las lecturas están ocultas por defecto: enciende el toggle.
+    await tester.tap(find.byKey(const Key('preview.tools_toggle')));
+    await tester.pumpAndSettle();
+    // El catálogo central pinta get_current_time con schedule_outlined; el
+    // mapa local del preview usaba Icons.schedule — el ícono los distingue.
+    expect(find.byIcon(toolIconFor('get_current_time')), findsOneWidget);
+    expect(find.byIcon(Icons.schedule), findsNothing);
+  });
+
+  testWidgets('el chip de efecto toma el glifo del catálogo central', (
+    tester,
+  ) async {
+    await _pump(tester, <PreviewItem>[
+      PreviewItem(kind: 'user', text: 'etiqueta', at: DateTime.utc(2026)),
+      PreviewItem(
+        kind: 'action',
+        tool: 'apply_label',
+        summary: 'Etiquetaría como VIP',
+        at: DateTime.utc(2026),
+      ),
+    ]);
+    expect(find.byIcon(toolIconFor('apply_label')), findsOneWidget);
   });
 
   testWidgets('sin items tool el toggle no aparece (nada que mostrar)', (

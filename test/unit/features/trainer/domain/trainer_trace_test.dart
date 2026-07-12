@@ -75,6 +75,15 @@ void main() {
       );
     });
 
+    test('tool en error NO reclama éxito: titula el fallo honesto', () {
+      final n = nodeFromProgress(
+        _ev('tool', toolName: 'edit_doc', toolError: true),
+      )!;
+      // El título de éxito «Documento actualizado» sería mentira: el tool falló.
+      expect(n.titulo, isNot('Documento actualizado'));
+      expect(n.titulo, trainerToolErrorCopy(''));
+    });
+
     test('completed y failed ⇒ null (el cierre lo da el POST)', () {
       expect(nodeFromProgress(_ev('completed')), isNull);
       expect(
@@ -194,6 +203,26 @@ void main() {
       expect(trace.nodos.single.kind, TraceNodeKind.tool);
       expect(trace.nodos.single.isError, isTrue);
       expect(turn.toolMessages, hasLength(1));
+    });
+
+    test('una tool FALLIDA titula el fallo honesto — jamás reclama éxito '
+        '(alinea con la TrainerToolErrorCard)', () {
+      final turns = traceFromMessages(<TrainerMessage>[
+        _msg('user', content: 'edita el doc'),
+        _msg(
+          'tool',
+          toolResultsRaw: _toolRaw('edit_doc', <String, dynamic>{
+            'error_kind': 'not_found',
+          }),
+        ),
+      ]);
+      final (_, trace) = turns.single;
+      final node = trace.nodos.single;
+      expect(node.isError, isTrue);
+      // El título de éxito «Documento actualizado» sería mentira: el edit falló.
+      expect(node.titulo, isNot('Documento actualizado'));
+      // Registro honesto y genérico; el motivo específico vive en la tarjeta.
+      expect(node.titulo, trainerToolErrorCopy(''));
     });
 
     test(
