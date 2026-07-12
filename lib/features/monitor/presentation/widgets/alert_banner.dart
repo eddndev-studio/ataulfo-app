@@ -24,8 +24,9 @@ class _AlertBannerState extends State<AlertBanner> {
 
   @override
   Widget build(BuildContext context) {
-    final events = context.watch<MonitorLiveCubit>().state.events;
-    final alert = _latestAlert(events);
+    // La alerta vive RETENIDA en su propio campo (no es un paso de la traza
+    // viva y el cierre de la corrida no debe barrerla).
+    final alert = context.watch<MonitorLiveCubit>().state.alert;
     if (alert == null || alert.at == _dismissed) return const SizedBox.shrink();
     final textTheme = Theme.of(context).textTheme;
     final semanticLabel =
@@ -100,13 +101,5 @@ class _AlertBannerState extends State<AlertBanner> {
         ],
       ),
     );
-  }
-
-  /// La alerta más reciente del flujo de eventos, o null si no hay ninguna.
-  static MonitorEvent? _latestAlert(List<MonitorEvent> events) {
-    for (final e in events.reversed) {
-      if (e.kind == MonitorEventKind.alert) return e;
-    }
-    return null;
   }
 }

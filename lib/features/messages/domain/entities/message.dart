@@ -105,6 +105,7 @@ class Message {
     this.mediaUrl,
     this.editedAtMs,
     this.revokedAtMs,
+    this.aiRunId = '',
   });
 
   final String externalId;
@@ -141,6 +142,11 @@ class Message {
   final int? editedAtMs;
   final int? revokedAtMs;
 
+  /// Corrida de IA que produjo este OUTBOUND (La Traza F0; `aiRunId` omitempty
+  /// en el wire). '' = el mensaje no nació de la IA (operador, flujo,
+  /// determinista). Habilita el badge de IA y el drill de la corrida.
+  final String aiRunId;
+
   /// Copia con el estado de entrega actualizado; el resto de campos intactos.
   /// La inmutabilidad la garantiza devolver una instancia nueva: el realtime de
   /// receipts (`message.status`) reemplaza el mensaje en la lista, no lo muta.
@@ -159,6 +165,7 @@ class Message {
     status: status,
     editedAtMs: editedAtMs,
     revokedAtMs: revokedAtMs,
+    aiRunId: aiRunId,
   );
 
   @override
@@ -178,7 +185,8 @@ class Message {
         other.timestampMs == timestampMs &&
         other.status == status &&
         other.editedAtMs == editedAtMs &&
-        other.revokedAtMs == revokedAtMs;
+        other.revokedAtMs == revokedAtMs &&
+        other.aiRunId == aiRunId;
   }
 
   @override
@@ -197,5 +205,6 @@ class Message {
     status,
     editedAtMs,
     revokedAtMs,
+    aiRunId,
   );
 }

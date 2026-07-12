@@ -84,6 +84,22 @@ void main() {
       final bad = msgJson()..['timestampMs'] = 'no-num';
       expect(() => MessageResp.fromJson(bad), throwsFormatException);
     });
+
+    // La Traza F0: el wire marca con `aiRunId` (omitempty) los OUTBOUND que
+    // nacieron de una corrida de IA; ausente ⇒ '' (mensaje ajeno a la IA).
+    test('aiRunId presente se parsea; ausente → vacío', () {
+      final con = MessageResp.fromJson(
+        msgJson(direction: 'OUTBOUND')..['aiRunId'] = 'run-7',
+      );
+      expect(con.aiRunId, 'run-7');
+      final sin = MessageResp.fromJson(msgJson());
+      expect(sin.aiRunId, '');
+    });
+
+    test('aiRunId no-string → FormatException', () {
+      final bad = msgJson()..['aiRunId'] = 42;
+      expect(() => MessageResp.fromJson(bad), throwsFormatException);
+    });
   });
 
   group('MessageThreadResp.fromJson', () {

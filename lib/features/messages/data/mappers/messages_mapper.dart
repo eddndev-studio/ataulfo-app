@@ -27,6 +27,7 @@ class MessagesMapper {
     status: MessageStatus.fromWire(r.status),
     editedAtMs: r.editedAtMs,
     revokedAtMs: r.revokedAtMs,
+    aiRunId: r.aiRunId,
   );
 
   static MessagePage respToPage(MessageThreadResp r) => MessagePage(

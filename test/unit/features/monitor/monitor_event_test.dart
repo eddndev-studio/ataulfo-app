@@ -41,6 +41,21 @@ void main() {
     expect(e.stepIdx, 3);
   });
 
+  test('flow.* trae flowName (F0); ausente → vacío', () {
+    final con = MonitorEvent.fromFrame('flow.started', <String, dynamic>{
+      'flowId': 'f1',
+      'flowName': 'Bienvenida',
+      'at': '2026-06-10T10:00:02Z',
+    });
+    expect(con.flowName, 'Bienvenida');
+    final sin = MonitorEvent.fromFrame('flow.step', <String, dynamic>{
+      'flowId': 'f1',
+      'stepIdx': 1,
+      'at': '2026-06-10T10:00:03Z',
+    });
+    expect(sin.flowName, '');
+  });
+
   test('agent.alert → alert con category, title y detail', () {
     final e = MonitorEvent.fromFrame('agent.alert', <String, dynamic>{
       'chatLid': 'c1',

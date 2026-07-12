@@ -1142,21 +1142,27 @@ class AppRouter {
           final id = state.pathParameters['id']!;
           final chatLid = state.pathParameters['chatLid']!;
           // `?msg=<wamid>` = drill-through inverso: muestra SOLO la corrida que
-          // produjo ese OUTBOUND. Ausente = log completo de la sesión.
+          // produjo ese OUTBOUND. `?run=<id>` = drill directo por corrida
+          // (badge de la burbuja / pill de fallo), sin resolver el wamid.
+          // Ausentes = log completo de la sesión.
           final msg = state.uri.queryParameters['msg'];
+          final run = state.uri.queryParameters['run'];
           return BlocProvider<AiLogBloc>(
             create: (_) => AiLogBloc(
               repo: _aiLogRepo,
               botId: id,
               chatLid: chatLid,
               targetExternalId: msg,
+              targetRunId: run,
             )..add(const AiLogLoadRequested()),
             child: Scaffold(
               appBar: AppBar(
                 title: Text(
-                  msg == null
-                      ? 'Razonamiento del bot'
-                      : 'Razonamiento de este mensaje',
+                  run != null
+                      ? 'Razonamiento de la corrida'
+                      : (msg == null
+                            ? 'Razonamiento del bot'
+                            : 'Razonamiento de este mensaje'),
                 ),
               ),
               body: const AiLogPage(),

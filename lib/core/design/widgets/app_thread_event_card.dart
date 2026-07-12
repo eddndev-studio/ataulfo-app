@@ -98,6 +98,7 @@ class AppThreadEventHeader extends StatelessWidget {
     this.chevronKey,
     this.labelStyle,
     this.crossAxisAlignment = CrossAxisAlignment.center,
+    this.leading,
   });
 
   final IconData icon;
@@ -110,6 +111,10 @@ class AppThreadEventHeader extends StatelessWidget {
   final TextStyle? labelStyle;
   final CrossAxisAlignment crossAxisAlignment;
 
+  /// Widget que sustituye al [icon] (p. ej. el TypingBubble que late en la
+  /// mini-traza del hilo). `null` ⇒ el ícono de siempre.
+  final Widget? leading;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -120,11 +125,13 @@ class AppThreadEventHeader extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: crossAxisAlignment,
       children: <Widget>[
-        Icon(
-          icon,
-          size: 16,
-          color: iconColor ?? (error ? AppTokens.danger : AppTokens.primary),
-        ),
+        leading ??
+            Icon(
+              icon,
+              size: 16,
+              color:
+                  iconColor ?? (error ? AppTokens.danger : AppTokens.primary),
+            ),
         const SizedBox(width: AppTokens.sp2),
         Flexible(child: Text(label, style: style)),
         if (showChevron) ...<Widget>[

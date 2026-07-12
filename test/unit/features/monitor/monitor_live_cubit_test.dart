@@ -129,6 +129,135 @@ void main() {
     expect: () => <dynamic>[],
   );
 
+  group('actividad del run VIGENTE (La Traza F5)', () {
+    MonitorEvent ev(
+      MonitorEventKind kind, {
+      String runId = '',
+      String tool = '',
+      String error = '',
+      DateTime? at,
+    }) => MonitorEvent(
+      kind: kind,
+      topic: '',
+      at: at ?? DateTime.utc(2026, 7, 1, 10),
+      runId: runId,
+      toolName: tool,
+      error: error,
+    );
+
+    Future<void> feed(MonitorEvent e) async {
+      ds.ctrl.add(e);
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    test('un terminal aiCompleted cierra la corrida: lista vacía', () async {
+      final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+      await feed(ev(MonitorEventKind.aiTurn, runId: 'r1'));
+      await feed(ev(MonitorEventKind.aiTool, runId: 'r1', tool: 'x'));
+      expect(c.state.events, hasLength(2));
+      await feed(ev(MonitorEventKind.aiCompleted, runId: 'r1'));
+      expect(c.state.events, isEmpty);
+      expect(c.state.failure, isNull);
+      await c.close();
+    });
+
+    test(
+      'aiFailed cierra la corrida y RETIENE runId/error del fallo',
+      () async {
+        final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+        await feed(ev(MonitorEventKind.aiTurn, runId: 'r1'));
+        await feed(
+          ev(
+            MonitorEventKind.aiFailed,
+            runId: 'r1',
+            error: 'deadline exceeded',
+          ),
+        );
+        expect(c.state.events, isEmpty);
+        final f = c.state.failure!;
+        expect(f.isFlow, isFalse);
+        expect(f.runId, 'r1');
+        expect(f.error, 'deadline exceeded');
+        await c.close();
+      },
+    );
+
+    test('una corrida nueva (runId distinto) arranca lista fresca y limpia '
+        'el fallo anterior', () async {
+      final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+      await feed(ev(MonitorEventKind.aiTurn, runId: 'r1'));
+      await feed(ev(MonitorEventKind.aiFailed, runId: 'r1', error: 'boom'));
+      await feed(ev(MonitorEventKind.aiTurn, runId: 'r2'));
+      expect(c.state.events, hasLength(1));
+      expect(c.state.events.single.runId, 'r2');
+      expect(c.state.failure, isNull);
+      await c.close();
+    });
+
+    test('el frame rezagado de una corrida YA cerrada no se anexa', () async {
+      final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+      await feed(ev(MonitorEventKind.aiTurn, runId: 'r1'));
+      await feed(ev(MonitorEventKind.aiCompleted, runId: 'r1'));
+      await feed(ev(MonitorEventKind.aiTool, runId: 'r1', tool: 'tarde'));
+      expect(c.state.events, isEmpty);
+      await c.close();
+    });
+
+    test('los eventos flow.* se anexan a la corrida vigente', () async {
+      final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+      await feed(ev(MonitorEventKind.aiTurn, runId: 'r1'));
+      await feed(ev(MonitorEventKind.flowStarted, runId: ''));
+      expect(c.state.events, hasLength(2));
+      // El terminal del flujo DENTRO de la corrida no la cierra (es un paso).
+      await feed(ev(MonitorEventKind.flowCompleted, runId: ''));
+      expect(c.state.events, hasLength(2));
+      await c.close();
+    });
+
+    test('carril solo-flujo: flowCompleted limpia; flowFailed retiene fallo '
+        'de flujo (sin runId)', () async {
+      final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+      await feed(ev(MonitorEventKind.flowStarted));
+      await feed(ev(MonitorEventKind.flowCompleted));
+      expect(c.state.events, isEmpty);
+      await feed(ev(MonitorEventKind.flowStarted));
+      await feed(ev(MonitorEventKind.flowFailed, error: 'paso inválido'));
+      expect(c.state.events, isEmpty);
+      final f = c.state.failure!;
+      expect(f.isFlow, isTrue);
+      expect(f.runId, '');
+      await c.close();
+    });
+
+    test('agent.alert no toca la traza viva, pero se RETIENE para el banner '
+        'y sobrevive al terminal de la corrida', () async {
+      final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+      await feed(ev(MonitorEventKind.aiTurn, runId: 'r1'));
+      await feed(ev(MonitorEventKind.alert));
+      expect(c.state.events, hasLength(1));
+      expect(c.state.events.single.kind, MonitorEventKind.aiTurn);
+      expect(c.state.alert?.kind, MonitorEventKind.alert);
+      // El cierre de la corrida vacía la traza SIN descartar la alerta (el
+      // operador la descarta con la X del banner, no un evento cualquiera).
+      await feed(ev(MonitorEventKind.aiCompleted, runId: 'r1'));
+      expect(c.state.events, isEmpty);
+      expect(c.state.alert, isNotNull);
+      await c.close();
+    });
+
+    test(
+      're-watch (cambio de chat) limpia la actividad del chat anterior',
+      () async {
+        final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+        await feed(ev(MonitorEventKind.aiTurn, runId: 'r1'));
+        expect(c.state.events, hasLength(1));
+        c.watch('b1', 'c2');
+        expect(c.state.events, isEmpty);
+        await c.close();
+      },
+    );
+  });
+
   test('close cancela la suscripción (no fuga)', () async {
     final c = MonitorLiveCubit(ds)..watch('b1', 'chat1');
     await c.close();
@@ -334,6 +463,81 @@ void main() {
       },
     );
   });
+
+  group('cierres de revisión F5', () {
+    MonitorEvent ev(
+      MonitorEventKind kind, {
+      String runId = '',
+      String tool = '',
+      String error = '',
+      DateTime? at,
+    }) => MonitorEvent(
+      kind: kind,
+      topic: '',
+      at: at ?? DateTime.utc(2026, 7, 1, 10),
+      runId: runId,
+      toolName: tool,
+      error: error,
+    );
+
+    Future<void> feed(MonitorEvent e) async {
+      ds.ctrl.add(e);
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    test('un terminal REZAGADO de otra corrida no apaga la vigente', () async {
+      final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+      await feed(ev(MonitorEventKind.aiTurn, runId: 'r2'));
+      // El ai.failed de r1 llega con jitter DESPUÉS de arrancar r2.
+      await feed(ev(MonitorEventKind.aiFailed, runId: 'r1', error: 'boom'));
+      expect(c.state.runId, 'r2');
+      expect(c.state.events, hasLength(1));
+      expect(c.state.failure, isNull);
+      // Un terminal degradado SIN runId sí cierra la vigente.
+      await feed(ev(MonitorEventKind.aiCompleted));
+      expect(c.state.events, isEmpty);
+      await c.close();
+    });
+
+    test('el tope de eventos deja `truncated` pegajoso', () async {
+      final c = MonitorLiveCubit(ds)..watch('b1', 'c1');
+      await feed(ev(MonitorEventKind.aiTurn, runId: 'r1'));
+      for (var i = 0; i < 110; i++) {
+        ds.ctrl.add(ev(MonitorEventKind.aiTool, runId: 'r1', tool: 't$i'));
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(c.state.events.length, lessThanOrEqualTo(100));
+      expect(c.state.truncated, isTrue);
+      await c.close();
+    });
+
+    test('el snapshot de la hidratación NO pisa una corrida nueva arrancada '
+        'en vivo durante el fetch', () async {
+      final t0 = DateTime.now().toUtc();
+      final catchup = _GatedCatchup(
+        run: (runId: 'R1', at: t0),
+        snapshot: <MonitorEvent>[
+          ev(MonitorEventKind.aiTurn, runId: 'R1', at: t0),
+        ],
+      );
+      final c = MonitorLiveCubit(ds, catchup: catchup)..watch('b1', 'c1');
+      await Future<void>.delayed(Duration.zero);
+      // R2 arranca EN VIVO con el fetch del snapshot de R1 aún en vuelo.
+      await feed(
+        ev(
+          MonitorEventKind.aiTurn,
+          runId: 'R2',
+          at: t0.add(const Duration(seconds: 2)),
+        ),
+      );
+      expect(c.state.runId, 'R2');
+      catchup.gate.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(c.state.runId, 'R2');
+      expect(c.state.events, hasLength(1));
+      await c.close();
+    });
+  });
 }
 
 /// Catch-up de prueba: devuelve un run/snapshot fijos (o null) para ejercer la
@@ -356,4 +560,30 @@ class _FakeCatchup implements MonitorCatchupDatasource {
     String chatLid,
     String runId,
   ) async => snapshot;
+}
+
+/// Catch-up cuyo snapshot espera una compuerta: reproduce el fetch en vuelo
+/// mientras la actividad en vivo avanza.
+class _GatedCatchup implements MonitorCatchupDatasource {
+  _GatedCatchup({required this.run, required this.snapshot});
+
+  final ({String runId, DateTime at})? run;
+  final List<MonitorEvent> snapshot;
+  final Completer<void> gate = Completer<void>();
+
+  @override
+  Future<({String runId, DateTime at})?> activeRun(
+    String botId,
+    String chatLid,
+  ) async => run;
+
+  @override
+  Future<List<MonitorEvent>> catchup(
+    String botId,
+    String chatLid,
+    String runId,
+  ) async {
+    await gate.future;
+    return snapshot;
+  }
 }

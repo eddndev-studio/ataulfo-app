@@ -280,9 +280,11 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                             overflow: TextOverflow.ellipsis,
                             style: textTheme.titleMedium,
                           ),
-                          // Estado en vivo del bot (Pensando / falló); oculto en
-                          // reposo. Lo alimenta el MonitorLiveCubit del scope.
-                          const BotStatePill(),
+                          // Estado en vivo del bot (Pensando / falló); oculto
+                          // en reposo. Lo alimenta el MonitorLiveCubit del
+                          // scope. El tap del fallo (drill/ejecuciones) gana
+                          // la arena de gestos sobre el InkWell del perfil.
+                          BotStatePill(botId: botId, chatLid: chatLid),
                         ],
                       ),
                     ),

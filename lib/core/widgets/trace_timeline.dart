@@ -29,10 +29,15 @@ class TraceTimeline extends StatefulWidget {
     this.stopButtonKey,
     this.stoppedSummary = '',
     this.stopped = false,
+    this.collapsedLeading,
   });
 
   final List<TraceNode> nodes;
   final String summary;
+
+  /// Widget que sustituye al ícono del renglón COLAPSADO (p. ej. el latido de
+  /// la mini-traza viva del hilo). `null` ⇒ el ícono del primer nodo.
+  final Widget? collapsedLeading;
 
   /// Cuerpo rico del nodo `i` (o `null`): las tarjetas/razonamiento del
   /// llamador. En vivo se deja nulo (los nodos vivos son solo etiquetas).
@@ -76,6 +81,8 @@ class _TraceTimelineState extends State<TraceTimeline> {
   @override
   Widget build(BuildContext context) {
     if (_stopped || widget.stopped) {
+      // Detenida: SIN el leading vivo — un latido sobre el copy de detención
+      // mentiría actividad.
       return _collapsed(
         label: widget.stoppedSummary,
         icon: Icons.stop_circle_outlined,
@@ -89,6 +96,7 @@ class _TraceTimelineState extends State<TraceTimeline> {
         icon: _leadingIcon,
         tappable: true,
         error: _isError,
+        leading: widget.collapsedLeading,
       );
     }
     return _expandedCard(context);
@@ -101,6 +109,7 @@ class _TraceTimelineState extends State<TraceTimeline> {
     required IconData icon,
     required bool tappable,
     required bool error,
+    Widget? leading,
   }) => AppThreadEventCard(
     error: error,
     onTap: tappable ? _toggle : null,
@@ -110,6 +119,7 @@ class _TraceTimelineState extends State<TraceTimeline> {
             label: label,
             error: error,
             showChevron: tappable,
+            leading: leading,
           )
         : Row(
             children: <Widget>[
@@ -119,6 +129,7 @@ class _TraceTimelineState extends State<TraceTimeline> {
                   label: label,
                   error: error,
                   showChevron: tappable,
+                  leading: leading,
                 ),
               ),
               AppButton.text(

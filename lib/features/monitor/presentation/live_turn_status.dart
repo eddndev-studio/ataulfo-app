@@ -29,30 +29,3 @@ LiveTurnPhase liveTurnPhaseOf(List<MonitorEvent> events) {
       return LiveTurnPhase.idle;
   }
 }
-
-/// Etiqueta de QUÉ hace el bot durante un turno activo (qué tool, o que corre
-/// un flujo), o null fuera de uno.
-String? liveTurnActivityLabel(List<MonitorEvent> events) {
-  if (liveTurnPhaseOf(events) != LiveTurnPhase.active) return null;
-  final last = events.last;
-  switch (last.kind) {
-    case MonitorEventKind.aiTool:
-      return last.toolName.isNotEmpty
-          ? 'Usando ${last.toolName}…'
-          : 'Trabajando…';
-    case MonitorEventKind.aiTurn:
-      return 'Pensando…';
-    // La fase ya acotó a no-terminales: aquí solo quedan los de flujo.
-    case MonitorEventKind.flowStarted:
-    case MonitorEventKind.flowStep:
-    case MonitorEventKind.aiCompleted:
-    case MonitorEventKind.aiFailed:
-    case MonitorEventKind.flowCompleted:
-    case MonitorEventKind.flowFailed:
-    case MonitorEventKind.alert:
-    case MonitorEventKind.unknown:
-    case MonitorEventKind.reconnect:
-    case MonitorEventKind.connected:
-      return 'Ejecutando un flujo…';
-  }
-}

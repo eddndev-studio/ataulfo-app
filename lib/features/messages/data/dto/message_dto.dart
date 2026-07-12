@@ -25,6 +25,7 @@ class MessageResp {
     this.mediaUrl,
     this.editedAtMs,
     this.revokedAtMs,
+    this.aiRunId = '',
   });
 
   factory MessageResp.fromJson(Map<String, dynamic> json) {
@@ -43,6 +44,9 @@ class MessageResp {
     // Claves aditivas de corrección (omitempty): ausentes ⇒ null (intacto).
     final editedAtMs = json['editedAtMs'];
     final revokedAtMs = json['revokedAtMs'];
+    // La Traza F0 (omitempty): la corrida de IA que produjo el OUTBOUND.
+    // Ausente ⇒ '' (mensaje de operador/flujo/determinista).
+    final aiRunId = json['aiRunId'];
     if (externalId is! String ||
         chatLid is! String ||
         senderLid is! String ||
@@ -73,6 +77,9 @@ class MessageResp {
     if (revokedAtMs != null && revokedAtMs is! int) {
       throw const FormatException('messageResp: revokedAtMs no es int ni null');
     }
+    if (aiRunId != null && aiRunId is! String) {
+      throw const FormatException('messageResp: aiRunId no es String ni null');
+    }
     return MessageResp(
       externalId: externalId,
       chatLid: chatLid,
@@ -88,6 +95,7 @@ class MessageResp {
       status: status as String?,
       editedAtMs: editedAtMs as int?,
       revokedAtMs: revokedAtMs as int?,
+      aiRunId: (aiRunId as String?) ?? '',
     );
   }
 
@@ -107,6 +115,9 @@ class MessageResp {
   final String? status;
   final int? editedAtMs;
   final int? revokedAtMs;
+
+  /// Corrida de IA que produjo este OUTBOUND (La Traza F0). '' = ninguna.
+  final String aiRunId;
 }
 
 /// Página del hilo: `{messages, prevCursor?}`. `messages` siempre presente

@@ -78,6 +78,11 @@ class Messages extends Table {
   IntColumn get editedAtMs => integer().nullable()();
   IntColumn get revokedAtMs => integer().nullable()();
 
+  /// Corrida de IA que produjo el OUTBOUND (La Traza F0). NULL = ninguna ('' en
+  /// dominio). Nullable ⇒ migración aditiva; se persiste para que el badge de
+  /// IA sobreviva al round-trip local (la UI observa la DB, no la red).
+  TextColumn get aiRunId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {botId, externalId};
 }

@@ -219,14 +219,16 @@ void main() {
       }),
     );
 
-    final entries = await ds.byRun(
+    final result = await ds.byRun(
       botId: 'b1',
       chatLid: 'chat@lid',
       runId: 'run-7',
     );
 
-    expect(entries, hasLength(1));
-    expect(entries.single.runId, 'run-7');
+    expect(result.items, hasLength(1));
+    expect(result.items.single.runId, 'run-7');
+    // Sin objeto run{} top-level (corrida vieja o en curso) ⇒ sin desenlace.
+    expect(result.run, isNull);
     final captured = verify(
       () => dio.get<Map<String, dynamic>>(
         captureAny(),
@@ -237,6 +239,52 @@ void main() {
     expect(captured[0], '/sessions/b1/chat%40lid/ai-log');
     expect(captured[1], containsPair('run', 'run-7'));
   });
+
+  test(
+    'byRun con run{} top-level → desenlace tipado (status/error/tiempos)',
+    () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => ok(<String, dynamic>{
+          'items': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 7,
+              'runId': 'run-7',
+              'role': 'assistant',
+              'createdAt': '2026-06-12T12:00:00Z',
+            },
+          ],
+          'run': <String, dynamic>{
+            'status': 'FAILED',
+            'error': 'context deadline exceeded',
+            'iterations': 5,
+            'tokensIn': 1200,
+            'tokensOut': 340,
+            'startedAt': '2026-06-12T12:00:00Z',
+            'endedAt': '2026-06-12T12:00:42Z',
+          },
+        }),
+      );
+
+      final result = await ds.byRun(botId: 'b1', chatLid: 'c1', runId: 'run-7');
+
+      final run = result.run!;
+      expect(run.failed, isTrue);
+      expect(run.error, 'context deadline exceeded');
+      expect(run.iterations, 5);
+      expect(run.tokensIn, 1200);
+      expect(run.tokensOut, 340);
+      expect(
+        run.endedAt.difference(run.startedAt),
+        const Duration(seconds: 42),
+      );
+    },
+  );
 
   test('403 → AiLogForbiddenFailure', () async {
     when(

@@ -30,7 +30,7 @@ AiLogEntry e(
 );
 
 void main() {
-  group('groupIntoRuns', () {
+  group('splitLog', () {
     test('agrupa por runId, corridas más recientes primero y entries '
         'cronológicas dentro de cada corrida', () {
       // El wire llega DESC (más reciente primero), como lo emite el backend.
@@ -43,8 +43,9 @@ void main() {
         e(1, runId: 'r1', role: AiLogRole.user, content: 'hola'),
       ];
 
-      final runs = groupIntoRuns(desc);
+      final (:runs, :legacy) = splitLog(desc);
 
+      expect(legacy, isEmpty);
       expect(runs, hasLength(2));
       expect(runs.first.runId, 'r2');
       expect(runs.first.entries.map((x) => x.id), <int>[5, 6]);
@@ -52,7 +53,8 @@ void main() {
       expect(runs.last.entries.map((x) => x.id), <int>[1, 2, 3, 4]);
     });
 
-    test('filas legacy sin runId: cada turno user abre una corrida nueva', () {
+    test('filas legacy (sin runId) van a «Actividad previa» SIN agrupación '
+        'inventada, cronológicas', () {
       final desc = <AiLogEntry>[
         e(4, role: AiLogRole.assistant),
         e(3, role: AiLogRole.user),
@@ -60,27 +62,31 @@ void main() {
         e(1, role: AiLogRole.user),
       ];
 
-      final runs = groupIntoRuns(desc);
+      final (:runs, :legacy) = splitLog(desc);
 
-      expect(runs, hasLength(2));
-      expect(runs.first.entries.map((x) => x.id), <int>[3, 4]);
-      expect(runs.last.entries.map((x) => x.id), <int>[1, 2]);
+      expect(runs, isEmpty);
+      expect(legacy.map((x) => x.id), <int>[1, 2, 3, 4]);
     });
 
-    test('mezcla: el cambio de runId corta corrida aunque no haya user', () {
+    test('mezcla: corridas reales arriba y la historia legacy aparte', () {
       final desc = <AiLogEntry>[
-        e(3, runId: 'r2', role: AiLogRole.assistant),
-        e(2, runId: 'r1', role: AiLogRole.assistant),
-        e(1, runId: 'r1', role: AiLogRole.user),
+        e(4, runId: 'r2', role: AiLogRole.assistant),
+        e(3, runId: 'r1', role: AiLogRole.user),
+        e(2, role: AiLogRole.assistant),
+        e(1, role: AiLogRole.user),
       ];
 
-      final runs = groupIntoRuns(desc);
+      final (:runs, :legacy) = splitLog(desc);
       expect(runs, hasLength(2));
       expect(runs.first.runId, 'r2');
+      expect(runs.last.runId, 'r1');
+      expect(legacy.map((x) => x.id), <int>[1, 2]);
     });
 
-    test('lista vacía ⇒ sin corridas', () {
-      expect(groupIntoRuns(const <AiLogEntry>[]), isEmpty);
+    test('lista vacía ⇒ sin corridas ni legacy', () {
+      final (:runs, :legacy) = splitLog(const <AiLogEntry>[]);
+      expect(runs, isEmpty);
+      expect(legacy, isEmpty);
     });
   });
 
@@ -108,7 +114,7 @@ void main() {
         e(1, runId: 'r1', role: AiLogRole.user),
       ];
 
-      final run = groupIntoRuns(desc).single;
+      final run = splitLog(desc).runs.single;
 
       expect(run.promptTokens, 1000);
       expect(run.completionTokens, 120);

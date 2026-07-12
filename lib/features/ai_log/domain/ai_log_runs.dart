@@ -35,16 +35,22 @@ class AiLogRun {
   DateTime get startedAt => entries.first.createdAt;
 }
 
-/// Agrupa el stream DESC del wire en corridas: más recientes primero,
-/// turnos cronológicos dentro de cada una. Frontera de corrida: cambio de
-/// runId; las filas legacy (runId vacío) abren corrida en cada turno user
-/// (la heurística pre-run_id).
-List<AiLogRun> groupIntoRuns(List<AiLogEntry> descItems) {
-  if (descItems.isEmpty) return const <AiLogRun>[];
+/// Particiona el stream DESC del wire: corridas REALES (runId no vacío,
+/// frontera = cambio de runId) más recientes primero y con turnos
+/// cronológicos, y la historia LEGACY (filas pre-migración sin runId) aparte,
+/// cronológica y SIN agrupación inventada — la vista la pinta plana como
+/// «Actividad previa».
+({List<AiLogRun> runs, List<AiLogEntry> legacy}) splitLog(
+  List<AiLogEntry> descItems,
+) {
+  if (descItems.isEmpty) {
+    return const (runs: <AiLogRun>[], legacy: <AiLogEntry>[]);
+  }
   final asc = descItems.reversed.toList();
+  final legacy = <AiLogEntry>[];
   final runs = <AiLogRun>[];
   var current = <AiLogEntry>[];
-  String currentRunId = asc.first.runId;
+  var currentRunId = '';
 
   void flush() {
     if (current.isEmpty) return;
@@ -53,17 +59,14 @@ List<AiLogRun> groupIntoRuns(List<AiLogEntry> descItems) {
   }
 
   for (final e in asc) {
-    final boundary =
-        current.isNotEmpty &&
-        (e.runId != currentRunId ||
-            (e.runId.isEmpty && e.role == AiLogRole.user));
-    if (boundary) {
-      flush();
-      currentRunId = e.runId;
+    if (e.runId.isEmpty) {
+      legacy.add(e);
+      continue;
     }
-    if (current.isEmpty) currentRunId = e.runId;
+    if (current.isNotEmpty && e.runId != currentRunId) flush();
+    currentRunId = e.runId;
     current.add(e);
   }
   flush();
-  return runs.reversed.toList();
+  return (runs: runs.reversed.toList(), legacy: legacy);
 }

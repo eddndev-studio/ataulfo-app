@@ -20,7 +20,7 @@ class AppDb extends _$AppDb {
   AppDb.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -46,6 +46,12 @@ class AppDb extends _$AppDb {
       if (from < 3) {
         await m.addColumn(messages, messages.editedAtMs);
         await m.addColumn(messages, messages.revokedAtMs);
+      }
+      // v3→v4: messages gana aiRunId (la corrida de IA que produjo el
+      // OUTBOUND — La Traza F5). Nullable ⇒ ADD COLUMN aditivo; las filas
+      // previas quedan NULL ('' en dominio: sin badge, honesto).
+      if (from < 4) {
+        await m.addColumn(messages, messages.aiRunId);
       }
     },
   );

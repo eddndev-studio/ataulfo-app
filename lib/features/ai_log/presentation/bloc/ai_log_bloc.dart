@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/ai_log_repository.dart';
 import '../../domain/entities/ai_log_entry.dart';
+import '../../domain/entities/ai_run_outcome.dart';
 import '../../domain/failures/ai_log_failure.dart';
 
 /// Bloc de la vista de observabilidad (ai-log). Page-scoped: se construye
@@ -13,10 +14,12 @@ class AiLogBloc extends Bloc<AiLogEvent, AiLogState> {
     required String botId,
     required String chatLid,
     String? targetExternalId,
+    String? targetRunId,
   }) : _repo = repo,
        _botId = botId,
        _chatLid = chatLid,
        _targetExternalId = targetExternalId,
+       _targetRunId = targetRunId,
        super(const AiLogLoading()) {
     on<AiLogLoadRequested>(_onLoad);
     on<AiLogMoreRequested>(_onMore);
@@ -31,12 +34,20 @@ class AiLogBloc extends Bloc<AiLogEvent, AiLogState> {
   /// historial. Null = vista normal del log de la sesión.
   final String? _targetExternalId;
 
+  /// Modo drill directo (?run=): la corrida YA conocida (badge de la burbuja,
+  /// pill de fallo) — sin resolver el wamid. Tiene prioridad sobre el wamid.
+  final String? _targetRunId;
+
   Future<void> _onLoad(
     AiLogLoadRequested event,
     Emitter<AiLogState> emit,
   ) async {
     if (state is! AiLogLoading) {
       emit(const AiLogLoading());
+    }
+    if (_targetRunId != null) {
+      await _loadRun(emit, _targetRunId);
+      return;
     }
     if (_targetExternalId != null) {
       await _loadSingleRun(emit, _targetExternalId);
@@ -58,8 +69,7 @@ class AiLogBloc extends Bloc<AiLogEvent, AiLogState> {
 
   /// Resuelve el wamid → corrida y carga solo sus entries. Sin corrida (el
   /// mensaje no salió de la IA) ⇒ Loaded vacío: la vista muestra el aviso, no
-  /// un error. byRun devuelve ASC; se invierte a DESC porque la vista agrupa
-  /// asumiendo el orden del wire (más recientes primero).
+  /// un error.
   Future<void> _loadSingleRun(
     Emitter<AiLogState> emit,
     String externalId,
@@ -76,20 +86,34 @@ class AiLogBloc extends Bloc<AiLogEvent, AiLogState> {
             entries: <AiLogEntry>[],
             nextBefore: null,
             isLoadingMore: false,
+            drill: true,
           ),
         );
         return;
       }
-      final entries = await _repo.byRun(
+      await _loadRun(emit, runId);
+    } on AiLogFailure catch (f) {
+      emit(AiLogFailed(f));
+    }
+  }
+
+  /// Carga UNA corrida con su desenlace `run{}` (si el wire lo trae). byRun
+  /// devuelve ASC; se invierte a DESC porque la vista asume el orden del wire
+  /// (más recientes primero).
+  Future<void> _loadRun(Emitter<AiLogState> emit, String runId) async {
+    try {
+      final result = await _repo.byRun(
         botId: _botId,
         chatLid: _chatLid,
         runId: runId,
       );
       emit(
         AiLogLoaded(
-          entries: entries.reversed.toList(growable: false),
+          entries: result.items.reversed.toList(growable: false),
           nextBefore: null,
           isLoadingMore: false,
+          drill: true,
+          run: result.run,
         ),
       );
     } on AiLogFailure catch (f) {
@@ -170,6 +194,8 @@ class AiLogLoaded extends AiLogState {
     required this.entries,
     required this.nextBefore,
     required this.isLoadingMore,
+    this.drill = false,
+    this.run,
   });
 
   /// Stream DESC tal cual el wire (la página agrupa por corrida al pintar).
@@ -177,10 +203,20 @@ class AiLogLoaded extends AiLogState {
   final int? nextBefore;
   final bool isLoadingMore;
 
+  /// Modo drill: la vista pinta UNA corrida como traza (expandida) en vez del
+  /// listado del log de la sesión.
+  final bool drill;
+
+  /// Desenlace persistido de la corrida del drill (nodo final de la traza), o
+  /// null si el wire lo omitió — la vista NO inventa el cierre.
+  final AiRunOutcome? run;
+
   AiLogLoaded copyWith({bool? isLoadingMore}) => AiLogLoaded(
     entries: entries,
     nextBefore: nextBefore,
     isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    drill: drill,
+    run: run,
   );
 
   @override
@@ -189,6 +225,8 @@ class AiLogLoaded extends AiLogState {
     if (other is! AiLogLoaded) return false;
     if (other.nextBefore != nextBefore) return false;
     if (other.isLoadingMore != isLoadingMore) return false;
+    if (other.drill != drill) return false;
+    if (other.run != run) return false;
     if (other.entries.length != entries.length) return false;
     for (var i = 0; i < entries.length; i++) {
       if (other.entries[i].id != entries[i].id) return false;
@@ -200,6 +238,8 @@ class AiLogLoaded extends AiLogState {
   int get hashCode => Object.hash(
     nextBefore,
     isLoadingMore,
+    drill,
+    run,
     Object.hashAll(entries.map((e) => e.id)),
   );
 }

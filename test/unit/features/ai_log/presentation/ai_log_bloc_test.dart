@@ -1,5 +1,6 @@
 import 'package:ataulfo/features/ai_log/domain/ai_log_repository.dart';
 import 'package:ataulfo/features/ai_log/domain/entities/ai_log_entry.dart';
+import 'package:ataulfo/features/ai_log/domain/entities/ai_run_outcome.dart';
 import 'package:ataulfo/features/ai_log/domain/failures/ai_log_failure.dart';
 import 'package:ataulfo/features/ai_log/presentation/bloc/ai_log_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -102,7 +103,9 @@ void main() {
       ).thenAnswer((_) async => 'run-7');
       when(
         () => repo.byRun(botId: 'b1', chatLid: 'c1', runId: 'run-7'),
-      ).thenAnswer((_) async => <AiLogEntry>[e(7)]);
+      ).thenAnswer(
+        (_) async => AiLogRunResult(items: <AiLogEntry>[e(7)], run: null),
+      );
       return AiLogBloc(
         repo: repo,
         botId: 'b1',
@@ -114,7 +117,9 @@ void main() {
     expect: () => <Matcher>[
       isA<AiLogLoaded>()
           .having((s) => s.entries.length, 'entries', 1)
-          .having((s) => s.nextBefore, 'nextBefore', isNull),
+          .having((s) => s.nextBefore, 'nextBefore', isNull)
+          .having((s) => s.drill, 'drill', isTrue)
+          .having((s) => s.run, 'run{} omitido', isNull),
     ],
     verify: (_) {
       verifyNever(
@@ -150,6 +155,57 @@ void main() {
           botId: any(named: 'botId'),
           chatLid: any(named: 'chatLid'),
           runId: any(named: 'runId'),
+        ),
+      );
+    },
+  );
+
+  blocTest<AiLogBloc, AiLogState>(
+    'drill ?run=: carga la corrida DIRECTO por runId con su desenlace '
+    '(sin resolver wamid)',
+    build: () {
+      when(
+        () => repo.byRun(botId: 'b1', chatLid: 'c1', runId: 'run-7'),
+      ).thenAnswer(
+        (_) async => AiLogRunResult(
+          items: <AiLogEntry>[e(7)],
+          run: AiRunOutcome(
+            status: 'COMPLETED',
+            error: '',
+            iterations: 3,
+            tokensIn: 100,
+            tokensOut: 40,
+            startedAt: DateTime.utc(2026, 7, 1, 10),
+            endedAt: DateTime.utc(2026, 7, 1, 10, 0, 12),
+          ),
+        ),
+      );
+      return AiLogBloc(
+        repo: repo,
+        botId: 'b1',
+        chatLid: 'c1',
+        targetRunId: 'run-7',
+      );
+    },
+    act: (bloc) => bloc.add(const AiLogLoadRequested()),
+    expect: () => <Matcher>[
+      isA<AiLogLoaded>()
+          .having((s) => s.entries.length, 'entries', 1)
+          .having((s) => s.drill, 'drill', isTrue)
+          .having((s) => s.run?.failed, 'desenlace ok', isFalse),
+    ],
+    verify: (_) {
+      verifyNever(
+        () => repo.runForMessage(
+          botId: any(named: 'botId'),
+          chatLid: any(named: 'chatLid'),
+          externalId: any(named: 'externalId'),
+        ),
+      );
+      verifyNever(
+        () => repo.page(
+          botId: any(named: 'botId'),
+          chatLid: any(named: 'chatLid'),
         ),
       );
     },

@@ -28,6 +28,7 @@ class MessageRowMapper {
     status: r.status == null ? null : MessageStatus.values.byName(r.status!),
     editedAtMs: r.editedAtMs,
     revokedAtMs: r.revokedAtMs,
+    aiRunId: r.aiRunId ?? '',
   );
 
   static MessagesCompanion toCompanion(
@@ -50,5 +51,8 @@ class MessageRowMapper {
     status: Value(m.status?.name),
     editedAtMs: Value(m.editedAtMs),
     revokedAtMs: Value(m.revokedAtMs),
+    // '' de dominio ⇒ NULL en la fila (la columna es aditiva y NULL = sin
+    // corrida, igual que las filas previas a la migración).
+    aiRunId: Value(m.aiRunId.isEmpty ? null : m.aiRunId),
   );
 }

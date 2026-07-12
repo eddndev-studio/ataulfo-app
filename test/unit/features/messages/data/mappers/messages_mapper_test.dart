@@ -10,6 +10,7 @@ void main() {
     String? status = 'READ',
     String type = 'text',
     String? mediaUrl,
+    String aiRunId = '',
   }) => MessageResp(
     externalId: 'e1',
     chatLid: 'grupo-1',
@@ -23,6 +24,7 @@ void main() {
     mediaUrl: mediaUrl,
     quotedId: null,
     status: status,
+    aiRunId: aiRunId,
   );
 
   group('MessagesMapper.respToMessage', () {
@@ -52,6 +54,14 @@ void main() {
       expect(
         () => MessagesMapper.respToMessage(resp(kind: 'CHANNEL')),
         throwsArgumentError,
+      );
+    });
+
+    test('aiRunId del wire pasa al dominio (default vacío)', () {
+      expect(MessagesMapper.respToMessage(resp()).aiRunId, '');
+      expect(
+        MessagesMapper.respToMessage(resp(aiRunId: 'run-9')).aiRunId,
+        'run-9',
       );
     });
   });

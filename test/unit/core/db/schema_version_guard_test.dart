@@ -33,6 +33,7 @@ String _schemaFingerprint(AppDb db) {
 const Map<int, String> _schemaFingerprints = <int, String>{
   2: '9b5bbf50',
   3: '94e95575',
+  4: 'c651fc8b',
 };
 
 void main() {

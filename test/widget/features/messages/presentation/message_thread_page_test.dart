@@ -107,6 +107,7 @@ Message msg({
   int ts = 1700,
   int? editedAtMs,
   int? revokedAtMs,
+  String aiRunId = '',
 }) => Message(
   externalId: externalId,
   chatLid: 'lid-1',
@@ -122,6 +123,7 @@ Message msg({
   status: status,
   editedAtMs: editedAtMs,
   revokedAtMs: revokedAtMs,
+  aiRunId: aiRunId,
 );
 
 /// 1x1 PNG válido: que Image.memory decodifique sin caer al errorBuilder.
@@ -1544,6 +1546,114 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('message.drill.im1')), findsNothing);
+    });
+  });
+
+  group('badge IA en la burbuja (La Traza F5)', () {
+    Widget hostRouted(AuthState authState) {
+      when(() => authBloc.state).thenReturn(authState);
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => RepositoryProvider<AudioRecorder>.value(
+              value: const NoopAudioRecorder(),
+              child: RepositoryProvider<MediaOpener>.value(
+                value: opener,
+                child: MultiBlocProvider(
+                  providers: <BlocProvider<dynamic>>[
+                    BlocProvider<MessagesBloc>.value(value: bloc),
+                    BlocProvider<ThreadAudioCubit>.value(value: audio),
+                    BlocProvider<AuthBloc>.value(value: authBloc),
+                    BlocProvider<MonitorLiveCubit>(
+                      create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
+                    ),
+                  ],
+                  child: const Scaffold(body: MessageThreadPage()),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/bots/:id/sessions/:chatLid/ai-log',
+            builder: (_, state) => Scaffold(
+              body: Text(
+                'ai-log-stub run=${state.uri.queryParameters['run'] ?? ''}',
+              ),
+            ),
+          ),
+        ],
+      );
+      return MaterialApp.router(
+        theme: AppDesignTheme.dark(),
+        routerConfig: router,
+      );
+    }
+
+    setUp(() {
+      when(() => bloc.state).thenReturn(
+        MessagesLoaded(
+          items: <Message>[
+            msg(
+              externalId: 'ia1',
+              direction: MessageDirection.outbound,
+              content: 'respuesta de la IA',
+              aiRunId: 'run-7',
+            ),
+            msg(
+              externalId: 'op1',
+              direction: MessageDirection.outbound,
+              content: 'mensaje del operador',
+              ts: 1800,
+            ),
+          ],
+          prevCursor: null,
+          isLoadingOlder: false,
+        ),
+      );
+      when(() => bloc.botId).thenReturn('b1');
+      when(() => bloc.chatLid).thenReturn('lid-1');
+    });
+
+    testWidgets('el badge ✦ aparece SOLO en el outbound con aiRunId', (
+      tester,
+    ) async {
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('message.ai_badge.ia1')), findsOneWidget);
+      // Mensajes sin aiRunId (operador/flujos) quedan exactamente como hoy.
+      expect(find.byKey(const Key('message.ai_badge.op1')), findsNothing);
+    });
+
+    testWidgets('el badge anuncia su semántica al lector de pantalla', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(host());
+      // El GestureDetector de la burbuja (long-press) fusiona la semántica de
+      // sus hijos en un solo nodo: el label del badge viaja DENTRO del nodo de
+      // la burbuja — el lector lo anuncia junto al contenido.
+      expect(
+        find.bySemanticsLabel(RegExp('Respuesta del asistente de IA')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('tap en el badge (ADMIN) abre el drill de ESA corrida', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        hostRouted(
+          const AuthAuthenticated(
+            Identity(userId: 'u', email: 'x@x', orgId: 'o', role: 'ADMIN'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('message.ai_badge.ia1')));
+      await tester.pumpAndSettle();
+      expect(find.text('ai-log-stub run=run-7'), findsOneWidget);
     });
   });
 

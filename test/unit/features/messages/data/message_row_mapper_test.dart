@@ -56,6 +56,45 @@ void main() {
     },
   );
 
+  // La Traza F0: aiRunId se PERSISTE (la UI observa la DB — sin columna, el
+  // badge de IA moriría en el primer round-trip local). Vacío ⇒ NULL en la fila.
+  test('aiRunId round-trip: no vacío se preserva; vacío queda NULL', () async {
+    const conRun = Message(
+      externalId: 'ext-ai',
+      chatLid: 'chat-1',
+      senderLid: 'bot',
+      kind: MessageKind.dm,
+      direction: MessageDirection.outbound,
+      type: 'text',
+      content: 'respuesta de la IA',
+      mediaRef: null,
+      quotedId: null,
+      timestampMs: 1700000005000,
+      status: MessageStatus.sent,
+      aiRunId: 'run-42',
+    );
+    final row = await roundTrip(conRun);
+    expect(row.aiRunId, 'run-42');
+    expect(MessageRowMapper.rowToEntity(row), conRun);
+
+    const sinRun = Message(
+      externalId: 'ext-no-ai',
+      chatLid: 'chat-1',
+      senderLid: 'sender-1',
+      kind: MessageKind.dm,
+      direction: MessageDirection.outbound,
+      type: 'text',
+      content: 'manual',
+      mediaRef: null,
+      quotedId: null,
+      timestampMs: 1700000006000,
+      status: MessageStatus.sent,
+    );
+    final rowSin = await roundTrip(sinRun);
+    expect(rowSin.aiRunId, isNull);
+    expect(MessageRowMapper.rowToEntity(rowSin).aiRunId, '');
+  });
+
   test('OUTBOUND con status READ round-trip preserva status', () async {
     const original = Message(
       externalId: 'ext-read',

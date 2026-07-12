@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../domain/ai_log_repository.dart';
 import '../domain/entities/ai_log_entry.dart';
+import '../domain/entities/ai_run_outcome.dart';
 import '../domain/failures/ai_log_failure.dart';
 
 /// Puerto de datos del ai-log. La impl lanza `AiLogFailure` tipadas.
@@ -22,8 +23,10 @@ abstract interface class AiLogDatasource {
     required String externalId,
   });
 
-  /// Trae las entries de UNA corrida (ASC, sin paginar) por su runId.
-  Future<List<AiLogEntry>> byRun({
+  /// Trae las entries de UNA corrida (ASC, sin paginar) por su runId, más el
+  /// desenlace `run{}` top-level si el wire lo trae (omitido en corridas
+  /// viejas o en curso).
+  Future<AiLogRunResult> byRun({
     required String botId,
     required String chatLid,
     required String runId,
@@ -88,7 +91,7 @@ class DioAiLogDatasource implements AiLogDatasource {
   }
 
   @override
-  Future<List<AiLogEntry>> byRun({
+  Future<AiLogRunResult> byRun({
     required String botId,
     required String chatLid,
     required String runId,
@@ -102,7 +105,10 @@ class DioAiLogDatasource implements AiLogDatasource {
       if (body == null) {
         throw const AiLogUnknownFailure();
       }
-      return _parsePage(body).items;
+      return AiLogRunResult(
+        items: _parsePage(body).items,
+        run: _parseRunOutcome(body['run']),
+      );
     } on AiLogFailure {
       rethrow;
     } on DioException catch (e) {
@@ -112,6 +118,24 @@ class DioAiLogDatasource implements AiLogDatasource {
     } on TypeError {
       throw const AiLogUnknownFailure();
     }
+  }
+
+  /// Objeto top-level `run{}` del drill: presente solo con fila en ai_runs
+  /// (corrida cerrada). Ausente o malformado ⇒ null (sin desenlace, honesto).
+  static AiRunOutcome? _parseRunOutcome(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final startedAt = DateTime.tryParse((raw['startedAt'] as String?) ?? '');
+    final endedAt = DateTime.tryParse((raw['endedAt'] as String?) ?? '');
+    if (startedAt == null || endedAt == null) return null;
+    return AiRunOutcome(
+      status: (raw['status'] as String?) ?? '',
+      error: (raw['error'] as String?) ?? '',
+      iterations: ((raw['iterations'] as num?) ?? 0).toInt(),
+      tokensIn: ((raw['tokensIn'] as num?) ?? 0).toInt(),
+      tokensOut: ((raw['tokensOut'] as num?) ?? 0).toInt(),
+      startedAt: startedAt.toUtc(),
+      endedAt: endedAt.toUtc(),
+    );
   }
 
   static AiLogPageResult _parsePage(Map<String, dynamic> body) {
@@ -211,7 +235,7 @@ class AiLogRepositoryImpl implements AiLogRepository {
       _ds.runForMessage(botId: botId, chatLid: chatLid, externalId: externalId);
 
   @override
-  Future<List<AiLogEntry>> byRun({
+  Future<AiLogRunResult> byRun({
     required String botId,
     required String chatLid,
     required String runId,

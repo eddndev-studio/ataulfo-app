@@ -1,4 +1,5 @@
 import 'entities/ai_log_entry.dart';
+import 'entities/ai_run_outcome.dart';
 
 /// Página del log de observabilidad: items DESC (más recientes primero) y
 /// el cursor de la siguiente página hacia atrás (null = última).
@@ -7,6 +8,16 @@ class AiLogPageResult {
 
   final List<AiLogEntry> items;
   final int? nextBefore;
+}
+
+/// Resultado del drill `?run=`: los items de ESA corrida (ASC) y su desenlace
+/// persistido, `null` si el wire lo omitió (corrida vieja o en curso — la
+/// vista no inventa el cierre).
+class AiLogRunResult {
+  const AiLogRunResult({required this.items, required this.run});
+
+  final List<AiLogEntry> items;
+  final AiRunOutcome? run;
 }
 
 /// Puerto de dominio de la vista de observabilidad (ADMIN+ en el backend).
@@ -26,8 +37,9 @@ abstract interface class AiLogRepository {
     required String externalId,
   });
 
-  /// Entries de UNA corrida (ASC) por su runId.
-  Future<List<AiLogEntry>> byRun({
+  /// Entries de UNA corrida (ASC) por su runId + el desenlace `run{}` si el
+  /// wire lo trae.
+  Future<AiLogRunResult> byRun({
     required String botId,
     required String chatLid,
     required String runId,

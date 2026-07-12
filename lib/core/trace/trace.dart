@@ -86,6 +86,17 @@ List<TraceNode> capNodesLive(List<TraceNode> nodes) {
   ];
 }
 
+/// Duración aproximada legible, SIEMPRE con «~» (no es cronometrada al ms):
+/// «~42s», «~3m», «~2h». Mismo formato que usan las trazas del asistente y el
+/// entrenador para el sufijo del resumen.
+String approxDurationLabel(Duration d) {
+  final s = d.inSeconds;
+  if (s < 60) return '~${s}s';
+  final m = d.inMinutes;
+  if (m < 60) return '~${m}m';
+  return '~${d.inHours}h';
+}
+
 /// Copy es-MX de un fallo de corrida. El `error` del wire es libre: se detecta
 /// por patrón y SIEMPRE degrada a un genérico honesto — jamás se muestra crudo.
 String runFailureCopy(String error) {

@@ -41,6 +41,7 @@ class MonitorEvent {
     this.tokensIn = 0,
     this.tokensOut = 0,
     this.flowId = '',
+    this.flowName = '',
     this.executionId = '',
     this.stepIdx = 0,
     this.category = '',
@@ -69,6 +70,7 @@ class MonitorEvent {
       tokensIn: _int(json['tokensIn']),
       tokensOut: _int(json['tokensOut']),
       flowId: json['flowId'] as String? ?? '',
+      flowName: json['flowName'] as String? ?? '',
       executionId: json['executionId'] as String? ?? '',
       stepIdx: _int(json['stepIdx']),
       category: json['category'] as String? ?? '',
@@ -101,6 +103,10 @@ class MonitorEvent {
 
   // flow.*
   final String flowId;
+
+  /// Nombre legible del flujo (F0, omitempty): alimenta el copy
+  /// «Ejecutando `<flujo>` · paso N». Vacío en eventos viejos en vuelo.
+  final String flowName;
   final String executionId;
   final int stepIdx;
 

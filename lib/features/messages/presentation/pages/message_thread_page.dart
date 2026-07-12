@@ -29,6 +29,7 @@ import '../bloc/messages_bloc.dart';
 import '../bloc/reply_draft_cubit.dart';
 import '../../../monitor/presentation/widgets/alert_banner.dart';
 import '../../../monitor/presentation/widgets/live_activity.dart';
+import '../widgets/ai_run_badge.dart';
 import '../widgets/attach_panel.dart';
 import '../widgets/audio_failures_listener.dart';
 import '../widgets/message_composer.dart';
@@ -1197,6 +1198,16 @@ class _MessageBubble extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
+                              // Badge discreto de IA (La Traza F5): solo el
+                              // OUTBOUND nacido de una corrida; tap = drill.
+                              if (isOutbound &&
+                                  m.aiRunId.isNotEmpty) ...<Widget>[
+                                AiRunBadge(
+                                  key: Key('message.ai_badge.${m.externalId}'),
+                                  message: m,
+                                ),
+                                const SizedBox(width: AppTokens.sp2),
+                              ],
                               if (m.editedAtMs != null &&
                                   m.revokedAtMs == null) ...<Widget>[
                                 Text('editada', style: caption),
