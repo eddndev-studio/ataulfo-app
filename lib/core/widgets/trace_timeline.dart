@@ -72,6 +72,12 @@ class TraceTimeline extends StatefulWidget {
 }
 
 class _TraceTimelineState extends State<TraceTimeline> {
+  /// Tope de ancho del contenido de la tarjeta. Acota el contenido largo y —en
+  /// modo hilo— iguala colapsada y expandida (mismo ancho al abrir). Deliberado
+  /// que NO sea la columna entera: a lo ancho, el cuerpo rico de un nodo puede
+  /// desbordar el IntrinsicHeight del carril.
+  static const double _threadMaxWidth = 520;
+
   late bool _expanded = widget.initiallyExpanded;
   bool _stopped = false;
 
@@ -137,6 +143,9 @@ class _TraceTimelineState extends State<TraceTimeline> {
     error: error,
     onTap: tappable ? _toggle : null,
     fill: widget.stretch,
+    // En hilo, MISMO tope que expandida (520): así colapsada y expandida miden
+    // igual —sin recálculo al abrir— y llena la columna hasta ese tope.
+    maxWidth: widget.stretch ? _threadMaxWidth : null,
     alignment: widget.stretch ? Alignment.centerLeft : Alignment.center,
     child: widget.onStop == null || _stopped || widget.stopped
         ? AppThreadEventHeader(
@@ -173,9 +182,12 @@ class _TraceTimelineState extends State<TraceTimeline> {
     return AppThreadEventCard(
       expanded: true,
       fill: true,
-      // En hilo, sin tope: llena la columna igual que colapsada (mismo ancho al
-      // abrir). Fuera de hilo, acota el contenido largo y queda centrada.
-      maxWidth: widget.stretch ? null : 520,
+      // Mismo tope (520) en hilo y fuera: en hilo iguala a la colapsada (sin
+      // salto de ancho al abrir) y llena la columna hasta ese tope, pegada a la
+      // izquierda; fuera de hilo acota el contenido largo y queda centrada. NO
+      // llenar la columna entera: a lo ancho, el cuerpo rico de un nodo puede
+      // desbordar el IntrinsicHeight del carril (mismatch intrínseco-vs-real).
+      maxWidth: _threadMaxWidth,
       alignment: widget.stretch ? Alignment.centerLeft : Alignment.center,
       error: _isError,
       child: Column(

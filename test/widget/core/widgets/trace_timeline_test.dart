@@ -203,6 +203,32 @@ void main() {
     );
   });
 
+  testWidgets('stretch: a lo ancho la tarjeta se ACOTA (no llena la columna '
+      'entera) para no desbordar el carril de los cuerpos ricos', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        width: 800,
+        TraceTimeline(
+          nodes: <TraceNode>[_n('Editó el prompt')],
+          summary: '1 paso',
+          stretch: true,
+          initiallyExpanded: true,
+          bodyBuilder: (_, i) => const Text('cuerpo del nodo'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final box = find.descendant(
+      of: find.byType(AppThreadEventCard),
+      matching: find.byType(Container),
+    );
+    // Acotada a 520 aunque la columna mida 800 (no la llena entera).
+    expect(tester.getSize(box.first).width, moreOrLessEquals(520, epsilon: 1));
+  });
+
   testWidgets('sin stretch: la tarjeta sigue centrada y abraza el contenido', (
     tester,
   ) async {
