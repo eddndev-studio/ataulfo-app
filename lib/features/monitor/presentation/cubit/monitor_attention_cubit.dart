@@ -32,12 +32,18 @@ class MonitorAttentionCubit extends Cubit<MonitorAttentionState> {
   final MonitorBotActivityDatasource _ds;
   StreamSubscription<MonitorEvent>? _sub;
 
+  /// Chat cuyo hilo tiene el operador EN FOCO: sus señales no acumulan (las
+  /// está viendo en vivo). Una sola supresión activa basta — no hay multi-hilo
+  /// abierto.
+  String? _suppressed;
+
   /// Empieza a observar el bot. El cancel NO se espera (un socket SSE vivo puede
   /// colgar al desmontarse y no debe bloquear).
   void watch(String botId) {
     unawaited(_sub?.cancel());
     _sub = _ds.botActivity(botId).listen((e) {
       if (isClosed || !_needsAttention(e.kind) || e.chatLid.isEmpty) return;
+      if (e.chatLid == _suppressed) return;
       if (state.needsAttention.contains(e.chatLid)) return;
       emit(
         MonitorAttentionState(
@@ -53,6 +59,13 @@ class MonitorAttentionCubit extends Cubit<MonitorAttentionState> {
     final next = <String>{...state.needsAttention}..remove(chatLid);
     emit(MonitorAttentionState(needsAttention: next));
   }
+
+  /// Suprime la acumulación de señales de un chat mientras su hilo está en
+  /// foco. No toca el conjunto: combínalo con [clear] al abrir el chat.
+  void suppress(String chatLid) => _suppressed = chatLid;
+
+  /// Reanuda la acumulación (el operador volvió a la bandeja).
+  void unsuppress() => _suppressed = null;
 
   static bool _needsAttention(MonitorEventKind kind) =>
       kind == MonitorEventKind.aiFailed ||

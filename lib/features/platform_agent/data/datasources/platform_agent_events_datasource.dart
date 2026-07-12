@@ -58,7 +58,7 @@ class DioPlatformAgentEventsDatasource
       if (body == null) return;
       await for (final ev in decodeSseEvents(body.stream)) {
         if (!_topics.contains(ev.event)) continue;
-        final parsed = _tryParse(ev.data);
+        final parsed = _tryParse(ev.event, ev.data);
         if (parsed != null) yield parsed;
       }
     } finally {
@@ -66,13 +66,15 @@ class DioPlatformAgentEventsDatasource
     }
   }
 
-  /// Traduce el `data` (paWire) a `PaProgressEvent`. JSON roto o canónico
-  /// ausente (kind/conversationId) ⇒ null y se omite: el progreso es
-  /// cosmético, un frame malo no debe derribar el indicador.
-  PaProgressEvent? _tryParse(String data) {
+  /// Traduce un frame (topic + `data` paWire) a `PaProgressEvent`. El kind se
+  /// deriva del topic (ya validado por el filtro); el `data.kind` del wire va
+  /// en MAYÚSCULAS y no se lee. JSON roto o canónico ausente (conversationId)
+  /// ⇒ null y se omite: el progreso es cosmético, un frame malo no debe
+  /// derribar el indicador.
+  PaProgressEvent? _tryParse(String topic, String data) {
     try {
       final json = jsonDecode(data) as Map<String, dynamic>;
-      return PaProgressEventDto.fromJson(json).toEntity();
+      return PaProgressEventDto.fromFrame(topic, json).toEntity();
     } catch (_) {
       return null;
     }

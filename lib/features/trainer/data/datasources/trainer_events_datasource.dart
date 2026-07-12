@@ -58,7 +58,7 @@ class DioTrainerEventsDatasource implements TrainerEvents {
       if (body == null) return;
       await for (final ev in decodeSseEvents(body.stream)) {
         if (!_topics.contains(ev.event)) continue;
-        final parsed = _tryParse(ev.data);
+        final parsed = _tryParse(ev.event, ev.data);
         if (parsed != null) yield parsed;
       }
     } finally {
@@ -67,16 +67,20 @@ class DioTrainerEventsDatasource implements TrainerEvents {
   }
 
   /// Traduce el `data` (taWire) a `TrainerProgressEvent`. JSON roto o canónico
-  /// ausente (kind/conversationId) ⇒ null y se omite: el progreso es cosmético,
+  /// ausente (conversationId) ⇒ null y se omite: el progreso es cosmético,
   /// un frame malo no debe derribar el indicador.
-  TrainerProgressEvent? _tryParse(String data) {
+  ///
+  /// El kind canónico se deriva del TOPIC (ya validado por el filtro), no de
+  /// `json['kind']`: el wire lo manda en MAYÚSCULAS (httptrainer reusa
+  /// PlatformAgentEvent) y leerlo crudo dejaba el indicador clavado en
+  /// «Pensando…» — mismo patrón sano que el monitor y el platform agent.
+  TrainerProgressEvent? _tryParse(String topic, String data) {
     try {
       final json = jsonDecode(data) as Map<String, dynamic>;
-      final kind = json['kind'] as String?;
       final conversationId = json['conversationId'] as String?;
-      if (kind == null || conversationId == null) return null;
+      if (conversationId == null) return null;
       return TrainerProgressEvent(
-        kind: kind,
+        kind: topic.split('.').last,
         conversationId: conversationId,
         at:
             DateTime.tryParse(json['at'] as String? ?? '')?.toUtc() ??

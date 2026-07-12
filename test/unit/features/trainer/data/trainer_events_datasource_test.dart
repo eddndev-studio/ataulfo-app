@@ -70,12 +70,15 @@ void main() {
   });
 
   test('filtra por topic del bus y mapea a TrainerProgressEvent', () async {
+    // Fixture wire-fiel: el data lleva kind en MAYÚSCULAS (httptrainer reusa
+    // PlatformAgentEvent; la verdad es el test Go). El kind canónico de la
+    // entidad se deriva del TOPIC, inmune al case del data.
     stub(
       sse(
         frame(
               'trainer_agent.thinking',
               jsonEncode(<String, dynamic>{
-                'kind': 'thinking',
+                'kind': 'THINKING',
                 'conversationId': 'c1',
               }),
             ) +
@@ -93,6 +96,38 @@ void main() {
 
     expect(got, hasLength(1));
     expect(got.single.kind, 'thinking');
+    expect(got.single.isThinking, isTrue);
     expect(got.single.conversationId, 'c1');
   });
+
+  test(
+    'el kind sale del topic: data sin kind (o discrepante) parsea igual',
+    () async {
+      stub(
+        sse(
+          frame(
+                'trainer_agent.tool',
+                jsonEncode(<String, dynamic>{
+                  'conversationId': 'c1',
+                  'toolName': 'list_flows',
+                }),
+              ) +
+              frame(
+                'trainer_agent.completed',
+                jsonEncode(<String, dynamic>{
+                  'kind': 'THINKING', // discrepante: gana el topic
+                  'conversationId': 'c1',
+                }),
+              ),
+        ),
+      );
+
+      final got = await ds.connectOnce('t1', 'c1').toList();
+
+      expect(got, hasLength(2));
+      expect(got.first.isTool, isTrue);
+      expect(got.first.toolName, 'list_flows');
+      expect(got.last.isCompleted, isTrue);
+    },
+  );
 }

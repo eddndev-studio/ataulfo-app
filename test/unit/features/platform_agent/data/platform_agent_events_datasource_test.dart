@@ -36,6 +36,9 @@ void main() {
 
   String frame(String event, String data) => 'event: $event\ndata: $data\n\n';
 
+  // Wire-fiel: el `data.kind` del paWire va en MAYÚSCULAS ("THINKING"/"TOOL"/
+  // "COMPLETED"/"FAILED", aseverado por el stream_test.go del backend). El
+  // cliente NO debe depender de su case: el kind canónico sale del topic.
   String progJson({
     required String kind,
     String conversationId = 'c1',
@@ -62,10 +65,10 @@ void main() {
   test('emite PaProgressEvent para thinking y tool', () async {
     stub(
       sse(
-        frame('platform_agent.thinking', progJson(kind: 'thinking')) +
+        frame('platform_agent.thinking', progJson(kind: 'THINKING')) +
             frame(
               'platform_agent.tool',
-              progJson(kind: 'tool', toolName: 'list_bots'),
+              progJson(kind: 'TOOL', toolName: 'list_bots'),
             ),
       ),
     );
@@ -81,8 +84,8 @@ void main() {
   test('emite completed y failed (terminales)', () async {
     stub(
       sse(
-        frame('platform_agent.completed', progJson(kind: 'completed')) +
-            frame('platform_agent.failed', progJson(kind: 'failed')),
+        frame('platform_agent.completed', progJson(kind: 'COMPLETED')) +
+            frame('platform_agent.failed', progJson(kind: 'FAILED')),
       ),
     );
 
@@ -94,12 +97,50 @@ void main() {
     expect(got[1].isFailed, isTrue);
   });
 
+  test('el kind sale del TOPIC: gana sobre un data.kind discrepante', () async {
+    stub(
+      sse(
+        frame(
+          'platform_agent.tool',
+          progJson(kind: 'THINKING', toolName: 'list_bots'),
+        ),
+      ),
+    );
+
+    final got = await ds.connectOnce('c1').toList();
+
+    expect(got.single.isTool, isTrue);
+    expect(got.single.isThinking, isFalse);
+    expect(got.single.toolName, 'list_bots');
+  });
+
+  test('data sin kind se parsea igual (el kind sale del topic)', () async {
+    stub(
+      sse(
+        frame(
+          'platform_agent.completed',
+          jsonEncode(<String, dynamic>{
+            'runId': 'r1',
+            'conversationId': 'c1',
+            'iteration': 1,
+            'at': '2026-06-10T10:00:00.000Z',
+          }),
+        ),
+      ),
+    );
+
+    final got = await ds.connectOnce('c1').toList();
+
+    expect(got.single.isCompleted, isTrue);
+    expect(got.single.isTerminal, isTrue);
+  });
+
   test('filtra topics ajenos (message.inbound, bot.session)', () async {
     stub(
       sse(
         frame('message.inbound', '{"x":1}') +
             frame('bot.session', '{"state":"CONNECTED"}') +
-            frame('platform_agent.tool', progJson(kind: 'tool')),
+            frame('platform_agent.tool', progJson(kind: 'TOOL')),
       ),
     );
 
@@ -113,7 +154,7 @@ void main() {
     stub(
       sse(
         frame('platform_agent.tool', '{no es json}') +
-            frame('platform_agent.completed', progJson(kind: 'completed')),
+            frame('platform_agent.completed', progJson(kind: 'COMPLETED')),
       ),
     );
 
@@ -138,7 +179,7 @@ void main() {
   });
 
   test('progress() envuelve la conexión (emite el primer evento)', () async {
-    stub(sse(frame('platform_agent.thinking', progJson(kind: 'thinking'))));
+    stub(sse(frame('platform_agent.thinking', progJson(kind: 'THINKING'))));
 
     final first = await ds.progress('c1').first;
 

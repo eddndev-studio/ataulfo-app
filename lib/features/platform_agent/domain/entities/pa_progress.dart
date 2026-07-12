@@ -15,7 +15,10 @@ class PaProgressEvent {
     this.error = '',
   });
 
-  final String kind; // thinking | tool | completed | failed
+  /// thinking | tool | completed | failed — sufijo del TOPIC del frame SSE.
+  /// El `data.kind` del wire va en MAYÚSCULAS ("TOOL") y NO se lee; derivar
+  /// del topic hace a los getters inmunes a su case y a su ausencia.
+  final String kind;
   final String conversationId;
   final DateTime at;
   final String runId;

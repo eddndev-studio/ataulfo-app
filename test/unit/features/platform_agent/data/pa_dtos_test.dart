@@ -25,8 +25,11 @@ Map<String, dynamic> msgJson({
   'created_at': '2026-06-10T10:00:01.000Z',
 };
 
+// Wire-fiel: el `data.kind` del paWire va en MAYÚSCULAS (stream_test.go del
+// backend). El DTO ya no lo lee — el kind canónico sale del topic del frame —
+// pero los fixtures lo conservan así para documentar la verdad del wire.
 Map<String, dynamic> progJson({
-  String kind = 'tool',
+  String kind = 'TOOL',
   String conversationId = 'c1',
   Object? toolName = 'list_bots',
 }) => <String, dynamic>{
@@ -86,8 +89,11 @@ void main() {
   });
 
   group('PaProgressEventDto', () {
-    test('parsea el paWire del SSE', () {
-      final e = PaProgressEventDto.fromJson(progJson()).toEntity();
+    test('parsea el paWire del SSE con kind derivado del topic', () {
+      final e = PaProgressEventDto.fromFrame(
+        'platform_agent.tool',
+        progJson(),
+      ).toEntity();
       expect(e.kind, 'tool');
       expect(e.conversationId, 'c1');
       expect(e.toolName, 'list_bots');
@@ -96,26 +102,40 @@ void main() {
       expect(e.isTerminal, isFalse);
     });
 
-    test('kind=completed ⇒ terminal; toolName ausente degrada a vacío', () {
-      final e = PaProgressEventDto.fromJson(
-        progJson(kind: 'completed', toolName: null),
+    test('topic completed ⇒ terminal; toolName ausente degrada a vacío', () {
+      final e = PaProgressEventDto.fromFrame(
+        'platform_agent.completed',
+        progJson(kind: 'COMPLETED', toolName: null),
       ).toEntity();
       expect(e.isCompleted, isTrue);
       expect(e.isTerminal, isTrue);
       expect(e.toolName, '');
     });
 
-    test('kind=failed ⇒ terminal', () {
-      final e = PaProgressEventDto.fromJson(
-        progJson(kind: 'failed', toolName: null),
+    test('topic failed ⇒ terminal', () {
+      final e = PaProgressEventDto.fromFrame(
+        'platform_agent.failed',
+        progJson(kind: 'FAILED', toolName: null),
       ).toEntity();
       expect(e.isFailed, isTrue);
       expect(e.isTerminal, isTrue);
     });
 
-    test('kind ausente ⇒ FormatException (canónico)', () {
+    test('el data.kind no se lee: ausente ⇒ parsea igual (topic manda)', () {
       final json = progJson()..remove('kind');
-      expect(() => PaProgressEventDto.fromJson(json), throwsFormatException);
+      final e = PaProgressEventDto.fromFrame(
+        'platform_agent.thinking',
+        json,
+      ).toEntity();
+      expect(e.isThinking, isTrue);
+    });
+
+    test('conversationId ausente ⇒ FormatException (canónico)', () {
+      final json = progJson()..remove('conversationId');
+      expect(
+        () => PaProgressEventDto.fromFrame('platform_agent.tool', json),
+        throwsFormatException,
+      );
     });
   });
 

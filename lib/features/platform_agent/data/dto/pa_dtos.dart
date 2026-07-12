@@ -194,8 +194,8 @@ class PaAttachmentDto {
 }
 
 /// DTO del `paWire` del SSE (camelCase — el adapter SSE emite ese shape).
-/// `kind` y `conversationId` son canónicos (dirigen filtro y dispatch); el
-/// resto degrada.
+/// `kind` se deriva del TOPIC del frame; `conversationId` es canónico (dirige
+/// el dispatch); el resto degrada.
 class PaProgressEventDto {
   const PaProgressEventDto({
     required this.kind,
@@ -209,15 +209,22 @@ class PaProgressEventDto {
     this.error = '',
   });
 
-  factory PaProgressEventDto.fromJson(Map<String, dynamic> json) {
-    final kind = json['kind'];
+  /// Construye desde el `event:` (topic) y el `data` (json) de un frame SSE.
+  /// El `kind` canónico es el SUFIJO del topic (`platform_agent.tool` ⇒
+  /// `tool`): el topic ya pasó el filtro del datasource y es la clave real de
+  /// enrutamiento. El `data.kind` del wire (MAYÚSCULAS, a veces ausente) NO se
+  /// lee — si discrepara del topic, gana el topic.
+  factory PaProgressEventDto.fromFrame(
+    String topic,
+    Map<String, dynamic> json,
+  ) {
     final conversationId = json['conversationId'];
-    if (kind is! String || conversationId is! String) {
+    if (conversationId is! String) {
       throw const FormatException('pa progress: shape inválido');
     }
     final at = json['at'];
     return PaProgressEventDto(
-      kind: kind,
+      kind: topic.split('.').last,
       conversationId: conversationId,
       at: at is String ? DateTime.parse(at).toUtc() : DateTime(0),
       runId: json['runId'] is String ? json['runId'] as String : '',

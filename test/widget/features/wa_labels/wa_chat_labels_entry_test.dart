@@ -5,6 +5,7 @@ import 'package:ataulfo/features/conversations/presentation/cubit/inbox_labels_c
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
+import 'package:ataulfo/features/monitor/presentation/cubit/monitor_attention_cubit.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
 import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
@@ -27,6 +28,12 @@ class _MockWaRepo extends Mock implements WaLabelsRepository {}
 
 class _MockChatLabelsRepo extends Mock implements ChatLabelsRepository {}
 
+// La página exige el cubit de atención sobre ella (el onTap de la fila lo
+// captura para atender/suprimir la pill): el host del test espeja el árbol
+// real de la ruta de bandeja.
+class _MockAttentionCubit extends MockCubit<MonitorAttentionState>
+    implements MonitorAttentionCubit {}
+
 const _dm = Conversation(
   chatLid: 'lid-dm',
   kind: ConversationKind.dm,
@@ -47,11 +54,14 @@ void main() {
   late _MockConvBloc conv;
   late _MockWaRepo repo;
   late _MockChatLabelsRepo chatLabelsRepo;
+  late _MockAttentionCubit attention;
 
   setUp(() {
     conv = _MockConvBloc();
     repo = _MockWaRepo();
     chatLabelsRepo = _MockChatLabelsRepo();
+    attention = _MockAttentionCubit();
+    when(() => attention.state).thenReturn(const MonitorAttentionState());
     when(() => conv.botId).thenReturn('b1');
     when(() => conv.state).thenReturn(
       const ConversationsLoaded(
@@ -93,6 +103,7 @@ void main() {
             child: MultiBlocProvider(
               providers: <BlocProvider<dynamic>>[
                 BlocProvider<ConversationsBloc>.value(value: conv),
+                BlocProvider<MonitorAttentionCubit>.value(value: attention),
                 BlocProvider<InboxLabelsCubit>(
                   create: (_) =>
                       InboxLabelsCubit(repo: repo, botId: 'b1')..load(),

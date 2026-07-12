@@ -13,6 +13,7 @@ import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/smart_timestamp.dart';
+import '../../../monitor/presentation/cubit/monitor_attention_cubit.dart';
 import '../../../profile/data/cache/profile_photo_cache.dart';
 import '../../../profile/presentation/widgets/profile_avatar.dart';
 import '../../../wa_labels/domain/entities/wa_label.dart';
@@ -415,10 +416,24 @@ class _ConversationTile extends StatelessWidget {
 
     return InkWell(
       key: Key('conversation.tile.${c.chatLid}'),
-      onTap: () => context.push(
-        '/bots/${context.read<ConversationsBloc>().botId}'
-        '/sessions/${Uri.encodeComponent(c.chatLid)}',
-      ),
+      onTap: () async {
+        // Abrir el chat lo atiende: su pill «Atención» se limpia y, mientras
+        // el hilo está en foco (la bandeja sigue montada bajo el push), sus
+        // señales nuevas no acumulan; al volver (el Future del push resuelve
+        // con el pop) se reanuda. Entrar al hilo por deep-link/push NO pasa
+        // por aquí — misma limitación page-scoped que la web: el subtree del
+        // hilo no ve el cubit. Nada usa `context` tras el await; el cubit se
+        // captura antes y sus métodos son inofensivos si ya se cerró.
+        final attention = context.read<MonitorAttentionCubit>();
+        attention
+          ..clear(c.chatLid)
+          ..suppress(c.chatLid);
+        await context.push(
+          '/bots/${context.read<ConversationsBloc>().botId}'
+          '/sessions/${Uri.encodeComponent(c.chatLid)}',
+        );
+        attention.unsuppress();
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppTokens.sp4,
