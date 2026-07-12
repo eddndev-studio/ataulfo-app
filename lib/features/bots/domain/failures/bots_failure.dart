@@ -66,6 +66,26 @@ final class BotsNotPausedFailure extends BotsFailure {
   const BotsNotPausedFailure();
 }
 
+/// 409 contra `POST /bots/:id/session/pair-phone`: el emparejamiento no está
+/// iniciado (`ErrNotRunning` — faltó el `POST /session` previo, o la sesión ya
+/// cayó). El operador acciona iniciando el emparejamiento primero. Mapeo
+/// POR-ENDPOINT: sólo pair-phone traduce su 409 a este failure (la otra causa
+/// del status, org ausente en claims, es inalcanzable post-login — mismo
+/// razonamiento que `BotsConflictFailure`).
+final class BotsPairingNotStartedFailure extends BotsFailure {
+  const BotsPairingNotStartedFailure();
+}
+
+/// 400/422 contra `POST /bots/:id/session/pair-phone`: el teléfono no fue
+/// aceptado. El backend colapsa varias causas en el 422 (número corto, cero
+/// inicial, device ya emparejado, IQ rechazado, timeout del wire) con cuerpo
+/// opaco; el 400 sólo ocurre con phone vacío — la validación local lo
+/// previene, así que agruparlo aquí es honesto. Mapeo POR-ENDPOINT: sólo
+/// pair-phone traduce 400/422 a este failure.
+final class BotsPhoneRejectedFailure extends BotsFailure {
+  const BotsPhoneRejectedFailure();
+}
+
 /// 5xx del backend. Distinto de red: el servidor respondió, pero rompió.
 final class BotsServerFailure extends BotsFailure {
   const BotsServerFailure();

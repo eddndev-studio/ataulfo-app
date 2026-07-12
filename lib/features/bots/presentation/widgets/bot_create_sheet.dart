@@ -574,6 +574,8 @@ class _FailedView extends StatelessWidget {
     BotsServerFailure() ||
     BotsConflictFailure() ||
     BotsNotPausedFailure() ||
+    BotsPairingNotStartedFailure() ||
+    BotsPhoneRejectedFailure() ||
     UnknownBotsFailure() => (
       'bot_create.error.generic',
       'No pudimos crear el bot. Inténtalo de nuevo.',

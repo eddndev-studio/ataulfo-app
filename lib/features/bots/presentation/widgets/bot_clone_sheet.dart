@@ -159,6 +159,8 @@ class _BotCloneSheetState extends State<BotCloneSheet> {
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     BotsConflictFailure() ||
     BotsNotPausedFailure() ||
+    BotsPairingNotStartedFailure() ||
+    BotsPhoneRejectedFailure() ||
     BotsServerFailure() ||
     UnknownBotsFailure() => 'No pudimos clonar el bot. Inténtalo de nuevo.',
   };

@@ -14,6 +14,7 @@ import '../../domain/entities/connect_link.dart';
 import '../../domain/entities/session_status.dart';
 import '../../domain/failures/bots_failure.dart';
 import '../bloc/bot_connect_bloc.dart';
+import '../widgets/pair_phone_section.dart';
 
 /// Pantalla "compartir enlace de conexión" (S04). Content-only: el Scaffold y
 /// el AppBar los aporta la ruta `/bots/:id/connect`.
@@ -40,6 +41,9 @@ class BotConnectPage extends StatelessWidget {
           phase: final phase,
           status: final status,
           qrExpired: final qrExpired,
+          pairCode: final pairCode,
+          pairRequesting: final pairRequesting,
+          pairFailure: final pairFailure,
         ) =>
           _ReadyView(
             link: link,
@@ -47,6 +51,9 @@ class BotConnectPage extends StatelessWidget {
             channel: channel,
             status: status,
             qrExpired: qrExpired,
+            pairCode: pairCode,
+            pairRequesting: pairRequesting,
+            pairFailure: pairFailure,
           ),
         BotConnectFailed(failure: final f) => _FailedView(failure: f),
       },
@@ -72,6 +79,9 @@ class _ReadyView extends StatelessWidget {
     required this.channel,
     required this.status,
     required this.qrExpired,
+    required this.pairCode,
+    required this.pairRequesting,
+    required this.pairFailure,
   });
 
   final ConnectLink link;
@@ -79,6 +89,9 @@ class _ReadyView extends StatelessWidget {
   final BotChannel channel;
   final SessionStatus? status;
   final bool qrExpired;
+  final String? pairCode;
+  final bool pairRequesting;
+  final BotsFailure? pairFailure;
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +135,14 @@ class _ReadyView extends StatelessWidget {
           const SizedBox(height: AppTokens.sp7),
           const Divider(color: AppTokens.divider, height: 1),
           const SizedBox(height: AppTokens.sp6),
-          _PairingSection(phase: phase, status: status, qrExpired: qrExpired),
+          _PairingSection(
+            phase: phase,
+            status: status,
+            qrExpired: qrExpired,
+            pairCode: pairCode,
+            pairRequesting: pairRequesting,
+            pairFailure: pairFailure,
+          ),
           // Wipe (Tier B): SÓLO WA no oficial; oculto en WABA. No gateado por
           // paused; siempre disponible tras confirmación fuerte.
           if (channel == BotChannel.waUnofficial) ...<Widget>[
@@ -199,11 +219,17 @@ class _PairingSection extends StatelessWidget {
     required this.phase,
     required this.status,
     required this.qrExpired,
+    required this.pairCode,
+    required this.pairRequesting,
+    required this.pairFailure,
   });
 
   final PairingPhase phase;
   final SessionStatus? status;
   final bool qrExpired;
+  final String? pairCode;
+  final bool pairRequesting;
+  final BotsFailure? pairFailure;
 
   void _start(BuildContext context) =>
       context.read<BotConnectBloc>().add(const BotConnectPairingRequested());
@@ -253,6 +279,14 @@ class _PairingSection extends StatelessWidget {
                 size: 220,
               ),
             ),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          // Vía alterna al QR: sólo vive en este branch (sesión PAIRING),
+          // la precondición dura del backend para emitir códigos.
+          PairPhoneSection(
+            pairCode: pairCode,
+            pairRequesting: pairRequesting,
+            pairFailure: pairFailure,
           ),
           const SizedBox(height: AppTokens.sp4),
           AppButton.danger(

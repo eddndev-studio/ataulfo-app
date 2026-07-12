@@ -42,6 +42,14 @@ abstract interface class BotSessionDatasource {
   /// sesión; el `qr` SÓLO viene en PAIRING. "No corre" = `200 + DISCONNECTED`
   /// (NO es error). Estado desconocido en el wire → `UnknownBotsFailure`.
   Future<SessionStatus> getSessionState(String botId);
+
+  /// `POST /bots/:id/session/pair-phone {phone}` ⇒ 200 `{code}`. Pide el
+  /// código de vinculación por teléfono (alternativa al QR); [phone] viaja en
+  /// formato internacional sin `+` ni ceros iniciales. El código llega YA
+  /// formateado (`XXXX-XXXX`) y cada pedida invalida la anterior. EXIGE la
+  /// sesión en PAIRING: 409 → `BotsPairingNotStartedFailure`; 400/422 →
+  /// `BotsPhoneRejectedFailure`.
+  Future<String> pairPhone(String botId, String phone);
 }
 
 class DioBotSessionDatasource implements BotSessionDatasource {
@@ -151,17 +159,50 @@ class DioBotSessionDatasource implements BotSessionDatasource {
     }
   }
 
+  @override
+  Future<String> pairPhone(String botId, String phone) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/bots/$botId/session/pair-phone',
+        data: <String, dynamic>{'phone': phone},
+      );
+      final body = res.data;
+      if (body == null) {
+        throw const UnknownBotsFailure();
+      }
+      // Parseo defensivo a mano: el código viaja YA formateado (XXXX-XXXX) y
+      // se entrega tal cual — sin re-agrupar, sin validar largo.
+      final code = body['code'];
+      if (code is! String) {
+        throw FormatException('pair-phone: code no es String', body);
+      }
+      return code;
+    } on BotsFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e, pairPhoneErrors: true);
+    } on FormatException {
+      throw const UnknownBotsFailure();
+    } on TypeError {
+      // Simetría con los hermanos: un body de tipo inesperado que escape del
+      // cast interno de dio no debe salir crudo del puerto.
+      throw const UnknownBotsFailure();
+    }
+  }
+
   /// Traduce DioException a la jerarquía sellada de BotsFailure. Mismo patrón
-  /// que `DioBotsDatasource._mapDioException`; sin caso 422 (los endpoints de
-  /// sesión no validan body).
+  /// que `DioBotsDatasource._mapDioException`.
   ///
-  /// `notPausedConflict` rige el 409 POR-ENDPOINT: en clear/reset un 409 es
-  /// `ErrBotNotPaused` (`BotsNotPausedFailure`); en los demás verbos de sesión
-  /// el 409 (org activa ausente) colapsa a genérico — el operador no acciona
-  /// distinto sin más contexto.
+  /// El mapeo de 409/422 es POR-ENDPOINT vía flags: `notPausedConflict` rige
+  /// el 409 de clear/reset (`ErrBotNotPaused` → `BotsNotPausedFailure`);
+  /// `pairPhoneErrors` rige pair-phone, el único verbo de sesión que valida
+  /// body (409 → `BotsPairingNotStartedFailure`, 400/422 →
+  /// `BotsPhoneRejectedFailure`). Sin flag, 409/400/422 colapsan a genérico —
+  /// el operador no acciona distinto sin más contexto.
   BotsFailure _mapDioException(
     DioException e, {
     bool notPausedConflict = false,
+    bool pairPhoneErrors = false,
   }) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
@@ -176,6 +217,12 @@ class DioBotSessionDatasource implements BotSessionDatasource {
         if (status == 404) return const BotsNotFoundFailure();
         if (status == 409 && notPausedConflict) {
           return const BotsNotPausedFailure();
+        }
+        if (pairPhoneErrors) {
+          if (status == 409) return const BotsPairingNotStartedFailure();
+          if (status == 400 || status == 422) {
+            return const BotsPhoneRejectedFailure();
+          }
         }
         if (status >= 500 && status < 600) return const BotsServerFailure();
         return const UnknownBotsFailure();

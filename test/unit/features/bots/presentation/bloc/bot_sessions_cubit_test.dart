@@ -46,6 +46,9 @@ class _GatedRepo implements BotSessionRepository {
   Future<void> resetSessions(String botId) => throw UnimplementedError();
   @override
   Future<void> wipeCredentials(String botId) => throw UnimplementedError();
+  @override
+  Future<String> pairPhone(String botId, String phone) =>
+      throw UnimplementedError();
 }
 
 /// Repo que cuenta cuántas consultas corren en simultáneo, para verificar la
@@ -85,6 +88,9 @@ class _CountingRepo implements BotSessionRepository {
   Future<void> resetSessions(String botId) => throw UnimplementedError();
   @override
   Future<void> wipeCredentials(String botId) => throw UnimplementedError();
+  @override
+  Future<String> pairPhone(String botId, String phone) =>
+      throw UnimplementedError();
 }
 
 void main() {

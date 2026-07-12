@@ -33,4 +33,11 @@ abstract interface class BotSessionRepository {
   /// Estado vivo de la sesión (`GET /bots/:id/session`). El QR sólo viene en
   /// PAIRING; "no corre" = `DISCONNECTED`.
   Future<SessionStatus> getSessionState(String botId);
+
+  /// Pide el código de vinculación por teléfono (`pair-phone`), alternativa
+  /// al QR. Devuelve el código YA formateado (`XXXX-XXXX`); cada pedida
+  /// invalida la anterior. EXIGE la sesión en PAIRING:
+  /// `BotsPairingNotStartedFailure` (409) si no lo está;
+  /// `BotsPhoneRejectedFailure` (400/422) si el número no fue aceptado.
+  Future<String> pairPhone(String botId, String phone);
 }

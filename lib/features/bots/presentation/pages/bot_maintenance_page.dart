@@ -233,7 +233,11 @@ class _Body extends StatelessWidget {
     BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
-    BotsInvalidCreateFailure() || BotsServerFailure() || UnknownBotsFailure() =>
+    BotsInvalidCreateFailure() ||
+    BotsPairingNotStartedFailure() ||
+    BotsPhoneRejectedFailure() ||
+    BotsServerFailure() ||
+    UnknownBotsFailure() =>
       'No pudimos completar la operación. Inténtalo de nuevo.',
   };
 }

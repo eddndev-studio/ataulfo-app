@@ -33,6 +33,7 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
     on<BotConnectStopRequested>(_onStopRequested);
     on<BotConnectWipeRequested>(_onWipeRequested);
     on<BotConnectStatusPolled>(_onStatusPolled);
+    on<BotConnectPairCodeRequested>(_onPairCodeRequested);
   }
 
   final BotSessionRepository _repo;
@@ -126,9 +127,16 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
       // este resultado quedó obsoleto: descartarlo en vez de pisar el estado
       // (evita un falso qrExpired tras cancelar, o resucitar un QR zombi).
       if (gen != _pollGen) return;
+      // Otros handlers interleavan con este await (p. ej. el 200 de
+      // pair-phone pintando el código): el snapshot de la entrada quedó
+      // viejo — releer y acarrear SIEMPRE desde el estado fresco, o este
+      // emit pisaría el código recién pintado y dejaría pairRequesting
+      // clavado en true (spinner eterno + pedidas bloqueadas).
+      final latest = state;
+      if (latest is! BotConnectReady) return;
       // El QR de whatsmeow vive ~2 min: si veníamos en PAIRING y el backend
       // reporta DISCONNECTED, el código expiró (no es un fallo).
-      final wasPairing = current.status?.state == SessionState.pairing;
+      final wasPairing = latest.status?.state == SessionState.pairing;
       final qrExpired = wasPairing && status.state == SessionState.disconnected;
       // PAIRING/CONNECTING/RECONNECTING son transitorios que justifican seguir
       // sondeando; en cualquier otro estado (CONNECTED/DISCONNECTED) paramos.
@@ -139,15 +147,107 @@ class BotConnectBloc extends Bloc<BotConnectEvent, BotConnectState> {
       if (!keepPolling) _stopPolling();
       emit(
         BotConnectReady(
-          current.link,
-          phase: current.phase,
+          latest.link,
+          phase: latest.phase,
           status: status,
           qrExpired: qrExpired,
+          // El código tecleable comparte la ventana del QR: la expiración
+          // mata a ambos. Mientras la sesión siga transitoria se preservan.
+          pairCode: qrExpired ? null : latest.pairCode,
+          pairRequesting: latest.pairRequesting,
+          pairFailure: qrExpired ? null : latest.pairFailure,
         ),
       );
     } on BotsFailure {
       // Poll transitorio fallido: el siguiente tick reintenta. No degradamos
       // el estado visible (no falseamos una desconexión por un fallo de red).
+    }
+  }
+
+  Future<void> _onPairCodeRequested(
+    BotConnectPairCodeRequested event,
+    Emitter<BotConnectState> emit,
+  ) async {
+    final current = state;
+    // Precondición dura del backend: el código sólo existe con la sesión en
+    // PAIRING (el mismo branch que muestra el QR); fuera de ahí contestaría
+    // 409. Una pedida en vuelo gatea la re-entrada (el loading del botón
+    // bloquea el doble-tap, este guard cubre el resto de los caminos).
+    if (current is! BotConnectReady) return;
+    if (current.status?.state != SessionState.pairing) return;
+    if (current.pairRequesting) return;
+    // Cada pedida invalida la anterior en whatsmeow: el código viejo se
+    // limpia ANTES del POST para no mostrar uno ya muerto mientras llega el
+    // nuevo.
+    emit(
+      BotConnectReady(
+        current.link,
+        phase: current.phase,
+        status: current.status,
+        qrExpired: current.qrExpired,
+        pairRequesting: true,
+      ),
+    );
+    final gen = _pollGen;
+    try {
+      final code = await _repo.pairPhone(_botId, event.phone);
+      // Un stop/wipe o un nuevo arranque en vuelo dejó obsoleto el resultado:
+      // descartarlo en vez de resucitar un código muerto.
+      if (gen != _pollGen) return;
+      final latest = state;
+      if (latest is! BotConnectReady) return;
+      if (latest.status?.state != SessionState.pairing) {
+        // La sesión salió de PAIRING mientras la red respondía (p. ej. ya
+        // están vinculando por el QR): pintar el código sería mostrar uno
+        // muerto. Sólo se apaga el spinner.
+        emit(
+          BotConnectReady(
+            latest.link,
+            phase: latest.phase,
+            status: latest.status,
+            qrExpired: latest.qrExpired,
+          ),
+        );
+        return;
+      }
+      emit(
+        BotConnectReady(
+          latest.link,
+          phase: latest.phase,
+          status: latest.status,
+          qrExpired: latest.qrExpired,
+          pairCode: code,
+        ),
+      );
+    } on BotsFailure catch (f) {
+      if (gen != _pollGen) return;
+      final latest = state;
+      if (latest is! BotConnectReady) return;
+      if (latest.status?.state != SessionState.pairing) {
+        // La sección pair-phone ya no está visible: escribir el fallo dejaría
+        // un error fantasma listo para reaparecer si la sesión rebota a
+        // PAIRING. Solo se apaga el spinner (espejo del camino de éxito).
+        emit(
+          BotConnectReady(
+            latest.link,
+            phase: latest.phase,
+            status: latest.status,
+            qrExpired: latest.qrExpired,
+          ),
+        );
+        return;
+      }
+      // Fallo local a la sección de pair-phone: el QR sigue vivo, así que no
+      // se degrada a una fase failed global.
+      emit(
+        BotConnectReady(
+          latest.link,
+          phase: latest.phase,
+          status: latest.status,
+          qrExpired: latest.qrExpired,
+          pairFailure: f,
+        ),
+      );
     }
   }
 
@@ -249,6 +349,21 @@ class BotConnectStatusPolled extends BotConnectEvent {
   int get hashCode => (BotConnectStatusPolled).hashCode;
 }
 
+/// Pide el código de vinculación por teléfono (`pair-phone`), la vía alterna
+/// al QR. [phone] llega YA saneado y validado por la UI (dígitos pelados en
+/// formato internacional). Sólo procede con la sesión en PAIRING.
+class BotConnectPairCodeRequested extends BotConnectEvent {
+  const BotConnectPairCodeRequested(this.phone);
+
+  final String phone;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BotConnectPairCodeRequested && other.phone == phone;
+  @override
+  int get hashCode => Object.hash(BotConnectPairCodeRequested, phone);
+}
+
 // States --------------------------------------------------------------------
 
 sealed class BotConnectState {
@@ -268,18 +383,29 @@ class BotConnectLoading extends BotConnectState {
 /// poll trae del backend (null hasta el primer poll). El QR escaneable
 /// (`status.qrCode`) sólo viene en `SessionState.pairing`. [qrExpired] marca la
 /// transición PAIRING→DISCONNECTED (el código de ~2 min caducó).
+///
+/// [pairCode] es el código de vinculación por teléfono (YA formateado
+/// `XXXX-XXXX`; se pinta tal cual), la vía alterna al QR con su misma ventana
+/// de vida; [pairRequesting] marca la pedida en vuelo y [pairFailure] su
+/// fallo, local a esa sección (el QR sigue vivo).
 class BotConnectReady extends BotConnectState {
   const BotConnectReady(
     this.link, {
     this.phase = PairingPhase.idle,
     this.status,
     this.qrExpired = false,
+    this.pairCode,
+    this.pairRequesting = false,
+    this.pairFailure,
   });
 
   final ConnectLink link;
   final PairingPhase phase;
   final SessionStatus? status;
   final bool qrExpired;
+  final String? pairCode;
+  final bool pairRequesting;
+  final BotsFailure? pairFailure;
 
   @override
   bool operator ==(Object other) =>
@@ -287,9 +413,20 @@ class BotConnectReady extends BotConnectState {
       other.link == link &&
       other.phase == phase &&
       other.status == status &&
-      other.qrExpired == qrExpired;
+      other.qrExpired == qrExpired &&
+      other.pairCode == pairCode &&
+      other.pairRequesting == pairRequesting &&
+      other.pairFailure == pairFailure;
   @override
-  int get hashCode => Object.hash(link, phase, status, qrExpired);
+  int get hashCode => Object.hash(
+    link,
+    phase,
+    status,
+    qrExpired,
+    pairCode,
+    pairRequesting,
+    pairFailure,
+  );
 }
 
 /// La emisión del enlace falló (no hay enlace). El retry re-emite el enlace.

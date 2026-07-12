@@ -180,6 +180,8 @@ class _BotEditSheetState extends State<BotEditSheet> {
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     BotsNotPausedFailure() ||
+    BotsPairingNotStartedFailure() ||
+    BotsPhoneRejectedFailure() ||
     BotsServerFailure() ||
     UnknownBotsFailure() => 'No pudimos guardar el cambio. Inténtalo de nuevo.',
   };

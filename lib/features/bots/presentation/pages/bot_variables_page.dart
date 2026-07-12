@@ -366,7 +366,11 @@ class _VariablesFormState extends State<_VariablesForm> {
     BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
-    BotsNotPausedFailure() || BotsServerFailure() || UnknownBotsFailure() =>
+    BotsNotPausedFailure() ||
+    BotsPairingNotStartedFailure() ||
+    BotsPhoneRejectedFailure() ||
+    BotsServerFailure() ||
+    UnknownBotsFailure() =>
       'No pudimos guardar las variables. Inténtalo de nuevo.',
   };
 }

@@ -35,4 +35,8 @@ class BotSessionRepositoryImpl implements BotSessionRepository {
   @override
   Future<SessionStatus> getSessionState(String botId) =>
       _ds.getSessionState(botId);
+
+  @override
+  Future<String> pairPhone(String botId, String phone) =>
+      _ds.pairPhone(botId, phone);
 }
