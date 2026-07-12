@@ -30,10 +30,19 @@ class TraceTimeline extends StatefulWidget {
     this.stoppedSummary = '',
     this.stopped = false,
     this.collapsedLeading,
+    this.stretch = false,
   });
 
   final List<TraceNode> nodes;
   final String summary;
+
+  /// Modo hilo de mensajes: la tarjeta se pega al área de mensaje (izquierda) y
+  /// llena el ancho de la columna en AMBOS estados —colapsada y expandida— para
+  /// que abrir el proceso no recalcule el ancho ni la deje flotando al centro.
+  /// Apagado (default) conserva la tarjeta centrada que abraza su contenido (el
+  /// registro de una corrida en el ai-log, el monitor, la mini-traza del hilo
+  /// real).
+  final bool stretch;
 
   /// Widget que sustituye al ícono del renglón COLAPSADO (p. ej. el latido de
   /// la mini-traza viva del hilo). `null` ⇒ el ícono del primer nodo.
@@ -80,6 +89,20 @@ class _TraceTimelineState extends State<TraceTimeline> {
 
   @override
   Widget build(BuildContext context) {
+    // El plegado/expandido anima el alto (y, sin stretch, el ancho) en vez de
+    // saltar. Con motion off la duración colapsa a cero y el cambio es directo.
+    return AnimatedSize(
+      duration: AppMotion.durationOf(
+        context,
+        const Duration(milliseconds: 200),
+      ),
+      curve: Curves.easeOutCubic,
+      alignment: widget.stretch ? Alignment.topLeft : Alignment.topCenter,
+      child: _content(context),
+    );
+  }
+
+  Widget _content(BuildContext context) {
     if (_stopped || widget.stopped) {
       // Detenida: SIN el leading vivo — un latido sobre el copy de detención
       // mentiría actividad.
@@ -113,6 +136,8 @@ class _TraceTimelineState extends State<TraceTimeline> {
   }) => AppThreadEventCard(
     error: error,
     onTap: tappable ? _toggle : null,
+    fill: widget.stretch,
+    alignment: widget.stretch ? Alignment.centerLeft : Alignment.center,
     child: widget.onStop == null || _stopped || widget.stopped
         ? AppThreadEventHeader(
             icon: icon,
@@ -148,7 +173,10 @@ class _TraceTimelineState extends State<TraceTimeline> {
     return AppThreadEventCard(
       expanded: true,
       fill: true,
-      maxWidth: 520,
+      // En hilo, sin tope: llena la columna igual que colapsada (mismo ancho al
+      // abrir). Fuera de hilo, acota el contenido largo y queda centrada.
+      maxWidth: widget.stretch ? null : 520,
+      alignment: widget.stretch ? Alignment.centerLeft : Alignment.center,
       error: _isError,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

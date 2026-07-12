@@ -71,9 +71,11 @@ void main() {
     expect(find.byKey(const Key('trainer.change_card.t1')), findsNothing);
 
     // Al expandir aparecen los nodos: razonamiento (texto inline) y el paso
-    // tool con la tarjeta de cambio como cuerpo — que conserva su expandir.
+    // tool con la tarjeta de cambio como cuerpo — que conserva su expandir. El
+    // carril abre animado (AnimatedSize): asentar antes de tocar el cuerpo, que
+    // hasta entonces queda recortado por el reveal (igual que para el usuario).
     await tester.tap(find.textContaining('Pensó · 1 paso'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Razonamiento'), findsOneWidget);
     expect(find.text('razono esto'), findsOneWidget);
     expect(find.byKey(const Key('trainer.change_card.t1')), findsOneWidget);

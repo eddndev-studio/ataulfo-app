@@ -142,6 +142,7 @@ class _TrainerChatViewState extends State<TrainerChatView>
           : capNodesLive(live.nodos),
       summary: s.livePartial ? '$resumen (traza parcial)' : resumen,
       initiallyExpanded: true,
+      stretch: true,
       pulseLast: s.sending,
       stopped: s.liveStopped,
       onStop: s.sending

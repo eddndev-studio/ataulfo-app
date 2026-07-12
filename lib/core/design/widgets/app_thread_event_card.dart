@@ -21,6 +21,7 @@ class AppThreadEventCard extends StatelessWidget {
     this.fill = false,
     this.onTap,
     this.maxWidth,
+    this.alignment = Alignment.center,
     this.padding = const EdgeInsets.symmetric(
       horizontal: AppTokens.sp3,
       vertical: AppTokens.sp2,
@@ -44,6 +45,11 @@ class AppThreadEventCard extends StatelessWidget {
   /// Tope de ancho para el contenido largo (envuelve dentro de él). `null` deja
   /// que la tarjeta crezca con su contenido (acotada por el padding de la lista).
   final double? maxWidth;
+
+  /// Cómo se ancla la tarjeta en su carril. Por defecto centrada (un registro
+  /// del hilo, no la burbuja de nadie); los hilos de mensajes la pegan a
+  /// `centerLeft` para que viva en el área de mensaje y no salte al expandir.
+  final AlignmentGeometry alignment;
 
   final EdgeInsetsGeometry padding;
 
@@ -77,7 +83,7 @@ class AppThreadEventCard extends StatelessWidget {
         child: box,
       );
     }
-    return Align(alignment: Alignment.center, child: box);
+    return Align(alignment: alignment, child: box);
   }
 }
 

@@ -47,6 +47,7 @@ class TrainerTurnGroup extends StatelessWidget {
           TraceTimeline(
             nodes: nodes,
             summary: _summaryLine(),
+            stretch: true,
             bodyBuilder: (ctx, i) => _bodyFor(ctx, nodes, i),
           ),
         for (final r in turn.responses)

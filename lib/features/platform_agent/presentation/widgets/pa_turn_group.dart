@@ -48,6 +48,7 @@ class PaTurnGroup extends StatelessWidget {
           TraceTimeline(
             nodes: nodes,
             summary: _summaryLine(),
+            stretch: true,
             bodyBuilder: (ctx, i) => _bodyFor(ctx, nodes, i),
           ),
         // Las confirmaciones nunca se pliegan: su lógica (posteo del literal,

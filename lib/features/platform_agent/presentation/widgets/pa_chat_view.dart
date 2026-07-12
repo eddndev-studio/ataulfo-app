@@ -139,6 +139,7 @@ class _PaChatViewState extends State<PaChatView>
           : capNodesLive(live.nodos),
       summary: s.livePartial ? '$resumen (traza parcial)' : resumen,
       initiallyExpanded: true,
+      stretch: true,
       pulseLast: s.sending,
       stopped: s.liveStopped,
       onStop: s.sending

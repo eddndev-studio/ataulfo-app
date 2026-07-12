@@ -121,7 +121,9 @@ void main() {
       expect(find.text('consulto el doc de horarios'), findsNothing);
 
       await tester.tap(find.byKey(const Key('ai_log.run_trace.r1')));
-      await tester.pump();
+      // El carril abre animado (AnimatedSize): asentar antes de tocar un cuerpo
+      // interno, que hasta que el reveal termina queda recortado.
+      await tester.pumpAndSettle();
 
       // Nodos con título humano (jamás el crudo) y el razonamiento como
       // cuerpo del nodo thinking — sin un segundo plegado propio.
@@ -182,7 +184,9 @@ void main() {
       await pump(tester);
 
       await tester.tap(find.byKey(const Key('ai_log.run_trace.r1')));
-      await tester.pump();
+      // El carril abre animado (AnimatedSize): asentar antes de tocar un cuerpo
+      // interno, que hasta que el reveal termina queda recortado.
+      await tester.pumpAndSettle();
       expect(find.text('Aviso del sistema'), findsOneWidget);
       expect(find.textContaining('AVISO DEL SISTEMA'), findsOneWidget);
       expect(find.text('Cliente'), findsOneWidget);
