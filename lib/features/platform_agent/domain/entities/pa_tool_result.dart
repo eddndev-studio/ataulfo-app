@@ -14,6 +14,20 @@ class PaFieldChange {
   final String to;
 }
 
+/// Reemplazo textual anclado que devuelve edit_prompt/edit_doc. `context`
+/// ubica el fragmento sin obligar a pintar el documento completo.
+class PaTextDiff {
+  const PaTextDiff({
+    required this.oldText,
+    required this.newText,
+    required this.context,
+  });
+
+  final String oldText;
+  final String newText;
+  final String context;
+}
+
 /// Resultado de un tool, parseado del envelope `tool_results` del wire. El
 /// envelope es jsonb crudo con claves snake_case (`tool_name`, `content`) y
 /// `content` DOBLE-CODIFICADO: un string JSON con el output real del tool
@@ -24,6 +38,8 @@ class PaToolResult {
     required this.changed,
     required this.errorKind,
     required this.bots,
+    this.resourceName = '',
+    this.diff,
   });
 
   final String toolName;
@@ -32,9 +48,12 @@ class PaToolResult {
 
   /// Nombres de los Bots impactados, sólo poblado en requires_confirmation.
   final List<String> bots;
+  final String resourceName;
+  final PaTextDiff? diff;
 
   /// Hay algo que valga la pena expandir (un changeset real o un error).
-  bool get hasDetail => changed.isNotEmpty || errorKind.isNotEmpty;
+  bool get hasDetail =>
+      changed.isNotEmpty || errorKind.isNotEmpty || diff != null;
 
   bool get requiresConfirmation => errorKind == 'requires_confirmation';
 
@@ -43,6 +62,7 @@ class PaToolResult {
     changed: <PaFieldChange>[],
     errorKind: '',
     bots: <String>[],
+    resourceName: '',
   );
 
   static PaToolResult parse(String? raw) {
@@ -57,6 +77,9 @@ class PaToolResult {
         changed: _parseChanged(inner['changed']),
         errorKind: inner['error_kind'] as String? ?? '',
         bots: _parseBots(inner['bots']),
+        resourceName:
+            inner['name']?.toString() ?? inner['template_id']?.toString() ?? '',
+        diff: _parseDiff(inner['diff']),
       );
     } on FormatException {
       // tool_results no es JSON: degrada a chip sin nombre.
@@ -109,6 +132,15 @@ class PaToolResult {
     return out;
   }
 
+  static PaTextDiff? _parseDiff(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final oldText = raw['old']?.toString() ?? '';
+    final newText = raw['new']?.toString() ?? '';
+    final context = raw['context']?.toString() ?? '';
+    if (oldText.isEmpty && newText.isEmpty) return null;
+    return PaTextDiff(oldText: oldText, newText: newText, context: context);
+  }
+
   /// Valor de un campo a texto: null ⇒ '∅' (distingue "vacío" de la cadena
   /// "null"); el resto, su representación natural.
   static String _fmt(Object? v) => v == null ? '∅' : v.toString();
@@ -121,6 +153,18 @@ String paToolErrorCopy(String kind) {
       return 'No se encontró el recurso.';
     case 'version_conflict':
       return 'Conflicto de versión: alguien más lo cambió, reintenta.';
+    case 'anchor_not_found':
+      return 'El fragmento ya no existe. Volveré a leer antes de reintentar.';
+    case 'anchor_not_unique':
+      return 'El fragmento aparece varias veces; hace falta un ancla más específica.';
+    case 'empty_anchor':
+      return 'El reemplazo necesita un fragmento de referencia.';
+    case 'no_change':
+      return 'El reemplazo no produciría ningún cambio.';
+    case 'already_exists':
+      return 'Ese documento ya existe; hay que editarlo en lugar de crearlo.';
+    case 'unavailable':
+      return 'Esta capacidad no está disponible en este entorno.';
     case 'invalid_input':
       return 'Dato inválido por las reglas del negocio.';
     case 'invalid_args':

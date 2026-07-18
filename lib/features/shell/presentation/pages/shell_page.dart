@@ -27,7 +27,7 @@ import '../widgets/email_verification_banner.dart';
 /// sub-rutas por tab obligaría a reabrir esa lógica sin ganar nada
 /// (los tabs no son destinos compartibles por URL en este producto).
 class ShellPage extends StatefulWidget {
-  const ShellPage({super.key, this.routeObserver});
+  const ShellPage({super.key, this.routeObserver, this.assistantDraft = ''});
 
   /// Observer compartido con el GoRouter del AppRouter. ShellPage no lo
   /// usa directamente: se lo entrega a Bots/TemplatesListPage para que
@@ -36,15 +36,28 @@ class ShellPage extends StatefulWidget {
   /// aislados que no necesitan el cableado completo.
   final RouteObserver<PageRoute<dynamic>>? routeObserver;
 
+  /// Handoff contextual desde una superficie del producto (p. ej. una
+  /// plantilla). Se siembra en el composer del agente único; nunca se envía
+  /// automáticamente para que el operador conserve control.
+  final String assistantDraft;
+
   @override
   State<ShellPage> createState() => _ShellPageState();
 }
 
 class _ShellPageState extends State<ShellPage> {
-  int _index = 0;
+  late int _index;
 
   /// Índice de la tab Ajustes: destino del avatar de los headers de sección.
   static const int _settingsIndex = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    // Conserva Bots como landing habitual, pero un handoff contextual abre el
+    // primer tab (Asistente) de inmediato.
+    _index = widget.assistantDraft.trim().isEmpty ? 1 : 0;
+  }
 
   /// Punto ÚNICO de verdad de las tabs: por entrada viven juntos la etiqueta
   /// e ícono del navegador, la página del IndexedStack y el FAB contextual.
@@ -53,6 +66,12 @@ class _ShellPageState extends State<ShellPage> {
   /// IndexedStack su estado); no puede ser const porque Bots/Templates
   /// reciben el routeObserver del widget.
   late final List<_TabSpec> _tabs = <_TabSpec>[
+    _TabSpec(
+      label: 'Asistente',
+      icon: Icons.auto_awesome,
+      page: PlatformAgentPage(initialDraft: widget.assistantDraft),
+      lazy: true,
+    ),
     _TabSpec(
       label: 'Bots',
       icon: Icons.smart_toy_outlined,
@@ -79,17 +98,6 @@ class _ShellPageState extends State<ShellPage> {
       activeIcon: Icons.label,
       page: LabelsAdminPage(onOpenSettings: () => _select(_settingsIndex)),
       fab: _labelCreateFab,
-    ),
-    // El asistente es lazy: su chat (que lee PlatformAgentChatBloc y
-    // muestra un spinner mientras carga) no debe vivir offstage en el
-    // IndexedStack — evita el spinner oculto que colgaría pumpAndSettle y
-    // difiere la carga hasta abrir la tab. Su glifo no tiene par
-    // outlined/filled: activa repite el mismo (con el pop de selección).
-    const _TabSpec(
-      label: 'Asistente',
-      icon: Icons.auto_awesome,
-      page: PlatformAgentPage(),
-      lazy: true,
     ),
     // Agenda: lazy como el asistente (su cubit carga el día al abrir la tab,
     // sin coste en el arranque). Su FAB abre la reserva manual; al crear con

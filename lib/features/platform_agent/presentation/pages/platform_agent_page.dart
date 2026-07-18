@@ -20,7 +20,9 @@ import '../widgets/pa_failure_copy.dart';
 /// context (provisto arriba del shell) y dispara la carga la primera vez que
 /// la tab se abre (init perezoso: solo si el estado sigue en Loading).
 class PlatformAgentPage extends StatefulWidget {
-  const PlatformAgentPage({super.key});
+  const PlatformAgentPage({super.key, this.initialDraft = ''});
+
+  final String initialDraft;
 
   @override
   State<PlatformAgentPage> createState() => _PlatformAgentPageState();
@@ -36,6 +38,9 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
     final bloc = context.read<PlatformAgentChatBloc>();
     if (bloc.state is PaChatLoading) {
       bloc.add(const PaChatStarted());
+    }
+    if (widget.initialDraft.trim().isNotEmpty) {
+      bloc.add(PaChatDraftSeeded(widget.initialDraft));
     }
   }
 
@@ -65,7 +70,8 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
           for (final c in state.conversations)
             AppThreadListItem(
               id: c.id,
-              title: c.title.isNotEmpty ? c.title : 'Conversación',
+              title: c.title.isNotEmpty ? c.title : 'Nueva conversación',
+              subtitle: _relativeThreadDate(c.updatedAt),
             ),
         ],
         onSelect: (id) {
@@ -174,11 +180,36 @@ class _Header extends StatelessWidget {
           const Icon(Icons.auto_awesome, size: 20, color: AppTokens.primary),
           const SizedBox(width: AppTokens.sp2),
           Expanded(
-            child: Text(
-              'Asistente',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(color: AppTokens.text1),
+            child: BlocBuilder<PlatformAgentChatBloc, PaChatState>(
+              buildWhen: (before, after) =>
+                  before is! PaChatLoaded ||
+                  after is! PaChatLoaded ||
+                  before.activeConversation != after.activeConversation,
+              builder: (context, state) {
+                final title = state is PaChatLoaded
+                    ? state.activeConversation.title.trim()
+                    : '';
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Ataúlfo',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: AppTokens.text1),
+                    ),
+                    if (title.isNotEmpty)
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: AppTokens.text2,
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
           const _ModelMenu(),
@@ -201,6 +232,19 @@ class _Header extends StatelessWidget {
       ),
     );
   }
+}
+
+String _relativeThreadDate(DateTime value) {
+  final local = value.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  final delta = today.difference(day).inDays;
+  final hh = local.hour.toString().padLeft(2, '0');
+  final mm = local.minute.toString().padLeft(2, '0');
+  if (delta == 0) return 'Hoy · $hh:$mm';
+  if (delta == 1) return 'Ayer · $hh:$mm';
+  return '${local.day}/${local.month}/${local.year}';
 }
 
 /// Menú de modelo del asistente. Solo aparece cuando el server expone la

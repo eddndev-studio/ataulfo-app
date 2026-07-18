@@ -17,7 +17,7 @@ import '../../domain/repositories/platform_agent_repository.dart';
 /// devuelve el assistant final, pero el hilo completo (tool results) vive en
 /// el server: tras cada turno se RECARGA.
 const int _pageLimit = 50;
-const String _newTitle = 'Asistente';
+const String _newTitle = '';
 
 sealed class PaChatEvent {
   const PaChatEvent();
@@ -25,6 +25,15 @@ sealed class PaChatEvent {
 
 final class PaChatStarted extends PaChatEvent {
   const PaChatStarted();
+}
+
+/// Siembra un handoff contextual en el composer sin enviarlo. Puede llegar
+/// mientras PaChatStarted aún carga; el bloc lo aplica al hilo que resulte
+/// activo cuando termine.
+final class PaChatDraftSeeded extends PaChatEvent {
+  const PaChatDraftSeeded(this.text);
+
+  final String text;
 }
 
 final class PaChatMessageSent extends PaChatEvent {
@@ -427,6 +436,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
        _mediaSink = mediaSink,
        super(const PaChatLoading()) {
     on<PaChatStarted>(_onStarted);
+    on<PaChatDraftSeeded>(_onDraftSeeded);
     on<PaChatMessageSent>(_onMessageSent);
     on<PaChatAttachRequested>(_onAttachRequested);
     on<PaChatAttachmentRemoved>(_onAttachmentRemoved);
@@ -488,6 +498,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
   /// Borradores del composer por conversationId (en memoria): sobreviven el
   /// cambio de pestaña del shell, que destruye el estado del composer.
   final Map<String, String> _drafts = <String, String>{};
+  String _pendingSeed = '';
 
   /// Borrador vigente del hilo activo. La página lo lee al (re)montarse —p.ej.
   /// al volver a la pestaña del shell, que destruye y recrea el composer— porque
@@ -554,6 +565,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       final list = convs.isNotEmpty ? convs : <PaConversation>[active];
       final models = await _loadModels();
       final page = await _loadMessages(active.id);
+      final seed = _pendingSeed;
+      _pendingSeed = '';
+      if (seed.isNotEmpty) _drafts[active.id] = seed;
       emit(
         PaChatLoaded(
           conversations: list,
@@ -563,6 +577,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
           sending: false,
           models: models.options,
           defaultModelId: models.defaultId,
+          draft: seed,
         ),
       );
     } on PaFailure catch (f) {
@@ -586,6 +601,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       return;
     }
     final convId = current.activeConversation.id;
+    final turnBase = _withIntentTitle(current, event.content);
     _cancelRequested = false;
     _drafts.remove(convId);
     final optimistic = PaMessage(
@@ -598,7 +614,9 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     );
     emit(
       current.copyWith(
-        messages: <PaMessage>[...current.messages, optimistic],
+        conversations: turnBase.conversations,
+        activeConversation: turnBase.activeConversation,
+        messages: <PaMessage>[...turnBase.messages, optimistic],
         sending: true,
         liveEvents: const <PaProgressEvent>[],
         livePartial: false,
@@ -655,8 +673,8 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         );
       } else {
         emit(
-          current.copyWith(
-            messages: <PaMessage>[...current.messages, optimistic, assistant],
+          turnBase.copyWith(
+            messages: <PaMessage>[...turnBase.messages, optimistic, assistant],
             sending: false,
             liveEvents: const <PaProgressEvent>[],
             livePartial: false,
@@ -671,6 +689,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
       // Recarga best-effort (follow-up, ya con el turno cerrado): trae el hilo
       // completo del server, incl. los mensajes de tool que el POST no devuelve.
       await _reloadThread(emit, convId, assistant.id);
+      await _refreshConversations(emit, convId);
     } on PaFailure catch (f) {
       unawaited(_progressSub?.cancel());
       _progressSub = null;
@@ -703,7 +722,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         );
       } else {
         emit(
-          current.copyWith(
+          turnBase.copyWith(
             sending: false,
             liveEvents: const <PaProgressEvent>[],
             livePartial: false,
@@ -714,6 +733,34 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         );
       }
     }
+  }
+
+  PaChatLoaded _withIntentTitle(PaChatLoaded state, String intent) {
+    if (state.activeConversation.title.trim().isNotEmpty) return state;
+    final fallback = _intentTitle(intent);
+    if (fallback.isEmpty) return state;
+    final updated = PaConversation(
+      id: state.activeConversation.id,
+      title: fallback,
+      createdAt: state.activeConversation.createdAt,
+      updatedAt: state.activeConversation.updatedAt,
+    );
+    return state.copyWith(
+      activeConversation: updated,
+      conversations: state.conversations
+          .map((c) => c.id == updated.id ? updated : c)
+          .toList(growable: false),
+    );
+  }
+
+  static String _intentTitle(String input) {
+    final clean = input
+        .trim()
+        .replaceAll(RegExp(r'[^A-Za-z0-9À-ÿ_-]+'), ' ')
+        .trim();
+    if (clean.isEmpty) return '';
+    final words = clean.split(RegExp(r'\s+')).take(7).join(' ');
+    return words.length <= 64 ? words : '${words.substring(0, 63)}…';
   }
 
   /// Marca parcial la traza viva del turno recién cerrado: la recarga falló o
@@ -746,7 +793,7 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     ({List<PaMessage> messages, String nextCursor}) reloaded;
     try {
       reloaded = await _loadMessages(conversationId);
-    } on PaFailure {
+    } on Object {
       _markLivePartial(emit, conversationId);
       return;
     }
@@ -770,6 +817,42 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
         livePartial: false,
       ),
     );
+  }
+
+  Future<void> _refreshConversations(
+    Emitter<PaChatState> emit,
+    String activeId,
+  ) async {
+    List<PaConversation> fresh;
+    try {
+      fresh = await _repo.listConversations();
+    } on Object {
+      return;
+    }
+    if (isClosed) return;
+    final current = state;
+    if (current is! PaChatLoaded ||
+        current.activeConversation.id != activeId ||
+        current.sending) {
+      return;
+    }
+    // Si el modelo aún no terminó, conservar el título optimista local en vez
+    // de volver a una fila vacía. La próxima recarga toma el título persistido.
+    final merged = fresh
+        .map((c) {
+          if (c.title.trim().isNotEmpty) return c;
+          for (final local in current.conversations) {
+            if (local.id == c.id && local.title.trim().isNotEmpty) return local;
+          }
+          return c;
+        })
+        .toList(growable: false);
+    PaConversation? active;
+    for (final c in merged) {
+      if (c.id == activeId) active = c;
+    }
+    if (active == null) return;
+    emit(current.copyWith(conversations: merged, activeConversation: active));
   }
 
   void _onProgressReceived(
@@ -1285,5 +1368,17 @@ class PlatformAgentChatBloc extends Bloc<PaChatEvent, PaChatState> {
     // Persistir sin re-emitir: el composer es la fuente de verdad mientras el
     // hilo está abierto; el borrador se siembra al cambiar de hilo o cancelar.
     _drafts[current.activeConversation.id] = event.text;
+  }
+
+  void _onDraftSeeded(PaChatDraftSeeded event, Emitter<PaChatState> emit) {
+    final text = event.text.trimRight();
+    if (text.isEmpty) return;
+    final current = state;
+    if (current is! PaChatLoaded) {
+      _pendingSeed = text;
+      return;
+    }
+    _drafts[current.activeConversation.id] = text;
+    emit(current.copyWith(draft: text));
   }
 }

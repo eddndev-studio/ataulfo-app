@@ -233,8 +233,8 @@ void main() {
       final labels = nav.items.map((i) => i.label).toList();
       expect(labels.last, 'Ajustes');
       expect(labels[labels.length - 2], 'Agenda');
-      // El asistente queda antes de Agenda (tras Etiquetas).
-      expect(labels[labels.length - 3], 'Asistente');
+      expect(labels.first, 'Asistente');
+      expect(labels[1], 'Bots');
     });
 
     testWidgets('Ajustes cierra la barra y Agenda es la penúltima (rail)', (
@@ -250,7 +250,8 @@ void main() {
           .toList();
       expect(labels.last, 'Ajustes');
       expect(labels[labels.length - 2], 'Agenda');
-      expect(labels[labels.length - 3], 'Asistente');
+      expect(labels.first, 'Asistente');
+      expect(labels[1], 'Bots');
     });
 
     testWidgets('tap Plantillas (phone) muestra TemplatesListPage', (

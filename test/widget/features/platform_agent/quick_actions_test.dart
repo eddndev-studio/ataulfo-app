@@ -62,13 +62,17 @@ void main() {
     tester,
   ) async {
     await pump(tester);
-    expect(find.byKey(const Key('pa.quick_action.pause')), findsOneWidget);
+    expect(find.byKey(const Key('pa.quick_action.prompt')), findsOneWidget);
+    expect(find.byKey(const Key('pa.quick_action.document')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('pa.quick_action.pause')));
+    await tester.tap(find.byKey(const Key('pa.quick_action.prompt')));
     await tester.pump();
 
     // El composer queda prefijado con el arranque editable (label distinto del
     // texto, para no confundir el chip con el campo).
-    expect(find.text('Pausa el bot '), findsOneWidget);
+    expect(
+      find.text('Quiero mejorar el prompt de la plantilla '),
+      findsOneWidget,
+    );
   });
 }

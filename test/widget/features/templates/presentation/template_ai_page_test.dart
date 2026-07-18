@@ -948,7 +948,7 @@ void main() {
     expect(find.text('Sin prompt definido'), findsOneWidget);
   });
 
-  testWidgets('CTA "Entrenar prompt" apila /templates/:id/trainer', (
+  testWidgets('CTA abre /home con plantilla e intención en el borrador', (
     tester,
   ) async {
     String? destinationUri;
@@ -966,7 +966,7 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/templates/:id/trainer',
+          path: '/home',
           builder: (_, st) {
             destinationUri = st.uri.toString();
             return const Scaffold(body: SizedBox.shrink());
@@ -986,7 +986,9 @@ void main() {
     await tester.tap(find.byKey(const Key('template_ai.train_button')));
     await tester.pumpAndSettle();
 
-    expect(destinationUri, '/templates/t1/trainer');
+    expect(destinationUri, contains('/home?prompt='));
+    expect(destinationUri, contains('Soporte'));
+    expect(destinationUri, contains('t1'));
   });
 
   testWidgets('Failed muestra Reintentar que dispatcha load', (tester) async {

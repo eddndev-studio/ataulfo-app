@@ -91,14 +91,8 @@ import '../../features/flows/presentation/widgets/flow_detail_app_bar.dart';
 import '../../features/labels/domain/repositories/chat_labels_repository.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/trainer/domain/repositories/trainer_repositories.dart';
-import '../../features/trainer/presentation/bloc/preview_bloc.dart';
 import '../../features/platform_agent/domain/repositories/platform_agent_repository.dart';
 import '../../features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
-import '../../features/trainer/presentation/bloc/trainer_chat_bloc.dart';
-import '../../features/trainer/presentation/bloc/workspace_bloc.dart';
-import '../../features/trainer/presentation/pages/preview_page.dart';
-import '../../features/trainer/presentation/pages/trainer_chat_page.dart';
-import '../../features/trainer/presentation/pages/workspace_page.dart';
 import '../../features/ai_ledger/domain/ai_ledger_repository.dart';
 import '../../features/ai_ledger/presentation/bloc/ai_ledger_bloc.dart';
 import '../../features/ai_ledger/presentation/pages/ai_ledger_page.dart';
@@ -267,13 +261,9 @@ class AppRouter {
        _aiLogRepo = aiLogRepository,
        _aiLedgerRepo = aiLedgerRepository,
        _executionsRepo = executionsRepository,
-       _trainerRepo = trainerRepository,
-       _trainerEvents = trainerEvents,
        _monitorActivity = monitorActivity,
        _monitorBotActivity = monitorBotActivity,
        _monitorCatchup = monitorCatchup,
-       _workspaceRepo = workspaceRepository,
-       _previewRepo = previewRepository,
        _platformAgentRepo = platformAgentRepository,
        _platformAgentEvents = platformAgentEvents,
        _membershipsRepo = membershipsRepository,
@@ -315,15 +305,12 @@ class AppRouter {
   final QuickRepliesRepository _quickRepliesRepo;
   final LabelsRepository _labelsRepo;
   final ChatLabelsRepository _chatLabelsRepo;
-  final TrainerRepository _trainerRepo;
-  final TrainerEvents _trainerEvents;
   final MonitorActivityDatasource _monitorActivity;
   final MonitorBotActivityDatasource _monitorBotActivity;
 
   /// Catch-up del run en curso (opcional): null ⇒ el monitor arranca vacío como
   /// antes; presente ⇒ el cubit hidrata el timeline al abrir el chat.
   final MonitorCatchupDatasource? _monitorCatchup;
-  final WorkspaceRepository _workspaceRepo;
 
   /// El operador actual es ADMIN+ (gatea la observación del monitor: el endpoint
   /// SSE de actividad es ADMIN+; no abrimos el socket para roles menores).
@@ -332,7 +319,6 @@ class AppRouter {
     return s is AuthAuthenticated && isAdminOrAbove(s.identity.role);
   }
 
-  final PreviewRepository _previewRepo;
   final PlatformAgentRepository _platformAgentRepo;
   final PlatformAgentEvents _platformAgentEvents;
   final NotesRepository _notesRepo;
@@ -672,7 +658,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/home',
-        builder: (context, _) {
+        builder: (context, state) {
           // El subárbol del shell se keyea por el orgId activo: al cambiar de
           // org (switch-org), el KeyedSubtree destruye y recrea el
           // MultiBlocProvider y sus blocs page-scoped, que recargan datos de la
@@ -781,7 +767,11 @@ class AppRouter {
                         // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
                         // El routeObserver se atraviesa al shell para que ambos list
                         // pages disparen su refresh al volver de una sub-ruta.
-                        child: ShellPage(routeObserver: _routeObserver),
+                        child: ShellPage(
+                          routeObserver: _routeObserver,
+                          assistantDraft:
+                              state.uri.queryParameters['prompt'] ?? '',
+                        ),
                       ),
                     ),
                   ),
@@ -1383,89 +1373,6 @@ class AppRouter {
               ),
               body: const OrgAiConfigPage(),
             ),
-          );
-        },
-      ),
-      // La pantalla "Editar plantilla" murió: renombrar vive en el sheet
-      // del hub y el motor IA se edita en su propia página (/ai).
-      GoRoute(
-        // Chat con el agente entrenador (S24). Page-scoped: el bloc carga
-        // (o crea) el hilo más reciente al montar. El WorkspaceRepository
-        // y PreviewRepository NO cuelgan aquí: las subrutas montan los
-        // suyos (cada pantalla es page-scoped completa).
-        path: '/templates/:id/trainer',
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          // El renderer compartido de adjuntos (AttachmentContent) exige en
-          // contexto el abridor de documentos, el reproductor de video y el
-          // player de audio del hilo; la caché de bytes ya es app-wide.
-          return MultiRepositoryProvider(
-            providers: <RepositoryProvider<dynamic>>[
-              RepositoryProvider<MediaOpener>.value(value: _mediaOpener),
-              RepositoryProvider<VideoPlayback>.value(
-                value: const InAppVideoPlayback(),
-              ),
-              // Grabador de notas de voz para el composer del entrenador
-              // (Noop fuera de Android: el micrófono no se ofrece si no está
-              // soportado).
-              RepositoryProvider<AudioRecorder>.value(value: _audioRecorder),
-            ],
-            child: MultiBlocProvider(
-              providers: <BlocProvider<dynamic>>[
-                BlocProvider<TrainerChatBloc>(
-                  create: (context) => TrainerChatBloc(
-                    repo: _trainerRepo,
-                    templateId: id,
-                    picker: FilePickerMediaFilePicker(),
-                    events: _trainerEvents,
-                    // Siembra la copia local de cada adjunto subido: el wire
-                    // del entrenador no trae URL firmada y la burbuja rica
-                    // solo puede servirse de la caché.
-                    mediaSink: context.read<MessageMediaCache>(),
-                  )..add(const TrainerChatStarted()),
-                ),
-                // Player de audio del hilo (uno por visita; el provider lo
-                // cierra al salir y el cubit dispone el engine).
-                BlocProvider<ThreadAudioCubit>(
-                  create: (_) =>
-                      ThreadAudioCubit(engine: _audioEngineFactory()),
-                ),
-              ],
-              child: TrainerChatPage(templateId: id),
-            ),
-          );
-        },
-      ),
-      GoRoute(
-        // Workspace de negocio (S24): documentos que alimentan al bot. El
-        // repo cuelga del scope para que el sheet de detalle haga el GET
-        // del contenido completo.
-        path: '/templates/:id/trainer/workspace',
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return RepositoryProvider<WorkspaceRepository>.value(
-            value: _workspaceRepo,
-            child: BlocProvider<WorkspaceBloc>(
-              create: (_) =>
-                  WorkspaceBloc(repo: _workspaceRepo, templateId: id)
-                    ..add(const WorkspaceLoadRequested()),
-              child: WorkspacePage(templateId: id),
-            ),
-          );
-        },
-      ),
-      GoRoute(
-        // Preview sandbox (S24): emulador del bot, efectos grabados.
-        path: '/templates/:id/trainer/preview',
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return BlocProvider<PreviewBloc>(
-            create: (_) => PreviewBloc(
-              repo: _previewRepo,
-              templateId: id,
-              picker: FilePickerMediaFilePicker(),
-            )..add(const PreviewStarted()),
-            child: PreviewPage(templateId: id),
           );
         },
       ),

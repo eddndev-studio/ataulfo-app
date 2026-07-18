@@ -82,10 +82,14 @@ class _PaChatViewState extends State<PaChatView>
         !cur.sending &&
         cur.sendFailure == null &&
         cur.draft.isNotEmpty;
+    final seedAppeared =
+        prev.draft != cur.draft &&
+        cur.draft.isNotEmpty &&
+        _composer.text.isEmpty;
     // Sembrar el composer SOLO en transiciones puntuales: cambio de hilo o
     // cancelación restauran el borrador; un fallo recupera el texto enviado.
     // Nunca en un rebuild ordinario, para no pisar lo que el operador teclea.
-    if (convChanged || cancelRestore) {
+    if (convChanged || cancelRestore || seedAppeared) {
       _setComposer(cur.draft);
     } else if (failureAppeared) {
       _setComposer(cur.lastAttemptedContent);

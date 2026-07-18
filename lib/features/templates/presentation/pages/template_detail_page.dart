@@ -19,10 +19,10 @@ import '../bloc/var_defs_bloc.dart';
 import '../widgets/template_detail_header.dart';
 import '../widgets/template_rename_sheet.dart';
 import '../../../ai_catalog/presentation/widgets/thinking_label.dart';
-import '../widgets/trainer_hero_card.dart';
+import '../widgets/template_assistant_card.dart';
 
 /// Detalle de una Template (S03): el HUB de la plantilla. Identidad en el
-/// header de gradiente, el Entrenador como card hero, y las áreas que crecen
+/// header de gradiente, el agente de plataforma como card hero, y las áreas que crecen
 /// sin tope (flujos, variables, motor IA) como filas launcher hacia páginas
 /// dedicadas — inline se volvían inusables con decenas de items. Consume el
 /// `TemplateDetailBloc` del scope; FlowsBloc/VarDefsBloc alimentan counts y
@@ -129,7 +129,10 @@ class _LoadedView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                TrainerHeroCard(templateId: template.id),
+                TemplateAssistantCard(
+                  templateId: template.id,
+                  templateName: template.name,
+                ),
                 const SizedBox(height: AppTokens.sp6),
                 _SectionLauncher(template: template),
                 const SizedBox(height: AppTokens.sp6),

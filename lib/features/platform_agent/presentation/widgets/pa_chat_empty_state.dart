@@ -28,10 +28,10 @@ const List<_Starter> _starters = <_Starter>[
     prefill: '¿Cuántos bots tengo y cómo se llaman?',
   ),
   _Starter(
-    id: 'pause',
-    label: 'Pausar un bot',
-    icon: Icons.pause_circle_outline,
-    prefill: 'Pausa el bot ',
+    id: 'prompt',
+    label: 'Ajustar una plantilla',
+    icon: Icons.edit_note,
+    prefill: 'Quiero mejorar el prompt de la plantilla ',
   ),
   _Starter(
     id: 'audit',
@@ -40,10 +40,10 @@ const List<_Starter> _starters = <_Starter>[
     prefill: 'Audita el flujo ',
   ),
   _Starter(
-    id: 'clone',
-    label: 'Duplicar un flujo',
-    icon: Icons.copy_all_outlined,
-    prefill: 'Duplica el flujo ',
+    id: 'document',
+    label: 'Crear un documento',
+    icon: Icons.description_outlined,
+    prefill: 'Crea un documento para ',
   ),
 ];
 
@@ -75,9 +75,9 @@ class PaChatEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppTokens.sp2),
             Text(
-              'Pídele que liste tus bots, ajuste una plantilla, cree o borre '
-              'flujos, o apague la IA de un bot. Te pedirá confirmación cuando '
-              'un cambio afecte a varios bots.',
+              'Opera bots, plantillas, flujos y documentos desde un solo hilo. '
+              'Puedes cambiar de tarea sin perder el contexto; te pedirá '
+              'confirmación antes de cambios con impacto.',
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
             ),

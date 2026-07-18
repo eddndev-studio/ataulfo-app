@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design/tool_glyphs.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_thread_event_card.dart';
@@ -116,14 +117,25 @@ class _PaExpandableToolCardState extends State<PaExpandableToolCard> {
   @override
   Widget build(BuildContext context) {
     final r = widget.result;
-    final label = r.toolName.isNotEmpty
-        ? 'Usó ${r.toolName}'
-        : 'Acción ejecutada';
+    final baseLabel = toolTitleFor(r.toolName);
+    final label =
+        r.resourceName.isNotEmpty &&
+            const <String>{
+              'read_doc',
+              'write_doc',
+              'edit_doc',
+              'delete_doc',
+            }.contains(r.toolName)
+        ? '$baseLabel · ${r.resourceName}'
+        : baseLabel;
     final isError = r.errorKind.isNotEmpty;
 
     if (!r.hasDetail) {
       return AppThreadEventCard(
-        child: AppThreadEventHeader(icon: Icons.bolt_outlined, label: label),
+        child: AppThreadEventHeader(
+          icon: toolIconFor(r.toolName),
+          label: label,
+        ),
       );
     }
 
@@ -138,7 +150,7 @@ class _PaExpandableToolCardState extends State<PaExpandableToolCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           AppThreadEventHeader(
-            icon: isError ? Icons.error_outline : Icons.bolt_outlined,
+            icon: isError ? Icons.error_outline : toolIconFor(r.toolName),
             label: label,
             error: isError,
             showChevron: true,
@@ -192,6 +204,39 @@ class PaToolDetail extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        if (result.diff case final diff?) ...<Widget>[
+          if (diff.context.isNotEmpty) ...<Widget>[
+            Text(
+              'Contexto',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppTokens.text2,
+              ),
+            ),
+            const SizedBox(height: AppTokens.sp1),
+            Text(
+              diff.context,
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppTokens.text2,
+                fontFamily: 'monospace',
+              ),
+            ),
+            const SizedBox(height: AppTokens.sp2),
+          ],
+          _TextDiffBlock(
+            prefix: '−',
+            text: diff.oldText,
+            color: AppTokens.danger,
+          ),
+          const SizedBox(height: AppTokens.sp1),
+          _TextDiffBlock(
+            prefix: '+',
+            text: diff.newText,
+            color: AppTokens.success,
+          ),
+          if (result.changed.isNotEmpty) const SizedBox(height: AppTokens.sp2),
+        ],
         for (final c in result.changed)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1 / 2),
@@ -203,6 +248,39 @@ class PaToolDetail extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _TextDiffBlock extends StatelessWidget {
+  const _TextDiffBlock({
+    required this.prefix,
+    required this.text,
+    required this.color,
+  });
+
+  final String prefix;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppTokens.sp2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+        border: Border(left: BorderSide(color: color, width: 2)),
+      ),
+      child: SelectableText(
+        '$prefix $text',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: AppTokens.text1,
+          fontFamily: 'monospace',
+          height: 1.45,
+        ),
+      ),
     );
   }
 }

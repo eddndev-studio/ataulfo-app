@@ -18,6 +18,7 @@ import '../../domain/entities/template.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../bloc/template_detail_bloc.dart';
 import '../widgets/silence_labels_sheet.dart';
+import '../widgets/template_assistant_card.dart';
 import '../widgets/template_prompt_card.dart';
 
 /// Contenido del motor IA de una plantilla (`/templates/:id/ai`): información Y
@@ -28,7 +29,8 @@ import '../widgets/template_prompt_card.dart';
 /// planos ('Motor IA'), la misma anatomía que la config de IA de la org.
 ///
 /// El prompt se LEE aquí (card colapsada + hoja "Ver completo"); se EDITA
-/// conversando con el Entrenador — el CTA del pie lo lleva ahí.
+/// conversando con el agente de plataforma — el CTA del pie conserva esta
+/// plantilla como contexto explícito en su composer.
 class TemplateAiPage extends StatelessWidget {
   const TemplateAiPage({super.key});
 
@@ -154,11 +156,15 @@ class _LoadedView extends StatelessWidget {
           const SizedBox(height: AppTokens.sp5),
           AppButton.filled(
             key: const Key('template_ai.train_button'),
-            label: 'Entrenar prompt',
-            icon: Icons.school_outlined,
+            label: 'Continuar en el asistente',
+            icon: Icons.auto_awesome,
             fullWidth: true,
-            // push apila el entrenador; back físico vuelve a esta ficha.
-            onPressed: () => context.push('/templates/${template.id}/trainer'),
+            onPressed: () => context.go(
+              templateAssistantLocation(
+                templateId: template.id,
+                templateName: template.name,
+              ),
+            ),
           ),
         ],
       ),

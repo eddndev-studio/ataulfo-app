@@ -47,7 +47,7 @@ void main() {
     // bug latente (leer tool_name, no toolName) — antes decía "Acción ejecutada".
     final raw = _toolRaw('list_bots', <String, dynamic>{'bots': <dynamic>[]});
     await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
-    expect(find.text('Usó list_bots'), findsOneWidget);
+    expect(find.text('Consultó los bots'), findsOneWidget);
     expect(find.byKey(const Key('pa.tool_card.header')), findsNothing);
   });
 
@@ -61,7 +61,7 @@ void main() {
     });
     await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
 
-    expect(find.text('Usó update_flow'), findsOneWidget);
+    expect(find.text('Actualizó un flujo'), findsOneWidget);
     // Colapsado: el campo cambiado no está visible.
     expect(find.textContaining('is_active'), findsNothing);
 
@@ -79,7 +79,7 @@ void main() {
     });
     await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
 
-    expect(find.text('Usó update_variable'), findsOneWidget);
+    expect(find.text('Actualizó una variable'), findsOneWidget);
     await tester.tap(find.byKey(const Key('pa.tool_card.header')));
     await tester.pumpAndSettle();
 
@@ -97,6 +97,37 @@ void main() {
     await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
     expect(find.text('Usó react'), findsOneWidget);
     expect(find.byKey(const Key('pa.tool_card.header')), findsNothing);
+  });
+
+  testWidgets('edit_doc muestra nombre, contexto y reemplazo anclado', (
+    tester,
+  ) async {
+    final raw = _toolRaw('edit_doc', <String, dynamic>{
+      'name': 'politica-devoluciones.md',
+      'diff': <String, dynamic>{
+        'old': 'Aceptamos devoluciones durante 15 días.',
+        'new': 'Aceptamos devoluciones durante 30 días.',
+        'context': 'Política de cambios y devoluciones',
+      },
+    });
+    await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
+
+    expect(
+      find.text('Documento actualizado · politica-devoluciones.md'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('pa.tool_card.header')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Política de cambios y devoluciones'), findsOneWidget);
+    expect(
+      find.text('− Aceptamos devoluciones durante 15 días.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('+ Aceptamos devoluciones durante 30 días.'),
+      findsOneWidget,
+    );
   });
 
   String confirmRaw() => _toolRaw('update_template', <String, dynamic>{
@@ -202,7 +233,7 @@ void main() {
   ) async {
     final raw = _toolRaw('list_bots', <String, dynamic>{'bots': <dynamic>[]});
     await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
-    await tester.longPress(find.text('Usó list_bots'));
+    await tester.longPress(find.text('Consultó los bots'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('copy.pa.m1.copy')), findsNothing);
   });

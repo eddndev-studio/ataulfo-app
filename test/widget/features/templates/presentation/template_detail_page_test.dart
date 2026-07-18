@@ -407,84 +407,44 @@ void main() {
     expect(find.textContaining('DeepSeek'), findsOneWidget);
   });
 
-  // ── Hero del Entrenador ─────────────────────────────────────────────────────
-  group('hero del Entrenador', () {
+  // ── Handoff al asistente org-scoped ────────────────────────────────────────
+  group('handoff al asistente', () {
     setUp(() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
-    testWidgets(
-      'Loaded muestra la card del Entrenador con accesos a Workspace y '
-      'Probar bot',
-      (tester) async {
-        await tester.pumpWidget(host());
+    testWidgets('Loaded ofrece un único acceso a Ataúlfo', (tester) async {
+      await tester.pumpWidget(host());
 
-        final card = find.byKey(const Key('template_detail.card.trainer'));
-        expect(card, findsOneWidget);
-        expect(
-          find.descendant(of: card, matching: find.text('Entrenador')),
-          findsOneWidget,
-        );
-        expect(
-          find.descendant(
-            of: card,
-            matching: find.byKey(const Key('template_detail.trainer')),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.descendant(
-            of: card,
-            matching: find.byKey(
-              const Key('template_detail.trainer.workspace'),
-            ),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.descendant(
-            of: card,
-            matching: find.byKey(const Key('template_detail.trainer.preview')),
-          ),
-          findsOneWidget,
-        );
-        expect(find.text('Workspace'), findsOneWidget);
-        expect(find.text('Probar bot'), findsOneWidget);
-      },
-    );
-
-    testWidgets('tap en la card apila /templates/:id/trainer', (tester) async {
-      final r = await pushFrom(
-        tester,
-        tapKey: const Key('template_detail.trainer'),
-        destinationPath: '/templates/:id/trainer',
+      final card = find.byKey(const Key('template_detail.card.assistant'));
+      expect(card, findsOneWidget);
+      expect(
+        find.descendant(of: card, matching: find.text('Trabajar con Ataúlfo')),
+        findsOneWidget,
       );
-      expect(r.uri, '/templates/t1/trainer');
-      expect(r.canPop, <bool>[true]);
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.byKey(const Key('template_detail.assistant')),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Workspace'), findsNothing);
+      expect(find.text('Probar bot'), findsNothing);
     });
 
-    testWidgets('tap Workspace apila /templates/:id/trainer/workspace', (
+    testWidgets('tap abre /home con plantilla e intención en el borrador', (
       tester,
     ) async {
       final r = await pushFrom(
         tester,
-        tapKey: const Key('template_detail.trainer.workspace'),
-        destinationPath: '/templates/:id/trainer/workspace',
+        tapKey: const Key('template_detail.assistant'),
+        destinationPath: '/home',
       );
-      expect(r.uri, '/templates/t1/trainer/workspace');
-      expect(r.canPop, <bool>[true]);
-    });
-
-    testWidgets('tap Probar bot apila /templates/:id/trainer/preview', (
-      tester,
-    ) async {
-      final r = await pushFrom(
-        tester,
-        tapKey: const Key('template_detail.trainer.preview'),
-        destinationPath: '/templates/:id/trainer/preview',
-      );
-      expect(r.uri, '/templates/t1/trainer/preview');
-      expect(r.canPop, <bool>[true]);
+      expect(r.uri, contains('/home?prompt='));
+      expect(r.uri, contains('Soporte'));
+      expect(r.uri, contains('t1'));
+      expect(r.canPop, <bool>[false]);
     });
   });
 
