@@ -4,21 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design/safe_bottom.dart';
-import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_empty_state.dart';
+import '../../../../core/auth/role_privilege.dart';
+import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/widgets/app_header_card.dart';
-import '../../../../core/design/widgets/app_notice_banner.dart';
 import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../bots/domain/entities/bot.dart';
 import '../../../bots/presentation/bloc/bots_bloc.dart';
 import '../../../labels/domain/entities/label.dart';
+import '../../../labels/domain/repositories/chat_labels_repository.dart';
 import '../../../labels/presentation/bloc/labels_admin_bloc.dart';
+import '../../../messages/domain/repositories/messages_repository.dart';
+import '../../application/inbox_bulk_actions.dart';
 import '../../domain/entities/conversation.dart';
 import '../bloc/conversations_bloc.dart';
-import '../widgets/inbox_conversation_row.dart';
-import '../widgets/inbox_filters.dart';
+import '../bloc/inbox_selection_cubit.dart';
+import '../widgets/inbox_label_action_sheet.dart';
+import '../widgets/inbox_ready_view.dart';
 import '../widgets/inbox_state_views.dart';
 
 class ConversationsListPage extends StatefulWidget {
@@ -33,6 +35,7 @@ class ConversationsListPage extends StatefulWidget {
 class _ConversationsListPageState extends State<ConversationsListPage> {
   late final TextEditingController _searchController;
   late final ScrollController _scrollController;
+  late final InboxSelectionCubit _selection;
   late List<Bot> _visibleBots;
   late List<Label> _visibleLabels;
   String? _selectedConversationKey;
@@ -44,6 +47,12 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
       text: context.read<ConversationsBloc>().state.query.search,
     );
     _scrollController = ScrollController()..addListener(_onScroll);
+    _selection = InboxSelectionCubit(
+      actions: InboxBulkActions(
+        messages: context.read<MessagesRepository>(),
+        chatLabels: context.read<ChatLabelsRepository>(),
+      ),
+    );
     _visibleBots = _botsOf(context.read<BotsBloc>().state);
     _visibleLabels = _labelsOf(context.read<LabelsAdminBloc>().state);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -57,6 +66,7 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
       ..removeListener(_onScroll)
       ..dispose();
     _searchController.dispose();
+    _selection.close();
     super.dispose();
   }
 
@@ -118,58 +128,148 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
     );
   }
 
+  void _toggleSelection(Conversation conversation) {
+    if (_selection.toggle(conversation)) return;
+    if (!_selection.state.isMutating &&
+        _selection.state.count == InboxSelectionCubit.maxSelection) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Puedes seleccionar hasta 50 conversaciones'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _editLabels() async {
+    final action = await InboxLabelActionSheet.open(
+      context,
+      labels: _visibleLabels,
+    );
+    if (!mounted || action == null) return;
+    await switch (action.mutation) {
+      InboxLabelMutation.add => _selection.addLabel(action.labelId),
+      InboxLabelMutation.remove => _selection.removeLabel(action.labelId),
+    };
+  }
+
+  Future<void> _confirmClearHistory() async {
+    final count = _selection.state.count;
+    if (count == 0) return;
+    final singular = count == 1;
+    final noun = singular ? 'conversación' : 'conversaciones';
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '¿Vaciar el historial de $count $noun?',
+      message:
+          'Se eliminarán permanentemente los mensajes de $count $noun. '
+          'Se conservarán el contacto, la sesión y sus etiquetas. Esta acción '
+          'no se puede deshacer.',
+      confirmLabel: 'Vaciar historial',
+      confirmKey: const Key('inbox.clear_history.confirm'),
+      cancelKey: const Key('inbox.clear_history.cancel'),
+    );
+    if (confirmed && mounted) await _selection.clearHistory();
+  }
+
+  void _onBulkResult(InboxBulkResult result) {
+    context.read<ConversationsBloc>().add(
+      const ConversationsRefreshRequested(),
+    );
+    final suffix = result.failedCount == 0
+        ? ''
+        : ' · ${result.failedCount} con error permanecen seleccionadas';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${result.succeededCount} de ${result.attemptedCount} '
+          'conversaciones actualizadas$suffix',
+        ),
+      ),
+    );
+  }
+
+  bool _canClearHistory() {
+    final auth = context.read<AuthBloc>().state;
+    return auth is AuthAuthenticated && isAdminOrAbove(auth.identity.role);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MultiBlocListener(
-      listeners: <BlocListener<dynamic, dynamic>>[
-        BlocListener<BotsBloc, BotsState>(
-          listener: (_, state) {
-            if (state is BotsLoaded) _reconcileFacets();
-          },
-        ),
-        BlocListener<LabelsAdminBloc, LabelsAdminState>(
-          listener: (_, state) {
-            if (state is LabelsAdminLoaded) _reconcileFacets();
-          },
-        ),
-        BlocListener<ConversationsBloc, ConversationsState>(
-          listenWhen: (before, after) =>
-              before.query.search != after.query.search,
-          listener: (_, state) {
-            if (_searchController.text != state.query.search) {
-              _searchController.text = state.query.search;
-            }
-          },
-        ),
-      ],
-      child: BlocBuilder<ConversationsBloc, ConversationsState>(
-        builder: (context, state) => switch (state.phase) {
-          ConversationsPhase.initial || ConversationsPhase.loading =>
-            InboxLoadingView(header: _header(context)),
-          ConversationsPhase.failure => InboxFailureView(
-            header: _header(context),
-            failure: state.failure,
+    return BlocProvider<InboxSelectionCubit>.value(
+      value: _selection,
+      child: MultiBlocListener(
+        listeners: <BlocListener<dynamic, dynamic>>[
+          BlocListener<BotsBloc, BotsState>(
+            listener: (_, state) {
+              if (state is BotsLoaded) _reconcileFacets();
+            },
           ),
-          ConversationsPhase.ready => RefreshIndicator(
-            onRefresh: _refresh,
-            child: _ReadyInbox(
+          BlocListener<LabelsAdminBloc, LabelsAdminState>(
+            listener: (_, state) {
+              if (state is LabelsAdminLoaded) _reconcileFacets();
+            },
+          ),
+          BlocListener<ConversationsBloc, ConversationsState>(
+            listenWhen: (before, after) => before.query != after.query,
+            listener: (_, state) {
+              if (_searchController.text != state.query.search) {
+                _searchController.text = state.query.search;
+              }
+              _selection.clear();
+            },
+          ),
+          BlocListener<ConversationsBloc, ConversationsState>(
+            listenWhen: (before, after) => before.items != after.items,
+            listener: (_, state) => _selection.reconcileVisible(state.items),
+          ),
+          BlocListener<InboxSelectionCubit, InboxSelectionState>(
+            listenWhen: (before, after) =>
+                before.lastResult != after.lastResult &&
+                after.lastResult != null,
+            listener: (_, state) => _onBulkResult(state.lastResult!),
+          ),
+        ],
+        child: BlocBuilder<ConversationsBloc, ConversationsState>(
+          builder: (context, state) => switch (state.phase) {
+            ConversationsPhase.initial || ConversationsPhase.loading =>
+              InboxLoadingView(header: _header(context)),
+            ConversationsPhase.failure => InboxFailureView(
               header: _header(context),
-              state: state,
-              bots: _visibleBots,
-              labels: _visibleLabels,
-              searchController: _searchController,
-              scrollController: _scrollController,
-              selectedConversationKey: _selectedConversationKey,
-              onOpenConversation: _openConversation,
-              onClearFilters: () {
-                _searchController.clear();
-                context.read<ConversationsBloc>().add(
-                  const ConversationsFiltersCleared(),
-                );
-              },
+              failure: state.failure,
             ),
-          ),
-        },
+            ConversationsPhase.ready =>
+              BlocBuilder<InboxSelectionCubit, InboxSelectionState>(
+                builder: (context, selection) => RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: InboxReadyView(
+                    header: _header(context),
+                    state: state,
+                    selection: selection,
+                    bots: _visibleBots,
+                    labels: _visibleLabels,
+                    searchController: _searchController,
+                    scrollController: _scrollController,
+                    selectedConversationKey: _selectedConversationKey,
+                    canClearHistory: _canClearHistory(),
+                    onOpenConversation: _openConversation,
+                    onToggleSelection: _toggleSelection,
+                    onClearSelection: _selection.clear,
+                    onOpenLabels: _editLabels,
+                    onMarkRead: _selection.markRead,
+                    onClearHistory: _confirmClearHistory,
+                    onQueryChanged: _selection.clear,
+                    onClearFilters: () {
+                      _selection.clear();
+                      _searchController.clear();
+                      context.read<ConversationsBloc>().add(
+                        const ConversationsFiltersCleared(),
+                      );
+                    },
+                  ),
+                ),
+              ),
+          },
+        ),
       ),
     );
   }
@@ -188,159 +288,6 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
       avatarInitial: user.initial,
       onAvatarTap: widget.onOpenSettings ?? () {},
       watermark: Icons.inbox_outlined,
-    );
-  }
-}
-
-class _ReadyInbox extends StatelessWidget {
-  const _ReadyInbox({
-    required this.header,
-    required this.state,
-    required this.bots,
-    required this.labels,
-    required this.searchController,
-    required this.scrollController,
-    required this.selectedConversationKey,
-    required this.onOpenConversation,
-    required this.onClearFilters,
-  });
-
-  final Widget header;
-  final ConversationsState state;
-  final List<Bot> bots;
-  final List<Label> labels;
-  final TextEditingController searchController;
-  final ScrollController scrollController;
-  final String? selectedConversationKey;
-  final ValueChanged<Conversation> onOpenConversation;
-  final VoidCallback onClearFilters;
-
-  @override
-  Widget build(BuildContext context) {
-    final bloc = context.read<ConversationsBloc>();
-    final items = state.items;
-    return CustomScrollView(
-      controller: scrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: <Widget>[
-        SliverToBoxAdapter(child: header),
-        if (state.isRefreshing)
-          const SliverToBoxAdapter(
-            child: LinearProgressIndicator(
-              minHeight: 2,
-              color: AppTokens.primary,
-              backgroundColor: Colors.transparent,
-            ),
-          ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppTokens.sp4,
-            AppTokens.sp5,
-            AppTokens.sp4,
-            AppTokens.sp4,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: InboxFilters(
-              query: state.query,
-              bots: bots,
-              labels: labels,
-              searchController: searchController,
-              onSearchChanged: (value) =>
-                  bloc.add(ConversationsSearchChanged(value)),
-              onStatusChanged: (value) =>
-                  bloc.add(ConversationsStatusChanged(value)),
-              onChannelChanged: (value) =>
-                  bloc.add(ConversationsChannelChanged(value)),
-              onLabelToggled: (value) =>
-                  bloc.add(ConversationsLabelToggled(value)),
-            ),
-          ),
-        ),
-        if (state.isOffline || state.failure != null)
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTokens.sp4,
-              0,
-              AppTokens.sp4,
-              AppTokens.sp4,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: state.isOffline
-                  ? const AppNoticeBanner.warning(
-                      key: Key('inbox.offline'),
-                      icon: Icons.cloud_off_outlined,
-                      message:
-                          'Estás sin conexión. Mostramos la última información guardada.',
-                    )
-                  : const AppNoticeBanner.danger(
-                      key: Key('inbox.refresh_error'),
-                      message:
-                          'No pudimos actualizar la Bandeja. Desliza para reintentar.',
-                    ),
-            ),
-          ),
-        if (items.isEmpty)
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTokens.sp4,
-              AppTokens.sp5,
-              AppTokens.sp4,
-              AppTokens.sp7,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: AppEmptyState(
-                key: Key(
-                  state.query.hasActiveFilters
-                      ? 'inbox.empty.filtered'
-                      : 'inbox.empty.initial',
-                ),
-                icon: state.query.hasActiveFilters
-                    ? Icons.filter_alt_off_outlined
-                    : Icons.forum_outlined,
-                title: state.query.hasActiveFilters
-                    ? 'No hay conversaciones con estos filtros'
-                    : 'Aún no hay conversaciones en tu organización',
-                description: state.query.hasActiveFilters
-                    ? 'Prueba otra búsqueda, Canal, estado o combinación de etiquetas.'
-                    : 'Cuando alguien escriba a un Canal conectado, aparecerá aquí.',
-                ctaLabel: state.query.hasActiveFilters
-                    ? 'Limpiar filtros'
-                    : null,
-                onCta: state.query.hasActiveFilters ? onClearFilters : null,
-              ),
-            ),
-          )
-        else
-          SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              if (index.isOdd) return const InboxConversationDivider();
-              final conversation = items[index ~/ 2];
-              return InboxConversationRow(
-                conversation: conversation,
-                selected: selectedConversationKey == conversation.stableKey,
-                onTap: () => onOpenConversation(conversation),
-              );
-            }, childCount: items.length * 2 - 1),
-          ),
-        if (state.isLoadingMore)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(AppTokens.sp5),
-              child: Center(
-                child: SizedBox.square(
-                  dimension: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppTokens.primary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        SliverToBoxAdapter(
-          child: SizedBox(height: AppTokens.sp5 + context.safeBottomInset),
-        ),
-      ],
     );
   }
 }

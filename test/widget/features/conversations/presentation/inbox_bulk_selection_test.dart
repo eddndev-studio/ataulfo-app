@@ -251,7 +251,7 @@ void main() {
     states.add(
       ready.copyWith(query: const InboxQuery(search: 'otra búsqueda')),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('inbox.selection.bar')), findsNothing);
   });

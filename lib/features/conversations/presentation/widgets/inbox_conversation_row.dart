@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_checkbox.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/util/smart_timestamp.dart';
 import '../../../labels/presentation/widgets/label_dot.dart';
@@ -17,11 +18,19 @@ class InboxConversationRow extends StatelessWidget {
     required this.conversation,
     required this.onTap,
     this.selected = false,
+    this.multiSelected = false,
+    this.showSelectionControl = false,
+    this.onSelectionChanged,
+    this.onLongPress,
   });
 
   final Conversation conversation;
   final VoidCallback onTap;
   final bool selected;
+  final bool multiSelected;
+  final bool showSelectionControl;
+  final ValueChanged<bool>? onSelectionChanged;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -31,12 +40,15 @@ class InboxConversationRow extends StatelessWidget {
     final timestamp = item.lastMessageTimestampMs;
     final textTheme = Theme.of(context).textTheme;
     return Semantics(
-      selected: selected,
+      selected: multiSelected || selected,
       child: Material(
-        color: selected ? AppTokens.surface2 : Colors.transparent,
+        color: multiSelected
+            ? AppTokens.primary.withValues(alpha: 0.08)
+            : (selected ? AppTokens.surface2 : Colors.transparent),
         child: InkWell(
           key: Key('conversation.tile.${item.botId}.${item.chatLid}'),
           onTap: onTap,
+          onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppTokens.sp4,
@@ -45,6 +57,21 @@ class InboxConversationRow extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+                if (showSelectionControl) ...<Widget>[
+                  Tooltip(
+                    message: multiSelected
+                        ? 'Quitar de la selección'
+                        : 'Seleccionar conversación',
+                    child: AppCheckbox(
+                      key: Key(
+                        'conversation.select.${item.botId}.${item.chatLid}',
+                      ),
+                      value: multiSelected,
+                      onChanged: onSelectionChanged,
+                    ),
+                  ),
+                  const SizedBox(width: AppTokens.sp1),
+                ],
                 ProfileAvatar(
                   cache: context.read<ProfilePhotoCache>(),
                   botId: item.botId,

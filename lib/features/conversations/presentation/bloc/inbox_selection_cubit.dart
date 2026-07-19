@@ -39,14 +39,13 @@ class InboxSelectionCubit extends Cubit<InboxSelectionState> {
         InboxConversationRef.fromConversation(conversation): conversation,
     };
     final next = <InboxConversationRef, Conversation>{
-      for (final ref in state.byRef.keys)
-        if (current[ref] case final conversation?) ref: conversation,
+      for (final ref in state.byRef.keys) ref: ?current[ref],
     };
     emit(state.copyWith(selected: next));
   }
 
   void clear() {
-    if (state.byRef.isEmpty || state.isMutating) return;
+    if (state.byRef.isEmpty) return;
     emit(state.copyWith(selected: const {}, clearResult: true));
   }
 
@@ -82,8 +81,7 @@ class InboxSelectionCubit extends Cubit<InboxSelectionState> {
     }
 
     final failures = <InboxConversationRef, Conversation>{
-      for (final ref in result.failed)
-        if (state.byRef[ref] case final conversation?) ref: conversation,
+      for (final ref in result.failed) ref: ?state.byRef[ref],
     };
     emit(
       state.copyWith(selected: failures, isMutating: false, lastResult: result),

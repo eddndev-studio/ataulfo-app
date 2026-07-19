@@ -18,7 +18,9 @@ import 'package:ataulfo/features/conversations/presentation/pages/conversations_
 import 'package:ataulfo/features/conversations/presentation/widgets/inbox_conversation_row.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/failures/labels_failure.dart';
+import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
+import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +43,10 @@ class _MockLabelsBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
+
+class _MockMessagesRepository extends Mock implements MessagesRepository {}
+
+class _MockChatLabelsRepository extends Mock implements ChatLabelsRepository {}
 
 const identity = Identity(
   userId: 'user-1',
@@ -121,6 +127,8 @@ void main() {
   late _MockBotsBloc bots;
   late _MockLabelsBloc labels;
   late _MockAuthBloc auth;
+  late _MockMessagesRepository messages;
+  late _MockChatLabelsRepository chatLabels;
 
   setUpAll(() {
     registerFallbackValue(const ConversationsLoadRequested());
@@ -131,6 +139,8 @@ void main() {
     bots = _MockBotsBloc();
     labels = _MockLabelsBloc();
     auth = _MockAuthBloc();
+    messages = _MockMessagesRepository();
+    chatLabels = _MockChatLabelsRepository();
     when(() => auth.state).thenReturn(const AuthAuthenticated(identity));
     when(
       () => bots.state,
@@ -147,6 +157,8 @@ void main() {
         RepositoryProvider<ProfilePhotoCache>.value(
           value: NoopProfilePhotoCache(),
         ),
+        RepositoryProvider<MessagesRepository>.value(value: messages),
+        RepositoryProvider<ChatLabelsRepository>.value(value: chatLabels),
       ],
       child: MultiBlocProvider(
         providers: <BlocProvider<dynamic>>[
@@ -412,6 +424,8 @@ void main() {
           RepositoryProvider<ProfilePhotoCache>.value(
             value: NoopProfilePhotoCache(),
           ),
+          RepositoryProvider<MessagesRepository>.value(value: messages),
+          RepositoryProvider<ChatLabelsRepository>.value(value: chatLabels),
         ],
         child: MultiBlocProvider(
           providers: <BlocProvider<dynamic>>[

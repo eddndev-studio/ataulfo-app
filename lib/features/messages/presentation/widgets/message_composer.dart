@@ -13,7 +13,6 @@ import '../../../media/domain/repositories/camera_capture.dart';
 import '../../../media/domain/repositories/device_gallery_port.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../../media/domain/repositories/media_repository.dart';
-import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../../quick_replies/presentation/widgets/quick_replies_sheet.dart';
 import '../../data/cache/message_media_cache.dart';
 import '../../domain/attachment_intake.dart';
