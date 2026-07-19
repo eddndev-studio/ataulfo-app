@@ -635,7 +635,7 @@ class _FailureCopy extends StatelessWidget {
       'notfound',
       isEdit
           ? 'Este disparador ya no existe. Recarga la lista para verificar.'
-          : 'No encontramos la plantilla padre. Recarga la lista.',
+          : 'No encontramos el Asistente. Recarga la lista.',
     ),
     TriggersForbiddenFailure() => (
       'forbidden',

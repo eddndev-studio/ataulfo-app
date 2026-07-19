@@ -165,7 +165,7 @@ void main() {
         tall(tester);
         await tester.pumpWidget(nameHost());
 
-        expect(find.text('Nuevo bot'), findsOneWidget);
+        expect(find.text('Nuevo canal'), findsOneWidget);
         expect(
           find.byKey(const Key('bot_create.template_chip')),
           findsOneWidget,
@@ -326,7 +326,7 @@ void main() {
       tall(tester);
       await tester.pumpWidget(pickHost());
 
-      expect(find.text('Elegir plantilla'), findsOneWidget);
+      expect(find.text('Elegir Asistente'), findsOneWidget);
       expect(find.text('Soporte ventas'), findsOneWidget);
       expect(find.text('Cobranza'), findsOneWidget);
       expect(find.byType(AppCard), findsNWidgets(2));
@@ -383,7 +383,7 @@ void main() {
       await tester.tap(find.byKey(const Key('bot_create.pick.t2')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Nuevo bot'), findsOneWidget);
+      expect(find.text('Nuevo canal'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const Key('bot_create.template_chip')),
@@ -403,12 +403,12 @@ void main() {
 
       await tester.tap(find.byKey(const Key('bot_create.pick.t1')));
       await tester.pumpAndSettle();
-      expect(find.text('Nuevo bot'), findsOneWidget);
+      expect(find.text('Nuevo canal'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('bot_create.back')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Elegir plantilla'), findsOneWidget);
+      expect(find.text('Elegir Asistente'), findsOneWidget);
       expect(find.byType(AppCard), findsNWidgets(2));
     });
   });
@@ -455,12 +455,12 @@ void main() {
 
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.text('Nuevo bot'), findsOneWidget);
+    expect(find.text('Nuevo canal'), findsOneWidget);
 
     controller.add(const BotCreateSucceeded(_bot));
     await tester.pumpAndSettle();
 
-    expect(find.text('Nuevo bot'), findsNothing, reason: 'cerró');
+    expect(find.text('Nuevo canal'), findsNothing, reason: 'cerró');
     expect(returned, _bot);
   });
 
@@ -477,7 +477,7 @@ void main() {
       await tester.pumpWidget(draftHost(store: store));
 
       // Con plantilla restaurada arranca directo en el paso de nombre.
-      expect(find.text('Nuevo bot'), findsOneWidget);
+      expect(find.text('Nuevo canal'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const Key('bot_create.template_chip')),
@@ -570,13 +570,13 @@ void main() {
       );
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
-      expect(find.text('Nuevo bot'), findsOneWidget);
+      expect(find.text('Nuevo canal'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('bot_create.discard')));
       await tester.pumpAndSettle();
 
       expect(store.current, isNull);
-      expect(find.text('Nuevo bot'), findsNothing, reason: 'cerró');
+      expect(find.text('Nuevo canal'), findsNothing, reason: 'cerró');
       expect(popped, isTrue);
       expect(returned, isNull);
     });
@@ -589,7 +589,7 @@ void main() {
       await tester.pumpWidget(draftHost(store: store));
 
       // Paso de selección sin nada elegido → nada que descartar.
-      expect(find.text('Elegir plantilla'), findsOneWidget);
+      expect(find.text('Elegir Asistente'), findsOneWidget);
       expect(find.byKey(const Key('bot_create.discard')), findsNothing);
 
       // Al elegir plantilla ya hay contenido → aparece "Descartar".

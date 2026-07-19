@@ -215,7 +215,7 @@ class StepMainField extends StatelessWidget {
           label: _isMultimedia ? 'Caption (opcional)' : 'Mensaje',
           hint: _isMultimedia
               ? 'Texto que acompaña al recurso (opcional)'
-              : 'Lo que el bot enviará al usuario',
+              : 'Lo que el Asistente enviará al usuario',
           controller: contentController,
           enabled: enabled,
           autofocus: !_isMultimedia,

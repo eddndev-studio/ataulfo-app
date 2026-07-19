@@ -140,9 +140,9 @@ class _PreferenceRow extends StatelessWidget {
   static String _labelFor(NotificationEventType type) {
     return switch (type) {
       NotificationEventType.messageInboundNew => 'Mensajes nuevos',
-      NotificationEventType.botDisconnected => 'Bot desconectado',
+      NotificationEventType.botDisconnected => 'Canal desconectado',
       NotificationEventType.flowFailed => 'Flujos fallidos',
-      NotificationEventType.agentAlert => 'Alertas del bot (IA)',
+      NotificationEventType.agentAlert => 'Alertas del Asistente',
     };
   }
 

@@ -60,7 +60,7 @@ class _AiConfigFollowUpSheetState extends State<AiConfigFollowUpSheet> {
               switchKey: Key('${widget.keyPrefix}.sheet.follow_up.enabled'),
               label: 'Dar seguimiento automático',
               caption:
-                  'Si el cliente no responde tras un tiempo, el bot decide si '
+                  'Si el cliente no responde tras un tiempo, el Asistente decide si '
                   'enviar UN seguimiento útil (o no enviar nada). Un mensaje '
                   'del cliente reinicia el ciclo.',
               value: _enabled,

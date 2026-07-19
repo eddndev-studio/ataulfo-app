@@ -131,12 +131,12 @@ void main() {
       );
     });
 
-    test('paso actual + conteo de tools: «Consultó los bots · 1 paso»', () {
+    test('paso actual + conteo de tools: «Consultó los Canales · 1 paso»', () {
       final t = monitorLiveTrace(<MonitorEvent>[
         _ev(MonitorEventKind.aiTurn, runId: 'r1', iteration: 1),
         _ev(MonitorEventKind.aiTool, runId: 'r1', tool: 'list_bots'),
       ]);
-      expect(liveTraceSummary(t), 'Consultó los bots · 1 paso');
+      expect(liveTraceSummary(t), 'Consultó los Canales · 1 paso');
     });
 
     test('plural y elipsis del paso en curso recortada', () {
@@ -154,7 +154,7 @@ void main() {
       final t = monitorLiveTrace(<MonitorEvent>[
         _ev(MonitorEventKind.aiTool, runId: 'r1', tool: 'list_bots'),
       ]);
-      expect(liveTraceSummary(t), 'Consultó los bots');
+      expect(liveTraceSummary(t), 'Consultó los Canales');
     });
 
     test('sin tools el resumen es solo el paso actual', () {

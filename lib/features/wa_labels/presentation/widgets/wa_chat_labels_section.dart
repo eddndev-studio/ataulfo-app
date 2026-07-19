@@ -118,12 +118,12 @@ class _List extends StatelessWidget {
 
   static String _message(WaLabelsFailure f) => switch (f) {
     WaLabelsNotConnectedFailure() =>
-      'El bot no está conectado a WhatsApp. Conéctalo e inténtalo de nuevo.',
+      'El Canal no está conectado a WhatsApp. Conéctalo e inténtalo de nuevo.',
     WaLabelsUpstreamFailure() =>
       'WhatsApp no respondió. Inténtalo de nuevo en un momento.',
     WaLabelsForbiddenFailure() =>
-      'No tienes permiso para etiquetar chats en este bot.',
-    WaLabelsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+      'No tienes permiso para etiquetar chats en este Canal.',
+    WaLabelsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     WaLabelsNetworkFailure() || WaLabelsTimeoutFailure() =>
       'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     _ => 'No pudimos cambiar la etiqueta. Inténtalo de nuevo.',

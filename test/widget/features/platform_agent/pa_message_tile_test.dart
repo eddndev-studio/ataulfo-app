@@ -47,7 +47,7 @@ void main() {
     // bug latente (leer tool_name, no toolName) — antes decía "Acción ejecutada".
     final raw = _toolRaw('list_bots', <String, dynamic>{'bots': <dynamic>[]});
     await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
-    expect(find.text('Consultó los bots'), findsOneWidget);
+    expect(find.text('Consultó los Canales'), findsOneWidget);
     expect(find.byKey(const Key('pa.tool_card.header')), findsNothing);
   });
 
@@ -233,7 +233,7 @@ void main() {
   ) async {
     final raw = _toolRaw('list_bots', <String, dynamic>{'bots': <dynamic>[]});
     await tester.pumpWidget(_wrap(PaMessageTile(message: _toolMsg(raw))));
-    await tester.longPress(find.text('Consultó los bots'));
+    await tester.longPress(find.text('Consultó los Canales'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('copy.pa.m1.copy')), findsNothing);
   });

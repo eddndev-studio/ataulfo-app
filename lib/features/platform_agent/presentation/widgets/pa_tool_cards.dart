@@ -6,7 +6,7 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_thread_event_card.dart';
 import '../../domain/entities/pa_tool_result.dart';
 
-/// Tarjeta interactiva de un requires_confirmation: nombra los Bots impactados y
+/// Tarjeta interactiva de un requires_confirmation: nombra los Canales impactados y
 /// ofrece Confirmar/Cancelar. Confirmar dispara onConfirm (la página reenvía la
 /// autorización al asistente, que re-llama el tool con confirm=true) y, tras
 /// actuar, retira los botones para no permitir una doble confirmación.
@@ -34,7 +34,7 @@ class _PaConfirmationCardState extends State<PaConfirmationCard> {
     final bots = widget.result.bots;
     final n = bots.length;
     final lead = n > 0
-        ? 'Esta acción afecta a $n bot${n == 1 ? '' : 's'}: ${bots.join(', ')}.'
+        ? 'Esta acción afecta a $n ${n == 1 ? 'Canal' : 'Canales'}: ${bots.join(', ')}.'
         : 'Esta acción requiere tu confirmación.';
     return AppThreadEventCard(
       maxWidth: 520,

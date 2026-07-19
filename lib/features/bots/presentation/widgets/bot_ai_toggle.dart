@@ -58,7 +58,7 @@ class _BotAiToggleState extends State<BotAiToggle> {
           return const AppToggleRow(
             switchKey: switchKey,
             label: label,
-            caption: 'Comprobando la IA de la plantilla…',
+            caption: 'Comprobando el comportamiento del Asistente…',
             value: false,
             onChanged: null,
           );
@@ -70,7 +70,7 @@ class _BotAiToggleState extends State<BotAiToggle> {
             switchKey: switchKey,
             label: label,
             caption:
-                'No pudimos verificar la IA de la plantilla; el cambio se '
+                'No pudimos verificar la IA del Asistente; el cambio se '
                 'aplicará igual.',
             value: aiDisabled,
             onChanged: widget.isMutating ? null : _toggle,
@@ -84,8 +84,8 @@ class _BotAiToggleState extends State<BotAiToggle> {
             switchKey: switchKey,
             label: label,
             caption:
-                'La plantilla tiene la IA apagada; actívala en la plantilla '
-                'para usarla en este bot.',
+                'El Asistente tiene la IA apagada; actívala en Comportamiento '
+                'para usarla en este Canal.',
             value: aiDisabled,
             onChanged: null,
           );
@@ -96,8 +96,8 @@ class _BotAiToggleState extends State<BotAiToggle> {
           switchKey: switchKey,
           label: label,
           caption: effective
-              ? 'La IA está activa para este bot.'
-              : 'La IA está desactivada para este bot.',
+              ? 'El Asistente está activo en este Canal.'
+              : 'El Asistente está desactivado en este Canal.',
           value: aiDisabled,
           onChanged: widget.isMutating ? null : _toggle,
         );

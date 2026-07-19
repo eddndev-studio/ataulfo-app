@@ -56,7 +56,7 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
             ..showSnackBar(
               const SnackBar(
                 content: Text(
-                  'La plantilla cambió. Recarga para ver los últimos datos.',
+                  'El Asistente cambió. Recarga para ver los últimos datos.',
                 ),
               ),
             );
@@ -132,7 +132,7 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
           ],
           if (all.isEmpty)
             Text(
-              'Esta plantilla aún no tiene variables.',
+              'Este Asistente aún no tiene variables.',
               key: const Key('var_defs.empty'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontStyle: FontStyle.italic,
@@ -285,7 +285,7 @@ class _VarDefTile extends StatelessWidget {
       title: 'Eliminar variable',
       message:
           '¿Eliminar la variable {{${def.name}}}? '
-          'Los bots que ya tengan un valor asignado bloquearán esta acción.',
+          'Los Canales que ya tengan un valor asignado bloquearán esta acción.',
       confirmLabel: 'Eliminar',
       confirmKey: const Key('var_defs.delete_confirm'),
     );

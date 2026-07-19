@@ -101,7 +101,10 @@ class _AssistantTurn extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        const AiLogRoleCaption(icon: Icons.smart_toy_outlined, title: 'Bot'),
+        const AiLogRoleCaption(
+          icon: Icons.smart_toy_outlined,
+          title: 'Asistente',
+        ),
         if (entry.reasoning.isNotEmpty)
           ReasoningDisclosure(reasoning: entry.reasoning, keyId: '${entry.id}'),
         if (entry.content.isNotEmpty)

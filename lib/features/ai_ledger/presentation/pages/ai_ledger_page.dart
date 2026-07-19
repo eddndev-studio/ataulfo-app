@@ -45,7 +45,7 @@ class _LedgerView extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppTokens.sp6),
           child: Text(
-            'Este chat aún no tiene acciones del bot.',
+            'Este chat aún no tiene acciones del Asistente.',
             key: const Key('ai_ledger.empty'),
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),

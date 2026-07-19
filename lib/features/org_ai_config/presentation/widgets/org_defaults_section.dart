@@ -52,8 +52,8 @@ class OrgDefaultsSection extends StatelessWidget {
         const AppSectionHeader(
           title: 'Valores por defecto',
           caption:
-              'Lo que heredan las plantillas nuevas de la organización al '
-              'crearse. No afecta a las plantillas existentes.',
+              'Lo que heredan los Asistentes nuevos de la organización al '
+              'crearse. No afecta a los Asistentes existentes.',
         ),
         const SizedBox(height: AppTokens.sp4),
         AiConfigEditor(
@@ -68,7 +68,7 @@ class OrgDefaultsSection extends StatelessWidget {
           deferredSave: true,
           enabledLabel: 'IA activa por defecto',
           enabledCaption:
-              'Las plantillas nuevas nacen con la IA encendida o apagada '
+              'Los Asistentes nuevos nacen con la IA encendida o apagada '
               'según este valor.',
           onChanged: onChanged,
         ),

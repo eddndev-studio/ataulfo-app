@@ -188,9 +188,9 @@ class _LoadedView extends StatelessWidget {
                       children: <Widget>[
                         AppToggleRow(
                           switchKey: const Key('bot_detail.paused'),
-                          label: 'Pausar bot',
+                          label: 'Pausar canal',
                           caption:
-                              'Pausado, el bot deja de procesar mensajes '
+                              'Pausado, el canal deja de procesar mensajes '
                               'hasta que lo reanudes; no se reanuda solo.',
                           value: bot.paused,
                           onChanged: isMutating
@@ -234,7 +234,7 @@ class _LoadedView extends StatelessWidget {
                   // FUERA de la zona peligrosa.
                   AppButton.tonal(
                     key: const Key('bot_detail.clone'),
-                    label: 'Clonar bot',
+                    label: 'Clonar canal',
                     fullWidth: true,
                     onPressed: isMutating
                         ? null
@@ -246,13 +246,13 @@ class _LoadedView extends StatelessWidget {
                   const SizedBox(height: AppTokens.sp7),
                   AppDangerZone(
                     caption:
-                        'Eliminar el bot es permanente: sus conversaciones, '
+                        'Eliminar el canal es permanente: sus conversaciones, '
                         'mensajes y ejecuciones quedan huérfanos. Si quieres '
                         'limpiarlos, usa Mantenimiento antes.',
                     actions: <Widget>[
                       AppButton.danger(
                         key: const Key('bot_detail.delete'),
-                        label: 'Eliminar bot',
+                        label: 'Eliminar canal',
                         fullWidth: true,
                         onPressed: isMutating
                             ? null
@@ -275,7 +275,7 @@ class _LoadedView extends StatelessWidget {
   Future<void> _confirmDelete(BuildContext context, Bot bot) async {
     final confirmed = await showAppConfirmDialog(
       context,
-      title: '¿Eliminar este bot?',
+      title: '¿Eliminar este canal?',
       message:
           'Se borrará "${bot.name}" de forma permanente. Sus conversaciones, '
           'mensajes y ejecuciones quedarán huérfanos; si quieres limpiarlos, '
@@ -303,9 +303,9 @@ class _LoadedView extends StatelessWidget {
     BotsConflictFailure() =>
       'Tu edición estaba desactualizada; la refrescamos. Revisa y reintenta.',
     BotsInvalidCreateFailure() =>
-      'Revisa los datos del bot: el cambio no es válido.',
-    BotsForbiddenFailure() => 'Tu rol no permite editar este bot.',
-    BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+      'Revisa los datos del canal: el cambio no es válido.',
+    BotsForbiddenFailure() => 'Tu rol no permite editar este canal.',
+    BotsNotFoundFailure() => 'Este canal ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     BotsNotPausedFailure() ||
@@ -336,7 +336,7 @@ class _SectionLauncher extends StatelessWidget {
             rowKey: const Key('bot_detail.link.sessions'),
             icon: Icons.chat_outlined,
             title: 'Conversaciones',
-            caption: 'La bandeja de chats del bot',
+            caption: 'La bandeja de chats del canal',
             onTap: () => context.push('/bots/${bot.id}/sessions'),
           ),
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
@@ -353,7 +353,7 @@ class _SectionLauncher extends StatelessWidget {
               rowKey: const Key('bot_detail.link.variables'),
               icon: Icons.data_object,
               title: 'Variables',
-              caption: 'Valores propios de este bot',
+              caption: 'Valores propios de este canal',
               onTap: () => context.push('/bots/${bot.id}/variables'),
             ),
             const Divider(height: AppTokens.sp5, color: AppTokens.divider),
@@ -392,8 +392,8 @@ class _FailedView extends StatelessWidget {
             children: <Widget>[
               Text(
                 isNotFound
-                    ? 'Este bot ya no existe en tu organización'
-                    : 'No pudimos cargar el detalle del bot',
+                    ? 'Este canal ya no existe en tu organización'
+                    : 'No pudimos cargar el detalle del canal',
                 textAlign: TextAlign.center,
                 style: textTheme.bodyLarge,
               ),

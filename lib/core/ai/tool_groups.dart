@@ -18,7 +18,7 @@ enum ToolGroup {
   mensajeria(
     'mensajeria',
     'Mensajería',
-    'Responder por texto a la persona. Si la desactivas, el bot no enviará '
+    'Responder por texto a la persona. Si la desactivas, el Asistente no enviará '
         'mensajes escritos (solo podrá usar sus otras capacidades).',
     Icons.chat_bubble_outline,
   ),
@@ -49,7 +49,7 @@ enum ToolGroup {
   documentos(
     'documentos',
     'Documentos',
-    'Consultar el workspace de documentos del negocio (precios, políticas…).',
+    'Consultar documentos de la Biblioteca de Recursos (precios, políticas…).',
     Icons.description_outlined,
   ),
   archivos(
@@ -102,7 +102,7 @@ enum ToolGroup {
   reenvio(
     'reenvio',
     'Reenvío a otros chats',
-    'Buscar otros chats del bot por nombre y reenviarles mensajes de esta '
+    'Buscar otros chats del Canal por nombre y reenviarles mensajes de esta '
         'conversación (p. ej. pasar un comprobante a un grupo interno).',
     Icons.shortcut,
   ),

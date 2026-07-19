@@ -363,7 +363,7 @@ class _VariablesFormState extends State<_VariablesForm> {
           'vuelve a guardar.',
     BotsInvalidCreateFailure() => 'Algún valor no es válido para su variable.',
     BotsForbiddenFailure() => 'Tu rol no permite editar las variables.',
-    BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+    BotsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     BotsNotPausedFailure() ||

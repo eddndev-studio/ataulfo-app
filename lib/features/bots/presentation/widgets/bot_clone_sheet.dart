@@ -105,10 +105,10 @@ class _BotCloneSheetState extends State<BotCloneSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Clonar bot', style: textTheme.titleLarge),
+                Text('Clonar Canal', style: textTheme.titleLarge),
                 const SizedBox(height: AppTokens.sp2),
                 Text(
-                  'Se crea un bot nuevo con la misma plantilla y canal, sin '
+                  'Se crea un Canal nuevo con el mismo Asistente y proveedor, sin '
                   'sesión ni etiquetas. Elige un nombre.',
                   style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
                 ),
@@ -153,8 +153,8 @@ class _BotCloneSheetState extends State<BotCloneSheet> {
   static String _failureMessage(BotsFailure f) => switch (f) {
     BotsInvalidCreateFailure() =>
       'El nombre del clon no es válido. Revísalo e inténtalo de nuevo.',
-    BotsForbiddenFailure() => 'Tu rol no permite clonar este bot.',
-    BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+    BotsForbiddenFailure() => 'Tu rol no permite clonar este Canal.',
+    BotsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     BotsConflictFailure() ||
@@ -162,6 +162,6 @@ class _BotCloneSheetState extends State<BotCloneSheet> {
     BotsPairingNotStartedFailure() ||
     BotsPhoneRejectedFailure() ||
     BotsServerFailure() ||
-    UnknownBotsFailure() => 'No pudimos clonar el bot. Inténtalo de nuevo.',
+    UnknownBotsFailure() => 'No pudimos clonar el Canal. Inténtalo de nuevo.',
   };
 }

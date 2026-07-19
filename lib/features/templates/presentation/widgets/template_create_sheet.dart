@@ -94,11 +94,11 @@ class _TemplateCreateSheetState extends State<TemplateCreateSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Text('Nueva plantilla', style: textTheme.titleLarge),
+              Text('Nuevo Asistente', style: textTheme.titleLarge),
               const SizedBox(height: AppTokens.sp4),
               AppTextField(
                 key: const Key('template_create.field.name'),
-                label: 'Nombre de la plantilla',
+                label: 'Nombre del Asistente',
                 hint: 'Ej. Soporte ventas',
                 controller: _ctrl,
                 enabled: !submitting,
@@ -152,7 +152,7 @@ class _FailedView extends StatelessWidget {
     ),
     TemplatesForbiddenFailure() => (
       'template_create.error.forbidden',
-      'Tu rol no permite crear plantillas. Pide acceso a un admin.',
+      'Tu rol no permite crear Asistentes. Pide acceso a un admin.',
     ),
     TemplatesNetworkFailure() || TemplatesTimeoutFailure() => (
       'template_create.error.network',
@@ -164,7 +164,7 @@ class _FailedView extends StatelessWidget {
     TemplatesServerFailure() ||
     UnknownTemplatesFailure() => (
       'template_create.error.generic',
-      'No pudimos crear la plantilla. Inténtalo de nuevo.',
+      'No pudimos crear el Asistente. Inténtalo de nuevo.',
     ),
   };
 }

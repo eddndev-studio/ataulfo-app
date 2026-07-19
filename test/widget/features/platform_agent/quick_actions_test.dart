@@ -71,7 +71,7 @@ void main() {
     // El composer queda prefijado con el arranque editable (label distinto del
     // texto, para no confundir el chip con el campo).
     expect(
-      find.text('Quiero mejorar el prompt de la plantilla '),
+      find.text('Quiero mejorar el comportamiento del Asistente '),
       findsOneWidget,
     );
   });

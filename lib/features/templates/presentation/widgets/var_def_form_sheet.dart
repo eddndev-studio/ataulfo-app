@@ -215,7 +215,7 @@ class _VarDefFormSheetState extends State<VarDefFormSheet> {
                 AppTextField(
                   key: const Key('var_def_form.default'),
                   label: 'Valor por defecto',
-                  hint: 'Usado cuando el bot no recibe valor',
+                  hint: 'Usado cuando el Canal no recibe valor',
                   controller: _defaultCtrl,
                   enabled: !isMutating,
                   minLines: 3,

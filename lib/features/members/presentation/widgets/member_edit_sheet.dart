@@ -195,7 +195,7 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
             const SizedBox(height: AppTokens.sp4),
             AppButton.tonal(
               key: const Key('member_edit.assign_bots'),
-              label: 'Asignar bots',
+              label: 'Asignar Canales',
               fullWidth: true,
               onPressed: () =>
                   Navigator.of(context).pop(const MemberSheetAssignBots()),

@@ -13,13 +13,13 @@ String templateAssistantLocation({
   path: '/home',
   queryParameters: <String, String>{
     'prompt':
-        'Quiero trabajar en la plantilla "$templateName" '
+        'Quiero trabajar en el Asistente "$templateName" '
         '(ID: $templateId). Lee su estado actual y ayúdame a ',
   },
 ).toString();
 
 /// Handoff al agente org-scoped. Prompt, corridas y documentos son
-/// capacidades del mismo hilo; la plantilla viaja como contexto explícito y
+/// capacidades del mismo hilo; el Asistente viaja como contexto explícito y
 /// editable, no como scope oculto de otra pantalla.
 class TemplateAssistantCard extends StatelessWidget {
   const TemplateAssistantCard({
@@ -55,7 +55,7 @@ class TemplateAssistantCard extends StatelessWidget {
                     Text('Trabajar con Ataúlfo', style: textTheme.titleMedium),
                     const SizedBox(height: AppTokens.sp1),
                     Text(
-                      'Ajusta el prompt, revisa corridas y edita documentos '
+                      'Ajusta el comportamiento, revisa corridas y crea recursos '
                       'sin salir de tu hilo de trabajo.',
                       style: textTheme.bodySmall?.copyWith(
                         color: AppTokens.text2,

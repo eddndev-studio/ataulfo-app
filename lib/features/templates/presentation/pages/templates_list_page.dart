@@ -33,7 +33,8 @@ import '../widgets/template_create_sheet.dart';
 /// operador acota la vista sin round-trip.
 enum _TemplateFilter { all, withAi, withoutAi }
 
-/// Listado de Plantillas (S03). Consume el TemplatesBloc del scope; el cableado
+/// Listado de Asistentes sobre el modelo interno Template. Consume el
+/// TemplatesBloc del scope; el cableado
 /// del provider lo hace el shell. Es content-only: el Scaffold, el AppBar (que
 /// titula "Plantillas") y el FAB de creación los aporta el ShellPage — la
 /// card-CTA de esta page comparte ese destino `/templates/new`.
@@ -156,10 +157,10 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
           children: <Widget>[
             AppHeaderCard(
               greeting: user.greeting,
-              title: 'Plantillas',
+              title: 'Asistentes',
               avatarInitial: user.initial,
               onAvatarTap: widget.onOpenSettings ?? () {},
-              watermark: Icons.description,
+              watermark: Icons.support_agent,
             ),
             Padding(
               key: const Key('templates.content_padding'),
@@ -205,7 +206,7 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppTextField(
       key: const Key('templates.search'),
-      label: 'Buscar plantilla',
+      label: 'Buscar Asistente',
       hint: 'Nombre',
       controller: controller,
     );
@@ -287,13 +288,13 @@ class _TemplateTile extends StatelessWidget {
       key: Key('templates.tile.${template.id}'),
       // push (no go): el detalle se apila sobre el listado para que el back
       // físico y la flecha del AppBar vuelvan al shell con la tab Plantillas.
-      onTap: () => context.push('/templates/${template.id}'),
+      onTap: () => context.push('/assistants/${template.id}'),
       borderRadius: BorderRadius.circular(AppTokens.radiusSm),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
         child: Row(
           children: <Widget>[
-            const AppEntityIcon(icon: Icons.description_outlined),
+            const AppEntityIcon(icon: Icons.support_agent_outlined),
             const SizedBox(width: AppTokens.sp4),
             Expanded(
               child: Column(
@@ -362,7 +363,7 @@ class _MetricsRow extends StatelessWidget {
       children: <Widget>[
         _Metric(
           icon: Icons.smart_toy_outlined,
-          label: _plural(counts.bots, 'bot', 'bots'),
+          label: _plural(counts.bots, 'canal', 'canales'),
         ),
         _Metric(
           icon: Icons.account_tree_outlined,
@@ -417,7 +418,7 @@ class _NoResults extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: AppTokens.sp6),
       child: Center(
         child: Text(
-          'Ninguna plantilla coincide con tu búsqueda o filtro.',
+          'Ningún Asistente coincide con tu búsqueda o filtro.',
           textAlign: TextAlign.center,
           style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
         ),
@@ -431,7 +432,7 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const AppLoadingIndicator(label: 'Cargando plantillas…');
+      const AppLoadingIndicator(label: 'Cargando Asistentes…');
 }
 
 /// Estado vacío (cero plantillas): card glass centrada que ES el CTA de
@@ -455,17 +456,17 @@ class _EmptyView extends StatelessWidget {
               child: Center(
                 child: AppEmptyState(
                   key: const Key('templates.empty'),
-                  icon: Icons.description_outlined,
-                  title: 'Aún no tienes plantillas',
+                  icon: Icons.support_agent_outlined,
+                  title: 'Aún no tienes Asistentes',
                   description:
-                      'Crea tu primera plantilla para definir el '
-                      'comportamiento que heredarán tus bots.',
-                  ctaLabel: 'Crear plantilla',
+                      'Crea tu primer Asistente, define cómo trabaja y después '
+                      'conéctalo a uno o varios canales.',
+                  ctaLabel: 'Crear Asistente',
                   ctaIcon: Icons.add,
                   onCta: () async {
                     final template = await TemplateCreateSheet.open(context);
                     if (template != null && context.mounted) {
-                      unawaited(context.push('/templates/${template.id}'));
+                      unawaited(context.push('/assistants/${template.id}'));
                     }
                   },
                 ),
@@ -489,7 +490,7 @@ class _FailedView extends StatelessWidget {
         padding: const EdgeInsets.all(AppTokens.sp5),
         child: AppErrorState(
           key: const Key('templates.error'),
-          message: 'No se pudieron cargar las plantillas',
+          message: 'No se pudieron cargar los Asistentes',
           description: 'Revisa tu conexión o intenta nuevamente.',
           onRetry: () =>
               context.read<TemplatesBloc>().add(const TemplatesLoadRequested()),

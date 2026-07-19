@@ -66,7 +66,7 @@ void main() {
       );
 
       expect(find.byKey(const Key('monitor.live_activity')), findsOneWidget);
-      expect(find.text('Consultó los bots · 1 paso'), findsOneWidget);
+      expect(find.text('Consultó los Canales · 1 paso'), findsOneWidget);
       expect(find.textContaining('list_bots'), findsNothing);
       // Colapsada por default: el carril (nodo thinking) aún no se pinta.
       expect(find.text('Pensando…'), findsNothing);
@@ -89,7 +89,7 @@ void main() {
 
     // Nodos solo-nombre de la gramática viva + el pulso en el paso actual.
     expect(find.text('Pensando…'), findsOneWidget);
-    expect(find.text('Consultó los bots'), findsOneWidget);
+    expect(find.text('Consultó los Canales'), findsOneWidget);
     expect(find.byKey(const Key('trace.pulse')), findsOneWidget);
     // Altura acotada: el carril vive dentro de un scroll interno.
     expect(find.byKey(const Key('monitor.live_trace.scroll')), findsOneWidget);
@@ -145,7 +145,10 @@ void main() {
     );
 
     // El wrapper Semantics(liveRegion) expone el resumen legible al lector.
-    expect(find.bySemanticsLabel('Consultó los bots · 1 paso'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Consultó los Canales · 1 paso'),
+      findsOneWidget,
+    );
     handle.dispose();
   });
 

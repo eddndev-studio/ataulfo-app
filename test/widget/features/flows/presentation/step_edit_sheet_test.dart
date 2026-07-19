@@ -389,7 +389,7 @@ void main() {
 
         expect(
           find.text(
-            'Cuánto espera el bot antes de enviar el paso '
+            'Cuánto espera el Asistente antes de enviar el paso '
             '(1 s a 1 min).',
           ),
           findsOneWidget,

@@ -84,7 +84,7 @@ class _ToolGroupsSheetState extends State<ToolGroupsSheet> {
             Text('Permisos de herramientas', style: textTheme.titleLarge),
             const SizedBox(height: 2),
             Text(
-              'Marca las capacidades que el bot puede usar. Las que desactives '
+              'Marca las capacidades que el Asistente puede usar en este Canal. Las que desactives '
               'no se le ofrecen ni se le describen.',
               style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
             ),
@@ -148,7 +148,7 @@ class _CoreRow extends StatelessWidget {
               children: <Widget>[
                 Text('Cierre de turno (núcleo)', style: textTheme.bodyMedium),
                 Text(
-                  'El bot siempre puede cerrar su turno. Siempre activo.',
+                  'El Asistente siempre puede cerrar su turno. Siempre activo.',
                   style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
                 ),
               ],
@@ -207,7 +207,7 @@ class _GroupRow extends StatelessWidget {
                 children: <Widget>[
                   Text(group.label, style: textTheme.bodyMedium),
                   Text(
-                    locked ? 'Desactivado por la plantilla' : group.description,
+                    locked ? 'Desactivado por el Asistente' : group.description,
                     style: textTheme.bodySmall?.copyWith(
                       color: AppTokens.text2,
                       fontStyle: locked ? FontStyle.italic : FontStyle.normal,

@@ -14,7 +14,7 @@ import '../../domain/entities/preview_item.dart';
 import '../bloc/preview_bloc.dart';
 import 'trainer_chat_page.dart' show trainerFailureCopy;
 
-/// Emulador del bot: corre el MISMO motor que producción contra una sesión
+/// Emulador del Asistente: corre el MISMO motor que producción contra una sesión
 /// sandbox. Nada llega a WhatsApp; los efectos (etiquetas, notas, flujos)
 /// aparecen como chips grabados. Consume tokens reales del proveedor. Las
 /// LECTURAS del bot (kind tool) viven tras un toggle: por defecto el hilo
@@ -36,7 +36,7 @@ class _PreviewPageState extends State<PreviewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Probar bot'),
+        title: const Text('Probar Asistente'),
         actions: <Widget>[
           BlocBuilder<PreviewBloc, PreviewState>(
             builder: (context, state) {
@@ -309,7 +309,7 @@ class _AccumulatingBanner extends StatelessWidget {
               const SizedBox(width: AppTokens.sp2),
               Flexible(
                 child: Text(
-                  'Acumulando mensajes — el bot responderá al cerrar la ventana',
+                  'Acumulando mensajes — el Asistente responderá al cerrar la ventana',
                   style: textTheme.labelMedium?.copyWith(
                     color: AppTokens.text2,
                   ),
@@ -342,7 +342,7 @@ class _EmptyView extends StatelessWidget {
             ),
             const SizedBox(height: AppTokens.sp3),
             Text(
-              'Escríbele al bot como si fueras un cliente y observa cómo responde con el entrenamiento actual.',
+              'Escríbele al Asistente como si fueras un cliente y observa cómo responde con su configuración actual.',
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
             ),

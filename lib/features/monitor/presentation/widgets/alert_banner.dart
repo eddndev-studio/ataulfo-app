@@ -30,7 +30,7 @@ class _AlertBannerState extends State<AlertBanner> {
     if (alert == null || alert.at == _dismissed) return const SizedBox.shrink();
     final textTheme = Theme.of(context).textTheme;
     final semanticLabel =
-        'Alerta del bot: ${alert.title.isNotEmpty ? alert.title : 'sin título'}'
+        'Alerta del Asistente: ${alert.title.isNotEmpty ? alert.title : 'sin título'}'
         '${alert.detail.isNotEmpty ? '. ${alert.detail}' : ''}';
     return Semantics(
       liveRegion: true,
@@ -72,7 +72,7 @@ class _AlertBannerState extends State<AlertBanner> {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  alert.title.isNotEmpty ? alert.title : 'Alerta del bot',
+                  alert.title.isNotEmpty ? alert.title : 'Alerta del Asistente',
                   style: textTheme.labelLarge?.copyWith(
                     color: AppTokens.text1,
                     fontWeight: FontWeight.w600,

@@ -122,7 +122,7 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
           ],
           if (all.isEmpty)
             Text(
-              'Esta plantilla aún no tiene flujos.',
+              'Este Asistente aún no tiene flujos.',
               key: const Key('flows.empty'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontStyle: FontStyle.italic,

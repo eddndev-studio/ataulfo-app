@@ -5,13 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('toolTitleFor', () {
     test('nombra las lecturas del asistente en es-MX', () {
-      expect(toolTitleFor('list_bots'), 'Consultó los bots');
+      expect(toolTitleFor('list_bots'), 'Consultó los Canales');
       expect(toolTitleFor('get_flow'), 'Consultó un flujo');
     });
 
     test('nombra las escrituras del asistente en es-MX', () {
       expect(toolTitleFor('create_flow'), 'Creó un flujo');
-      expect(toolTitleFor('set_bot_paused'), 'Pausó o reanudó un bot');
+      expect(toolTitleFor('set_bot_paused'), 'Pausó o reanudó un Canal');
       expect(toolTitleFor('update_step'), 'Actualizó un paso');
     });
 
@@ -37,7 +37,7 @@ void main() {
     });
 
     test('nombra las lecturas del entrenador en es-MX', () {
-      expect(toolTitleFor('get_template_overview'), 'Consultó la plantilla');
+      expect(toolTitleFor('get_template_overview'), 'Consultó el Asistente');
       expect(toolTitleFor('inspect_flow'), 'Inspeccionó un flujo');
       expect(toolTitleFor('list_labels'), 'Consultó las etiquetas');
       expect(toolTitleFor('validate_prompt'), 'Validó el prompt');
@@ -45,7 +45,7 @@ void main() {
         toolTitleFor('check_prompt_capabilities'),
         'Verificó las capacidades del prompt',
       );
-      expect(toolTitleFor('read_bot_runs'), 'Revisó corridas de los bots');
+      expect(toolTitleFor('read_bot_runs'), 'Revisó corridas de los Canales');
       expect(toolTitleFor('read_prompt'), 'Leyó el prompt');
       expect(
         toolTitleFor('list_prompt_history'),
@@ -64,6 +64,33 @@ void main() {
       );
       expect(toolTitleFor('read_attachment'), 'Revisó un adjunto');
       expect(toolTitleFor('get_current_time'), 'Consultó la hora');
+    });
+
+    test('nombra las operaciones de la Biblioteca de Recursos', () {
+      expect(
+        toolTitleFor('list_resources'),
+        'Consultó la Biblioteca de Recursos',
+      );
+      expect(
+        toolTitleFor('list_assistant_resources'),
+        'Consultó los Recursos de un Asistente',
+      );
+      expect(
+        toolTitleFor('get_assistant_resource_policy'),
+        'Consultó el acceso a Recursos',
+      );
+      expect(
+        toolTitleFor('attach_resource'),
+        'Asoció un Recurso a un Asistente',
+      );
+      expect(
+        toolTitleFor('detach_resource'),
+        'Retiró un Recurso de un Asistente',
+      );
+      expect(
+        toolTitleFor('set_assistant_resource_policy'),
+        'Ajustó el acceso a Recursos',
+      );
     });
 
     test('un nombre vacío cae a un genérico sin crudo del wire', () {

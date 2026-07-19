@@ -327,7 +327,7 @@ class AiConfigEditor extends StatelessWidget {
               key: Key('$keyPrefix.subagent.inherit'),
               value: (selection: null),
               title: 'Heredar (modelo principal)',
-              caption: 'Los subagentes corren con el modelo de la plantilla.',
+              caption: 'Los subagentes corren con el modelo del Asistente.',
             ),
           ],
         ),

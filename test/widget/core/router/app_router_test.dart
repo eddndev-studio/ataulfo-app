@@ -34,7 +34,6 @@ import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_maintenance_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_variables_page.dart';
-import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
@@ -80,6 +79,7 @@ import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:ataulfo/features/templates/presentation/pages/template_detail_page.dart';
+import 'package:ataulfo/features/templates/presentation/pages/templates_list_page.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
@@ -506,13 +506,15 @@ void main() {
     expect(find.byType(LoginPage), findsNothing);
   });
 
-  testWidgets('AuthAuthenticated → /home muestra BotsListPage', (tester) async {
+  testWidgets('AuthAuthenticated → /home muestra el catálogo de Asistentes', (
+    tester,
+  ) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(_host(router, authBloc));
     await tester.pumpAndSettle();
 
-    expect(find.byType(BotsListPage), findsOneWidget);
+    expect(find.byType(TemplatesListPage), findsOneWidget);
   });
 
   testWidgets('AuthAuthenticated → /home expone TemplatesBloc al árbol', (
@@ -526,10 +528,10 @@ void main() {
     await tester.pumpWidget(_host(router, authBloc));
     await tester.pumpAndSettle();
 
-    // Leer el bloc desde el árbol del BotsListPage (tab activa por
-    // default) confirma que el provider está aguas arriba del shell.
+    // Leer el bloc desde su catálogo confirma que el provider está aguas
+    // arriba del shell y sobrevive a los cambios de tab.
     final templatesBloc = tester
-        .element(find.byType(BotsListPage))
+        .element(find.byType(TemplatesListPage))
         .read<TemplatesBloc>();
     expect(templatesBloc, isNotNull);
     // El bloc dispara LoadRequested al construirse; el repo mock responde
@@ -561,13 +563,13 @@ void main() {
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
-      expect(find.byType(BotsListPage), findsOneWidget);
+      expect(find.byType(TemplatesListPage), findsOneWidget);
     },
   );
 
   testWidgets(
     'cambiar de org reconstruye el shell: los blocs org-scoped recargan datos '
-    'de la org nueva (botsRepo.list dos veces)',
+    'de la org nueva (templatesRepo.list dos veces)',
     (tester) async {
       // El shell /home se re-keyea por orgId: cuando el orgId activo cambia,
       // el subárbol (MultiBlocProvider incluido) se destruye y recrea, y los
@@ -586,18 +588,19 @@ void main() {
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
-      expect(find.byType(BotsListPage), findsOneWidget);
+      expect(find.byType(TemplatesListPage), findsOneWidget);
 
       controller.add(const AuthAuthenticated(_orgB));
       await tester.pumpAndSettle();
 
-      verify(botsRepo.list).called(2);
+      verify(templatesRepo.list).called(2);
+      verifyNever(botsRepo.list);
     },
   );
 
   testWidgets(
     'refresh que sólo cambia emailVerified (mismo orgId) NO reconstruye el '
-    'shell (botsRepo.list una vez)',
+    'shell (templatesRepo.list una vez)',
     (tester) async {
       // Guarda contra el over-rebuild: el shell se keyea por orgId SOLO, no por
       // la identity completa. Un /auth/me que sólo confirme el correo deja el
@@ -613,12 +616,13 @@ void main() {
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
-      expect(find.byType(BotsListPage), findsOneWidget);
+      expect(find.byType(TemplatesListPage), findsOneWidget);
 
       controller.add(const AuthAuthenticated(_orgAVerified));
       await tester.pumpAndSettle();
 
-      verify(botsRepo.list).called(1);
+      verify(templatesRepo.list).called(1);
+      verifyNever(botsRepo.list);
     },
   );
 

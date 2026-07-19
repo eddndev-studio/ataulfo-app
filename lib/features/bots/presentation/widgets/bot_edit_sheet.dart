@@ -103,12 +103,12 @@ class _BotEditSheetState extends State<BotEditSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Editar bot', style: textTheme.titleLarge),
+                Text('Editar Canal', style: textTheme.titleLarge),
                 const SizedBox(height: AppTokens.sp4),
                 AppTextField(
                   key: const Key('bot_edit.name'),
                   label: 'Nombre',
-                  hint: 'Nombre del bot',
+                  hint: 'Nombre del Canal',
                   controller: _nameCtrl,
                   enabled: !isMutating,
                   autofocus: true,
@@ -175,8 +175,8 @@ class _BotEditSheetState extends State<BotEditSheet> {
       'Tu edición estaba desactualizada; la refrescamos. Revisa y reintenta.',
     BotsInvalidCreateFailure() =>
       'El nombre no es válido. Revísalo e inténtalo de nuevo.',
-    BotsForbiddenFailure() => 'Tu rol no permite editar este bot.',
-    BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+    BotsForbiddenFailure() => 'Tu rol no permite editar este Canal.',
+    BotsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     BotsNotPausedFailure() ||

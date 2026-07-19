@@ -84,7 +84,7 @@ void main() {
     test('tool ⇒ nodo con el título humano y el ícono del tool', () {
       final n = nodeFromProgress(_ev('tool', toolName: 'list_bots'))!;
       expect(n.kind, TraceNodeKind.tool);
-      expect(n.titulo, 'Consultó los bots');
+      expect(n.titulo, 'Consultó los Canales');
       expect(n.icon, Icons.smart_toy_outlined);
       expect(n.isError, isFalse);
     });

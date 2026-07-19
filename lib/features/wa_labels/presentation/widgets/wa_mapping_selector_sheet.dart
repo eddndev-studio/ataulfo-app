@@ -185,8 +185,8 @@ class _WaMappingSelectorSheetState extends State<WaMappingSelectorSheet> {
     WaLabelsInvalidFailure() =>
       'Esa etiqueta interna ya no existe. Actualiza la lista e inténtalo.',
     WaLabelsForbiddenFailure() =>
-      'No tienes permiso para vincular etiquetas en este bot.',
-    WaLabelsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+      'No tienes permiso para vincular etiquetas en este Canal.',
+    WaLabelsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     WaLabelsNetworkFailure() || WaLabelsTimeoutFailure() =>
       'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     _ => 'No pudimos guardar el vínculo. Inténtalo de nuevo.',

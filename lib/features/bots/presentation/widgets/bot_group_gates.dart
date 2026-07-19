@@ -43,7 +43,7 @@ class BotGroupGates extends StatelessWidget {
           const SizedBox(height: AppTokens.sp1),
           Text(
             'En los chats de grupo de WhatsApp puedes apagar la IA y los '
-            'flujos disparados por mensaje de este bot. Los flujos disparados '
+            'flujos disparados por mensaje de este Canal. Los flujos disparados '
             'por etiqueta o lanzados a mano, y las respuestas manuales del '
             'operador, no se ven afectados.',
             style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),

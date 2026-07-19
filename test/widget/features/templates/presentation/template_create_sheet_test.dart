@@ -58,12 +58,12 @@ void main() {
   AppButton submitButton(WidgetTester tester) =>
       tester.widget<AppButton>(find.byKey(const Key('template_create.submit')));
 
-  testWidgets('título "Nueva plantilla", campo y submit deshabilitado', (
+  testWidgets('título "Nuevo Asistente", campo y submit deshabilitado', (
     tester,
   ) async {
     await tester.pumpWidget(host());
 
-    expect(find.text('Nueva plantilla'), findsOneWidget);
+    expect(find.text('Nuevo Asistente'), findsOneWidget);
     expect(find.byType(AppTextField), findsOneWidget);
     expect(find.byKey(const Key('template_create.field.name')), findsOneWidget);
     final btn = submitButton(tester);
@@ -226,12 +226,12 @@ void main() {
 
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.text('Nueva plantilla'), findsOneWidget);
+    expect(find.text('Nuevo Asistente'), findsOneWidget);
 
     controller.add(const TemplateCreateSucceeded(_tpl));
     await tester.pumpAndSettle();
 
-    expect(find.text('Nueva plantilla'), findsNothing, reason: 'cerró');
+    expect(find.text('Nuevo Asistente'), findsNothing, reason: 'cerró');
     expect(returned, _tpl);
   });
 }

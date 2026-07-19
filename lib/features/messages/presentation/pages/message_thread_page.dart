@@ -213,8 +213,8 @@ class _CorrectionFailuresListenerState
 String _correctionCopy(MessagesFailure f) => switch (f) {
   MessagesConflictFailure() => 'WhatsApp ya no permite editar ese mensaje',
   MessagesBotPausedFailure() =>
-    'El bot está pausado; reactívalo para corregir mensajes',
-  MessagesNotConnectedFailure() => 'El bot no está conectado a WhatsApp',
+    'El Canal está pausado; reactívalo para corregir mensajes',
+  MessagesNotConnectedFailure() => 'El Canal no está conectado a WhatsApp',
   MessagesNetworkFailure() ||
   MessagesTimeoutFailure() => 'Sin conexión: no se pudo aplicar la corrección',
   _ => 'No se pudo aplicar la corrección',
@@ -271,7 +271,7 @@ class _FailedView extends StatelessWidget {
           children: <Widget>[
             Text(
               isNotFound
-                  ? 'Este bot ya no existe en tu organización'
+                  ? 'Este Canal ya no existe en tu organización'
                   : 'No pudimos cargar los mensajes',
               textAlign: TextAlign.center,
               style: textTheme.bodyLarge,
@@ -632,8 +632,8 @@ String _mediaPlaceholder(String type) => switch (type) {
 String _pendingErrorText(MessagesFailure f) => switch (f) {
   MessagesNotFoundFailure() =>
     'No se pudo enviar: la conversación no está disponible',
-  MessagesBotPausedFailure() => 'El bot está pausado',
-  MessagesNotConnectedFailure() => 'El bot no está conectado',
+  MessagesBotPausedFailure() => 'El Canal está pausado',
+  MessagesNotConnectedFailure() => 'El Canal no está conectado',
   MessagesValidationFailure() => 'Mensaje inválido',
   MessagesForbiddenFailure() => 'No tienes permiso para enviar',
   MessagesNetworkFailure() || MessagesTimeoutFailure() => 'Sin conexión',
@@ -832,7 +832,7 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
                   key: Key('message.drill.$messageId'),
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.psychology_outlined),
-                  title: const Text('Ver razonamiento del bot'),
+                  title: const Text('Ver razonamiento del Asistente'),
                   subtitle: const Text(
                     'La corrida de IA que generó este mensaje',
                   ),

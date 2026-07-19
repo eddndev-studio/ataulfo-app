@@ -22,16 +22,16 @@ class _Starter {
 
 const List<_Starter> _starters = <_Starter>[
   _Starter(
-    id: 'bots',
-    label: '¿Cuántos bots tengo?',
-    icon: Icons.smart_toy_outlined,
-    prefill: '¿Cuántos bots tengo y cómo se llaman?',
+    id: 'assistants',
+    label: '¿Qué Asistentes tengo?',
+    icon: Icons.auto_awesome_outlined,
+    prefill: '¿Qué Asistentes tengo, qué hace cada uno y en qué Canales opera?',
   ),
   _Starter(
     id: 'prompt',
-    label: 'Ajustar una plantilla',
+    label: 'Ajustar un Asistente',
     icon: Icons.edit_note,
-    prefill: 'Quiero mejorar el prompt de la plantilla ',
+    prefill: 'Quiero mejorar el comportamiento del Asistente ',
   ),
   _Starter(
     id: 'audit',
@@ -75,7 +75,7 @@ class PaChatEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppTokens.sp2),
             Text(
-              'Opera bots, plantillas, flujos y documentos desde un solo hilo. '
+              'Opera Asistentes, Canales, automatizaciones y Recursos desde un solo hilo. '
               'Puedes cambiar de tarea sin perder el contexto; te pedirá '
               'confirmación antes de cambios con impacto.',
               textAlign: TextAlign.center,

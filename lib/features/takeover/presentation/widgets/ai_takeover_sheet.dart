@@ -51,7 +51,7 @@ class AiTakeoverSheet extends StatelessWidget {
         listener: (context, state) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No se pudo cambiar el estado del bot.'),
+              content: Text('No se pudo cambiar el estado del Canal.'),
             ),
           );
         },
@@ -65,7 +65,10 @@ class AiTakeoverSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Control del bot en este chat', style: textTheme.titleLarge),
+              Text(
+                'Control del Canal en este chat',
+                style: textTheme.titleLarge,
+              ),
               const SizedBox(height: AppTokens.sp4),
               switch (state) {
                 AiTakeoverLoading() => const Center(
@@ -75,7 +78,7 @@ class AiTakeoverSheet extends StatelessWidget {
                   ),
                 ),
                 AiTakeoverError() => Text(
-                  'No se pudo cargar el estado del bot.',
+                  'No se pudo cargar el estado del Canal.',
                   key: const Key('takeover.error'),
                   style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
                 ),
@@ -102,8 +105,8 @@ class AiTakeoverSheet extends StatelessWidget {
   ) {
     if (!configured) {
       return Text(
-        'Este bot no tiene una etiqueta de silencio configurada. Define una en '
-        'la plantilla para poder pausarlo en un chat.',
+        'Este Canal no tiene una etiqueta de silencio configurada. Defínela en '
+        'el Asistente para poder pausarlo en un chat.',
         key: const Key('takeover.not_configured'),
         style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
       );
@@ -121,8 +124,8 @@ class AiTakeoverSheet extends StatelessWidget {
             Expanded(
               child: Text(
                 paused
-                    ? 'El bot está pausado en este chat.'
-                    : 'El bot está respondiendo en este chat.',
+                    ? 'El Canal está pausado en este chat.'
+                    : 'El Asistente está respondiendo en este chat.',
                 key: const Key('takeover.state'),
                 style: textTheme.bodyLarge,
               ),
@@ -140,7 +143,7 @@ class AiTakeoverSheet extends StatelessWidget {
           leading: Icon(
             paused ? Icons.play_circle_outline : Icons.pause_circle_outline,
           ),
-          title: Text(paused ? 'Reanudar bot' : 'Pausar bot aquí'),
+          title: Text(paused ? 'Reanudar Canal' : 'Pausar Canal aquí'),
           onTap: () => context.read<AiTakeoverCubit>().toggle(),
         ),
       ],

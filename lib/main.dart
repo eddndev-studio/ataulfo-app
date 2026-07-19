@@ -59,6 +59,7 @@ import 'features/monitor/data/datasources/monitor_catchup_datasource.dart';
 import 'features/trainer/data/datasources/trainer_events_datasource.dart';
 import 'features/trainer/data/datasources/workspace_datasource.dart';
 import 'features/trainer/data/repositories/trainer_repositories_impl.dart';
+import 'features/resources/data/repositories/dio_resources_repository.dart';
 import 'features/ai_ledger/data/ai_ledger_datasource.dart';
 import 'features/ai_log/data/ai_log_datasource.dart';
 import 'features/executions/data/execution_datasource.dart';
@@ -363,6 +364,7 @@ Future<void> main() async {
   final previewRepository = PreviewRepositoryImpl(
     datasource: DioPreviewDatasource(mainDio),
   );
+  final resourcesRepository = DioResourcesRepository(mainDio);
 
   // Asistente de plataforma (org-scoped): chat CRUD + turno síncrono y un
   // stream SSE de progreso. Vive como dock sobre el shell.
@@ -508,6 +510,7 @@ Future<void> main() async {
     monitorCatchup: monitorCatchupDs,
     workspaceRepository: workspaceRepository,
     previewRepository: previewRepository,
+    resourcesRepository: resourcesRepository,
     platformAgentRepository: platformAgentRepository,
     platformAgentEvents: platformAgentEvents,
     membershipsRepository: membershipsRepository,

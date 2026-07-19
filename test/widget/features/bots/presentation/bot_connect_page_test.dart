@@ -241,7 +241,7 @@ void main() {
       expect(find.byKey(const Key('bot_connect.qr')), findsOneWidget);
     });
 
-    testWidgets('CONNECTED muestra "Bot en línea" y no QR', (tester) async {
+    testWidgets('CONNECTED muestra "Canal en línea" y no QR', (tester) async {
       when(() => bloc.state).thenReturn(
         BotConnectReady(
           _link,
@@ -253,7 +253,7 @@ void main() {
       await tester.pumpWidget(host());
 
       expect(find.byKey(const Key('bot_connect.connected')), findsOneWidget);
-      expect(find.text('Bot en línea'), findsOneWidget);
+      expect(find.text('Canal en línea'), findsOneWidget);
       expect(find.byKey(const Key('bot_connect.qr')), findsNothing);
     });
 

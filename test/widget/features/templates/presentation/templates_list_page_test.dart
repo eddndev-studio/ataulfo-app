@@ -130,7 +130,7 @@ void main() {
   });
 
   testWidgets(
-    'Loaded monta el header rico full-bleed con título "Plantillas"',
+    'Loaded monta el header rico full-bleed con título "Asistentes"',
     (tester) async {
       loaded(const <Template>[_t1]);
       await tester.pumpWidget(host());
@@ -140,7 +140,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AppHeaderCard),
-          matching: find.text('Plantillas'),
+          matching: find.text('Asistentes'),
         ),
         findsOneWidget,
       );
@@ -160,16 +160,17 @@ void main() {
     expect(find.byType(ListTile), findsNothing);
   });
 
-  testWidgets('tile con counts muestra bots/flujos/variables (pluralizado)', (
-    tester,
-  ) async {
-    loaded(const <Template>[_t1]);
-    await tester.pumpWidget(host());
+  testWidgets(
+    'tile con counts muestra canales/flujos/variables (pluralizado)',
+    (tester) async {
+      loaded(const <Template>[_t1]);
+      await tester.pumpWidget(host());
 
-    expect(find.text('3 bots'), findsOneWidget);
-    expect(find.text('12 flujos'), findsOneWidget);
-    expect(find.text('4 variables'), findsOneWidget);
-  });
+      expect(find.text('3 canales'), findsOneWidget);
+      expect(find.text('12 flujos'), findsOneWidget);
+      expect(find.text('4 variables'), findsOneWidget);
+    },
+  );
 
   testWidgets('counts en cero se muestran; singular sin "s" (1 flujo)', (
     tester,
@@ -177,7 +178,7 @@ void main() {
     loaded(const <Template>[_t2]);
     await tester.pumpWidget(host());
 
-    expect(find.text('0 bots'), findsOneWidget);
+    expect(find.text('0 canales'), findsOneWidget);
     expect(find.text('1 flujo'), findsOneWidget);
     expect(find.text('0 variables'), findsOneWidget);
   });
@@ -393,9 +394,9 @@ void main() {
             ),
           ),
           GoRoute(
-            path: '/templates/:id',
+            path: '/assistants/:id',
             builder: (_, state) {
-              navigated.add('/templates/${state.pathParameters['id']}');
+              navigated.add('/assistants/${state.pathParameters['id']}');
               return Scaffold(
                 body: Builder(
                   builder: (ctx) {
@@ -413,7 +414,7 @@ void main() {
       await tester.tap(find.byKey(const Key('templates.tile.t1')));
       await tester.pumpAndSettle();
 
-      expect(navigated, <String>['/templates/t1']);
+      expect(navigated, <String>['/assistants/t1']);
       expect(
         canPopAtDestination,
         <bool>[true],

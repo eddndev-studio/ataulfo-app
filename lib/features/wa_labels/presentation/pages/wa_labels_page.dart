@@ -288,8 +288,8 @@ class _FailedView extends StatelessWidget {
   static String _message(WaLabelsFailure f) => switch (f) {
     WaLabelsForbiddenFailure() =>
       'No tienes permiso para ver las etiquetas '
-          'de este bot.',
-    WaLabelsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+          'de este Canal.',
+    WaLabelsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     WaLabelsNetworkFailure() || WaLabelsTimeoutFailure() =>
       'Sin conexión. Revisa tu red e inténtalo de '
           'nuevo.',

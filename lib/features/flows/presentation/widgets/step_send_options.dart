@@ -152,7 +152,7 @@ class StepSendOptions extends StatelessWidget {
             ),
             const SizedBox(height: AppTokens.sp1),
             Text(
-              'Cuánto espera el bot antes de enviar el paso (1 s a 1 min).',
+              'Cuánto espera el Asistente antes de enviar el paso (1 s a 1 min).',
               style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
             ),
             if (delayBeyondSlider) ...<Widget>[

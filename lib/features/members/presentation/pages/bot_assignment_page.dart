@@ -24,7 +24,7 @@ class BotAssignmentPage extends StatelessWidget {
           Navigator.of(context).maybePop();
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Bots actualizados')));
+          ).showSnackBar(const SnackBar(content: Text('Canales actualizados')));
         } else if (state is AssignBotsFailed &&
             state.phase == AssignBotsPhase.save) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -85,7 +85,7 @@ class _ReadyView extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppTokens.sp6),
           child: Text(
-            'Esta organización todavía no tiene bots que asignar',
+            'Esta organización todavía no tiene Canales que asignar',
             textAlign: TextAlign.center,
             style: textTheme.bodyLarge,
           ),
@@ -144,7 +144,7 @@ class _LoadFailed extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Text(
-              'No pudimos cargar los bots',
+              'No pudimos cargar los Canales',
               textAlign: TextAlign.center,
               style: textTheme.bodyLarge,
             ),

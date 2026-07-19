@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +8,7 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
-import '../../../bots/presentation/widgets/bot_create_sheet.dart';
+import '../../../ai_catalog/presentation/widgets/thinking_label.dart';
 import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../domain/entities/template.dart';
 import '../../domain/failures/templates_failure.dart';
@@ -18,10 +16,9 @@ import '../bloc/template_detail_bloc.dart';
 import '../bloc/var_defs_bloc.dart';
 import '../widgets/template_detail_header.dart';
 import '../widgets/template_rename_sheet.dart';
-import '../../../ai_catalog/presentation/widgets/thinking_label.dart';
 import '../widgets/template_assistant_card.dart';
 
-/// Detalle de una Template (S03): el HUB de la plantilla. Identidad en el
+/// Detalle de un Asistente sobre la entidad interna Template. Identidad en el
 /// header de gradiente, el agente de plataforma como card hero, y las áreas que crecen
 /// sin tope (flujos, variables, motor IA) como filas launcher hacia páginas
 /// dedicadas — inline se volvían inusables con decenas de items. Consume el
@@ -134,9 +131,9 @@ class _LoadedView extends StatelessWidget {
                   templateName: template.name,
                 ),
                 const SizedBox(height: AppTokens.sp6),
-                _SectionLauncher(template: template),
+                _AssistantOverview(template: template),
                 const SizedBox(height: AppTokens.sp6),
-                _CreateBotButton(template: template),
+                _SectionLauncher(template: template),
               ],
             ),
           ),
@@ -146,9 +143,83 @@ class _LoadedView extends StatelessWidget {
   }
 }
 
-/// Launcher de las áreas de la plantilla: una card con filas hacia las
-/// páginas dedicadas. Cada fila resume su área (count + caption) para que
-/// el hub informe de un vistazo sin cargar las listas completas en pantalla.
+class _AssistantOverview extends StatelessWidget {
+  const _AssistantOverview({required this.template});
+
+  final Template template;
+
+  @override
+  Widget build(BuildContext context) {
+    final ai = template.ai;
+    final channels = template.counts?.bots;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('Resumen', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: AppTokens.sp3),
+        AppCard(
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: _OverviewMetric(
+                  icon: Icons.psychology_outlined,
+                  label: ai.enabled
+                      ? 'Comportamiento activo'
+                      : 'Comportamiento pausado',
+                  value: '${ProviderBadge.labelOf(ai.provider)} · ${ai.model}',
+                ),
+              ),
+              const SizedBox(width: AppTokens.sp4),
+              Expanded(
+                child: _OverviewMetric(
+                  icon: Icons.cable_outlined,
+                  label: 'Canales',
+                  value: channels == null
+                      ? 'Consulta sus conexiones'
+                      : '$channels ${channels == 1 ? 'conectado' : 'conectados'}',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OverviewMetric extends StatelessWidget {
+  const _OverviewMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      Icon(icon, color: AppTokens.primary),
+      const SizedBox(height: AppTokens.sp2),
+      Text(label, style: Theme.of(context).textTheme.titleSmall),
+      const SizedBox(height: 2),
+      Text(
+        value,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+      ),
+    ],
+  );
+}
+
+/// Las áreas del producto se presentan con el vocabulario visible objetivo;
+/// los paths /templates y /bots quedan como adaptadores internos temporales.
 class _SectionLauncher extends StatelessWidget {
   const _SectionLauncher({required this.template});
 
@@ -157,11 +228,60 @@ class _SectionLauncher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ai = template.ai;
-    return AppCard(
+    return Column(
       key: const Key('template_detail.card.sections'),
-      child: Column(
-        children: <Widget>[
-          BlocBuilder<FlowsBloc, FlowsState>(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const _SectionTitle('Comportamiento'),
+        AppCard(
+          child: Column(
+            children: <Widget>[
+              AppSectionLink(
+                rowKey: const Key('template_detail.link.ai'),
+                icon: Icons.psychology_outlined,
+                title: 'Instrucciones y motor IA',
+                caption:
+                    '${ProviderBadge.labelOf(ai.provider)} · ${ai.model} · '
+                    'temperatura ${ai.temperature.toStringAsFixed(1)} · '
+                    'razonamiento '
+                    '${thinkingLabel(ai.thinkingLevel).toLowerCase()}',
+                onTap: () => context.push('/templates/${template.id}/ai'),
+              ),
+              const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+              BlocBuilder<VarDefsBloc, VarDefsState>(
+                builder: (context, state) => AppSectionLink(
+                  rowKey: const Key('template_detail.link.variables'),
+                  icon: Icons.data_object,
+                  title: 'Variables',
+                  count: _varDefsCount(state),
+                  caption: _varDefsCaption(state),
+                  onTap: () =>
+                      context.push('/templates/${template.id}/variables'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppTokens.sp5),
+        const _SectionTitle('Recursos'),
+        AppCard(
+          child: AppSectionLink(
+            rowKey: const Key('template_detail.link.resources'),
+            icon: Icons.library_books_outlined,
+            title: 'Recursos disponibles',
+            caption: 'Conocimiento, archivos, medios y productos permitidos',
+            onTap: () => context.push(
+              Uri(
+                path: '/assistants/${template.id}/resources',
+                queryParameters: <String, String>{'name': template.name},
+              ).toString(),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppTokens.sp5),
+        const _SectionTitle('Automatizaciones'),
+        AppCard(
+          child: BlocBuilder<FlowsBloc, FlowsState>(
             builder: (context, state) => AppSectionLink(
               rowKey: const Key('template_detail.link.flows'),
               icon: Icons.account_tree_outlined,
@@ -171,34 +291,36 @@ class _SectionLauncher extends StatelessWidget {
               onTap: () => context.push('/templates/${template.id}/flows'),
             ),
           ),
-          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-          BlocBuilder<VarDefsBloc, VarDefsState>(
-            builder: (context, state) => AppSectionLink(
-              rowKey: const Key('template_detail.link.variables'),
-              icon: Icons.data_object,
-              title: 'Variables',
-              count: _varDefsCount(state),
-              caption: _varDefsCaption(state),
-              onTap: () => context.push('/templates/${template.id}/variables'),
-            ),
+        ),
+        const SizedBox(height: AppTokens.sp5),
+        const _SectionTitle('Canales'),
+        AppCard(
+          child: AppSectionLink(
+            rowKey: const Key('template_detail.link.channels'),
+            icon: Icons.cable_outlined,
+            title: 'Canales conectados',
+            count: template.counts?.bots,
+            caption: template.counts?.bots == 0
+                ? 'Pruébalo antes de conectarlo'
+                : 'WhatsApp y futuras conexiones',
+            onTap: () => context.push('/assistants/${template.id}/channels'),
           ),
-          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-          AppSectionLink(
-            rowKey: const Key('template_detail.link.ai'),
-            icon: Icons.psychology_outlined,
-            title: 'Motor IA',
-            caption:
-                'Temperatura ${ai.temperature.toStringAsFixed(1)} · '
-                'razonamiento ${thinkingLabel(ai.thinkingLevel).toLowerCase()}',
-            onTap: () => context.push('/templates/${template.id}/ai'),
+        ),
+        const SizedBox(height: AppTokens.sp5),
+        const _SectionTitle('Probar'),
+        AppCard(
+          child: AppSectionLink(
+            rowKey: const Key('template_detail.link.preview'),
+            icon: Icons.play_circle_outline,
+            title: 'Probar Asistente',
+            caption: 'Conversa en un entorno seguro antes de publicarlo',
+            onTap: () => context.push('/assistants/${template.id}/preview'),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  /// Count visible para la fila; null mientras la sección no tiene snapshot
-  /// (Loading/Failed) — la fila va sin pill.
   static int? _flowsCount(FlowsState state) => switch (state) {
     FlowsLoaded(flows: final f) => f.length,
     FlowsMutating(flows: final f) => f.length,
@@ -243,30 +365,16 @@ class _SectionLauncher extends StatelessWidget {
   }
 }
 
-class _CreateBotButton extends StatelessWidget {
-  const _CreateBotButton({required this.template});
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.label);
 
-  final Template template;
+  final String label;
 
   @override
-  Widget build(BuildContext context) {
-    return AppButton.filled(
-      key: const Key('template_detail.create_bot_button'),
-      label: 'Crear bot',
-      icon: Icons.smart_toy_outlined,
-      fullWidth: true,
-      onPressed: () async {
-        // Abre la hoja de creación con esta plantilla ya elegida (salta el
-        // paso de selección). Al crear, la hoja devuelve el bot y aquí se
-        // empuja su detalle sobre el shell + este detalle, así el back
-        // físico vuelve a esta plantilla.
-        final bot = await BotCreateSheet.open(context, template: template);
-        if (bot != null && context.mounted) {
-          unawaited(context.push('/bots/${bot.id}'));
-        }
-      },
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: AppTokens.sp3),
+    child: Text(label, style: Theme.of(context).textTheme.titleLarge),
+  );
 }
 
 class _FailedView extends StatelessWidget {
@@ -290,8 +398,8 @@ class _FailedView extends StatelessWidget {
             children: <Widget>[
               Text(
                 isNotFound
-                    ? 'Esta plantilla ya no existe en tu organización'
-                    : 'No pudimos cargar el detalle de la plantilla',
+                    ? 'Este Asistente ya no existe en tu organización'
+                    : 'No pudimos cargar el detalle del Asistente',
                 textAlign: TextAlign.center,
                 style: textTheme.bodyLarge,
               ),

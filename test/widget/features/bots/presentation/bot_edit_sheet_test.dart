@@ -53,7 +53,7 @@ void main() {
   ) async {
     await tester.pumpWidget(host());
 
-    expect(find.text('Editar bot'), findsOneWidget);
+    expect(find.text('Editar Canal'), findsOneWidget);
     expect(find.widgetWithText(TextField, 'Soporte'), findsOneWidget);
     // Canal como pill read-only (NO un TextField editable — I-B3 inmutable).
     expect(find.widgetWithText(AppPill, 'WhatsApp'), findsOneWidget);
@@ -140,7 +140,7 @@ void main() {
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.text('Editar bot'), findsOneWidget);
+    expect(find.text('Editar Canal'), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('bot_edit.name')), 'Nuevo');
     await tester.pump();
@@ -162,6 +162,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Editar bot'), findsNothing);
+    expect(find.text('Editar Canal'), findsNothing);
   });
 }

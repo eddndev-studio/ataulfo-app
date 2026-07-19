@@ -75,7 +75,7 @@ void main() {
     await tester.pump();
     expect(find.text('Razonamiento'), findsOneWidget);
     expect(find.text('razono esto'), findsOneWidget);
-    expect(find.text('Consultó los bots'), findsOneWidget);
+    expect(find.text('Consultó los Canales'), findsOneWidget);
   });
 
   testWidgets('la confirmación queda SIEMPRE fuera de la traza', (

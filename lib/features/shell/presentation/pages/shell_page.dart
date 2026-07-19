@@ -5,8 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/widgets/app_icon_pop.dart';
-import '../../../bots/presentation/pages/bots_list_page.dart';
-import '../../../bots/presentation/widgets/bot_create_sheet.dart';
 import '../../../calendar/presentation/bloc/agenda_cubit.dart';
 import '../../../calendar/presentation/pages/agenda_page.dart';
 import '../../../labels/presentation/pages/labels_admin_page.dart';
@@ -30,7 +28,7 @@ class ShellPage extends StatefulWidget {
   const ShellPage({super.key, this.routeObserver, this.assistantDraft = ''});
 
   /// Observer compartido con el GoRouter del AppRouter. ShellPage no lo
-  /// usa directamente: se lo entrega a Bots/TemplatesListPage para que
+  /// usa directamente: se lo entrega a TemplatesListPage para que
   /// se suscriban y dispatchen su refresh tras pop. `null` ⇒ los list
   /// pages siguen funcionando, sólo sin auto-refresh — útil en tests
   /// aislados que no necesitan el cableado completo.
@@ -49,13 +47,13 @@ class _ShellPageState extends State<ShellPage> {
   late int _index;
 
   /// Índice de la tab Ajustes: destino del avatar de los headers de sección.
-  static const int _settingsIndex = 5;
+  static const int _settingsIndex = 4;
 
   @override
   void initState() {
     super.initState();
-    // Conserva Bots como landing habitual, pero un handoff contextual abre el
-    // primer tab (Asistente) de inmediato.
+    // Asistentes es la landing habitual; un handoff contextual abre Ataúlfo
+    // de inmediato sin crear otro hilo.
     _index = widget.assistantDraft.trim().isEmpty ? 1 : 0;
   }
 
@@ -67,30 +65,20 @@ class _ShellPageState extends State<ShellPage> {
   /// reciben el routeObserver del widget.
   late final List<_TabSpec> _tabs = <_TabSpec>[
     _TabSpec(
-      label: 'Asistente',
+      label: 'Ataúlfo',
       icon: Icons.auto_awesome,
       page: PlatformAgentPage(initialDraft: widget.assistantDraft),
       lazy: true,
     ),
     _TabSpec(
-      label: 'Bots',
-      icon: Icons.smart_toy_outlined,
-      activeIcon: Icons.smart_toy,
-      page: BotsListPage(
-        routeObserver: widget.routeObserver,
-        onOpenSettings: () => _select(_settingsIndex),
-      ),
-      fab: _botCreateFab,
-    ),
-    _TabSpec(
-      label: 'Plantillas',
-      icon: Icons.description_outlined,
-      activeIcon: Icons.description,
+      label: 'Asistentes',
+      icon: Icons.support_agent_outlined,
+      activeIcon: Icons.support_agent,
       page: TemplatesListPage(
         routeObserver: widget.routeObserver,
         onOpenSettings: () => _select(_settingsIndex),
       ),
-      fab: _templateCreateFab,
+      fab: _assistantCreateFab,
     ),
     _TabSpec(
       label: 'Etiquetas',
@@ -226,33 +214,17 @@ class _TabSpec {
   final bool lazy;
 }
 
-// FABs por tab. Bots y Plantillas abren su hoja de creación (bottom sheet)
-// in situ sobre el shell; al crear con éxito la hoja devuelve la entidad y
-// aquí se empuja su detalle. No navegan a una pantalla intermedia: el back
-// físico cierra la hoja sin salir del listado. La tab Etiquetas abre su
-// propia hoja de creación.
-
-Widget _botCreateFab(BuildContext context) => FloatingActionButton(
-  key: const Key('shell.fab.bot_create'),
-  onPressed: () async {
-    final bot = await BotCreateSheet.open(context);
-    if (bot != null && context.mounted) {
-      unawaited(context.push('/bots/${bot.id}'));
-    }
-  },
-  tooltip: 'Crear bot',
-  child: const Icon(Icons.add),
-);
-
-Widget _templateCreateFab(BuildContext context) => FloatingActionButton(
+// FABs por tab. Asistentes abre su hoja de creación in situ; los Canales se
+// conectan dentro del Asistente para no revivir la navegación hermana.
+Widget _assistantCreateFab(BuildContext context) => FloatingActionButton(
   key: const Key('shell.fab.template_create'),
   onPressed: () async {
     final template = await TemplateCreateSheet.open(context);
     if (template != null && context.mounted) {
-      unawaited(context.push('/templates/${template.id}'));
+      unawaited(context.push('/assistants/${template.id}'));
     }
   },
-  tooltip: 'Crear plantilla',
+  tooltip: 'Crear Asistente',
   child: const Icon(Icons.add),
 );
 

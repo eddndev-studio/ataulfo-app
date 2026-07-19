@@ -101,12 +101,12 @@ class _TemplateRenameSheetState extends State<TemplateRenameSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Renombrar plantilla', style: textTheme.titleLarge),
+                Text('Renombrar Asistente', style: textTheme.titleLarge),
                 const SizedBox(height: AppTokens.sp4),
                 AppTextField(
                   key: const Key('template_rename.name'),
                   label: 'Nombre',
-                  hint: 'Nombre de la plantilla',
+                  hint: 'Nombre del Asistente',
                   controller: _nameCtrl,
                   enabled: !isMutating,
                   autofocus: true,
@@ -146,9 +146,9 @@ class _TemplateRenameSheetState extends State<TemplateRenameSheet> {
       'Tu edición estaba desactualizada; la refrescamos. Revisa y reintenta.',
     TemplatesInvalidUpdateFailure() =>
       'El nombre no es válido. Revísalo e inténtalo de nuevo.',
-    TemplatesForbiddenFailure() => 'Tu rol no permite editar esta plantilla.',
+    TemplatesForbiddenFailure() => 'Tu rol no permite editar este Asistente.',
     TemplatesNotFoundFailure() =>
-      'Esta plantilla ya no existe en tu organización.',
+      'Este Asistente ya no existe en tu organización.',
     TemplatesNetworkFailure() || TemplatesTimeoutFailure() =>
       'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     _ => 'No pudimos guardar el cambio. Inténtalo de nuevo.',

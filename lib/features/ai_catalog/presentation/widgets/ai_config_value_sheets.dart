@@ -286,7 +286,7 @@ class _AiConfigDelaySheetState extends State<AiConfigDelaySheet> {
             Text('Retraso de respuesta', style: textTheme.titleLarge),
             const SizedBox(height: 2),
             Text(
-              'Segundos que el bot acumula mensajes del cliente antes de '
+              'Segundos que el Asistente acumula mensajes del cliente antes de '
               'responder todo junto. 0 = inmediato; máximo $_max.',
               style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
             ),

@@ -17,15 +17,15 @@ String toolTitleFor(String tool) {
   switch (tool) {
     // Lecturas.
     case 'list_bots':
-      return 'Consultó los bots';
+      return 'Consultó los Canales';
     case 'get_bot':
-      return 'Consultó un bot';
+      return 'Consultó un Canal';
     case 'get_bot_variables':
-      return 'Consultó variables de un bot';
+      return 'Consultó variables de un Canal';
     case 'list_templates':
-      return 'Consultó las plantillas';
+      return 'Consultó los Asistentes';
     case 'get_template':
-      return 'Consultó una plantilla';
+      return 'Consultó un Asistente';
     case 'list_flows':
       return 'Consultó los flujos';
     case 'get_flow':
@@ -43,20 +43,20 @@ String toolTitleFor(String tool) {
     case 'view_file':
       return 'Leyó un archivo';
     case 'explain_bot_run':
-      return 'Revisó una corrida de bot';
+      return 'Revisó una corrida del Asistente';
     case 'check_flow_integrity':
       return 'Verificó un flujo';
     case 'check_template_integrity':
-      return 'Verificó una plantilla';
+      return 'Verificó un Asistente';
     // Bots.
     case 'set_bot_paused':
-      return 'Pausó o reanudó un bot';
+      return 'Pausó o reanudó un Canal';
     case 'set_bot_ai_disabled':
-      return 'Activó o desactivó la IA de un bot';
+      return 'Activó o desactivó el Asistente en un Canal';
     case 'set_bot_tool_groups':
-      return 'Ajustó los permisos de un bot';
+      return 'Ajustó los permisos de un Canal';
     case 'set_bot_variables':
-      return 'Actualizó variables de un bot';
+      return 'Actualizó variables de un Canal';
     // Variables.
     case 'add_variable':
       return 'Creó una variable';
@@ -66,15 +66,28 @@ String toolTitleFor(String tool) {
       return 'Eliminó una variable';
     // Plantillas.
     case 'create_template':
-      return 'Creó una plantilla';
+      return 'Creó un Asistente';
     case 'update_template':
-      return 'Actualizó una plantilla';
+      return 'Actualizó un Asistente';
     case 'delete_template':
-      return 'Eliminó una plantilla';
+      return 'Eliminó un Asistente';
     case 'clone_template':
-      return 'Duplicó una plantilla';
+      return 'Duplicó un Asistente';
     case 'patch_template_ai':
-      return 'Ajustó la IA de una plantilla';
+      return 'Ajustó el comportamiento de un Asistente';
+    // Biblioteca de Recursos por organización.
+    case 'list_resources':
+      return 'Consultó la Biblioteca de Recursos';
+    case 'list_assistant_resources':
+      return 'Consultó los Recursos de un Asistente';
+    case 'get_assistant_resource_policy':
+      return 'Consultó el acceso a Recursos';
+    case 'attach_resource':
+      return 'Asoció un Recurso a un Asistente';
+    case 'detach_resource':
+      return 'Retiró un Recurso de un Asistente';
+    case 'set_assistant_resource_policy':
+      return 'Ajustó el acceso a Recursos';
     // Flujos.
     case 'create_flow':
       return 'Creó un flujo';
@@ -127,13 +140,13 @@ String toolTitleFor(String tool) {
       return 'Recordó del historial';
     // Entrenador — lecturas del catálogo (trainertools).
     case 'get_template_overview':
-      return 'Consultó la plantilla';
+      return 'Consultó el Asistente';
     case 'inspect_flow':
       return 'Inspeccionó un flujo';
     case 'list_labels':
       return 'Consultó las etiquetas';
     case 'read_bot_runs':
-      return 'Revisó corridas de los bots';
+      return 'Revisó corridas de los Canales';
     case 'list_recent_attachments':
       return 'Consultó los adjuntos recientes';
     case 'read_attachment':
@@ -213,6 +226,14 @@ IconData toolIconFor(String tool) {
     case 'patch_template_ai':
     case 'check_template_integrity':
       return Icons.dashboard_customize_outlined;
+    // Biblioteca y bindings de Recursos.
+    case 'list_resources':
+    case 'list_assistant_resources':
+    case 'get_assistant_resource_policy':
+    case 'attach_resource':
+    case 'detach_resource':
+    case 'set_assistant_resource_policy':
+      return Icons.library_books_outlined;
     // Flujos, pasos y disparadores.
     case 'inspect_flow':
     case 'list_flows':

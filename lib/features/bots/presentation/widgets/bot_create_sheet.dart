@@ -252,10 +252,10 @@ class _PickStep extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('Elegir plantilla', style: textTheme.titleLarge),
+          Text('Elegir Asistente', style: textTheme.titleLarge),
           const SizedBox(height: AppTokens.sp2),
           Text(
-            'El bot heredará el comportamiento de la plantilla que elijas.',
+            'El canal usará el comportamiento del Asistente que elijas.',
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
           ),
           const SizedBox(height: AppTokens.sp4),
@@ -357,10 +357,10 @@ class _PickEmpty extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('No tienes plantillas todavía.', style: textTheme.bodyLarge),
+          Text('No tienes Asistentes todavía.', style: textTheme.bodyLarge),
           const SizedBox(height: AppTokens.sp2),
           Text(
-            'Crea una desde la tab Plantillas para poder crear bots.',
+            'Crea uno desde la tab Asistentes antes de conectar un canal.',
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
           ),
         ],
@@ -381,7 +381,7 @@ class _PickFailed extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('No pudimos cargar tus plantillas', style: textTheme.bodyLarge),
+          Text('No pudimos cargar tus Asistentes', style: textTheme.bodyLarge),
           const SizedBox(height: AppTokens.sp3),
           AppButton.tonal(
             label: 'Reintentar',
@@ -439,13 +439,13 @@ class _NameStep extends StatelessWidget {
               if (onBack != null) ...<Widget>[
                 IconButton(
                   key: const Key('bot_create.back'),
-                  tooltip: 'Elegir otra plantilla',
+                  tooltip: 'Elegir otro Asistente',
                   icon: const Icon(Icons.arrow_back),
                   onPressed: submitting ? null : onBack,
                 ),
                 const SizedBox(width: AppTokens.sp1),
               ],
-              Expanded(child: Text('Nuevo bot', style: textTheme.titleLarge)),
+              Expanded(child: Text('Nuevo canal', style: textTheme.titleLarge)),
             ],
           ),
           const SizedBox(height: AppTokens.sp4),
@@ -453,8 +453,8 @@ class _NameStep extends StatelessWidget {
           const SizedBox(height: AppTokens.sp4),
           AppTextField(
             key: const Key('bot_create.field.name'),
-            label: 'Nombre del bot',
-            hint: 'Ej. Bot soporte ventas',
+            label: 'Nombre del canal',
+            hint: 'Ej. WhatsApp de ventas',
             controller: nameCtrl,
             enabled: !submitting,
             autofocus: true,
@@ -560,11 +560,11 @@ class _FailedView extends StatelessWidget {
   static (String key, String copy) _resolve(BotsFailure f) => switch (f) {
     BotsInvalidCreateFailure() => (
       'bot_create.error.invalid_create',
-      'Revisa los datos del bot: el nombre o la plantilla no son válidos.',
+      'Revisa los datos del canal: el nombre o el Asistente no son válidos.',
     ),
     BotsForbiddenFailure() => (
       'bot_create.error.forbidden',
-      'Tu rol no permite crear bots. Pide acceso a un admin.',
+      'Tu rol no permite conectar canales. Pide acceso a un admin.',
     ),
     BotsNetworkFailure() || BotsTimeoutFailure() => (
       'bot_create.error.network',
@@ -578,7 +578,7 @@ class _FailedView extends StatelessWidget {
     BotsPhoneRejectedFailure() ||
     UnknownBotsFailure() => (
       'bot_create.error.generic',
-      'No pudimos crear el bot. Inténtalo de nuevo.',
+      'No pudimos conectar el canal. Inténtalo de nuevo.',
     ),
   };
 }

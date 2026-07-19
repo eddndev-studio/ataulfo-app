@@ -26,7 +26,7 @@ void main() {
     ),
   );
 
-  testWidgets('respondiendo: muestra estado + botón "Pausar bot aquí"', (
+  testWidgets('respondiendo: muestra estado + acción "Pausar Canal aquí"', (
     tester,
   ) async {
     when(() => cubit.state).thenReturn(
@@ -36,7 +36,7 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('takeover.state')), findsOneWidget);
-    expect(find.text('Pausar bot aquí'), findsOneWidget);
+    expect(find.text('Pausar Canal aquí'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('takeover.toggle')));
     verify(() => cubit.toggle()).called(1);
@@ -50,7 +50,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(host());
-    expect(find.text('Reanudar bot'), findsOneWidget);
+    expect(find.text('Reanudar Canal'), findsOneWidget);
   });
 
   testWidgets('sin etiqueta de silencio configurada: aviso, sin toggle', (
@@ -99,7 +99,9 @@ void main() {
       when(() => cubit.toggle()).thenAnswer((_) async {});
       await tester.pumpWidget(host());
 
-      final h1 = tester.widget<Text>(find.text('Control del bot en este chat'));
+      final h1 = tester.widget<Text>(
+        find.text('Control del Canal en este chat'),
+      );
       expect(h1.style?.fontSize, AppTokens.titleLSize);
 
       // La acción vive como fila tipo ListTile al ras del padding del sheet

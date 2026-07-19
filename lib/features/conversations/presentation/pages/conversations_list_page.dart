@@ -316,7 +316,7 @@ class _EmptyView extends StatelessWidget {
                 child: AppEmptyState(
                   key: Key('conversations.empty'),
                   icon: Icons.forum_outlined,
-                  title: 'Este bot todavía no tiene conversaciones',
+                  title: 'Este Canal todavía no tiene conversaciones',
                 ),
               ),
             ),
@@ -343,7 +343,7 @@ class _FailedView extends StatelessWidget {
               ? const Key('conversations.error.not_found')
               : const Key('conversations.error.generic'),
           message: isNotFound
-              ? 'Este bot ya no existe en tu organización'
+              ? 'Este Canal ya no existe en tu organización'
               : 'No pudimos cargar las conversaciones',
           onRetry: () => context.read<ConversationsBloc>().add(
             const ConversationsLoadRequested(),

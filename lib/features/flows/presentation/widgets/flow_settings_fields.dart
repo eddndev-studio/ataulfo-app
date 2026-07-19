@@ -201,7 +201,7 @@ class FlowSettingsExcludesPicker extends StatelessWidget {
           )
         else if (siblings.isEmpty)
           Text(
-            'No hay otros flujos en esta plantilla.',
+            'No hay otros flujos en este Asistente.',
             key: const Key('flow_settings.excludes.empty'),
             style: textTheme.bodySmall?.copyWith(
               color: AppTokens.text2,

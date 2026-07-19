@@ -280,8 +280,8 @@ class _FailedView extends StatelessWidget {
 
   static String _message(WaMappingError e) => switch (e) {
     WaMappingError.forbidden =>
-      'No tienes permiso para ver los vínculos de este bot.',
-    WaMappingError.notFound => 'Este bot ya no existe en tu organización.',
+      'No tienes permiso para ver los vínculos de este Canal.',
+    WaMappingError.notFound => 'Este Canal ya no existe en tu organización.',
     WaMappingError.network =>
       'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     WaMappingError.generic => 'No pudimos cargar los vínculos.',

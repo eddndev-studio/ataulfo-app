@@ -70,7 +70,7 @@ class _LogView extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppTokens.sp6),
           child: Text(
-            'Este chat aún no tiene actividad del bot de IA.',
+            'Este chat aún no tiene actividad del Asistente.',
             key: const Key('ai_log.empty'),
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
@@ -169,11 +169,11 @@ class _FailedView extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final copy = switch (failure) {
       AiLogForbiddenFailure() =>
-        'Tu rol no permite ver el razonamiento del bot. Pide acceso a un admin.',
+        'Tu rol no permite ver el razonamiento del Asistente. Pide acceso a un admin.',
       AiLogNetworkFailure() =>
         'Sin conexión con el servidor. Revisa tu red y reintenta.',
       AiLogUnknownFailure() =>
-        'No pudimos cargar el registro del bot. Inténtalo de nuevo.',
+        'No pudimos cargar el registro del Asistente. Inténtalo de nuevo.',
     };
     return Center(
       child: Padding(

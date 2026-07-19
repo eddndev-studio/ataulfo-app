@@ -2,10 +2,7 @@ import 'package:ataulfo/core/design/widgets/app_icon_pop.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
-import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
-import 'package:ataulfo/features/bots/presentation/bot_create_draft.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
-import 'package:ataulfo/features/bots/presentation/pages/bots_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
 import 'package:ataulfo/features/labels/presentation/pages/labels_admin_page.dart';
@@ -38,8 +35,6 @@ class _MockLabelsAdminBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
 
 class _MockPaBloc extends MockBloc<PaChatEvent, PaChatState>
     implements PlatformAgentChatBloc {}
-
-class _MockBotsRepository extends Mock implements BotsRepository {}
 
 class _MockTemplatesRepository extends Mock implements TemplatesRepository {}
 
@@ -114,13 +109,12 @@ void main() {
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
 
-      // Bots activa: variante filled envuelta en el pop del kit.
-      expect(inNav(find.byIcon(Icons.smart_toy)), findsOneWidget);
+      // Asistentes activa: variante filled envuelta en el pop del kit.
+      expect(inNav(find.byIcon(Icons.support_agent)), findsOneWidget);
       expect(inNav(find.byType(AppIconPop)), findsOneWidget);
-      expect(inNav(find.byIcon(Icons.smart_toy_outlined)), findsNothing);
-      // Plantillas inactiva: outline, sin pop.
-      expect(inNav(find.byIcon(Icons.description_outlined)), findsOneWidget);
-      expect(inNav(find.byIcon(Icons.description)), findsNothing);
+      expect(inNav(find.byIcon(Icons.support_agent_outlined)), findsNothing);
+      // Ataúlfo está inactivo y no lleva el wrapper animado.
+      expect(inNav(find.byIcon(Icons.auto_awesome)), findsOneWidget);
     });
 
     testWidgets('cambiar de tab mueve el filled+pop a la nueva selección', (
@@ -130,12 +124,13 @@ void main() {
 
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Plantillas'));
+      await tester.tap(find.text('Etiquetas'));
       await tester.pumpAndSettle();
 
-      expect(inNav(find.byIcon(Icons.description)), findsOneWidget);
-      expect(inNav(find.byIcon(Icons.smart_toy_outlined)), findsOneWidget);
-      expect(inNav(find.byIcon(Icons.smart_toy)), findsNothing);
+      expect(inNav(find.byIcon(Icons.support_agent_outlined)), findsOneWidget);
+      expect(inNav(find.byIcon(Icons.support_agent)), findsNothing);
+      expect(inNav(find.byIcon(Icons.label)), findsOneWidget);
+      expect(inNav(find.byType(AppIconPop)), findsOneWidget);
     });
 
     testWidgets('el rail (≥600dp) también pinta filled+pop en la selección', (
@@ -154,7 +149,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(NavigationRail),
-          matching: find.byIcon(Icons.smart_toy),
+          matching: find.byIcon(Icons.support_agent),
         ),
         findsOneWidget,
       );
@@ -186,37 +181,36 @@ void main() {
   });
 
   group('navegación entre tabs', () {
-    testWidgets('arranca en la tab Bots (BotsListPage visible)', (
+    testWidgets('arranca en la tab Asistentes (catálogo visible)', (
       tester,
     ) async {
       useViewport(tester, widthDp: 420);
 
       await tester.pumpWidget(host());
 
-      expect(find.byType(BotsListPage), findsOneWidget);
+      expect(find.byType(TemplatesListPage), findsOneWidget);
       // Otras pages existen en el IndexedStack pero quedan offstage —
       // su contenido no debe ser visible al usuario.
       expect(find.text('Cerrar sesión'), findsNothing);
-      expect(find.byKey(const Key('templates.empty')), findsNothing);
+      expect(find.byKey(const Key('templates.empty')), findsOneWidget);
     });
 
-    testWidgets('tab Plantillas presente en BottomNavigationBar (phone)', (
+    testWidgets('un único destino Asistentes reemplaza Bots + Plantillas', (
       tester,
     ) async {
       useViewport(tester, widthDp: 420);
 
       await tester.pumpWidget(host());
 
-      // Texto "Bots" aparece también en el AppBar (título dinámico de la
-      // tab activa). Filtramos por descendiente del BottomNavigationBar
-      // para verificar la presencia de cada label dentro del nav.
       Finder inNav(String label) => find.descendant(
         of: find.byType(BottomNavigationBar),
         matching: find.text(label),
       );
 
-      expect(inNav('Bots'), findsOneWidget);
-      expect(inNav('Plantillas'), findsOneWidget);
+      expect(inNav('Ataúlfo'), findsOneWidget);
+      expect(inNav('Asistentes'), findsOneWidget);
+      expect(inNav('Bots'), findsNothing);
+      expect(inNav('Plantillas'), findsNothing);
       expect(inNav('Ajustes'), findsOneWidget);
     });
 
@@ -233,8 +227,8 @@ void main() {
       final labels = nav.items.map((i) => i.label).toList();
       expect(labels.last, 'Ajustes');
       expect(labels[labels.length - 2], 'Agenda');
-      expect(labels.first, 'Asistente');
-      expect(labels[1], 'Bots');
+      expect(labels.first, 'Ataúlfo');
+      expect(labels[1], 'Asistentes');
     });
 
     testWidgets('Ajustes cierra la barra y Agenda es la penúltima (rail)', (
@@ -250,34 +244,26 @@ void main() {
           .toList();
       expect(labels.last, 'Ajustes');
       expect(labels[labels.length - 2], 'Agenda');
-      expect(labels.first, 'Asistente');
-      expect(labels[1], 'Bots');
+      expect(labels.first, 'Ataúlfo');
+      expect(labels[1], 'Asistentes');
     });
 
-    testWidgets('tap Plantillas (phone) muestra TemplatesListPage', (
-      tester,
-    ) async {
+    testWidgets('Asistentes (phone) muestra TemplatesListPage', (tester) async {
       useViewport(tester, widthDp: 420);
 
       await tester.pumpWidget(host());
-      await tester.tap(find.text('Plantillas'));
-      await tester.pumpAndSettle();
-
       expect(find.byType(TemplatesListPage), findsOneWidget);
       // El empty state de Templates (TemplatesLoaded([]) del stub) confirma
       // que el árbol del bloc llegó al widget.
       expect(find.byKey(const Key('templates.empty')), findsOneWidget);
     });
 
-    testWidgets('tap Plantillas (tablet) muestra TemplatesListPage', (
+    testWidgets('Asistentes (tablet) muestra TemplatesListPage', (
       tester,
     ) async {
       useViewport(tester, widthDp: 800);
 
       await tester.pumpWidget(host());
-      await tester.tap(find.text('Plantillas'));
-      await tester.pumpAndSettle();
-
       expect(find.byType(TemplatesListPage), findsOneWidget);
     });
 
@@ -304,88 +290,32 @@ void main() {
       expect(find.text('Cerrar sesión'), findsOneWidget);
     });
 
-    testWidgets('cambiar tab preserva el BotsBloc del shell (mismo instance)', (
-      tester,
-    ) async {
-      useViewport(tester, widthDp: 420);
-
-      await tester.pumpWidget(host());
-      // Capturamos el bloc visto desde Bots tab.
-      final blocBefore = tester
-          .element(find.byType(BotsListPage))
-          .read<BotsBloc>();
-      await tester.tap(find.text('Ajustes'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Bots'));
-      await tester.pumpAndSettle();
-      final blocAfter = tester
-          .element(find.byType(BotsListPage))
-          .read<BotsBloc>();
-
-      // El cambio de tab NO debe reconstruir el bloc — el provider está
-      // en el route builder, no dentro de cada tab.
-      expect(identical(blocBefore, blocAfter), isTrue);
-    });
-
-    testWidgets('tab Bots (phone) expone FAB de selector de plantilla', (
+    testWidgets('Asistentes (phone) expone un único FAB de creación', (
       tester,
     ) async {
       useViewport(tester, widthDp: 420);
 
       await tester.pumpWidget(host());
 
-      expect(find.byKey(const Key('shell.fab.bot_create')), findsOneWidget);
-      expect(find.byKey(const Key('shell.fab.template_create')), findsNothing);
+      expect(
+        find.byKey(const Key('shell.fab.template_create')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('shell.fab.bot_create')), findsNothing);
     });
 
-    testWidgets('tab Bots (tablet) expone FAB de selector de plantilla', (
+    testWidgets('Asistentes (tablet) expone el mismo FAB de creación', (
       tester,
     ) async {
       useViewport(tester, widthDp: 800);
 
       await tester.pumpWidget(host());
 
-      expect(find.byKey(const Key('shell.fab.bot_create')), findsOneWidget);
-    });
-
-    testWidgets('tab Plantillas (phone) expone FAB de crear plantilla', (
-      tester,
-    ) async {
-      useViewport(tester, widthDp: 420);
-
-      await tester.pumpWidget(host());
-      await tester.tap(
-        find.descendant(
-          of: find.byType(BottomNavigationBar),
-          matching: find.text('Plantillas'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
       expect(
         find.byKey(const Key('shell.fab.template_create')),
         findsOneWidget,
       );
-    });
-
-    testWidgets('tab Plantillas (tablet) expone FAB de crear plantilla', (
-      tester,
-    ) async {
-      useViewport(tester, widthDp: 800);
-
-      await tester.pumpWidget(host());
-      await tester.tap(
-        find.descendant(
-          of: find.byType(NavigationRail),
-          matching: find.text('Plantillas'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('shell.fab.template_create')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('shell.fab.bot_create')), findsNothing);
     });
 
     testWidgets('tab Etiquetas presente en BottomNavigationBar (phone)', (
@@ -468,43 +398,7 @@ void main() {
       expect(find.byType(FloatingActionButton), findsNothing);
     });
 
-    testWidgets('tap FAB en tab Bots abre la hoja de creación (wizard)', (
-      tester,
-    ) async {
-      useViewport(tester, widthDp: 420);
-
-      // El FAB ya no navega a una pantalla: abre el bottom sheet de creación
-      // sobre el shell. El repo de bots y el TemplatesBloc del shell (que el
-      // paso de selección consume) deben estar en el árbol.
-      final botsRepo = _MockBotsRepository();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: RepositoryProvider<BotsRepository>.value(
-            value: botsRepo,
-            child: RepositoryProvider<BotCreateDraftStore>(
-              create: (_) => BotCreateDraftStore(),
-              child: MultiBlocProvider(
-                providers: <BlocProvider<dynamic>>[
-                  BlocProvider<AuthBloc>.value(value: authBloc),
-                  BlocProvider<BotsBloc>.value(value: botsBloc),
-                  BlocProvider<TemplatesBloc>.value(value: templatesBloc),
-                  BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
-                ],
-                child: const ShellPage(),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('shell.fab.bot_create')));
-      await tester.pumpAndSettle();
-
-      // El wizard arranca en el paso de selección de plantilla.
-      expect(find.text('Elegir plantilla'), findsOneWidget);
-    });
-
-    testWidgets('tap FAB en tab Plantillas abre la hoja de creación', (
+    testWidgets('tap FAB en Asistentes abre la hoja de creación', (
       tester,
     ) async {
       useViewport(tester, widthDp: 420);
@@ -527,12 +421,10 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Plantillas'));
-      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('shell.fab.template_create')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Nueva plantilla'), findsOneWidget);
+      expect(find.text('Nuevo Asistente'), findsOneWidget);
     });
 
     testWidgets(
@@ -541,14 +433,12 @@ void main() {
         useViewport(tester, widthDp: 420);
 
         await tester.pumpWidget(host());
-        await tester.tap(find.text('Plantillas'));
-        await tester.pumpAndSettle();
         final blocBefore = tester
             .element(find.byType(TemplatesListPage))
             .read<TemplatesBloc>();
-        await tester.tap(find.text('Bots'));
+        await tester.tap(find.text('Ajustes'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Plantillas'));
+        await tester.tap(find.text('Asistentes'));
         await tester.pumpAndSettle();
         final blocAfter = tester
             .element(find.byType(TemplatesListPage))
@@ -561,10 +451,10 @@ void main() {
 
   group('propagación del RouteObserver', () {
     // Para que el auto-refresh tras pop funcione, el shell tiene que
-    // entregarle el observer a las dos list pages. El cableado vive en
+    // entregarle el observer al catálogo de Asistentes. El cableado vive en
     // el route builder del router (AppRouter), pero la prop se atraviesa
     // por ShellPage — éste test ancla esa prop como contrato del shell.
-    testWidgets('ShellPage propaga el routeObserver a ambos list pages', (
+    testWidgets('ShellPage propaga el routeObserver a Asistentes', (
       tester,
     ) async {
       useViewport(tester, widthDp: 420);
@@ -581,21 +471,6 @@ void main() {
           child: MaterialApp(home: ShellPage(routeObserver: observer)),
         ),
       );
-
-      final botsList = tester.widget<BotsListPage>(find.byType(BotsListPage));
-      expect(
-        botsList.routeObserver,
-        same(observer),
-        reason:
-            'BotsListPage debe recibir el mismo observer que ShellPage, '
-            'sin esto el auto-refresh tras pop no se cabla.',
-      );
-
-      // Cambiar a la tab Plantillas para que TemplatesListPage materialice.
-      // IndexedStack mantiene todas las tabs montadas, pero el find debe
-      // resolver inequívoco — Plantillas es la segunda tab.
-      await tester.tap(find.text('Plantillas'));
-      await tester.pumpAndSettle();
 
       final templatesList = tester.widget<TemplatesListPage>(
         find.byType(TemplatesListPage),
@@ -619,7 +494,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Como Bots/Plantillas: la tarjeta-header full-bleed ES el encabezado.
+      // Como Asistentes: la tarjeta-header full-bleed ES el encabezado.
       expect(find.byType(AppBar), findsNothing);
     });
 
@@ -663,7 +538,7 @@ void main() {
     });
   });
 
-  group('pestaña Asistente', () {
+  group('pestaña Ataúlfo', () {
     Widget hostWithAssistant(_MockPaBloc pa) {
       // Estado terminal (sin spinner): solo verificamos que la página se monte
       // al abrir la tab. La carga real la cubre platform_agent_page_test.
@@ -685,7 +560,7 @@ void main() {
     }
 
     testWidgets(
-      'tab Asistente: se monta SOLO al abrirla (lazy en IndexedStack)',
+      'tab Ataúlfo: se monta SOLO al abrirla (lazy en IndexedStack)',
       (tester) async {
         useViewport(tester, widthDp: 420);
         final pa = _MockPaBloc();
@@ -697,7 +572,7 @@ void main() {
         await tester.tap(
           find.descendant(
             of: find.byType(BottomNavigationBar),
-            matching: find.text('Asistente'),
+            matching: find.text('Ataúlfo'),
           ),
         );
         await tester.pumpAndSettle();

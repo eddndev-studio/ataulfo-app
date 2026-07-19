@@ -208,13 +208,13 @@ class _WaLabelEditSheetState extends State<WaLabelEditSheet> {
 
   static String _failureMessage(WaLabelsFailure f) => switch (f) {
     WaLabelsNotConnectedFailure() =>
-      'El bot no está conectado a WhatsApp. Conéctalo e inténtalo de nuevo.',
+      'El Canal no está conectado a WhatsApp. Conéctalo e inténtalo de nuevo.',
     WaLabelsUpstreamFailure() =>
       'WhatsApp no respondió. Inténtalo de nuevo en un momento.',
     WaLabelsInvalidFailure() => 'Revisa el nombre de la etiqueta.',
     WaLabelsForbiddenFailure() =>
-      'No tienes permiso para gestionar etiquetas en este bot.',
-    WaLabelsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+      'No tienes permiso para gestionar etiquetas en este Canal.',
+    WaLabelsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     WaLabelsNetworkFailure() || WaLabelsTimeoutFailure() =>
       'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     WaLabelsServerFailure() ||

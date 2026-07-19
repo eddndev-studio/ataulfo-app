@@ -136,7 +136,7 @@ class BotDetailHeader extends StatelessWidget {
                       onPressed: onEdit,
                       icon: const Icon(Icons.edit_outlined),
                       color: AppTokens.onPrimary,
-                      tooltip: 'Editar bot',
+                      tooltip: 'Editar canal',
                     ),
                 ],
               ),

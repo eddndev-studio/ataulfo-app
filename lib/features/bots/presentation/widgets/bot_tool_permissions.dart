@@ -66,7 +66,7 @@ class _BotToolPermissionsState extends State<BotToolPermissions> {
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const _Row(
-            caption: 'Comprobando los permisos de la plantilla…',
+            caption: 'Comprobando los permisos del Asistente…',
             onTap: null,
           );
         }
@@ -85,13 +85,13 @@ class _BotToolPermissionsState extends State<BotToolPermissions> {
 
   static String _caption(int own, int locked, bool unknownTemplate) {
     final base = own == 0
-        ? 'Sin restricciones extra de este bot'
-        : '$own ${own == 1 ? 'grupo restringido' : 'grupos restringidos'} por este bot';
+        ? 'Sin restricciones extra de este Canal'
+        : '$own ${own == 1 ? 'grupo restringido' : 'grupos restringidos'} por este Canal';
     if (unknownTemplate) {
-      return '$base · no se pudo leer la plantilla';
+      return '$base · no se pudo leer el Asistente';
     }
     if (locked > 0) {
-      return '$base · la plantilla ya restringe $locked';
+      return '$base · el Asistente ya restringe $locked';
     }
     return base;
   }

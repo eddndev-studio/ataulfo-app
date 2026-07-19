@@ -193,6 +193,6 @@ void main() {
     // (el ScaffoldMessenger es de nivel app).
     expect(find.byKey(const Key('base-sentinel')), findsOneWidget);
     expect(find.byType(BotAssignmentPage), findsNothing);
-    expect(find.text('Bots actualizados'), findsOneWidget);
+    expect(find.text('Canales actualizados'), findsOneWidget);
   });
 }

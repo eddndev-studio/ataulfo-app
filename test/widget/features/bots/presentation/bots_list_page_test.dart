@@ -134,7 +134,7 @@ void main() {
     expect(find.byType(AppLoadingIndicator), findsOneWidget);
   });
 
-  testWidgets('Loaded monta el header rico full-bleed con título "Bots"', (
+  testWidgets('Loaded monta el header rico full-bleed con título "Canales"', (
     tester,
   ) async {
     tall(tester);
@@ -145,13 +145,13 @@ void main() {
     await tester.pumpWidget(host());
 
     // El AppHeaderCard reemplaza al AppBar del shell para esta sección. El
-    // título coincide con la etiqueta de la tab del shell: "Bots" es el
-    // término interno consistente en toda la app.
+    // título usa el lenguaje de producto aunque esta lista siga siendo una
+    // superficie de compatibilidad durante el rollout.
     expect(find.byType(AppHeaderCard), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(AppHeaderCard),
-        matching: find.text('Bots'),
+        matching: find.text('Canales'),
       ),
       findsOneWidget,
     );
@@ -414,8 +414,8 @@ void main() {
     await tester.tap(find.widgetWithText(AppButton, 'Crear bot'));
     await tester.pumpAndSettle();
 
-    // La hoja (wizard de bot) arranca en el paso de selección de plantilla.
-    expect(find.text('Elegir plantilla'), findsOneWidget);
+    // La hoja de canal arranca seleccionando el Asistente que atenderá.
+    expect(find.text('Elegir Asistente'), findsOneWidget);
   });
 
   testWidgets('Failed muestra card de error y botón Reintentar', (

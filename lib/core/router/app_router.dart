@@ -91,6 +91,11 @@ import '../../features/flows/presentation/widgets/flow_detail_app_bar.dart';
 import '../../features/labels/domain/repositories/chat_labels_repository.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/trainer/domain/repositories/trainer_repositories.dart';
+import '../../features/trainer/presentation/bloc/preview_bloc.dart';
+import '../../features/trainer/presentation/pages/preview_page.dart';
+import '../../features/resources/domain/repositories/resources_repository.dart';
+import '../../features/resources/presentation/bloc/assistant_resources_cubit.dart';
+import '../../features/resources/presentation/pages/assistant_resources_page.dart';
 import '../../features/platform_agent/domain/repositories/platform_agent_repository.dart';
 import '../../features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
 import '../../features/ai_ledger/domain/ai_ledger_repository.dart';
@@ -165,6 +170,7 @@ import '../../features/templates/presentation/bloc/template_detail_bloc.dart';
 import '../../features/templates/presentation/bloc/templates_bloc.dart';
 import '../../features/templates/presentation/bloc/var_defs_bloc.dart';
 import '../../features/templates/presentation/pages/template_ai_page.dart';
+import '../../features/templates/presentation/pages/assistant_channels_page.dart';
 import '../../features/templates/presentation/pages/template_detail_page.dart';
 import '../../features/templates/presentation/pages/template_flows_page.dart';
 import '../../features/templates/presentation/pages/template_variables_page.dart';
@@ -217,6 +223,7 @@ class AppRouter {
     MonitorCatchupDatasource? monitorCatchup,
     required WorkspaceRepository workspaceRepository,
     required PreviewRepository previewRepository,
+    ResourcesRepository? resourcesRepository,
     required PlatformAgentRepository platformAgentRepository,
     required PlatformAgentEvents platformAgentEvents,
     required MembershipsRepository membershipsRepository,
@@ -264,6 +271,8 @@ class AppRouter {
        _monitorActivity = monitorActivity,
        _monitorBotActivity = monitorBotActivity,
        _monitorCatchup = monitorCatchup,
+       _previewRepo = previewRepository,
+       _resourcesRepo = resourcesRepository,
        _platformAgentRepo = platformAgentRepository,
        _platformAgentEvents = platformAgentEvents,
        _membershipsRepo = membershipsRepository,
@@ -321,6 +330,8 @@ class AppRouter {
 
   final PlatformAgentRepository _platformAgentRepo;
   final PlatformAgentEvents _platformAgentEvents;
+  final PreviewRepository _previewRepo;
+  final ResourcesRepository? _resourcesRepo;
   final NotesRepository _notesRepo;
   final AiLogRepository _aiLogRepo;
 
@@ -859,7 +870,7 @@ class AppRouter {
               botId: id,
             )..add(const BotVariablesLoadRequested()),
             child: Scaffold(
-              appBar: AppBar(title: const Text('Variables del bot')),
+              appBar: AppBar(title: const Text('Variables del Canal')),
               body: const BotVariablesPage(),
             ),
           );
@@ -1151,7 +1162,7 @@ class AppRouter {
                   run != null
                       ? 'Razonamiento de la corrida'
                       : (msg == null
-                            ? 'Razonamiento del bot'
+                            ? 'Razonamiento del Asistente'
                             : 'Razonamiento de este mensaje'),
                 ),
               ),
@@ -1209,7 +1220,7 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/templates/:id',
+        path: '/assistants/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           // El repo de bots cuelga del scope para que el CTA "Crear bot" del
@@ -1234,6 +1245,10 @@ class AppRouter {
                       FlowsBloc(repo: _flowsRepo, templateId: id)
                         ..add(const FlowsLoadRequested()),
                 ),
+                BlocProvider<BotsBloc>(
+                  create: (_) =>
+                      BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+                ),
               ],
               // Sin AppBar: el header de gradiente full-bleed de la página
               // aporta retorno + editar, y el Entrenador entra por su card
@@ -1242,6 +1257,76 @@ class AppRouter {
             ),
           );
         },
+      ),
+      GoRoute(
+        path: '/assistants/:id/channels',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return RepositoryProvider<BotsRepository>.value(
+            value: _botsRepo,
+            child: MultiBlocProvider(
+              providers: <BlocProvider<dynamic>>[
+                BlocProvider<TemplateDetailBloc>(
+                  create: (_) =>
+                      TemplateDetailBloc(repo: _templatesRepo, id: id)
+                        ..add(const TemplateDetailLoadRequested()),
+                ),
+                BlocProvider<BotsBloc>(
+                  create: (_) =>
+                      BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+                ),
+              ],
+              child: AssistantChannelsPage(assistantId: id),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/assistants/:id/resources',
+        builder: (context, state) {
+          final repo = _resourcesRepo;
+          if (repo == null) {
+            return const Scaffold(
+              body: Center(
+                child: Text('Biblioteca no disponible en este entorno.'),
+              ),
+            );
+          }
+          final id = state.pathParameters['id']!;
+          return BlocProvider<AssistantResourcesCubit>(
+            create: (_) =>
+                AssistantResourcesCubit(repository: repo, assistantId: id)
+                  ..load(),
+            child: AssistantResourcesPage(
+              assistantName: state.uri.queryParameters['name'] ?? '',
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/assistants/:id/preview',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BlocProvider<PreviewBloc>(
+            create: (_) => PreviewBloc(
+              repo: _previewRepo,
+              templateId: id,
+              picker: FilePickerMediaFilePicker(),
+            )..add(const PreviewStarted()),
+            child: PreviewPage(templateId: id),
+          );
+        },
+      ),
+      // Compatibilidad de deep links durante el rollout. El usuario aterriza
+      // en la IA nueva sin perder marcadores ni enlaces de versiones previas.
+      GoRoute(
+        path: '/templates/:id',
+        redirect: (_, state) => '/assistants/${state.pathParameters['id']!}',
+      ),
+      GoRoute(
+        path: '/templates/:id/trainer/preview',
+        redirect: (_, state) =>
+            '/assistants/${state.pathParameters['id']!}/preview',
       ),
       GoRoute(
         // Lista de flujos de la plantilla con buscador local. Página
@@ -1561,7 +1646,7 @@ class AppRouter {
             botsRepo: _botsRepo,
           )..load(),
           child: Scaffold(
-            appBar: AppBar(title: const Text('Asignar bots')),
+            appBar: AppBar(title: const Text('Asignar Canales')),
             body: const BotAssignmentPage(),
           ),
         ),

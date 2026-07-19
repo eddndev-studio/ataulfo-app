@@ -72,7 +72,7 @@ void main() {
     ),
   );
 
-  testWidgets('resume el override del bot y la restricción de la plantilla', (
+  testWidgets('resume el override del Canal y la restricción del Asistente', (
     tester,
   ) async {
     when(
@@ -83,10 +83,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('1 grupo restringido por este bot'),
+      find.textContaining('1 grupo restringido por este Canal'),
       findsOneWidget,
     );
-    expect(find.textContaining('la plantilla ya restringe 1'), findsOneWidget);
+    expect(find.textContaining('el Asistente ya restringe 1'), findsOneWidget);
   });
 
   testWidgets('la fila es un AppSectionLink del kit con glifo de entidad', (
@@ -107,7 +107,7 @@ void main() {
     expect(find.text('Permisos de herramientas'), findsOneWidget);
   });
 
-  testWidgets('mientras la plantilla carga, la fila queda inerte', (
+  testWidgets('mientras el Asistente carga, la fila queda inerte', (
     tester,
   ) async {
     // Future que nunca completa: el estado "comprobando…" queda estable.
@@ -119,7 +119,7 @@ void main() {
     final link = tester.widget<AppSectionLink>(find.byType(AppSectionLink));
     expect(link.onTap, isNull);
     expect(
-      find.textContaining('Comprobando los permisos de la plantilla'),
+      find.textContaining('Comprobando los permisos del Asistente'),
       findsOneWidget,
     );
   });

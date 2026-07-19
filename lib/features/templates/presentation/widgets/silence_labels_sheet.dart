@@ -63,7 +63,7 @@ class _SilenceLabelsSheetState extends State<SilenceLabelsSheet> {
             Text('Etiquetas de silencio', style: textTheme.titleLarge),
             const SizedBox(height: 2),
             Text(
-              'Cuando el chat tenga alguna de estas etiquetas, el bot no '
+              'Cuando el chat tenga alguna de estas etiquetas, el Asistente no '
               'responderá: el control queda en manos de una persona.',
               style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
             ),

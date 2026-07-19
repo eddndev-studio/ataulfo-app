@@ -132,7 +132,7 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Consultó los bots'), findsOneWidget);
+    expect(find.text('Consultó los Canales'), findsOneWidget);
   });
 
   testWidgets('Failed muestra copy + reintentar dispara Started', (

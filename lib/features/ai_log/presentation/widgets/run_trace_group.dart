@@ -85,7 +85,7 @@ class RunTraceGroup extends StatelessWidget {
               padding: const EdgeInsets.only(top: AppTokens.sp3),
               child: AiLogTurnBubble(
                 icon: Icons.smart_toy_outlined,
-                title: 'Bot',
+                title: 'Asistente',
                 mine: false,
                 child: AssistantMarkdown(data: r.content),
               ),

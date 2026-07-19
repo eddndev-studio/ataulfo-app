@@ -101,7 +101,7 @@ class _FlowRunSheetState extends State<FlowRunSheet> {
                             vertical: AppTokens.sp6,
                           ),
                           child: Text(
-                            'Este bot no tiene flujos activos',
+                            'Este Canal no tiene flujos activos',
                             style: textTheme.bodyLarge,
                           ),
                         )
@@ -178,7 +178,7 @@ bool _isTransient(FlowRunFailure f) =>
     f is UnknownFlowRunFailure;
 
 String _errorText(FlowRunFailure f) => switch (f) {
-  FlowRunPausedFailure() => 'El bot está pausado',
+  FlowRunPausedFailure() => 'El Canal está pausado',
   FlowRunNotFoundFailure() => 'El flujo ya no está disponible',
   FlowRunForbiddenFailure() => 'No tienes permiso para correr flujos',
   FlowRunNetworkFailure() || FlowRunTimeoutFailure() => 'Sin conexión',

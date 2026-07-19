@@ -247,7 +247,9 @@ class _PairingSection extends StatelessWidget {
           children: <Widget>[
             const Icon(Icons.check_circle, color: AppTokens.success, size: 20),
             const SizedBox(width: AppTokens.sp2),
-            Expanded(child: Text('Bot en línea', style: textTheme.titleMedium)),
+            Expanded(
+              child: Text('Canal en línea', style: textTheme.titleMedium),
+            ),
           ],
         ),
       );
@@ -461,8 +463,8 @@ class _FailedView extends StatelessWidget {
   }
 
   static String _message(BotsFailure f) => switch (f) {
-    BotsForbiddenFailure() => 'No tienes permiso para conectar este bot.',
-    BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+    BotsForbiddenFailure() => 'No tienes permiso para conectar este Canal.',
+    BotsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e intenta de nuevo.',
     _ => 'No pudimos preparar el enlace de conexión.',

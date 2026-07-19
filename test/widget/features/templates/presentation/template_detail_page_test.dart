@@ -5,7 +5,6 @@ import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
-import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
 import 'package:ataulfo/features/flows/presentation/bloc/flows_bloc.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -35,8 +34,6 @@ class _MockFlowsBloc extends MockBloc<FlowsEvent, FlowsState>
 
 class _MockTriggersBloc extends MockBloc<TriggersEvent, TriggersState>
     implements TriggersBloc {}
-
-class _MockBotsRepository extends Mock implements BotsRepository {}
 
 const _ai = AIConfig(
   enabled: true,
@@ -229,8 +226,8 @@ void main() {
     },
   );
 
-  testWidgets('el header expone retorno y lápiz de editar; Crear bot vive '
-      'FUERA del header como CTA propio', (tester) async {
+  testWidgets('el header expone retorno y lápiz; los accesos del Asistente '
+      'viven en el cuerpo', (tester) async {
     when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
 
     await tester.pumpWidget(host());
@@ -250,16 +247,16 @@ void main() {
       ),
       findsOneWidget,
     );
-    // El CTA de crear bot NO está dentro del header (es botón del cuerpo).
     expect(
-      find.descendant(
-        of: header,
-        matching: find.byKey(const Key('template_detail.create_bot_button')),
-      ),
-      findsNothing,
+      find.byKey(const Key('template_detail.link.resources')),
+      findsOneWidget,
     );
     expect(
-      find.byKey(const Key('template_detail.create_bot_button')),
+      find.byKey(const Key('template_detail.link.channels')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('template_detail.link.preview')),
       findsOneWidget,
     );
   });
@@ -307,7 +304,7 @@ void main() {
 
       // IA off es estado de configuración, no error → neutral (no danger).
       expect(find.widgetWithText(AppPill, 'IA deshabilitada'), findsOneWidget);
-      expect(find.textContaining('OpenAI'), findsOneWidget);
+      expect(find.textContaining('OpenAI'), findsWidgets);
       // El nivel de razonamiento vive en el caption de la fila Motor IA.
       expect(find.textContaining('razonamiento bajo'), findsOneWidget);
     },
@@ -380,7 +377,7 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.textContaining('MiniMax'), findsOneWidget);
+    expect(find.textContaining('MiniMax'), findsWidgets);
     expect(find.textContaining('razonamiento alto'), findsOneWidget);
   });
 
@@ -404,7 +401,7 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.textContaining('DeepSeek'), findsOneWidget);
+    expect(find.textContaining('DeepSeek'), findsWidgets);
   });
 
   // ── Handoff al asistente org-scoped ────────────────────────────────────────
@@ -470,7 +467,7 @@ void main() {
       expect(find.byKey(const Key('template_detail.link.ai')), findsOneWidget);
       expect(find.text('Flujos'), findsOneWidget);
       expect(find.text('Variables'), findsOneWidget);
-      expect(find.text('Motor IA'), findsOneWidget);
+      expect(find.text('Instrucciones y motor IA'), findsOneWidget);
       // Las listas ya NO viven inline en el detalle.
       expect(find.byKey(const Key('flows.add_button')), findsNothing);
       expect(find.byKey(const Key('var_defs.add_button')), findsNothing);
@@ -598,77 +595,53 @@ void main() {
     });
   });
 
-  // ── Botón "Crear bot" (mini-S04a) ──────────────────────────────────────────
-  group('botón Crear bot', () {
+  // ── Superficies propias del Asistente ──────────────────────────────────────
+  group('recursos, canales y prueba', () {
     setUp(() {
       when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
     });
 
-    testWidgets('Loaded expone botón con key contractual y AppButton', (
-      tester,
-    ) async {
-      await tester.pumpWidget(host());
-
-      final keyFinder = find.byKey(
-        const Key('template_detail.create_bot_button'),
-      );
-      expect(keyFinder, findsOneWidget);
-      // El botón es AppButton.filled (no FilledButton.icon Material).
-      expect(find.widgetWithText(AppButton, 'Crear bot'), findsOneWidget);
-      expect(find.byType(FilledButton), findsNothing);
-    });
-
     testWidgets(
-      'tap abre la hoja de creación de bot con esta plantilla ya elegida '
-      '(salta el paso de selección)',
+      'Loaded expone las tres superficies con vocabulario de producto',
       (tester) async {
-        when(() => bloc.state).thenReturn(const TemplateDetailLoaded(_tpl));
-        final botsRepo = _MockBotsRepository();
+        await tester.pumpWidget(host());
 
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppDesignTheme.dark(),
-            // El repo de bots cuelga del scope (como en la ruta real) para que
-            // la hoja construya su BotCreateBloc.
-            home: RepositoryProvider<BotsRepository>.value(
-              value: botsRepo,
-              child: MultiBlocProvider(
-                providers: <BlocProvider<dynamic>>[
-                  BlocProvider<TemplateDetailBloc>.value(value: bloc),
-                  BlocProvider<VarDefsBloc>.value(value: varDefsBloc),
-                  BlocProvider<FlowsBloc>.value(value: flowsBloc),
-                  BlocProvider<TriggersBloc>.value(value: triggersBloc),
-                ],
-                child: const Scaffold(body: TemplateDetailPage()),
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-        // El detalle es más alto que el test surface; el botón vive tras el
-        // scroll. ensureVisible lo trae a un punto hit-testable.
-        await tester.ensureVisible(
-          find.byKey(const Key('template_detail.create_bot_button')),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const Key('template_detail.create_bot_button')),
-        );
-        await tester.pumpAndSettle();
-
-        // Con la plantilla preseleccionada la hoja arranca en el paso de
-        // nombre (no en el selector) y la resume en su chip.
-        expect(find.text('Nuevo bot'), findsOneWidget);
-        expect(find.text('Elegir plantilla'), findsNothing);
-        expect(
-          find.descendant(
-            of: find.byKey(const Key('bot_create.template_chip')),
-            matching: find.text('Soporte'),
-          ),
-          findsOneWidget,
-        );
+        expect(find.text('Recursos disponibles'), findsOneWidget);
+        expect(find.text('Canales conectados'), findsOneWidget);
+        expect(find.text('Probar Asistente'), findsOneWidget);
+        expect(find.text('Crear bot'), findsNothing);
       },
     );
+
+    testWidgets('tap Recursos conserva nombre y apila la ruta de Asistente', (
+      tester,
+    ) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.link.resources'),
+        destinationPath: '/assistants/:id/resources',
+      );
+      expect(r.uri, '/assistants/t1/resources?name=Soporte');
+      expect(r.canPop, <bool>[true]);
+    });
+
+    testWidgets('tap Canales apila /assistants/:id/channels', (tester) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.link.channels'),
+        destinationPath: '/assistants/:id/channels',
+      );
+      expect(r.uri, '/assistants/t1/channels');
+    });
+
+    testWidgets('tap Probar apila /assistants/:id/preview', (tester) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.link.preview'),
+        destinationPath: '/assistants/:id/preview',
+      );
+      expect(r.uri, '/assistants/t1/preview');
+    });
   });
 
   // ── Botón "Editar plantilla" (TE1) ─────────────────────────────────────────

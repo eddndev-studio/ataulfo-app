@@ -390,7 +390,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('bot_detail.edit')));
       await tester.pumpAndSettle();
-      expect(find.text('Editar bot'), findsOneWidget);
+      expect(find.text('Editar Canal'), findsOneWidget);
       expect(find.byKey(const Key('bot_edit.name')), findsOneWidget);
     });
 
@@ -465,7 +465,7 @@ void main() {
         find.byKey(const Key('bot_detail.ai')),
       );
       expect(sw.onChanged, isNull); // inerte
-      expect(find.textContaining('plantilla'), findsWidgets);
+      expect(find.textContaining('Asistente'), findsWidgets);
     });
 
     testWidgets('fetch de Template falla → switch IA sigue operable', (
@@ -918,7 +918,9 @@ void main() {
   });
 
   group('clonar (S7, ADMIN+)', () {
-    testWidgets('ADMIN ve Clonar bot; tap abre BotCloneSheet', (tester) async {
+    testWidgets('ADMIN ve Clonar Canal; tap abre BotCloneSheet', (
+      tester,
+    ) async {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
       await tester.pumpWidget(host());
@@ -929,11 +931,11 @@ void main() {
       await tester.ensureVisible(clone);
       await tester.tap(clone);
       await tester.pumpAndSettle();
-      expect(find.text('Clonar bot'), findsWidgets);
+      expect(find.text('Clonar Canal'), findsWidgets);
       expect(find.byKey(const Key('bot_clone.name')), findsOneWidget);
     });
 
-    testWidgets('WORKER no ve Clonar bot', (tester) async {
+    testWidgets('WORKER no ve Clonar Canal', (tester) async {
       when(() => bloc.state).thenReturn(const BotDetailLoaded(_bot));
 
       await tester.pumpWidget(host(role: 'WORKER'));

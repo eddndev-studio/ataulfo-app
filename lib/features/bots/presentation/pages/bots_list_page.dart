@@ -174,7 +174,7 @@ class _BotsListPageState extends State<BotsListPage> with RouteAware {
               greeting: user.greeting,
               // Mismo término que la etiqueta de la tab del shell: "Bots" es
               // el nombre interno consistente de la entidad en toda la app.
-              title: 'Bots',
+              title: 'Canales',
               avatarInitial: user.initial,
               onAvatarTap: widget.onOpenSettings ?? () {},
               watermark: Icons.smart_toy,
@@ -261,7 +261,7 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppTextField(
       key: const Key('bots.search'),
-      label: 'Buscar bot',
+      label: 'Buscar Canal',
       hint: 'Nombre o canal',
       controller: controller,
     );
@@ -323,7 +323,7 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const AppLoadingIndicator(label: 'Cargando bots…');
+      const AppLoadingIndicator(label: 'Cargando Canales…');
 }
 
 /// Estado vacío (cero bots): card glass centrada que ES el CTA de creación.
@@ -348,7 +348,7 @@ class _EmptyView extends StatelessWidget {
                 child: AppEmptyState(
                   key: const Key('bots.empty'),
                   icon: Icons.smart_toy_outlined,
-                  title: 'Aún no tienes bots',
+                  title: 'Aún no tienes Canales',
                   description:
                       'Crea tu primer bot para automatizar una conversación '
                       'o tarea recurrente.',
@@ -381,7 +381,7 @@ class _FailedView extends StatelessWidget {
         padding: const EdgeInsets.all(AppTokens.sp5),
         child: AppErrorState(
           key: const Key('bots.error'),
-          message: 'No se pudieron cargar los bots',
+          message: 'No se pudieron cargar los Canales',
           description: 'Revisa tu conexión o intenta nuevamente.',
           onRetry: () =>
               context.read<BotsBloc>().add(const BotsLoadRequested()),

@@ -71,7 +71,7 @@ class TemplateAiPage extends StatelessWidget {
     TemplatesConflictFailure() =>
       'Tu edición estaba desactualizada; la refrescamos. Reintenta.',
     TemplatesInvalidUpdateFailure() => 'El valor no es válido para el motor.',
-    TemplatesForbiddenFailure() => 'Tu rol no permite editar esta plantilla.',
+    TemplatesForbiddenFailure() => 'Tu rol no permite editar este Asistente.',
     _ => 'No pudimos guardar el cambio. Inténtalo de nuevo.',
   };
 }
@@ -139,7 +139,7 @@ class _LoadedView extends StatelessWidget {
                       eligibleProviders: eligibleProviders,
                       enabledLabel: 'IA habilitada',
                       enabledCaption:
-                          'Apagada, los bots de esta plantilla no responden '
+                          'Apagada, los Canales de este Asistente no responden '
                           'con IA.',
                       onChanged: (next) => context
                           .read<TemplateDetailBloc>()
@@ -200,7 +200,7 @@ class _FailedView extends StatelessWidget {
       padding: const EdgeInsets.all(AppTokens.sp4),
       children: <Widget>[
         AppErrorState(
-          message: 'No pudimos cargar el motor IA de la plantilla',
+          message: 'No pudimos cargar el comportamiento del Asistente',
           onRetry: () => context.read<TemplateDetailBloc>().add(
             const TemplateDetailLoadRequested(),
           ),

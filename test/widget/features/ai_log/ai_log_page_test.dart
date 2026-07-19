@@ -152,7 +152,7 @@ void main() {
       expect(bubbles.length, 2);
       expect(bubbles.where((b) => b.mine).length, 1);
       expect(find.text('Cliente'), findsOneWidget);
-      expect(find.text('Bot'), findsOneWidget);
+      expect(find.text('Asistente'), findsOneWidget);
     });
 
     testWidgets('el contenido del bot renderiza Markdown; el del cliente va '

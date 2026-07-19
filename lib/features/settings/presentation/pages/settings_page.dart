@@ -186,7 +186,7 @@ class _SectionsCard extends StatelessWidget {
               rowKey: const Key('settings.members_tile'),
               icon: Icons.people_outline,
               title: 'Miembros',
-              caption: 'Roles, invitaciones y acceso a bots',
+              caption: 'Roles, invitaciones y acceso a Canales',
               onTap: () => context.push('/members'),
             ),
             const Divider(height: AppTokens.sp5, color: AppTokens.divider),

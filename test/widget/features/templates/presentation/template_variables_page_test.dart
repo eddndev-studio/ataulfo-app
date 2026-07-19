@@ -293,7 +293,7 @@ void main() {
 
     expect(find.byType(SnackBar), findsOneWidget);
     expect(
-      find.textContaining('plantilla cambió', findRichText: true),
+      find.textContaining('Asistente cambió', findRichText: true),
       findsOneWidget,
     );
   });

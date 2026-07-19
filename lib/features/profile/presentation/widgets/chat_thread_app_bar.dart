@@ -88,7 +88,7 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                     key: const Key('thread.ai_log'),
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.psychology_outlined),
-                    title: const Text('Razonamiento del bot'),
+                    title: const Text('Razonamiento del Asistente'),
                     onTap: () =>
                         Navigator.of(sheetContext).pop(_ThreadAction.reasoning),
                   ),
@@ -168,7 +168,7 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
       title: '¿Vaciar historial?',
       message:
           'Se eliminarán los mensajes de esta conversación y la memoria del '
-          'bot sobre ella. El contacto y sus etiquetas se conservan. '
+          'Asistente sobre ella. El contacto y sus etiquetas se conservan. '
           'No se puede deshacer.',
       confirmLabel: 'Vaciar',
       confirmKey: const Key('thread.clear_history.confirm'),
@@ -216,7 +216,7 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (isAdmin)
                   IconButton(
                     key: const Key('thread.takeover'),
-                    tooltip: 'Control del bot',
+                    tooltip: 'Control del Canal',
                     icon: const Icon(Icons.smart_toy_outlined),
                     onPressed: () => AiTakeoverSheet.open(
                       context,

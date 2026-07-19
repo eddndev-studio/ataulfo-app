@@ -138,7 +138,7 @@ class _Body extends StatelessWidget {
           const SizedBox(height: AppTokens.sp5),
           AppToggleRow(
             switchKey: const Key('bot_maint.pause'),
-            label: bot.paused ? 'Reanudar bot' : 'Pausar bot',
+            label: bot.paused ? 'Reanudar Canal' : 'Pausar Canal',
             caption: bot.paused
                 ? 'Reanuda el procesamiento de mensajes.'
                 : 'Pausar habilita las operaciones de abajo.',
@@ -230,7 +230,7 @@ class _Body extends StatelessWidget {
     BotsConflictFailure() =>
       'El bot cambió mientras operabas. Refresca e inténtalo de nuevo.',
     BotsForbiddenFailure() => 'Tu rol no permite esta operación.',
-    BotsNotFoundFailure() => 'Este bot ya no existe en tu organización.',
+    BotsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     BotsNetworkFailure() ||
     BotsTimeoutFailure() => 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     BotsInvalidCreateFailure() ||
