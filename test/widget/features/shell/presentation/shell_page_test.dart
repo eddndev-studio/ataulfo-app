@@ -6,7 +6,9 @@ import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
+import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/platform_agent/domain/failures/pa_failure.dart';
 import 'package:ataulfo/features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
 import 'package:ataulfo/features/platform_agent/presentation/pages/platform_agent_page.dart';
@@ -46,6 +48,10 @@ class _MockPaBloc extends MockBloc<PaChatEvent, PaChatState>
 
 class _MockTemplatesRepository extends Mock implements TemplatesRepository {}
 
+class _MockMessagesRepository extends Mock implements MessagesRepository {}
+
+class _MockChatLabelsRepository extends Mock implements ChatLabelsRepository {}
+
 const _identity = Identity(
   userId: 'u1',
   orgId: 'o1',
@@ -60,6 +66,8 @@ void main() {
   late _MockTemplatesBloc templatesBloc;
   late _MockLabelsAdminBloc labelsBloc;
   late _MockConversationsBloc inboxBloc;
+  late _MockMessagesRepository messagesRepository;
+  late _MockChatLabelsRepository chatLabelsRepository;
 
   setUpAll(() {
     registerFallbackValue(const ConversationsLoadRequested());
@@ -71,6 +79,8 @@ void main() {
     templatesBloc = _MockTemplatesBloc();
     labelsBloc = _MockLabelsAdminBloc();
     inboxBloc = _MockConversationsBloc();
+    messagesRepository = _MockMessagesRepository();
+    chatLabelsRepository = _MockChatLabelsRepository();
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
     when(
       () => botsBloc.state,
@@ -87,8 +97,18 @@ void main() {
   });
 
   Widget host({String assistantDraft = '', String? contextualBotId}) =>
-      RepositoryProvider<ProfilePhotoCache>.value(
-        value: NoopProfilePhotoCache(),
+      MultiRepositoryProvider(
+        providers: <RepositoryProvider<dynamic>>[
+          RepositoryProvider<ProfilePhotoCache>.value(
+            value: NoopProfilePhotoCache(),
+          ),
+          RepositoryProvider<MessagesRepository>.value(
+            value: messagesRepository,
+          ),
+          RepositoryProvider<ChatLabelsRepository>.value(
+            value: chatLabelsRepository,
+          ),
+        ],
         child: MultiBlocProvider(
           providers: <BlocProvider<dynamic>>[
             BlocProvider<AuthBloc>.value(value: authBloc),
@@ -244,8 +264,18 @@ void main() {
       useViewport(tester, widthDp: 420);
       final observer = RouteObserver<PageRoute<dynamic>>();
       await tester.pumpWidget(
-        RepositoryProvider<ProfilePhotoCache>.value(
-          value: NoopProfilePhotoCache(),
+        MultiRepositoryProvider(
+          providers: <RepositoryProvider<dynamic>>[
+            RepositoryProvider<ProfilePhotoCache>.value(
+              value: NoopProfilePhotoCache(),
+            ),
+            RepositoryProvider<MessagesRepository>.value(
+              value: messagesRepository,
+            ),
+            RepositoryProvider<ChatLabelsRepository>.value(
+              value: chatLabelsRepository,
+            ),
+          ],
           child: MultiBlocProvider(
             providers: <BlocProvider<dynamic>>[
               BlocProvider<AuthBloc>.value(value: authBloc),

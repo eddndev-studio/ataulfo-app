@@ -5,7 +5,9 @@ import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
+import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/shell/presentation/pages/shell_page.dart';
 import 'package:ataulfo/features/shell/presentation/widgets/email_verification_banner.dart';
@@ -38,6 +40,10 @@ class _MockConversationsBloc
 class _MockResendCubit extends MockBloc<Object, ResendVerificationState>
     implements ResendVerificationCubit {}
 
+class _MockMessagesRepository extends Mock implements MessagesRepository {}
+
+class _MockChatLabelsRepository extends Mock implements ChatLabelsRepository {}
+
 const _unverified = Identity(
   userId: 'u1',
   orgId: 'o1',
@@ -60,6 +66,8 @@ void main() {
   late _MockLabelsAdminBloc labelsBloc;
   late _MockConversationsBloc inboxBloc;
   late _MockResendCubit resendCubit;
+  late _MockMessagesRepository messagesRepository;
+  late _MockChatLabelsRepository chatLabelsRepository;
 
   setUp(() {
     authBloc = _MockAuthBloc();
@@ -68,6 +76,8 @@ void main() {
     labelsBloc = _MockLabelsAdminBloc();
     inboxBloc = _MockConversationsBloc();
     resendCubit = _MockResendCubit();
+    messagesRepository = _MockMessagesRepository();
+    chatLabelsRepository = _MockChatLabelsRepository();
     when(() => resendCubit.state).thenReturn(const ResendVerificationIdle());
     when(() => labelsBloc.state).thenReturn(
       const LabelsAdminLoaded(labels: <Label>[], isRefreshing: false),
@@ -83,8 +93,16 @@ void main() {
     ).thenReturn(const ConversationsState(phase: ConversationsPhase.ready));
   });
 
-  Widget host() => RepositoryProvider<ProfilePhotoCache>.value(
-    value: NoopProfilePhotoCache(),
+  Widget host() => MultiRepositoryProvider(
+    providers: <RepositoryProvider<dynamic>>[
+      RepositoryProvider<ProfilePhotoCache>.value(
+        value: NoopProfilePhotoCache(),
+      ),
+      RepositoryProvider<MessagesRepository>.value(value: messagesRepository),
+      RepositoryProvider<ChatLabelsRepository>.value(
+        value: chatLabelsRepository,
+      ),
+    ],
     child: MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<AuthBloc>.value(value: authBloc),
