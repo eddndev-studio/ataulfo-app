@@ -1,8 +1,16 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/quick_replies/domain/entities/quick_reply.dart';
+import 'package:ataulfo/features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import 'package:ataulfo/features/quick_replies/presentation/widgets/quick_replies_sheet.dart';
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockQuickRepliesBloc
+    extends MockBloc<QuickRepliesEvent, QuickRepliesState>
+    implements QuickRepliesBloc {}
 
 QuickReply _qr({
   String id = '61',
@@ -17,15 +25,22 @@ QuickReply _qr({
 );
 
 void main() {
-  Widget host(List<QuickReply> items, {void Function(String?)? onResult}) =>
-      MaterialApp(
-        theme: AppDesignTheme.dark(),
-        home: Scaffold(
+  late _MockQuickRepliesBloc bloc;
+
+  setUp(() => bloc = _MockQuickRepliesBloc());
+
+  Widget host(List<QuickReply> items, {void Function(String?)? onResult}) {
+    when(() => bloc.state).thenReturn(QuickRepliesLoaded(items));
+    return MaterialApp(
+      theme: AppDesignTheme.dark(),
+      home: BlocProvider<QuickRepliesBloc>.value(
+        value: bloc,
+        child: Scaffold(
           body: Builder(
             builder: (context) => Center(
               child: ElevatedButton(
                 onPressed: () async {
-                  final r = await QuickRepliesSheet.open(context, items);
+                  final r = await QuickRepliesSheet.open(context);
                   onResult?.call(r);
                 },
                 child: const Text('abrir'),
@@ -33,7 +48,9 @@ void main() {
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 
   Future<void> openSheet(WidgetTester tester) async {
     await tester.tap(find.text('abrir'));

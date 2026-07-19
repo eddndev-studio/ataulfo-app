@@ -13,7 +13,6 @@ import '../../../media/domain/repositories/camera_capture.dart';
 import '../../../media/domain/repositories/device_gallery_port.dart';
 import '../../../media/domain/repositories/media_file_picker.dart';
 import '../../../media/domain/repositories/media_repository.dart';
-import '../../../quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import '../../../quick_replies/presentation/widgets/quick_replies_sheet.dart';
 import '../../data/cache/message_media_cache.dart';
 import '../../domain/attachment_intake.dart';
@@ -885,26 +884,11 @@ class _MessageComposerState extends State<MessageComposer> {
     _ => 'No se pudo enviar la nota de voz',
   };
 
-  /// Abre el selector ⚡ de respuestas rápidas e inserta la elegida. Lee el último
-  /// estado del catálogo (cargado al abrir el hilo): si aún no cargó o no hay
-  /// respuestas activas, avisa con un SnackBar en vez de abrir un sheet vacío.
+  /// Abre el selector ⚡ de respuestas rápidas e inserta la elegida. La hoja
+  /// observa el catálogo precargado por el hilo, de modo que un solo toque
+  /// conserva continuidad aunque la primera carga siga en vuelo.
   Future<void> _quickReply() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final state = context.read<QuickRepliesBloc>().state;
-    if (state is! QuickRepliesLoaded) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Cargando respuestas rápidas…')),
-      );
-      return;
-    }
-    final active = state.items.where((q) => !q.deleted).toList(growable: false);
-    if (active.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('No hay respuestas rápidas guardadas')),
-      );
-      return;
-    }
-    final message = await QuickRepliesSheet.open(context, active);
+    final message = await QuickRepliesSheet.open(context);
     if (!mounted || message == null) {
       return;
     }

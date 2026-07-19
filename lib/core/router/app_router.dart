@@ -704,6 +704,15 @@ class AppRouter {
                     RepositoryProvider<VideoPlayback>.value(
                       value: const InAppVideoPlayback(),
                     ),
+                    // La Bandeja coordina selección múltiple con los puertos
+                    // existentes por chat; el scope org evita un segundo
+                    // estado paralelo al navegar entre tabs.
+                    RepositoryProvider<MessagesRepository>.value(
+                      value: _messagesRepo,
+                    ),
+                    RepositoryProvider<ChatLabelsRepository>.value(
+                      value: _chatLabelsRepo,
+                    ),
                   ],
                   child: KeyedSubtree(
                     key: ValueKey<String>(orgId),

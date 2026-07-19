@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/features/messages/data/media/noop_audio_recorder.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
@@ -7,6 +9,7 @@ import 'package:ataulfo/features/messages/presentation/bloc/messages_bloc.dart';
 import 'package:ataulfo/features/messages/presentation/bloc/reply_draft_cubit.dart';
 import 'package:ataulfo/features/messages/presentation/widgets/message_composer.dart';
 import 'package:ataulfo/features/quick_replies/domain/entities/quick_reply.dart';
+import 'package:ataulfo/features/quick_replies/domain/failures/quick_replies_failure.dart';
 import 'package:ataulfo/features/quick_replies/presentation/bloc/quick_replies_bloc.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -110,7 +113,7 @@ void main() {
     expect(inputText(tester), 'Hola gracias');
   });
 
-  testWidgets('tap ⚡ con catálogo sin activos → SnackBar, sin sheet', (
+  testWidgets('tap ⚡ con catálogo sin activos abre el estado vacío', (
     tester,
   ) async {
     when(
@@ -121,18 +124,65 @@ void main() {
     await tester.tap(find.byKey(const Key('composer.quickreply')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('quick_replies_sheet')), findsNothing);
-    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.byKey(const Key('quick_replies_sheet')), findsOneWidget);
+    expect(find.byKey(const Key('quick_replies_sheet.empty')), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
   });
 
-  testWidgets('tap ⚡ mientras carga → SnackBar, sin sheet', (tester) async {
-    when(() => qrBloc.state).thenReturn(const QuickRepliesLoading());
+  testWidgets(
+    'un toque durante Loading abre la hoja y muestra Loaded automáticamente',
+    (tester) async {
+      final states = StreamController<QuickRepliesState>.broadcast();
+      addTearDown(states.close);
+      whenListen(
+        qrBloc,
+        states.stream,
+        initialState: const QuickRepliesLoading(),
+      );
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('composer.quickreply')));
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byKey(const Key('quick_replies_sheet')), findsOneWidget);
+      expect(
+        find.byKey(const Key('quick_replies_sheet.loading')),
+        findsOneWidget,
+      );
+
+      states.add(
+        QuickRepliesLoaded(<QuickReply>[_qr(message: 'Respuesta lista')]),
+      );
+      await tester.pump();
+
+      expect(find.text('saludo'), findsOneWidget);
+      expect(find.text('Respuesta lista'), findsOneWidget);
+      expect(
+        find.byKey(const Key('quick_replies_sheet.loading')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('Failed abre error real y Reintentar despacha una nueva carga', (
+    tester,
+  ) async {
+    when(
+      () => qrBloc.state,
+    ).thenReturn(const QuickRepliesFailed(QuickRepliesNetworkFailure()));
     await tester.pumpWidget(host());
 
     await tester.tap(find.byKey(const Key('composer.quickreply')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('quick_replies_sheet')), findsNothing);
-    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.byKey(const Key('quick_replies_sheet')), findsOneWidget);
+    expect(find.byKey(const Key('quick_replies_sheet.error')), findsOneWidget);
+    expect(
+      find.text('No se pudieron cargar las respuestas rápidas'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Reintentar'));
+    verify(() => qrBloc.add(const QuickRepliesLoadRequested())).called(1);
   });
 }
