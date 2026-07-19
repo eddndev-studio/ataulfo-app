@@ -6,11 +6,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_empty_state.dart';
+import '../../../../core/design/widgets/app_error_state.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../bots/domain/entities/bot.dart';
 import '../../../bots/presentation/bloc/bots_bloc.dart';
 import '../../../bots/presentation/widgets/bot_create_sheet.dart';
+import '../../../bots/presentation/widgets/bot_tile.dart';
 import '../../domain/entities/template.dart';
 import '../bloc/template_detail_bloc.dart';
 
@@ -41,12 +44,18 @@ class AssistantChannelsPage extends StatelessWidget {
                 ),
           body: template == null
               ? switch (templateState) {
-                  TemplateDetailFailed() => _TemplateFailed(
-                    onRetry: () => context.read<TemplateDetailBloc>().add(
-                      const TemplateDetailLoadRequested(),
+                  TemplateDetailFailed() => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppTokens.sp5),
+                      child: AppErrorState(
+                        message: 'No pudimos cargar este Asistente.',
+                        onRetry: () => context.read<TemplateDetailBloc>().add(
+                          const TemplateDetailLoadRequested(),
+                        ),
+                      ),
                     ),
                   ),
-                  _ => const Center(child: CircularProgressIndicator()),
+                  _ => const AppLoadingIndicator(label: 'Cargando Asistente…'),
                 }
               : _Channels(assistantId: assistantId, template: template),
         );
@@ -72,10 +81,17 @@ class _Channels extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<BotsBloc, BotsState>(
       builder: (context, state) => switch (state) {
-        BotsInitial() || BotsLoading() => const _ChannelsSkeleton(),
-        BotsFailed() => _ChannelsFailed(
-          onRetry: () =>
-              context.read<BotsBloc>().add(const BotsLoadRequested()),
+        BotsInitial() ||
+        BotsLoading() => const AppLoadingIndicator(label: 'Cargando canales…'),
+        BotsFailed() => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppTokens.sp5),
+            child: AppErrorState(
+              message: 'No pudimos cargar los canales.',
+              onRetry: () =>
+                  context.read<BotsBloc>().add(const BotsLoadRequested()),
+            ),
+          ),
         ),
         BotsLoaded(items: final items) => _LoadedChannels(
           assistantName: template.name,
@@ -131,32 +147,12 @@ class _LoadedChannels extends StatelessWidget {
           ),
           const SizedBox(height: AppTokens.sp5),
           if (channels.isEmpty)
-            AppCard(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppTokens.sp5),
-                child: Column(
-                  children: <Widget>[
-                    const Icon(
-                      Icons.cable_outlined,
-                      size: 40,
-                      color: AppTokens.text2,
-                    ),
-                    const SizedBox(height: AppTokens.sp3),
-                    Text(
-                      'Aún no hay canales conectados',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: AppTokens.sp1),
-                    Text(
-                      'Puedes preparar y probar el Asistente antes de conectarlo a WhatsApp.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-                    ),
-                  ],
-                ),
-              ),
+            const AppEmptyState(
+              icon: Icons.cable_outlined,
+              title: 'Aún no hay canales conectados',
+              description:
+                  'Puedes preparar y probar el Asistente antes de conectarlo '
+                  'a WhatsApp.',
             )
           else
             AppCard(
@@ -172,7 +168,10 @@ class _LoadedChannels extends StatelessWidget {
                         height: AppTokens.sp4,
                         color: AppTokens.divider,
                       ),
-                    _ChannelRow(channel: channels[index]),
+                    BotTile(
+                      key: Key('assistant_channels.row.${channels[index].id}'),
+                      bot: channels[index],
+                    ),
                   ],
                 ],
               ),
@@ -181,112 +180,4 @@ class _LoadedChannels extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ChannelRow extends StatelessWidget {
-  const _ChannelRow({required this.channel});
-
-  final Bot channel;
-
-  @override
-  Widget build(BuildContext context) {
-    final state = channel.paused ? 'Pausado' : 'Activo';
-    final provider = switch (channel.channel) {
-      BotChannel.waUnofficial => 'WhatsApp',
-      BotChannel.waba => 'WhatsApp Business',
-    };
-    return InkWell(
-      key: Key('assistant_channels.row.${channel.id}'),
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      onTap: () => context.push('/bots/${channel.id}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp2),
-        child: Row(
-          children: <Widget>[
-            const Icon(Icons.cable_outlined, color: AppTokens.text2),
-            const SizedBox(width: AppTokens.sp3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    channel.name,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$provider · $state',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: AppTokens.text2),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              channel.paused
-                  ? Icons.pause_circle_outline
-                  : Icons.check_circle_outline,
-              color: channel.paused ? AppTokens.warning : AppTokens.success,
-            ),
-            const SizedBox(width: AppTokens.sp1),
-            const Icon(Icons.chevron_right, color: AppTokens.text2),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChannelsSkeleton extends StatelessWidget {
-  const _ChannelsSkeleton();
-
-  @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(AppTokens.sp5),
-    children: <Widget>[
-      for (final height in <double>[72, 72, 72]) ...<Widget>[
-        Container(
-          height: height,
-          decoration: BoxDecoration(
-            color: AppTokens.surface1,
-            borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-          ),
-        ),
-        const SizedBox(height: AppTokens.sp3),
-      ],
-    ],
-  );
-}
-
-class _ChannelsFailed extends StatelessWidget {
-  const _ChannelsFailed({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: AppButton.tonal(label: 'Reintentar', onPressed: onRetry),
-  );
-}
-
-class _TemplateFailed extends StatelessWidget {
-  const _TemplateFailed({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(AppTokens.sp5),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Text('No pudimos cargar este Asistente.'),
-          const SizedBox(height: AppTokens.sp3),
-          AppButton.tonal(label: 'Reintentar', onPressed: onRetry),
-        ],
-      ),
-    ),
-  );
 }

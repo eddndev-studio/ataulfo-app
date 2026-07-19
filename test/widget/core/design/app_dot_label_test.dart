@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_dot_label.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   Future<void> pump(WidgetTester tester, Widget child) => tester.pumpWidget(
     MaterialApp(
+      theme: AppDesignTheme.dark(),
       home: Scaffold(body: Center(child: child)),
     ),
   );
@@ -28,6 +30,11 @@ void main() {
 
       final text = tester.widget<Text>(find.text('Enlazado'));
       expect(text.style?.color, AppTokens.text2);
+      final labelStyle = AppDesignTheme.dark().textTheme.labelSmall!;
+      expect(text.style?.fontFamily, labelStyle.fontFamily);
+      expect(text.style?.fontSize, labelStyle.fontSize);
+      expect(text.style?.fontWeight, labelStyle.fontWeight);
+      expect(text.style?.letterSpacing, labelStyle.letterSpacing);
     });
 
     testWidgets('un label largo ellipsa en una línea', (tester) async {

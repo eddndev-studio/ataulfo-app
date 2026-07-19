@@ -181,6 +181,24 @@ void main() {
       expect(s.fontWeight, AppTokens.titleMWeight);
     });
 
+    test('headlineSmall reutiliza la escala titleL del kit', () {
+      final s = textTheme.headlineSmall!;
+      expect(s.fontFamily, AppTokens.fontSans);
+      expect(s.fontSize, AppTokens.titleLSize);
+      expect(s.height, AppTokens.titleLLineHeight / AppTokens.titleLSize);
+      expect(s.fontWeight, AppTokens.titleLWeight);
+      expect(s.color, AppTokens.text1);
+    });
+
+    test('titleSmall es un título compacto 16/24 weight 600', () {
+      final s = textTheme.titleSmall!;
+      expect(s.fontFamily, AppTokens.fontSans);
+      expect(s.fontSize, AppTokens.bodyLSize);
+      expect(s.height, AppTokens.bodyLLineHeight / AppTokens.bodyLSize);
+      expect(s.fontWeight, AppTokens.titleMWeight);
+      expect(s.color, AppTokens.text1);
+    });
+
     test('bodyLarge usa size 16 weight 400', () {
       final s = textTheme.bodyLarge!;
       expect(s.fontSize, AppTokens.bodyLSize);
@@ -191,6 +209,33 @@ void main() {
       final s = textTheme.bodyMedium!;
       expect(s.fontSize, AppTokens.bodyMSize);
       expect(s.fontWeight, AppTokens.bodyMWeight);
+    });
+
+    test('bodySmall reutiliza la caption canónica 12/16 weight 500', () {
+      final s = textTheme.bodySmall!;
+      expect(s.fontFamily, AppTokens.fontSans);
+      expect(s.fontSize, AppTokens.captionSize);
+      expect(s.height, AppTokens.captionLineHeight / AppTokens.captionSize);
+      expect(s.fontWeight, AppTokens.captionWeight);
+      expect(s.color, AppTokens.text1);
+    });
+
+    test('labelLarge es 14/20 weight 600', () {
+      final s = textTheme.labelLarge!;
+      expect(s.fontFamily, AppTokens.fontSans);
+      expect(s.fontSize, AppTokens.bodyMSize);
+      expect(s.height, AppTokens.bodyMLineHeight / AppTokens.bodyMSize);
+      expect(s.fontWeight, AppTokens.titleMWeight);
+      expect(s.color, AppTokens.text1);
+    });
+
+    test('labelMedium reutiliza la caption canónica', () {
+      final s = textTheme.labelMedium!;
+      expect(s.fontFamily, AppTokens.fontSans);
+      expect(s.fontSize, AppTokens.captionSize);
+      expect(s.height, AppTokens.captionLineHeight / AppTokens.captionSize);
+      expect(s.fontWeight, AppTokens.captionWeight);
+      expect(s.color, AppTokens.text1);
     });
 
     test('labelSmall (caption) usa size 12 weight 500 color text2', () {

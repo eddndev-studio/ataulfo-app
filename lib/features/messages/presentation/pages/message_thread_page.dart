@@ -33,6 +33,7 @@ import '../widgets/ai_run_badge.dart';
 import '../widgets/attach_panel.dart';
 import '../widgets/audio_failures_listener.dart';
 import '../widgets/message_composer.dart';
+import '../widgets/message_delivery_indicator.dart';
 import '../widgets/message_media.dart';
 
 /// Hilo de mensajes de una conversación (S09 `GET
@@ -1219,7 +1220,7 @@ class _MessageBubble extends StatelessWidget {
                               ),
                               if (isOutbound && m.status != null) ...<Widget>[
                                 const SizedBox(width: AppTokens.sp2),
-                                _statusTick(m.status!),
+                                MessageDeliveryIndicator(status: m.status!),
                               ],
                             ],
                           ),
@@ -1420,25 +1421,3 @@ String _pollQuestion(String rawContent) {
     return 'Encuesta';
   }
 }
-
-/// Tick de entrega estilo mensajería: ✓ enviado, ✓✓ entregado (gris), ✓✓ leído
-/// (verde de la sección de chat), ⚠ falló (rojo). El receipt en vivo
-/// (`message.status`) repinta este ícono solo. Conserva la etiqueta de texto
-/// como `semanticLabel` para que un lector de pantalla anuncie "Entregado/
-/// Leído", no un glifo.
-Widget _statusTick(MessageStatus s) {
-  final (IconData icon, Color color) = switch (s) {
-    MessageStatus.sent => (Icons.done, AppTokens.text2),
-    MessageStatus.delivered => (Icons.done_all, AppTokens.text2),
-    MessageStatus.read => (Icons.done_all, AppTokens.chatAccent),
-    MessageStatus.failed => (Icons.error_outline, AppTokens.danger),
-  };
-  return Icon(icon, size: 16, color: color, semanticLabel: _statusLabel(s));
-}
-
-String _statusLabel(MessageStatus s) => switch (s) {
-  MessageStatus.sent => 'Enviado',
-  MessageStatus.delivered => 'Entregado',
-  MessageStatus.read => 'Leído',
-  MessageStatus.failed => 'Falló',
-};

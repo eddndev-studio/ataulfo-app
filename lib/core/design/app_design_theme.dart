@@ -134,6 +134,12 @@ class AppDesignTheme {
         weight: AppTokens.displayWeight,
         letterSpacing: -0.28,
       ),
+      headlineSmall: base(
+        size: AppTokens.titleLSize,
+        height: AppTokens.titleLLineHeight,
+        weight: AppTokens.titleLWeight,
+        letterSpacing: -0.11,
+      ),
       titleLarge: base(
         size: AppTokens.titleLSize,
         height: AppTokens.titleLLineHeight,
@@ -145,6 +151,11 @@ class AppDesignTheme {
         height: AppTokens.titleMLineHeight,
         weight: AppTokens.titleMWeight,
       ),
+      titleSmall: base(
+        size: AppTokens.bodyLSize,
+        height: AppTokens.bodyLLineHeight,
+        weight: AppTokens.titleMWeight,
+      ),
       bodyLarge: base(
         size: AppTokens.bodyLSize,
         height: AppTokens.bodyLLineHeight,
@@ -154,6 +165,22 @@ class AppDesignTheme {
         size: AppTokens.bodyMSize,
         height: AppTokens.bodyMLineHeight,
         weight: AppTokens.bodyMWeight,
+      ),
+      bodySmall: base(
+        size: AppTokens.captionSize,
+        height: AppTokens.captionLineHeight,
+        weight: AppTokens.captionWeight,
+      ),
+      labelLarge: base(
+        size: AppTokens.bodyMSize,
+        height: AppTokens.bodyMLineHeight,
+        weight: AppTokens.titleMWeight,
+      ),
+      labelMedium: base(
+        size: AppTokens.captionSize,
+        height: AppTokens.captionLineHeight,
+        weight: AppTokens.captionWeight,
+        letterSpacing: 0.12,
       ),
       labelSmall: base(
         size: AppTokens.captionSize,

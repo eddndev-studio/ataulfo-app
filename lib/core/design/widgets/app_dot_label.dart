@@ -37,7 +37,7 @@ class AppDotLabel extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+            style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
           ),
         ),
       ],
