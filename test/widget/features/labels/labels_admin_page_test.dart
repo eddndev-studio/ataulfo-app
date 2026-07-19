@@ -50,14 +50,14 @@ void main() {
     );
   }
 
-  Widget host() => MaterialApp(
+  Widget host({bool showHeader = true}) => MaterialApp(
     theme: AppDesignTheme.dark(),
     home: MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<LabelsAdminBloc>.value(value: bloc),
         BlocProvider<AuthBloc>.value(value: authBloc),
       ],
-      child: const Scaffold(body: LabelsAdminPage()),
+      child: Scaffold(body: LabelsAdminPage(showHeader: showHeader)),
     ),
   );
 
@@ -86,6 +86,20 @@ void main() {
     expect(find.text('Etiquetas'), findsOneWidget);
     // El saludo viene de la sesión (parte local del email capitalizada).
     expect(find.textContaining('Op'), findsWidgets);
+  });
+
+  testWidgets('como subruta omite el header duplicado y conserva el catálogo', (
+    tester,
+  ) async {
+    seed(twoLabels);
+    await tester.pumpWidget(host(showHeader: false));
+
+    expect(find.byType(AppHeaderCard), findsNothing);
+    expect(find.text('VIP'), findsOneWidget);
+    expect(
+      find.byKey(const Key('labels_admin.content_padding')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Loaded con etiquetas → nombres + glifo tintado por etiqueta', (

@@ -1,63 +1,77 @@
 import '../../domain/entities/conversation.dart';
+import '../../domain/entities/conversations_page.dart';
+import '../../domain/entities/inbox_live_event.dart';
+import '../../domain/entities/inbox_query.dart';
 import '../../domain/failures/conversations_failure.dart';
 import '../../domain/repositories/conversations_repository.dart';
 import '../datasources/conversations_dao.dart';
 import '../datasources/conversations_datasource.dart';
+import '../datasources/conversations_events_datasource.dart';
 import '../mappers/conversation_row_mapper.dart';
 
-/// Orquesta verdad local vs. remota (RFC-0001): la UI observa la DB
-/// (`watchForBot`) y `refresh` trae el snapshot HTTP y lo escribe write-through
-/// vía el DAO. Si el refresh falla por red, la caché local del watch permanece.
 class ConversationsRepositoryImpl implements ConversationsRepository {
   ConversationsRepositoryImpl({
     required ConversationsDatasource datasource,
+    required ConversationsEventsDatasource events,
     required ConversationsDao dao,
     DateTime Function() now = DateTime.now,
-  }) : _ds = datasource,
+  }) : _datasource = datasource,
+       _events = events,
        _dao = dao,
        _now = now;
 
-  final ConversationsDatasource _ds;
+  final ConversationsDatasource _datasource;
+  final ConversationsEventsDatasource _events;
   final ConversationsDao _dao;
   final DateTime Function() _now;
 
   @override
-  Stream<List<Conversation>> watchForBot(String botId) => _dao
-      .watchForBot(botId)
+  Stream<List<Conversation>> watchAll() => _dao
+      .watchAll()
       .map(
         (rows) =>
             rows.map(ConversationRowMapper.rowToEntity).toList(growable: false),
       )
-      // El contrato del puerto es surtir solo ConversationsFailure tipadas: un
-      // error crudo de drift en la consulta del watch se traduce para que el
-      // bloc lo entienda en vez de escapar como error asíncrono no manejado.
       .handleError(
         (Object _) => throw const UnknownConversationsFailure(),
-        test: (Object? e) => e is! ConversationsFailure,
+        test: (Object? error) => error is! ConversationsFailure,
       );
 
   @override
-  Future<void> refresh(String botId) async {
+  Future<ConversationsPage> fetchPage(InboxQuery query) async {
+    // El tenant se captura ANTES del await. Un cambio de organización puede
+    // ocurrir mientras la petición está en vuelo; atribuir la respuesta al
+    // valor vivo posterior mezclaría la proyección anterior con la nueva org.
+    final requestOrgId = _dao.activeOrgId;
     try {
-      final fresh = await _ds.listForBot(botId);
+      final page = await _datasource.list(query);
       final syncedAtMs = _now().millisecondsSinceEpoch;
-      final rows = fresh
-          .map(
-            (c) => ConversationRowMapper.entityToCompanion(
-              botId,
-              c,
-              syncedAtMs: syncedAtMs,
-            ),
-          )
-          .toList(growable: false);
-      await _dao.replaceForBot(botId, rows);
+      await _dao.upsertPage(
+        page.items
+            .map(
+              (item) => ConversationRowMapper.entityToCompanion(
+                item,
+                orgId: requestOrgId,
+                syncedAtMs: syncedAtMs,
+              ),
+            )
+            .toList(growable: false),
+      );
+      return page;
     } on ConversationsFailure {
-      rethrow; // el datasource ya surte fallos tipados.
+      rethrow;
     } catch (_) {
-      // La escritura local (drift) puede fallar con un error no tipado (p. ej.
-      // "database is locked" si otro escritor toca la DB); el bloc solo
-      // entiende ConversationsFailure.
       throw const UnknownConversationsFailure();
     }
   }
+
+  @override
+  Stream<InboxLiveEvent> live() => _events.liveEvents();
+
+  @override
+  Future<void> markNeedsAttention(String botId, String chatLid) =>
+      _dao.markNeedsAttention(botId, chatLid);
+
+  @override
+  Future<void> clearCached() => _dao.clearCached();
 }

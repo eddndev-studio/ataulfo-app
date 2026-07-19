@@ -17,18 +17,22 @@ import '../bloc/labels_admin_bloc.dart';
 import '../widgets/label_dot.dart';
 import '../widgets/label_edit_sheet.dart';
 
-/// Cuerpo de la sección "Etiquetas" (S10), org-scoped. Es una tab del shell con
-/// header rico propio (la tarjeta-header full-bleed ES su encabezado, como en
-/// Bots/Plantillas — el shell no monta AppBar para esta tab; el FAB de crear sí
-/// lo aporta el shell). Consume el `LabelsAdminBloc` del scope: pinta el
-/// catálogo con buscador client-side, abre la hoja de edición al tocar una
-/// etiqueta y deja recargar con pull-to-refresh.
+/// Catálogo org-scoped de etiquetas internas (S10). Como superficie autónoma
+/// conserva su header rico; cuando vive bajo `/org/labels`, el AppBar de la
+/// ruta toma esa responsabilidad y [showHeader] evita chrome duplicado.
 class LabelsAdminPage extends StatefulWidget {
-  const LabelsAdminPage({super.key, this.onOpenSettings});
+  const LabelsAdminPage({
+    super.key,
+    this.onOpenSettings,
+    this.showHeader = true,
+  });
 
   /// Acción del avatar del header → abrir Ajustes. La aporta el shell (que
   /// controla los tabs). Sin ella, el avatar es no-op.
   final VoidCallback? onOpenSettings;
+
+  /// `false` al montarse como subruta con AppBar propio.
+  final bool showHeader;
 
   @override
   State<LabelsAdminPage> createState() => _LabelsAdminPageState();
@@ -107,7 +111,9 @@ class _LabelsAdminPageState extends State<LabelsAdminPage> {
 
   Widget _buildLoaded(BuildContext context, List<Label> labels) {
     final filtered = _applyFilter(labels);
-    final user = userGreeting(_emailFromSession(context));
+    final user = widget.showHeader
+        ? userGreeting(_emailFromSession(context))
+        : null;
     return RefreshIndicator(
       onRefresh: () => _refresh(context),
       child: SingleChildScrollView(
@@ -118,13 +124,14 @@ class _LabelsAdminPageState extends State<LabelsAdminPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            AppHeaderCard(
-              greeting: user.greeting,
-              title: 'Etiquetas',
-              avatarInitial: user.initial,
-              onAvatarTap: widget.onOpenSettings ?? () {},
-              watermark: Icons.label,
-            ),
+            if (user != null)
+              AppHeaderCard(
+                greeting: user.greeting,
+                title: 'Etiquetas',
+                avatarInitial: user.initial,
+                onAvatarTap: widget.onOpenSettings ?? () {},
+                watermark: Icons.label,
+              ),
             Padding(
               key: const Key('labels_admin.content_padding'),
               padding: EdgeInsets.fromLTRB(

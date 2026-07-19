@@ -1,24 +1,30 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
-import 'package:ataulfo/core/design/tokens.dart';
-import 'package:ataulfo/core/design/widgets/app_avatar.dart';
-import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
-import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
-import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/core/design/widgets/app_notice_banner.dart';
+import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
+import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
+import 'package:ataulfo/features/conversations/domain/entities/inbox_query.dart';
 import 'package:ataulfo/features/conversations/domain/failures/conversations_failure.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
-import 'package:ataulfo/features/conversations/presentation/cubit/inbox_labels_cubit.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
+import 'package:ataulfo/features/conversations/presentation/widgets/inbox_conversation_row.dart';
+import 'package:ataulfo/features/labels/domain/entities/label.dart';
+import 'package:ataulfo/features/labels/domain/failures/labels_failure.dart';
+import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
-import 'package:ataulfo/features/wa_labels/domain/entities/wa_chat_assoc.dart';
-import 'package:ataulfo/features/wa_labels/domain/entities/wa_label.dart';
-import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../../support/noop_profile_photo_cache.dart';
@@ -27,805 +33,480 @@ class _MockConversationsBloc
     extends MockBloc<ConversationsEvent, ConversationsState>
     implements ConversationsBloc {}
 
-class _MockInboxLabelsCubit extends MockCubit<InboxLabelsState>
-    implements InboxLabelsCubit {}
+class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
+    implements BotsBloc {}
 
-class _MockWaLabelsRepo extends Mock implements WaLabelsRepository {}
+class _MockLabelsBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
+    implements LabelsAdminBloc {}
 
-const _dm = Conversation(
-  chatLid: 'lid-dm',
+class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
+    implements AuthBloc {}
+
+const identity = Identity(
+  userId: 'user-1',
+  orgId: 'org-1',
+  role: 'WORKER',
+  email: 'maria@rivera.gt',
+  emailVerified: true,
+);
+
+const bot = Bot(
+  id: 'bot-1',
+  orgId: 'org-1',
+  templateId: 'assistant-1',
+  name: 'Ventas Guatemala',
+  channel: BotChannel.waUnofficial,
+  identifier: '+502 2440 9012',
+  version: 2,
+  paused: false,
+  aiDisabled: false,
+);
+
+const vip = Label(
+  id: 'vip',
+  name: 'Cliente VIP',
+  color: '#C57B57',
+  description: 'Atención prioritaria',
+);
+
+const conversation = Conversation(
+  botId: 'bot-1',
+  chatLid: 'lid-1',
   kind: ConversationKind.dm,
-  phone: '5215550001',
+  phone: '+502 5555 9012',
+  displayName: 'Comercial Rivera',
   isArchived: false,
   isPinned: false,
   isMarkedUnread: false,
   mutedUntil: null,
+  unreadCount: 3,
+  lastMessagePreview: '¿Me confirma la entrega?',
+  lastMessageType: 'text',
+  lastMessageDirection: 'INBOUND',
+  lastMessageTimestampMs: 1770000000000,
+  needsAttention: true,
+  assistantId: 'assistant-1',
+  assistantName: 'Ventas regionales',
+  channelName: 'Ventas Guatemala',
+  channelType: 'WA_UNOFFICIAL',
+  channelIdentifier: '+502 2440 9012',
+  labels: <ConversationLabel>[
+    ConversationLabel(id: 'vip', name: 'Cliente VIP', color: '#C57B57'),
+  ],
 );
-const _group = Conversation(
-  chatLid: 'lid-grp',
-  kind: ConversationKind.group,
-  phone: null,
+
+Conversation conversationAt(int index) => Conversation(
+  botId: 'bot-1',
+  chatLid: 'lid-$index',
+  kind: ConversationKind.dm,
+  phone: '+502 5555 ${9000 + index}',
+  displayName: 'Contacto Rivera $index',
   isArchived: false,
-  isPinned: true,
+  isPinned: false,
   isMarkedUnread: false,
   mutedUntil: null,
+  lastMessagePreview: 'Seguimiento de conversación $index',
+  lastMessageType: 'text',
+  lastMessageDirection: 'INBOUND',
+  lastMessageTimestampMs: 1770000000000 - index,
+  assistantId: 'assistant-1',
+  assistantName: 'Ventas regionales',
+  channelName: 'Ventas Guatemala',
+  channelType: 'WA_UNOFFICIAL',
+  channelIdentifier: '+502 2440 9012',
 );
 
 void main() {
+  late _MockConversationsBloc inbox;
+  late _MockBotsBloc bots;
+  late _MockLabelsBloc labels;
+  late _MockAuthBloc auth;
+
   setUpAll(() {
     registerFallbackValue(const ConversationsLoadRequested());
   });
 
-  late _MockConversationsBloc bloc;
-  late _MockInboxLabelsCubit inbox;
-
   setUp(() {
-    bloc = _MockConversationsBloc();
-    when(() => bloc.state).thenReturn(const ConversationsInitial());
-    // El avatar de cada fila lee `botId` en build (resuelve la foto del chat);
-    // sin stub, el getter del mock devuelve null y revienta el tile.
-    when(() => bloc.botId).thenReturn('b1');
-    // Por defecto sin etiquetas: la bandeja se prueba sin blobs ni chips de
-    // etiqueta salvo cuando un test los siembra explícitamente.
-    inbox = _MockInboxLabelsCubit();
-    when(() => inbox.state).thenReturn(const InboxLabelsState());
+    inbox = _MockConversationsBloc();
+    bots = _MockBotsBloc();
+    labels = _MockLabelsBloc();
+    auth = _MockAuthBloc();
+    when(() => auth.state).thenReturn(const AuthAuthenticated(identity));
+    when(
+      () => bots.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[bot], isRefreshing: false));
+    when(() => labels.state).thenReturn(
+      const LabelsAdminLoaded(labels: <Label>[vip], isRefreshing: false),
+    );
   });
 
-  Widget host() => MaterialApp(
-    theme: AppDesignTheme.dark(),
-    home: RepositoryProvider<ProfilePhotoCache>.value(
-      value: NoopProfilePhotoCache(),
+  Widget host(ConversationsState state) {
+    when(() => inbox.state).thenReturn(state);
+    return MultiRepositoryProvider(
+      providers: <RepositoryProvider<dynamic>>[
+        RepositoryProvider<ProfilePhotoCache>.value(
+          value: NoopProfilePhotoCache(),
+        ),
+      ],
       child: MultiBlocProvider(
         providers: <BlocProvider<dynamic>>[
-          BlocProvider<ConversationsBloc>.value(value: bloc),
-          BlocProvider<InboxLabelsCubit>.value(value: inbox),
+          BlocProvider<AuthBloc>.value(value: auth),
+          BlocProvider<BotsBloc>.value(value: bots),
+          BlocProvider<LabelsAdminBloc>.value(value: labels),
+          BlocProvider<ConversationsBloc>.value(value: inbox),
         ],
-        child: const Scaffold(body: ConversationsListPage()),
+        child: MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: const Scaffold(body: ConversationsListPage()),
+        ),
       ),
-    ),
+    );
+  }
+
+  testWidgets('jerarquía visual: búsqueda, estado, canal, labels y filas', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      host(
+        const ConversationsState(
+          phase: ConversationsPhase.ready,
+          items: <Conversation>[conversation],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final searchY = tester.getTopLeft(find.byKey(const Key('inbox.search'))).dy;
+    final statusY = tester
+        .getTopLeft(find.byKey(const Key('inbox.status.filters')))
+        .dy;
+    final channelY = tester
+        .getTopLeft(find.byKey(const Key('inbox.channel.filter')))
+        .dy;
+    final labelsY = tester
+        .getTopLeft(find.byKey(const Key('inbox.labels.filters')))
+        .dy;
+    final rowY = tester
+        .getTopLeft(find.byKey(const Key('conversation.tile.bot-1.lid-1')))
+        .dy;
+    expect(searchY, lessThan(statusY));
+    expect(statusY, lessThan(channelY));
+    expect(channelY, lessThan(labelsY));
+    expect(labelsY, lessThan(rowY));
+  });
+
+  testWidgets(
+    'un canal contextual ausente no rompe el selector mientras carga',
+    (tester) async {
+      when(
+        () => bots.state,
+      ).thenReturn(const BotsLoaded(items: <Bot>[], isRefreshing: false));
+
+      await tester.pumpWidget(
+        host(
+          const ConversationsState(
+            phase: ConversationsPhase.ready,
+            query: InboxQuery(botId: 'bot-eliminado'),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Todos los canales'), findsOneWidget);
+    },
   );
 
-  testWidgets('Loading muestra spinner con AppTokens.primary', (tester) async {
-    when(() => bloc.state).thenReturn(const ConversationsLoading());
-    await tester.pumpWidget(host());
-    final spinner = tester.widget<CircularProgressIndicator>(
-      find.byType(CircularProgressIndicator),
-    );
-    expect(spinner.valueColor?.value, AppTokens.primary);
-    // El spinner de página es el primitivo canónico del kit.
-    expect(find.byType(AppLoadingIndicator), findsOneWidget);
-  });
+  testWidgets(
+    'no invalida filtros contextuales antes de cargar sus catálogos',
+    (tester) async {
+      when(() => bots.state).thenReturn(const BotsLoading());
+      when(() => labels.state).thenReturn(const LabelsAdminLoading());
 
-  testWidgets('Loaded con N conversaciones renderiza una fila por cada una', (
+      await tester.pumpWidget(
+        host(
+          const ConversationsState(
+            phase: ConversationsPhase.ready,
+            query: InboxQuery(
+              botId: 'bot-contextual',
+              labelIds: <String>{'vip-contextual'},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      verifyNever(
+        () => inbox.add(any(that: isA<ConversationsValidChannelsChanged>())),
+      );
+      verifyNever(
+        () => inbox.add(any(that: isA<ConversationsValidLabelsChanged>())),
+      );
+    },
+  );
+
+  testWidgets(
+    'un refresh fallido conserva el último catálogo visible de filtros',
+    (tester) async {
+      final botStates = StreamController<BotsState>();
+      final labelStates = StreamController<LabelsAdminState>();
+      addTearDown(botStates.close);
+      addTearDown(labelStates.close);
+      whenListen(
+        bots,
+        botStates.stream,
+        initialState: const BotsLoaded(items: <Bot>[bot], isRefreshing: false),
+      );
+      whenListen(
+        labels,
+        labelStates.stream,
+        initialState: const LabelsAdminLoaded(
+          labels: <Label>[vip],
+          isRefreshing: false,
+        ),
+      );
+      const state = ConversationsState(
+        phase: ConversationsPhase.ready,
+        query: InboxQuery(botId: 'bot-1', labelIds: <String>{'vip'}),
+        items: <Conversation>[conversation],
+      );
+      await tester.pumpWidget(host(state));
+      await tester.pump();
+
+      Finder channelFilterLabel() => find.descendant(
+        of: find.byKey(const Key('inbox.channel.filter')),
+        matching: find.text('Ventas Guatemala · +502 2440 9012'),
+      );
+      Finder labelFilterChip() => find.descendant(
+        of: find.byKey(const Key('inbox.labels.filters')),
+        matching: find.text('Cliente VIP'),
+      );
+      expect(channelFilterLabel(), findsOneWidget);
+      expect(labelFilterChip(), findsOneWidget);
+
+      botStates.add(const BotsFailed(BotsNetworkFailure()));
+      labelStates.add(const LabelsAdminFailed(LabelsNetworkFailure()));
+      await tester.pumpAndSettle();
+      expect(bots.state, isA<BotsFailed>());
+      expect(labels.state, isA<LabelsAdminFailed>());
+
+      expect(channelFilterLabel(), findsOneWidget);
+      expect(labelFilterChip(), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'usa labels internas, muestra procedencia y no ofrece labels WA',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          const ConversationsState(
+            phase: ConversationsPhase.ready,
+            items: <Conversation>[conversation],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Cliente VIP'), findsNWidgets(2));
+      expect(find.textContaining('Ventas regionales'), findsOneWidget);
+      expect(find.textContaining('Ventas Guatemala'), findsWidgets);
+      expect(
+        find.byKey(const Key('conversation.labels.bot-1.lid-1')),
+        findsNothing,
+      );
+      expect(find.textContaining('WhatsApp'), findsNothing);
+    },
+  );
+
+  testWidgets('estado y label despachan filtros independientes', (
     tester,
   ) async {
-    when(() => bloc.state).thenReturn(
-      const ConversationsLoaded(
-        items: <Conversation>[_dm, _group],
-        isRefreshing: false,
-      ),
-    );
-    await tester.pumpWidget(host());
-
-    expect(find.byKey(const Key('conversation.tile.lid-dm')), findsOneWidget);
-    expect(find.byKey(const Key('conversation.tile.lid-grp')), findsOneWidget);
-    expect(find.byType(AppAvatar), findsNWidgets(2));
-    // DM se identifica por phone (no hay nombre aún); GROUP por etiqueta.
-    expect(find.text('5215550001'), findsOneWidget);
-    expect(find.text('Grupo'), findsOneWidget);
-  });
-
-  testWidgets('un chat con señal de atención muestra la píldora "Atención"', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(
-      const ConversationsLoaded(
-        items: <Conversation>[_dm, _group],
-        isRefreshing: false,
-      ),
-    );
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppDesignTheme.dark(),
-        home: RepositoryProvider<ProfilePhotoCache>.value(
-          value: NoopProfilePhotoCache(),
-          child: MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<ConversationsBloc>.value(value: bloc),
-              BlocProvider<InboxLabelsCubit>.value(value: inbox),
-            ],
-            child: const Scaffold(
-              body: ConversationsListPage(needsAttention: <String>{'lid-dm'}),
-            ),
-          ),
-        ),
-      ),
+      host(const ConversationsState(phase: ConversationsPhase.ready)),
     );
-    expect(
-      find.byKey(const Key('conversation.attention.lid-dm')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('conversation.attention.lid-grp')),
-      findsNothing,
-    );
-  });
-
-  testWidgets('cada conversación expone la acción de etiquetas de WhatsApp', (
-    tester,
-  ) async {
-    when(() => bloc.state).thenReturn(
-      const ConversationsLoaded(
-        items: <Conversation>[_dm, _group],
-        isRefreshing: false,
-      ),
-    );
-    await tester.pumpWidget(host());
-    expect(find.byKey(const Key('conversation.labels.lid-dm')), findsOneWidget);
-    expect(
-      find.byKey(const Key('conversation.labels.lid-grp')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('conversación fijada muestra AppPill "Fijado"', (tester) async {
-    when(() => bloc.state).thenReturn(
-      const ConversationsLoaded(
-        items: <Conversation>[_group],
-        isRefreshing: false,
-      ),
-    );
-    await tester.pumpWidget(host());
-    expect(find.widgetWithText(AppPill, 'Fijado'), findsOneWidget);
-  });
-
-  testWidgets('Loaded vacío muestra empty state (sin tiles)', (tester) async {
-    when(() => bloc.state).thenReturn(
-      const ConversationsLoaded(items: <Conversation>[], isRefreshing: false),
-    );
-    await tester.pumpWidget(host());
-    expect(find.byType(AppAvatar), findsNothing);
-    expect(find.byKey(const Key('conversations.empty')), findsOneWidget);
-    // El vacío rico canónico del kit, en su variante informativa (sin CTA).
-    expect(find.byType(AppEmptyState), findsOneWidget);
-    expect(find.byType(AppButton), findsNothing);
-  });
-
-  testWidgets('Failed genérico → mensaje genérico + Reintentar', (
-    tester,
-  ) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const ConversationsFailed(ConversationsNetworkFailure()));
-    await tester.pumpWidget(host());
-    expect(
-      find.byKey(const Key('conversations.error.generic')),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
-    // La card de error es el primitivo canónico del kit.
-    expect(find.byType(AppErrorState), findsOneWidget);
-  });
-
-  testWidgets('Failed NotFound → copy específico "este bot ya no existe"', (
-    tester,
-  ) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const ConversationsFailed(ConversationsNotFoundFailure()));
-    await tester.pumpWidget(host());
-    expect(
-      find.byKey(const Key('conversations.error.not_found')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('tap Reintentar dispara ConversationsLoadRequested', (
-    tester,
-  ) async {
-    when(
-      () => bloc.state,
-    ).thenReturn(const ConversationsFailed(ConversationsServerFailure()));
-    await tester.pumpWidget(host());
-    await tester.tap(find.widgetWithText(AppButton, 'Reintentar'));
     await tester.pump();
-    verify(() => bloc.add(const ConversationsLoadRequested())).called(1);
+
+    await tester.tap(find.widgetWithText(AppChoiceChip, 'Requieren atención'));
+    await tester.tap(find.widgetWithText(AppChoiceChip, 'Cliente VIP'));
+
+    final events = verify(
+      () => inbox.add(captureAny()),
+    ).captured.cast<ConversationsEvent>();
+    expect(
+      events.whereType<ConversationsStatusChanged>().single.status,
+      InboxStatus.attention,
+    );
+    expect(events.whereType<ConversationsLabelToggled>().single.labelId, 'vip');
   });
 
-  group('bandeja enriquecida (nombre + último-mensaje + no-leídos)', () {
-    Future<void> pumpOne(WidgetTester tester, Conversation c) async {
-      when(() => bloc.state).thenReturn(
-        ConversationsLoaded(items: <Conversation>[c], isRefreshing: false),
-      );
-      await tester.pumpWidget(host());
-    }
-
-    testWidgets('displayName se muestra como título (sobre phone)', (
-      tester,
-    ) async {
-      await pumpOne(
-        tester,
-        const Conversation(
-          chatLid: 'lid-dm',
-          kind: ConversationKind.dm,
-          phone: '5215550001',
-          isArchived: false,
-          isPinned: false,
-          isMarkedUnread: false,
-          mutedUntil: null,
-          displayName: 'Alice',
-        ),
-      );
-      expect(find.text('Alice'), findsOneWidget);
-      expect(find.text('5215550001'), findsNothing);
-    });
-
-    testWidgets('grupo sin mensajes: nunca muestra el chatLid crudo', (
-      tester,
-    ) async {
-      await pumpOne(
-        tester,
-        const Conversation(
-          chatLid: '123456789-1234@g.us',
-          kind: ConversationKind.group,
-          phone: null,
-          isArchived: false,
-          isPinned: false,
-          isMarkedUnread: false,
-          mutedUntil: null,
-        ),
-      );
-      // El JID no significa nada para el operador; el hueco se comunica
-      // con copy humano.
-      expect(find.text('123456789-1234@g.us'), findsNothing);
-      expect(find.text('Sin mensajes'), findsOneWidget);
-    });
-
-    testWidgets('último-mensaje de texto: preview + hora', (tester) async {
-      // Instante fijo de un año pasado; lo esperado se calcula con la misma
-      // fórmula local del widget para no depender de la zona del runner. Al
-      // ser de otro año, el timestamp inteligente antepone la fecha completa
-      // (DD/MM/YY) — sin ella "14:32" no dice nada de cuándo fue.
-      const ts = 1700000000000;
-      final dt = DateTime.fromMillisecondsSinceEpoch(ts);
-      final dd = dt.day.toString().padLeft(2, '0');
-      final mo = dt.month.toString().padLeft(2, '0');
-      final yy = (dt.year % 100).toString().padLeft(2, '0');
-      final hhmm =
-          '$dd/$mo/$yy '
-          '${dt.hour.toString().padLeft(2, '0')}:'
-          '${dt.minute.toString().padLeft(2, '0')}';
-      await pumpOne(
-        tester,
-        const Conversation(
-          chatLid: 'lid-dm',
-          kind: ConversationKind.dm,
-          phone: '5215550001',
-          isArchived: false,
-          isPinned: false,
-          isMarkedUnread: false,
-          mutedUntil: null,
-          lastMessagePreview: 'nos vemos',
-          lastMessageType: 'text',
-          lastMessageDirection: 'INBOUND',
-          lastMessageTimestampMs: ts,
-        ),
-      );
-      expect(find.text('nos vemos'), findsOneWidget);
-      expect(find.text(hhmm), findsOneWidget);
-    });
-
-    testWidgets(
-      'último-mensaje no-texto: etiqueta de tipo en vez del preview',
-      (tester) async {
-        await pumpOne(
-          tester,
-          const Conversation(
-            chatLid: 'lid-dm',
-            kind: ConversationKind.dm,
-            phone: '5215550001',
-            isArchived: false,
-            isPinned: false,
-            isMarkedUnread: false,
-            mutedUntil: null,
-            lastMessagePreview: '',
-            lastMessageType: 'image',
-            lastMessageDirection: 'INBOUND',
-            lastMessageTimestampMs: 1700000000000,
+  testWidgets(
+    'offline con caché conserva filas y presenta aviso no bloqueante',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          const ConversationsState(
+            phase: ConversationsPhase.ready,
+            items: <Conversation>[conversation],
+            isOffline: true,
           ),
-        );
-        expect(find.text('Imagen'), findsOneWidget);
-      },
-    );
-
-    testWidgets('no-leídos: badge verde con el conteo', (tester) async {
-      await pumpOne(
-        tester,
-        const Conversation(
-          chatLid: 'lid-dm',
-          kind: ConversationKind.dm,
-          phone: '5215550001',
-          isArchived: false,
-          isPinned: false,
-          isMarkedUnread: false,
-          mutedUntil: null,
-          lastMessagePreview: 'hola',
-          lastMessageType: 'text',
-          lastMessageDirection: 'INBOUND',
-          lastMessageTimestampMs: 1700000000000,
-          unreadCount: 3,
         ),
       );
-      final badge = find.byKey(const Key('conversation.unread.lid-dm'));
-      expect(badge, findsOneWidget);
-      expect(
-        find.descendant(of: badge, matching: find.text('3')),
-        findsOneWidget,
-      );
-      final box = tester.widget<Container>(badge);
-      final deco = box.decoration as BoxDecoration;
-      expect(deco.color, AppTokens.chatAccent);
-    });
-
-    testWidgets('sin no-leídos (0) → sin badge', (tester) async {
-      await pumpOne(
-        tester,
-        const Conversation(
-          chatLid: 'lid-dm',
-          kind: ConversationKind.dm,
-          phone: '5215550001',
-          isArchived: false,
-          isPinned: false,
-          isMarkedUnread: false,
-          mutedUntil: null,
-          lastMessagePreview: 'hola',
-          lastMessageType: 'text',
-          lastMessageDirection: 'INBOUND',
-          lastMessageTimestampMs: 1700000000000,
-        ),
-      );
-      expect(find.byKey(const Key('conversation.unread.lid-dm')), findsNothing);
-    });
-  });
-
-  group('blobs de etiquetas WhatsApp por chat', () {
-    const vip = WaLabel(waLabelId: 'A', name: 'VIP', color: 0, deleted: false);
-
-    testWidgets('un chat con etiquetas muestra un blob por cada una', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(
-        const ConversationsLoaded(
-          items: <Conversation>[_dm],
-          isRefreshing: false,
-        ),
-      );
-      when(() => inbox.state).thenReturn(
-        const InboxLabelsState(
-          catalog: <WaLabel>[vip],
-          byChat: <String, List<WaLabel>>{
-            'lid-dm': <WaLabel>[vip],
-          },
-        ),
-      );
-      await tester.pumpWidget(host());
-
-      // Scoped al tile: el blob, no un chip de filtro homónimo.
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('conversation.tile.lid-dm')),
-          matching: find.text('VIP'),
-        ),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('un chat sin etiquetas no muestra blobs en su fila', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(
-        const ConversationsLoaded(
-          items: <Conversation>[_dm],
-          isRefreshing: false,
-        ),
-      );
-      when(() => inbox.state).thenReturn(const InboxLabelsState());
-      await tester.pumpWidget(host());
-
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('conversation.tile.lid-dm')),
-          matching: find.text('VIP'),
-        ),
-        findsNothing,
-      );
-    });
-
-    testWidgets('el texto del blob se aclara para etiquetas oscuras', (
-      tester,
-    ) async {
-      // Índice 9 (índigo) es un swatch oscuro: el blob sube la luminancia del
-      // texto para que siga legible sobre el tinte oscuro.
-      const indigo = WaLabel(
-        waLabelId: 'A',
-        name: 'Índigo',
-        color: 9,
-        deleted: false,
-      );
-      when(() => bloc.state).thenReturn(
-        const ConversationsLoaded(
-          items: <Conversation>[_dm],
-          isRefreshing: false,
-        ),
-      );
-      when(() => inbox.state).thenReturn(
-        const InboxLabelsState(
-          catalog: <WaLabel>[indigo],
-          byChat: <String, List<WaLabel>>{
-            'lid-dm': <WaLabel>[indigo],
-          },
-        ),
-      );
-      await tester.pumpWidget(host());
-
-      final blob = tester.widget<Text>(
-        find.descendant(
-          of: find.byKey(const Key('conversation.tile.lid-dm')),
-          matching: find.text('Índigo'),
-        ),
-      );
-      expect(
-        HSLColor.fromColor(blob.style!.color!).lightness,
-        greaterThanOrEqualTo(0.7),
-      );
-    });
-  });
-
-  group('filtros por etiqueta WhatsApp', () {
-    const vip = WaLabel(waLabelId: 'A', name: 'VIP', color: 0, deleted: false);
-    const soporte = WaLabel(
-      waLabelId: 'B',
-      name: 'Soporte',
-      color: 3,
-      deleted: false,
-    );
-
-    Conversation conv({required String chatLid, required String displayName}) =>
-        Conversation(
-          chatLid: chatLid,
-          kind: ConversationKind.dm,
-          phone: '521555',
-          displayName: displayName,
-          isArchived: false,
-          isPinned: false,
-          isMarkedUnread: false,
-          mutedUntil: null,
-          lastMessagePreview: 'hola',
-          lastMessageType: 'text',
-          lastMessageDirection: 'INBOUND',
-          lastMessageTimestampMs: 1700000000000,
-        );
-
-    testWidgets('los chips de filtro se generan desde el catálogo', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(
-        const ConversationsLoaded(
-          items: <Conversation>[_dm],
-          isRefreshing: false,
-        ),
-      );
-      when(
-        () => inbox.state,
-      ).thenReturn(const InboxLabelsState(catalog: <WaLabel>[vip, soporte]));
-      await tester.pumpWidget(host());
-      expect(
-        find.byKey(const Key('conversations.filter.label.A')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('conversations.filter.label.B')),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('sin catálogo no hay chips de etiqueta', (tester) async {
-      when(() => bloc.state).thenReturn(
-        const ConversationsLoaded(
-          items: <Conversation>[_dm],
-          isRefreshing: false,
-        ),
-      );
-      when(() => inbox.state).thenReturn(const InboxLabelsState());
-      await tester.pumpWidget(host());
-      expect(
-        find.byKey(const Key('conversations.filter.label.A')),
-        findsNothing,
-      );
-    });
-
-    testWidgets(
-      'tocar un chip de etiqueta filtra a los chats con esa etiqueta',
-      (tester) async {
-        when(() => bloc.state).thenReturn(
-          ConversationsLoaded(
-            items: <Conversation>[
-              conv(chatLid: 'l1', displayName: 'Con VIP'),
-              conv(chatLid: 'l2', displayName: 'Sin etiqueta'),
-            ],
-            isRefreshing: false,
-          ),
-        );
-        when(() => inbox.state).thenReturn(
-          const InboxLabelsState(
-            catalog: <WaLabel>[vip],
-            byChat: <String, List<WaLabel>>{
-              'l1': <WaLabel>[vip],
-            },
-          ),
-        );
-        await tester.pumpWidget(host());
-
-        expect(find.text('Con VIP'), findsOneWidget);
-        expect(find.text('Sin etiqueta'), findsOneWidget);
-
-        await tester.tap(find.byKey(const Key('conversations.filter.label.A')));
-        await tester.pump();
-
-        expect(find.text('Con VIP'), findsOneWidget);
-        expect(find.text('Sin etiqueta'), findsNothing);
-      },
-    );
-
-    testWidgets('re-tocar el chip activo lo deselecciona (vuelve a Todas)', (
-      tester,
-    ) async {
-      when(() => bloc.state).thenReturn(
-        ConversationsLoaded(
-          items: <Conversation>[
-            conv(chatLid: 'l1', displayName: 'Con VIP'),
-            conv(chatLid: 'l2', displayName: 'Sin etiqueta'),
-          ],
-          isRefreshing: false,
-        ),
-      );
-      when(() => inbox.state).thenReturn(
-        const InboxLabelsState(
-          catalog: <WaLabel>[vip],
-          byChat: <String, List<WaLabel>>{
-            'l1': <WaLabel>[vip],
-          },
-        ),
-      );
-      await tester.pumpWidget(host());
-
-      await tester.tap(find.byKey(const Key('conversations.filter.label.A')));
       await tester.pump();
-      expect(find.text('Sin etiqueta'), findsNothing);
 
-      await tester.tap(find.byKey(const Key('conversations.filter.label.A')));
-      await tester.pump();
-      expect(find.text('Sin etiqueta'), findsOneWidget);
-    });
+      expect(find.byType(AppNoticeBanner), findsOneWidget);
+      expect(find.textContaining('sin conexión'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('conversation.tile.bot-1.lid-1')),
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.byKey(const Key('conversation.tile.bot-1.lid-1')),
+        findsOneWidget,
+      );
+    },
+  );
 
-    testWidgets(
-      'si la etiqueta activa desaparece del catálogo, vuelve a mostrar todo',
-      (tester) async {
-        // Cubit real para poder recargar y emitir un catálogo sin la etiqueta.
-        final repo = _MockWaLabelsRepo();
-        when(
-          () => repo.listCatalog('b1'),
-        ).thenAnswer((_) async => const <WaLabel>[vip]);
-        when(() => repo.listChatAssocs('b1')).thenAnswer(
-          (_) async => const <WaChatAssoc>[
-            WaChatAssoc(chatLid: 'l1', waLabelId: 'A', labeled: true),
-          ],
-        );
-        final realCubit = InboxLabelsCubit(repo: repo, botId: 'b1');
-        addTearDown(realCubit.close);
-        await realCubit.load();
-
-        when(() => bloc.state).thenReturn(
-          ConversationsLoaded(
-            items: <Conversation>[
-              conv(chatLid: 'l1', displayName: 'Con VIP'),
-              conv(chatLid: 'l2', displayName: 'Sin etiqueta'),
-            ],
-            isRefreshing: false,
+  testWidgets('abrir un hilo y volver conserva filtros, scroll e instancia', (
+    tester,
+  ) async {
+    final items = List<Conversation>.generate(24, conversationAt);
+    const query = InboxQuery(
+      search: 'Rivera',
+      status: InboxStatus.unread,
+      botId: 'bot-1',
+      labelIds: <String>{'vip'},
+    );
+    when(() => inbox.state).thenReturn(
+      ConversationsState(
+        phase: ConversationsPhase.ready,
+        query: query,
+        items: items,
+      ),
+    );
+    final router = GoRouter(
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (_, _) => const Scaffold(body: ConversationsListPage()),
+        ),
+        GoRoute(
+          path: '/bots/:id/sessions/:chatLid',
+          builder: (_, state) => Scaffold(
+            key: const Key('test.thread'),
+            body: Text(state.pathParameters['chatLid']!),
           ),
-        );
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
 
-        await tester.pumpWidget(
-          MaterialApp(
+    await tester.pumpWidget(
+      MultiRepositoryProvider(
+        providers: <RepositoryProvider<dynamic>>[
+          RepositoryProvider<ProfilePhotoCache>.value(
+            value: NoopProfilePhotoCache(),
+          ),
+        ],
+        child: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<AuthBloc>.value(value: auth),
+            BlocProvider<BotsBloc>.value(value: bots),
+            BlocProvider<LabelsAdminBloc>.value(value: labels),
+            BlocProvider<ConversationsBloc>.value(value: inbox),
+          ],
+          child: MaterialApp.router(
             theme: AppDesignTheme.dark(),
-            home: RepositoryProvider<ProfilePhotoCache>.value(
-              value: NoopProfilePhotoCache(),
-              child: MultiBlocProvider(
-                providers: <BlocProvider<dynamic>>[
-                  BlocProvider<ConversationsBloc>.value(value: bloc),
-                  BlocProvider<InboxLabelsCubit>.value(value: realCubit),
-                ],
-                child: const Scaffold(body: ConversationsListPage()),
-              ),
-            ),
+            routerConfig: router,
           ),
-        );
-        await tester.pump();
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-        await tester.tap(find.byKey(const Key('conversations.filter.label.A')));
-        await tester.pump();
-        // Filtrado por A: solo el chat con la etiqueta.
-        expect(find.text('Sin etiqueta'), findsNothing);
+    final pageState = tester.state(find.byType(ConversationsListPage));
+    var scrollable = find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.drag(scrollable, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    final before = tester.state<ScrollableState>(scrollable).position.pixels;
 
-        // A desaparece del catálogo (borrada o WhatsApp cae) en la recarga.
-        when(
-          () => repo.listCatalog('b1'),
-        ).thenAnswer((_) async => const <WaLabel>[]);
-        when(
-          () => repo.listChatAssocs('b1'),
-        ).thenAnswer((_) async => const <WaChatAssoc>[]);
-        await realCubit.load();
-        await tester.pump();
+    final target = find.byType(InboxConversationRow).hitTestable().last;
+    final selectedKey = tester
+        .widget<InboxConversationRow>(target)
+        .conversation
+        .stableKey;
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('test.thread')), findsOneWidget);
 
-        // Reconciliado: el filtro colgado se ignora y la bandeja vuelve a todo.
-        expect(find.text('Sin etiqueta'), findsOneWidget);
-        expect(find.text('Con VIP'), findsOneWidget);
-      },
+    router.pop();
+    await tester.pumpAndSettle();
+    scrollable = find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+
+    expect(tester.state(find.byType(ConversationsListPage)), same(pageState));
+    expect(inbox.state.query, query);
+    expect(
+      tester.state<ScrollableState>(scrollable).position.pixels,
+      closeTo(before, 0.1),
+    );
+    final selectedRow = tester
+        .widgetList<InboxConversationRow>(find.byType(InboxConversationRow))
+        .singleWhere((row) => row.conversation.stableKey == selectedKey);
+    expect(selectedRow.selected, isTrue);
+  });
+
+  testWidgets('vacío filtrado se distingue del vacío inicial', (tester) async {
+    await tester.pumpWidget(
+      host(
+        const ConversationsState(
+          query: InboxQuery(search: 'sin coincidencias'),
+          phase: ConversationsPhase.ready,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(AppEmptyState), findsOneWidget);
+    expect(
+      find.text('No hay conversaciones con estos filtros'),
+      findsOneWidget,
     );
   });
 
-  group('bandeja: búsqueda, filtros y jerarquía', () {
-    Conversation conv({
-      required String chatLid,
-      String? displayName,
-      String? phone,
-      bool archived = false,
-      bool pinned = false,
-      int unread = 0,
-      String lastType = 'text',
-      String lastPreview = 'hola',
-    }) => Conversation(
-      chatLid: chatLid,
-      kind: ConversationKind.dm,
-      phone: phone ?? '5215550001',
-      displayName: displayName,
-      isArchived: archived,
-      isPinned: pinned,
-      isMarkedUnread: false,
-      mutedUntil: null,
-      unreadCount: unread,
-      lastMessagePreview: lastPreview,
-      lastMessageType: lastType,
-      lastMessageDirection: 'INBOUND',
-      lastMessageTimestampMs: 1700000000000,
+  testWidgets('loading usa skeleton de la lista y error usa componente DS', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(const ConversationsState(phase: ConversationsPhase.loading)),
     );
+    await tester.pump();
+    expect(find.byKey(const Key('inbox.loading.skeleton')), findsOneWidget);
 
-    void seed(List<Conversation> items) {
-      when(
-        () => bloc.state,
-      ).thenReturn(ConversationsLoaded(items: items, isRefreshing: false));
-    }
-
-    testWidgets('la búsqueda filtra por nombre (case-insensitive)', (
-      tester,
-    ) async {
-      seed(<Conversation>[
-        conv(chatLid: 'l1', displayName: 'Carlos Pérez'),
-        conv(chatLid: 'l2', displayName: 'María López'),
-      ]);
-      await tester.pumpWidget(host());
-
-      await tester.enterText(
-        find.byKey(const Key('conversations.search')),
-        'marí',
-      );
-      await tester.pump();
-
-      expect(find.text('María López'), findsOneWidget);
-      expect(find.text('Carlos Pérez'), findsNothing);
-    });
-
-    testWidgets('la búsqueda también encuentra por teléfono', (tester) async {
-      seed(<Conversation>[
-        conv(chatLid: 'l1', phone: '5215550001'),
-        conv(chatLid: 'l2', phone: '5219998888'),
-      ]);
-      await tester.pumpWidget(host());
-
-      await tester.enterText(
-        find.byKey(const Key('conversations.search')),
-        '9998',
-      );
-      await tester.pump();
-
-      expect(find.text('5219998888'), findsOneWidget);
-      expect(find.text('5215550001'), findsNothing);
-    });
-
-    testWidgets('el preview de media lleva ícono de tipo', (tester) async {
-      seed(<Conversation>[
-        conv(chatLid: 'l1', lastType: 'image', lastPreview: ''),
-      ]);
-      await tester.pumpWidget(host());
-
-      expect(find.byIcon(Icons.image_outlined), findsOneWidget);
-      expect(find.text('Imagen'), findsOneWidget);
-    });
-
-    testWidgets('con no-leídos el preview se enfatiza (text1 + w600)', (
-      tester,
-    ) async {
-      seed(<Conversation>[conv(chatLid: 'l1', unread: 3)]);
-      await tester.pumpWidget(host());
-
-      final preview = tester.widget<Text>(
-        find.byKey(const Key('conversation.preview.l1')),
-      );
-      expect(preview.style?.color, AppTokens.text1);
-      expect(preview.style?.fontWeight, FontWeight.w600);
-    });
-
-    testWidgets('filtro "No leídas" muestra solo las pendientes', (
-      tester,
-    ) async {
-      seed(<Conversation>[
-        conv(chatLid: 'l1', displayName: 'Leída'),
-        conv(chatLid: 'l2', displayName: 'Pendiente', unread: 2),
-      ]);
-      await tester.pumpWidget(host());
-
-      await tester.tap(find.byKey(const Key('conversations.filter.unread')));
-      await tester.pump();
-
-      expect(find.text('Pendiente'), findsOneWidget);
-      expect(find.text('Leída'), findsNothing);
-    });
-
-    testWidgets('las archivadas viven bajo su filtro y "Todas" las oculta', (
-      tester,
-    ) async {
-      seed(<Conversation>[
-        conv(chatLid: 'l1', displayName: 'Activa'),
-        conv(chatLid: 'l2', displayName: 'Guardada', archived: true),
-      ]);
-      await tester.pumpWidget(host());
-
-      // Vista default (Todas): la archivada no aparece.
-      expect(find.text('Activa'), findsOneWidget);
-      expect(find.text('Guardada'), findsNothing);
-
-      await tester.tap(find.byKey(const Key('conversations.filter.archived')));
-      await tester.pump();
-
-      expect(find.text('Guardada'), findsOneWidget);
-      expect(find.text('Activa'), findsNothing);
-    });
-
-    testWidgets('las fijadas se ordenan primero', (tester) async {
-      seed(<Conversation>[
-        conv(chatLid: 'l1', displayName: 'Normal'),
-        conv(chatLid: 'l2', displayName: 'Fijada', pinned: true),
-      ]);
-      await tester.pumpWidget(host());
-
-      final normal = tester.getTopLeft(find.text('Normal'));
-      final pinned = tester.getTopLeft(find.text('Fijada'));
-      expect(pinned.dy, lessThan(normal.dy));
-    });
-
-    testWidgets('búsqueda sin coincidencias muestra "sin resultados"', (
-      tester,
-    ) async {
-      seed(<Conversation>[conv(chatLid: 'l1', displayName: 'Carlos')]);
-      await tester.pumpWidget(host());
-
-      await tester.enterText(
-        find.byKey(const Key('conversations.search')),
-        'zzz',
-      );
-      await tester.pump();
-
-      expect(find.byKey(const Key('conversations.no_results')), findsOneWidget);
-    });
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(
+      host(
+        const ConversationsState(
+          phase: ConversationsPhase.failure,
+          failure: ConversationsServerFailure(),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(AppErrorState), findsOneWidget);
   });
 }

@@ -25,9 +25,15 @@ void main() {
         .into(db.conversations)
         .insert(
           ConversationsCompanion.insert(
+            orgId: 'org-1',
             botId: botId,
             chatLid: chatLid,
             kind: kind,
+            assistantId: 'assistant-$botId',
+            assistantName: 'Asistente',
+            channelName: 'Principal',
+            channelType: 'WA_UNOFFICIAL',
+            labelsJson: '[]',
             syncedAtMs: syncedAtMs,
             displayName: Value.absentIfNull(displayName),
             unreadCount: Value(unreadCount),
@@ -100,9 +106,15 @@ void main() {
           .into(db.conversations)
           .insertOnConflictUpdate(
             ConversationsCompanion.insert(
+              orgId: 'org-1',
               botId: 'b1',
               chatLid: 'c1',
               kind: 'dm',
+              assistantId: 'assistant-b1',
+              assistantName: 'Asistente',
+              channelName: 'Principal',
+              channelType: 'WA_UNOFFICIAL',
+              labelsJson: '[]',
               syncedAtMs: 200,
               displayName: const Value('Ana López'),
             ),

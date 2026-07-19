@@ -1,51 +1,97 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 
 import '../../../../core/db/app_db.dart';
 import '../../domain/entities/conversation.dart';
 
-/// Traduce entre la entidad de dominio [Conversation] y la fila drift
-/// [ConversationRow]. El `kind` se guarda por su `.name`; `mutedUntil` como
-/// epoch en milisegundos (mismo instante absoluto al ida y vuelta).
 class ConversationRowMapper {
   const ConversationRowMapper._();
 
-  static Conversation rowToEntity(ConversationRow r) => Conversation(
-    chatLid: r.chatLid,
-    kind: ConversationKind.values.byName(r.kind),
-    phone: r.phone,
-    isArchived: r.isArchived,
-    isPinned: r.isPinned,
-    isMarkedUnread: r.isMarkedUnread,
-    mutedUntil: r.mutedUntilMs == null
+  static Conversation rowToEntity(ConversationRow row) => Conversation(
+    botId: row.botId,
+    chatLid: row.chatLid,
+    kind: ConversationKind.values.byName(row.kind),
+    phone: row.phone,
+    isArchived: row.isArchived,
+    isPinned: row.isPinned,
+    isMarkedUnread: row.isMarkedUnread,
+    mutedUntil: row.mutedUntilMs == null
         ? null
-        : DateTime.fromMillisecondsSinceEpoch(r.mutedUntilMs!),
-    displayName: r.displayName,
-    unreadCount: r.unreadCount,
-    lastMessagePreview: r.lastMessagePreview,
-    lastMessageType: r.lastMessageType,
-    lastMessageDirection: r.lastMessageDirection,
-    lastMessageTimestampMs: r.lastMessageTimestampMs,
+        : DateTime.fromMillisecondsSinceEpoch(row.mutedUntilMs!),
+    displayName: row.displayName,
+    unreadCount: row.unreadCount,
+    lastMessagePreview: row.lastMessagePreview,
+    lastMessageType: row.lastMessageType,
+    lastMessageDirection: row.lastMessageDirection,
+    lastMessageTimestampMs: row.lastMessageTimestampMs,
+    needsAttention: row.needsAttention,
+    assistantId: row.assistantId,
+    assistantName: row.assistantName,
+    channelName: row.channelName,
+    channelType: row.channelType,
+    channelIdentifier: row.channelIdentifier,
+    labels: _decodeLabels(row.labelsJson),
   );
 
   static ConversationsCompanion entityToCompanion(
-    String botId,
-    Conversation c, {
+    Conversation conversation, {
+    required String orgId,
     required int syncedAtMs,
   }) => ConversationsCompanion.insert(
-    botId: botId,
-    chatLid: c.chatLid,
-    kind: c.kind.name,
+    orgId: orgId,
+    botId: conversation.botId,
+    chatLid: conversation.chatLid,
+    kind: conversation.kind.name,
+    assistantId: conversation.assistantId,
+    assistantName: conversation.assistantName,
+    channelName: conversation.channelName,
+    channelType: conversation.channelType,
+    labelsJson: _encodeLabels(conversation.labels),
     syncedAtMs: syncedAtMs,
-    phone: Value(c.phone),
-    isArchived: Value(c.isArchived),
-    isPinned: Value(c.isPinned),
-    isMarkedUnread: Value(c.isMarkedUnread),
-    mutedUntilMs: Value(c.mutedUntil?.millisecondsSinceEpoch),
-    displayName: Value(c.displayName),
-    unreadCount: Value(c.unreadCount),
-    lastMessagePreview: Value(c.lastMessagePreview),
-    lastMessageType: Value(c.lastMessageType),
-    lastMessageDirection: Value(c.lastMessageDirection),
-    lastMessageTimestampMs: Value(c.lastMessageTimestampMs),
+    phone: Value(conversation.phone),
+    isArchived: Value(conversation.isArchived),
+    isPinned: Value(conversation.isPinned),
+    isMarkedUnread: Value(conversation.isMarkedUnread),
+    mutedUntilMs: Value(conversation.mutedUntil?.millisecondsSinceEpoch),
+    displayName: Value(conversation.displayName),
+    unreadCount: Value(conversation.unreadCount),
+    lastMessagePreview: Value(conversation.lastMessagePreview),
+    lastMessageType: Value(conversation.lastMessageType),
+    lastMessageDirection: Value(conversation.lastMessageDirection),
+    lastMessageTimestampMs: Value(conversation.lastMessageTimestampMs),
+    needsAttention: Value(conversation.needsAttention),
+    channelIdentifier: Value(conversation.channelIdentifier),
   );
+
+  static String _encodeLabels(List<ConversationLabel> labels) =>
+      jsonEncode(<Map<String, String>>[
+        for (final label in labels)
+          <String, String>{
+            'id': label.id,
+            'name': label.name,
+            'color': label.color,
+          },
+      ]);
+
+  static List<ConversationLabel> _decodeLabels(String encoded) {
+    final raw = jsonDecode(encoded);
+    if (raw is! List<dynamic>) {
+      throw const FormatException('labelsJson no es una lista');
+    }
+    return raw
+        .map((item) {
+          if (item is! Map<String, dynamic>) {
+            throw const FormatException('labelsJson contiene un item inválido');
+          }
+          final id = item['id'];
+          final name = item['name'];
+          final color = item['color'];
+          if (id is! String || name is! String || color is! String) {
+            throw const FormatException('labelsJson contiene campos inválidos');
+          }
+          return ConversationLabel(id: id, name: name, color: color);
+        })
+        .toList(growable: false);
+  }
 }

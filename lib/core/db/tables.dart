@@ -1,10 +1,10 @@
 import 'package:drift/drift.dart';
 
 // Tablas del almacén local (SQLite vía drift): espejo offline del núcleo
-// conversacional y única fuente de verdad de la UI. Toda fila lleva `botId`
-// como ámbito — las consultas filtran por el bot activo y el cierre de sesión
-// purga todo, así que no hay verdad local que deba sobrevivir a un cambio de
-// cuenta. Las marcas de tiempo se guardan como epoch en milisegundos (int),
+// conversacional y única fuente de verdad de la UI. Las conversaciones llevan
+// `orgId` además de `botId`: la Bandeja puede cambiar de organización mientras
+// una purga asíncrona sigue en vuelo y nunca debe observar filas del tenant
+// anterior. Las marcas de tiempo se guardan como epoch en milisegundos (int),
 // uniforme con el contrato del wire; los enums de dominio se guardan por su
 // `.name`. El nombre de la fila generada lleva sufijo `Row` para no chocar con
 // las entidades de dominio (`Conversation`, `Message`).
@@ -21,9 +21,10 @@ import 'package:drift/drift.dart';
 @DataClassName('ConversationRow')
 @TableIndex(
   name: 'idx_conversations_inbox',
-  columns: {#botId, #isArchived, #lastMessageTimestampMs},
+  columns: {#orgId, #isPinned, #lastMessageTimestampMs, #botId, #chatLid},
 )
 class Conversations extends Table {
+  TextColumn get orgId => text()();
   TextColumn get botId => text()();
   TextColumn get chatLid => text()();
   TextColumn get kind => text()();
@@ -39,6 +40,14 @@ class Conversations extends Table {
   TextColumn get lastMessageType => text().nullable()();
   TextColumn get lastMessageDirection => text().nullable()();
   IntColumn get lastMessageTimestampMs => integer().nullable()();
+  BoolColumn get needsAttention =>
+      boolean().withDefault(const Constant(false))();
+  TextColumn get assistantId => text()();
+  TextColumn get assistantName => text()();
+  TextColumn get channelName => text()();
+  TextColumn get channelType => text()();
+  TextColumn get channelIdentifier => text().nullable()();
+  TextColumn get labelsJson => text()();
   IntColumn get syncedAtMs => integer()();
 
   @override

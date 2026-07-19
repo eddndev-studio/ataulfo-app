@@ -76,9 +76,8 @@ import '../../features/bots/presentation/pages/bot_detail_page.dart';
 import '../../features/bots/presentation/pages/bot_maintenance_page.dart';
 import '../../features/bots/presentation/pages/bot_variables_page.dart';
 import '../../features/conversations/domain/repositories/conversations_repository.dart';
+import '../../features/conversations/domain/entities/inbox_query.dart';
 import '../../features/conversations/presentation/bloc/conversations_bloc.dart';
-import '../../features/conversations/presentation/cubit/inbox_labels_cubit.dart';
-import '../../features/conversations/presentation/pages/conversations_list_page.dart';
 import '../../features/flow_run/domain/repositories/flow_run_repository.dart';
 import '../../features/flows/domain/repositories/flows_repository.dart';
 import '../../features/flows/presentation/bloc/flow_detail_bloc.dart';
@@ -110,6 +109,8 @@ import '../../features/executions/presentation/pages/executions_page.dart';
 import '../../features/notes/domain/repositories/notes_repository.dart';
 import '../../features/labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../features/labels/presentation/bloc/labels_bloc.dart';
+import '../../features/labels/presentation/pages/labels_admin_page.dart';
+import '../../features/labels/presentation/widgets/label_edit_sheet.dart';
 import '../../features/media/domain/repositories/camera_capture.dart';
 import '../../features/media/domain/repositories/device_gallery_port.dart';
 import '../../features/media/domain/repositories/media_file_picker.dart';
@@ -148,7 +149,6 @@ import '../../features/messages/presentation/bloc/thread_audio_cubit.dart';
 import '../../features/messages/presentation/pages/message_thread_page.dart';
 import '../../features/monitor/data/datasources/monitor_activity_datasource.dart';
 import '../../features/monitor/data/datasources/monitor_catchup_datasource.dart';
-import '../../features/monitor/presentation/cubit/monitor_attention_cubit.dart';
 import '../../features/monitor/presentation/cubit/monitor_live_cubit.dart';
 import '../../features/notifications/domain/repositories/notifications_repository.dart';
 import '../../features/notifications/presentation/bloc/notification_preferences_bloc.dart';
@@ -219,7 +219,6 @@ class AppRouter {
     required TrainerRepository trainerRepository,
     required TrainerEvents trainerEvents,
     required MonitorActivityDatasource monitorActivity,
-    required MonitorBotActivityDatasource monitorBotActivity,
     MonitorCatchupDatasource? monitorCatchup,
     required WorkspaceRepository workspaceRepository,
     required PreviewRepository previewRepository,
@@ -269,7 +268,6 @@ class AppRouter {
        _aiLedgerRepo = aiLedgerRepository,
        _executionsRepo = executionsRepository,
        _monitorActivity = monitorActivity,
-       _monitorBotActivity = monitorBotActivity,
        _monitorCatchup = monitorCatchup,
        _previewRepo = previewRepository,
        _resourcesRepo = resourcesRepository,
@@ -315,7 +313,6 @@ class AppRouter {
   final LabelsRepository _labelsRepo;
   final ChatLabelsRepository _chatLabelsRepo;
   final MonitorActivityDatasource _monitorActivity;
-  final MonitorBotActivityDatasource _monitorBotActivity;
 
   /// Catch-up del run en curso (opcional): null ⇒ el monitor arranca vacío como
   /// antes; presente ⇒ el cubit hidrata el timeline al abrir el chat.
@@ -680,6 +677,10 @@ class AppRouter {
           // verificación debe actualizarse sin nukear las listas.
           final auth = context.watch<AuthBloc>().state;
           final orgId = auth is AuthAuthenticated ? auth.identity.orgId : '';
+          final requestedBotId = state.uri.queryParameters['botId']?.trim();
+          final initialBotId = requestedBotId == null || requestedBotId.isEmpty
+              ? null
+              : requestedBotId;
           // Los repos de plantillas y bots cuelgan del scope del shell para
           // que las hojas de creación (FAB / empty-state) las construyan: un
           // bottom sheet vive fuera de este subárbol de providers, así que el
@@ -714,6 +715,18 @@ class AppRouter {
                       create: (_) => BotCreateDraftStore(),
                       child: MultiBlocProvider(
                         providers: <BlocProvider<dynamic>>[
+                          // Bandeja org-scoped: una sola consulta para toda la
+                          // organización. La key cambia únicamente ante una
+                          // entrada contextual por Canal; ShellPage actualiza
+                          // este mismo bloc sin reconstruir el resto. Al
+                          // abrir/cerrar un hilo la URL de home no cambia y el
+                          // bloc conserva filtros/estado.
+                          BlocProvider<ConversationsBloc>(
+                            create: (_) => ConversationsBloc(
+                              repo: _conversationsRepo,
+                              initialQuery: InboxQuery(botId: initialBotId),
+                            )..add(const ConversationsLoadRequested()),
+                          ),
                           BlocProvider<BotsBloc>(
                             create: (_) =>
                                 BotsBloc(_botsRepo)
@@ -775,11 +788,12 @@ class AppRouter {
                         ],
                         // Blocs page-scoped a nivel del shell: cambiar de tab no
                         // rebuildea los providers y cada lista preserva estado
-                        // (Loaded, refresh, failures) entre Bots ⇄ Plantillas ⇄ Ajustes.
+                        // entre Bandeja ⇄ Asistentes ⇄ Agenda ⇄ Ajustes.
                         // El routeObserver se atraviesa al shell para que ambos list
                         // pages disparen su refresh al volver de una sub-ruta.
                         child: ShellPage(
                           routeObserver: _routeObserver,
+                          contextualBotId: initialBotId,
                           assistantDraft:
                               state.uri.queryParameters['prompt'] ?? '',
                         ),
@@ -937,59 +951,17 @@ class AppRouter {
         },
       ),
       GoRoute(
-        // Conversaciones (sesiones S07 RF#7) del bot: bandeja per-bot. Sub-ruta
-        // de `/bots/:id` con un segmento más, así no compite con el detalle por
-        // orden de match. Page-scoped: `ConversationsBloc` se construye con el
-        // ID y dispara el primer load al montarse.
+        // Compatibilidad con entradas históricas desde un Asistente/Canal y
+        // push notifications sin conversación concreta. Ya no existe una
+        // segunda bandeja per-bot: el alias aterriza en el destino principal
+        // con la conexión concreta preseleccionada.
         path: '/bots/:id/sessions',
-        builder: (context, state) {
+        redirect: (context, state) {
           final id = state.pathParameters['id']!;
-          // Los repos de etiquetas cuelgan del scope para el sheet de etiquetas
-          // por chat (la fila de la bandeja lo abre con su chatLid + kind): las
-          // etiquetas WhatsApp (sección "WhatsApp" + mapeos) y los Labels
-          // internos puestos al chat (sección "Internas", solo lectura).
-          return MultiRepositoryProvider(
-            providers: <RepositoryProvider<dynamic>>[
-              RepositoryProvider<WaLabelsRepository>.value(
-                value: _waLabelsRepo,
-              ),
-              RepositoryProvider<ChatLabelsRepository>.value(
-                value: _chatLabelsRepo,
-              ),
-            ],
-            child: MultiBlocProvider(
-              providers: <BlocProvider<dynamic>>[
-                BlocProvider<ConversationsBloc>(
-                  create: (_) =>
-                      ConversationsBloc(repo: _conversationsRepo, botId: id)
-                        ..add(const ConversationsLoadRequested()),
-                ),
-                // Señales de atención del bot (falló/alerta) por chat: tier
-                // operador (WORKER+), feed bot-scoped. Destaca filas en la bandeja.
-                BlocProvider<MonitorAttentionCubit>(
-                  create: (_) =>
-                      MonitorAttentionCubit(_monitorBotActivity)..watch(id),
-                ),
-                // Etiquetas WhatsApp del bot para la bandeja: blobs por chat y
-                // chips de filtro. Carga al montar y se queda en vivo (feed
-                // `label.wa.*`) para reflejar etiquetados sin recargar; degrada
-                // a vacío si falla.
-                BlocProvider<InboxLabelsCubit>(
-                  create: (_) =>
-                      InboxLabelsCubit(repo: _waLabelsRepo, botId: id)
-                        ..watchLive(),
-                ),
-              ],
-              child: Scaffold(
-                appBar: AppBar(title: const Text('Conversaciones')),
-                body: BlocBuilder<MonitorAttentionCubit, MonitorAttentionState>(
-                  builder: (context, attn) => ConversationsListPage(
-                    needsAttention: attn.needsAttention,
-                  ),
-                ),
-              ),
-            ),
-          );
+          return Uri(
+            path: '/home',
+            queryParameters: <String, String>{'botId': id},
+          ).toString();
         },
       ),
       GoRoute(
@@ -1418,6 +1390,28 @@ class AppRouter {
             ),
           );
         },
+      ),
+      GoRoute(
+        // Taxonomía interna de la organización. Sale de la navegación
+        // primaria, pero conserva toda la gestión CRUD bajo Ajustes.
+        path: '/org/labels',
+        builder: (context, state) => BlocProvider<LabelsAdminBloc>(
+          create: (_) =>
+              LabelsAdminBloc(repo: _labelsRepo)
+                ..add(const LabelsAdminLoadRequested()),
+          child: Builder(
+            builder: (context) => Scaffold(
+              appBar: AppBar(title: const Text('Etiquetas')),
+              body: const LabelsAdminPage(showHeader: false),
+              floatingActionButton: FloatingActionButton(
+                key: const Key('org_labels.fab.create'),
+                tooltip: 'Crear etiqueta',
+                onPressed: () => LabelEditSheet.openCreate(context),
+                child: const Icon(Icons.add),
+              ),
+            ),
+          ),
+        ),
       ),
       GoRoute(
         // Config de IA a nivel ORG (ADMIN/OWNER): proveedor por modelo +

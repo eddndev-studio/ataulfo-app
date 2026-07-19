@@ -19,6 +19,7 @@ void main() {
   group('Conversation value-equality', () {
     final muted = DateTime.utc(2026, 6, 1, 12);
     Conversation make({
+      String botId = 'bot-1',
       String chatLid = 'lid-1',
       ConversationKind kind = ConversationKind.dm,
       String? phone = '5215550001',
@@ -32,7 +33,12 @@ void main() {
       String? lastMessageType,
       String? lastMessageDirection,
       int? lastMessageTimestampMs,
+      bool needsAttention = false,
+      String assistantName = '',
+      String channelName = '',
+      List<ConversationLabel> labels = const <ConversationLabel>[],
     }) => Conversation(
+      botId: botId,
       chatLid: chatLid,
       kind: kind,
       phone: phone,
@@ -46,6 +52,10 @@ void main() {
       lastMessageType: lastMessageType,
       lastMessageDirection: lastMessageDirection,
       lastMessageTimestampMs: lastMessageTimestampMs,
+      needsAttention: needsAttention,
+      assistantName: assistantName,
+      channelName: channelName,
+      labels: labels,
     );
 
     test('iguales con los mismos campos', () {
@@ -71,6 +81,7 @@ void main() {
     test('difieren si cambia un campo', () {
       expect(make(), isNot(make(isPinned: true)));
       expect(make(), isNot(make(chatLid: 'lid-2')));
+      expect(make(), isNot(make(botId: 'bot-2')));
       expect(make(phone: '5215550001'), isNot(make(phone: null)));
     });
 
@@ -81,6 +92,23 @@ void main() {
       expect(make(), isNot(make(lastMessageType: 'image')));
       expect(make(), isNot(make(lastMessageDirection: 'OUTBOUND')));
       expect(make(), isNot(make(lastMessageTimestampMs: 1700)));
+      expect(make(), isNot(make(needsAttention: true)));
+      expect(make(), isNot(make(assistantName: 'Ventas')));
+      expect(make(), isNot(make(channelName: 'Principal')));
+      expect(
+        make(),
+        isNot(
+          make(
+            labels: const <ConversationLabel>[
+              ConversationLabel(id: 'vip', name: 'VIP', color: '#ff0000'),
+            ],
+          ),
+        ),
+      );
+    });
+
+    test('stableKey incluye botId para evitar colisiones entre canales', () {
+      expect(make(botId: 'a').stableKey, isNot(make(botId: 'b').stableKey));
     });
   });
 }

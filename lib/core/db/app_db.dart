@@ -20,7 +20,7 @@ class AppDb extends _$AppDb {
   AppDb.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -52,6 +52,54 @@ class AppDb extends _$AppDb {
       // previas quedan NULL ('' en dominio: sin badge, honesto).
       if (from < 4) {
         await m.addColumn(messages, messages.aiRunId);
+      }
+      // v4→v5: la Bandeja pasa de snapshot per-Bot a proyección org-scoped.
+      // La identidad `(bot_id, chat_lid)` ya existía; sólo añadimos procedencia,
+      // atención y etiquetas internas. Los defaults del ALTER conservan las
+      // filas antiguas hasta que el siguiente pull autoritativo las reemplace.
+      if (from < 5) {
+        await customStatement(
+          'ALTER TABLE conversations ADD COLUMN needs_attention '
+          'INTEGER NOT NULL DEFAULT 0',
+        );
+        await customStatement(
+          'ALTER TABLE conversations ADD COLUMN assistant_id '
+          'TEXT NOT NULL DEFAULT \'\'',
+        );
+        await customStatement(
+          'ALTER TABLE conversations ADD COLUMN assistant_name '
+          'TEXT NOT NULL DEFAULT \'\'',
+        );
+        await customStatement(
+          'ALTER TABLE conversations ADD COLUMN channel_name '
+          'TEXT NOT NULL DEFAULT \'\'',
+        );
+        await customStatement(
+          'ALTER TABLE conversations ADD COLUMN channel_type '
+          'TEXT NOT NULL DEFAULT \'\'',
+        );
+        await customStatement(
+          'ALTER TABLE conversations ADD COLUMN channel_identifier TEXT',
+        );
+        await customStatement(
+          'ALTER TABLE conversations ADD COLUMN labels_json '
+          'TEXT NOT NULL DEFAULT \'[]\'',
+        );
+      }
+      // v5→v6: namespace explícito del espejo de Bandeja. Las filas antiguas
+      // quedan sin dueño (`''`) y no se revelan; el siguiente pull de la org
+      // activa las repuebla. Es preferible perder una caché reconstruible tras
+      // el upgrade a atribuirla a un tenant que no podemos inferir localmente.
+      if (from < 6) {
+        await customStatement(
+          'ALTER TABLE conversations ADD COLUMN org_id '
+          'TEXT NOT NULL DEFAULT \'\'',
+        );
+        await customStatement('DROP INDEX IF EXISTS idx_conversations_inbox');
+        await customStatement(
+          'CREATE INDEX idx_conversations_inbox ON conversations '
+          '(org_id, is_pinned, last_message_timestamp_ms, bot_id, chat_lid)',
+        );
       }
     },
   );

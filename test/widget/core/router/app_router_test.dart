@@ -35,7 +35,11 @@ import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_maintenance_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_variables_page.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
+import 'package:ataulfo/features/conversations/domain/entities/conversations_page.dart';
+import 'package:ataulfo/features/conversations/domain/entities/inbox_live_event.dart';
+import 'package:ataulfo/features/conversations/domain/entities/inbox_query.dart';
 import 'package:ataulfo/features/conversations/domain/repositories/conversations_repository.dart';
+import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
 import 'package:ataulfo/features/flow_run/domain/repositories/flow_run_repository.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as fdom;
@@ -77,13 +81,12 @@ import 'package:ataulfo/features/profile/presentation/widgets/chat_thread_app_ba
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
-import 'package:ataulfo/features/templates/presentation/bloc/templates_bloc.dart';
 import 'package:ataulfo/features/templates/presentation/pages/template_detail_page.dart';
-import 'package:ataulfo/features/templates/presentation/pages/templates_list_page.dart';
 import 'package:ataulfo/features/triggers/domain/entities/trigger.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/labels/domain/repositories/labels_repository.dart';
+import 'package:ataulfo/features/labels/presentation/pages/labels_admin_page.dart';
 import 'package:ataulfo/features/ai_log/domain/ai_log_repository.dart';
 import 'package:ataulfo/features/monitor/data/datasources/monitor_activity_datasource.dart';
 import 'package:ataulfo/features/monitor/domain/entities/monitor_event.dart';
@@ -169,10 +172,8 @@ _MockQuickRepliesRepo _quickRepliesRepo() {
   return r;
 }
 
-// La bandeja monta un InboxLabelsCubit que hace watchLive: carga catálogo +
-// asociaciones y se suscribe al feed en vivo `label.wa.*`. Stubs vacíos
-// (incluido el stream) dejan terminar el pumpAndSettle sin romper por un
-// stream nulo del mock.
+// El hilo y las rutas específicas de etiquetas WhatsApp consumen catálogo,
+// asociaciones y feed `label.wa.*`; la Bandeja unificada no los usa.
 _MockWaLabelsRepo _waLabelsRepo() {
   final r = _MockWaLabelsRepo();
   when(() => r.listCatalog(any())).thenAnswer((_) async => <Never>[]);
@@ -324,6 +325,10 @@ void main() {
   late _MockAuthRepo authRepo;
   late AppRouter router;
 
+  setUpAll(() {
+    registerFallbackValue(const InboxQuery());
+  });
+
   setUp(() {
     authBloc = _MockAuthBloc();
     authRepo = _MockAuthRepo();
@@ -366,6 +371,20 @@ void main() {
     // su propio widget test).
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
+    when(
+      conversationsRepo.watchAll,
+    ).thenAnswer((_) => Stream.value(const <Conversation>[]));
+    when(
+      conversationsRepo.live,
+    ).thenAnswer((_) => const Stream<InboxLiveEvent>.empty());
+    when(() => conversationsRepo.fetchPage(any())).thenAnswer(
+      (_) async =>
+          const ConversationsPage(items: <Conversation>[], nextCursor: null),
+    );
+    when(conversationsRepo.clearCached).thenAnswer((_) async {});
+    when(
+      () => conversationsRepo.markNeedsAttention(any(), any()),
+    ).thenAnswer((_) async {});
     // El detalle del bot, para un rol ADMIN+, monta el toggle de IA que lee
     // Template.ai.enabled (IA efectiva). El _identity de estos tests es OWNER,
     // así que la ruta /bots/:id fetchea la Template — un stub la resuelve.
@@ -458,7 +477,6 @@ void main() {
       trainerRepository: _MockTrainerRepo(),
       trainerEvents: _MockTrainerEvents(),
       monitorActivity: _FakeMonitorActivity(),
-      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -506,7 +524,7 @@ void main() {
     expect(find.byType(LoginPage), findsNothing);
   });
 
-  testWidgets('AuthAuthenticated → /home muestra el catálogo de Asistentes', (
+  testWidgets('AuthAuthenticated → /home muestra la Bandeja unificada', (
     tester,
   ) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
@@ -514,29 +532,23 @@ void main() {
     await tester.pumpWidget(_host(router, authBloc));
     await tester.pumpAndSettle();
 
-    expect(find.byType(TemplatesListPage), findsOneWidget);
+    expect(find.byType(ConversationsListPage), findsOneWidget);
   });
 
-  testWidgets('AuthAuthenticated → /home expone TemplatesBloc al árbol', (
+  testWidgets('AuthAuthenticated → /home expone ConversationsBloc org-scoped', (
     tester,
   ) async {
-    // El provider del TemplatesBloc vive en el route builder de /home (no
-    // dentro de cada tab) para preservarlo entre cambios de tab. Si lo
-    // mueven adentro del shell, este test rompe — guarda el contrato.
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(_host(router, authBloc));
     await tester.pumpAndSettle();
 
-    // Leer el bloc desde su catálogo confirma que el provider está aguas
-    // arriba del shell y sobrevive a los cambios de tab.
-    final templatesBloc = tester
-        .element(find.byType(TemplatesListPage))
-        .read<TemplatesBloc>();
-    expect(templatesBloc, isNotNull);
-    // El bloc dispara LoadRequested al construirse; el repo mock responde
-    // con [] y el bloc termina en Loaded(empty). pumpAndSettle ya esperó
-    // la transición.
+    final inbox = tester
+        .element(find.byType(ConversationsListPage))
+        .read<ConversationsBloc>();
+    expect(inbox.state.query, const InboxQuery());
+    verify(() => conversationsRepo.fetchPage(const InboxQuery())).called(1);
+    // IndexedStack conserva Asistentes montado offstage; su carga sigue viva.
     verify(templatesRepo.list).called(1);
   });
 
@@ -563,13 +575,13 @@ void main() {
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
-      expect(find.byType(TemplatesListPage), findsOneWidget);
+      expect(find.byType(ConversationsListPage), findsOneWidget);
     },
   );
 
   testWidgets(
     'cambiar de org reconstruye el shell: los blocs org-scoped recargan datos '
-    'de la org nueva (templatesRepo.list dos veces)',
+    'de la org nueva (Bandeja y facetas recargan)',
     (tester) async {
       // El shell /home se re-keyea por orgId: cuando el orgId activo cambia,
       // el subárbol (MultiBlocProvider incluido) se destruye y recrea, y los
@@ -588,19 +600,20 @@ void main() {
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
-      expect(find.byType(TemplatesListPage), findsOneWidget);
+      expect(find.byType(ConversationsListPage), findsOneWidget);
 
       controller.add(const AuthAuthenticated(_orgB));
       await tester.pumpAndSettle();
 
+      verify(() => conversationsRepo.fetchPage(const InboxQuery())).called(2);
+      verify(botsRepo.list).called(2);
       verify(templatesRepo.list).called(2);
-      verifyNever(botsRepo.list);
     },
   );
 
   testWidgets(
     'refresh que sólo cambia emailVerified (mismo orgId) NO reconstruye el '
-    'shell (templatesRepo.list una vez)',
+    'shell (Bandeja carga una vez)',
     (tester) async {
       // Guarda contra el over-rebuild: el shell se keyea por orgId SOLO, no por
       // la identity completa. Un /auth/me que sólo confirme el correo deja el
@@ -616,13 +629,14 @@ void main() {
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
-      expect(find.byType(TemplatesListPage), findsOneWidget);
+      expect(find.byType(ConversationsListPage), findsOneWidget);
 
       controller.add(const AuthAuthenticated(_orgAVerified));
       await tester.pumpAndSettle();
 
+      verify(() => conversationsRepo.fetchPage(const InboxQuery())).called(1);
+      verify(botsRepo.list).called(1);
       verify(templatesRepo.list).called(1);
-      verifyNever(botsRepo.list);
     },
   );
 
@@ -777,26 +791,24 @@ void main() {
   );
 
   testWidgets(
-    'AuthAuthenticated → /bots/:id/sessions monta ConversationsListPage con el botId',
+    'ruta histórica /bots/:id/sessions abre la misma Bandeja prefiltrada',
     (tester) async {
-      // Bloquea el seam que ningún test de widget alcanza: la ruta debe sembrar
-      // el ConversationsBloc con el botId del path Y disparar el load al montar.
-      // Un typo de path, repo equivocado o ..add(load) caído daría spinner
-      // infinito que el widget test (que inyecta un bloc mock) no detecta.
       when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-      when(
-        () => conversationsRepo.watchForBot('b1'),
-      ).thenAnswer((_) => Stream.value(const <Conversation>[]));
-      when(() => conversationsRepo.refresh('b1')).thenAnswer((_) async {});
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
+      clearInteractions(conversationsRepo);
       router.router.go('/bots/b1/sessions');
       await tester.pumpAndSettle();
 
       expect(find.byType(ConversationsListPage), findsOneWidget);
-      verify(() => conversationsRepo.watchForBot('b1')).called(1);
-      verify(() => conversationsRepo.refresh('b1')).called(1);
+      final bloc = tester
+          .element(find.byType(ConversationsListPage))
+          .read<ConversationsBloc>();
+      expect(bloc.state.query.botId, 'b1');
+      verify(
+        () => conversationsRepo.fetchPage(const InboxQuery(botId: 'b1')),
+      ).called(1);
     },
   );
 
@@ -824,29 +836,47 @@ void main() {
   testWidgets(
     'tap en una conversación navega a su hilo (/bots/:id/sessions/:chatLid)',
     (tester) async {
-      // El tap de la fila empuja la ruta del hilo con el chatLid de la
-      // conversación; confirma el cableado fila→navegación end-to-end.
       when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
-      when(() => conversationsRepo.watchForBot('b1')).thenAnswer(
-        (_) => Stream.value(const <Conversation>[
-          Conversation(
-            chatLid: 'lid-1',
-            kind: ConversationKind.dm,
-            phone: '5215550001',
-            isArchived: false,
-            isPinned: false,
-            isMarkedUnread: false,
-            mutedUntil: null,
+      when(botsRepo.list).thenAnswer(
+        (_) async => const <Bot>[
+          Bot(
+            id: 'b1',
+            orgId: 'o1',
+            templateId: 't1',
+            name: 'Principal',
+            channel: BotChannel.waUnofficial,
+            identifier: null,
+            version: 1,
+            paused: false,
+            aiDisabled: false,
           ),
-        ]),
+        ],
       );
-      when(() => conversationsRepo.refresh('b1')).thenAnswer((_) async {});
+      when(() => conversationsRepo.fetchPage(any())).thenAnswer(
+        (_) async => const ConversationsPage(
+          items: <Conversation>[
+            Conversation(
+              botId: 'b1',
+              chatLid: 'lid-1',
+              kind: ConversationKind.dm,
+              phone: '5215550001',
+              isArchived: false,
+              isPinned: false,
+              isMarkedUnread: false,
+              mutedUntil: null,
+              assistantName: 'Ventas',
+              channelName: 'Principal',
+            ),
+          ],
+          nextCursor: null,
+        ),
+      );
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
-      router.router.go('/bots/b1/sessions');
-      await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('5215550001'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('5215550001'));
       await tester.pumpAndSettle();
 
@@ -854,6 +884,21 @@ void main() {
       verify(() => messagesRepo.watchThread('b1', 'lid-1')).called(1);
     },
   );
+
+  testWidgets('ruta /org/labels conserva gestión y creación de etiquetas', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    router.router.go('/org/labels');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LabelsAdminPage), findsOneWidget);
+    expect(find.text('Etiquetas'), findsOneWidget);
+    expect(find.byKey(const Key('org_labels.fab.create')), findsOneWidget);
+  });
 
   testWidgets('tap en el header del hilo abre la pantalla de perfil', (
     tester,
@@ -913,7 +958,6 @@ void main() {
       trainerRepository: _MockTrainerRepo(),
       trainerEvents: _MockTrainerEvents(),
       monitorActivity: _FakeMonitorActivity(),
-      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -1012,7 +1056,6 @@ void main() {
       trainerRepository: _MockTrainerRepo(),
       trainerEvents: _MockTrainerEvents(),
       monitorActivity: _FakeMonitorActivity(),
-      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -1313,7 +1356,6 @@ void main() {
       trainerRepository: _MockTrainerRepo(),
       trainerEvents: _MockTrainerEvents(),
       monitorActivity: _FakeMonitorActivity(),
-      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -1569,7 +1611,6 @@ void main() {
       trainerRepository: _MockTrainerRepo(),
       trainerEvents: _MockTrainerEvents(),
       monitorActivity: _FakeMonitorActivity(),
-      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
@@ -1664,7 +1705,6 @@ void main() {
         trainerRepository: _MockTrainerRepo(),
         trainerEvents: _MockTrainerEvents(),
         monitorActivity: _FakeMonitorActivity(),
-        monitorBotActivity: _FakeMonitorActivity(),
         workspaceRepository: _MockWorkspaceRepo(),
         previewRepository: _MockPreviewRepo(),
         platformAgentRepository: _MockPlatformAgentRepo(),

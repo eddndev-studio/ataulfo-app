@@ -7,8 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/widgets/app_icon_pop.dart';
 import '../../../calendar/presentation/bloc/agenda_cubit.dart';
 import '../../../calendar/presentation/pages/agenda_page.dart';
-import '../../../labels/presentation/pages/labels_admin_page.dart';
-import '../../../labels/presentation/widgets/label_edit_sheet.dart';
+import '../../../conversations/presentation/bloc/conversations_bloc.dart';
+import '../../../conversations/presentation/pages/conversations_list_page.dart';
+import '../../../labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../../platform_agent/presentation/pages/platform_agent_page.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../templates/presentation/pages/templates_list_page.dart';
@@ -25,7 +26,12 @@ import '../widgets/email_verification_banner.dart';
 /// sub-rutas por tab obligaría a reabrir esa lógica sin ganar nada
 /// (los tabs no son destinos compartibles por URL en este producto).
 class ShellPage extends StatefulWidget {
-  const ShellPage({super.key, this.routeObserver, this.assistantDraft = ''});
+  const ShellPage({
+    super.key,
+    this.routeObserver,
+    this.assistantDraft = '',
+    this.contextualBotId,
+  });
 
   /// Observer compartido con el GoRouter del AppRouter. ShellPage no lo
   /// usa directamente: se lo entrega a TemplatesListPage para que
@@ -38,6 +44,10 @@ class ShellPage extends StatefulWidget {
   /// plantilla). Se siembra en el composer del agente único; nunca se envía
   /// automáticamente para que el operador conserve control.
   final String assistantDraft;
+
+  /// Conexión concreta solicitada por una entrada contextual histórica.
+  /// Cambiarla actualiza el mismo bloc para no desmontar el resto del shell.
+  final String? contextualBotId;
 
   @override
   State<ShellPage> createState() => _ShellPageState();
@@ -52,9 +62,20 @@ class _ShellPageState extends State<ShellPage> {
   @override
   void initState() {
     super.initState();
-    // Asistentes es la landing habitual; un handoff contextual abre Ataúlfo
-    // de inmediato sin crear otro hilo.
-    _index = widget.assistantDraft.trim().isEmpty ? 1 : 0;
+    // Bandeja es la landing operativa. Un handoff contextual conserva el
+    // contrato previo y abre Ataúlfo sin crear otro hilo.
+    _index = widget.assistantDraft.trim().isEmpty ? 0 : 3;
+  }
+
+  @override
+  void didUpdateWidget(covariant ShellPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.contextualBotId != widget.contextualBotId) {
+      _index = 0;
+      context.read<ConversationsBloc>().add(
+        ConversationsChannelChanged(widget.contextualBotId),
+      );
+    }
   }
 
   /// Punto ÚNICO de verdad de las tabs: por entrada viven juntos la etiqueta
@@ -65,10 +86,12 @@ class _ShellPageState extends State<ShellPage> {
   /// reciben el routeObserver del widget.
   late final List<_TabSpec> _tabs = <_TabSpec>[
     _TabSpec(
-      label: 'Ataúlfo',
-      icon: Icons.auto_awesome,
-      page: PlatformAgentPage(initialDraft: widget.assistantDraft),
-      lazy: true,
+      label: 'Bandeja',
+      icon: Icons.inbox_outlined,
+      activeIcon: Icons.inbox,
+      page: ConversationsListPage(
+        onOpenSettings: () => _select(_settingsIndex),
+      ),
     ),
     _TabSpec(
       label: 'Asistentes',
@@ -79,13 +102,6 @@ class _ShellPageState extends State<ShellPage> {
         onOpenSettings: () => _select(_settingsIndex),
       ),
       fab: _assistantCreateFab,
-    ),
-    _TabSpec(
-      label: 'Etiquetas',
-      icon: Icons.label_outline,
-      activeIcon: Icons.label,
-      page: LabelsAdminPage(onOpenSettings: () => _select(_settingsIndex)),
-      fab: _labelCreateFab,
     ),
     // Agenda: lazy como el asistente (su cubit carga el día al abrir la tab,
     // sin coste en el arranque). Su FAB abre la reserva manual; al crear con
@@ -98,14 +114,24 @@ class _ShellPageState extends State<ShellPage> {
       fab: _agendaBookFab,
       lazy: true,
     ),
+    _TabSpec(
+      label: 'Ataúlfo',
+      icon: Icons.auto_awesome,
+      page: PlatformAgentPage(initialDraft: widget.assistantDraft),
+      lazy: true,
+    ),
     // Ajustes cierra la barra: es la tab de menor frecuencia y el rincón
     // final es donde el pulgar la busca en el resto de apps. Su índice es
     // contrato de los onOpenSettings de los headers (_settingsIndex).
-    const _TabSpec(
+    _TabSpec(
       label: 'Ajustes',
       icon: Icons.settings_outlined,
       activeIcon: Icons.settings,
-      page: SettingsPage(),
+      page: SettingsPage(
+        onLabelsChanged: () => context.read<LabelsAdminBloc>().add(
+          const LabelsAdminRefreshRequested(),
+        ),
+      ),
     ),
   ];
 
@@ -215,7 +241,7 @@ class _TabSpec {
 }
 
 // FABs por tab. Asistentes abre su hoja de creación in situ; los Canales se
-// conectan dentro del Asistente para no revivir la navegación hermana.
+// conectan dentro del Asistente y Etiquetas se gestiona desde Ajustes.
 Widget _assistantCreateFab(BuildContext context) => FloatingActionButton(
   key: const Key('shell.fab.template_create'),
   onPressed: () async {
@@ -225,13 +251,6 @@ Widget _assistantCreateFab(BuildContext context) => FloatingActionButton(
     }
   },
   tooltip: 'Crear Asistente',
-  child: const Icon(Icons.add),
-);
-
-Widget _labelCreateFab(BuildContext context) => FloatingActionButton(
-  key: const Key('shell.fab.label_create'),
-  onPressed: () => LabelEditSheet.openCreate(context),
-  tooltip: 'Crear etiqueta',
   child: const Icon(Icons.add),
 );
 

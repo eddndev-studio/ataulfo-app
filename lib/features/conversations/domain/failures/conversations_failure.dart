@@ -41,6 +41,12 @@ final class ConversationsServerFailure extends ConversationsFailure {
   const ConversationsServerFailure();
 }
 
+/// 422: filtro o cursor inválido/obsoleto. Un cursor queda ligado al conjunto
+/// de filtros, por lo que la recuperación correcta es reiniciar la página.
+final class ConversationsInvalidQueryFailure extends ConversationsFailure {
+  const ConversationsInvalidQueryFailure();
+}
+
 /// Status no contemplado (incl. 409 sin org activa) o body malformado. Se
 /// expone como error genérico sin filtrar el status crudo.
 final class UnknownConversationsFailure extends ConversationsFailure {

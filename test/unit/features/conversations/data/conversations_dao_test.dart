@@ -7,137 +7,143 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   late AppDb db;
   late ConversationsDao dao;
+  late String activeOrgId;
 
   setUp(() {
     db = AppDb.forTesting(NativeDatabase.memory());
-    dao = ConversationsDao(db);
+    activeOrgId = 'org-a';
+    dao = ConversationsDao(db, activeOrgId: () => activeOrgId);
   });
   tearDown(() => db.close());
 
-  ConversationsCompanion conv(
+  ConversationsCompanion row(
+    String botId,
     String chatLid, {
-    int? lastTs,
-    String bot = 'b1',
+    int? timestamp,
+    bool pinned = false,
+    int unread = 0,
+    bool needsAttention = false,
+    String preview = 'inicial',
+    String orgId = 'org-a',
   }) => ConversationsCompanion.insert(
-    botId: bot,
+    orgId: orgId,
+    botId: botId,
     chatLid: chatLid,
     kind: 'dm',
-    syncedAtMs: 0,
-    lastMessageTimestampMs: Value.absentIfNull(lastTs),
-  );
-
-  test('watch ordena por reciente (DESC) con los nulos al final', () async {
-    await dao.replaceForBot('b1', [
-      conv('a', lastTs: 100),
-      conv('b', lastTs: 300),
-      conv('c'), // sin último mensaje
-      conv('d', lastTs: 200),
-    ]);
-    final rows = await dao.watchForBot('b1').first;
-    expect(rows.map((r) => r.chatLid).toList(), <String>['b', 'd', 'a', 'c']);
-  });
-
-  test('replaceForBot reemplaza el set anterior del bot', () async {
-    await dao.replaceForBot('b1', [conv('a', lastTs: 1)]);
-    await dao.replaceForBot('b1', [conv('x', lastTs: 5), conv('y', lastTs: 9)]);
-    final rows = await dao.watchForBot('b1').first;
-    expect(rows.map((r) => r.chatLid).toList(), <String>['y', 'x']);
-  });
-
-  test(
-    'watch aísla por botId (mismo chatLid en otro bot no se cruza)',
-    () async {
-      await dao.replaceForBot('b1', [conv('a', lastTs: 1)]);
-      await dao.replaceForBot('b2', [conv('a', lastTs: 1, bot: 'b2')]);
-      final b1 = await dao.watchForBot('b1').first;
-      expect(b1, hasLength(1));
-      expect(b1.single.botId, 'b1');
-    },
-  );
-
-  ConversationsCompanion convUnread(
-    String chatLid, {
-    required int unread,
-    bool markedUnread = false,
-    String bot = 'b1',
-  }) => ConversationsCompanion.insert(
-    botId: bot,
-    chatLid: chatLid,
-    kind: 'dm',
-    syncedAtMs: 0,
-    lastMessageTimestampMs: const Value(100),
+    syncedAtMs: 1,
+    assistantId: 'assistant-1',
+    assistantName: 'Ventas regionales',
+    channelName: 'Ventas $botId',
+    channelType: 'WA_UNOFFICIAL',
+    labelsJson: '[]',
+    isPinned: Value(pinned),
     unreadCount: Value(unread),
-    isMarkedUnread: Value(markedUnread),
+    needsAttention: Value(needsAttention),
+    lastMessagePreview: Value(preview),
+    lastMessageTimestampMs: Value.absentIfNull(timestamp),
   );
 
-  test('clearUnread baja el badge de la fila (contador + marca)', () async {
-    await dao.replaceForBot('b1', [
-      convUnread('a', unread: 5, markedUnread: true),
+  test('watchAll preserva mismo chatLid en dos canales', () async {
+    await dao.upsertPage(<ConversationsCompanion>[
+      row('b1', 'same', timestamp: 10),
+      row('b2', 'same', timestamp: 20),
     ]);
-    await dao.clearUnread('b1', 'a');
-    final row = (await dao.watchForBot('b1').first).single;
-    expect(row.unreadCount, 0);
-    expect(row.isMarkedUnread, isFalse);
+
+    final rows = await dao.watchAll().first;
+
+    expect(rows, hasLength(2));
+    expect(rows.map((r) => r.botId).toSet(), <String>{'b1', 'b2'});
+  });
+
+  test('watchAll y clearCached quedan aislados por organización', () async {
+    await dao.upsertPage(<ConversationsCompanion>[
+      row('bot-a', 'chat-a'),
+      row('bot-b', 'chat-b', orgId: 'org-b'),
+    ]);
+
+    expect((await dao.watchAll().first).map((item) => item.botId), <String>[
+      'bot-a',
+    ]);
+
+    await dao.clearCached();
+    expect(await dao.watchAll().first, isEmpty);
+
+    activeOrgId = 'org-b';
+    expect((await dao.watchAll().first).map((item) => item.botId), <String>[
+      'bot-b',
+    ]);
   });
 
   test(
-    'clearUnread no inserta filas ausentes (no hay badge que bajar)',
+    'upsertPage conserva páginas anteriores y actualiza duplicados',
     () async {
-      await dao.clearUnread('b1', 'ghost');
-      expect(await dao.watchForBot('b1').first, isEmpty);
+      await dao.upsertPage(<ConversationsCompanion>[
+        row('b1', 'first', timestamp: 30),
+        row('b1', 'duplicate', timestamp: 20),
+      ]);
+      await dao.upsertPage(<ConversationsCompanion>[
+        row('b1', 'duplicate', timestamp: 40, preview: 'actualizado'),
+        row('b2', 'third', timestamp: 10),
+      ]);
+
+      final rows = await dao.watchAll().first;
+      expect(rows, hasLength(3));
+      expect(
+        rows.singleWhere((r) => r.chatLid == 'duplicate').lastMessagePreview,
+        'actualizado',
+      );
     },
   );
 
-  test('clearUnread aísla por chat: otras filas quedan intactas', () async {
-    await dao.replaceForBot('b1', [
-      convUnread('a', unread: 5),
-      convUnread('b', unread: 3),
+  test('watchAll ordena fijadas, actividad y luego identidad', () async {
+    await dao.upsertPage(<ConversationsCompanion>[
+      row('b2', 'same-ts', timestamp: 20),
+      row('b1', 'same-ts', timestamp: 20),
+      row('b1', 'old', timestamp: 10),
+      row('b1', 'pinned', timestamp: 1, pinned: true),
     ]);
-    await dao.clearUnread('b1', 'a');
-    final rows = await dao.watchForBot('b1').first;
-    final byId = {for (final r in rows) r.chatLid: r};
-    expect(byId['a']!.unreadCount, 0);
-    expect(byId['b']!.unreadCount, 3);
+
+    final rows = await dao.watchAll().first;
+
+    expect(rows.map((r) => '${r.botId}/${r.chatLid}').toList(), <String>[
+      'b1/pinned',
+      'b1/same-ts',
+      'b2/same-ts',
+      'b1/old',
+    ]);
   });
 
-  test(
-    'un replace posterior del backend reconcilia (el snapshot es autoritativo)',
-    () async {
-      await dao.replaceForBot('b1', [convUnread('a', unread: 5)]);
-      await dao.clearUnread('b1', 'a'); // optimista → 0
-      expect((await dao.watchForBot('b1').first).single.unreadCount, 0);
-      // El backend aún ve no-leídos (outbox sin drenar) y llega un pull:
-      // el snapshot gana. Es el comportamiento correcto (eventual-consistente),
-      // no un badge que resucita para siempre.
-      await dao.replaceForBot('b1', [convUnread('a', unread: 5)]);
-      expect((await dao.watchForBot('b1').first).single.unreadCount, 5);
-    },
-  );
+  test('clearUnread limpia contador, marca manual y atención', () async {
+    await dao.upsertPage(<ConversationsCompanion>[
+      row('b1', 'chat', unread: 4, needsAttention: true),
+    ]);
 
-  test('clearUnread hace re-emitir el watch (bandeja reactiva)', () async {
-    await dao.replaceForBot('b1', [convUnread('a', unread: 5)]);
-    final emissions = <int>[];
-    final sub = dao
-        .watchForBot('b1')
-        .listen((rows) => emissions.add(rows.single.unreadCount));
-    await Future<void>.delayed(Duration.zero);
-    await dao.clearUnread('b1', 'a');
-    await Future<void>.delayed(Duration.zero);
-    await sub.cancel();
-    expect(emissions.first, 5);
-    expect(emissions.last, 0);
+    await dao.clearUnread('b1', 'chat');
+
+    final result = (await dao.watchAll().first).single;
+    expect(result.unreadCount, 0);
+    expect(result.isMarkedUnread, isFalse);
+    expect(result.needsAttention, isFalse);
   });
 
-  test('watch re-emite tras un replace (reactivo)', () async {
-    final emissions = <List<String>>[];
-    final sub = dao
-        .watchForBot('b1')
-        .listen((rows) => emissions.add(rows.map((r) => r.chatLid).toList()));
-    await Future<void>.delayed(Duration.zero); // emisión inicial (vacía)
-    await dao.replaceForBot('b1', [conv('a', lastTs: 1)]);
-    await Future<void>.delayed(Duration.zero);
-    await sub.cancel();
-    expect(emissions.first, isEmpty);
-    expect(emissions.last, <String>['a']);
+  test('markNeedsAttention sólo toca la identidad compuesta exacta', () async {
+    await dao.upsertPage(<ConversationsCompanion>[
+      row('b1', 'same'),
+      row('b2', 'same'),
+    ]);
+
+    await dao.markNeedsAttention('b2', 'same');
+
+    final rows = await dao.watchAll().first;
+    expect(rows.singleWhere((r) => r.botId == 'b1').needsAttention, isFalse);
+    expect(rows.singleWhere((r) => r.botId == 'b2').needsAttention, isTrue);
+  });
+
+  test('clearCached elimina sólo la proyección reconstruible', () async {
+    await dao.upsertPage(<ConversationsCompanion>[row('b1', 'chat')]);
+
+    await dao.clearCached();
+
+    expect(await dao.watchAll().first, isEmpty);
   });
 }

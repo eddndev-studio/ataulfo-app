@@ -12,6 +12,7 @@ class ConversationsMapper {
   const ConversationsMapper._();
 
   static Conversation respToEntity(ConversationResp resp) => Conversation(
+    botId: resp.botId,
     chatLid: resp.chatLid,
     kind: ConversationKind.fromWire(resp.kind),
     phone: resp.phone,
@@ -27,5 +28,20 @@ class ConversationsMapper {
     lastMessageType: resp.lastMessageType,
     lastMessageDirection: resp.lastMessageDirection,
     lastMessageTimestampMs: resp.lastMessageTimestampMs,
+    needsAttention: resp.needsAttention,
+    assistantId: resp.assistantId,
+    assistantName: resp.assistantName,
+    channelName: resp.channelName,
+    channelType: resp.channelType,
+    channelIdentifier: resp.channelIdentifier,
+    labels: resp.labels
+        .map(
+          (label) => ConversationLabel(
+            id: label.id,
+            name: label.name,
+            color: label.color,
+          ),
+        )
+        .toList(growable: false),
   );
 }

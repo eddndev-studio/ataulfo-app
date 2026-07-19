@@ -16,6 +16,30 @@ enum ConversationKind {
   };
 }
 
+/// Etiqueta interna de la organización aplicada a una conversación. No es una
+/// etiqueta nativa de WhatsApp: vive en el mismo catálogo org-scoped de S10.
+class ConversationLabel {
+  const ConversationLabel({
+    required this.id,
+    required this.name,
+    required this.color,
+  });
+
+  final String id;
+  final String name;
+  final String color;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ConversationLabel &&
+      other.id == id &&
+      other.name == name &&
+      other.color == color;
+
+  @override
+  int get hashCode => Object.hash(id, name, color);
+}
+
 /// Una conversación (contacto/chat) de un bot. Es la entidad `Session` de S07
 /// del backend (`GET /sessions/:botId`); en el cliente se llama Conversation
 /// para no chocar con la "sesión de canal" del bot (start/stop/pairing), que
@@ -29,6 +53,7 @@ enum ConversationKind {
 /// desde el wire cuando viene.
 class Conversation {
   const Conversation({
+    required this.botId,
     required this.chatLid,
     required this.kind,
     required this.phone,
@@ -42,8 +67,18 @@ class Conversation {
     this.lastMessageType,
     this.lastMessageDirection,
     this.lastMessageTimestampMs,
+    this.needsAttention = false,
+    this.assistantId = '',
+    this.assistantName = '',
+    this.channelName = '',
+    this.channelType = '',
+    this.channelIdentifier,
+    this.labels = const <ConversationLabel>[],
   });
 
+  /// Primera mitad de la identidad estable. Dos canales pueden compartir el
+  /// mismo chatLid y aun así representan conversaciones distintas.
+  final String botId;
   final String chatLid;
   final ConversationKind kind;
 
@@ -74,10 +109,55 @@ class Conversation {
   final String? lastMessageDirection;
   final int? lastMessageTimestampMs;
 
+  /// Proyección operativa persistida por el backend. Se limpia al atender o
+  /// marcar leído el hilo.
+  final bool needsAttention;
+
+  /// Procedencia legible de la fila. `assistant*` identifica la plantilla y
+  /// `channel*` la conexión concreta (Bot), no sólo el transporte.
+  final String assistantId;
+  final String assistantName;
+  final String channelName;
+  final String channelType;
+  final String? channelIdentifier;
+
+  /// Etiquetas internas aplicadas al chat. La selección múltiple de Bandeja
+  /// exige que estén presentes TODAS las elegidas.
+  final List<ConversationLabel> labels;
+
+  /// Clave local sin colisiones: SQLite/PostgreSQL text no admiten NUL, por lo
+  /// que el separador no puede confundirse con ningún componente válido.
+  String get stableKey => '$botId\u0000$chatLid';
+
+  Conversation withLabels(List<ConversationLabel> nextLabels) => Conversation(
+    botId: botId,
+    chatLid: chatLid,
+    kind: kind,
+    phone: phone,
+    isArchived: isArchived,
+    isPinned: isPinned,
+    isMarkedUnread: isMarkedUnread,
+    mutedUntil: mutedUntil,
+    displayName: displayName,
+    unreadCount: unreadCount,
+    lastMessagePreview: lastMessagePreview,
+    lastMessageType: lastMessageType,
+    lastMessageDirection: lastMessageDirection,
+    lastMessageTimestampMs: lastMessageTimestampMs,
+    needsAttention: needsAttention,
+    assistantId: assistantId,
+    assistantName: assistantName,
+    channelName: channelName,
+    channelType: channelType,
+    channelIdentifier: channelIdentifier,
+    labels: nextLabels,
+  );
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is Conversation &&
+        other.botId == botId &&
         other.chatLid == chatLid &&
         other.kind == kind &&
         other.phone == phone &&
@@ -90,11 +170,19 @@ class Conversation {
         other.lastMessagePreview == lastMessagePreview &&
         other.lastMessageType == lastMessageType &&
         other.lastMessageDirection == lastMessageDirection &&
-        other.lastMessageTimestampMs == lastMessageTimestampMs;
+        other.lastMessageTimestampMs == lastMessageTimestampMs &&
+        other.needsAttention == needsAttention &&
+        other.assistantId == assistantId &&
+        other.assistantName == assistantName &&
+        other.channelName == channelName &&
+        other.channelType == channelType &&
+        other.channelIdentifier == channelIdentifier &&
+        _labelsEqual(other.labels, labels);
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll(<Object?>[
+    botId,
     chatLid,
     kind,
     phone,
@@ -108,5 +196,21 @@ class Conversation {
     lastMessageType,
     lastMessageDirection,
     lastMessageTimestampMs,
-  );
+    needsAttention,
+    assistantId,
+    assistantName,
+    channelName,
+    channelType,
+    channelIdentifier,
+    Object.hashAll(labels),
+  ]);
+}
+
+bool _labelsEqual(List<ConversationLabel> a, List<ConversationLabel> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

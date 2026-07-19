@@ -3,8 +3,10 @@ import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/resend_verification_cubit.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
+import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
+import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
 import 'package:ataulfo/features/shell/presentation/pages/shell_page.dart';
 import 'package:ataulfo/features/shell/presentation/widgets/email_verification_banner.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -14,6 +16,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../../../support/noop_profile_photo_cache.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
     implements AuthBloc {}
@@ -26,6 +30,10 @@ class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
 
 class _MockLabelsAdminBloc extends MockBloc<LabelsAdminEvent, LabelsAdminState>
     implements LabelsAdminBloc {}
+
+class _MockConversationsBloc
+    extends MockBloc<ConversationsEvent, ConversationsState>
+    implements ConversationsBloc {}
 
 class _MockResendCubit extends MockBloc<Object, ResendVerificationState>
     implements ResendVerificationCubit {}
@@ -50,6 +58,7 @@ void main() {
   late _MockBotsBloc botsBloc;
   late _MockTemplatesBloc templatesBloc;
   late _MockLabelsAdminBloc labelsBloc;
+  late _MockConversationsBloc inboxBloc;
   late _MockResendCubit resendCubit;
 
   setUp(() {
@@ -57,6 +66,7 @@ void main() {
     botsBloc = _MockBotsBloc();
     templatesBloc = _MockTemplatesBloc();
     labelsBloc = _MockLabelsAdminBloc();
+    inboxBloc = _MockConversationsBloc();
     resendCubit = _MockResendCubit();
     when(() => resendCubit.state).thenReturn(const ResendVerificationIdle());
     when(() => labelsBloc.state).thenReturn(
@@ -68,17 +78,24 @@ void main() {
     when(() => templatesBloc.state).thenReturn(
       const TemplatesLoaded(items: <Template>[], isRefreshing: false),
     );
+    when(
+      () => inboxBloc.state,
+    ).thenReturn(const ConversationsState(phase: ConversationsPhase.ready));
   });
 
-  Widget host() => MultiBlocProvider(
-    providers: <BlocProvider<dynamic>>[
-      BlocProvider<AuthBloc>.value(value: authBloc),
-      BlocProvider<BotsBloc>.value(value: botsBloc),
-      BlocProvider<TemplatesBloc>.value(value: templatesBloc),
-      BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
-      BlocProvider<ResendVerificationCubit>.value(value: resendCubit),
-    ],
-    child: const MaterialApp(home: ShellPage()),
+  Widget host() => RepositoryProvider<ProfilePhotoCache>.value(
+    value: NoopProfilePhotoCache(),
+    child: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<AuthBloc>.value(value: authBloc),
+        BlocProvider<BotsBloc>.value(value: botsBloc),
+        BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+        BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
+        BlocProvider<ConversationsBloc>.value(value: inboxBloc),
+        BlocProvider<ResendVerificationCubit>.value(value: resendCubit),
+      ],
+      child: const MaterialApp(home: ShellPage()),
+    ),
   );
 
   testWidgets('email NO verificado: el shell muestra el aviso sobre los tabs', (

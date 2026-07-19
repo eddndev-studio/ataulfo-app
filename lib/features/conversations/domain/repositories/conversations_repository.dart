@@ -1,17 +1,20 @@
 import '../entities/conversation.dart';
+import '../entities/conversations_page.dart';
+import '../entities/inbox_live_event.dart';
+import '../entities/inbox_query.dart';
 
-/// Puerto de dominio para Conversaciones (S07 RF#7). La DB local es la fuente
-/// de verdad de la UI: el bloc **observa** [watchForBot] y dispara [refresh]
-/// para traer el snapshot del backend y escribirlo (write-through). Offline, el
-/// watch sigue sirviendo la última caché.
 abstract interface class ConversationsRepository {
-  /// Bandeja del bot observada desde la DB local (recientes primero). Emite al
-  /// abrir con lo cacheado y de nuevo en cada escritura (refresh, realtime).
-  Stream<List<Conversation>> watchForBot(String botId);
+  Stream<List<Conversation>> watchAll();
 
-  /// Trae la bandeja del backend (org-scoped) y la escribe en la DB local. El
-  /// `watch` emite el resultado. Lanza `ConversationsFailure` tipada (404 bot
-  /// ajeno/inexistente, 403, red/timeout/server) que el bloc traduce a UI; si
-  /// falla por red, la caché local permanece intacta.
-  Future<void> refresh(String botId);
+  /// Consulta una página org-scoped y la persiste por upsert. El valor devuelto
+  /// conserva el orden autoritativo del servidor y su cursor opaco.
+  Future<ConversationsPage> fetchPage(InboxQuery query);
+
+  Stream<InboxLiveEvent> live();
+
+  /// Proyección optimista para que Atención responda antes del reconcile REST.
+  Future<void> markNeedsAttention(String botId, String chatLid);
+
+  /// Se usa ante revocación/403: una caché previa no debe seguir siendo visible.
+  Future<void> clearCached();
 }

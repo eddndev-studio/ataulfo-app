@@ -1,19 +1,13 @@
 import 'package:dio/dio.dart';
 
-import '../../domain/entities/conversation.dart';
+import '../../domain/entities/conversations_page.dart';
+import '../../domain/entities/inbox_query.dart';
 import '../../domain/failures/conversations_failure.dart';
 import '../dto/conversation_dto.dart';
 import '../mappers/conversations_mapper.dart';
 
-/// Puerto de datos del listado de conversaciones de un bot (S07 RF#7).
-///
-/// Las implementaciones lanzan `ConversationsFailure` tipadas; nunca
-/// DioException cruda. El repositorio y el bloc consumen failures de dominio.
 abstract interface class ConversationsDatasource {
-  /// `GET /sessions/:botId` org-scoped. El AuthInterceptor inyecta el Bearer.
-  /// El backend autoriza por propiedad del bot (404 si ajeno/inexistente) y
-  /// omite las sesiones provisionales. Devuelve la bandeja (puede ser vacía).
-  Future<List<Conversation>> listForBot(String botId);
+  Future<ConversationsPage> list(InboxQuery query);
 }
 
 class DioConversationsDatasource implements ConversationsDatasource {
@@ -22,36 +16,52 @@ class DioConversationsDatasource implements ConversationsDatasource {
   final Dio _dio;
 
   @override
-  Future<List<Conversation>> listForBot(String botId) async {
+  Future<ConversationsPage> list(InboxQuery query) async {
     try {
-      final res = await _dio.get<List<dynamic>>('/sessions/$botId');
-      final body = res.data;
-      if (body == null) {
-        throw const UnknownConversationsFailure();
-      }
-      return body
-          .cast<Map<String, dynamic>>()
-          .map(ConversationResp.fromJson)
-          .map(ConversationsMapper.respToEntity)
-          .toList(growable: false);
+      final response = await _dio.get<Map<String, dynamic>>(_pathFor(query));
+      final body = response.data;
+      if (body == null) throw const UnknownConversationsFailure();
+      final page = ConversationsPageResp.fromJson(body);
+      return ConversationsPage(
+        items: page.items
+            .map(ConversationsMapper.respToEntity)
+            .toList(growable: false),
+        nextCursor: page.nextCursor,
+      );
     } on ConversationsFailure {
       rethrow;
-    } on DioException catch (e) {
-      throw _mapDioException(e);
+    } on DioException catch (error) {
+      throw _mapDioException(error);
     } on FormatException {
-      // Body malformado o muted_until no parseable: contrato roto.
+      throw const UnknownConversationsFailure();
+    } on ArgumentError {
       throw const UnknownConversationsFailure();
     } on TypeError {
-      // `cast<Map<String,dynamic>>` rompe si el wire mete un tipo inesperado.
       throw const UnknownConversationsFailure();
     }
   }
 
-  /// Traduce DioException a la jerarquía sellada. Mismo patrón que
-  /// `DioBotsDatasource`: 404 = bot ajeno/inexistente (el endpoint autoriza
-  /// por bot); 409 (sin org activa) no se distingue — colapsa a Unknown.
-  ConversationsFailure _mapDioException(DioException e) {
-    switch (e.type) {
+  String _pathFor(InboxQuery query) {
+    final parts = <String>[];
+    final search = query.search.trim();
+    if (search.isNotEmpty) parts.add('q=${Uri.encodeQueryComponent(search)}');
+    parts.add('status=${query.status.wireName}');
+    if (query.botId case final botId?) {
+      parts.add('botId=${Uri.encodeQueryComponent(botId)}');
+    }
+    final labels = query.labelIds.toList()..sort();
+    for (final labelId in labels) {
+      parts.add('labelId=${Uri.encodeQueryComponent(labelId)}');
+    }
+    if (query.cursor case final cursor?) {
+      parts.add('cursor=${Uri.encodeQueryComponent(cursor)}');
+    }
+    parts.add('limit=${query.limit}');
+    return '/inbox/conversations?${parts.join('&')}';
+  }
+
+  ConversationsFailure _mapDioException(DioException error) {
+    switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
@@ -59,9 +69,9 @@ class DioConversationsDatasource implements ConversationsDatasource {
       case DioExceptionType.connectionError:
         return const ConversationsNetworkFailure();
       case DioExceptionType.badResponse:
-        final status = e.response?.statusCode ?? 0;
+        final status = error.response?.statusCode ?? 0;
         if (status == 403) return const ConversationsForbiddenFailure();
-        if (status == 404) return const ConversationsNotFoundFailure();
+        if (status == 422) return const ConversationsInvalidQueryFailure();
         if (status >= 500 && status < 600) {
           return const ConversationsServerFailure();
         }

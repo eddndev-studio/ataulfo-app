@@ -29,7 +29,10 @@ import '../../../auth/domain/entities/identity.dart';
 /// `orgId` se interpreta al humano en `/memberships` (badge "Activa"
 /// sobre el nombre legible).
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.onLabelsChanged});
+
+  /// Sincroniza el catálogo vivo de la Bandeja al volver del CRUD de etiquetas.
+  final VoidCallback? onLabelsChanged;
 
   /// Confirmación previa al logout: cerrar sesión descarta el estado local y
   /// obliga a re-autenticarse, así que un tap accidental no debe bastar.
@@ -77,7 +80,10 @@ class SettingsPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    _SectionsCard(identity: identity),
+                    _SectionsCard(
+                      identity: identity,
+                      onLabelsChanged: onLabelsChanged,
+                    ),
                     const SizedBox(height: AppTokens.sp7),
                     AppButton.danger(
                       label: 'Cerrar sesión',
@@ -148,9 +154,10 @@ class _ProfileHeader extends StatelessWidget {
 /// gateado ADMIN+ porque el backend 403ea a roles por debajo (RequireRole);
 /// el gate es cosmético — la autoridad real es el 403 del servidor.
 class _SectionsCard extends StatelessWidget {
-  const _SectionsCard({required this.identity});
+  const _SectionsCard({required this.identity, this.onLabelsChanged});
 
   final Identity identity;
+  final VoidCallback? onLabelsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -179,6 +186,17 @@ class _SectionsCard extends StatelessWidget {
             title: 'Unirse a una organización',
             caption: 'Únete a otra organización con un código o enlace',
             onTap: () => context.push('/accept-invite'),
+          ),
+          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+          AppSectionLink(
+            rowKey: const Key('settings.labels_tile'),
+            icon: Icons.label_outline,
+            title: 'Etiquetas',
+            caption: 'Organiza las conversaciones con categorías internas',
+            onTap: () async {
+              await context.push<void>('/org/labels');
+              if (context.mounted) onLabelsChanged?.call();
+            },
           ),
           if (isAdminOrAbove(identity.role)) ...<Widget>[
             const Divider(height: AppTokens.sp5, color: AppTokens.divider),

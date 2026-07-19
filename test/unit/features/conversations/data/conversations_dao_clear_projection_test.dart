@@ -14,14 +14,20 @@ void main() {
 
   setUp(() {
     db = AppDb.forTesting(NativeDatabase.memory());
-    dao = ConversationsDao(db);
+    dao = ConversationsDao(db, activeOrgId: () => 'org-1');
   });
   tearDown(() => db.close());
 
   ConversationsCompanion conv(String chatLid) => ConversationsCompanion.insert(
+    orgId: 'org-1',
     botId: 'b1',
     chatLid: chatLid,
     kind: 'dm',
+    assistantId: 'assistant-1',
+    assistantName: 'Ventas',
+    channelName: 'Principal',
+    channelType: 'WA_UNOFFICIAL',
+    labelsJson: '[]',
     syncedAtMs: 0,
     unreadCount: const Value(3),
     lastMessagePreview: const Value('hola'),
@@ -31,11 +37,11 @@ void main() {
   );
 
   test('vacía la proyección del chat sin tocar a las vecinas', () async {
-    await dao.replaceForBot('b1', [conv('chat-1'), conv('chat-2')]);
+    await dao.upsertPage([conv('chat-1'), conv('chat-2')]);
 
     await dao.clearThreadProjection('b1', 'chat-1');
 
-    final rows = await dao.watchForBot('b1').first;
+    final rows = await dao.watchAll().first;
     final cleared = rows.singleWhere((r) => r.chatLid == 'chat-1');
     expect(cleared.unreadCount, 0);
     expect(cleared.lastMessagePreview, isNull);
@@ -47,6 +53,6 @@ void main() {
 
   test('no inserta filas ausentes (chat aún no cacheado)', () async {
     await dao.clearThreadProjection('b1', 'chat-fantasma');
-    expect(await dao.watchForBot('b1').first, isEmpty);
+    expect(await dao.watchAll().first, isEmpty);
   });
 }

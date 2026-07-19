@@ -32,9 +32,15 @@ void main() {
           .into(v1.conversations)
           .insert(
             ConversationsCompanion.insert(
+              orgId: '',
               botId: 'bot-1',
               chatLid: '111@lid',
               kind: 'user',
+              assistantId: '',
+              assistantName: '',
+              channelName: '',
+              channelType: '',
+              labelsJson: '[]',
               syncedAtMs: 1000,
             ),
           );
@@ -64,6 +70,33 @@ void main() {
         'ALTER TABLE messages DROP COLUMN revoked_at_ms',
       );
       await v1.customStatement('ALTER TABLE messages DROP COLUMN ai_run_id');
+      await v1.customStatement(
+        'ALTER TABLE conversations DROP COLUMN needs_attention',
+      );
+      await v1.customStatement(
+        'ALTER TABLE conversations DROP COLUMN assistant_id',
+      );
+      await v1.customStatement(
+        'ALTER TABLE conversations DROP COLUMN assistant_name',
+      );
+      await v1.customStatement(
+        'ALTER TABLE conversations DROP COLUMN channel_name',
+      );
+      await v1.customStatement(
+        'ALTER TABLE conversations DROP COLUMN channel_type',
+      );
+      await v1.customStatement(
+        'ALTER TABLE conversations DROP COLUMN channel_identifier',
+      );
+      await v1.customStatement(
+        'ALTER TABLE conversations DROP COLUMN labels_json',
+      );
+      await v1.customStatement('DROP INDEX idx_conversations_inbox');
+      await v1.customStatement('ALTER TABLE conversations DROP COLUMN org_id');
+      await v1.customStatement(
+        'CREATE INDEX idx_conversations_inbox ON conversations '
+        '(bot_id, is_archived, last_message_timestamp_ms)',
+      );
       await v1.customStatement('PRAGMA user_version = 1');
       await v1.close();
 
@@ -72,6 +105,12 @@ void main() {
       final outboxRows = await v2.select(v2.outbox).get();
       final convRows = await v2.select(v2.conversations).get();
       final msgRows = await v2.select(v2.messages).get();
+      final inboxIndex = await v2
+          .customSelect(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' "
+            "AND name = 'idx_conversations_inbox'",
+          )
+          .getSingle();
       await v2.close();
 
       // El outbox (escrituras sin sincronizar) SOBREVIVE — invariante crítico.
@@ -82,6 +121,20 @@ void main() {
       // recree conversations sin necesidad).
       expect(convRows, hasLength(1));
       expect(convRows.first.chatLid, '111@lid');
+      expect(convRows.first.needsAttention, isFalse);
+      expect(convRows.first.assistantId, isEmpty);
+      expect(convRows.first.assistantName, isEmpty);
+      expect(convRows.first.channelName, isEmpty);
+      expect(convRows.first.channelType, isEmpty);
+      expect(convRows.first.channelIdentifier, isNull);
+      expect(convRows.first.labelsJson, '[]');
+      expect(convRows.first.orgId, isEmpty);
+      expect(
+        inboxIndex.read<String>('sql').replaceAll(RegExp(r'\s+'), ' '),
+        contains(
+          '(org_id, is_pinned, last_message_timestamp_ms, bot_id, chat_lid)',
+        ),
+      );
       // El mensaje pre-v4 sobrevive con la columna nueva en NULL: si alguien
       // volviera ai_run_id non-nullable (o un mapper hiciera `aiRunId!`), este
       // es el test que debe caerse antes que el hilo en producción.

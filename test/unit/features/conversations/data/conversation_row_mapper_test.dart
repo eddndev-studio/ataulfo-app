@@ -10,28 +10,26 @@ void main() {
   setUp(() => db = AppDb.forTesting(NativeDatabase.memory()));
   tearDown(() => db.close());
 
-  Future<ConversationRow> roundTrip(
-    Conversation c, {
-    int syncedAtMs = 1,
-  }) async {
+  Future<Conversation> roundTrip(Conversation conversation) async {
     await db
         .into(db.conversations)
         .insert(
           ConversationRowMapper.entityToCompanion(
-            'b1',
-            c,
-            syncedAtMs: syncedAtMs,
+            conversation,
+            orgId: 'org-1',
+            syncedAtMs: 42,
           ),
         );
-    return (db.select(
-      db.conversations,
-    )..where((t) => t.chatLid.equals(c.chatLid))).getSingle();
+    final row = await db.select(db.conversations).getSingle();
+    expect(row.syncedAtMs, 42);
+    return ConversationRowMapper.rowToEntity(row);
   }
 
   test(
-    'grupo con todos los campos: entity → row → entity preserva todo',
+    'round-trip preserva procedencia, atención y etiquetas internas',
     () async {
       final original = Conversation(
+        botId: 'bot-1',
         chatLid: 'lid-1',
         kind: ConversationKind.group,
         phone: null,
@@ -39,33 +37,52 @@ void main() {
         isPinned: true,
         isMarkedUnread: true,
         mutedUntil: DateTime.fromMillisecondsSinceEpoch(1700000000000),
-        displayName: 'Equipo',
+        displayName: 'Distribuidores del norte',
         unreadCount: 7,
-        lastMessagePreview: 'hola',
+        lastMessagePreview: 'Confirmado',
         lastMessageType: 'text',
         lastMessageDirection: 'INBOUND',
         lastMessageTimestampMs: 1699999999999,
+        needsAttention: true,
+        assistantId: 'assistant-1',
+        assistantName: 'Ventas regionales',
+        channelName: 'Ventas Guatemala',
+        channelType: 'WA_UNOFFICIAL',
+        channelIdentifier: '+502 2440 9012',
+        labels: const <ConversationLabel>[
+          ConversationLabel(id: 'vip', name: 'VIP', color: '#C57B57'),
+        ],
       );
-      final row = await roundTrip(original, syncedAtMs: 42);
-      expect(ConversationRowMapper.rowToEntity(row), original);
-      expect(row.syncedAtMs, 42);
+
+      expect(await roundTrip(original), original);
     },
   );
 
-  test('dm sin actividad ni muted: round-trip con defaults', () async {
-    const original = Conversation(
-      chatLid: 'lid-2',
-      kind: ConversationKind.dm,
-      phone: '5215550000',
-      isArchived: false,
-      isPinned: false,
-      isMarkedUnread: false,
-      mutedUntil: null,
-    );
-    final back = ConversationRowMapper.rowToEntity(await roundTrip(original));
-    expect(back, original);
-    expect(back.mutedUntil, isNull);
-    expect(back.unreadCount, 0);
-    expect(back.lastMessageTimestampMs, isNull);
-  });
+  test(
+    'labelsJson inválido falla fuerte para que repo tipifique el error',
+    () async {
+      await db
+          .into(db.conversations)
+          .insert(
+            ConversationsCompanion.insert(
+              orgId: 'org-1',
+              botId: 'bot-1',
+              chatLid: 'lid-1',
+              kind: 'dm',
+              syncedAtMs: 1,
+              assistantId: 'assistant-1',
+              assistantName: 'Ventas',
+              channelName: 'Canal',
+              channelType: 'WA_UNOFFICIAL',
+              labelsJson: '{roto',
+            ),
+          );
+      final row = await db.select(db.conversations).getSingle();
+
+      expect(
+        () => ConversationRowMapper.rowToEntity(row),
+        throwsFormatException,
+      );
+    },
+  );
 }

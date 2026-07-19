@@ -42,6 +42,7 @@ import 'features/bots/data/repositories/bot_session_repository_impl.dart';
 import 'features/bots/data/repositories/bots_repository_impl.dart';
 import 'features/conversations/data/datasources/conversations_dao.dart';
 import 'features/conversations/data/datasources/conversations_datasource.dart';
+import 'features/conversations/data/datasources/conversations_events_datasource.dart';
 import 'features/conversations/data/repositories/conversations_repository_impl.dart';
 import 'features/flow_run/data/datasources/flow_run_datasource.dart';
 import 'features/flow_run/data/repositories/flow_run_repository_impl.dart';
@@ -239,9 +240,16 @@ Future<void> main() async {
     datasource: DioBotSessionDatasource(mainDio),
   );
 
-  final conversationsDao = ConversationsDao(db);
+  final conversationsDao = ConversationsDao(
+    db,
+    activeOrgId: () {
+      final state = authBloc.state;
+      return state is AuthAuthenticated ? state.identity.orgId : '';
+    },
+  );
   final conversationsRepository = ConversationsRepositoryImpl(
     datasource: DioConversationsDatasource(mainDio),
+    events: DioConversationsEventsDatasource(mainDio),
     dao: conversationsDao,
   );
 
@@ -506,7 +514,6 @@ Future<void> main() async {
     // Un solo datasource sirve el monitor por-chat (ADMIN+) y el feed bot-scoped
     // (operador): implementa ambas interfaces.
     monitorActivity: monitorActivityDs,
-    monitorBotActivity: monitorActivityDs,
     monitorCatchup: monitorCatchupDs,
     workspaceRepository: workspaceRepository,
     previewRepository: previewRepository,

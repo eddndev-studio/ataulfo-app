@@ -34,6 +34,8 @@ const Map<int, String> _schemaFingerprints = <int, String>{
   2: '9b5bbf50',
   3: '94e95575',
   4: 'c651fc8b',
+  5: '6f045892',
+  6: '303e1501',
 };
 
 void main() {

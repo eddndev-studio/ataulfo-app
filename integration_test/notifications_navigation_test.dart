@@ -242,7 +242,6 @@ void main() {
       trainerRepository: _MockTrainerRepo(),
       trainerEvents: _MockTrainerEvents(),
       monitorActivity: _FakeMonitorActivity(),
-      monitorBotActivity: _FakeMonitorActivity(),
       workspaceRepository: _MockWorkspaceRepo(),
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
