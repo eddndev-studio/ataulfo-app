@@ -109,7 +109,7 @@ class _ReadyView extends StatelessWidget {
           Text('Comparte este enlace', style: textTheme.titleLarge),
           const SizedBox(height: AppTokens.sp2),
           Text(
-            'Quien lo abra verá el código QR para vincular este bot desde '
+            'Quien lo abra verá el código QR para vincular este Canal desde '
             'WhatsApp. No necesita una cuenta.',
             style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
           ),
@@ -149,9 +149,9 @@ class _ReadyView extends StatelessWidget {
             const SizedBox(height: AppTokens.sp7),
             AppDangerZone(
               caption:
-                  'Borrar las credenciales del dispositivo desvincula el bot: '
+                  'Borrar las credenciales del dispositivo desvincula el Canal: '
                   're-parea desde cero (nuevo QR). Úsalo si la sesión quedó '
-                  'corrupta o quieres mover el bot a otro número.',
+                  'corrupta o quieres mover el Canal a otro número.',
               actions: <Widget>[
                 AppButton.danger(
                   key: const Key('bot_connect.wipe'),
@@ -174,7 +174,7 @@ class _ReadyView extends StatelessWidget {
       context,
       title: '¿Borrar credenciales del dispositivo?',
       message:
-          'El bot perderá su vínculo con WhatsApp y deberá re-parearse desde '
+          'El Canal perderá su vínculo con WhatsApp y deberá re-parearse desde '
           'cero (nuevo QR). Esta acción no se puede deshacer.',
       confirmLabel: 'Borrar',
       confirmKey: const Key('bot_connect.wipe_confirm'),

@@ -88,7 +88,7 @@ class _EmptyView extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(AppTokens.sp6),
         child: Text(
-          'Esta plantilla no declara variables.',
+          'Este Asistente no declara variables.',
           textAlign: TextAlign.center,
           style: textTheme.bodyLarge,
         ),
@@ -114,13 +114,13 @@ class _FailedView extends StatelessWidget {
             Text(
               switch (error) {
                 BotVariablesLoadError.notFound =>
-                  'El bot o su plantilla ya no existen en tu organización.',
+                  'El Canal o su Asistente ya no existen en tu organización.',
                 BotVariablesLoadError.forbidden =>
-                  'Tu rol no permite editar las variables de este bot.',
+                  'Tu rol no permite editar las variables de este Canal.',
                 BotVariablesLoadError.network =>
                   'Sin conexión. Revisa tu red e inténtalo de nuevo.',
                 BotVariablesLoadError.generic =>
-                  'No pudimos cargar las variables del bot.',
+                  'No pudimos cargar las variables del Canal.',
               },
               textAlign: TextAlign.center,
               style: textTheme.bodyLarge,
@@ -257,7 +257,7 @@ class _VariablesFormState extends State<_VariablesForm> {
             child: Text(
               'Estos valores reemplazan por completo los actuales. Los campos '
               'vienen con el valor ya configurado; lo que dejes en blanco usará '
-              'el valor por defecto de la plantilla.',
+              'el valor por defecto del Asistente.',
               style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
             ),
           ),
@@ -359,7 +359,7 @@ class _VariablesFormState extends State<_VariablesForm> {
 
   static String _failureMessage(BotsFailure f) => switch (f) {
     BotsConflictFailure() =>
-      'El bot cambió mientras editabas (versión desactualizada). Recarga y '
+      'El Canal cambió mientras editabas (versión desactualizada). Recarga y '
           'vuelve a guardar.',
     BotsInvalidCreateFailure() => 'Algún valor no es válido para su variable.',
     BotsForbiddenFailure() => 'Tu rol no permite editar las variables.',

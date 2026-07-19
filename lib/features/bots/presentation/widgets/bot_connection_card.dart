@@ -106,7 +106,7 @@ class BotConnectionCard extends StatelessWidget {
         BotSessionStatusLoaded(status: final s) => switch (s.state) {
           SessionState.connected => const _ConnectionView(
             title: 'En línea',
-            caption: 'WhatsApp está vinculado y el bot opera.',
+            caption: 'WhatsApp está vinculado y el Canal está operativo.',
             icon: Icons.check_circle,
             color: AppTokens.success,
             ctaLabel: 'Gestionar conexión',
@@ -167,7 +167,7 @@ class BotConnectionCard extends StatelessWidget {
     'connect_failed' => 'No se pudo establecer la conexión con WhatsApp.',
     'pairing_timeout' => 'El emparejamiento expiró sin completarse.',
     'pairing_failed' => 'El emparejamiento no se pudo completar.',
-    _ => 'Vincula WhatsApp para que el bot reciba mensajes.',
+    _ => 'Vincula WhatsApp para que el Canal reciba mensajes.',
   };
 }
 

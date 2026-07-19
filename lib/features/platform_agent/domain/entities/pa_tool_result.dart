@@ -172,7 +172,7 @@ String paToolErrorCopy(String kind) {
     case 'forbidden_for_role':
       return 'Tu rol no tiene permiso para esta acción.';
     case 'variable_in_use':
-      return 'La variable está en uso por algún bot.';
+      return 'La variable está en uso por algún Canal.';
     case 'requires_confirmation':
       return 'Requiere confirmación antes de aplicar.';
     case 'unknown_tool':

@@ -79,7 +79,7 @@ class _FailedView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Text(
-              'No pudimos cargar el mantenimiento del bot.',
+              'No pudimos cargar el mantenimiento del Canal.',
               textAlign: TextAlign.center,
               style: textTheme.bodyLarge,
             ),
@@ -122,15 +122,15 @@ class _Body extends StatelessWidget {
           if (!bot.paused)
             AppCard(
               child: Text(
-                'Estas operaciones requieren pausar el bot primero. Pausa para '
-                'habilitarlas; el bot NO se reanuda solo, reanúdalo al terminar.',
+                'Estas operaciones requieren pausar el Canal primero. Pausa para '
+                'habilitarlas; el Canal NO se reanuda solo, reanúdalo al terminar.',
                 style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
               ),
             )
           else
             AppCard(
               child: Text(
-                'El bot está pausado. El bot NO se reanuda solo: reanúdalo con '
+                'El Canal está pausado. El Canal NO se reanuda solo: reanúdalo con '
                 'el interruptor cuando termines.',
                 style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
               ),
@@ -159,8 +159,8 @@ class _Body extends StatelessWidget {
           const SizedBox(height: AppTokens.sp7),
           AppDangerZone(
             caption:
-                'Estas operaciones alteran datos reales del bot y no se '
-                'pueden deshacer. Exigen el bot pausado.',
+                'Estas operaciones alteran datos reales del Canal y no se '
+                'pueden deshacer. Exigen el Canal pausado.',
             actions: <Widget>[
               AppButton.danger(
                 key: const Key('bot_maint.clear'),
@@ -172,7 +172,7 @@ class _Body extends StatelessWidget {
                         title: '¿Borrar conversaciones?',
                         body:
                             'Se eliminarán mensajes, sesiones, ejecuciones y '
-                            'etiquetas de chat de este bot. No se puede '
+                            'etiquetas de chat de este Canal. No se puede '
                             'deshacer.',
                         confirmKey: const Key('bot_maint.clear_confirm'),
                         onConfirm: () => context.read<BotMaintenanceBloc>().add(
@@ -226,9 +226,9 @@ class _Body extends StatelessWidget {
 
   static String _failureMessage(BotsFailure f) => switch (f) {
     BotsNotPausedFailure() =>
-      'El bot no está pausado. Refresca y pausa antes de continuar.',
+      'El Canal no está pausado. Refresca y pausa antes de continuar.',
     BotsConflictFailure() =>
-      'El bot cambió mientras operabas. Refresca e inténtalo de nuevo.',
+      'El Canal cambió mientras operabas. Refresca e inténtalo de nuevo.',
     BotsForbiddenFailure() => 'Tu rol no permite esta operación.',
     BotsNotFoundFailure() => 'Este Canal ya no existe en tu organización.',
     BotsNetworkFailure() ||
