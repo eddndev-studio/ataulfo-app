@@ -197,22 +197,54 @@ void main() {
     await bloc.close();
   });
 
-  test('catálogo vivo elimina canales borrados de una página REST', () async {
-    final kept = conversation('b1', 'kept', timestamp: 20);
-    final deleted = conversation('b2', 'deleted', timestamp: 10);
+  test(
+    'catálogo local conserva canales presentes en una página REST',
+    () async {
+      final kept = conversation('b1', 'kept', timestamp: 20);
+      final deleted = conversation('b2', 'deleted', timestamp: 10);
+      when(() => repository.fetchPage(const InboxQuery())).thenAnswer(
+        (_) async => ConversationsPage(
+          items: <Conversation>[kept, deleted],
+          nextCursor: null,
+        ),
+      );
+      final bloc = build()..add(const ConversationsLoadRequested());
+      await tick(3);
+
+      bloc.add(const ConversationsValidChannelsChanged(<String>{'b1'}));
+      await tick(2);
+
+      expect(bloc.state.items, <Conversation>[kept, deleted]);
+      await bloc.close();
+    },
+  );
+
+  test('catálogo local no altera etiquetas de una página REST', () async {
+    const vip = ConversationLabel(id: 'vip', name: 'VIP', color: '#176B5B');
+    const catalogMissing = ConversationLabel(
+      id: 'remote-only',
+      name: 'Sólo REST',
+      color: '#C57B57',
+    );
+    final remote = conversation(
+      'b1',
+      'remote',
+      labels: const <ConversationLabel>[vip, catalogMissing],
+    );
     when(() => repository.fetchPage(const InboxQuery())).thenAnswer(
-      (_) async => ConversationsPage(
-        items: <Conversation>[kept, deleted],
-        nextCursor: null,
-      ),
+      (_) async =>
+          ConversationsPage(items: <Conversation>[remote], nextCursor: null),
     );
     final bloc = build()..add(const ConversationsLoadRequested());
     await tick(3);
 
-    bloc.add(const ConversationsValidChannelsChanged(<String>{'b1'}));
+    bloc.add(const ConversationsValidLabelsChanged(<String>{'vip'}));
     await tick(2);
 
-    expect(bloc.state.items, <Conversation>[kept]);
+    expect(bloc.state.items.single.labels, const <ConversationLabel>[
+      vip,
+      catalogMissing,
+    ]);
     await bloc.close();
   });
 

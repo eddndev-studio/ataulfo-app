@@ -4,8 +4,8 @@ part of 'conversations_bloc.dart';
 /// into the BLoC event handlers.
 ///
 /// A fresh REST row wins until Drift echoes the same value. From that point on,
-/// local optimistic mutations win again. The connected-channel catalogue is an
-/// additional live boundary for both cached and remote rows.
+/// local optimistic mutations win again. Local catalogues only constrain a
+/// cache-only fallback; a successful REST page is the authorization authority.
 class _ConversationsProjection {
   final Map<String, Conversation> _cacheByKey = <String, Conversation>{};
   final Map<String, Conversation> _remoteByKey = <String, Conversation>{};
@@ -86,10 +86,7 @@ class _ConversationsProjection {
       final item = _pendingCacheSyncKeys.contains(key)
           ? _remoteByKey[key] ?? _cacheByKey[key]
           : _cacheByKey[key] ?? _remoteByKey[key];
-      if (item != null && _hasValidChannel(item)) {
-        final projected = _withValidLabels(item);
-        if (query.matches(projected)) items.add(projected);
-      }
+      if (item != null && query.matches(item)) items.add(item);
     }
     return items;
   }
