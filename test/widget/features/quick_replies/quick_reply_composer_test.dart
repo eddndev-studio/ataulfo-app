@@ -142,7 +142,7 @@ void main() {
       await tester.pumpWidget(host());
 
       await tester.tap(find.byKey(const Key('composer.quickreply')));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.byKey(const Key('quick_replies_sheet')), findsOneWidget);
       expect(
@@ -182,7 +182,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('quick_replies_sheet.retry')));
+    await tester.tap(find.text('Reintentar'));
     verify(() => qrBloc.add(const QuickRepliesLoadRequested())).called(1);
   });
 }
