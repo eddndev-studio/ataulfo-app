@@ -230,17 +230,11 @@ class _FileFace extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: textTheme.labelSmall?.copyWith(
-              color: AppTokens.text1,
-              fontSize: 9,
-            ),
+            style: textTheme.labelSmall?.copyWith(color: AppTokens.text1),
           ),
           Text(
             _formatBytes(attachment.sizeBytes),
-            style: textTheme.labelSmall?.copyWith(
-              color: AppTokens.text2,
-              fontSize: 9,
-            ),
+            style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
           ),
         ],
       ),

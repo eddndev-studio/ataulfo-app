@@ -9,6 +9,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_danger_zone.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -84,13 +85,8 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const _BackScaffold(
-    child: Center(
-      child: CircularProgressIndicator(
-        valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      const _BackScaffold(child: AppLoadingIndicator());
 }
 
 /// Envuelve los estados sin header (carga/error) con un retorno claro arriba a

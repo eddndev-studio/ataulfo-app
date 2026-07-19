@@ -5,6 +5,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/chat_profile.dart';
 import '../../domain/failures/profile_failure.dart';
@@ -21,11 +22,8 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<ProfileBloc, ProfileState>(
       builder: (context, state) => switch (state) {
-        ProfileInitial() || ProfileLoading() => const Center(
+        ProfileInitial() || ProfileLoading() => const AppLoadingIndicator(
           key: Key('profile.loading'),
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-          ),
         ),
         ProfileLoaded(profile: final p) => _ProfileView(profile: p),
         ProfileFailed(failure: final f) => _FailedView(failure: f),

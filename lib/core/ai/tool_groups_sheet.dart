@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../design/safe_bottom.dart';
 import '../design/tokens.dart';
 import '../design/widgets/app_button.dart';
+import '../design/widgets/app_checkbox_row.dart';
 import 'tool_groups.dart';
 
 /// Multi-select de grupos de capacidad del agente IA: el operador HABILITA o
@@ -177,48 +178,14 @@ class _GroupRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final on = enabled && !locked;
-    final color = locked
-        ? AppTokens.text2
-        : (on ? AppTokens.primary : AppTokens.text2);
-    return InkWell(
+    return AppCheckboxRow(
       key: Key('tool_groups.sheet.option.${group.wire}'),
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: AppTokens.sp3,
-          horizontal: AppTokens.sp1,
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(
-              on ? Icons.check_box : Icons.check_box_outline_blank,
-              color: color,
-              size: 22,
-            ),
-            const SizedBox(width: AppTokens.sp2),
-            Icon(group.icon, color: AppTokens.text2, size: 20),
-            const SizedBox(width: AppTokens.sp2),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(group.label, style: textTheme.bodyMedium),
-                  Text(
-                    locked ? 'Desactivado por el Asistente' : group.description,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: AppTokens.text2,
-                      fontStyle: locked ? FontStyle.italic : FontStyle.normal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      value: on,
+      onChanged: onTap == null ? null : (_) => onTap!(),
+      leading: Icon(group.icon, color: AppTokens.text2, size: 20),
+      title: group.label,
+      subtitle: locked ? 'Desactivado por el Asistente' : group.description,
     );
   }
 }

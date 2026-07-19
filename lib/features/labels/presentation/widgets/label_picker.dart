@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_checkbox_row.dart';
 import '../../../../core/design/widgets/app_option_row.dart';
 import '../../domain/entities/label.dart';
 import '../bloc/labels_bloc.dart';
@@ -209,46 +210,14 @@ class _UnknownOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
+    return AppCheckboxRow(
       key: Key('$keyPrefix.unknown'),
-      padding: const EdgeInsets.symmetric(
-        vertical: AppTokens.sp3,
-        horizontal: AppTokens.sp1,
-      ),
-      child: Row(
-        children: <Widget>[
-          const Icon(Icons.help_outline, color: AppTokens.text2, size: 16),
-          const SizedBox(width: AppTokens.sp2),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Etiqueta desconocida',
-                  style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-                ),
-                // El rawId NO se renderiza (es ruido para el operador) pero
-                // sigue viajando aguas arriba: el submit lo preserva.
-                Text(
-                  'Fue eliminada del catálogo. Elige otra etiqueta.',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: AppTokens.text2,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.check,
-            key: Key('$keyPrefix.selected'),
-            color: AppTokens.primary,
-            size: 20,
-          ),
-        ],
-      ),
+      value: true,
+      onChanged: null,
+      affinity: AppCheckboxAffinity.trailing,
+      leading: const Icon(Icons.help_outline, color: AppTokens.text2, size: 16),
+      title: 'Etiqueta desconocida',
+      subtitle: 'Fue eliminada del catálogo. Elige otra etiqueta.',
     );
   }
 }

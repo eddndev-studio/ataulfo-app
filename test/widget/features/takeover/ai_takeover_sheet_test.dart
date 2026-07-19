@@ -1,6 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_action_row.dart';
 import 'package:ataulfo/features/takeover/presentation/cubit/ai_takeover_cubit.dart';
 import 'package:ataulfo/features/takeover/presentation/widgets/ai_takeover_sheet.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -104,12 +105,11 @@ void main() {
       );
       expect(h1.style?.fontSize, AppTokens.titleLSize);
 
-      // La acción vive como fila tipo ListTile al ras del padding del sheet
-      // (idioma de menú-sheet), no como botón CTA.
-      final tile = tester.widget<ListTile>(
+      // La acción vive como fila canónica de menú-sheet, no como botón CTA.
+      final tile = tester.widget<AppActionRow>(
         find.byKey(const Key('takeover.toggle')),
       );
-      expect(tile.contentPadding, EdgeInsets.zero);
+      expect(tile.title, 'Pausar Canal aquí');
       expect(find.byType(AppButton), findsNothing);
 
       await tester.tap(find.byKey(const Key('takeover.toggle')));

@@ -73,8 +73,8 @@ class AppHeaderCard extends StatelessWidget {
     final hasTopRow = greeting != null || avatarInitial != null;
     return ClipRRect(
       borderRadius: const BorderRadius.only(
-        bottomLeft: Radius.circular(28),
-        bottomRight: Radius.circular(28),
+        bottomLeft: Radius.circular(AppTokens.radiusHeader),
+        bottomRight: Radius.circular(AppTokens.radiusHeader),
       ),
       child: DecoratedBox(
         decoration: const BoxDecoration(gradient: _gradient),

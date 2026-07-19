@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_text_action.dart';
 import '../bloc/register_bloc.dart';
 
 /// Página de alta de cuenta. Es presentación pura: la lógica vive en
@@ -142,9 +143,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     onPressed: (_canSubmit && !submitting) ? _submit : null,
                   ),
                   const SizedBox(height: AppTokens.sp2),
-                  TextButton(
+                  AppTextAction(
+                    label: 'Ya tengo cuenta',
                     onPressed: submitting ? null : widget.onGoToLogin,
-                    child: const Text('Ya tengo cuenta'),
                   ),
                   if (state is RegisterFailed)
                     Text(

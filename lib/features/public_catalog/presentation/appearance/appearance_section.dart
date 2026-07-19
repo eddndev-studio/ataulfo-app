@@ -159,7 +159,7 @@ class _DesignOptionState extends State<_DesignOption> {
   @override
   Widget build(BuildContext context) {
     final selected = widget.selected;
-    final radius = BorderRadius.circular(12);
+    final radius = BorderRadius.circular(AppTokens.radiusMd);
     final name = catalogDesignName(widget.design);
     return Semantics(
       button: true,

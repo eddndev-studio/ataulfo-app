@@ -7,6 +7,7 @@ import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
+import '../../../../core/design/widgets/app_action_row.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../conversations/domain/entities/conversation.dart';
 import '../../../conversations/presentation/widgets/chat_labels_sheet.dart';
@@ -66,45 +67,40 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                ListTile(
+                AppActionRow(
                   key: const Key('thread.run_flow'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.play_circle_outline),
-                  title: const Text('Correr un flujo'),
+                  icon: Icons.play_circle_outline,
+                  title: 'Correr un flujo',
                   onTap: () =>
                       Navigator.of(sheetContext).pop(_ThreadAction.runFlow),
                 ),
-                ListTile(
+                AppActionRow(
                   key: const Key('thread.notes'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.sticky_note_2_outlined),
-                  title: const Text('Notas del chat'),
+                  icon: Icons.sticky_note_2_outlined,
+                  title: 'Notas del chat',
                   onTap: () =>
                       Navigator.of(sheetContext).pop(_ThreadAction.notes),
                 ),
                 if (isAdmin) ...<Widget>[
                   const Divider(height: AppTokens.sp6),
-                  ListTile(
+                  AppActionRow(
                     key: const Key('thread.ai_log'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.psychology_outlined),
-                    title: const Text('Razonamiento del Asistente'),
+                    icon: Icons.psychology_outlined,
+                    title: 'Razonamiento del Asistente',
                     onTap: () =>
                         Navigator.of(sheetContext).pop(_ThreadAction.reasoning),
                   ),
-                  ListTile(
+                  AppActionRow(
                     key: const Key('thread.ai_ledger'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.receipt_long_outlined),
-                    title: const Text('Bitácora de acciones'),
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Bitácora de acciones',
                     onTap: () =>
                         Navigator.of(sheetContext).pop(_ThreadAction.ledger),
                   ),
-                  ListTile(
+                  AppActionRow(
                     key: const Key('thread.executions'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.history_outlined),
-                    title: const Text('Ejecuciones del chat'),
+                    icon: Icons.history_outlined,
+                    title: 'Ejecuciones del chat',
                     onTap: () => Navigator.of(
                       sheetContext,
                     ).pop(_ThreadAction.executions),
@@ -112,11 +108,11 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                   const Divider(height: AppTokens.sp6),
                   // Destructiva e irreversible: al final de la hoja, tras su
                   // propio divisor, y con confirmación antes de despachar.
-                  ListTile(
+                  AppActionRow(
                     key: const Key('thread.clear_history'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.delete_sweep_outlined),
-                    title: const Text('Vaciar historial'),
+                    icon: Icons.delete_sweep_outlined,
+                    title: 'Vaciar historial',
+                    tone: AppActionRowTone.danger,
                     onTap: () => Navigator.of(
                       sheetContext,
                     ).pop(_ThreadAction.clearHistory),

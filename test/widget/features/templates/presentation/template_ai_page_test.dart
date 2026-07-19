@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_checkbox_row.dart';
 import 'package:ataulfo/core/design/widgets/app_switch.dart';
 import 'package:ataulfo/features/ai_catalog/domain/entities/catalog.dart';
 import 'package:ataulfo/features/ai_catalog/presentation/bloc/catalog_bloc.dart';
@@ -570,10 +571,7 @@ void main() {
       final l1Row = find.byKey(
         const Key('template_ai.sheet.silence.option.l1'),
       );
-      expect(
-        find.descendant(of: l1Row, matching: find.byIcon(Icons.check_box)),
-        findsOneWidget,
-      );
+      expect(tester.widget<AppCheckboxRow>(l1Row).value, isTrue);
 
       await tester.tap(l1Row);
       await tester.pump();

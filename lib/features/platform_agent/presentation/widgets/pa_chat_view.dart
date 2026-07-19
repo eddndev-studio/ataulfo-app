@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
+import '../../../../core/design/widgets/app_inline_loading_indicator.dart';
+import '../../../../core/design/widgets/app_text_action.dart';
 import '../../../../core/design/widgets/voice_recording_bar.dart';
 import '../../../../core/design/widgets/voice_recording_mixin.dart';
 import '../../../../core/media/attachment_kind.dart';
@@ -383,18 +385,11 @@ class _LoadMoreButton extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(bottom: AppTokens.sp2),
         child: loading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-                ),
-              )
-            : TextButton(
+            ? const AppInlineLoadingIndicator(size: 18)
+            : AppTextAction(
                 key: const Key('pa.load_more'),
+                label: 'Cargar mensajes anteriores',
                 onPressed: onTap,
-                child: const Text('Cargar mensajes anteriores'),
               ),
       ),
     );

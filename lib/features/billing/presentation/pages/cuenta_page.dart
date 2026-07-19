@@ -7,6 +7,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
 import '../../domain/entities/entitlement.dart';
@@ -43,9 +44,8 @@ class CuentaPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<EntitlementBloc, EntitlementState>(
       builder: (context, state) => switch (state) {
-        EntitlementInitial() || EntitlementLoading() => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        EntitlementInitial() ||
+        EntitlementLoading() => const AppLoadingIndicator(),
         // 404 = org sin suscripción: estado del producto con salida a la
         // web, no un error de carga (reintentar no lo cambiaría).
         EntitlementFailed(failure: BillingNotFoundFailure()) => _SinPlanView(

@@ -5,6 +5,7 @@ import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_action_row.dart';
 import '../../domain/failures/flow_run_failure.dart';
 import '../../domain/repositories/flow_run_repository.dart';
 import '../bloc/flow_run_cubit.dart';
@@ -110,16 +111,12 @@ class _FlowRunSheetState extends State<FlowRunSheet> {
                             shrinkWrap: true,
                             children: <Widget>[
                               for (final f in flows)
-                                ListTile(
+                                AppActionRow(
                                   key: Key('flow_run.item.${f.id}'),
-                                  contentPadding: EdgeInsets.zero,
-                                  enabled: !_running,
-                                  leading: const Icon(
-                                    Icons.play_circle_outline,
-                                    color: AppTokens.primary,
-                                  ),
-                                  title: Text(f.name),
-                                  onTap: () => _run(f.id),
+                                  icon: Icons.play_circle_outline,
+                                  title: f.name,
+                                  tone: AppActionRowTone.primary,
+                                  onTap: _running ? null : () => _run(f.id),
                                 ),
                             ],
                           ),

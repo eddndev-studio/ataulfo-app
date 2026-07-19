@@ -7,6 +7,7 @@ import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
+import 'package:ataulfo/core/design/widgets/app_text_action.dart';
 import 'package:ataulfo/core/design/widgets/provider_badge.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/domain/failures/bots_failure.dart';
@@ -607,7 +608,7 @@ void main() {
       await tester.pumpWidget(draftHost(store: store));
 
       // En vuelo no se puede abandonar (el bot podría crearse igual en server).
-      final btn = tester.widget<TextButton>(
+      final btn = tester.widget<AppTextAction>(
         find.byKey(const Key('bot_create.discard')),
       );
       expect(btn.onPressed, isNull);

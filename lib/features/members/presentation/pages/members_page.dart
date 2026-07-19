@@ -9,6 +9,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/member.dart';
 import '../../domain/failures/members_failure.dart';
@@ -118,22 +119,7 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          Text(
-            'Cargando miembros…',
-            style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
-          ),
-        ],
-      ),
-    );
+    return const AppLoadingIndicator(label: 'Cargando miembros…');
   }
 }
 

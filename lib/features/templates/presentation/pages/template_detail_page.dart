@@ -6,6 +6,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../ai_catalog/presentation/widgets/thinking_label.dart';
@@ -52,13 +53,8 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const _BackOverlay(
-    child: Center(
-      child: CircularProgressIndicator(
-        valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      const _BackOverlay(child: AppLoadingIndicator());
 }
 
 /// Superpone un retorno claro arriba a la izquierda en los estados sin header

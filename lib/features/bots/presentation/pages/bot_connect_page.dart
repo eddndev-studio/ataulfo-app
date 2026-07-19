@@ -9,6 +9,8 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_danger_zone.dart';
+import '../../../../core/design/widgets/app_inline_loading_indicator.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/entities/connect_link.dart';
 import '../../domain/entities/session_status.dart';
@@ -65,11 +67,7 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) => const AppLoadingIndicator();
 }
 
 class _ReadyView extends StatelessWidget {
@@ -371,16 +369,7 @@ class _PairingSection extends StatelessWidget {
               // de pedir escanear algo que no está en pantalla.
               Row(
                 children: <Widget>[
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppTokens.primary,
-                      ),
-                    ),
-                  ),
+                  const AppInlineLoadingIndicator(size: 16),
                   const SizedBox(width: AppTokens.sp2),
                   Expanded(
                     child: Text(

@@ -5,6 +5,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../domain/entities/notification_preference.dart';
 import '../bloc/notification_preferences_bloc.dart';
@@ -53,9 +54,8 @@ class _PreferencesLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return const AppLoadingIndicator(
       key: Key('notification_preferences.loading'),
-      child: CircularProgressIndicator(),
     );
   }
 }

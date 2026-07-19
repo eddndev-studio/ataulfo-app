@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_text_action.dart';
 import '../../../../core/network/connectivity_cubit.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
@@ -89,11 +91,9 @@ class _ReconnectingViewState extends State<ReconnectingView> {
                   style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
                 ),
                 const SizedBox(height: AppTokens.sp4),
-                const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-                ),
+                const AppLoadingIndicator(),
                 const SizedBox(height: AppTokens.sp4),
-                TextButton(onPressed: _retry, child: const Text('Reintentar')),
+                AppTextAction(label: 'Reintentar', onPressed: _retry),
               ],
             ),
           ),

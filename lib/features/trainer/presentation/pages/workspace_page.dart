@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/safe_bottom.dart';
+import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_action_row.dart';
+import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../domain/entities/workspace_doc.dart';
 import '../bloc/workspace_bloc.dart';
@@ -54,20 +58,18 @@ class WorkspacePage extends StatelessWidget {
           }
         },
         builder: (context, state) => switch (state) {
-          WorkspaceLoading() => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          WorkspaceLoading() => const AppLoadingIndicator(),
           WorkspaceFailed(:final failure) => Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(trainerFailureCopy(failure)),
-                const SizedBox(height: 12),
-                FilledButton(
+                const SizedBox(height: AppTokens.sp3),
+                AppButton.filled(
+                  label: 'Reintentar',
                   onPressed: () => context.read<WorkspaceBloc>().add(
                     const WorkspaceLoadRequested(),
                   ),
-                  child: const Text('Reintentar'),
                 ),
               ],
             ),
@@ -186,11 +188,11 @@ class _DocTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    return AppActionRow(
       key: Key('workspace.doc.${doc.name}'),
-      leading: const Icon(Icons.description_outlined),
-      title: Text(doc.name),
-      subtitle: Text(_size),
+      icon: Icons.description_outlined,
+      title: doc.name,
+      subtitle: _size,
       trailing: doc.updatedByTrainer
           ? AppPill.primary(
               key: Key('workspace.badge.${doc.name}'),

@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_checkbox_row.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../bots/domain/entities/bot.dart';
 import '../bloc/assign_bots_cubit.dart';
 
@@ -38,11 +40,8 @@ class BotAssignmentPage extends StatelessWidget {
       },
       child: BlocBuilder<AssignBotsCubit, AssignBotsState>(
         builder: (context, state) => switch (state) {
-          AssignBotsLoading() || AssignBotsSaved() => const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-            ),
-          ),
+          AssignBotsLoading() ||
+          AssignBotsSaved() => const AppLoadingIndicator(),
           AssignBotsFailed(phase: AssignBotsPhase.load) => const _LoadFailed(),
           AssignBotsFailed() => const _SavingView(),
           AssignBotsSaving() => const _SavingView(),
@@ -58,11 +57,7 @@ class _SavingView extends StatelessWidget {
   const _SavingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) => const AppLoadingIndicator();
 }
 
 class _ReadyView extends StatelessWidget {
@@ -100,9 +95,10 @@ class _ReadyView extends StatelessWidget {
             itemCount: bots.length,
             itemBuilder: (context, i) {
               final bot = bots[i];
-              return CheckboxListTile(
+              return AppCheckboxRow(
+                key: Key('bot_assignment.bot.${bot.id}'),
                 value: selected.contains(bot.id),
-                title: Text(bot.name),
+                title: bot.name,
                 onChanged: saving
                     ? null
                     : (_) => context.read<AssignBotsCubit>().toggle(bot.id),

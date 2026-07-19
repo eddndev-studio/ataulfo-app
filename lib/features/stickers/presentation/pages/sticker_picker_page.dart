@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../bloc/sticker_cubit.dart';
@@ -108,12 +109,12 @@ class _PickCellState extends State<_PickCell> {
     final bytes = _bytes;
     return InkWell(
       key: Key('sticker_pick.${widget.ref}'),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppTokens.radiusMd),
       onTap: () => Navigator.of(context).pop(widget.ref),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppTokens.radiusMd),
         ),
         child: bytes != null
             ? Padding(

@@ -5,6 +5,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/widgets/trace_timeline.dart';
 import '../../domain/ai_log_runs.dart';
 import '../../domain/ai_log_trace.dart';
@@ -26,11 +27,7 @@ class AiLogPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AiLogBloc, AiLogState>(
       builder: (context, state) => switch (state) {
-        AiLogLoading() => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-          ),
-        ),
+        AiLogLoading() => const AppLoadingIndicator(),
         AiLogFailed(failure: final f) => _FailedView(failure: f),
         AiLogLoaded() => _LogView(state: state),
       },

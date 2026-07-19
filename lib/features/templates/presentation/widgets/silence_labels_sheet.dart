@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_checkbox_row.dart';
+import '../../../../core/design/widgets/app_inline_loading_indicator.dart';
 import '../../../labels/domain/entities/label.dart';
 import '../../../labels/presentation/bloc/labels_bloc.dart';
 import '../../../labels/presentation/widgets/label_dot.dart';
@@ -73,7 +75,7 @@ class _SilenceLabelsSheetState extends State<SilenceLabelsSheet> {
                 builder: (context, state) => switch (state) {
                   LabelsLoading() => const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppTokens.sp6),
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(child: AppInlineLoadingIndicator()),
                   ),
                   LabelsFailed() => const _ErrorRetry(),
                   LabelsLoaded(labels: final ls) => _options(ls, textTheme),
@@ -149,36 +151,12 @@ class _CheckRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return InkWell(
+    return AppCheckboxRow(
       key: Key('template_ai.sheet.silence.option.${label.id}'),
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: AppTokens.sp3,
-          horizontal: AppTokens.sp1,
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(
-              selected ? Icons.check_box : Icons.check_box_outline_blank,
-              color: selected ? AppTokens.primary : AppTokens.text2,
-              size: 22,
-            ),
-            const SizedBox(width: AppTokens.sp2),
-            LabelDot(hex: label.color),
-            const SizedBox(width: AppTokens.sp2),
-            Expanded(
-              child: Text(
-                label.name,
-                style: textTheme.bodyMedium,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
+      value: selected,
+      onChanged: (_) => onTap(),
+      leading: LabelDot(hex: label.color),
+      title: label.name,
     );
   }
 }

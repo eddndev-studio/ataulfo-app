@@ -36,6 +36,21 @@ void main() {
       await pumpChip(tester, const AppInputChip(label: 'Diseño'));
       expect(find.byIcon(Icons.close), findsOneWidget);
     });
+
+    testWidgets('leading opcional permite miniatura sin romper el contrato', (
+      tester,
+    ) async {
+      await pumpChip(
+        tester,
+        const AppInputChip(
+          label: 'catalogo.png',
+          leading: Icon(Icons.image_outlined, key: Key('chip.leading')),
+        ),
+      );
+
+      expect(find.byKey(const Key('chip.leading')), findsOneWidget);
+      expect(find.text('catalogo.png'), findsOneWidget);
+    });
   });
 
   group('AppInputChip — contrato visual', () {

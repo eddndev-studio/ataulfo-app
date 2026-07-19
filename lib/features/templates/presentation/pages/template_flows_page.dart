@@ -7,6 +7,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
@@ -74,11 +75,8 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
       ),
       body: BlocBuilder<FlowsBloc, FlowsState>(
         builder: (context, state) => switch (state) {
-          FlowsLoading() => const Center(
+          FlowsLoading() => const AppLoadingIndicator(
             key: Key('flows.loading'),
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-            ),
           ),
           FlowsLoaded(flows: final fs) => _content(context, fs),
           FlowsMutating(flows: final fs) => _content(context, fs),

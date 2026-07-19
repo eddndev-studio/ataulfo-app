@@ -602,7 +602,7 @@ class _LabelBlob extends StatelessWidget {
         label.name,
         style: TextStyle(
           color: textColor,
-          fontSize: 11,
+          fontSize: AppTokens.captionSize,
           fontWeight: FontWeight.w600,
         ),
       ),

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_text_action.dart';
 import '../../domain/entities/auth_tokens.dart';
 import '../bloc/login_bloc.dart';
 
@@ -127,13 +128,13 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: _submit,
                   ),
                   const SizedBox(height: AppTokens.sp2),
-                  TextButton(
+                  AppTextAction(
+                    label: 'Crear cuenta',
                     onPressed: submitting ? null : widget.onCreateAccount,
-                    child: const Text('Crear cuenta'),
                   ),
-                  TextButton(
+                  AppTextAction(
+                    label: '¿Olvidaste tu contraseña?',
                     onPressed: submitting ? null : widget.onForgotPassword,
-                    child: const Text('¿Olvidaste tu contraseña?'),
                   ),
                   const SizedBox(height: AppTokens.sp4),
                   if (state is LoginFailed)

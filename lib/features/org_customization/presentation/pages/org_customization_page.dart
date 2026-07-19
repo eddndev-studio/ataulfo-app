@@ -8,6 +8,7 @@ import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../auth/presentation/bloc/rename_org_cubit.dart';
 import '../../../media/domain/entities/media_asset.dart';
 import '../../../memberships/presentation/widgets/rename_org_sheet.dart';
@@ -142,9 +143,7 @@ class OrgCustomizationPage extends StatelessWidget {
           (state as OrgCustomizationReady).mutationFailure!,
         ),
         builder: (context, state) => switch (state) {
-          OrgCustomizationLoading() => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          OrgCustomizationLoading() => const AppLoadingIndicator(),
           OrgCustomizationError() => _ErrorView(
             onRetry: () => context.read<OrgCustomizationCubit>().load(),
           ),

@@ -8,6 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/tool_glyphs.dart';
 import '../../../../core/design/widgets/app_chat_composer.dart';
+import '../../../../core/design/widgets/app_input_chip.dart';
 import '../../../../core/design/widgets/chat_bubble.dart';
 import '../../../../core/design/widgets/typing_bubble.dart';
 import '../../domain/entities/preview_item.dart';
@@ -184,7 +185,7 @@ class _PreviewThreadState extends State<_PreviewThread> {
         if (s.accumulatingUntil != null) const _AccumulatingBanner(),
         if (s.pendingAttachments.isNotEmpty)
           SizedBox(
-            height: 40,
+            height: 48,
             child: ListView.separated(
               key: const Key('preview.pending_attachments'),
               scrollDirection: Axis.horizontal,
@@ -194,12 +195,12 @@ class _PreviewThreadState extends State<_PreviewThread> {
               itemBuilder: (context, i) {
                 final att = s.pendingAttachments[i];
                 final isImage = _looksLikeImage(att.name);
-                return InputChip(
+                return AppInputChip(
                   key: Key('preview.pending_att.${att.name}'),
                   // Miniatura real para imágenes (los bytes ya están en
                   // memoria); ícono por tipo para el resto — el mismo trato
                   // que la bandeja del entrenador/asistente.
-                  avatar: isImage
+                  leading: isImage
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(
                             AppTokens.radiusSm,
@@ -217,8 +218,7 @@ class _PreviewThreadState extends State<_PreviewThread> {
                           ),
                         )
                       : Icon(_pendingIcon(att.name), size: 16),
-                  deleteIcon: const Icon(Icons.close, size: 16),
-                  label: Text(att.name, overflow: TextOverflow.ellipsis),
+                  label: att.name,
                   onDeleted: () => context.read<PreviewBloc>().add(
                     PreviewAttachmentRemoved(att.name),
                   ),

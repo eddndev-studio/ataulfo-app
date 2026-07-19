@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../bloc/accept_invitation_cubit.dart';
 import '../bloc/auth_bloc.dart';
@@ -68,11 +69,7 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) => const AppLoadingIndicator();
 }
 
 /// Sin sesión: el canje exige estar logueado con el correo invitado. El token

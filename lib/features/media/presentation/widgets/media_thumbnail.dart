@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_inline_loading_indicator.dart';
+import '../../../../core/design/widgets/app_selection_overlay.dart';
 import '../../domain/entities/media_asset.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../media_format.dart';
@@ -119,18 +121,8 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
 
   /// Overlay de selección: tinte de la primaria sobre la celda + check en la
   /// esquina. Sólo visible cuando [MediaThumbnail.selected].
-  Widget _selectedOverlay() => const Positioned.fill(
-    child: ColoredBox(
-      color: AppTokens.primaryGlow,
-      child: Align(
-        alignment: Alignment.topRight,
-        child: Padding(
-          padding: EdgeInsets.all(AppTokens.sp1),
-          child: Icon(Icons.check_circle, color: AppTokens.primary, size: 22),
-        ),
-      ),
-    ),
-  );
+  Widget _selectedOverlay() =>
+      const Positioned.fill(child: AppSelectionOverlay());
 
   /// Caption inferior con el [MediaAsset.displayName] (alias o, si vacío,
   /// filename) sobre un scrim degradado para legibilidad sobre cualquier
@@ -160,7 +152,7 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 11,
+            fontSize: AppTokens.captionSize,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -168,16 +160,8 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
     );
   }
 
-  Widget _loading() => const Center(
-    child: SizedBox(
-      width: 20,
-      height: 20,
-      child: CircularProgressIndicator(
-        strokeWidth: 2,
-        valueColor: AlwaysStoppedAnimation<Color>(AppTokens.text2),
-      ),
-    ),
-  );
+  Widget _loading() =>
+      const Center(child: AppInlineLoadingIndicator(color: AppTokens.text2));
 
   /// Placeholder cuando no hay bytes que pintar: un ícono según el tipo de
   /// contenido sobre la superficie de la card. El nombre del asset NO va aquí

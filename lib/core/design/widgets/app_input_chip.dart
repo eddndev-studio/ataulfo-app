@@ -17,11 +17,13 @@ class AppInputChip extends StatelessWidget {
   const AppInputChip({
     super.key,
     required this.label,
+    this.leading,
     this.onPressed,
     this.onDeleted,
   });
 
   final String label;
+  final Widget? leading;
   final VoidCallback? onPressed;
   final VoidCallback? onDeleted;
 
@@ -53,6 +55,10 @@ class AppInputChip extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
+                  if (leading != null) ...<Widget>[
+                    leading!,
+                    const SizedBox(width: AppTokens.sp2),
+                  ],
                   Text(
                     label,
                     style: const TextStyle(

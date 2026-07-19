@@ -1,5 +1,6 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/core/design/widgets/app_checkbox_row.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/members/presentation/bloc/assign_bots_cubit.dart';
 import 'package:ataulfo/features/members/presentation/pages/bot_assignment_page.dart';
@@ -64,11 +65,11 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    expect(find.byType(CheckboxListTile), findsNWidgets(2));
+    expect(find.byType(AppCheckboxRow), findsNWidgets(2));
     expect(find.text('Uno'), findsOneWidget);
     expect(find.text('Dos'), findsOneWidget);
     final checks = tester
-        .widgetList<CheckboxListTile>(find.byType(CheckboxListTile))
+        .widgetList<AppCheckboxRow>(find.byType(AppCheckboxRow))
         .toList();
     expect(checks[0].value, isFalse); // b1 no asignado
     expect(checks[1].value, isTrue); // b2 asignado
@@ -106,7 +107,7 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byKey(const Key('bot_assignment.empty')), findsOneWidget);
-    expect(find.byType(CheckboxListTile), findsNothing);
+    expect(find.byType(AppCheckboxRow), findsNothing);
   });
 
   testWidgets('Failed(load) muestra error y Reintentar dispara load()', (

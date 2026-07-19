@@ -5,6 +5,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_radio_row.dart';
 import '../../domain/entities/resource_item.dart';
 import '../bloc/assistant_resources_cubit.dart';
 
@@ -132,36 +133,21 @@ class _Loaded extends StatelessWidget {
               children: <Widget>[
                 Text('Acceso', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: AppTokens.sp2),
-                Material(
-                  color: Colors.transparent,
-                  child: RadioGroup<AssistantResourceScope>(
-                    groupValue: state.scope,
-                    onChanged: (value) {
-                      if (!state.saving && value != null) cubit.setScope(value);
-                    },
-                    child: Column(
-                      children: <Widget>[
-                        RadioListTile<AssistantResourceScope>(
-                          contentPadding: EdgeInsets.zero,
-                          value: AssistantResourceScope.all,
-                          enabled: !state.saving,
-                          title: const Text('Toda la Biblioteca'),
-                          subtitle: const Text(
-                            'Recomendado: incluye automáticamente los recursos activos.',
-                          ),
-                        ),
-                        RadioListTile<AssistantResourceScope>(
-                          contentPadding: EdgeInsets.zero,
-                          value: AssistantResourceScope.selected,
-                          enabled: !state.saving,
-                          title: const Text('Selección personalizada'),
-                          subtitle: const Text(
-                            'Muestra controles individuales sólo cuando los necesitas.',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                AppRadioRow<AssistantResourceScope>(
+                  value: AssistantResourceScope.all,
+                  groupValue: state.scope,
+                  onChanged: state.saving ? null : cubit.setScope,
+                  title: 'Toda la Biblioteca',
+                  subtitle:
+                      'Recomendado: incluye automáticamente los recursos activos.',
+                ),
+                AppRadioRow<AssistantResourceScope>(
+                  value: AssistantResourceScope.selected,
+                  groupValue: state.scope,
+                  onChanged: state.saving ? null : cubit.setScope,
+                  title: 'Selección personalizada',
+                  subtitle:
+                      'Muestra controles individuales sólo cuando los necesitas.',
                 ),
               ],
             ),

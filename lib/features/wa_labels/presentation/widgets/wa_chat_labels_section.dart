@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_checkbox_row.dart';
+import '../../../../core/design/widgets/app_inline_loading_indicator.dart';
 import '../../domain/entities/wa_label.dart';
 import '../../domain/failures/wa_labels_failure.dart';
 import '../bloc/wa_chat_labels_bloc.dart';
@@ -55,16 +57,7 @@ class _Loader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Padding(
     padding: EdgeInsets.symmetric(vertical: AppTokens.sp4),
-    child: Center(
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-        ),
-      ),
-    ),
+    child: Center(child: AppInlineLoadingIndicator(size: 22)),
   );
 }
 
@@ -147,39 +140,19 @@ class _Toggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return InkWell(
-      onTap: enabled
-          ? () => context.read<WaChatLabelsBloc>().add(
+    return AppCheckboxRow(
+      value: associated,
+      affinity: AppCheckboxAffinity.trailing,
+      leading: WaLabelSwatch(colorIndex: colorIndex, size: 18),
+      title: name,
+      onChanged: enabled
+          ? (value) => context.read<WaChatLabelsBloc>().add(
               WaChatLabelsToggleRequested(
                 waLabelId: waLabelId,
-                associate: !associated,
+                associate: value,
               ),
             )
           : null,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppTokens.sp3),
-        child: Row(
-          children: <Widget>[
-            WaLabelSwatch(colorIndex: colorIndex, size: 18),
-            const SizedBox(width: AppTokens.sp3),
-            Expanded(
-              child: Text(
-                name,
-                style: textTheme.bodyLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Icon(
-              associated ? Icons.check_box : Icons.check_box_outline_blank,
-              color: associated ? AppTokens.primary : AppTokens.text2,
-              size: 22,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

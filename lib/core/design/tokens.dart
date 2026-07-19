@@ -169,6 +169,8 @@ class AppTokens {
   static const double radiusField = 999.0; // radius/full — pill
   static const double radiusChip = 8.0; // radius/2
   static const double radiusSm = 8.0; // radius/2
+  static const double radiusMd = 12.0; // radius/3
+  static const double radiusHeader = 28.0; // detalle full-bleed
 
   // ── Spacing (4pt grid) ──────────────────────────────────────────────────
   static const double sp1 = 4.0;

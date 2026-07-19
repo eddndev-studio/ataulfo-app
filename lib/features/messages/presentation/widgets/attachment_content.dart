@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_text_action.dart';
 import '../../../../core/media/attachment_kind.dart';
 import '../../../../core/util/image_aspect.dart';
 import '../../data/cache/message_media_cache.dart';
@@ -281,10 +282,10 @@ class _AttachmentImageState extends State<AttachmentImage> {
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         card,
-        TextButton(
+        AppTextAction(
           key: Key('message.image.${widget.id}.retry'),
+          label: 'Reintentar',
           onPressed: _retry,
-          child: const Text('Reintentar'),
         ),
       ],
     );

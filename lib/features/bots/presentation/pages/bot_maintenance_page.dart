@@ -7,6 +7,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_danger_zone.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_toggle_row.dart';
 import '../../domain/entities/bot.dart';
 import '../../domain/failures/bots_failure.dart';
@@ -57,11 +58,7 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(
-      valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-    ),
-  );
+  Widget build(BuildContext context) => const AppLoadingIndicator();
 }
 
 class _FailedView extends StatelessWidget {

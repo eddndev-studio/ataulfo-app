@@ -201,8 +201,8 @@ class TimelineJumpBadge extends StatelessWidget {
         label,
         style: const TextStyle(
           fontFamily: AppTokens.fontSans,
-          fontSize: 11,
-          height: 18 / 11,
+          fontSize: AppTokens.captionSize,
+          height: AppTokens.captionLineHeight / AppTokens.captionSize,
           fontWeight: AppTokens.captionWeight,
           color: AppTokens.text2,
         ),

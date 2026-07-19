@@ -9,6 +9,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../domain/entities/invitation.dart';
 import '../../domain/failures/invitations_failure.dart';
 import '../bloc/invitation_mutation_cubit.dart';
@@ -141,11 +142,8 @@ class _Body extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<InvitationsBloc, InvitationsState>(
       builder: (context, state) => switch (state) {
-        InvitationsInitial() || InvitationsLoading() => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-          ),
-        ),
+        InvitationsInitial() ||
+        InvitationsLoading() => const AppLoadingIndicator(),
         InvitationsLoaded(items: final items) => _LoadedView(items: items),
         InvitationsFailed() => const _FailedView(),
       },

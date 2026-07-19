@@ -5,6 +5,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/message_timestamp.dart';
 import '../../domain/entities/ledger_action.dart';
 import '../../domain/failures/ai_ledger_failure.dart';
@@ -20,11 +21,7 @@ class AiLedgerPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AiLedgerBloc, AiLedgerState>(
       builder: (context, state) => switch (state) {
-        AiLedgerLoading() => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary),
-          ),
-        ),
+        AiLedgerLoading() => const AppLoadingIndicator(),
         AiLedgerFailed(failure: final f) => _FailedView(failure: f),
         AiLedgerLoaded() => _LedgerView(state: state),
       },

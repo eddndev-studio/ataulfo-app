@@ -17,6 +17,8 @@ import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_action_row.dart';
+import '../../../../core/design/widgets/app_text_action.dart';
 import '../../../../core/util/smart_timestamp.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/cache/message_media_cache.dart';
@@ -598,19 +600,20 @@ class _PendingFailed extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            TextButton(
+            AppTextAction(
               key: Key('message.pending.$token.retry'),
+              label: 'Reintentar',
               onPressed: () => context.read<MessagesBloc>().add(
                 MessagesSendRetryRequested(token),
               ),
-              child: const Text('Reintentar'),
             ),
-            TextButton(
+            AppTextAction(
               key: Key('message.pending.$token.discard'),
+              label: 'Descartar',
+              tone: AppTextActionTone.neutral,
               onPressed: () => context.read<MessagesBloc>().add(
                 MessagesSendDiscarded(token),
               ),
-              child: const Text('Descartar'),
             ),
           ],
         ),
@@ -751,22 +754,20 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
                 ],
               ),
               const Divider(height: AppTokens.sp6),
-              ListTile(
+              AppActionRow(
                 key: Key('message.reply.$messageId'),
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.reply_outlined),
-                title: const Text('Responder'),
+                icon: Icons.reply_outlined,
+                title: 'Responder',
                 onTap: () {
                   Navigator.of(sheetContext).pop();
                   replyDraft.setReply(message);
                 },
               ),
               if (hasMedia)
-                ListTile(
+                AppActionRow(
                   key: Key('message.share.$messageId'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.share_outlined),
-                  title: const Text('Compartir'),
+                  icon: Icons.share_outlined,
+                  title: 'Compartir',
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _shareMedia(mediaCache!, mediaSharer!, messenger, message);
@@ -774,11 +775,10 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
                 ),
               if (isText) ...<Widget>[
                 const Divider(height: AppTokens.sp6),
-                ListTile(
+                AppActionRow(
                   key: Key('message.copy.$messageId'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.copy_outlined),
-                  title: const Text('Copiar'),
+                  icon: Icons.copy_outlined,
+                  title: 'Copiar',
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     Clipboard.setData(ClipboardData(text: message.content));
@@ -787,11 +787,10 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
                     );
                   },
                 ),
-                ListTile(
+                AppActionRow(
                   key: Key('message.select.$messageId'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.text_fields_outlined),
-                  title: const Text('Seleccionar texto'),
+                  icon: Icons.text_fields_outlined,
+                  title: 'Seleccionar texto',
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _showSelectableText(rootNavigator.context, message.content);
@@ -801,22 +800,21 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
               if (canEdit || canDelete) ...<Widget>[
                 const Divider(height: AppTokens.sp6),
                 if (canEdit)
-                  ListTile(
+                  AppActionRow(
                     key: Key('message.edit.$messageId'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.edit_outlined),
-                    title: const Text('Editar mensaje'),
+                    icon: Icons.edit_outlined,
+                    title: 'Editar mensaje',
                     onTap: () {
                       Navigator.of(sheetContext).pop();
                       _showEditDialog(rootNavigator.context, bloc, message);
                     },
                   ),
                 if (canDelete)
-                  ListTile(
+                  AppActionRow(
                     key: Key('message.delete.$messageId'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.delete_outline),
-                    title: const Text('Eliminar para todos'),
+                    icon: Icons.delete_outline,
+                    title: 'Eliminar para todos',
+                    tone: AppActionRowTone.danger,
                     onTap: () {
                       Navigator.of(sheetContext).pop();
                       _showDeleteConfirm(
@@ -829,14 +827,11 @@ Future<void> _showMessageActions(BuildContext context, Message message) async {
               ],
               if (canDrill) ...<Widget>[
                 const Divider(height: AppTokens.sp6),
-                ListTile(
+                AppActionRow(
                   key: Key('message.drill.$messageId'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.psychology_outlined),
-                  title: const Text('Ver razonamiento del Asistente'),
-                  subtitle: const Text(
-                    'La corrida de IA que generó este mensaje',
-                  ),
+                  icon: Icons.psychology_outlined,
+                  title: 'Ver razonamiento del Asistente',
+                  subtitle: 'La corrida de IA que generó este mensaje',
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     router!.push(

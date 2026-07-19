@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_text_action.dart';
 import '../bloc/forgot_password_bloc.dart';
 
 /// Página de "olvidé mi contraseña". Es presentación pura: la lógica vive en
@@ -105,9 +106,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     onPressed: (_canSubmit && !submitting) ? _submit : null,
                   ),
                   const SizedBox(height: AppTokens.sp2),
-                  TextButton(
+                  AppTextAction(
+                    label: 'Ya tengo un código',
                     onPressed: submitting ? null : widget.onHaveCode,
-                    child: const Text('Ya tengo un código'),
                   ),
                   if (sent) ...<Widget>[
                     const SizedBox(height: AppTokens.sp4),

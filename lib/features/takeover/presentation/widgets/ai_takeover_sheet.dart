@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_action_row.dart';
 import '../../../bots/domain/repositories/bots_repository.dart';
 import '../../../labels/domain/repositories/chat_labels_repository.dart';
 import '../../../templates/domain/repositories/templates_repository.dart';
@@ -136,15 +137,11 @@ class AiTakeoverSheet extends StatelessWidget {
         // Fila de menú, no botón CTA: la hoja es un menú de acciones sobre el
         // chat y su única acción habla el mismo idioma que las demás hojas de
         // acciones (fila ListTile al ras del padding del sheet).
-        ListTile(
+        AppActionRow(
           key: const Key('takeover.toggle'),
-          contentPadding: EdgeInsets.zero,
-          enabled: !busy,
-          leading: Icon(
-            paused ? Icons.play_circle_outline : Icons.pause_circle_outline,
-          ),
-          title: Text(paused ? 'Reanudar Canal' : 'Pausar Canal aquí'),
-          onTap: () => context.read<AiTakeoverCubit>().toggle(),
+          icon: paused ? Icons.play_circle_outline : Icons.pause_circle_outline,
+          title: paused ? 'Reanudar Canal' : 'Pausar Canal aquí',
+          onTap: busy ? null : () => context.read<AiTakeoverCubit>().toggle(),
         ),
       ],
     );

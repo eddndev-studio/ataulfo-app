@@ -9,6 +9,7 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_text_action.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/presentation/bloc/templates_bloc.dart';
@@ -510,13 +511,11 @@ class _DiscardButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: AppTokens.sp2),
       child: Align(
-        child: TextButton(
+        child: AppTextAction(
           key: const Key('bot_create.discard'),
+          label: 'Descartar',
+          tone: AppTextActionTone.neutral,
           onPressed: onPressed,
-          child: const Text(
-            'Descartar',
-            style: TextStyle(color: AppTokens.text2),
-          ),
         ),
       ),
     );
