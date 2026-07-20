@@ -1,13 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
-import '../../../../core/design/widgets/app_header_card.dart';
-import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../bots/domain/entities/bot.dart';
 import '../../../bots/presentation/bloc/bots_bloc.dart';
@@ -17,16 +16,27 @@ import '../../../labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../../messages/domain/repositories/messages_repository.dart';
 import '../../application/inbox_bulk_actions.dart';
 import '../../domain/entities/conversation.dart';
+import '../../domain/entities/inbox_query.dart';
 import '../bloc/conversations_bloc.dart';
 import '../bloc/inbox_selection_cubit.dart';
+import '../widgets/inbox_context_header.dart';
 import '../widgets/inbox_label_action_sheet.dart';
 import '../widgets/inbox_ready_view.dart';
 import '../widgets/inbox_state_views.dart';
 
 class ConversationsListPage extends StatefulWidget {
-  const ConversationsListPage({super.key, this.onOpenSettings});
+  const ConversationsListPage({
+    super.key,
+    this.onOpenSettings,
+    this.isActiveListenable,
+  });
 
   final VoidCallback? onOpenSettings;
+
+  /// Visibilidad dentro del IndexedStack del shell. Al salir de Bandeja se
+  /// cancela cualquier selección contextual para no restaurar un modo obsoleto
+  /// al volver desde otra tab.
+  final ValueListenable<bool>? isActiveListenable;
 
   @override
   State<ConversationsListPage> createState() => _ConversationsListPageState();
@@ -55,19 +65,34 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
     );
     _visibleBots = _botsOf(context.read<BotsBloc>().state);
     _visibleLabels = _labelsOf(context.read<LabelsAdminBloc>().state);
+    widget.isActiveListenable?.addListener(_onVisibilityChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _reconcileFacets();
     });
   }
 
   @override
+  void didUpdateWidget(covariant ConversationsListPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActiveListenable == widget.isActiveListenable) return;
+    oldWidget.isActiveListenable?.removeListener(_onVisibilityChanged);
+    widget.isActiveListenable?.addListener(_onVisibilityChanged);
+    _onVisibilityChanged();
+  }
+
+  @override
   void dispose() {
+    widget.isActiveListenable?.removeListener(_onVisibilityChanged);
     _scrollController
       ..removeListener(_onScroll)
       ..dispose();
     _searchController.dispose();
     _selection.close();
     super.dispose();
+  }
+
+  void _onVisibilityChanged() {
+    if (!(widget.isActiveListenable?.value ?? true)) _selection.clear();
   }
 
   void _onScroll() {
@@ -128,13 +153,32 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
     );
   }
 
+  void _beginSelection() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _selection.begin();
+  }
+
   void _toggleSelection(Conversation conversation) {
+    if (!_selection.state.isActive) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
     if (_selection.toggle(conversation)) return;
     if (!_selection.state.isMutating &&
         _selection.state.count == InboxSelectionCubit.maxSelection) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Puedes seleccionar hasta 50 conversaciones'),
+        ),
+      );
+    }
+  }
+
+  void _selectVisible(List<Conversation> visible) {
+    final completed = _selection.selectVisible(visible);
+    if (!completed && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Se seleccionaron las primeras 50 conversaciones'),
         ),
       );
     }
@@ -175,6 +219,10 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
     context.read<ConversationsBloc>().add(
       const ConversationsRefreshRequested(),
     );
+    if (!(widget.isActiveListenable?.value ?? true)) {
+      _selection.clear();
+      return;
+    }
     final suffix = result.failedCount == 0
         ? ''
         : ' · ${result.failedCount} con error permanecen seleccionadas';
@@ -191,6 +239,23 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
   bool _canClearHistory() {
     final auth = context.read<AuthBloc>().state;
     return auth is AuthAuthenticated && isAdminOrAbove(auth.identity.role);
+  }
+
+  void _toggleArchived(InboxStatus current) {
+    _selection.clear();
+    context.read<ConversationsBloc>().add(
+      ConversationsStatusChanged(
+        current == InboxStatus.archived
+            ? InboxStatus.all
+            : InboxStatus.archived,
+      ),
+    );
+  }
+
+  void _clearFilters() {
+    _selection.clear();
+    _searchController.clear();
+    context.read<ConversationsBloc>().add(const ConversationsFiltersCleared());
   }
 
   @override
@@ -219,6 +284,12 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
             },
           ),
           BlocListener<ConversationsBloc, ConversationsState>(
+            listenWhen: (before, after) =>
+                before.phase != after.phase &&
+                after.phase != ConversationsPhase.ready,
+            listener: (_, _) => _selection.clear(),
+          ),
+          BlocListener<ConversationsBloc, ConversationsState>(
             listenWhen: (before, after) => before.items != after.items,
             listener: (_, state) => _selection.reconcileVisible(state.items),
           ),
@@ -230,64 +301,80 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
           ),
         ],
         child: BlocBuilder<ConversationsBloc, ConversationsState>(
-          builder: (context, state) => switch (state.phase) {
-            ConversationsPhase.initial || ConversationsPhase.loading =>
-              InboxLoadingView(header: _header(context)),
-            ConversationsPhase.failure => InboxFailureView(
-              header: _header(context),
-              failure: state.failure,
-            ),
-            ConversationsPhase.ready =>
+          builder: (context, state) =>
               BlocBuilder<InboxSelectionCubit, InboxSelectionState>(
-                builder: (context, selection) => RefreshIndicator(
-                  onRefresh: _refresh,
-                  child: InboxReadyView(
-                    header: _header(context),
-                    state: state,
-                    selection: selection,
-                    bots: _visibleBots,
-                    labels: _visibleLabels,
-                    searchController: _searchController,
-                    scrollController: _scrollController,
-                    selectedConversationKey: _selectedConversationKey,
-                    canClearHistory: _canClearHistory(),
-                    onOpenConversation: _openConversation,
-                    onToggleSelection: _toggleSelection,
-                    onClearSelection: _selection.clear,
-                    onOpenLabels: _editLabels,
-                    onMarkRead: _selection.markRead,
-                    onClearHistory: _confirmClearHistory,
-                    onQueryChanged: _selection.clear,
-                    onClearFilters: () {
-                      _selection.clear();
-                      _searchController.clear();
-                      context.read<ConversationsBloc>().add(
-                        const ConversationsFiltersCleared(),
+                builder: (context, selection) {
+                  final ready = state.phase == ConversationsPhase.ready;
+                  final canSelectVisible =
+                      ready &&
+                      selection.count < InboxSelectionCubit.maxSelection &&
+                      state.items.any(
+                        (conversation) => !selection.contains(conversation),
                       );
+                  final body = switch (state.phase) {
+                    ConversationsPhase.initial ||
+                    ConversationsPhase.loading => const InboxLoadingView(),
+                    ConversationsPhase.failure => InboxFailureView(
+                      failure: state.failure,
+                    ),
+                    ConversationsPhase.ready => RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: InboxReadyView(
+                        state: state,
+                        selection: selection,
+                        bots: _visibleBots,
+                        labels: _visibleLabels,
+                        searchController: _searchController,
+                        scrollController: _scrollController,
+                        selectedConversationKey: _selectedConversationKey,
+                        onOpenConversation: _openConversation,
+                        onToggleSelection: _toggleSelection,
+                        onQueryChanged: _selection.clear,
+                        onClearFilters: _clearFilters,
+                      ),
+                    ),
+                  };
+                  return PopScope<Object?>(
+                    canPop: !selection.isActive,
+                    onPopInvokedWithResult: (didPop, _) {
+                      if (!didPop &&
+                          selection.isActive &&
+                          !selection.isMutating) {
+                        _selection.clear();
+                      }
                     },
-                  ),
-                ),
+                    child: Column(
+                      children: <Widget>[
+                        InboxContextHeader(
+                          selectionActive: selection.isActive,
+                          selectedCount: selection.count,
+                          isMutating: selection.isMutating,
+                          canStartSelection: ready && state.items.isNotEmpty,
+                          canSelectVisible: canSelectVisible,
+                          canClearHistory: _canClearHistory(),
+                          showingArchived:
+                              state.query.status == InboxStatus.archived,
+                          hasActiveFilters: state.query.hasActiveFilters,
+                          onStartSelection: _beginSelection,
+                          onCancelSelection: _selection.clear,
+                          onSelectVisible: () => _selectVisible(state.items),
+                          onOpenLabels: _editLabels,
+                          onMarkRead: _selection.markRead,
+                          onClearHistory: _confirmClearHistory,
+                          onToggleArchived: () =>
+                              _toggleArchived(state.query.status),
+                          onRefresh: () => unawaited(_refresh()),
+                          onClearFilters: _clearFilters,
+                          onOpenSettings: widget.onOpenSettings,
+                        ),
+                        Expanded(child: body),
+                      ],
+                    ),
+                  );
+                },
               ),
-          },
         ),
       ),
-    );
-  }
-
-  Widget _header(BuildContext context) {
-    final auth = context.read<AuthBloc>().state;
-    final email = switch (auth) {
-      AuthAuthenticated(:final identity) => identity.email,
-      AuthAuthenticatedNoOrg(:final identity) => identity.email,
-      _ => '',
-    };
-    final user = userGreeting(email);
-    return AppHeaderCard(
-      greeting: user.greeting,
-      title: 'Bandeja',
-      avatarInitial: user.initial,
-      onAvatarTap: widget.onOpenSettings ?? () {},
-      watermark: Icons.inbox_outlined,
     );
   }
 }

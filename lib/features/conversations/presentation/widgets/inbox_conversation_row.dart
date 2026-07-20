@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
-import '../../../../core/design/widgets/app_checkbox.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/util/smart_timestamp.dart';
 import '../../../labels/presentation/widgets/label_dot.dart';
@@ -11,6 +10,7 @@ import '../../../profile/presentation/widgets/profile_avatar.dart';
 import '../../domain/entities/conversation.dart';
 
 const double _avatarSize = 42;
+const double _avatarControlSize = 48;
 
 class InboxConversationRow extends StatelessWidget {
   const InboxConversationRow({
@@ -55,29 +55,16 @@ class InboxConversationRow extends StatelessWidget {
               vertical: AppTokens.sp3,
             ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              // La columna de contenido puede crecer por etiquetas y estados;
+              // el avatar conserva el centro óptico de la tarjeta completa.
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                if (showSelectionControl) ...<Widget>[
-                  Tooltip(
-                    message: multiSelected
-                        ? 'Quitar de la selección'
-                        : 'Seleccionar conversación',
-                    child: AppCheckbox(
-                      key: Key(
-                        'conversation.select.${item.botId}.${item.chatLid}',
-                      ),
-                      value: multiSelected,
-                      onChanged: onSelectionChanged,
-                    ),
-                  ),
-                  const SizedBox(width: AppTokens.sp1),
-                ],
-                ProfileAvatar(
-                  cache: context.read<ProfilePhotoCache>(),
-                  botId: item.botId,
-                  chatLid: item.chatLid,
+                _ConversationAvatar(
+                  conversation: item,
                   name: title,
-                  size: _avatarSize,
+                  selected: multiSelected,
+                  showControl: showSelectionControl,
+                  onChanged: onSelectionChanged,
                 ),
                 const SizedBox(width: AppTokens.sp3),
                 Expanded(
@@ -204,6 +191,105 @@ class InboxConversationRow extends StatelessWidget {
   }
 }
 
+/// Avatar de la fila con el check superpuesto en su esquina inferior derecha,
+/// como en las bandejas de mensajería. En móvil el badge sólo aparece sobre
+/// filas seleccionadas y el tap de la fila gobierna la selección; en desktop
+/// el avatar conserva un control explícito con hit-target de 48 px.
+class _ConversationAvatar extends StatelessWidget {
+  const _ConversationAvatar({
+    required this.conversation,
+    required this.name,
+    required this.selected,
+    required this.showControl,
+    required this.onChanged,
+  });
+
+  final Conversation conversation;
+  final String name;
+  final bool selected;
+  final bool showControl;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = SizedBox.square(
+      dimension: _avatarControlSize,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          Center(
+            child: ProfileAvatar(
+              cache: context.read<ProfilePhotoCache>(),
+              botId: conversation.botId,
+              chatLid: conversation.chatLid,
+              name: name,
+              size: _avatarSize,
+            ),
+          ),
+          if (selected || showControl)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: AnimatedContainer(
+                key: Key(
+                  'conversation.selection_badge.${conversation.botId}.${conversation.chatLid}',
+                ),
+                duration: AppTokens.durationFast,
+                width: 21,
+                height: 21,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? AppTokens.text1 : AppTokens.surface3,
+                  border: Border.all(
+                    color: selected ? AppTokens.surface1 : AppTokens.text2,
+                    width: 2,
+                  ),
+                ),
+                child: selected
+                    ? const Icon(
+                        Icons.check,
+                        size: 15,
+                        color: AppTokens.onPrimary,
+                      )
+                    : null,
+              ),
+            ),
+        ],
+      ),
+    );
+    if (!showControl) return visual;
+
+    final disabled = onChanged == null;
+    return Semantics(
+      key: Key(
+        'conversation.select.${conversation.botId}.${conversation.chatLid}',
+      ),
+      container: true,
+      checked: selected,
+      enabled: !disabled,
+      label: selected ? 'Quitar $name de la selección' : 'Seleccionar $name',
+      onTap: disabled ? null : () => onChanged!(!selected),
+      child: ExcludeSemantics(
+        child: Tooltip(
+          message: selected
+              ? 'Quitar de la selección'
+              : 'Seleccionar conversación',
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: disabled ? null : () => onChanged!(!selected),
+              child: visual,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class InboxConversationDivider extends StatelessWidget {
   const InboxConversationDivider({super.key});
 
@@ -211,7 +297,7 @@ class InboxConversationDivider extends StatelessWidget {
   Widget build(BuildContext context) => const Divider(
     height: 1,
     thickness: 1,
-    indent: AppTokens.sp4 + _avatarSize + AppTokens.sp3,
+    indent: AppTokens.sp4 + _avatarControlSize + AppTokens.sp3,
     endIndent: AppTokens.sp4,
     color: AppTokens.divider,
   );

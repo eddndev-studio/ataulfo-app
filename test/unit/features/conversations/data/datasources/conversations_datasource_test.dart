@@ -39,10 +39,10 @@ void main() {
         data: body,
       );
 
-  test('consulta una sola página org-scoped con labelId repetible', () async {
+  test('consulta una sola página org-scoped con una etiqueta', () async {
     const path =
         '/inbox/conversations?q=rivera&status=attention&botId=bot-1'
-        '&labelId=lead&labelId=vip&cursor=opaque%2Bcursor&limit=40';
+        '&labelId=vip&cursor=opaque%2Bcursor&limit=40';
     when(() => dio.get<Map<String, dynamic>>(path)).thenAnswer(
       (_) async => response(<String, dynamic>{
         'items': <Map<String, dynamic>>[itemJson()],
@@ -55,7 +55,7 @@ void main() {
         search: ' rivera ',
         status: InboxStatus.attention,
         botId: 'bot-1',
-        labelIds: <String>{'vip', 'lead'},
+        labelId: 'vip',
         cursor: 'opaque+cursor',
       ),
     );

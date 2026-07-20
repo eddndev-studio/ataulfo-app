@@ -19,7 +19,7 @@ import '../tokens.dart';
 class AppTextField extends StatefulWidget {
   const AppTextField({
     super.key,
-    required this.label,
+    this.label,
     required this.hint,
     required this.controller,
     this.enabled = true,
@@ -40,7 +40,10 @@ class AppTextField extends StatefulWidget {
     this.onChanged,
   });
 
-  final String label;
+  /// Caption visible sobre el campo. Los formularios deben proporcionarlo;
+  /// buscadores compactos pueden omitirlo cuando lupa + hint ya comunican la
+  /// función sin ambigüedad ni consumen una línea vertical adicional.
+  final String? label;
   final String hint;
   final TextEditingController controller;
   final bool enabled;
@@ -258,6 +261,7 @@ class _AppTextFieldState extends State<AppTextField> {
         : AppTokens.input;
 
     final labelColor = hasError ? AppTokens.danger : AppTokens.text2;
+    final label = widget.label?.trim();
     final helperOrError = widget.errorText ?? widget.helperText;
     final helperColor = hasError ? AppTokens.danger : AppTokens.text2;
 
@@ -265,11 +269,10 @@ class _AppTextFieldState extends State<AppTextField> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Text(
-          widget.label,
-          style: textTheme.labelSmall?.copyWith(color: labelColor),
-        ),
-        const SizedBox(height: AppTokens.sp1),
+        if (label != null && label.isNotEmpty) ...<Widget>[
+          Text(label, style: textTheme.labelSmall?.copyWith(color: labelColor)),
+          const SizedBox(height: AppTokens.sp1),
+        ],
         // El kit fija un objetivo táctil de 48px: el shell garantiza ese alto
         // mínimo aunque el texto de una sola línea mida menos. El ConstrainedBox
         // envuelve el Container por fuera para que la píldora siga siendo el

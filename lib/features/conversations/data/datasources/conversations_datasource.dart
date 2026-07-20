@@ -49,8 +49,7 @@ class DioConversationsDatasource implements ConversationsDatasource {
     if (query.botId case final botId?) {
       parts.add('botId=${Uri.encodeQueryComponent(botId)}');
     }
-    final labels = query.labelIds.toList()..sort();
-    for (final labelId in labels) {
+    if (query.labelId case final labelId?) {
       parts.add('labelId=${Uri.encodeQueryComponent(labelId)}');
     }
     if (query.cursor case final cursor?) {

@@ -10,14 +10,12 @@ import '../../../labels/domain/entities/label.dart';
 import '../../domain/entities/conversation.dart';
 import '../bloc/conversations_bloc.dart';
 import '../bloc/inbox_selection_cubit.dart';
-import 'inbox_bulk_action_bar.dart';
 import 'inbox_conversation_row.dart';
 import 'inbox_filters.dart';
 
 class InboxReadyView extends StatelessWidget {
   const InboxReadyView({
     super.key,
-    required this.header,
     required this.state,
     required this.selection,
     required this.bots,
@@ -25,18 +23,12 @@ class InboxReadyView extends StatelessWidget {
     required this.searchController,
     required this.scrollController,
     required this.selectedConversationKey,
-    required this.canClearHistory,
     required this.onOpenConversation,
     required this.onToggleSelection,
-    required this.onClearSelection,
-    required this.onOpenLabels,
-    required this.onMarkRead,
-    required this.onClearHistory,
     required this.onQueryChanged,
     required this.onClearFilters,
   });
 
-  final Widget header;
   final ConversationsState state;
   final InboxSelectionState selection;
   final List<Bot> bots;
@@ -44,13 +36,8 @@ class InboxReadyView extends StatelessWidget {
   final TextEditingController searchController;
   final ScrollController scrollController;
   final String? selectedConversationKey;
-  final bool canClearHistory;
   final ValueChanged<Conversation> onOpenConversation;
   final ValueChanged<Conversation> onToggleSelection;
-  final VoidCallback onClearSelection;
-  final VoidCallback onOpenLabels;
-  final VoidCallback onMarkRead;
-  final VoidCallback onClearHistory;
   final VoidCallback onQueryChanged;
   final VoidCallback onClearFilters;
 
@@ -58,13 +45,12 @@ class InboxReadyView extends StatelessWidget {
   Widget build(BuildContext context) {
     final bloc = context.read<ConversationsBloc>();
     final items = state.items;
-    final selectionMode = selection.count > 0;
+    final selectionMode = selection.isActive;
     final desktop = MediaQuery.sizeOf(context).width >= 720;
     return CustomScrollView(
       controller: scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: <Widget>[
-        SliverToBoxAdapter(child: header),
         if (state.isRefreshing)
           const SliverToBoxAdapter(
             child: LinearProgressIndicator(
@@ -81,38 +67,35 @@ class InboxReadyView extends StatelessWidget {
             AppTokens.sp4,
           ),
           sliver: SliverToBoxAdapter(
-            child: selectionMode
-                ? InboxBulkActionBar(
-                    count: selection.count,
-                    isMutating: selection.isMutating,
-                    canClearHistory: canClearHistory,
-                    onCancel: onClearSelection,
-                    onLabels: onOpenLabels,
-                    onMarkRead: onMarkRead,
-                    onClearHistory: onClearHistory,
-                  )
-                : InboxFilters(
-                    query: state.query,
-                    bots: bots,
-                    labels: labels,
-                    searchController: searchController,
-                    onSearchChanged: (value) {
-                      onQueryChanged();
-                      bloc.add(ConversationsSearchChanged(value));
-                    },
-                    onStatusChanged: (value) {
-                      onQueryChanged();
-                      bloc.add(ConversationsStatusChanged(value));
-                    },
-                    onChannelChanged: (value) {
-                      onQueryChanged();
-                      bloc.add(ConversationsChannelChanged(value));
-                    },
-                    onLabelToggled: (value) {
-                      onQueryChanged();
-                      bloc.add(ConversationsLabelToggled(value));
-                    },
-                  ),
+            child: AnimatedOpacity(
+              duration: AppTokens.durationFast,
+              opacity: selection.isMutating ? 0.55 : 1,
+              child: AbsorbPointer(
+                absorbing: selection.isMutating,
+                child: InboxFilters(
+                  query: state.query,
+                  bots: bots,
+                  labels: labels,
+                  searchController: searchController,
+                  onSearchChanged: (value) {
+                    onQueryChanged();
+                    bloc.add(ConversationsSearchChanged(value));
+                  },
+                  onStatusChanged: (value) {
+                    onQueryChanged();
+                    bloc.add(ConversationsStatusChanged(value));
+                  },
+                  onChannelChanged: (value) {
+                    onQueryChanged();
+                    bloc.add(ConversationsChannelChanged(value));
+                  },
+                  onLabelChanged: (value) {
+                    onQueryChanged();
+                    bloc.add(ConversationsLabelChanged(value));
+                  },
+                ),
+              ),
+            ),
           ),
         ),
         if (state.isOffline || state.failure != null)
@@ -179,7 +162,7 @@ class InboxReadyView extends StatelessWidget {
                 conversation: conversation,
                 selected: selectedConversationKey == conversation.stableKey,
                 multiSelected: checked,
-                showSelectionControl: desktop || selectionMode,
+                showSelectionControl: desktop,
                 onSelectionChanged: (_) => onToggleSelection(conversation),
                 onLongPress: () => onToggleSelection(conversation),
                 onTap: () => selectionMode

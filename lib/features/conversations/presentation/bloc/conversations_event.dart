@@ -31,9 +31,9 @@ class ConversationsChannelChanged extends ConversationsEvent {
   final String? botId;
 }
 
-class ConversationsLabelToggled extends ConversationsEvent {
-  const ConversationsLabelToggled(this.labelId);
-  final String labelId;
+class ConversationsLabelChanged extends ConversationsEvent {
+  const ConversationsLabelChanged(this.labelId);
+  final String? labelId;
 }
 
 class ConversationsFiltersCleared extends ConversationsEvent {

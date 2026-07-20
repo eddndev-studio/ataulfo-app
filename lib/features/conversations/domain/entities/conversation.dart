@@ -121,8 +121,9 @@ class Conversation {
   final String channelType;
   final String? channelIdentifier;
 
-  /// Etiquetas internas aplicadas al chat. La selección múltiple de Bandeja
-  /// exige que estén presentes TODAS las elegidas.
+  /// Etiquetas internas aplicadas al chat. La Bandeja permite filtrar por una
+  /// sola a la vez; el chat sí puede conservar varias para automatización y
+  /// clasificación.
   final List<ConversationLabel> labels;
 
   /// Clave local sin colisiones: SQLite/PostgreSQL text no admiten NUL, por lo

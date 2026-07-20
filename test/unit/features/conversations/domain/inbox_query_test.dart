@@ -47,8 +47,8 @@ void main() {
     expect(<String>{first.stableKey, second.stableKey}, hasLength(2));
   });
 
-  test('varias etiquetas usan ALL/AND, no OR', () {
-    const query = InboxQuery(labelIds: <String>{'vip', 'lead'});
+  test('la faceta de etiqueta representa una sola opción', () {
+    const query = InboxQuery(labelId: 'vip');
 
     expect(
       query.matches(
@@ -58,7 +58,7 @@ void main() {
     );
     expect(
       query.matches(
-        conversation(botId: 'b1', chatLid: 'one', labels: const [vip]),
+        conversation(botId: 'b1', chatLid: 'other', labels: const [lead]),
       ),
       isFalse,
     );
@@ -69,7 +69,7 @@ void main() {
       search: 'rivera',
       status: InboxStatus.attention,
       botId: 'b1',
-      labelIds: <String>{'vip'},
+      labelId: 'vip',
     );
     final matching = conversation(
       botId: 'b1',

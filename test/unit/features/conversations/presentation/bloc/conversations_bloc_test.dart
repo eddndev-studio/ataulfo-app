@@ -249,7 +249,7 @@ void main() {
   });
 
   test(
-    'cambiar filtros reinicia cursor y compone estado, canal y labels',
+    'canal y etiqueta se combinan; una etiqueta reemplaza a la anterior',
     () async {
       when(() => repository.fetchPage(any())).thenAnswer(
         (invocation) async =>
@@ -264,19 +264,19 @@ void main() {
       bloc
         ..add(const ConversationsStatusChanged(InboxStatus.attention))
         ..add(const ConversationsChannelChanged('bot-1'))
-        ..add(const ConversationsLabelToggled('vip'))
-        ..add(const ConversationsLabelToggled('lead'));
+        ..add(const ConversationsLabelChanged('vip'))
+        ..add(const ConversationsLabelChanged('lead'));
       await tick(5);
 
       expect(bloc.state.query.status, InboxStatus.attention);
       expect(bloc.state.query.botId, 'bot-1');
-      expect(bloc.state.query.labelIds, <String>{'vip', 'lead'});
+      expect(bloc.state.query.labelId, 'lead');
       expect(bloc.state.query.cursor, isNull);
       final queries = verify(
         () => repository.fetchPage(captureAny()),
       ).captured.cast<InboxQuery>();
       expect(queries.last.cursor, isNull);
-      expect(queries.last.labelIds, <String>{'vip', 'lead'});
+      expect(queries.last.labelId, 'lead');
       await bloc.close();
     },
   );
@@ -403,20 +403,19 @@ void main() {
     await bloc.close();
   });
 
-  test('etiqueta borrada sale de la selección y reconsulta', () async {
+  test('etiqueta borrada limpia la faceta y reconsulta', () async {
     when(() => repository.fetchPage(any())).thenAnswer(
       (_) async =>
           const ConversationsPage(items: <Conversation>[], nextCursor: null),
     );
-    final bloc = build(
-      query: const InboxQuery(labelIds: <String>{'vip', 'deleted'}),
-    )..add(const ConversationsLoadRequested());
+    final bloc = build(query: const InboxQuery(labelId: 'deleted'))
+      ..add(const ConversationsLoadRequested());
     await tick(2);
 
     bloc.add(const ConversationsValidLabelsChanged(<String>{'vip'}));
     await tick(3);
 
-    expect(bloc.state.query.labelIds, <String>{'vip'});
+    expect(bloc.state.query.labelId, isNull);
     await bloc.close();
   });
 

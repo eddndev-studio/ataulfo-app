@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ataulfo/features/conversations/application/inbox_bulk_actions.dart';
 import 'package:ataulfo/features/conversations/domain/entities/conversation.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/inbox_selection_cubit.dart';
@@ -42,6 +44,7 @@ void main() {
     expect(cubit.toggle(second), isTrue);
 
     expect(cubit.state.count, 2);
+    expect(cubit.state.isActive, isTrue);
     expect(cubit.state.contains(first), isTrue);
     expect(cubit.state.contains(second), isTrue);
   });
@@ -71,6 +74,25 @@ void main() {
     expect(cubit.state.contains(rows.last), isFalse);
   });
 
+  test('begin entra al modo contextual sin fabricar una selección', () {
+    cubit.begin();
+
+    expect(cubit.state.isActive, isTrue);
+    expect(cubit.state.count, 0);
+
+    cubit.clear();
+    expect(cubit.state.isActive, isFalse);
+  });
+
+  test('selectVisible respeta el límite e informa el truncamiento', () {
+    final rows = List<Conversation>.generate(51, _conversation);
+
+    expect(cubit.selectVisible(rows), isFalse);
+    expect(cubit.state.isActive, isTrue);
+    expect(cubit.state.count, InboxSelectionCubit.maxSelection);
+    expect(cubit.state.contains(rows.last), isFalse);
+  });
+
   test('tras éxito parcial deselecciona éxitos y conserva fallos', () async {
     final first = _conversation(1);
     final second = _conversation(2);
@@ -96,9 +118,67 @@ void main() {
 
     expect(result?.succeededCount, 1);
     expect(cubit.state.count, 1);
+    expect(cubit.state.isActive, isTrue);
     expect(cubit.state.contains(first), isFalse);
     expect(cubit.state.contains(second), isTrue);
   });
+
+  test(
+    'una mutación congela targets y el éxito completo cierra el modo',
+    () async {
+      final selected = _conversation(1);
+      final pending = Completer<InboxBulkResult>();
+      cubit.toggle(selected);
+      when(() => actions.markRead(any())).thenAnswer((_) => pending.future);
+
+      final operation = cubit.markRead();
+      expect(cubit.state.isMutating, isTrue);
+
+      cubit
+        ..clear()
+        ..reconcileVisible(const <Conversation>[]);
+      expect(cubit.state.count, 1);
+      expect(cubit.state.isActive, isTrue);
+
+      final ref = InboxConversationRef.fromConversation(selected);
+      pending.complete(
+        InboxBulkResult(
+          attempted: <InboxConversationRef>{ref},
+          succeeded: <InboxConversationRef>{ref},
+          failed: const <InboxConversationRef>{},
+        ),
+      );
+      await operation;
+
+      expect(cubit.state.isMutating, isFalse);
+      expect(cubit.state.count, 0);
+      expect(cubit.state.isActive, isFalse);
+    },
+  );
+
+  test(
+    'ignora la emisión si la bandeja se desmonta durante la mutación',
+    () async {
+      final selected = _conversation(1);
+      final pending = Completer<InboxBulkResult>();
+      final ref = InboxConversationRef.fromConversation(selected);
+      cubit.toggle(selected);
+      when(() => actions.markRead(any())).thenAnswer((_) => pending.future);
+
+      final operation = cubit.markRead();
+      await cubit.close();
+      pending.complete(
+        InboxBulkResult(
+          attempted: <InboxConversationRef>{ref},
+          succeeded: <InboxConversationRef>{ref},
+          failed: const <InboxConversationRef>{},
+        ),
+      );
+
+      await expectLater(operation, completion(isNotNull));
+      expect(cubit.isClosed, isTrue);
+    },
+  );
 
   test('clear descarta toda la selección', () {
     cubit
@@ -107,5 +187,6 @@ void main() {
       ..clear();
 
     expect(cubit.state.count, 0);
+    expect(cubit.state.isActive, isFalse);
   });
 }

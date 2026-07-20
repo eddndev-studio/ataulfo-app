@@ -28,7 +28,7 @@ class ConversationsBloc extends Bloc<ConversationsEvent, ConversationsState> {
     on<ConversationsSearchChanged>(_onSearchChanged);
     on<ConversationsStatusChanged>(_onStatusChanged);
     on<ConversationsChannelChanged>(_onChannelChanged);
-    on<ConversationsLabelToggled>(_onLabelToggled);
+    on<ConversationsLabelChanged>(_onLabelChanged);
     on<ConversationsFiltersCleared>(_onFiltersCleared);
     on<ConversationsValidLabelsChanged>(_onValidLabelsChanged);
     on<ConversationsValidChannelsChanged>(_onValidChannelsChanged);
@@ -216,16 +216,10 @@ class ConversationsBloc extends Bloc<ConversationsEvent, ConversationsState> {
     Emitter<ConversationsState> emit,
   ) => _changeQuery(state.query.copyWith(botId: event.botId), emit);
 
-  void _onLabelToggled(
-    ConversationsLabelToggled event,
+  void _onLabelChanged(
+    ConversationsLabelChanged event,
     Emitter<ConversationsState> emit,
-  ) {
-    final labels = Set<String>.of(state.query.labelIds);
-    labels.contains(event.labelId)
-        ? labels.remove(event.labelId)
-        : labels.add(event.labelId);
-    _changeQuery(state.query.copyWith(labelIds: labels), emit);
-  }
+  ) => _changeQuery(state.query.copyWith(labelId: event.labelId), emit);
 
   void _onFiltersCleared(
     ConversationsFiltersCleared event,
@@ -240,9 +234,9 @@ class ConversationsBloc extends Bloc<ConversationsEvent, ConversationsState> {
     Emitter<ConversationsState> emit,
   ) {
     _projection.setValidLabelIds(event.labelIds);
-    final reconciled = state.query.labelIds.intersection(event.labelIds);
-    if (reconciled.length != state.query.labelIds.length) {
-      _changeQuery(state.query.copyWith(labelIds: reconciled), emit);
+    final selected = state.query.labelId;
+    if (selected != null && !event.labelIds.contains(selected)) {
+      _changeQuery(state.query.copyWith(labelId: null), emit);
       return;
     }
     emit(state.copyWith(items: _projection.visible(state.query)));

@@ -14,7 +14,9 @@ import 'package:ataulfo/features/labels/domain/repositories/chat_labels_reposito
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
+import 'package:ataulfo/features/profile/presentation/widgets/profile_avatar.dart';
 import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,15 +76,21 @@ const vip = Label(
   description: 'Atención prioritaria',
 );
 
-Conversation conversation(int index) => Conversation(
+Conversation conversation(
+  int index, {
+  bool needsAttention = false,
+  bool isMarkedUnread = false,
+  bool isPinned = false,
+  List<ConversationLabel> chatLabels = const <ConversationLabel>[],
+}) => Conversation(
   botId: 'bot-1',
   chatLid: 'lid-$index',
   kind: ConversationKind.dm,
   phone: '+502 5555 $index',
   displayName: 'Contacto $index',
   isArchived: false,
-  isPinned: false,
-  isMarkedUnread: false,
+  isPinned: isPinned,
+  isMarkedUnread: isMarkedUnread,
   mutedUntil: null,
   unreadCount: index,
   lastMessagePreview: 'Mensaje $index',
@@ -93,6 +101,8 @@ Conversation conversation(int index) => Conversation(
   assistantName: 'Ventas regionales',
   channelName: 'Ventas',
   channelType: 'WA_UNOFFICIAL',
+  needsAttention: needsAttention,
+  labels: chatLabels,
 );
 
 void main() {
@@ -129,27 +139,32 @@ void main() {
     );
   });
 
-  Widget host() => MultiRepositoryProvider(
-    providers: <RepositoryProvider<dynamic>>[
-      RepositoryProvider<ProfilePhotoCache>.value(
-        value: NoopProfilePhotoCache(),
-      ),
-      RepositoryProvider<MessagesRepository>.value(value: messages),
-      RepositoryProvider<ChatLabelsRepository>.value(value: chatLabels),
-    ],
-    child: MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<AuthBloc>.value(value: auth),
-        BlocProvider<BotsBloc>.value(value: bots),
-        BlocProvider<LabelsAdminBloc>.value(value: labels),
-        BlocProvider<ConversationsBloc>.value(value: inbox),
-      ],
-      child: MaterialApp(
-        theme: AppDesignTheme.dark(),
-        home: const Scaffold(body: ConversationsListPage()),
-      ),
-    ),
-  );
+  Widget host({ValueListenable<bool>? isActiveListenable}) =>
+      MultiRepositoryProvider(
+        providers: <RepositoryProvider<dynamic>>[
+          RepositoryProvider<ProfilePhotoCache>.value(
+            value: NoopProfilePhotoCache(),
+          ),
+          RepositoryProvider<MessagesRepository>.value(value: messages),
+          RepositoryProvider<ChatLabelsRepository>.value(value: chatLabels),
+        ],
+        child: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<AuthBloc>.value(value: auth),
+            BlocProvider<BotsBloc>.value(value: bots),
+            BlocProvider<LabelsAdminBloc>.value(value: labels),
+            BlocProvider<ConversationsBloc>.value(value: inbox),
+          ],
+          child: MaterialApp(
+            theme: AppDesignTheme.dark(),
+            home: Scaffold(
+              body: ConversationsListPage(
+                isActiveListenable: isActiveListenable,
+              ),
+            ),
+          ),
+        ),
+      );
 
   Future<void> selectFirst(WidgetTester tester) async {
     await tester.longPress(
@@ -157,6 +172,92 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  String selectionCount(WidgetTester tester) =>
+      tester.widget<Text>(find.byKey(const Key('inbox.selection.count'))).data!;
+
+  Future<void> openSelectionMenu(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('inbox.selection.more')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('header compacto entra a selección desde su menú', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(find.byKey(const Key('inbox.header.normal')), findsOneWidget);
+    expect(find.text('Ataúlfo'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('inbox.header.more')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ver archivadas'), findsOneWidget);
+    expect(find.text('Actualizar bandeja'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('inbox.header.menu.select')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inbox.selection.bar')), findsOneWidget);
+    expect(selectionCount(tester), '0');
+    await tester.tap(find.byKey(const Key('conversation.tile.bot-1.lid-1')));
+    await tester.pump();
+    expect(selectionCount(tester), '1');
+  });
+
+  testWidgets('overflow contextual selecciona las filas visibles', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('inbox.header.more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('inbox.header.menu.select')));
+    await tester.pumpAndSettle();
+
+    await openSelectionMenu(tester);
+    await tester.tap(find.byKey(const Key('inbox.selection.select_visible')));
+    await tester.pumpAndSettle();
+
+    expect(selectionCount(tester), '2');
+  });
+
+  testWidgets('header queda fijo al seleccionar lejos del inicio', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    when(() => inbox.state).thenReturn(
+      ConversationsState(
+        phase: ConversationsPhase.ready,
+        items: List<Conversation>.generate(20, conversation),
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    final header = find.byKey(const Key('inbox.header'));
+    final initialTop = tester.getTopLeft(header).dy;
+    final target = find.byKey(const Key('conversation.tile.bot-1.lid-12'));
+    await tester.scrollUntilVisible(
+      target,
+      320,
+      scrollable: find
+          .descendant(
+            of: find.byType(CustomScrollView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(header).dy, initialTop);
+    await tester.longPress(target);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('inbox.selection.bar')), findsOneWidget);
+    expect(tester.getTopLeft(header).dy, initialTop);
+  });
 
   testWidgets(
     'long press móvil abre selección y el tap siguiente alterna fila',
@@ -171,14 +272,14 @@ void main() {
       expect(find.byKey(const Key('inbox.selection.bar')), findsNothing);
       await selectFirst(tester);
       expect(find.byKey(const Key('inbox.selection.bar')), findsOneWidget);
-      expect(find.text('1 seleccionada'), findsOneWidget);
+      expect(selectionCount(tester), '1');
 
       await tester.tap(find.byKey(const Key('conversation.tile.bot-1.lid-2')));
       await tester.pump();
-      expect(find.text('2 seleccionadas'), findsOneWidget);
+      expect(selectionCount(tester), '2');
 
       await tester.tap(find.byKey(const Key('inbox.selection.cancel')));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('inbox.selection.bar')), findsNothing);
     },
   );
@@ -195,7 +296,105 @@ void main() {
     expect(checkbox, findsOneWidget);
     await tester.tap(checkbox);
     await tester.pump();
-    expect(find.text('1 seleccionada'), findsOneWidget);
+    expect(selectionCount(tester), '1');
+  });
+
+  testWidgets(
+    'el check seleccionado se superpone abajo a la derecha del avatar',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(host());
+      await tester.pump();
+      await selectFirst(tester);
+
+      final tile = find.byKey(const Key('conversation.tile.bot-1.lid-1'));
+      final avatar = find.descendant(
+        of: tile,
+        matching: find.byType(ProfileAvatar),
+      );
+      final badge = find.byKey(
+        const Key('conversation.selection_badge.bot-1.lid-1'),
+      );
+      expect(avatar, findsOneWidget);
+      expect(badge, findsOneWidget);
+      expect(
+        tester.getCenter(badge).dx,
+        greaterThan(tester.getCenter(avatar).dx),
+      );
+      expect(
+        tester.getCenter(badge).dy,
+        greaterThan(tester.getCenter(avatar).dy),
+      );
+    },
+  );
+
+  testWidgets('el avatar queda centrado respecto a una tarjeta alta', (
+    tester,
+  ) async {
+    when(() => inbox.state).thenReturn(
+      ConversationsState(
+        phase: ConversationsPhase.ready,
+        items: <Conversation>[
+          conversation(
+            1,
+            needsAttention: true,
+            isMarkedUnread: true,
+            isPinned: true,
+            chatLabels: const <ConversationLabel>[
+              ConversationLabel(
+                id: 'vip',
+                name: 'Cliente VIP',
+                color: '#C57B57',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    final tile = find.byKey(const Key('conversation.tile.bot-1.lid-1'));
+    final avatar = find.descendant(
+      of: tile,
+      matching: find.byType(ProfileAvatar),
+    );
+    expect(avatar, findsOneWidget);
+    expect(
+      tester.getCenter(avatar).dy,
+      closeTo(tester.getCenter(tile).dy, 0.1),
+    );
+  });
+
+  testWidgets('Atrás cancela selección antes de abandonar la Bandeja', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await tester.pump();
+    await selectFirst(tester);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inbox.selection.bar')), findsNothing);
+    expect(find.byKey(const Key('inbox.header.normal')), findsOneWidget);
+  });
+
+  testWidgets('salir de la tab cancela el modo contextual', (tester) async {
+    final visible = ValueNotifier<bool>(true);
+    addTearDown(visible.dispose);
+    await tester.pumpWidget(host(isActiveListenable: visible));
+    await tester.pump();
+    await selectFirst(tester);
+
+    visible.value = false;
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inbox.selection.bar')), findsNothing);
+    expect(find.byKey(const Key('inbox.header.normal')), findsOneWidget);
   });
 
   testWidgets(
@@ -211,11 +410,12 @@ void main() {
       await tester.tap(find.byKey(const Key('conversation.tile.bot-1.lid-2')));
       await tester.pump();
 
+      await openSelectionMenu(tester);
       await tester.tap(find.byKey(const Key('inbox.selection.mark_read')));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('1 de 2'), findsOneWidget);
-      expect(find.text('1 seleccionada'), findsOneWidget);
+      expect(selectionCount(tester), '1');
       verify(() => inbox.add(const ConversationsRefreshRequested())).called(1);
     },
   );

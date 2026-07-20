@@ -55,6 +55,7 @@ class ShellPage extends StatefulWidget {
 
 class _ShellPageState extends State<ShellPage> {
   late int _index;
+  late final ValueNotifier<bool> _inboxVisible;
 
   /// Índice de la tab Ajustes: destino del avatar de los headers de sección.
   static const int _settingsIndex = 4;
@@ -65,6 +66,7 @@ class _ShellPageState extends State<ShellPage> {
     // Bandeja es la landing operativa. Un handoff contextual conserva el
     // contrato previo y abre Ataúlfo sin crear otro hilo.
     _index = widget.assistantDraft.trim().isEmpty ? 0 : 3;
+    _inboxVisible = ValueNotifier<bool>(_index == 0);
   }
 
   @override
@@ -72,10 +74,17 @@ class _ShellPageState extends State<ShellPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.contextualBotId != widget.contextualBotId) {
       _index = 0;
+      _inboxVisible.value = true;
       context.read<ConversationsBloc>().add(
         ConversationsChannelChanged(widget.contextualBotId),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _inboxVisible.dispose();
+    super.dispose();
   }
 
   /// Punto ÚNICO de verdad de las tabs: por entrada viven juntos la etiqueta
@@ -91,6 +100,7 @@ class _ShellPageState extends State<ShellPage> {
       activeIcon: Icons.inbox,
       page: ConversationsListPage(
         onOpenSettings: () => _select(_settingsIndex),
+        isActiveListenable: _inboxVisible,
       ),
     ),
     _TabSpec(
@@ -135,7 +145,11 @@ class _ShellPageState extends State<ShellPage> {
     ),
   ];
 
-  void _select(int i) => setState(() => _index = i);
+  void _select(int i) {
+    if (_index == i) return;
+    _inboxVisible.value = i == 0;
+    setState(() => _index = i);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,12 +173,10 @@ class _ShellPageState extends State<ShellPage> {
             ],
           ),
         );
-        // Sin AppBar del shell: cada tab trae su propio encabezado. Las
-        // secciones montan la tarjeta-header full-bleed del kit; el asistente
-        // (una superficie de chat con el hilo + composer fijos) trae chrome
-        // compacto tipo app bar, porque un header alto y fijo le restaría
-        // altura al hilo con el teclado abierto y sus acciones con estado no
-        // leerían sobre el gradiente.
+        // Sin AppBar del shell: cada tab trae su propio encabezado. Catálogos y
+        // ajustes montan la tarjeta full-bleed del kit; Bandeja y Ataúlfo son
+        // superficies operativas de mensajería y usan chrome compacto fijo para
+        // no restar altura a listas/hilos ni separar sus acciones contextuales.
         return Scaffold(
           body: useRail
               ? Row(

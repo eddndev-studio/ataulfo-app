@@ -175,7 +175,7 @@ void main() {
     );
   }
 
-  testWidgets('jerarquía visual: búsqueda, estado, canal, labels y filas', (
+  testWidgets('búsqueda y facetas comparten una jerarquía compacta', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(430, 1000);
@@ -206,9 +206,16 @@ void main() {
         .getTopLeft(find.byKey(const Key('conversation.tile.bot-1.lid-1')))
         .dy;
     expect(searchY, lessThan(statusY));
-    expect(statusY, lessThan(channelY));
-    expect(channelY, lessThan(labelsY));
-    expect(labelsY, lessThan(rowY));
+    expect(channelY, closeTo(statusY, 0.1));
+    expect(labelsY, closeTo(statusY, 0.1));
+    expect(statusY, lessThan(rowY));
+    expect(find.text('Buscar conversaciones'), findsNothing);
+    expect(find.text('Canal conectado'), findsNothing);
+    expect(
+      find.text('Una conexión concreta, no sólo el tipo de canal.'),
+      findsNothing,
+    );
+    expect(find.text('Etiquetas internas'), findsNothing);
   });
 
   testWidgets(
@@ -229,7 +236,7 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Todos los canales'), findsOneWidget);
+      expect(find.text('Canal'), findsOneWidget);
     },
   );
 
@@ -245,7 +252,7 @@ void main() {
             phase: ConversationsPhase.ready,
             query: InboxQuery(
               botId: 'bot-contextual',
-              labelIds: <String>{'vip-contextual'},
+              labelId: 'vip-contextual',
             ),
           ),
         ),
@@ -283,7 +290,7 @@ void main() {
       );
       const state = ConversationsState(
         phase: ConversationsPhase.ready,
-        query: InboxQuery(botId: 'bot-1', labelIds: <String>{'vip'}),
+        query: InboxQuery(botId: 'bot-1', labelId: 'vip'),
         items: <Conversation>[conversation],
       );
       await tester.pumpWidget(host(state));
@@ -324,7 +331,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Cliente VIP'), findsNWidgets(2));
+      expect(find.text('Cliente VIP'), findsOneWidget);
       expect(find.textContaining('Ventas regionales'), findsOneWidget);
       expect(find.textContaining('Ventas Guatemala'), findsWidgets);
       expect(
@@ -332,10 +339,14 @@ void main() {
         findsNothing,
       );
       expect(find.textContaining('WhatsApp'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('inbox.labels.filters')));
+      await tester.pumpAndSettle();
+      expect(find.text('Cliente VIP'), findsNWidgets(2));
     },
   );
 
-  testWidgets('estado y label despachan filtros independientes', (
+  testWidgets('canal, etiqueta y estado despachan facetas independientes', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -343,8 +354,23 @@ void main() {
     );
     await tester.pump();
 
+    await tester.tap(find.byKey(const Key('inbox.channel.filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('inbox.channel.option.bot-1')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('inbox.labels.filters')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('inbox.label.option.vip')));
+    await tester.pumpAndSettle();
+
+    final filterScroll = find.descendant(
+      of: find.byKey(const Key('inbox.filters')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.drag(filterScroll, const Offset(-500, 0));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(AppChoiceChip, 'Requieren atención'));
-    await tester.tap(find.widgetWithText(AppChoiceChip, 'Cliente VIP'));
 
     final events = verify(
       () => inbox.add(captureAny()),
@@ -353,7 +379,36 @@ void main() {
       events.whereType<ConversationsStatusChanged>().single.status,
       InboxStatus.attention,
     );
-    expect(events.whereType<ConversationsLabelToggled>().single.labelId, 'vip');
+    expect(
+      events.whereType<ConversationsChannelChanged>().single.botId,
+      'bot-1',
+    );
+    expect(events.whereType<ConversationsLabelChanged>().single.labelId, 'vip');
+  });
+
+  testWidgets('Todas las etiquetas limpia la faceta singular', (tester) async {
+    await tester.pumpWidget(
+      host(
+        const ConversationsState(
+          phase: ConversationsPhase.ready,
+          query: InboxQuery(labelId: 'vip'),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('inbox.labels.filters')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('inbox.label.option.all')));
+    await tester.pumpAndSettle();
+
+    final events = verify(
+      () => inbox.add(captureAny()),
+    ).captured.cast<ConversationsEvent>();
+    expect(
+      events.whereType<ConversationsLabelChanged>().single.labelId,
+      isNull,
+    );
   });
 
   testWidgets(
@@ -392,7 +447,7 @@ void main() {
       search: 'Rivera',
       status: InboxStatus.unread,
       botId: 'bot-1',
-      labelIds: <String>{'vip'},
+      labelId: 'vip',
     );
     when(() => inbox.state).thenReturn(
       ConversationsState(

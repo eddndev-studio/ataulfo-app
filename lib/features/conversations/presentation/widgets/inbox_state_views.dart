@@ -7,16 +7,13 @@ import '../../domain/failures/conversations_failure.dart';
 import '../bloc/conversations_bloc.dart';
 
 class InboxLoadingView extends StatelessWidget {
-  const InboxLoadingView({super.key, required this.header});
-
-  final Widget header;
+  const InboxLoadingView({super.key});
 
   @override
-  Widget build(BuildContext context) => CustomScrollView(
-    physics: const NeverScrollableScrollPhysics(),
+  Widget build(BuildContext context) => const CustomScrollView(
+    physics: NeverScrollableScrollPhysics(),
     slivers: <Widget>[
-      SliverToBoxAdapter(child: header),
-      const SliverPadding(
+      SliverPadding(
         padding: EdgeInsets.all(AppTokens.sp4),
         sliver: SliverToBoxAdapter(child: _InboxSkeleton()),
       ),
@@ -73,16 +70,14 @@ class _SkeletonBlock extends StatelessWidget {
 }
 
 class InboxFailureView extends StatelessWidget {
-  const InboxFailureView({super.key, required this.header, this.failure});
+  const InboxFailureView({super.key, this.failure});
 
-  final Widget header;
   final ConversationsFailure? failure;
 
   @override
   Widget build(BuildContext context) => CustomScrollView(
     physics: const AlwaysScrollableScrollPhysics(),
     slivers: <Widget>[
-      SliverToBoxAdapter(child: header),
       SliverFillRemaining(
         hasScrollBody: false,
         child: Padding(

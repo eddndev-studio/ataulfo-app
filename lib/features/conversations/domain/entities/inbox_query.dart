@@ -11,14 +11,15 @@ enum InboxStatus {
 
 const Object _notProvided = Object();
 
-/// Filtros componibles de la Bandeja. Todos se cruzan con AND; entre varias
-/// etiquetas también rige ALL/AND.
+/// Filtros componibles de la Bandeja. Las facetas se cruzan con AND, pero la
+/// etiqueta es deliberadamente singular: canal + una etiqueta pueden convivir;
+/// dos etiquetas simultáneas son un estado que el modelo no puede representar.
 class InboxQuery {
   const InboxQuery({
     this.search = '',
     this.status = InboxStatus.all,
     this.botId,
-    this.labelIds = const <String>{},
+    this.labelId,
     this.cursor,
     this.limit = 40,
   });
@@ -26,7 +27,7 @@ class InboxQuery {
   final String search;
   final InboxStatus status;
   final String? botId;
-  final Set<String> labelIds;
+  final String? labelId;
   final String? cursor;
   final int limit;
 
@@ -34,20 +35,22 @@ class InboxQuery {
       search.trim().isNotEmpty ||
       status != InboxStatus.all ||
       botId != null ||
-      labelIds.isNotEmpty;
+      labelId != null;
 
   InboxQuery copyWith({
     String? search,
     InboxStatus? status,
     Object? botId = _notProvided,
-    Set<String>? labelIds,
+    Object? labelId = _notProvided,
     Object? cursor = _notProvided,
     int? limit,
   }) => InboxQuery(
     search: search ?? this.search,
     status: status ?? this.status,
     botId: identical(botId, _notProvided) ? this.botId : botId as String?,
-    labelIds: labelIds ?? this.labelIds,
+    labelId: identical(labelId, _notProvided)
+        ? this.labelId
+        : labelId as String?,
     cursor: identical(cursor, _notProvided) ? this.cursor : cursor as String?,
     limit: limit ?? this.limit,
   );
@@ -70,8 +73,10 @@ class InboxQuery {
     };
     if (!matchesStatus) return false;
 
-    final presentLabels = <String>{for (final l in conversation.labels) l.id};
-    if (!labelIds.every(presentLabels.contains)) return false;
+    if (labelId case final selectedLabel?) {
+      final presentLabels = <String>{for (final l in conversation.labels) l.id};
+      if (!presentLabels.contains(selectedLabel)) return false;
+    }
 
     final needle = search.trim().toLowerCase();
     if (needle.isEmpty) return true;
@@ -93,19 +98,13 @@ class InboxQuery {
       other.search == search &&
       other.status == status &&
       other.botId == botId &&
-      _setEquals(other.labelIds, labelIds) &&
+      other.labelId == labelId &&
       other.cursor == cursor &&
       other.limit == limit;
 
   @override
-  int get hashCode => Object.hash(
-    search,
-    status,
-    botId,
-    Object.hashAll(labelIds.toList()..sort()),
-    cursor,
-    limit,
-  );
+  int get hashCode =>
+      Object.hash(search, status, botId, labelId, cursor, limit);
 }
 
 /// Orden de respaldo para la caché: fijadas, actividad descendente y desempate
@@ -118,9 +117,4 @@ int compareInboxConversations(Conversation a, Conversation b) {
   if (timestamp != 0) return timestamp;
   final bot = a.botId.compareTo(b.botId);
   return bot != 0 ? bot : a.chatLid.compareTo(b.chatLid);
-}
-
-bool _setEquals(Set<String> a, Set<String> b) {
-  if (a.length != b.length) return false;
-  return a.every(b.contains);
 }
