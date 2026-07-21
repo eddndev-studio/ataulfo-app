@@ -34,6 +34,7 @@ class AuthMapper {
     orgId: resp.orgId,
     orgName: resp.orgName,
     role: resp.role,
+    botIds: resp.botIds,
   );
 
   static AcceptedInvitation acceptedInvitationRespToEntity(

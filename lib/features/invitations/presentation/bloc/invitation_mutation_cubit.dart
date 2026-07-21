@@ -15,10 +15,10 @@ class InvitationMutationCubit extends Cubit<InvitationMutationState> {
 
   final InvitationsRepository _repo;
 
-  Future<void> create(String email, String role) async {
+  Future<void> create(String email, String role, List<String> botIds) async {
     emit(const InvitationMutationInProgress());
     try {
-      final created = await _repo.create(email, role);
+      final created = await _repo.create(email, role, botIds);
       emit(
         InvitationMutationSuccess(
           InvitationMutationAction.created,

@@ -2,6 +2,21 @@ import 'package:ataulfo/core/auth/role_privilege.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('isSupervisorOrAbove', () {
+    test('OWNER, ADMIN y SUPERVISOR tienen herramientas globales', () {
+      expect(isSupervisorOrAbove('OWNER'), isTrue);
+      expect(isSupervisorOrAbove('ADMIN'), isTrue);
+      expect(isSupervisorOrAbove('SUPERVISOR'), isTrue);
+    });
+
+    test('WORKER y roles desconocidos fallan cerrado', () {
+      expect(isSupervisorOrAbove('WORKER'), isFalse);
+      expect(isSupervisorOrAbove('ROOT'), isFalse);
+      expect(isSupervisorOrAbove('supervisor'), isFalse);
+      expect(isSupervisorOrAbove(''), isFalse);
+    });
+  });
+
   group('isAdminOrAbove', () {
     // El gateo de cliente debe espejar el guard `adminOnly` del backend
     // (`RequireRole(RoleAdmin)` = `AtLeast(RoleAdmin)`). Con la jerarquía

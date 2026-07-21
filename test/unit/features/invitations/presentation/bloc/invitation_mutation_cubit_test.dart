@@ -22,7 +22,7 @@ void main() {
         'ok → [InProgress, Success(created, email, token, emailSent)]',
         build: () {
           final repo = _MockRepo();
-          when(() => repo.create(any(), any())).thenAnswer(
+          when(() => repo.create(any(), any(), any())).thenAnswer(
             (_) async => const CreatedInvitation(
               email: 'a@x.com',
               token: 'RAW-T',
@@ -31,7 +31,7 @@ void main() {
           );
           return InvitationMutationCubit(repo);
         },
-        act: (cubit) => cubit.create('a@x.com', 'WORKER'),
+        act: (cubit) => cubit.create('a@x.com', 'WORKER', const <String>['b1']),
         expect: () => const <InvitationMutationState>[
           InvitationMutationInProgress(),
           InvitationMutationSuccess(
@@ -49,11 +49,11 @@ void main() {
         build: () {
           final repo = _MockRepo();
           when(
-            () => repo.create(any(), any()),
+            () => repo.create(any(), any(), any()),
           ).thenThrow(const InvitationsDuplicateFailure());
           return InvitationMutationCubit(repo);
         },
-        act: (cubit) => cubit.create('a@x.com', 'WORKER'),
+        act: (cubit) => cubit.create('a@x.com', 'WORKER', const <String>[]),
         expect: () => const <InvitationMutationState>[
           InvitationMutationInProgress(),
           InvitationMutationFailure(InvitationsDuplicateFailure()),
@@ -65,11 +65,11 @@ void main() {
         build: () {
           final repo = _MockRepo();
           when(
-            () => repo.create(any(), any()),
+            () => repo.create(any(), any(), any()),
           ).thenThrow(const InvitationsValidationFailure());
           return InvitationMutationCubit(repo);
         },
-        act: (cubit) => cubit.create('mal', 'WORKER'),
+        act: (cubit) => cubit.create('mal', 'WORKER', const <String>[]),
         expect: () => const <InvitationMutationState>[
           InvitationMutationInProgress(),
           InvitationMutationFailure(InvitationsValidationFailure()),

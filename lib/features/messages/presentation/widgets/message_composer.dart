@@ -54,11 +54,16 @@ enum _Release { send, discard, cancel }
 /// subida del lote a través de controladores externos sin ganancia real de
 /// claridad. La bandeja y los helpers puros (tipo/topes) ya viven aparte.
 class MessageComposer extends StatefulWidget {
-  const MessageComposer({super.key, this.now});
+  const MessageComposer({super.key, this.now, this.canUseMedia = true});
 
   /// Reloj para medir cuánto se mantuvo el dedo (toque corto vs mantener).
   /// Inyectable en tests; en producción es `DateTime.now`.
   final DateTime Function()? now;
+
+  /// Capacidad org-scoped para subir/seleccionar medios y grabar voz. El
+  /// backend sigue siendo la autoridad; este gate evita ofrecer acciones que
+  /// terminarían en 403 para un Agente.
+  final bool canUseMedia;
 
   @override
   State<MessageComposer> createState() => _MessageComposerState();
@@ -144,13 +149,43 @@ class _MessageComposerState extends State<MessageComposer> {
   void initState() {
     super.initState();
     _recorder = context.read<AudioRecorder>();
-    _recorder.isSupported().then((ok) {
-      if (mounted) setState(() => _canRecord = ok);
-    });
+    if (widget.canUseMedia) _loadRecorderSupport();
     _fieldFocus.addListener(_onFieldFocus);
     _attachIntents = context.read<AttachPanelCubit>().intents.listen(
       _onAttachIntent,
     );
+  }
+
+  void _loadRecorderSupport() {
+    _recorder.isSupported().then((ok) {
+      if (mounted && widget.canUseMedia) {
+        setState(() => _canRecord = ok);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant MessageComposer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.canUseMedia == widget.canUseMedia) return;
+    if (widget.canUseMedia) {
+      _loadRecorderSupport();
+      return;
+    }
+    // Una degradación de rol viva retira también cualquier estado local que
+    // pudiera completar una operación de medios desde la UI anterior.
+    context.read<AttachPanelCubit>().dismiss();
+    if (_recording || _starting) unawaited(_recorder.cancel());
+    _canRecord = false;
+    _starting = false;
+    _recording = false;
+    _locked = false;
+    _cancelArmed = false;
+    _paused = false;
+    _activePointer = null;
+    _pending = null;
+    _attachments.clear();
+    _uploadedCount = 0;
   }
 
   @override
@@ -178,7 +213,7 @@ class _MessageComposerState extends State<MessageComposer> {
   /// aquí se corre el flujo con las dependencias del composer (picker, cámara,
   /// carrete) y se suma lo elegido a la bandeja.
   void _onAttachIntent(AttachIntent intent) {
-    if (!mounted) return;
+    if (!mounted || !widget.canUseMedia) return;
     switch (intent) {
       case AttachDocumentIntent():
         unawaited(_pickAttachments());
@@ -212,7 +247,7 @@ class _MessageComposerState extends State<MessageComposer> {
   // ── Gesto del micrófono ───────────────────────────────────────────────────
 
   void _onPointerDown(PointerDownEvent e) {
-    if (!_canRecord || _recording || _starting) return;
+    if (!widget.canUseMedia || !_canRecord || _recording || _starting) return;
     final box = _micKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
     final local = box.globalToLocal(e.position);
@@ -398,6 +433,7 @@ class _MessageComposerState extends State<MessageComposer> {
   /// con eso el panel es una función pura de su estado (Documento y Medios
   /// siempre; Cámara/Galería sólo con soporte real).
   Future<void> _toggleAttachPanel() async {
+    if (!widget.canUseMedia) return;
     final panel = context.read<AttachPanelCubit>();
     if (panel.isOpen) {
       panel.dismiss();
@@ -1001,7 +1037,9 @@ class _MessageComposerState extends State<MessageComposer> {
       // Con adjuntos pendientes, el slot final vacío es el botón de enviar el
       // lote (el campo vacío no habilita el envío del kit); si no hay adjuntos,
       // vuelve al micrófono de nota de voz.
-      final Widget? emptyTrailing = _attachments.isNotEmpty
+      final Widget? emptyTrailing = !widget.canUseMedia
+          ? null
+          : _attachments.isNotEmpty
           ? _batchSendButton()
           : (_canRecord ? _micButton(active: false) : null);
       body = AppChatComposer(
@@ -1013,13 +1051,14 @@ class _MessageComposerState extends State<MessageComposer> {
         onSend: _onComposerSend,
         emptyTrailing: emptyTrailing,
         leading: <Widget>[
-          IconButton(
-            key: const Key('composer.attach'),
-            tooltip: 'Adjuntar',
-            color: AppTokens.text2,
-            onPressed: _uploading ? null : _toggleAttachPanel,
-            icon: const Icon(Icons.attach_file),
-          ),
+          if (widget.canUseMedia)
+            IconButton(
+              key: const Key('composer.attach'),
+              tooltip: 'Adjuntar',
+              color: AppTokens.text2,
+              onPressed: _uploading ? null : _toggleAttachPanel,
+              icon: const Icon(Icons.attach_file),
+            ),
           IconButton(
             key: const Key('composer.quickreply'),
             tooltip: 'Respuestas rápidas',
@@ -1030,7 +1069,8 @@ class _MessageComposerState extends State<MessageComposer> {
         ],
       );
     }
-    final showTray = _attachments.isNotEmpty && !_recording;
+    final showTray =
+        widget.canUseMedia && _attachments.isNotEmpty && !_recording;
     if (replyingTo == null && !showTray) return body;
     return Column(
       mainAxisSize: MainAxisSize.min,

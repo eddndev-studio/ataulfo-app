@@ -51,6 +51,7 @@ void main() {
         orgId: 'o-9',
         orgName: 'Acme',
         role: 'WORKER',
+        botIds: <String>['b1'],
       );
 
       final entity = AuthMapper.pendingInvitationRespToEntity(resp);
@@ -59,6 +60,7 @@ void main() {
       expect(entity.orgId, 'o-9');
       expect(entity.orgName, 'Acme');
       expect(entity.role, 'WORKER');
+      expect(entity.botIds, <String>['b1']);
     });
   });
 

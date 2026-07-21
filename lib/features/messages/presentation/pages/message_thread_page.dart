@@ -116,6 +116,9 @@ class _ThreadContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthBloc>().state;
+    final canUseMedia =
+        auth is AuthAuthenticated && isSupervisorOrAbove(auth.identity.role);
     return AttachPanelScaffold(
       children: <Widget>[
         child,
@@ -124,7 +127,7 @@ class _ThreadContent extends StatelessWidget {
         // no pintan.
         const AlertBanner(),
         const LiveActivity(),
-        if (showComposer) const MessageComposer(),
+        if (showComposer) MessageComposer(canUseMedia: canUseMedia),
       ],
     );
   }

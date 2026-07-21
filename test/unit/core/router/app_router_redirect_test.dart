@@ -17,6 +17,20 @@ const _worker = Identity(
   email: 'worker@example.com',
 );
 
+const _supervisor = Identity(
+  userId: 'u4',
+  orgId: 'o1',
+  role: 'SUPERVISOR',
+  email: 'supervisor@example.com',
+);
+
+const _admin = Identity(
+  userId: 'u5',
+  orgId: 'o1',
+  role: 'ADMIN',
+  email: 'admin@example.com',
+);
+
 const _noOrg = Identity(
   userId: 'u3',
   orgId: '',
@@ -180,20 +194,20 @@ void main() {
     );
 
     test('gateo ADMIN+ de sub-rutas bot-level: WORKER → detalle', () {
-      expect(
-        redirectForState(
-          const AuthAuthenticated(_worker),
-          '/bots/b1/variables',
-        ),
-        '/bots/b1',
-      );
-      expect(
-        redirectForState(
-          const AuthAuthenticated(_worker),
-          '/bots/b1/maintenance',
-        ),
-        '/bots/b1',
-      );
+      for (final location in <String>[
+        '/bots/b1/variables',
+        '/bots/b1/maintenance',
+        '/bots/b1/wa-label-mappings',
+        '/bots/b1/sessions/chat-1/ai-log',
+        '/bots/b1/sessions/chat-1/ai-ledger',
+        '/bots/b1/sessions/chat-1/executions',
+      ]) {
+        expect(
+          redirectForState(const AuthAuthenticated(_worker), location),
+          '/bots/b1',
+          reason: '$location requiere administrar el canal',
+        );
+      }
     });
 
     test('gateo ADMIN+: OWNER pasa a las sub-rutas bot-level', () {
@@ -201,6 +215,91 @@ void main() {
         redirectForState(const AuthAuthenticated(_owner), '/bots/b1/variables'),
         isNull,
       );
+    });
+
+    test('WORKER conserva las rutas operativas de sus canales', () {
+      for (final location in <String>[
+        '/home',
+        '/bots/b1',
+        '/bots/b1/sessions',
+        '/bots/b1/sessions/s1/chat',
+        '/notifications',
+        '/appearance',
+      ]) {
+        expect(
+          redirectForState(const AuthAuthenticated(_worker), location),
+          isNull,
+          reason: '$location forma parte de la operación del Agente',
+        );
+      }
+    });
+
+    test('WORKER no entra a herramientas globales SUPERVISOR+', () {
+      for (final location in <String>[
+        '/agenda/book',
+        '/calendar/hours',
+        '/catalog/products',
+        '/media',
+        '/cuenta',
+      ]) {
+        expect(
+          redirectForState(const AuthAuthenticated(_worker), location),
+          '/home',
+          reason: '$location requiere SUPERVISOR+',
+        );
+      }
+    });
+
+    test('WORKER y SUPERVISOR no entran a administración ADMIN+', () {
+      for (final identity in <Identity>[_worker, _supervisor]) {
+        for (final location in <String>[
+          '/assistants/a1',
+          '/templates',
+          '/flows',
+          '/members',
+          '/invitations',
+          '/org/labels',
+          '/org/ai-config',
+        ]) {
+          expect(
+            redirectForState(AuthAuthenticated(identity), location),
+            '/home',
+            reason: '${identity.role} no puede abrir $location',
+          );
+        }
+      }
+    });
+
+    test('SUPERVISOR entra a herramientas globales pero no administra', () {
+      for (final location in <String>[
+        '/agenda/book',
+        '/calendar/hours',
+        '/catalog/products',
+        '/media',
+        '/cuenta',
+      ]) {
+        expect(
+          redirectForState(const AuthAuthenticated(_supervisor), location),
+          isNull,
+          reason: '$location forma parte de las capacidades SUPERVISOR+',
+        );
+      }
+    });
+
+    test('ADMIN entra a administración y herramientas globales', () {
+      for (final location in <String>[
+        '/assistants/a1',
+        '/members',
+        '/invitations',
+        '/org/labels',
+        '/media',
+      ]) {
+        expect(
+          redirectForState(const AuthAuthenticated(_admin), location),
+          isNull,
+          reason: '$location debe estar disponible para ADMIN+',
+        );
+      }
     });
   });
 

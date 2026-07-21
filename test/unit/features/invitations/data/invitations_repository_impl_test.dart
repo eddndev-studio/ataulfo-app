@@ -35,7 +35,7 @@ void main() {
   });
 
   test('create delega y devuelve el CreatedInvitation', () async {
-    when(() => ds.create(any(), any())).thenAnswer(
+    when(() => ds.create(any(), any(), any())).thenAnswer(
       (_) async => const CreatedInvitation(
         email: 'a@x.com',
         token: 'RAW-T',
@@ -43,11 +43,15 @@ void main() {
       ),
     );
 
-    final created = await repo.create('a@x.com', 'ADMIN');
+    final created = await repo.create('a@x.com', 'WORKER', const <String>[
+      'b1',
+    ]);
 
     expect(created.token, 'RAW-T');
     expect(created.emailSent, isTrue);
-    verify(() => ds.create('a@x.com', 'ADMIN')).called(1);
+    verify(
+      () => ds.create('a@x.com', 'WORKER', const <String>['b1']),
+    ).called(1);
   });
 
   test('cancel delega con id', () async {
@@ -60,11 +64,11 @@ void main() {
 
   test('propaga la failure del datasource sin envolverla', () async {
     when(
-      () => ds.create(any(), any()),
+      () => ds.create(any(), any(), any()),
     ).thenThrow(const InvitationsDuplicateFailure());
 
     await expectLater(
-      () => repo.create('a@x.com', 'ADMIN'),
+      () => repo.create('a@x.com', 'ADMIN', const <String>[]),
       throwsA(isA<InvitationsDuplicateFailure>()),
     );
   });

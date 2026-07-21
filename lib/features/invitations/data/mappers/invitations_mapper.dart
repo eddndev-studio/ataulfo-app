@@ -10,6 +10,7 @@ class InvitationsMapper {
     email: resp.email,
     role: resp.role,
     status: resp.status,
+    botIds: resp.botIds,
     expiresAt: resp.expiresAt,
     createdAt: resp.createdAt,
   );

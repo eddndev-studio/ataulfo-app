@@ -31,6 +31,7 @@ import 'package:ataulfo/features/bots/domain/entities/bot_variables_snapshot.dar
 import 'package:ataulfo/features/bots/domain/entities/session_status.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bot_session_repository.dart';
 import 'package:ataulfo/features/bots/domain/repositories/bots_repository.dart';
+import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_detail_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_maintenance_page.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_variables_page.dart';
@@ -1168,6 +1169,7 @@ void main() {
     verify(invitationsRepo.list).called(1);
     final page = tester.element(find.byType(InvitationsPage));
     expect(page.read<InvitationMutationCubit>(), isNotNull);
+    expect(page.read<BotsBloc>(), isNotNull);
   });
 
   testWidgets('AuthAuthenticated → /members ofrece "Invitar" que navega a '

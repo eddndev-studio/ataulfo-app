@@ -1058,6 +1058,7 @@ void main() {
               'org_id': 'o-9',
               'org_name': 'Acme',
               'role': 'WORKER',
+              'bot_ids': <String>['b1'],
               'expires_at': '2026-07-15T00:00:00Z',
             },
           ],
@@ -1070,6 +1071,7 @@ void main() {
       expect(got.first.id, 'inv-1');
       expect(got.first.orgName, 'Acme');
       expect(got.first.role, 'WORKER');
+      expect(got.first.botIds, <String>['b1']);
     });
 
     test(

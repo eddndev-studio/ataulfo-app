@@ -1,7 +1,7 @@
 name: ataulfo
-description: "Cliente Flutter (OWNER/ADMIN, Android-first) de la plataforma Ataúlfo."
+description: "Cliente Flutter Android-first de la plataforma Ataúlfo."
 publish_to: 'none'
-version: 0.53.1+91
+version: 0.54.0+92
 
 environment:
   sdk: ^3.12.0

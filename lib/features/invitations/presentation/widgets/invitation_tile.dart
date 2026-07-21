@@ -71,6 +71,11 @@ class InvitationTile extends StatelessWidget {
                   runSpacing: AppTokens.sp2,
                   children: <Widget>[
                     AppPill.neutral(label: roleLabel(invitation.role)),
+                    if (invitation.role == 'WORKER')
+                      AppPill.outline(
+                        key: const Key('invitation_tile.channels'),
+                        label: _channelCount(invitation.botIds.length),
+                      ),
                     AppPill.outline(
                       label: invitationStatusLabel(invitation.status),
                     ),
@@ -101,3 +106,9 @@ class InvitationTile extends StatelessWidget {
     );
   }
 }
+
+String _channelCount(int count) => switch (count) {
+  0 => 'Sin Canales',
+  1 => '1 Canal',
+  _ => '$count Canales',
+};

@@ -8,11 +8,13 @@ Invitation _inv({
   String status = 'PENDING',
   DateTime? expiresAt,
   DateTime? createdAt,
+  List<String> botIds = const <String>['b1'],
 }) => Invitation(
   id: id,
   email: email,
   role: role,
   status: status,
+  botIds: botIds,
   expiresAt: expiresAt ?? DateTime.utc(2026, 1, 2),
   createdAt: createdAt ?? DateTime.utc(2026, 1, 1),
 );
@@ -25,6 +27,7 @@ void main() {
       expect(inv.email, 'a@x.com');
       expect(inv.role, 'WORKER');
       expect(inv.status, 'PENDING');
+      expect(inv.botIds, <String>['b1']);
       expect(inv.expiresAt, DateTime.utc(2026, 1, 2));
       expect(inv.createdAt, DateTime.utc(2026, 1, 1));
     });
@@ -37,6 +40,7 @@ void main() {
     test('difieren si cambia un campo', () {
       expect(_inv(), isNot(_inv(status: 'CANCELED')));
       expect(_inv(), isNot(_inv(email: 'b@x.com')));
+      expect(_inv(), isNot(_inv(botIds: const <String>['b2'])));
     });
   });
 

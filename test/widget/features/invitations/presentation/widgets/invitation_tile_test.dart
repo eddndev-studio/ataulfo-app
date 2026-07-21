@@ -9,12 +9,14 @@ Invitation _inv({
   String email = 'a@x.com',
   String role = 'WORKER',
   String status = 'PENDING',
+  List<String> botIds = const <String>[],
   DateTime? expiresAt,
 }) => Invitation(
   id: 'i1',
   email: email,
   role: role,
   status: status,
+  botIds: botIds,
   expiresAt: expiresAt ?? DateTime.utc(2026, 6, 1),
   createdAt: DateTime.utc(2026, 5, 25),
 );
@@ -36,6 +38,20 @@ void main() {
     expect(find.text('a@x.com'), findsOneWidget);
     expect(find.widgetWithText(AppPill, 'Agente'), findsOneWidget);
     expect(find.widgetWithText(AppPill, 'Pendiente'), findsWidgets);
+  });
+
+  testWidgets('Agente muestra cuántos Canales recibirá', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        InvitationTile(
+          invitation: _inv(botIds: const <String>['b1', 'b2']),
+          now: _now,
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('invitation_tile.channels')), findsOneWidget);
+    expect(find.text('2 Canales'), findsOneWidget);
   });
 
   testWidgets('PENDING no caducada NO muestra badge de expirada', (

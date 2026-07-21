@@ -401,12 +401,35 @@ class AppRouter {
   final RouteObserver<PageRoute<dynamic>> _routeObserver =
       RouteObserver<PageRoute<dynamic>>();
 
-  /// Sub-rutas de configuración bot-level que el backend gatea ADMIN+
-  /// (`/bots/:id/{variables,maintenance}`). El `_redirect` las desvía al
-  /// detalle si el rol no alcanza.
+  /// Sub-rutas de configuración/observabilidad del Canal que el backend gatea
+  /// ADMIN+. Captura el id para que un deep-link sin privilegio vuelva al
+  /// detalle operativo del mismo Canal.
   static final RegExp _adminOnlyBotRoute = RegExp(
-    r'^/bots/[^/]+/(variables|maintenance)$',
+    r'^/bots/([^/]+)/(?:connect|variables|maintenance|wa-label-mappings)$'
+    r'|^/bots/([^/]+)/sessions/[^/]+/(?:ai-log|ai-ledger|executions)$',
   );
+
+  static const Set<String> _adminOnlyRoutePrefixes = <String>{
+    '/assistants',
+    '/templates',
+    '/flows',
+    '/members',
+    '/invitations',
+    '/org/labels',
+    '/org/ai-config',
+    '/org/customization',
+    '/org/public-catalog',
+    '/org/stickers',
+    '/stickers/pick',
+  };
+
+  static const Set<String> _supervisorOnlyRoutePrefixes = <String>{
+    '/agenda',
+    '/calendar',
+    '/catalog',
+    '/media',
+    '/cuenta',
+  };
 
   /// Bytes de miniatura para la comparación antes/después de una
   /// composición. Primero el cache compartido por ref; en un miss busca el
@@ -1671,6 +1694,10 @@ class AppRouter {
             BlocProvider<InvitationMutationCubit>(
               create: (_) => InvitationMutationCubit(_invitationsRepo),
             ),
+            BlocProvider<BotsBloc>(
+              create: (_) =>
+                  BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+            ),
           ],
           child: Scaffold(
             appBar: AppBar(title: const Text('Invitaciones')),
@@ -2074,13 +2101,20 @@ String? redirectForState(AuthState auth, String location) {
       // /login.
       return _isPublic(location) ? null : '/login';
     case AuthAuthenticated(:final identity):
-      // Gateo ADMIN+ de las sub-rutas de configuración bot-level (el backend
-      // las cabla adminOnly y 403ea a WORKER). Un deep-link de WORKER cae al
-      // detalle del bot en vez de pintar una pantalla que fallaría. Es gateo
-      // cosmético: la autoridad real sigue siendo el 403/404 del backend.
-      if (AppRouter._adminOnlyBotRoute.hasMatch(location) &&
+      // Gateo cosmético, fail-closed, que refleja las bandas de capacidades
+      // del backend. La autoridad real continúa siendo su 403/404.
+      final botAdminMatch = AppRouter._adminOnlyBotRoute.firstMatch(location);
+      if (botAdminMatch != null && !isAdminOrAbove(identity.role)) {
+        final botId = botAdminMatch.group(1) ?? botAdminMatch.group(2)!;
+        return '/bots/$botId';
+      }
+      if (_matchesAnyPrefix(location, AppRouter._adminOnlyRoutePrefixes) &&
           !isAdminOrAbove(identity.role)) {
-        return location.substring(0, location.lastIndexOf('/'));
+        return '/home';
+      }
+      if (_matchesAnyPrefix(location, AppRouter._supervisorOnlyRoutePrefixes) &&
+          !isSupervisorOrAbove(identity.role)) {
+        return '/home';
       }
       // Sesión válida: las rutas de entrada rebotan a /home; verify/accept se
       // permiten (el operador puede verificar o aceptar invitaciones logueado).
@@ -2107,6 +2141,10 @@ String? redirectForState(AuthState auth, String location) {
       return '/select-org';
   }
 }
+
+bool _matchesAnyPrefix(String location, Set<String> prefixes) => prefixes.any(
+  (prefix) => location == prefix || location.startsWith('$prefix/'),
+);
 
 /// Adapta el stream del bloc a un `Listenable` que GoRouter sabe
 /// consumir. Cada emisión del bloc → `notifyListeners()` → re-evaluación

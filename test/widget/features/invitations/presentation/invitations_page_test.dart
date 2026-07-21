@@ -1,5 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
+import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/invitations/domain/entities/invitation.dart';
 import 'package:ataulfo/features/invitations/domain/failures/invitations_failure.dart';
 import 'package:ataulfo/features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
@@ -17,6 +19,21 @@ class _MockInvitationsBloc extends MockBloc<InvitationsEvent, InvitationsState>
 
 class _MockInvitationMutationCubit extends MockCubit<InvitationMutationState>
     implements InvitationMutationCubit {}
+
+class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
+    implements BotsBloc {}
+
+const _bot = Bot(
+  id: 'b1',
+  orgId: 'o1',
+  templateId: 't1',
+  name: 'Ventas',
+  channel: BotChannel.waba,
+  identifier: null,
+  version: 1,
+  paused: false,
+  aiDisabled: false,
+);
 
 Invitation _pending({String id = 'i1', String email = 'a@x.com'}) => Invitation(
   id: id,
@@ -43,13 +60,18 @@ void main() {
 
   late _MockInvitationsBloc bloc;
   late _MockInvitationMutationCubit mutation;
+  late _MockBotsBloc botsBloc;
 
   setUp(() {
     bloc = _MockInvitationsBloc();
     mutation = _MockInvitationMutationCubit();
+    botsBloc = _MockBotsBloc();
     when(() => bloc.state).thenReturn(const InvitationsInitial());
     when(() => mutation.state).thenReturn(const InvitationMutationIdle());
-    when(() => mutation.create(any(), any())).thenAnswer((_) async {});
+    when(
+      () => botsBloc.state,
+    ).thenReturn(const BotsLoaded(items: <Bot>[_bot], isRefreshing: false));
+    when(() => mutation.create(any(), any(), any())).thenAnswer((_) async {});
     when(() => mutation.cancel(any())).thenAnswer((_) async {});
   });
 
@@ -59,6 +81,7 @@ void main() {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<InvitationsBloc>.value(value: bloc),
         BlocProvider<InvitationMutationCubit>.value(value: mutation),
+        BlocProvider<BotsBloc>.value(value: botsBloc),
       ],
       child: const Scaffold(body: InvitationsPage()),
     ),
@@ -125,7 +148,9 @@ void main() {
     await tester.tap(find.byKey(const Key('invite.submit')));
     await tester.pumpAndSettle();
 
-    verify(() => mutation.create('new@x.com', 'WORKER')).called(1);
+    verify(
+      () => mutation.create('new@x.com', 'WORKER', const <String>[]),
+    ).called(1);
   });
 
   testWidgets('cancelar una PENDING (confirmado) despacha cancel', (

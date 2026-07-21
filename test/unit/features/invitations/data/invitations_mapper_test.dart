@@ -11,6 +11,7 @@ void main() {
         email: 'a@x.com',
         role: 'ADMIN',
         status: 'PENDING',
+        botIds: const <String>['b1'],
         expiresAt: DateTime.utc(2026, 6, 1),
         createdAt: DateTime.utc(2026, 5, 25),
       );
@@ -24,6 +25,7 @@ void main() {
           email: 'a@x.com',
           role: 'ADMIN',
           status: 'PENDING',
+          botIds: const <String>['b1'],
           expiresAt: DateTime.utc(2026, 6, 1),
           createdAt: DateTime.utc(2026, 5, 25),
         ),

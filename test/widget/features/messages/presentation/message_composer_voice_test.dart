@@ -116,30 +116,35 @@ void main() {
     when(() => qrBloc.state).thenReturn(const QuickRepliesLoading());
   });
 
-  Widget host(AudioRecorder recorder, {ReplyDraftCubit? replyDraft}) =>
-      MaterialApp(
-        theme: AppDesignTheme.dark(),
-        home: MultiRepositoryProvider(
-          providers: <RepositoryProvider<dynamic>>[
-            RepositoryProvider<MediaFilePicker>.value(value: picker),
-            RepositoryProvider<MediaRepository>.value(value: mediaRepo),
-            RepositoryProvider<MessageMediaCache>.value(value: mediaCache),
-            RepositoryProvider<AudioRecorder>.value(value: recorder),
-          ],
-          child: MultiBlocProvider(
-            providers: <BlocProvider<dynamic>>[
-              BlocProvider<MessagesBloc>.value(value: msgBloc),
-              BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
-              if (replyDraft != null)
-                BlocProvider<ReplyDraftCubit>.value(value: replyDraft)
-              else
-                BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
-              BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
-            ],
-            child: Scaffold(body: MessageComposer(now: () => fakeNow)),
-          ),
+  Widget host(
+    AudioRecorder recorder, {
+    ReplyDraftCubit? replyDraft,
+    bool canUseMedia = true,
+  }) => MaterialApp(
+    theme: AppDesignTheme.dark(),
+    home: MultiRepositoryProvider(
+      providers: <RepositoryProvider<dynamic>>[
+        RepositoryProvider<MediaFilePicker>.value(value: picker),
+        RepositoryProvider<MediaRepository>.value(value: mediaRepo),
+        RepositoryProvider<MessageMediaCache>.value(value: mediaCache),
+        RepositoryProvider<AudioRecorder>.value(value: recorder),
+      ],
+      child: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<MessagesBloc>.value(value: msgBloc),
+          BlocProvider<QuickRepliesBloc>.value(value: qrBloc),
+          if (replyDraft != null)
+            BlocProvider<ReplyDraftCubit>.value(value: replyDraft)
+          else
+            BlocProvider<ReplyDraftCubit>(create: (_) => ReplyDraftCubit()),
+          BlocProvider<AttachPanelCubit>(create: (_) => AttachPanelCubit()),
+        ],
+        child: Scaffold(
+          body: MessageComposer(now: () => fakeNow, canUseMedia: canUseMedia),
         ),
-      );
+      ),
+    ),
+  );
 
   /// Mantiene el dedo sobre el micrófono y deja que `start()` resuelva. Devuelve
   /// el gesto vivo para deslizar/soltar.
@@ -183,6 +188,17 @@ void main() {
     await tester.pumpWidget(host(_FakeRecorder()));
     await tester.pump();
     expect(find.byKey(const Key('composer.mic')), findsOneWidget);
+  });
+
+  testWidgets('sin capacidad de medios oculta clip y micrófono, no el texto', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(_FakeRecorder(), canUseMedia: false));
+    await tester.pump();
+    expect(find.byKey(const Key('composer.input')), findsOneWidget);
+    expect(find.byKey(const Key('composer.quickreply')), findsOneWidget);
+    expect(find.byKey(const Key('composer.attach')), findsNothing);
+    expect(find.byKey(const Key('composer.mic')), findsNothing);
   });
 
   testWidgets('sin permiso de micrófono avisa y no entra a grabar', (

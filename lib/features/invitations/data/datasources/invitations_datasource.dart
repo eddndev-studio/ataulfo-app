@@ -12,9 +12,14 @@ abstract interface class InvitationsDatasource {
   /// `GET /workspace/invitations` — historial. 200 con `[]` legítimo.
   Future<List<Invitation>> list();
 
-  /// `POST /workspace/invitations` con body `{email, role}`. 201 ⇒ devuelve el
-  /// [CreatedInvitation] (token crudo a compartir + si el correo salió).
-  Future<CreatedInvitation> create(String email, String role);
+  /// `POST /workspace/invitations` con body `{email, role, bot_ids}`. Los ids
+  /// sólo conceden acceso cuando el rol es WORKER; el backend valida el
+  /// invariante. 201 ⇒ token crudo a compartir + si el correo salió.
+  Future<CreatedInvitation> create(
+    String email,
+    String role,
+    List<String> botIds,
+  );
 
   /// `DELETE /workspace/invitations/{id}`. 204 ⇒ completa.
   Future<void> cancel(String id);
@@ -50,11 +55,19 @@ class DioInvitationsDatasource implements InvitationsDatasource {
   }
 
   @override
-  Future<CreatedInvitation> create(String email, String role) async {
+  Future<CreatedInvitation> create(
+    String email,
+    String role,
+    List<String> botIds,
+  ) async {
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '/workspace/invitations',
-        data: <String, dynamic>{'email': email, 'role': role},
+        data: <String, dynamic>{
+          'email': email,
+          'role': role,
+          'bot_ids': botIds,
+        },
       );
       final body = res.data;
       if (body == null) {

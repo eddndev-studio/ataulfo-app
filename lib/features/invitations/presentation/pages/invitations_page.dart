@@ -10,6 +10,8 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../bots/domain/entities/bot.dart';
+import '../../../bots/presentation/bloc/bots_bloc.dart';
 import '../../domain/entities/invitation.dart';
 import '../../domain/failures/invitations_failure.dart';
 import '../bloc/invitation_mutation_cubit.dart';
@@ -43,10 +45,32 @@ class InvitationsPage extends StatelessWidget {
               AppTokens.sp4,
               0,
             ),
-            child: AppButton.filled(
-              key: const Key('invitations.invite'),
-              label: 'Invitar',
-              onPressed: () => _openInviteSheet(context),
+            child: BlocBuilder<BotsBloc, BotsState>(
+              builder: (context, state) => AppButton.filled(
+                key: const Key('invitations.invite'),
+                label: switch (state) {
+                  BotsLoaded() => 'Invitar',
+                  BotsFailed() => 'Reintentar Canales',
+                  _ => 'Cargando Canales…',
+                },
+                onPressed: switch (state) {
+                  BotsLoaded(items: final bots) => () => _openInviteSheet(
+                    context,
+                    bots,
+                  ),
+                  BotsFailed() => () {
+                    context.read<BotsBloc>().add(const BotsLoadRequested());
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Necesitamos cargar los Canales antes de invitar.',
+                        ),
+                      ),
+                    );
+                  },
+                  _ => null,
+                },
+              ),
             ),
           ),
           const Expanded(child: _Body()),
@@ -95,11 +119,11 @@ class InvitationsPage extends StatelessWidget {
   }
 }
 
-Future<void> _openInviteSheet(BuildContext context) async {
+Future<void> _openInviteSheet(BuildContext context, List<Bot> bots) async {
   final cubit = context.read<InvitationMutationCubit>();
-  final result = await InviteSheet.open(context);
+  final result = await InviteSheet.open(context, bots: bots);
   if (result == null) return;
-  unawaited(cubit.create(result.email, result.role));
+  unawaited(cubit.create(result.email, result.role, result.botIds));
 }
 
 Future<void> _confirmCancel(BuildContext context, Invitation invitation) async {

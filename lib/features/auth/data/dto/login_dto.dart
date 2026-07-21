@@ -181,6 +181,7 @@ class PendingInvitationResp {
     required this.orgId,
     required this.orgName,
     required this.role,
+    required this.botIds,
   });
 
   factory PendingInvitationResp.fromJson(Map<String, dynamic> json) {
@@ -188,10 +189,13 @@ class PendingInvitationResp {
     final orgId = json['org_id'];
     final orgName = json['org_name'];
     final role = json['role'];
+    final botIds = json['bot_ids'];
     if (id is! String ||
         orgId is! String ||
         orgName is! String ||
-        role is! String) {
+        role is! String ||
+        botIds is! List<dynamic> ||
+        botIds.any((id) => id is! String)) {
       throw const FormatException(
         'pendingInvitationResp: clave obligatoria ausente',
       );
@@ -201,6 +205,7 @@ class PendingInvitationResp {
       orgId: orgId,
       orgName: orgName,
       role: role,
+      botIds: List<String>.unmodifiable(botIds.cast<String>()),
     );
   }
 
@@ -208,6 +213,7 @@ class PendingInvitationResp {
   final String orgId;
   final String orgName;
   final String role;
+  final List<String> botIds;
 }
 
 /// Respuesta de `POST /auth/invitations/accept-pending`: la membership recién

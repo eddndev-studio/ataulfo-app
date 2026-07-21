@@ -49,7 +49,11 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// las acciones sobre un mensaje): cada fila devuelve su acción al cerrarse
   /// la hoja y se despacha con el context del app bar, que sí tiene los
   /// repos/blocs del scope del hilo.
-  Future<void> _openActionsSheet(BuildContext context, bool isAdmin) async {
+  Future<void> _openActionsSheet(
+    BuildContext context,
+    bool isAdmin,
+    bool canUseNotes,
+  ) async {
     final action = await showAppBottomSheet<_ThreadAction>(
       context,
       backgroundColor: AppTokens.surface1,
@@ -74,13 +78,14 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                   onTap: () =>
                       Navigator.of(sheetContext).pop(_ThreadAction.runFlow),
                 ),
-                AppActionRow(
-                  key: const Key('thread.notes'),
-                  icon: Icons.sticky_note_2_outlined,
-                  title: 'Notas del chat',
-                  onTap: () =>
-                      Navigator.of(sheetContext).pop(_ThreadAction.notes),
-                ),
+                if (canUseNotes)
+                  AppActionRow(
+                    key: const Key('thread.notes'),
+                    icon: Icons.sticky_note_2_outlined,
+                    title: 'Notas del chat',
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(_ThreadAction.notes),
+                  ),
                 if (isAdmin) ...<Widget>[
                   const Divider(height: AppTokens.sp6),
                   AppActionRow(
@@ -197,15 +202,17 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
         // El control del bot y el resto de acciones se agrupan tras una sola
         // lectura del rol para no saturar la barra. "Control del bot"
         // (pausar/reanudar) queda visible para ADMIN+ porque leer las etiquetas
-        // de silencio exige acceso a la plantilla; correr flujo y notas viven
-        // siempre en el menú (operación cotidiana, sin gate); y las pantallas
-        // de observabilidad (razonamiento/bitácora/ejecuciones) se agregan al
-        // menú solo para ADMIN+ (el backend igual rechaza con 403).
+        // de silencio exige acceso a la plantilla; correr flujo permanece como
+        // operación del Canal; Notas requiere SUPERVISOR+; y observabilidad se
+        // agrega sólo para ADMIN+ (el backend igual rechaza con 403).
         BlocBuilder<AuthBloc, AuthState>(
           builder: (context, authState) {
             final isAdmin =
                 authState is AuthAuthenticated &&
                 isAdminOrAbove(authState.identity.role);
+            final canUseNotes =
+                authState is AuthAuthenticated &&
+                isSupervisorOrAbove(authState.identity.role);
             return Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
@@ -224,7 +231,8 @@ class ChatThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
                   key: const Key('thread.more'),
                   tooltip: 'Más acciones',
                   icon: const Icon(Icons.more_vert),
-                  onPressed: () => _openActionsSheet(context, isAdmin),
+                  onPressed: () =>
+                      _openActionsSheet(context, isAdmin, canUseNotes),
                 ),
               ],
             );

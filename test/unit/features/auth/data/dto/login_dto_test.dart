@@ -213,6 +213,7 @@ void main() {
         'org_id': 'o-9',
         'org_name': 'Acme',
         'role': 'WORKER',
+        'bot_ids': <String>['b1', 'b2'],
         'expires_at': '2026-07-15T00:00:00Z',
       });
 
@@ -220,6 +221,7 @@ void main() {
       expect(resp.orgId, 'o-9');
       expect(resp.orgName, 'Acme');
       expect(resp.role, 'WORKER');
+      expect(resp.botIds, <String>['b1', 'b2']);
     });
 
     test('lanza FormatException si falta una clave obligatoria', () {
@@ -229,6 +231,24 @@ void main() {
           'org_id': 'o-9',
           'org_name': 'Acme',
           // role ausente
+        }),
+        throwsFormatException,
+      );
+    });
+
+    test('lanza FormatException si bot_ids falta o no son strings', () {
+      final base = <String, dynamic>{
+        'id': 'inv-1',
+        'org_id': 'o-9',
+        'org_name': 'Acme',
+        'role': 'WORKER',
+      };
+
+      expect(() => PendingInvitationResp.fromJson(base), throwsFormatException);
+      expect(
+        () => PendingInvitationResp.fromJson(<String, dynamic>{
+          ...base,
+          'bot_ids': <Object>['b1', 2],
         }),
         throwsFormatException,
       );

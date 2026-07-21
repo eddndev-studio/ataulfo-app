@@ -60,6 +60,22 @@ const _identity = Identity(
   emailVerified: true,
 );
 
+const _workerIdentity = Identity(
+  userId: 'u2',
+  orgId: 'o1',
+  role: 'WORKER',
+  email: 'agente@example.com',
+  emailVerified: true,
+);
+
+const _supervisorIdentity = Identity(
+  userId: 'u3',
+  orgId: 'o1',
+  role: 'SUPERVISOR',
+  email: 'supervisor@example.com',
+  emailVerified: true,
+);
+
 void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsBloc botsBloc;
@@ -156,6 +172,61 @@ void main() {
         'Ajustes',
       ]);
       expect(inBottomNav(find.text('Etiquetas')), findsNothing);
+    });
+
+    testWidgets('Agente solo ve Bandeja y Ajustes', (tester) async {
+      when(
+        () => authBloc.state,
+      ).thenReturn(const AuthAuthenticated(_workerIdentity));
+      useViewport(tester, widthDp: 420);
+      await tester.pumpWidget(host());
+
+      final nav = tester.widget<BottomNavigationBar>(
+        find.byType(BottomNavigationBar),
+      );
+      expect(nav.items.map((item) => item.label).toList(), <String>[
+        'Bandeja',
+        'Ajustes',
+      ]);
+      expect(inBottomNav(find.text('Asistentes')), findsNothing);
+      expect(inBottomNav(find.text('Agenda')), findsNothing);
+      expect(inBottomNav(find.text('Ataúlfo')), findsNothing);
+    });
+
+    testWidgets('Supervisor ve operación global pero no Asistentes', (
+      tester,
+    ) async {
+      when(
+        () => authBloc.state,
+      ).thenReturn(const AuthAuthenticated(_supervisorIdentity));
+      useViewport(tester, widthDp: 420);
+      await tester.pumpWidget(host());
+
+      final nav = tester.widget<BottomNavigationBar>(
+        find.byType(BottomNavigationBar),
+      );
+      expect(nav.items.map((item) => item.label).toList(), <String>[
+        'Bandeja',
+        'Agenda',
+        'Ataúlfo',
+        'Ajustes',
+      ]);
+      expect(find.text('Asistentes'), findsNothing);
+    });
+
+    testWidgets('handoff a Ataúlfo no evade el rol Agente', (tester) async {
+      when(
+        () => authBloc.state,
+      ).thenReturn(const AuthAuthenticated(_workerIdentity));
+      useViewport(tester, widthDp: 420);
+      await tester.pumpWidget(host(assistantDraft: 'Crea una campaña'));
+
+      expect(find.byType(ConversationsListPage), findsOneWidget);
+      expect(find.byType(PlatformAgentPage), findsNothing);
+      final nav = tester.widget<BottomNavigationBar>(
+        find.byType(BottomNavigationBar),
+      );
+      expect(nav.currentIndex, 0);
     });
 
     testWidgets('la selección usa ícono filled + AppIconPop', (tester) async {

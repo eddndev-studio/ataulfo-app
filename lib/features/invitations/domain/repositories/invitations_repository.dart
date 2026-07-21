@@ -11,7 +11,11 @@ abstract interface class InvitationsRepository {
   /// Emite una invitación al [email] con el [role] (uppercase del set cerrado).
   /// Devuelve el [CreatedInvitation] con el token crudo a compartir y si el
   /// correo salió; lanza `InvitationsFailure` tipada ante el rechazo.
-  Future<CreatedInvitation> create(String email, String role);
+  Future<CreatedInvitation> create(
+    String email,
+    String role,
+    List<String> botIds,
+  );
 
   /// Cancela (soft) la invitación [id]. Completa sin valor en 204; lanza
   /// `InvitationsFailure` tipada (not-found, gone, etc.).

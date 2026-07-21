@@ -307,7 +307,7 @@ void main() {
       expect(find.byWidgetPredicate((w) => w is PopupMenuButton), findsNothing);
     });
 
-    testWidgets('correr flujo y notas viven en el menú, no en la barra', (
+    testWidgets('Agente puede correr flujo pero no abre Notas globales', (
       tester,
     ) async {
       when(() => bloc.state).thenReturn(const ProfileLoading());
@@ -315,10 +315,23 @@ void main() {
       // Cerrado: las acciones del menú no están en el árbol.
       expect(find.byKey(const Key('thread.run_flow')), findsNothing);
       expect(find.byKey(const Key('thread.notes')), findsNothing);
-      // Abierto: aparecen como entradas del menú.
+      // Abierto: la operación del Canal permanece, Notas requiere Supervisor.
       await tester.tap(find.byKey(const Key('thread.more')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('thread.run_flow')), findsOneWidget);
+      expect(find.byKey(const Key('thread.notes')), findsNothing);
+    });
+
+    testWidgets('Supervisor sí ve Notas en el menú', (tester) async {
+      when(() => auth.state).thenReturn(
+        const AuthAuthenticated(
+          Identity(userId: 'u1', email: 'x@x', orgId: 'o1', role: 'SUPERVISOR'),
+        ),
+      );
+      await tester.pumpWidget(host());
+      await tester.tap(find.byKey(const Key('thread.more')));
+      await tester.pumpAndSettle();
+
       expect(find.byKey(const Key('thread.notes')), findsOneWidget);
     });
   });
@@ -374,6 +387,11 @@ void main() {
         ),
       ).thenAnswer((_) async => <Note>[]);
       when(() => bloc.state).thenReturn(const ProfileLoading());
+      when(() => auth.state).thenReturn(
+        const AuthAuthenticated(
+          Identity(userId: 'u1', email: 'x@x', orgId: 'o1', role: 'SUPERVISOR'),
+        ),
+      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -414,9 +432,9 @@ void main() {
       expect(find.byKey(const Key('thread.ai_log')), findsNothing);
       expect(find.byKey(const Key('thread.ai_ledger')), findsNothing);
       expect(find.byKey(const Key('thread.executions')), findsNothing);
-      // Pero el menú NO queda vacío: correr flujo y notas siguen ahí.
+      // El menú no queda vacío: correr flujo sigue siendo operación del Canal.
       expect(find.byKey(const Key('thread.run_flow')), findsOneWidget);
-      expect(find.byKey(const Key('thread.notes')), findsOneWidget);
+      expect(find.byKey(const Key('thread.notes')), findsNothing);
     });
 
     testWidgets('ADMIN: el menú lista razonamiento, bitácora y ejecuciones', (

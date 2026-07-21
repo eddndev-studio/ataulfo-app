@@ -14,8 +14,11 @@ class InvitationsRepositoryImpl implements InvitationsRepository {
   Future<List<Invitation>> list() => _ds.list();
 
   @override
-  Future<CreatedInvitation> create(String email, String role) =>
-      _ds.create(email, role);
+  Future<CreatedInvitation> create(
+    String email,
+    String role,
+    List<String> botIds,
+  ) => _ds.create(email, role, botIds);
 
   @override
   Future<void> cancel(String id) => _ds.cancel(id);

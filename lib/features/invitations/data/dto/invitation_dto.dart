@@ -7,6 +7,7 @@ class InvitationResp {
     required this.email,
     required this.role,
     required this.status,
+    required this.botIds,
     required this.expiresAt,
     required this.createdAt,
     this.token,
@@ -18,12 +19,15 @@ class InvitationResp {
     final email = json['email'];
     final role = json['role'];
     final status = json['status'];
+    final botIds = json['bot_ids'];
     final expiresAt = json['expires_at'];
     final createdAt = json['created_at'];
     if (id is! String ||
         email is! String ||
         role is! String ||
         status is! String ||
+        botIds is! List<dynamic> ||
+        botIds.any((id) => id is! String) ||
         expiresAt is! String ||
         createdAt is! String) {
       throw const FormatException('invitationResp: clave obligatoria ausente');
@@ -39,6 +43,7 @@ class InvitationResp {
       email: email,
       role: role,
       status: status,
+      botIds: List<String>.unmodifiable(botIds.cast<String>()),
       expiresAt: DateTime.parse(expiresAt),
       createdAt: DateTime.parse(createdAt),
       token: token is String && token.isNotEmpty ? token : null,
@@ -50,6 +55,7 @@ class InvitationResp {
   final String email;
   final String role;
   final String status;
+  final List<String> botIds;
   final DateTime expiresAt;
   final DateTime createdAt;
 

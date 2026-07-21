@@ -10,6 +10,7 @@ class Invitation {
     required this.email,
     required this.role,
     required this.status,
+    this.botIds = const <String>[],
     required this.expiresAt,
     required this.createdAt,
   });
@@ -18,6 +19,7 @@ class Invitation {
   final String email;
   final String role;
   final String status;
+  final List<String> botIds;
   final DateTime expiresAt;
   final DateTime createdAt;
 
@@ -35,11 +37,28 @@ class Invitation {
         other.email == email &&
         other.role == role &&
         other.status == status &&
+        _sameStrings(other.botIds, botIds) &&
         other.expiresAt == expiresAt &&
         other.createdAt == createdAt;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, email, role, status, expiresAt, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    email,
+    role,
+    status,
+    Object.hashAll(botIds),
+    expiresAt,
+    createdAt,
+  );
+}
+
+bool _sameStrings(List<String> a, List<String> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

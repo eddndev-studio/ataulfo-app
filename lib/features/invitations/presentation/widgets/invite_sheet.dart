@@ -7,22 +7,30 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/i18n/role_labels.dart';
+import '../../../bots/domain/entities/bot.dart';
 
 /// Lo que la hoja devuelve al enviarse: a quién invitar y con qué rol. La hoja
 /// NO conoce ningún bloc; la página despacha la creación sobre su cubit (la hoja
 /// vive en otro subárbol del Navigator).
 class InviteSheetResult {
-  const InviteSheetResult({required this.email, required this.role});
+  const InviteSheetResult({
+    required this.email,
+    required this.role,
+    required this.botIds,
+  });
 
   final String email;
   final String role;
+  final List<String> botIds;
 }
 
 /// Hoja para emitir una invitación: correo + rol. El correo viaja recortado; el
 /// backend es la autoridad sobre su validez (un correo inválido vuelve como
 /// 422). El rol arranca en WORKER (el invitado más común) y se puede cambiar.
 class InviteSheet extends StatefulWidget {
-  const InviteSheet({super.key});
+  const InviteSheet({super.key, required this.bots});
+
+  final List<Bot> bots;
 
   // OWNER se excluye a propósito: aceptar una invitación OWNER mintearía un
   // segundo propietario saltando el flujo deliberado de transferir propiedad.
@@ -35,12 +43,15 @@ class InviteSheet extends StatefulWidget {
 
   /// Abre la hoja y resuelve con los datos de la invitación, o `null` si se
   /// descartó sin enviar.
-  static Future<InviteSheetResult?> open(BuildContext context) {
+  static Future<InviteSheetResult?> open(
+    BuildContext context, {
+    required List<Bot> bots,
+  }) {
     return showAppBottomSheet<InviteSheetResult>(
       context,
       isScrollControlled: true,
       backgroundColor: AppTokens.surface1,
-      builder: (_) => const InviteSheet(),
+      builder: (_) => InviteSheet(bots: bots),
     );
   }
 
@@ -51,6 +62,7 @@ class InviteSheet extends StatefulWidget {
 class _InviteSheetState extends State<InviteSheet> {
   late final TextEditingController _emailCtrl;
   String _role = 'WORKER';
+  final Set<String> _selectedBotIds = <String>{};
 
   @override
   void initState() {
@@ -77,9 +89,33 @@ class _InviteSheetState extends State<InviteSheet> {
 
   void _submit() {
     if (!_canSubmit) return;
-    Navigator.of(
-      context,
-    ).pop(InviteSheetResult(email: _emailCtrl.text.trim(), role: _role));
+    final botIds = _role == 'WORKER'
+        ? (_selectedBotIds.toList(growable: false)..sort())
+        : const <String>[];
+    Navigator.of(context).pop(
+      InviteSheetResult(
+        email: _emailCtrl.text.trim(),
+        role: _role,
+        botIds: botIds,
+      ),
+    );
+  }
+
+  void _selectRole(String role) {
+    setState(() {
+      _role = role;
+      if (role != 'WORKER') _selectedBotIds.clear();
+    });
+  }
+
+  void _selectBot(String id, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedBotIds.add(id);
+      } else {
+        _selectedBotIds.remove(id);
+      }
+    });
   }
 
   @override
@@ -125,10 +161,57 @@ class _InviteSheetState extends State<InviteSheet> {
                 AppChoiceChip(
                   label: roleLabel(r),
                   selected: r == _role,
-                  onSelected: (_) => setState(() => _role = r),
+                  onSelected: (_) => _selectRole(r),
                 ),
             ],
           ),
+          if (_role == 'WORKER') ...<Widget>[
+            const SizedBox(height: AppTokens.sp4),
+            Text(
+              'Canales que puede atender',
+              style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+            ),
+            const SizedBox(height: AppTokens.sp1),
+            Column(
+              key: const Key('invite.channels'),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                if (widget.bots.isNotEmpty)
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: <Widget>[
+                      for (final bot in widget.bots)
+                        AppChoiceChip(
+                          label: bot.name,
+                          selected: _selectedBotIds.contains(bot.id),
+                          onSelected: (selected) =>
+                              _selectBot(bot.id, selected),
+                        ),
+                    ],
+                  ),
+                if (widget.bots.isNotEmpty && _selectedBotIds.isEmpty) ...[
+                  const SizedBox(height: AppTokens.sp2),
+                  Text(
+                    'Sin selección, el Agente entrará sin acceso a Canales.',
+                    key: const Key('invite.channels.warning'),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppTokens.warning,
+                    ),
+                  ),
+                ],
+                if (widget.bots.isEmpty)
+                  Text(
+                    'No hay Canales disponibles. El Agente entrará con acceso '
+                    'cero hasta que le asignes uno.',
+                    key: const Key('invite.channels.warning'),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppTokens.warning,
+                    ),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppTokens.sp5),
           AppButton.filled(
             key: const Key('invite.submit'),

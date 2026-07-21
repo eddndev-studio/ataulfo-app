@@ -104,10 +104,21 @@ void main() {
     expect(find.text('Tus organizaciones'), findsOneWidget);
   });
 
-  testWidgets('Etiquetas internas se gestiona desde Ajustes para todo rol', (
+  testWidgets('WORKER no gestiona el catálogo interno de Etiquetas', (
     tester,
   ) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_worker));
+
+    await tester.pumpWidget(host());
+
+    expect(find.byKey(const Key('settings.labels_tile')), findsNothing);
+    expect(find.text('Etiquetas'), findsNothing);
+  });
+
+  testWidgets('ADMIN sí gestiona el catálogo interno de Etiquetas', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_admin));
 
     await tester.pumpWidget(host());
 
@@ -231,11 +242,10 @@ void main() {
     expect(find.text('Medios'), findsOneWidget);
   });
 
-  testWidgets('Authenticated expone tile "Catálogo de productos" (visible '
-      'para todo rol: el listado es de lectura para cualquier miembro)', (
+  testWidgets('SUPERVISOR expone el Catálogo de productos global', (
     tester,
   ) async {
-    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_worker));
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_supervisor));
 
     await tester.pumpWidget(host());
 
@@ -247,6 +257,24 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Catálogo de productos'), findsOneWidget);
+  });
+
+  testWidgets('WORKER no ve catálogos ni herramientas globales', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_worker));
+
+    await tester.pumpWidget(host());
+
+    for (final key in <String>[
+      'settings.account_tile',
+      'settings.event_types_tile',
+      'settings.business_hours_tile',
+      'settings.product_catalog_tile',
+      'settings.media_tile',
+    ]) {
+      expect(find.byKey(Key(key)), findsNothing);
+    }
   });
 
   testWidgets('Authenticated expone tile "Notificaciones"', (tester) async {
@@ -466,8 +494,18 @@ void main() {
       find.byKey(const Key('settings.org_customization_tile')),
       findsNothing,
     );
-    // Billing es territorio admin: consistente con Configuración de IA.
-    expect(find.byKey(const Key('settings.account_tile')), findsNothing);
+    // Las herramientas globales sí pertenecen a la banda SUPERVISOR+.
+    for (final key in <String>[
+      'settings.account_tile',
+      'settings.event_types_tile',
+      'settings.business_hours_tile',
+      'settings.product_catalog_tile',
+      'settings.media_tile',
+    ]) {
+      expect(find.byKey(Key(key)), findsOneWidget);
+    }
+    // Gestionar catálogos organizacionales continúa siendo ADMIN+.
+    expect(find.byKey(const Key('settings.labels_tile')), findsNothing);
   });
 
   testWidgets('WORKER NO ve el tile "Miembros"', (tester) async {
@@ -477,6 +515,13 @@ void main() {
 
     expect(find.byKey(const Key('settings.members_tile')), findsNothing);
     expect(find.byKey(const Key('settings.org_ai_config_tile')), findsNothing);
+    expect(find.byKey(const Key('settings.labels_tile')), findsNothing);
+    expect(find.byKey(const Key('settings.account_tile')), findsNothing);
+    expect(
+      find.byKey(const Key('settings.product_catalog_tile')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('settings.media_tile')), findsNothing);
   });
 
   testWidgets('tap "Miembros" apila /members (push, no go)', (tester) async {

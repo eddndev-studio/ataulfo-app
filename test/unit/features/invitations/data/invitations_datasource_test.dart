@@ -51,6 +51,7 @@ void main() {
     'email': email,
     'role': role,
     'status': status,
+    'bot_ids': <String>['b1'],
     'expires_at': '2026-06-01T12:00:00Z',
     'created_at': '2026-05-25T09:30:00Z',
   };
@@ -123,7 +124,7 @@ void main() {
   );
 
   group('DioInvitationsDatasource.create', () {
-    test('201 → devuelve token + email_sent y envía {email, role}', () async {
+    test('201 → devuelve token y envía correo, rol y canales', () async {
       when(
         () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
       ).thenAnswer(
@@ -137,7 +138,10 @@ void main() {
         ),
       );
 
-      final created = await ds.create('a@x.com', 'ADMIN');
+      final created = await ds.create('a@x.com', 'WORKER', const <String>[
+        'b2',
+        'b1',
+      ]);
 
       expect(created.token, 'RAW-SHARE-TOKEN');
       expect(created.emailSent, isTrue);
@@ -145,7 +149,11 @@ void main() {
       verify(
         () => dio.post<Map<String, dynamic>>(
           '/workspace/invitations',
-          data: const <String, dynamic>{'email': 'a@x.com', 'role': 'ADMIN'},
+          data: const <String, dynamic>{
+            'email': 'a@x.com',
+            'role': 'WORKER',
+            'bot_ids': <String>['b2', 'b1'],
+          },
         ),
       ).called(1);
     });
@@ -164,7 +172,7 @@ void main() {
         ),
       );
 
-      final created = await ds.create('a@x.com', 'ADMIN');
+      final created = await ds.create('a@x.com', 'ADMIN', const <String>[]);
       expect(created.token, 'T');
       expect(created.emailSent, isFalse);
     });
@@ -175,7 +183,7 @@ void main() {
       ).thenThrow(badResponse(409));
 
       await expectLater(
-        ds.create('a@x.com', 'ADMIN'),
+        ds.create('a@x.com', 'ADMIN', const <String>[]),
         throwsA(isA<InvitationsDuplicateFailure>()),
       );
     });
@@ -186,7 +194,7 @@ void main() {
       ).thenThrow(badResponse(422));
 
       await expectLater(
-        ds.create('a@x.com', 'ADMIN'),
+        ds.create('a@x.com', 'ADMIN', const <String>[]),
         throwsA(isA<InvitationsValidationFailure>()),
       );
     });
@@ -197,7 +205,7 @@ void main() {
       ).thenThrow(badResponse(403));
 
       await expectLater(
-        ds.create('a@x.com', 'ADMIN'),
+        ds.create('a@x.com', 'ADMIN', const <String>[]),
         throwsA(isA<InvitationsForbiddenFailure>()),
       );
     });
@@ -210,7 +218,7 @@ void main() {
         ).thenThrow(badResponse(500));
 
         await expectLater(
-          ds.create('a@x.com', 'ADMIN'),
+          ds.create('a@x.com', 'ADMIN', const <String>[]),
           throwsA(isA<InvitationsServerFailure>()),
         );
       },

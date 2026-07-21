@@ -13,12 +13,14 @@ class PendingInvitation {
     required this.orgId,
     required this.orgName,
     required this.role,
+    this.botIds = const <String>[],
   });
 
   final String id;
   final String orgId;
   final String orgName;
   final String role;
+  final List<String> botIds;
 
   @override
   bool operator ==(Object other) {
@@ -27,9 +29,20 @@ class PendingInvitation {
         other.id == id &&
         other.orgId == orgId &&
         other.orgName == orgName &&
-        other.role == role;
+        other.role == role &&
+        _sameStrings(other.botIds, botIds);
   }
 
   @override
-  int get hashCode => Object.hash(id, orgId, orgName, role);
+  int get hashCode =>
+      Object.hash(id, orgId, orgName, role, Object.hashAll(botIds));
+}
+
+bool _sameStrings(List<String> a, List<String> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

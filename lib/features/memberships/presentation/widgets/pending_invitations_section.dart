@@ -163,6 +163,18 @@ class _PendingTile extends StatelessWidget {
                 ),
                 const SizedBox(height: AppTokens.sp1),
                 AppPill.neutral(label: roleLabel(invitation.role)),
+                if (invitation.role == 'WORKER') ...<Widget>[
+                  const SizedBox(height: AppTokens.sp2),
+                  Text(
+                    _assignedChannels(invitation.botIds.length),
+                    key: const Key('memberships.pending.channels'),
+                    style: textTheme.labelSmall?.copyWith(
+                      color: invitation.botIds.isEmpty
+                          ? AppTokens.warning
+                          : AppTokens.text2,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -178,3 +190,9 @@ class _PendingTile extends StatelessWidget {
     );
   }
 }
+
+String _assignedChannels(int count) => switch (count) {
+  0 => 'Sin Canales asignados',
+  1 => '1 Canal asignado',
+  _ => '$count Canales asignados',
+};

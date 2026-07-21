@@ -10,6 +10,7 @@ void main() {
         'email': 'a@x.com',
         'role': 'WORKER',
         'status': 'PENDING',
+        'bot_ids': <String>['b1', 'b2'],
         'expires_at': '2026-06-01T12:00:00Z',
         'created_at': '2026-05-25T09:30:00Z',
       };
@@ -20,6 +21,7 @@ void main() {
       expect(resp.email, 'a@x.com');
       expect(resp.role, 'WORKER');
       expect(resp.status, 'PENDING');
+      expect(resp.botIds, <String>['b1', 'b2']);
       expect(resp.expiresAt, DateTime.utc(2026, 6, 1, 12));
       expect(resp.createdAt, DateTime.utc(2026, 5, 25, 9, 30));
     });
@@ -30,6 +32,7 @@ void main() {
         'email': 'a@x.com',
         'role': 'WORKER',
         'status': 'PENDING',
+        'bot_ids': <String>[],
         'expires_at': '2026-06-01T00:00:00Z',
         'created_at': '2026-05-25T00:00:00Z',
       };
@@ -53,12 +56,33 @@ void main() {
       expect(() => InvitationResp.fromJson(incomplete), throwsFormatException);
     });
 
+    test('lanza FormatException si bot_ids falta o contiene otro tipo', () {
+      final base = <String, dynamic>{
+        'id': 'i1',
+        'email': 'a@x.com',
+        'role': 'WORKER',
+        'status': 'PENDING',
+        'expires_at': '2026-06-01T00:00:00Z',
+        'created_at': '2026-05-25T00:00:00Z',
+      };
+
+      expect(() => InvitationResp.fromJson(base), throwsFormatException);
+      expect(
+        () => InvitationResp.fromJson(<String, dynamic>{
+          ...base,
+          'bot_ids': <Object>['b1', 2],
+        }),
+        throwsFormatException,
+      );
+    });
+
     test('lanza FormatException si un timestamp es inválido', () {
       final bad = <String, dynamic>{
         'id': 'i1',
         'email': 'a@x.com',
         'role': 'WORKER',
         'status': 'PENDING',
+        'bot_ids': <String>[],
         'expires_at': 'no-es-fecha',
         'created_at': '2026-05-25T00:00:00Z',
       };

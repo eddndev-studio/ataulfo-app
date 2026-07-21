@@ -150,9 +150,10 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 /// Las áreas de Ajustes como filas launcher en UNA card (paridad con los
-/// hubs): título + caption de qué hay detrás + chevron. Miembros queda
-/// gateado ADMIN+ porque el backend 403ea a roles por debajo (RequireRole);
-/// el gate es cosmético — la autoridad real es el 403 del servidor.
+/// hubs): título + caption de qué hay detrás + chevron. Las filas reflejan las
+/// bandas del backend: gestión organizacional ADMIN+, herramientas globales
+/// SUPERVISOR+ y preferencias personales para cualquier miembro. El gate es
+/// cosmético — la autoridad real es el 403 del servidor.
 class _SectionsCard extends StatelessWidget {
   const _SectionsCard({required this.identity, this.onLabelsChanged});
 
@@ -187,18 +188,18 @@ class _SectionsCard extends StatelessWidget {
             caption: 'Únete a otra organización con un código o enlace',
             onTap: () => context.push('/accept-invite'),
           ),
-          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-          AppSectionLink(
-            rowKey: const Key('settings.labels_tile'),
-            icon: Icons.label_outline,
-            title: 'Etiquetas',
-            caption: 'Organiza las conversaciones con categorías internas',
-            onTap: () async {
-              await context.push<void>('/org/labels');
-              if (context.mounted) onLabelsChanged?.call();
-            },
-          ),
           if (isAdminOrAbove(identity.role)) ...<Widget>[
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.labels_tile'),
+              icon: Icons.label_outline,
+              title: 'Etiquetas',
+              caption: 'Organiza las conversaciones con categorías internas',
+              onTap: () async {
+                await context.push<void>('/org/labels');
+                if (context.mounted) onLabelsChanged?.call();
+              },
+            ),
             const Divider(height: AppTokens.sp5, color: AppTokens.divider),
             AppSectionLink(
               rowKey: const Key('settings.members_tile'),
@@ -239,6 +240,8 @@ class _SectionsCard extends StatelessWidget {
               caption: 'Crea stickers de tu negocio con IA para el chat',
               onTap: () => context.push('/org/stickers'),
             ),
+          ],
+          if (isSupervisorOrAbove(identity.role)) ...<Widget>[
             const Divider(height: AppTokens.sp5, color: AppTokens.divider),
             AppSectionLink(
               rowKey: const Key('settings.account_tile'),
@@ -263,27 +266,25 @@ class _SectionsCard extends StatelessWidget {
               caption: 'Los días y horas en que se agendan citas',
               onTap: () => context.push('/calendar/hours'),
             ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.product_catalog_tile'),
+              icon: Icons.storefront_outlined,
+              title: 'Catálogo de productos',
+              caption: 'Lo que tu asistente puede ofrecer y compartir',
+              onTap: () => context.push('/catalog/products'),
+            ),
+            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+            AppSectionLink(
+              rowKey: const Key('settings.media_tile'),
+              icon: Icons.perm_media_outlined,
+              // Mismo término que el destino "Medios" del menú de adjuntar del
+              // chat: ambos abren el MISMO catálogo de la organización.
+              title: 'Medios',
+              caption: 'Imágenes, videos y audios para tus flujos',
+              onTap: () => context.push('/media'),
+            ),
           ],
-          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-          // Visible para todos: el listado del catálogo es de lectura para
-          // cualquier miembro; crear/editar lo autoriza el backend (403).
-          AppSectionLink(
-            rowKey: const Key('settings.product_catalog_tile'),
-            icon: Icons.storefront_outlined,
-            title: 'Catálogo de productos',
-            caption: 'Lo que tu asistente puede ofrecer y compartir',
-            onTap: () => context.push('/catalog/products'),
-          ),
-          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-          AppSectionLink(
-            rowKey: const Key('settings.media_tile'),
-            icon: Icons.perm_media_outlined,
-            // Mismo término que el destino "Medios" del menú de adjuntar del
-            // chat: ambos abren el MISMO catálogo de la organización.
-            title: 'Medios',
-            caption: 'Imágenes, videos y audios para tus flujos',
-            onTap: () => context.push('/media'),
-          ),
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
           AppSectionLink(
             rowKey: const Key('settings.notifications_tile'),

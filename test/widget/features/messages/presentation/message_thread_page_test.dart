@@ -1673,6 +1673,32 @@ void main() {
       expect(find.byType(AppChatComposer), findsOneWidget);
     });
 
+    testWidgets('WORKER conserva texto y respuestas, sin controles de medios', (
+      tester,
+    ) async {
+      when(() => bloc.state).thenReturn(loadedEmpty);
+      when(() => authBloc.state).thenReturn(
+        const AuthAuthenticated(
+          Identity(userId: 'u', email: 'x@x', orgId: 'o', role: 'WORKER'),
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('composer.input')), findsOneWidget);
+      expect(find.byKey(const Key('composer.quickreply')), findsOneWidget);
+      expect(find.byKey(const Key('composer.attach')), findsNothing);
+    });
+
+    testWidgets('SUPERVISOR conserva los controles de medios', (tester) async {
+      when(() => bloc.state).thenReturn(loadedEmpty);
+      when(() => authBloc.state).thenReturn(
+        const AuthAuthenticated(
+          Identity(userId: 'u', email: 'x@x', orgId: 'o', role: 'SUPERVISOR'),
+        ),
+      );
+      await tester.pumpWidget(host());
+      expect(find.byKey(const Key('composer.attach')), findsOneWidget);
+    });
+
     testWidgets('Loading y Failed ocultan el composer', (tester) async {
       when(() => bloc.state).thenReturn(const MessagesLoading());
       await tester.pumpWidget(host());
@@ -1883,6 +1909,11 @@ void main() {
           isLoadingOlder: false,
         ),
       );
+      when(() => authBloc.state).thenReturn(
+        const AuthAuthenticated(
+          Identity(userId: 'u', email: 'x@x', orgId: 'o', role: 'SUPERVISOR'),
+        ),
+      );
     });
 
     Widget hostMedia() => MaterialApp(
@@ -1906,6 +1937,7 @@ void main() {
           providers: <BlocProvider<dynamic>>[
             BlocProvider<MessagesBloc>.value(value: bloc),
             BlocProvider<ThreadAudioCubit>.value(value: audio),
+            BlocProvider<AuthBloc>.value(value: authBloc),
             BlocProvider<MonitorLiveCubit>(
               create: (_) => MonitorLiveCubit(_FakeMonitorDs()),
             ),

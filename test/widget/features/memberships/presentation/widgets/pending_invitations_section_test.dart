@@ -27,6 +27,7 @@ const _inv = PendingInvitation(
   orgId: 'o-9',
   orgName: 'Acme',
   role: 'WORKER',
+  botIds: <String>['b1'],
 );
 
 const _identity = Identity(
@@ -97,6 +98,7 @@ void main() {
     expect(find.text('Invitaciones pendientes'), findsOneWidget);
     expect(find.text('Acme'), findsOneWidget);
     expect(find.text('Agente'), findsOneWidget); // roleLabel(WORKER)
+    expect(find.text('1 Canal asignado'), findsOneWidget);
     expect(
       find.byKey(const Key('memberships.pending.join.inv-1')),
       findsOneWidget,
