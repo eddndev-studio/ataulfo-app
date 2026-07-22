@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../tokens.dart';
 
-/// Header rico de una sección (Bots / Plantillas / Ajustes): una tarjeta
-/// full-bleed con el fondo PRIMARIO (gradiente vertical) que reemplaza al
-/// AppBar. Va pegada al borde superior — solo las esquinas inferiores son
-/// redondeadas — y muestra el título de la sección; opcionalmente el saludo,
-/// el acceso al perfil (avatar oscuro con glifo ámbar, que invierte el
-/// lenguaje de color para resaltar sobre el gradiente), la marca de agua de
-/// la sección y un [content] propio bajo el título (p. ej. la identidad del
-/// operador en Ajustes).
+/// Header rico para secciones que sí merecen tratamiento hero (Canales y
+/// Etiquetas): una tarjeta full-bleed con fondo PRIMARIO que reemplaza al
+/// AppBar. Las pantallas operativas frecuentes usan `AppPageHeader` para no
+/// competir visualmente con el contenido ni con el contexto de organización.
+///
+/// Va pegada al borde superior —solo las esquinas inferiores son redondeadas—
+/// y muestra el título; opcionalmente el saludo, el acceso al perfil, la marca
+/// de agua y un [content] propio bajo el título.
 ///
 /// Deliberadamente NO incluye acción de crear (la aporta el FAB del shell) ni
 /// de buscar (el buscador vive siempre visible debajo del header): duplicarlas

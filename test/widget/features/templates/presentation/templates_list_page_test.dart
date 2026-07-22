@@ -8,7 +8,7 @@ import 'package:ataulfo/core/design/widgets/app_dot_label.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
-import 'package:ataulfo/core/design/widgets/app_header_card.dart';
+import 'package:ataulfo/core/design/widgets/app_page_header.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -95,7 +95,7 @@ void main() {
     bloc = _MockTemplatesBloc();
     when(() => bloc.state).thenReturn(const TemplatesInitial());
     authBloc = _MockAuthBloc();
-    // El header rico saluda con el nombre derivado del email de la sesión.
+    // La sesión aporta la identidad al acceso de perfil cuando el shell lo usa.
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
   });
 
@@ -130,16 +130,15 @@ void main() {
   });
 
   testWidgets(
-    'Loaded monta el header rico full-bleed con título "Asistentes"',
+    'Loaded monta el header neutro compacto con título "Asistentes"',
     (tester) async {
       loaded(const <Template>[_t1]);
       await tester.pumpWidget(host());
 
-      // El AppHeaderCard reemplaza al AppBar del shell para esta sección.
-      expect(find.byType(AppHeaderCard), findsOneWidget);
+      expect(find.byType(AppPageHeader), findsOneWidget);
       expect(
         find.descendant(
-          of: find.byType(AppHeaderCard),
+          of: find.byType(AppPageHeader),
           matching: find.text('Asistentes'),
         ),
         findsOneWidget,

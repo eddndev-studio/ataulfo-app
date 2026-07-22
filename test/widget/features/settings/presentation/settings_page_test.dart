@@ -2,7 +2,7 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_avatar.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
-import 'package:ataulfo/core/design/widgets/app_header_card.dart';
+import 'package:ataulfo/core/design/widgets/app_page_header.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_section_link.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
@@ -51,7 +51,7 @@ void main() {
     expect(find.byKey(const Key('settings.header')), findsOneWidget);
     expect(
       tester.widget(find.byKey(const Key('settings.header'))),
-      isA<AppHeaderCard>(),
+      isA<AppPageHeader>(),
     );
     expect(find.byType(AppAvatar), findsOneWidget);
     expect(find.text('op@example.com'), findsOneWidget);

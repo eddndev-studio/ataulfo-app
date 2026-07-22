@@ -9,10 +9,9 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_avatar.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
-import '../../../../core/design/widgets/app_header_card.dart';
+import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
-import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/domain/entities/identity.dart';
 
@@ -98,13 +97,12 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = userGreeting(identity.email);
-    return AppHeaderCard(
+    return AppPageHeader(
       key: const Key('settings.header'),
       title: 'Ajustes',
       content: Row(
         children: <Widget>[
-          AppAvatar(name: user.initial, size: 56, colorKey: identity.email),
+          AppAvatar(name: identity.email, size: 48, colorKey: identity.email),
           const SizedBox(width: AppTokens.sp4),
           Expanded(
             child: Column(
@@ -119,11 +117,11 @@ class _ProfileHeader extends StatelessWidget {
                     fontFamily: AppTokens.fontSans,
                     fontSize: AppTokens.bodyLSize,
                     fontWeight: FontWeight.w600,
-                    color: AppTokens.onPrimary,
+                    color: AppTokens.text1,
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp2),
-                const AppPill.glass(label: 'Cuenta personal'),
+                const AppPill.neutral(label: 'Cuenta personal'),
               ],
             ),
           ),

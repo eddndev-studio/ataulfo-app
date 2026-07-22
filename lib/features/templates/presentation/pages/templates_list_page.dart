@@ -17,7 +17,7 @@ import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
-import '../../../../core/design/widgets/app_header_card.dart';
+import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_dot_label.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
@@ -145,7 +145,10 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
 
   Widget _buildLoaded(BuildContext context, List<Template> items) {
     final filtered = _applyFilters(items);
-    final user = userGreeting(_emailFromSession(context));
+    final operatorEmail = widget.onOpenSettings == null
+        ? null
+        : _emailFromSession(context);
+    final user = operatorEmail == null ? null : userGreeting(operatorEmail);
     return RefreshIndicator(
       onRefresh: () => _refresh(context),
       child: SingleChildScrollView(
@@ -155,12 +158,11 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            AppHeaderCard(
-              greeting: user.greeting,
+            AppPageHeader(
               title: 'Asistentes',
-              avatarInitial: user.initial,
-              onAvatarTap: widget.onOpenSettings ?? () {},
-              watermark: Icons.support_agent,
+              avatarInitial: user?.initial,
+              avatarColorKey: operatorEmail,
+              onAvatarTap: widget.onOpenSettings,
             ),
             Padding(
               key: const Key('templates.content_padding'),

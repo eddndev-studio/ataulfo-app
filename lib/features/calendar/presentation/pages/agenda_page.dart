@@ -6,7 +6,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
-import '../../../../core/design/widgets/app_header_card.dart';
+import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -36,7 +36,7 @@ class AgendaPage extends StatelessWidget {
   final VoidCallback? onManageEventTypes;
   final VoidCallback? onManageBusinessHours;
 
-  /// Correo del operador para el avatar/saludo del header. Solo se consulta
+  /// Correo del operador para el avatar del header. Solo se consulta
   /// cuando el shell aporta la navegación a Ajustes (el avatar va en pareja con
   /// su acción); en montajes aislados sin AuthBloc, el header queda solo-título.
   String _operatorEmail(BuildContext context) {
@@ -50,21 +50,21 @@ class AgendaPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = onOpenSettings == null
+    final operatorEmail = onOpenSettings == null
         ? null
-        : userGreeting(_operatorEmail(context));
+        : _operatorEmail(context);
+    final user = operatorEmail == null ? null : userGreeting(operatorEmail);
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          AppHeaderCard(
-            greeting: user?.greeting,
+          AppPageHeader(
             title: 'Agenda',
             avatarInitial: user?.initial,
+            avatarColorKey: operatorEmail,
             onAvatarTap: onOpenSettings,
-            watermark: Icons.event_available,
             content: _DayNavBar(
               onManageEventTypes: onManageEventTypes,
               onManageBusinessHours: onManageBusinessHours,
@@ -85,7 +85,7 @@ class AgendaPage extends StatelessWidget {
   }
 }
 
-/// Barra de navegación del día, embebida en el header sobre el gradiente:
+/// Barra de navegación del día, embebida en el segundo renglón del header:
 /// ‹ día › con un botón de calendario para saltar a una fecha y «Hoy» cuando
 /// el día en foco no es hoy.
 class _DayNavBar extends StatelessWidget {
@@ -116,7 +116,7 @@ class _DayNavBar extends StatelessWidget {
         final onToday = _isToday(state.day);
         return Row(
           children: <Widget>[
-            _GlassIconButton(
+            _HeaderIconButton(
               rowKey: const Key('agenda.prev_day'),
               icon: Icons.chevron_left,
               onTap: () => context.read<AgendaCubit>().prevDay(),
@@ -137,22 +137,22 @@ class _DayNavBar extends StatelessWidget {
                         fontFamily: AppTokens.fontSans,
                         fontSize: AppTokens.titleMSize,
                         fontWeight: AppTokens.titleMWeight,
-                        color: AppTokens.onPrimary,
+                        color: AppTokens.text1,
                       ),
                     ),
                     if (!onToday)
                       GestureDetector(
                         key: const Key('agenda.today'),
                         onTap: () => context.read<AgendaCubit>().goToToday(),
-                        child: Text(
+                        child: const Text(
                           'Volver a hoy',
                           style: TextStyle(
                             fontFamily: AppTokens.fontSans,
                             fontSize: AppTokens.captionSize,
                             fontWeight: AppTokens.captionWeight,
-                            color: AppTokens.onPrimary.withValues(alpha: 0.8),
+                            color: AppTokens.primary,
                             decoration: TextDecoration.underline,
-                            decorationColor: AppTokens.onPrimary,
+                            decorationColor: AppTokens.primary,
                           ),
                         ),
                       ),
@@ -164,7 +164,7 @@ class _DayNavBar extends StatelessWidget {
               PopupMenuButton<_AgendaManageAction>(
                 key: const Key('agenda.manage'),
                 tooltip: 'Configurar agenda',
-                icon: const Icon(Icons.tune, color: AppTokens.onPrimary),
+                icon: const Icon(Icons.tune, color: AppTokens.text2),
                 onSelected: (action) {
                   switch (action) {
                     case _AgendaManageAction.eventTypes:
@@ -188,7 +188,7 @@ class _DayNavBar extends StatelessWidget {
                     ),
                 ],
               ),
-            _GlassIconButton(
+            _HeaderIconButton(
               rowKey: const Key('agenda.next_day'),
               icon: Icons.chevron_right,
               onTap: () => context.read<AgendaCubit>().nextDay(),
@@ -202,8 +202,8 @@ class _DayNavBar extends StatelessWidget {
 
 enum _AgendaManageAction { eventTypes, businessHours }
 
-class _GlassIconButton extends StatelessWidget {
-  const _GlassIconButton({
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
     required this.rowKey,
     required this.icon,
     required this.onTap,
@@ -217,7 +217,7 @@ class _GlassIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       key: rowKey,
-      icon: Icon(icon, color: AppTokens.onPrimary),
+      icon: Icon(icon, color: AppTokens.text2),
       onPressed: onTap,
     );
   }
