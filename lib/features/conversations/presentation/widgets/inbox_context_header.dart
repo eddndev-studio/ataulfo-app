@@ -24,6 +24,7 @@ class InboxContextHeader extends StatelessWidget {
     required this.onToggleArchived,
     required this.onRefresh,
     required this.onClearFilters,
+    this.onManageLabels,
     this.onOpenSettings,
   });
 
@@ -44,6 +45,7 @@ class InboxContextHeader extends StatelessWidget {
   final VoidCallback onToggleArchived;
   final VoidCallback onRefresh;
   final VoidCallback onClearFilters;
+  final VoidCallback? onManageLabels;
   final VoidCallback? onOpenSettings;
 
   static const double _toolbarHeight = 56;
@@ -94,6 +96,7 @@ class InboxContextHeader extends StatelessWidget {
                           onToggleArchived: onToggleArchived,
                           onRefresh: onRefresh,
                           onClearFilters: onClearFilters,
+                          onManageLabels: onManageLabels,
                           onOpenSettings: onOpenSettings,
                         ),
                 ),
@@ -128,6 +131,7 @@ enum _InboxMenuAction {
   toggleArchived,
   refresh,
   clearFilters,
+  manageLabels,
   settings,
 }
 
@@ -141,6 +145,7 @@ class _NormalHeader extends StatelessWidget {
     required this.onToggleArchived,
     required this.onRefresh,
     required this.onClearFilters,
+    required this.onManageLabels,
     required this.onOpenSettings,
   });
 
@@ -151,6 +156,7 @@ class _NormalHeader extends StatelessWidget {
   final VoidCallback onToggleArchived;
   final VoidCallback onRefresh;
   final VoidCallback onClearFilters;
+  final VoidCallback? onManageLabels;
   final VoidCallback? onOpenSettings;
 
   @override
@@ -182,6 +188,8 @@ class _NormalHeader extends StatelessWidget {
                   onRefresh();
                 case _InboxMenuAction.clearFilters:
                   onClearFilters();
+                case _InboxMenuAction.manageLabels:
+                  onManageLabels?.call();
                 case _InboxMenuAction.settings:
                   onOpenSettings?.call();
               }
@@ -223,8 +231,19 @@ class _NormalHeader extends StatelessWidget {
                     label: 'Limpiar filtros',
                   ),
                 ),
-              if (onOpenSettings != null) ...<PopupMenuEntry<_InboxMenuAction>>[
+              if (onManageLabels != null) ...<PopupMenuEntry<_InboxMenuAction>>[
                 const PopupMenuDivider(),
+                const PopupMenuItem<_InboxMenuAction>(
+                  key: Key('inbox.header.menu.manage_labels'),
+                  value: _InboxMenuAction.manageLabels,
+                  child: _MenuRow(
+                    icon: Icons.label_outline,
+                    label: 'Gestionar etiquetas',
+                  ),
+                ),
+              ],
+              if (onOpenSettings != null) ...<PopupMenuEntry<_InboxMenuAction>>[
+                if (onManageLabels == null) const PopupMenuDivider(),
                 const PopupMenuItem<_InboxMenuAction>(
                   key: Key('inbox.header.menu.settings'),
                   value: _InboxMenuAction.settings,

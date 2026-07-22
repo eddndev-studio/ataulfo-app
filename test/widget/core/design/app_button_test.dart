@@ -103,6 +103,26 @@ void main() {
       expect(size.width, 400);
     });
 
+    testWidgets('fullWidth: el label largo envuelve en un ancho compacto', (
+      tester,
+    ) async {
+      await pumpButton(
+        tester,
+        SizedBox(
+          width: 200,
+          child: AppButton.tonal(
+            label: 'Cambiar organización',
+            icon: Icons.swap_horiz,
+            onPressed: () {},
+            fullWidth: true,
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(AppButton)).height, greaterThan(48));
+    });
+
     testWidgets('default: NO ocupa todo el ancho disponible', (tester) async {
       await pumpButton(
         tester,

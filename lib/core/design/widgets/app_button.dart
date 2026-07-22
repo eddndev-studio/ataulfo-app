@@ -119,6 +119,16 @@ class _AppButtonState extends State<AppButton> {
     final colors = AppButton._colorsFor(widget._variant);
     final padding = AppButton._paddingFor(widget._variant);
     final radius = BorderRadius.circular(AppTokens.radiusButton);
+    final label = Text(
+      widget.label,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontFamily: AppTokens.fontSans,
+        fontSize: AppTokens.bodyLSize,
+        fontWeight: FontWeight.w600,
+        color: colors.foreground,
+      ),
+    );
 
     final content = widget.loading
         ? Row(
@@ -147,15 +157,10 @@ class _AppButtonState extends State<AppButton> {
                 Icon(widget.icon, size: 20, color: colors.foreground),
                 const SizedBox(width: 8),
               ],
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontFamily: AppTokens.fontSans,
-                  fontSize: AppTokens.bodyLSize,
-                  fontWeight: FontWeight.w600,
-                  color: colors.foreground,
-                ),
-              ),
+              // En fullWidth el label cede al ancho disponible y puede crecer
+              // a dos líneas. Esto conserva el copy y el escalado de texto en
+              // teléfonos compactos sin desbordar el Row del botón.
+              if (widget.fullWidth) Flexible(child: label) else label,
             ],
           );
 

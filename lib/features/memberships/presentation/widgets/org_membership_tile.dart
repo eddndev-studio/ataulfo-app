@@ -45,16 +45,16 @@ class OrgMembershipTile extends StatelessWidget {
               children: <Widget>[
                 Text(membership.orgName, style: textTheme.titleMedium),
                 const SizedBox(height: AppTokens.sp2),
-                Row(
+                Wrap(
+                  spacing: AppTokens.sp2,
+                  runSpacing: AppTokens.sp2,
                   children: <Widget>[
                     AppPill.neutral(label: roleLabel(membership.role)),
-                    if (isActive) ...<Widget>[
-                      const SizedBox(width: AppTokens.sp2),
+                    if (isActive)
                       const AppPill.primary(
                         key: Key('memberships.active_badge'),
                         label: 'Activa',
                       ),
-                    ],
                   ],
                 ),
               ],

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../bloc/sticker_cubit.dart';
@@ -14,14 +17,35 @@ import '../bloc/sticker_cubit.dart';
 /// fallo ⇒ null (placeholder), nunca un error. A diferencia de la pantalla de
 /// Ajustes, aquí no se generan stickers: solo se eligen los ya hechos.
 class StickerPickerPage extends StatelessWidget {
-  const StickerPickerPage({required this.resolveThumb, super.key});
+  const StickerPickerPage({
+    required this.resolveThumb,
+    this.canManage = false,
+    super.key,
+  });
 
   final Future<Uint8List?> Function(String ref) resolveThumb;
+  final bool canManage;
+
+  Future<void> _manage(BuildContext context) async {
+    await context.push<void>('/org/stickers');
+    if (context.mounted) await context.read<StickerCubit>().load();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Enviar sticker')),
+      appBar: AppBar(
+        title: const Text('Enviar sticker'),
+        actions: <Widget>[
+          if (canManage)
+            IconButton(
+              key: const Key('sticker_picker.manage'),
+              tooltip: 'Crear y administrar stickers',
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              onPressed: () => unawaited(_manage(context)),
+            ),
+        ],
+      ),
       body: BlocBuilder<StickerCubit, StickerState>(
         builder: (context, state) {
           return switch (state.status) {
@@ -33,6 +57,7 @@ class StickerPickerPage extends StatelessWidget {
             StickerListStatus.loaded => _Grid(
               refs: <String>[for (final j in state.ready) j.resultMediaRef],
               resolveThumb: resolveThumb,
+              onManage: canManage ? () => _manage(context) : null,
             ),
           };
         },
@@ -42,20 +67,34 @@ class StickerPickerPage extends StatelessWidget {
 }
 
 class _Grid extends StatelessWidget {
-  const _Grid({required this.refs, required this.resolveThumb});
+  const _Grid({required this.refs, required this.resolveThumb, this.onManage});
 
   final List<String> refs;
   final Future<Uint8List?> Function(String ref) resolveThumb;
+  final VoidCallback? onManage;
 
   @override
   Widget build(BuildContext context) {
     if (refs.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Aún no tienes stickers. Genéralos en Ajustes › Stickers.',
-            textAlign: TextAlign.center,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Text(
+                'Aún no hay stickers listos para enviar.',
+                textAlign: TextAlign.center,
+              ),
+              if (onManage != null) ...<Widget>[
+                const SizedBox(height: AppTokens.sp4),
+                AppButton.tonal(
+                  key: const Key('sticker_picker.empty.manage'),
+                  label: 'Crear stickers',
+                  onPressed: onManage,
+                ),
+              ],
+            ],
           ),
         ),
       );

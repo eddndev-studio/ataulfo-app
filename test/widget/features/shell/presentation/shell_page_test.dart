@@ -137,6 +137,7 @@ void main() {
             home: ShellPage(
               assistantDraft: assistantDraft,
               contextualBotId: contextualBotId,
+              organizationContextBuilder: (_) => const SizedBox.shrink(),
             ),
           ),
         ),
@@ -355,7 +356,12 @@ void main() {
               BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
               BlocProvider<ConversationsBloc>.value(value: inboxBloc),
             ],
-            child: MaterialApp(home: ShellPage(routeObserver: observer)),
+            child: MaterialApp(
+              home: ShellPage(
+                routeObserver: observer,
+                organizationContextBuilder: (_) => const SizedBox.shrink(),
+              ),
+            ),
           ),
         ),
       );

@@ -111,6 +111,11 @@ void main() {
     await tester.tap(find.text('abrir'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Aún no tienes stickers'), findsOneWidget);
+    expect(
+      find.text('Aún no hay stickers listos para enviar.'),
+      findsOneWidget,
+    );
+    // La generación sólo aparece cuando el router confirma un rol ADMIN+.
+    expect(find.byKey(const Key('sticker_picker.empty.manage')), findsNothing);
   });
 }

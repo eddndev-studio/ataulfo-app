@@ -27,7 +27,11 @@ import '../widgets/member_tile.dart';
 /// devuelve la intención; esta página la despacha y cierra el lazo): ante éxito
 /// recarga la lista y avisa, ante fallo traduce la causa a un aviso.
 class MembersPage extends StatelessWidget {
-  const MembersPage({super.key});
+  const MembersPage({super.key, this.onInvite});
+
+  /// En la superficie unificada cambia a la tab Invitaciones sin apilar otra
+  /// página. Nulo conserva el deep link histórico para montajes aislados.
+  final VoidCallback? onInvite;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +40,10 @@ class MembersPage extends StatelessWidget {
       child: BlocBuilder<MembersBloc, MembersState>(
         builder: (context, state) => switch (state) {
           MembersInitial() || MembersLoading() => const _LoadingView(),
-          MembersLoaded(items: final items) => _LoadedView(items: items),
+          MembersLoaded(items: final items) => _LoadedView(
+            items: items,
+            onInvite: onInvite,
+          ),
           MembersFailed() => const _FailedView(),
         },
       ),
@@ -124,13 +131,14 @@ class _LoadingView extends StatelessWidget {
 }
 
 class _LoadedView extends StatelessWidget {
-  const _LoadedView({required this.items});
+  const _LoadedView({required this.items, this.onInvite});
 
   final List<Member> items;
+  final VoidCallback? onInvite;
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const _EmptyView();
+    if (items.isEmpty) return _EmptyView(onInvite: onInvite);
     final auth = context.read<AuthBloc>().state;
     final selfUserId = auth is AuthAuthenticated ? auth.identity.userId : null;
     return ListView.separated(
@@ -158,7 +166,9 @@ class _LoadedView extends StatelessWidget {
 /// Estado vacío: card glass que ES el CTA de invitar (antes era una línea de
 /// texto suelta sin salida, la queja de UX #1). Invitar apila `/invitations`.
 class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+  const _EmptyView({this.onInvite});
+
+  final VoidCallback? onInvite;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +206,7 @@ class _EmptyView extends StatelessWidget {
                 label: 'Invitar a alguien',
                 icon: Icons.person_add_alt_1,
                 fullWidth: true,
-                onPressed: () => context.push('/invitations'),
+                onPressed: onInvite ?? () => context.push('/invitations'),
               ),
             ],
           ),

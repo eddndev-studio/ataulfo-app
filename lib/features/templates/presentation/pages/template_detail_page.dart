@@ -15,6 +15,7 @@ import '../../domain/entities/template.dart';
 import '../../domain/failures/templates_failure.dart';
 import '../bloc/template_detail_bloc.dart';
 import '../bloc/var_defs_bloc.dart';
+import '../widgets/template_detail_back_overlay.dart';
 import '../widgets/template_detail_header.dart';
 import '../widgets/template_rename_sheet.dart';
 import '../widgets/template_assistant_card.dart';
@@ -33,7 +34,9 @@ class TemplateDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<TemplateDetailBloc, TemplateDetailState>(
       builder: (context, state) => switch (state) {
-        TemplateDetailLoading() => const _LoadingView(),
+        TemplateDetailLoading() => const TemplateDetailBackOverlay(
+          child: AppLoadingIndicator(),
+        ),
         TemplateDetailLoaded(template: final tpl) => _LoadedView(template: tpl),
         // Mutación en vuelo / fallida: el detalle sigue pintado con el
         // snapshot (sin flash); el feedback fino lo da el sheet que mutó.
@@ -45,42 +48,6 @@ class TemplateDetailPage extends StatelessWidget {
         ),
         TemplateDetailFailed(failure: final f) => _FailedView(failure: f),
       },
-    );
-  }
-}
-
-class _LoadingView extends StatelessWidget {
-  const _LoadingView();
-
-  @override
-  Widget build(BuildContext context) =>
-      const _BackOverlay(child: AppLoadingIndicator());
-}
-
-/// Superpone un retorno claro arriba a la izquierda en los estados sin header
-/// (carga/error). La ruta ya no aporta AppBar; sin esto el operador quedaría
-/// atrapado si la carga cuelga o la plantilla falla.
-class _BackOverlay extends StatelessWidget {
-  const _BackOverlay({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: <Widget>[
-        Positioned.fill(child: child),
-        SafeArea(
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: IconButton(
-              tooltip: 'Volver',
-              icon: const Icon(Icons.arrow_back, color: AppTokens.text1),
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -261,17 +228,29 @@ class _SectionLauncher extends StatelessWidget {
         const SizedBox(height: AppTokens.sp5),
         const _SectionTitle('Recursos'),
         AppCard(
-          child: AppSectionLink(
-            rowKey: const Key('template_detail.link.resources'),
-            icon: Icons.library_books_outlined,
-            title: 'Recursos disponibles',
-            caption: 'Conocimiento, archivos, medios y productos permitidos',
-            onTap: () => context.push(
-              Uri(
-                path: '/assistants/${template.id}/resources',
-                queryParameters: <String, String>{'name': template.name},
-              ).toString(),
-            ),
+          child: Column(
+            children: <Widget>[
+              AppSectionLink(
+                rowKey: const Key('template_detail.link.resources'),
+                icon: Icons.library_books_outlined,
+                title: 'Recursos disponibles',
+                caption: 'Conocimiento y archivos permitidos',
+                onTap: () => context.push(
+                  Uri(
+                    path: '/assistants/${template.id}/resources',
+                    queryParameters: <String, String>{'name': template.name},
+                  ).toString(),
+                ),
+              ),
+              const Divider(height: AppTokens.sp5, color: AppTokens.divider),
+              AppSectionLink(
+                rowKey: const Key('template_detail.link.product_catalog'),
+                icon: Icons.storefront_outlined,
+                title: 'Catálogo de productos',
+                caption: 'Productos y servicios que tus Asistentes ofrecen',
+                onTap: () => context.push('/catalog/products'),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: AppTokens.sp5),
@@ -382,7 +361,7 @@ class _FailedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final isNotFound = failure is TemplatesNotFoundFailure;
     final textTheme = Theme.of(context).textTheme;
-    return _BackOverlay(
+    return TemplateDetailBackOverlay(
       child: Center(
         key: isNotFound
             ? const Key('template_detail.error.not_found')

@@ -22,10 +22,19 @@ import '../widgets/month_calendar_sheet.dart';
 /// reserva los aporta el shell. Consume el `AgendaCubit` del scope del shell,
 /// que carga el día de hoy al montarse la tab.
 class AgendaPage extends StatelessWidget {
-  const AgendaPage({super.key, this.onOpenSettings});
+  const AgendaPage({
+    super.key,
+    this.onOpenSettings,
+    this.onManageEventTypes,
+    this.onManageBusinessHours,
+  });
 
   /// Acción del avatar del header → abrir Ajustes (la aporta el shell).
   final VoidCallback? onOpenSettings;
+
+  /// Gestión contextual de Agenda. El shell las aporta sólo a ADMIN+.
+  final VoidCallback? onManageEventTypes;
+  final VoidCallback? onManageBusinessHours;
 
   /// Correo del operador para el avatar/saludo del header. Solo se consulta
   /// cuando el shell aporta la navegación a Ajustes (el avatar va en pareja con
@@ -56,7 +65,10 @@ class AgendaPage extends StatelessWidget {
             avatarInitial: user?.initial,
             onAvatarTap: onOpenSettings,
             watermark: Icons.event_available,
-            content: const _DayNavBar(),
+            content: _DayNavBar(
+              onManageEventTypes: onManageEventTypes,
+              onManageBusinessHours: onManageBusinessHours,
+            ),
           ),
           Padding(
             padding: EdgeInsets.fromLTRB(
@@ -77,7 +89,10 @@ class AgendaPage extends StatelessWidget {
 /// ‹ día › con un botón de calendario para saltar a una fecha y «Hoy» cuando
 /// el día en foco no es hoy.
 class _DayNavBar extends StatelessWidget {
-  const _DayNavBar();
+  const _DayNavBar({this.onManageEventTypes, this.onManageBusinessHours});
+
+  final VoidCallback? onManageEventTypes;
+  final VoidCallback? onManageBusinessHours;
 
   bool _isToday(DateTime day) {
     final now = DateTime.now();
@@ -145,6 +160,34 @@ class _DayNavBar extends StatelessWidget {
                 ),
               ),
             ),
+            if (onManageEventTypes != null || onManageBusinessHours != null)
+              PopupMenuButton<_AgendaManageAction>(
+                key: const Key('agenda.manage'),
+                tooltip: 'Configurar agenda',
+                icon: const Icon(Icons.tune, color: AppTokens.onPrimary),
+                onSelected: (action) {
+                  switch (action) {
+                    case _AgendaManageAction.eventTypes:
+                      onManageEventTypes?.call();
+                    case _AgendaManageAction.businessHours:
+                      onManageBusinessHours?.call();
+                  }
+                },
+                itemBuilder: (_) => <PopupMenuEntry<_AgendaManageAction>>[
+                  if (onManageEventTypes != null)
+                    const PopupMenuItem<_AgendaManageAction>(
+                      key: Key('agenda.manage.event_types'),
+                      value: _AgendaManageAction.eventTypes,
+                      child: Text('Tipos de cita'),
+                    ),
+                  if (onManageBusinessHours != null)
+                    const PopupMenuItem<_AgendaManageAction>(
+                      key: Key('agenda.manage.business_hours'),
+                      value: _AgendaManageAction.businessHours,
+                      child: Text('Horario de atención'),
+                    ),
+                ],
+              ),
             _GlassIconButton(
               rowKey: const Key('agenda.next_day'),
               icon: Icons.chevron_right,
@@ -156,6 +199,8 @@ class _DayNavBar extends StatelessWidget {
     );
   }
 }
+
+enum _AgendaManageAction { eventTypes, businessHours }
 
 class _GlassIconButton extends StatelessWidget {
   const _GlassIconButton({

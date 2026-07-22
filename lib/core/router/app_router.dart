@@ -119,7 +119,6 @@ import '../../features/media/domain/repositories/media_repository.dart';
 import '../../features/invitations/domain/repositories/invitations_repository.dart';
 import '../../features/invitations/presentation/bloc/invitation_mutation_cubit.dart';
 import '../../features/invitations/presentation/bloc/invitations_bloc.dart';
-import '../../features/invitations/presentation/pages/invitations_page.dart';
 import '../../features/media/data/repositories/url_launcher_media_preview_launcher.dart';
 import '../../features/media/domain/entities/media_asset.dart';
 import '../../features/media/domain/repositories/media_thumbnail_loader.dart';
@@ -132,11 +131,12 @@ import '../../features/members/presentation/bloc/assign_bots_cubit.dart';
 import '../../features/members/presentation/bloc/member_mutation_cubit.dart';
 import '../../features/members/presentation/bloc/members_bloc.dart';
 import '../../features/members/presentation/pages/bot_assignment_page.dart';
-import '../../features/members/presentation/pages/members_page.dart';
 import '../../features/memberships/domain/repositories/memberships_repository.dart';
 import '../../features/memberships/presentation/bloc/memberships_bloc.dart';
 import '../../features/memberships/presentation/pages/memberships_page.dart';
 import '../../features/memberships/presentation/pages/select_org_page.dart';
+import '../../features/organization/presentation/pages/organization_page.dart';
+import '../../features/organization/presentation/pages/organization_team_page.dart';
 import '../../features/messages/domain/repositories/audio_engine.dart';
 import '../audio/audio_recorder.dart';
 import '../../features/messages/data/cache/message_media_cache.dart';
@@ -413,13 +413,7 @@ class AppRouter {
     '/assistants',
     '/templates',
     '/flows',
-    '/members',
-    '/invitations',
     '/org/labels',
-    '/org/ai-config',
-    '/org/customization',
-    '/org/public-catalog',
-    '/org/stickers',
     '/stickers/pick',
   };
 
@@ -455,6 +449,38 @@ class AppRouter {
     }
     if (asset == null) return null;
     return ProductThumbResolver.session.load(ref, asset: asset);
+  }
+
+  /// Miembros e invitaciones comparten estado y navegación. Las rutas antiguas
+  /// llaman este mismo builder con una tab inicial distinta para conservar
+  /// deep links sin sostener dos superficies paralelas.
+  Widget _organizationTeamScaffold({required int initialTab}) {
+    return MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<MembersBloc>(
+          create: (_) =>
+              MembersBloc(_membersRepo)..add(const MembersLoadRequested()),
+        ),
+        BlocProvider<MemberMutationCubit>(
+          create: (_) => MemberMutationCubit(_membersRepo),
+        ),
+        BlocProvider<InvitationsBloc>(
+          create: (_) =>
+              InvitationsBloc(_invitationsRepo)
+                ..add(const InvitationsLoadRequested()),
+        ),
+        BlocProvider<InvitationMutationCubit>(
+          create: (_) => InvitationMutationCubit(_invitationsRepo),
+        ),
+        BlocProvider<BotsBloc>(
+          create: (_) => BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+        ),
+      ],
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Equipo y acceso')),
+        body: OrganizationTeamPage(initialTab: initialTab),
+      ),
+    );
   }
 
   late final GoRouter router = GoRouter(
@@ -780,6 +806,18 @@ class AppRouter {
                             create: (_) =>
                                 LabelsAdminBloc(repo: _labelsRepo)
                                   ..add(const LabelsAdminLoadRequested()),
+                          ),
+                          // El contexto de organización es chrome global del
+                          // shell. Se recrea con el subárbol keyeado por orgId
+                          // para que nombre, lista y estado de cambio nunca
+                          // sobrevivan al contexto anterior.
+                          BlocProvider<MembershipsBloc>(
+                            create: (_) =>
+                                MembershipsBloc(_membershipsRepo)
+                                  ..add(const MembershipsLoadRequested()),
+                          ),
+                          BlocProvider<SwitchOrgCubit>(
+                            create: (_) => SwitchOrgCubit(_authRepo),
                           ),
                           // Agenda del día, scoped al shell: la tab Agenda es
                           // lazy, así que este create (lazy por defecto) no
@@ -1424,8 +1462,8 @@ class AppRouter {
         },
       ),
       GoRoute(
-        // Taxonomía interna de la organización. Sale de la navegación
-        // primaria, pero conserva toda la gestión CRUD bajo Ajustes.
+        // Taxonomía interna de la organización, gestionada desde el menú
+        // contextual de la Bandeja.
         path: '/org/labels',
         builder: (context, state) => BlocProvider<LabelsAdminBloc>(
           create: (_) =>
@@ -1447,7 +1485,7 @@ class AppRouter {
       ),
       GoRoute(
         // Config de IA a nivel ORG (ADMIN/OWNER): proveedor por modelo +
-        // defaults de plantillas nuevas. El gate de la tile en Settings es
+        // defaults de plantillas nuevas. El gate del hub Organización es
         // cosmético; la autoridad real es el 403 del backend (cae en
         // OrgAiConfigLoadFailed → "sin permiso"). CatalogBloc alimenta los
         // hosts seleccionables y el picker de modelo de los defaults. La
@@ -1595,8 +1633,52 @@ class AppRouter {
         },
       ),
       GoRoute(
+        // Hub de la organización activa. La identidad siempre carga; el
+        // overview y las áreas de administración sólo solicitan endpoints
+        // ADMIN+ cuando el rol puede usarlos.
+        path: '/organization',
+        builder: (context, _) {
+          final canManage = _isAdmin;
+          final billingRepo = _billingRepo;
+          return MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<MembershipsBloc>(
+                create: (_) =>
+                    MembershipsBloc(_membershipsRepo)
+                      ..add(const MembershipsLoadRequested()),
+              ),
+              if (canManage) ...<BlocProvider<dynamic>>[
+                BlocProvider<MembersBloc>(
+                  create: (_) =>
+                      MembersBloc(_membersRepo)
+                        ..add(const MembersLoadRequested()),
+                ),
+                BlocProvider<InvitationsBloc>(
+                  create: (_) =>
+                      InvitationsBloc(_invitationsRepo)
+                        ..add(const InvitationsLoadRequested()),
+                ),
+                if (billingRepo != null)
+                  BlocProvider<EntitlementBloc>(
+                    create: (_) =>
+                        EntitlementBloc(billingRepo)
+                          ..add(const EntitlementLoadRequested()),
+                  ),
+              ],
+            ],
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Organización')),
+              body: OrganizationPage(
+                canManage: canManage,
+                hasBilling: canManage && billingRepo != null,
+              ),
+            ),
+          );
+        },
+      ),
+      GoRoute(
         // Listado de orgs del operador con cambio de organización in-app. Entry
-        // point único hoy: tile en SettingsPage. Page-scoped: el
+        // point: selector global. Page-scoped: el
         // MembershipsBloc dispara LoadRequested al construirse y el
         // SwitchOrgCubit habilita el switch (la página orquesta el flip de la
         // sesión y la navegación al shell, ya re-keyeado, tras un switch
@@ -1628,37 +1710,17 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        // Roster de la org activa. Entry point: tile admin-gated en SettingsPage
-        // (el gate es cosmético; el backend 403ea a roles por debajo de ADMIN).
-        // Page-scoped: el MembersBloc dispara LoadRequested al construirse y el
-        // MemberMutationCubit habilita cambiar rol / quitar (la página cierra el
-        // lazo recargando tras una mutación exitosa; el cubit no conoce el bloc).
-        path: '/members',
-        builder: (context, _) => MultiBlocProvider(
-          providers: <BlocProvider<dynamic>>[
-            BlocProvider<MembersBloc>(
-              create: (_) =>
-                  MembersBloc(_membersRepo)..add(const MembersLoadRequested()),
-            ),
-            BlocProvider<MemberMutationCubit>(
-              create: (_) => MemberMutationCubit(_membersRepo),
-            ),
-          ],
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Miembros'),
-              actions: <Widget>[
-                IconButton(
-                  key: const Key('members.invite'),
-                  tooltip: 'Invitar',
-                  icon: const Icon(Icons.person_add_alt_1_outlined),
-                  onPressed: () => context.push('/invitations'),
-                ),
-              ],
-            ),
-            body: const MembersPage(),
-          ),
+        // Superficie unificada. El query conserva un deep link directo a la
+        // segunda tab sin crear otra jerarquía de navegación.
+        path: '/organization/team',
+        builder: (context, state) => _organizationTeamScaffold(
+          initialTab: state.uri.queryParameters['tab'] == 'invitations' ? 1 : 0,
         ),
+      ),
+      GoRoute(
+        // Alias histórico: ahora abre la misma superficie unificada.
+        path: '/members',
+        builder: (context, _) => _organizationTeamScaffold(initialTab: 0),
       ),
       GoRoute(
         // Asignación de bots a un miembro WORKER. Se apila desde MemberEditSheet
@@ -1678,32 +1740,10 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        // Historial de invitaciones de la org + emitir / cancelar. Entry point:
-        // acción "Invitar" en la AppBar de /members. Page-scoped: el
-        // InvitationsBloc dispara LoadRequested al construirse y el
-        // InvitationMutationCubit habilita crear/cancelar (la página cierra el
-        // lazo recargando tras una mutación; el cubit no conoce el bloc).
+        // Alias histórico: conserva `/invitations` para enlaces guardados y
+        // abre la tab correcta de Equipo y acceso.
         path: '/invitations',
-        builder: (context, _) => MultiBlocProvider(
-          providers: <BlocProvider<dynamic>>[
-            BlocProvider<InvitationsBloc>(
-              create: (_) =>
-                  InvitationsBloc(_invitationsRepo)
-                    ..add(const InvitationsLoadRequested()),
-            ),
-            BlocProvider<InvitationMutationCubit>(
-              create: (_) => InvitationMutationCubit(_invitationsRepo),
-            ),
-            BlocProvider<BotsBloc>(
-              create: (_) =>
-                  BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
-            ),
-          ],
-          child: Scaffold(
-            appBar: AppBar(title: const Text('Invitaciones')),
-            body: const InvitationsPage(),
-          ),
-        ),
+        builder: (context, _) => _organizationTeamScaffold(initialTab: 1),
       ),
       GoRoute(
         path: '/notifications',
@@ -1740,9 +1780,9 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        // Personalización de la organización: nombre + logo de los
-        // documentos del asistente. Entry point: tile admin-gated en
-        // SettingsPage (gate cosmético; el backend 403ea por debajo de
+        // General de la organización: nombre + logo de los documentos del
+        // asistente. Entry point: hub Organización (gate cosmético; el backend
+        // 403ea por debajo de
         // ADMIN). Page-scoped: el cubit carga marca + nombre al montarse;
         // RenameOrgCubit reusa el mismo flujo de renombrar de memberships.
         path: '/org/customization',
@@ -1771,7 +1811,7 @@ class AppRouter {
               ),
             ],
             child: Scaffold(
-              appBar: AppBar(title: const Text('Personalización')),
+              appBar: AppBar(title: const Text('General')),
               body: const OrgCustomizationPage(),
             ),
           );
@@ -1828,14 +1868,17 @@ class AppRouter {
           }
           return BlocProvider<StickerCubit>(
             create: (_) => StickerCubit(repo)..load(),
-            child: StickerPickerPage(resolveThumb: _compositionThumbBytes),
+            child: StickerPickerPage(
+              resolveThumb: _compositionThumbBytes,
+              canManage: _isAdmin,
+            ),
           );
         },
       ),
       GoRoute(
         // Cuenta y plan de la org, SOLO-LECTURA: gestionar (contratar,
         // mejorar, pagar) vive en el sitio web y la página solo enlaza.
-        // Entry point: tile admin-gated en SettingsPage (gate cosmético,
+        // Entry point: hub Organización (gate cosmético,
         // como Configuración de IA). Page-scoped: el bloc carga el
         // entitlement al montarse; un retry desde Failed reusa el load.
         path: '/cuenta',
@@ -1851,7 +1894,7 @@ class AppRouter {
                 EntitlementBloc(billingRepo)
                   ..add(const EntitlementLoadRequested()),
             child: Scaffold(
-              appBar: AppBar(title: const Text('Cuenta')),
+              appBar: AppBar(title: const Text('Plan y uso')),
               body: CuentaPage(
                 webBaseUrl: _webBaseUrl,
                 launcher: const UrlLauncherWebLinkLauncher(),
@@ -1875,8 +1918,8 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        // Ajustes → Agenda → Tipos de cita (CRUD). Entry point: tile ADMIN+ en
-        // SettingsPage. Page-scoped: carga los tipos al montarse.
+        // Agenda → Tipos de cita (CRUD). Entry point: menú contextual ADMIN+
+        // de la propia Agenda. Page-scoped: carga los tipos al montarse.
         path: '/calendar/event-types',
         builder: (context, _) => BlocProvider<EventTypesCubit>(
           create: (_) => EventTypesCubit(_calendarRepo)..load(),
@@ -1887,8 +1930,8 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        // Ajustes → Agenda → Horario de atención (editor semanal). Entry point:
-        // tile ADMIN+ en SettingsPage. Page-scoped: carga el horario al montar.
+        // Agenda → Horario de atención (editor semanal). Entry point: menú
+        // contextual ADMIN+ de la propia Agenda.
         path: '/calendar/hours',
         builder: (context, _) => BlocProvider<BusinessHoursCubit>(
           create: (_) => BusinessHoursCubit(_calendarRepo)..load(),
@@ -1899,9 +1942,9 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        // Ajustes → Catálogo de productos (listado + búsqueda + alta/edición).
-        // Entry point: tile para todo miembro en SettingsPage (leer es de
-        // cualquier rol; crear/editar lo autoriza el backend con 403).
+        // Catálogo de productos (listado + búsqueda + alta/edición). Entry
+        // point: Recursos del Asistente; leer es de cualquier rol y
+        // crear/editar lo autoriza el backend con 403.
         // Page-scoped: carga productos y categorías al montarse. El FAB de
         // alta vive en el Scaffold de la ruta, bajo el mismo provider.
         path: '/catalog/products',
@@ -1916,7 +1959,21 @@ class AppRouter {
           return BlocProvider<ProductCatalogCubit>(
             create: (_) => ProductCatalogCubit(repo)..load(),
             child: Scaffold(
-              appBar: AppBar(title: const Text('Catálogo de productos')),
+              appBar: AppBar(
+                title: const Text('Catálogo de productos'),
+                actions: <Widget>[
+                  // La vitrina pública se configura junto al catálogo que
+                  // publica, no desde Ajustes. El backend mantiene el gate;
+                  // aquí evitamos ofrecer una acción ADMIN+ a otros roles.
+                  if (_isAdmin && _publicCatalogRepo != null)
+                    IconButton(
+                      key: const Key('product_catalog.public_settings'),
+                      tooltip: 'Configurar catálogo público',
+                      icon: const Icon(Icons.public_outlined),
+                      onPressed: () => context.push('/org/public-catalog'),
+                    ),
+                ],
+              ),
               body: ProductCatalogPage(
                 // «Mejorar foto con IA» solo si el wiring trae el repo de
                 // composición; sin él la edición no ofrece la acción.
@@ -1935,8 +1992,8 @@ class AppRouter {
         },
       ),
       GoRoute(
-        // Galería de media de la org. Entry point: tile en SettingsPage.
-        // Reusable como picker abriéndola con un `onSelect` que devuelve el
+        // Galería de media de la org. Entry point: acción Administrar dentro
+        // de los pickers contextuales. Reusable con un `onSelect` que devuelve el
         // `ref` BARE. Page-scoped: el bloc se construye con repo + picker y
         // dispara el primer load al montarse.
         path: '/media',
@@ -2030,21 +2087,40 @@ class AppRouter {
               picker: _mediaFilePicker,
               type: type,
             )..add(const MediaGalleryLoadRequested()),
-            child: Scaffold(
-              appBar: AppBar(title: const Text('Elegir multimedia')),
-              body: MediaGalleryPage(
-                onSelect: multi ? null : (asset) => context.pop(asset),
-                onConfirmSelection: multi
-                    ? (assets) => context.pop(assets)
-                    : null,
-                onOpenDetail: (asset) async =>
-                    (await context.push<bool>(
-                      '/media/detail?readOnly=1',
-                      extra: asset,
-                    )) ??
-                    false,
-                loader: _mediaThumbnailLoader,
-                showTypeTabs: type == null,
+            child: Builder(
+              builder: (context) => Scaffold(
+                appBar: AppBar(
+                  title: const Text('Elegir multimedia'),
+                  actions: <Widget>[
+                    IconButton(
+                      key: const Key('media_picker.manage'),
+                      tooltip: 'Administrar medios',
+                      icon: const Icon(Icons.perm_media_outlined),
+                      onPressed: () async {
+                        await context.push<void>('/media');
+                        if (context.mounted) {
+                          context.read<MediaGalleryBloc>().add(
+                            const MediaGalleryLoadRequested(),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                body: MediaGalleryPage(
+                  onSelect: multi ? null : (asset) => context.pop(asset),
+                  onConfirmSelection: multi
+                      ? (assets) => context.pop(assets)
+                      : null,
+                  onOpenDetail: (asset) async =>
+                      (await context.push<bool>(
+                        '/media/detail?readOnly=1',
+                        extra: asset,
+                      )) ??
+                      false,
+                  loader: _mediaThumbnailLoader,
+                  showTypeTabs: type == null,
+                ),
               ),
             ),
           );
@@ -2070,10 +2146,27 @@ const Set<String> _publicRoutes = <String>{
   '/verify-email',
 };
 
+/// Destinos de administración de la organización. La pantalla raíz de
+/// Organización queda fuera: cualquier miembro puede verla como contexto
+/// legible, pero sólo ADMIN/OWNER entra a estas áreas.
+const Set<String> _adminOrganizationRoutes = <String>{
+  '/organization/team',
+  '/members',
+  '/invitations',
+  '/org/ai-config',
+  '/org/customization',
+  '/org/public-catalog',
+  '/org/stickers',
+};
+
 /// `true` si [loc] es una ruta pública. Match por prefijo: el path base o
 /// cualquier sub-path/query (`/reset-password?token=…`) cuenta como público.
 bool _isPublic(String loc) => _publicRoutes.any(
   (p) => loc == p || loc.startsWith('$p/') || loc.startsWith('$p?'),
+);
+
+bool _isAdminOrganizationRoute(String loc) => _adminOrganizationRoutes.any(
+  (path) => loc == path || loc.startsWith('$path/') || loc.startsWith('$path?'),
 );
 
 /// Decisión de redirect en función del estado de auth y la ubicación. Pura y
@@ -2115,6 +2208,10 @@ String? redirectForState(AuthState auth, String location) {
       if (_matchesAnyPrefix(location, AppRouter._supervisorOnlyRoutePrefixes) &&
           !isSupervisorOrAbove(identity.role)) {
         return '/home';
+      }
+      if (_isAdminOrganizationRoute(location) &&
+          !isAdminOrAbove(identity.role)) {
+        return '/organization';
       }
       // Sesión válida: las rutas de entrada rebotan a /home; verify/accept se
       // permiten (el operador puede verificar o aceptar invitaciones logueado).

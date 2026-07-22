@@ -250,21 +250,44 @@ void main() {
       }
     });
 
-    test('WORKER y SUPERVISOR no entran a administración ADMIN+', () {
+    test('WORKER y SUPERVISOR no entran a administración global ADMIN+', () {
       for (final identity in <Identity>[_worker, _supervisor]) {
         for (final location in <String>[
           '/assistants/a1',
           '/templates',
           '/flows',
-          '/members',
-          '/invitations',
           '/org/labels',
-          '/org/ai-config',
         ]) {
           expect(
             redirectForState(AuthAuthenticated(identity), location),
             '/home',
             reason: '${identity.role} no puede abrir $location',
+          );
+        }
+      }
+    });
+
+    test('Organización es visible a cualquier rol, su administración no', () {
+      expect(
+        redirectForState(const AuthAuthenticated(_worker), '/organization'),
+        isNull,
+      );
+      for (final identity in <Identity>[_worker, _supervisor]) {
+        for (final path in <String>[
+          '/organization/team',
+          '/organization/team?tab=invitations',
+          '/members',
+          '/members/m1/bots',
+          '/invitations',
+          '/org/ai-config',
+          '/org/customization',
+          '/org/public-catalog',
+          '/org/stickers',
+        ]) {
+          expect(
+            redirectForState(AuthAuthenticated(identity), path),
+            '/organization',
+            reason: '$path requiere administración organizacional ADMIN+',
           );
         }
       }
@@ -291,6 +314,7 @@ void main() {
         '/assistants/a1',
         '/members',
         '/invitations',
+        '/organization/team',
         '/org/labels',
         '/media',
       ]) {
@@ -300,6 +324,17 @@ void main() {
           reason: '$location debe estar disponible para ADMIN+',
         );
       }
+    });
+
+    test('OWNER entra a las áreas de administración organizacional', () {
+      expect(
+        redirectForState(const AuthAuthenticated(_owner), '/organization/team'),
+        isNull,
+      );
+      expect(
+        redirectForState(const AuthAuthenticated(_owner), '/org/customization'),
+        isNull,
+      );
     });
   });
 

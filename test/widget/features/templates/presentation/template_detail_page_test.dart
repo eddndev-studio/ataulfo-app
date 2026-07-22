@@ -607,6 +607,7 @@ void main() {
         await tester.pumpWidget(host());
 
         expect(find.text('Recursos disponibles'), findsOneWidget);
+        expect(find.text('Catálogo de productos'), findsOneWidget);
         expect(find.text('Canales conectados'), findsOneWidget);
         expect(find.text('Probar Asistente'), findsOneWidget);
         expect(find.text('Crear bot'), findsNothing);
@@ -622,6 +623,18 @@ void main() {
         destinationPath: '/assistants/:id/resources',
       );
       expect(r.uri, '/assistants/t1/resources?name=Soporte');
+      expect(r.canPop, <bool>[true]);
+    });
+
+    testWidgets('tap Catálogo abre el recurso compartido de productos', (
+      tester,
+    ) async {
+      final r = await pushFrom(
+        tester,
+        tapKey: const Key('template_detail.link.product_catalog'),
+        destinationPath: '/catalog/products',
+      );
+      expect(r.uri, '/catalog/products');
       expect(r.canPop, <bool>[true]);
     });
 

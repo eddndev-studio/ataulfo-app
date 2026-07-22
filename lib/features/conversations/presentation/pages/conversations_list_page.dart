@@ -28,10 +28,14 @@ class ConversationsListPage extends StatefulWidget {
   const ConversationsListPage({
     super.key,
     this.onOpenSettings,
+    this.onManageLabels,
     this.isActiveListenable,
   });
 
   final VoidCallback? onOpenSettings;
+
+  /// Abre el catálogo de etiquetas desde su contexto natural: la Bandeja.
+  final VoidCallback? onManageLabels;
 
   /// Visibilidad dentro del IndexedStack del shell. Al salir de Bandeja se
   /// cancela cualquier selección contextual para no restaurar un modo obsoleto
@@ -365,6 +369,7 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
                               _toggleArchived(state.query.status),
                           onRefresh: () => unawaited(_refresh()),
                           onClearFilters: _clearFilters,
+                          onManageLabels: widget.onManageLabels,
                           onOpenSettings: widget.onOpenSettings,
                         ),
                         Expanded(child: body),

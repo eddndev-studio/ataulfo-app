@@ -108,6 +108,38 @@ void main() {
     verify(() => cubit.nextDay()).called(1);
   });
 
+  testWidgets('gestión de Agenda vive en su menú contextual', (tester) async {
+    when(() => cubit.state).thenReturn(_state(status: AgendaStatus.loaded));
+    var eventTypes = 0;
+    var businessHours = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: BlocProvider<AgendaCubit>.value(
+          value: cubit,
+          child: Scaffold(
+            body: AgendaPage(
+              onManageEventTypes: () => eventTypes++,
+              onManageBusinessHours: () => businessHours++,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('agenda.manage')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('agenda.manage.event_types')));
+    await tester.pumpAndSettle();
+    expect(eventTypes, 1);
+
+    await tester.tap(find.byKey(const Key('agenda.manage')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('agenda.manage.business_hours')));
+    await tester.pumpAndSettle();
+    expect(businessHours, 1);
+  });
+
   testWidgets(
     'con onOpenSettings el avatar del header usa la identidad y navega a Ajustes',
     (tester) async {

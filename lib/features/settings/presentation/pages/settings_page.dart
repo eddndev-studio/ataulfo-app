@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../../../core/auth/role_privilege.dart';
 import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
@@ -13,26 +12,16 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
-import '../../../../core/i18n/role_labels.dart';
 import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/domain/entities/identity.dart';
 
-/// Pantalla de Ajustes del shell. Header gradiente propio con el PERFIL del
-/// operador (avatar + email + rol) — la identidad es el contenido principal
-/// de esta tab, no un texto suelto — y las áreas como filas launcher
-/// agrupadas en una card con caption (paridad con los hubs). Al pie: cerrar
-/// sesión (confirmado) y la versión instalada (soporte: "¿qué versión
-/// traes?").
-///
-/// Sin UUIDs visibles: el operador no acciona sobre `userId`/`orgId`;
-/// `orgId` se interpreta al humano en `/memberships` (badge "Activa"
-/// sobre el nombre legible).
+/// Preferencias personales del operador. La organización activa y toda su
+/// administración viven en el selector global y en `/organization`; esta tab
+/// conserva únicamente identidad personal, notificaciones, apariencia y
+/// sesión.
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key, this.onLabelsChanged});
-
-  /// Sincroniza el catálogo vivo de la Bandeja al volver del CRUD de etiquetas.
-  final VoidCallback? onLabelsChanged;
+  const SettingsPage({super.key});
 
   /// Confirmación previa al logout: cerrar sesión descarta el estado local y
   /// obliga a re-autenticarse, así que un tap accidental no debe bastar.
@@ -80,10 +69,7 @@ class SettingsPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    _SectionsCard(
-                      identity: identity,
-                      onLabelsChanged: onLabelsChanged,
-                    ),
+                    const _PersonalSectionsCard(),
                     const SizedBox(height: AppTokens.sp7),
                     AppButton.danger(
                       label: 'Cerrar sesión',
@@ -103,10 +89,8 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-/// Header de Ajustes: el AppHeaderCard del kit con la identidad del operador
-/// como contenido principal (quién soy, con qué rol), no un texto suelto al
-/// inicio de una lista. Sin saludo ni avatar de perfil arriba: esta tab ES el
-/// perfil, así que la identidad vive en el slot de contenido.
+/// Header personal: el rol se omite deliberadamente porque pertenece a la
+/// organización activa y ya se muestra en el selector global.
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({required this.identity});
 
@@ -139,7 +123,7 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp2),
-                AppPill.glass(label: roleLabel(identity.role)),
+                const AppPill.glass(label: 'Cuenta personal'),
               ],
             ),
           ),
@@ -149,143 +133,17 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
-/// Las áreas de Ajustes como filas launcher en UNA card (paridad con los
-/// hubs): título + caption de qué hay detrás + chevron. Las filas reflejan las
-/// bandas del backend: gestión organizacional ADMIN+, herramientas globales
-/// SUPERVISOR+ y preferencias personales para cualquier miembro. El gate es
-/// cosmético — la autoridad real es el 403 del servidor.
-class _SectionsCard extends StatelessWidget {
-  const _SectionsCard({required this.identity, this.onLabelsChanged});
-
-  final Identity identity;
-  final VoidCallback? onLabelsChanged;
+/// Preferencias cuyo dueño es la persona o el dispositivo. Mantener esta lista
+/// corta evita que Ajustes vuelva a convertirse en el índice de toda la app.
+class _PersonalSectionsCard extends StatelessWidget {
+  const _PersonalSectionsCard();
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      key: const Key('settings.card.sections'),
+      key: const Key('settings.card.personal'),
       child: Column(
         children: <Widget>[
-          AppSectionLink(
-            rowKey: const Key('settings.memberships_tile'),
-            icon: Icons.business_outlined,
-            title: 'Tus organizaciones',
-            caption: 'Cambia o renombra la organización activa',
-            // push (no go): apila sobre Settings para que el back físico
-            // vuelva al shell sin sacar al operador de la app. Igual en
-            // todas las filas.
-            onTap: () => context.push('/memberships'),
-          ),
-          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-          // Visible para todos: cualquiera puede ser invitado a otra org, y la
-          // pantalla de aceptar sólo era alcanzable desde /select-org (usuarios
-          // sin org). Como registrarse autocrea una org personal, sin esta
-          // entrada un usuario con org no tenía forma de aceptar una invitación.
-          AppSectionLink(
-            rowKey: const Key('settings.accept_invite_tile'),
-            icon: Icons.mark_email_read_outlined,
-            title: 'Unirse a una organización',
-            caption: 'Únete a otra organización con un código o enlace',
-            onTap: () => context.push('/accept-invite'),
-          ),
-          if (isAdminOrAbove(identity.role)) ...<Widget>[
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.labels_tile'),
-              icon: Icons.label_outline,
-              title: 'Etiquetas',
-              caption: 'Organiza las conversaciones con categorías internas',
-              onTap: () async {
-                await context.push<void>('/org/labels');
-                if (context.mounted) onLabelsChanged?.call();
-              },
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.members_tile'),
-              icon: Icons.people_outline,
-              title: 'Miembros',
-              caption: 'Roles, invitaciones y acceso a Canales',
-              onTap: () => context.push('/members'),
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.org_ai_config_tile'),
-              icon: Icons.smart_toy_outlined,
-              title: 'Configuración de IA',
-              caption: 'Proveedor por modelo y valores por defecto',
-              onTap: () => context.push('/org/ai-config'),
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.org_customization_tile'),
-              icon: Icons.workspace_premium_outlined,
-              title: 'Personalización',
-              caption: 'Nombre y logo de los documentos de tu organización',
-              onTap: () => context.push('/org/customization'),
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.public_catalog_tile'),
-              icon: Icons.storefront_outlined,
-              title: 'Catálogo público',
-              caption: 'Una página web con tus productos para compartir',
-              onTap: () => context.push('/org/public-catalog'),
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.stickers_tile'),
-              icon: Icons.emoji_emotions_outlined,
-              title: 'Stickers',
-              caption: 'Crea stickers de tu negocio con IA para el chat',
-              onTap: () => context.push('/org/stickers'),
-            ),
-          ],
-          if (isSupervisorOrAbove(identity.role)) ...<Widget>[
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.account_tile'),
-              icon: Icons.credit_card_outlined,
-              title: 'Cuenta y plan',
-              caption: 'Tu plan, consumo y estado de la IA',
-              onTap: () => context.push('/cuenta'),
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.event_types_tile'),
-              icon: Icons.event_note_outlined,
-              title: 'Tipos de cita',
-              caption: 'Qué se puede reservar y cuánto dura',
-              onTap: () => context.push('/calendar/event-types'),
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.business_hours_tile'),
-              icon: Icons.schedule_outlined,
-              title: 'Horario de atención',
-              caption: 'Los días y horas en que se agendan citas',
-              onTap: () => context.push('/calendar/hours'),
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.product_catalog_tile'),
-              icon: Icons.storefront_outlined,
-              title: 'Catálogo de productos',
-              caption: 'Lo que tu asistente puede ofrecer y compartir',
-              onTap: () => context.push('/catalog/products'),
-            ),
-            const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-            AppSectionLink(
-              rowKey: const Key('settings.media_tile'),
-              icon: Icons.perm_media_outlined,
-              // Mismo término que el destino "Medios" del menú de adjuntar del
-              // chat: ambos abren el MISMO catálogo de la organización.
-              title: 'Medios',
-              caption: 'Imágenes, videos y audios para tus flujos',
-              onTap: () => context.push('/media'),
-            ),
-          ],
-          const Divider(height: AppTokens.sp5, color: AppTokens.divider),
           AppSectionLink(
             rowKey: const Key('settings.notifications_tile'),
             icon: Icons.notifications_outlined,
@@ -294,8 +152,6 @@ class _SectionsCard extends StatelessWidget {
             onTap: () => context.push('/notifications'),
           ),
           const Divider(height: AppTokens.sp5, color: AppTokens.divider),
-          // Preferencia del DISPOSITIVO (no de la cuenta ni de la org):
-          // visible para cualquier rol, sin gate.
           AppSectionLink(
             rowKey: const Key('settings.appearance_tile'),
             icon: Icons.palette_outlined,

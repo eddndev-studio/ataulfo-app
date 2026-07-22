@@ -139,32 +139,35 @@ void main() {
     );
   });
 
-  Widget host({ValueListenable<bool>? isActiveListenable}) =>
-      MultiRepositoryProvider(
-        providers: <RepositoryProvider<dynamic>>[
-          RepositoryProvider<ProfilePhotoCache>.value(
-            value: NoopProfilePhotoCache(),
-          ),
-          RepositoryProvider<MessagesRepository>.value(value: messages),
-          RepositoryProvider<ChatLabelsRepository>.value(value: chatLabels),
-        ],
-        child: MultiBlocProvider(
-          providers: <BlocProvider<dynamic>>[
-            BlocProvider<AuthBloc>.value(value: auth),
-            BlocProvider<BotsBloc>.value(value: bots),
-            BlocProvider<LabelsAdminBloc>.value(value: labels),
-            BlocProvider<ConversationsBloc>.value(value: inbox),
-          ],
-          child: MaterialApp(
-            theme: AppDesignTheme.dark(),
-            home: Scaffold(
-              body: ConversationsListPage(
-                isActiveListenable: isActiveListenable,
-              ),
-            ),
+  Widget host({
+    ValueListenable<bool>? isActiveListenable,
+    VoidCallback? onManageLabels,
+  }) => MultiRepositoryProvider(
+    providers: <RepositoryProvider<dynamic>>[
+      RepositoryProvider<ProfilePhotoCache>.value(
+        value: NoopProfilePhotoCache(),
+      ),
+      RepositoryProvider<MessagesRepository>.value(value: messages),
+      RepositoryProvider<ChatLabelsRepository>.value(value: chatLabels),
+    ],
+    child: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<AuthBloc>.value(value: auth),
+        BlocProvider<BotsBloc>.value(value: bots),
+        BlocProvider<LabelsAdminBloc>.value(value: labels),
+        BlocProvider<ConversationsBloc>.value(value: inbox),
+      ],
+      child: MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: Scaffold(
+          body: ConversationsListPage(
+            isActiveListenable: isActiveListenable,
+            onManageLabels: onManageLabels,
           ),
         ),
-      );
+      ),
+    ),
+  );
 
   Future<void> selectFirst(WidgetTester tester) async {
     await tester.longPress(
@@ -180,6 +183,19 @@ void main() {
     await tester.tap(find.byKey(const Key('inbox.selection.more')));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('la gestión de etiquetas vive en el menú de Bandeja', (
+    tester,
+  ) async {
+    var opens = 0;
+    await tester.pumpWidget(host(onManageLabels: () => opens++));
+
+    await tester.tap(find.byKey(const Key('inbox.header.more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('inbox.header.menu.manage_labels')));
+
+    expect(opens, 1);
+  });
 
   testWidgets('header compacto entra a selección desde su menú', (
     tester,

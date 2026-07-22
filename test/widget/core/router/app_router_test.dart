@@ -65,6 +65,8 @@ import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
 import 'package:ataulfo/features/memberships/domain/repositories/memberships_repository.dart';
 import 'package:ataulfo/features/memberships/presentation/pages/memberships_page.dart';
 import 'package:ataulfo/features/memberships/presentation/pages/select_org_page.dart';
+import 'package:ataulfo/features/organization/presentation/pages/organization_page.dart';
+import 'package:ataulfo/features/organization/presentation/pages/organization_team_page.dart';
 import 'package:ataulfo/features/messages/domain/entities/message.dart';
 import 'package:ataulfo/features/messages/domain/entities/outbox_entry.dart';
 import 'package:ataulfo/features/messages/domain/entities/thread_live_event.dart';
@@ -1090,6 +1092,42 @@ void main() {
   });
 
   testWidgets(
+    'AuthAuthenticated → /organization monta el hub y carga su overview',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      clearInteractions(membershipsRepo);
+      clearInteractions(membersRepo);
+      clearInteractions(invitationsRepo);
+
+      router.router.go('/organization');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrganizationPage), findsOneWidget);
+      verify(membershipsRepo.list).called(1);
+      verify(membersRepo.list).called(1);
+      verify(invitationsRepo.list).called(1);
+    },
+  );
+
+  testWidgets(
+    '/organization/team?tab=invitations abre la superficie unificada en la tab correcta',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/organization/team?tab=invitations');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrganizationTeamPage), findsOneWidget);
+      expect(find.byKey(const Key('invitations.invite')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'AuthAuthenticated → /memberships monta MembershipsPage y dispara '
     'MembershipsLoadRequested al construirse',
     (tester) async {
@@ -1100,6 +1138,9 @@ void main() {
 
       await tester.pumpWidget(_host(router, authBloc));
       await tester.pumpAndSettle();
+      // /home ya carga memberships para el selector global; aislamos la carga
+      // propia de la ruta que este test verifica.
+      clearInteractions(membershipsRepo);
       router.router.go('/memberships');
       await tester.pumpAndSettle();
 
@@ -1172,8 +1213,8 @@ void main() {
     expect(page.read<BotsBloc>(), isNotNull);
   });
 
-  testWidgets('AuthAuthenticated → /members ofrece "Invitar" que navega a '
-      '/invitations', (tester) async {
+  testWidgets('AuthAuthenticated → /members conserva el alias y permite '
+      'cambiar a Invitaciones sin apilar otra pantalla', (tester) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -1181,10 +1222,12 @@ void main() {
     router.router.go('/members');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('members.invite')));
+    await tester.tap(find.widgetWithText(Tab, 'Invitaciones'));
     await tester.pumpAndSettle();
 
     expect(find.byType(InvitationsPage), findsOneWidget);
+    expect(find.byKey(const Key('invitations.invite')), findsOneWidget);
+    expect(router.router.state.matchedLocation, '/members');
   });
 
   testWidgets('AuthAuthenticated → /create-org monta CreateOrgPage', (
@@ -1760,6 +1803,22 @@ void main() {
         find.byKey(const Key('media_gallery.type_chip.all')),
         findsNothing,
       );
+    });
+
+    testWidgets('Administrar abre la galería completa desde el picker', (
+      tester,
+    ) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+      final localRouter = pickerRouter();
+      await tester.pumpWidget(_host(localRouter, authBloc));
+      await tester.pumpAndSettle();
+      localRouter.router.go('/media/pick');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('media_picker.manage')));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(AppBar, 'Medios'), findsOneWidget);
     });
 
     testWidgets('multi=1: el tap selecciona (barra Agregar), no popea', (

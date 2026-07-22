@@ -12,6 +12,7 @@ import '../../../calendar/presentation/pages/agenda_page.dart';
 import '../../../conversations/presentation/bloc/conversations_bloc.dart';
 import '../../../conversations/presentation/pages/conversations_list_page.dart';
 import '../../../labels/presentation/bloc/labels_admin_bloc.dart';
+import '../../../organization/presentation/widgets/organization_context_switcher.dart';
 import '../../../platform_agent/presentation/pages/platform_agent_page.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../templates/presentation/pages/templates_list_page.dart';
@@ -33,6 +34,7 @@ class ShellPage extends StatefulWidget {
     this.routeObserver,
     this.assistantDraft = '',
     this.contextualBotId,
+    this.organizationContextBuilder,
   });
 
   /// Observer compartido con el GoRouter del AppRouter. ShellPage no lo
@@ -51,6 +53,11 @@ class ShellPage extends StatefulWidget {
   /// Cambiarla actualiza el mismo bloc para no desmontar el resto del shell.
   final String? contextualBotId;
 
+  /// Seam de composición para montajes aislados. Producción usa el selector
+  /// real; los tests de tabs pueden sustituir sólo este chrome sin construir
+  /// repositorios ajenos al comportamiento que verifican.
+  final Widget Function(bool compact)? organizationContextBuilder;
+
   @override
   State<ShellPage> createState() => _ShellPageState();
 }
@@ -58,6 +65,16 @@ class ShellPage extends StatefulWidget {
 class _ShellPageState extends State<ShellPage> {
   late _ShellTab _selectedTab;
   late final ValueNotifier<bool> _inboxVisible;
+
+  bool get _canManageOrganization {
+    final auth = context.read<AuthBloc>().state;
+    return auth is AuthAuthenticated && isAdminOrAbove(auth.identity.role);
+  }
+
+  bool get _canManageAgenda {
+    final auth = context.read<AuthBloc>().state;
+    return auth is AuthAuthenticated && isSupervisorOrAbove(auth.identity.role);
+  }
 
   @override
   void initState() {
@@ -106,6 +123,7 @@ class _ShellPageState extends State<ShellPage> {
       activeIcon: Icons.inbox,
       page: ConversationsListPage(
         onOpenSettings: () => _select(_ShellTab.settings),
+        onManageLabels: _canManageOrganization ? _manageLabels : null,
         isActiveListenable: _inboxVisible,
       ),
     ),
@@ -129,7 +147,15 @@ class _ShellPageState extends State<ShellPage> {
       label: 'Agenda',
       icon: Icons.event_outlined,
       activeIcon: Icons.event,
-      page: AgendaPage(onOpenSettings: () => _select(_ShellTab.settings)),
+      page: AgendaPage(
+        onOpenSettings: () => _select(_ShellTab.settings),
+        onManageEventTypes: _canManageAgenda
+            ? () => context.push('/calendar/event-types')
+            : null,
+        onManageBusinessHours: _canManageAgenda
+            ? () => context.push('/calendar/hours')
+            : null,
+      ),
       fab: _agendaBookFab,
       lazy: true,
       supervisorOnly: true,
@@ -143,18 +169,13 @@ class _ShellPageState extends State<ShellPage> {
       supervisorOnly: true,
     ),
     // Ajustes cierra la barra: es la tab de menor frecuencia y el rincón
-    // final es donde el pulgar la busca en el resto de apps. Su índice es
-    // contrato de los onOpenSettings de los headers (_settingsIndex).
-    _TabSpec(
+    // final es donde el pulgar la busca en el resto de apps.
+    const _TabSpec(
       id: _ShellTab.settings,
       label: 'Ajustes',
       icon: Icons.settings_outlined,
       activeIcon: Icons.settings,
-      page: SettingsPage(
-        onLabelsChanged: () => context.read<LabelsAdminBloc>().add(
-          const LabelsAdminRefreshRequested(),
-        ),
-      ),
+      page: SettingsPage(),
     ),
   ];
 
@@ -162,6 +183,12 @@ class _ShellPageState extends State<ShellPage> {
     if (_selectedTab == tab) return;
     _inboxVisible.value = tab == _ShellTab.inbox;
     setState(() => _selectedTab = tab);
+  }
+
+  Future<void> _manageLabels() async {
+    await context.push<void>('/org/labels');
+    if (!mounted) return;
+    context.read<LabelsAdminBloc>().add(const LabelsAdminRefreshRequested());
   }
 
   @override
@@ -180,12 +207,15 @@ class _ShellPageState extends State<ShellPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final useRail = constraints.maxWidth >= 600;
+        Widget organizationContext(bool compact) =>
+            widget.organizationContextBuilder?.call(compact) ??
+            OrganizationContextSwitcher(compact: compact);
         // IndexedStack preserva el estado interno de cada tab (scroll
         // de la lista, bloc compartido por el shell) entre cambios. El aviso
         // de verificación envuelve el contenido de las tabs (sólo pinta su
         // franja cuando el correo no está verificado, y coordina el inset del
         // status bar), idéntico en ambos layouts (compact y rail).
-        final body = EmailVerificationBanner(
+        final tabBody = EmailVerificationBanner(
           child: IndexedStack(
             index: effectiveIndex,
             children: <Widget>[
@@ -206,6 +236,7 @@ class _ShellPageState extends State<ShellPage> {
               ? Row(
                   children: <Widget>[
                     NavigationRail(
+                      leading: organizationContext(true),
                       selectedIndex: effectiveIndex,
                       onDestinationSelected: (i) => _select(tabs[i].id),
                       labelType: NavigationRailLabelType.all,
@@ -221,10 +252,25 @@ class _ShellPageState extends State<ShellPage> {
                       ],
                     ),
                     const VerticalDivider(width: 1, thickness: 1),
-                    Expanded(child: body),
+                    Expanded(child: tabBody),
                   ],
                 )
-              : body,
+              : Column(
+                  children: <Widget>[
+                    organizationContext(false),
+                    Expanded(
+                      // El selector ya consumió el inset del status bar. Las
+                      // cabeceras de cada tab reciben top=0 para evitar el
+                      // doble espacio y el banner de verificación conserva el
+                      // mismo contrato.
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeTop: true,
+                        child: tabBody,
+                      ),
+                    ),
+                  ],
+                ),
           floatingActionButton: effectiveTab.fab?.call(context),
           bottomNavigationBar: useRail
               ? null

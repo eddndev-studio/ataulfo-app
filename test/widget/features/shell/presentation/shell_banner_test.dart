@@ -112,7 +112,11 @@ void main() {
         BlocProvider<ConversationsBloc>.value(value: inboxBloc),
         BlocProvider<ResendVerificationCubit>.value(value: resendCubit),
       ],
-      child: const MaterialApp(home: ShellPage()),
+      child: MaterialApp(
+        home: ShellPage(
+          organizationContextBuilder: (_) => const SizedBox.shrink(),
+        ),
+      ),
     ),
   );
 
