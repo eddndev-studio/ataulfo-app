@@ -2,8 +2,74 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../motion.dart';
 import '../safe_bottom.dart';
 import '../tokens.dart';
+
+/// Dirección espacial entre dos pasos consecutivos de un wizard.
+enum AppWizardStepDirection { forward, backward }
+
+/// Cambia el contenido de un paso con continuidad espacial, sin crossfade.
+///
+/// Cada [child] debe tener una key distinta. Al avanzar, la vista actual sale
+/// por la izquierda y la siguiente entra por la derecha; al volver se invierte
+/// el recorrido. [ClipRect] mantiene ambas páginas dentro del mismo viewport,
+/// de modo que nunca parecen dos hojas superpuestas.
+class AppWizardStepTransition extends StatelessWidget {
+  const AppWizardStepTransition({
+    super.key,
+    required this.direction,
+    required this.child,
+  });
+
+  final AppWizardStepDirection direction;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    assert(child.key != null, 'Cada paso del wizard necesita una key estable.');
+    final incomingOffset = switch (direction) {
+      AppWizardStepDirection.forward => const Offset(1, 0),
+      AppWizardStepDirection.backward => const Offset(-1, 0),
+    };
+    final outgoingOffset = -incomingOffset;
+    final currentKey = child.key;
+
+    return ClipRect(
+      child: AnimatedSwitcher(
+        duration: AppMotion.durationOf(context, AppTokens.durationBase),
+        layoutBuilder: (currentChild, previousChildren) {
+          return Stack(
+            alignment: Alignment.topCenter,
+            children: <Widget>[
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          );
+        },
+        transitionBuilder: (transitionChild, animation) {
+          final isIncoming = transitionChild.key == currentKey;
+          final curvedAnimation = CurvedAnimation(
+            parent: animation,
+            curve: AppTokens.ease,
+            // La curva invertida conserva juntas ambas páginas durante la
+            // salida: no se cruzan ni dejan ver un hueco entre ellas.
+            reverseCurve: AppTokens.ease.flipped,
+          );
+
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: isIncoming ? incomingOffset : outgoingOffset,
+              end: Offset.zero,
+            ).animate(curvedAnimation),
+            child: transitionChild,
+          );
+        },
+        child: child,
+      ),
+    );
+  }
+}
 
 /// Estructura canónica para formularios por pasos dentro de una hoja inferior.
 ///
