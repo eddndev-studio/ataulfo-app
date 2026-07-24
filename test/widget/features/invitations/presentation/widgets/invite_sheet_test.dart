@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:ataulfo/core/design/app_bottom_sheet.dart';
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_radio_row.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
@@ -128,6 +129,12 @@ void main() {
     expect(find.text('1 de 2 · Persona'), findsOneWidget);
     expect(find.textContaining('correo que usará para entrar'), findsOneWidget);
     expect(find.byKey(const Key('invite.email')), findsOneWidget);
+    expect(
+      tester
+          .widget<AppTextField>(find.byKey(const Key('invite.email')))
+          .autofocus,
+      isFalse,
+    );
     expect(find.byKey(const Key('invite.cancel')), findsOneWidget);
     expect(find.byKey(const Key('invite.continue')), findsOneWidget);
     expect(find.byKey(const Key('invite.role.WORKER')), findsNothing);
@@ -157,6 +164,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('invite.step.access')), findsOneWidget);
   });
+
+  testWidgets(
+    'Persona y Acceso se deslizan de lado sin fundirse ni superponerse',
+    (tester) async {
+      await pumpHost(tester);
+      await tester.enterText(
+        find.byKey(const Key('invite.email')),
+        'persona@empresa.com',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('invite.continue')));
+      await tester.pump();
+      await tester.pump(AppTokens.durationBase ~/ 2);
+
+      final viewport = find.byKey(const Key('invite.step_transition'));
+      expect(viewport, findsOneWidget);
+      expect(
+        find.descendant(of: viewport, matching: find.byType(FadeTransition)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: viewport, matching: find.byType(SlideTransition)),
+        findsAtLeastNWidgets(2),
+      );
+
+      final personX = tester
+          .getCenter(find.byKey(const Key('invite.step.person')))
+          .dx;
+      final accessX = tester
+          .getCenter(find.byKey(const Key('invite.step.access')))
+          .dx;
+      expect(personX, lessThan(accessX));
+      expect(
+        accessX - personX,
+        greaterThan(AppTokens.sp9),
+        reason: 'las vistas deben viajar lado a lado, no ocupar el mismo plano',
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('invite.step.person')), findsNothing);
+      expect(find.byKey(const Key('invite.step.access')), findsOneWidget);
+    },
+  );
 
   testWidgets('2 de 2 · Acceso resume el correo y explica los tres roles', (
     tester,

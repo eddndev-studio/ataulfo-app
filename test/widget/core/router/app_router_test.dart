@@ -1189,6 +1189,39 @@ void main() {
   );
 
   testWidgets(
+    'Equipo y acceso no desplaza el contenido detrás de un teclado modal',
+    (tester) async {
+      addTearDown(tester.view.reset);
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      router.router.go('/invitations');
+      await tester.pumpAndSettle();
+
+      final empty = find.byKey(const Key('invitations.empty'));
+      expect(empty, findsOneWidget);
+      final beforeKeyboard = tester.getCenter(empty).dy;
+
+      // El teclado pertenece al sheet superpuesto. La pantalla administrativa
+      // que queda detrás debe conservar exactamente su geometría.
+      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+      await tester.pumpAndSettle();
+
+      expect(tester.getCenter(empty).dy, moreOrLessEquals(beforeKeyboard));
+      final routeScaffold = find.ancestor(
+        of: find.byType(OrganizationTeamPage),
+        matching: find.byType(Scaffold),
+      );
+      expect(routeScaffold, findsOneWidget);
+      expect(
+        tester.widget<Scaffold>(routeScaffold).resizeToAvoidBottomInset,
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets(
     'AuthAuthenticated → /memberships monta MembershipsPage y dispara '
     'MembershipsLoadRequested al construirse',
     (tester) async {
