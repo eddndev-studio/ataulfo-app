@@ -233,7 +233,7 @@ class _InviteSheetState extends State<InviteSheet> {
         final Widget footer;
 
         if (isSuccess) {
-          final success = state as InvitationMutationSuccess;
+          final success = state;
           body = InvitationShareContent(
             key: const ValueKey<String>('invite.success'),
             email: success.email ?? _emailCtrl.text.trim(),

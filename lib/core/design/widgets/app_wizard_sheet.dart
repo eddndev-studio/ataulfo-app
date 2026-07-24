@@ -41,10 +41,7 @@ class AppWizardStepTransition extends StatelessWidget {
         layoutBuilder: (currentChild, previousChildren) {
           return Stack(
             alignment: Alignment.topCenter,
-            children: <Widget>[
-              ...previousChildren,
-              if (currentChild != null) currentChild,
-            ],
+            children: <Widget>[...previousChildren, ?currentChild],
           );
         },
         transitionBuilder: (transitionChild, animation) {
