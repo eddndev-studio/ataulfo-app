@@ -13,18 +13,21 @@ class AppPageHeader extends StatelessWidget {
   const AppPageHeader({
     super.key,
     required this.title,
+    this.titleKey,
     this.leading,
     this.actions = const <Widget>[],
     this.avatarInitial,
     this.avatarColorKey,
     this.onAvatarTap,
     this.content,
+    this.bottomIndicator,
   }) : assert(
          (avatarInitial == null) == (onAvatarTap == null),
          'el avatar del header exige su acción (y viceversa)',
        );
 
   final String title;
+  final Key? titleKey;
 
   /// Navegación global o contextual antes del título (p. ej. menú o volver).
   final Widget? leading;
@@ -41,6 +44,11 @@ class AppPageHeader extends StatelessWidget {
 
   /// Controles o contexto propios de la sección, bajo la barra principal.
   final Widget? content;
+
+  /// Indicador de 2 px que reemplaza temporalmente al divisor inferior.
+  /// Bandeja lo usa para una mutación contextual; el resto conserva el
+  /// hairline canónico.
+  final Widget? bottomIndicator;
 
   static const double _toolbarHeight = 56;
 
@@ -70,6 +78,7 @@ class AppPageHeader extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title,
+                        key: titleKey,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -98,12 +107,14 @@ class AppPageHeader extends StatelessWidget {
                 ),
                 child: content!,
               ),
-            const SizedBox(
+            SizedBox(
               height: 2,
-              child: ColoredBox(
-                key: Key('app_page_header.divider'),
-                color: AppTokens.divider,
-              ),
+              child:
+                  bottomIndicator ??
+                  const ColoredBox(
+                    key: Key('app_page_header.divider'),
+                    color: AppTokens.divider,
+                  ),
             ),
           ],
         ),

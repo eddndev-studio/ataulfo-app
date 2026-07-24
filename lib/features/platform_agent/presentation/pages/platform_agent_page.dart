@@ -6,6 +6,7 @@ import '../../../../core/design/app_confirm_dialog.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/design/widgets/app_thread_list_sheet.dart';
 import '../../domain/entities/pa_conversation.dart';
 import '../../domain/failures/pa_failure.dart';
@@ -154,16 +155,9 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
   }
 }
 
-/// Header full-bleed de la pestaña: reserva el inset del status bar (como las
-/// demás tabs del shell, que van sin AppBar). Marca + acciones de modelo,
-/// conversaciones y nuevo hilo.
-///
-/// Deliberadamente NO es la tarjeta-header gradiente de las secciones: esta
-/// tab es un chat (hilo + composer fijos, sin scroll que se lleve el header),
-/// así que el chrome compacto tipo app bar — como el del hilo de mensajes —
-/// preserva la altura del hilo con el teclado abierto; además sus acciones
-/// comunican estado por color (modelo elegido), lenguaje que no lee sobre el
-/// gradiente de marca.
+/// Copiloto comparte la barra principal del shell. Sus controles propios viven
+/// en la zona de acciones y el hilo activo ocupa el segundo renglón contextual:
+/// varía el contenido, no la cuadrícula del app bar.
 class _Header extends StatelessWidget {
   const _Header({
     required this.onThreads,
@@ -179,78 +173,61 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topInset = MediaQuery.paddingOf(context).top;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp3,
-        topInset + AppTokens.sp2,
-        AppTokens.sp1,
-        AppTokens.sp2,
-      ),
-      decoration: const BoxDecoration(
-        color: AppTokens.surface1,
-        border: Border(bottom: BorderSide(color: AppTokens.divider)),
-      ),
-      child: Row(
-        children: <Widget>[
-          if (leading != null) ...<Widget>[
-            leading!,
-            const SizedBox(width: AppTokens.sp1),
+    return AppPageHeader(
+      title: 'Copiloto',
+      leading: leading,
+      actions: <Widget>[
+        ...actions,
+        const _ModelMenu(),
+        IconButton(
+          key: const Key('pa.history'),
+          tooltip: 'Conversaciones',
+          icon: const Icon(Icons.history, color: AppTokens.text2),
+          onPressed: onThreads,
+        ),
+        IconButton(
+          key: const Key('pa.new_conversation'),
+          tooltip: 'Nueva conversación',
+          icon: const Icon(Icons.add_comment_outlined, color: AppTokens.text2),
+          onPressed: onNew,
+        ),
+      ],
+      content: const _ActiveConversationContext(),
+    );
+  }
+}
+
+class _ActiveConversationContext extends StatelessWidget {
+  const _ActiveConversationContext();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<PlatformAgentChatBloc, PaChatState>(
+      buildWhen: (before, after) =>
+          before is! PaChatLoaded ||
+          after is! PaChatLoaded ||
+          before.activeConversation != after.activeConversation,
+      builder: (context, state) {
+        final title = state is PaChatLoaded
+            ? state.activeConversation.title.trim()
+            : '';
+        return Row(
+          children: <Widget>[
+            const Icon(Icons.auto_awesome, size: 18, color: AppTokens.primary),
+            const SizedBox(width: AppTokens.sp2),
+            Expanded(
+              child: Text(
+                title.isEmpty ? 'Nueva conversación' : title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+              ),
+            ),
           ],
-          const Icon(Icons.auto_awesome, size: 20, color: AppTokens.primary),
-          const SizedBox(width: AppTokens.sp2),
-          Expanded(
-            child: BlocBuilder<PlatformAgentChatBloc, PaChatState>(
-              buildWhen: (before, after) =>
-                  before is! PaChatLoaded ||
-                  after is! PaChatLoaded ||
-                  before.activeConversation != after.activeConversation,
-              builder: (context, state) {
-                final title = state is PaChatLoaded
-                    ? state.activeConversation.title.trim()
-                    : '';
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Copiloto',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(color: AppTokens.text1),
-                    ),
-                    if (title.isNotEmpty)
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppTokens.text2,
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-          ...actions,
-          const _ModelMenu(),
-          IconButton(
-            key: const Key('pa.history'),
-            tooltip: 'Conversaciones',
-            icon: const Icon(Icons.history, color: AppTokens.text2),
-            onPressed: onThreads,
-          ),
-          IconButton(
-            key: const Key('pa.new_conversation'),
-            tooltip: 'Nueva conversación',
-            icon: const Icon(
-              Icons.add_comment_outlined,
-              color: AppTokens.text2,
-            ),
-            onPressed: onNew,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

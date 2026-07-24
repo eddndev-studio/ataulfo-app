@@ -4,6 +4,7 @@ import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
+import 'package:ataulfo/features/calendar/presentation/bloc/agenda_cubit.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/pages/conversations_list_page.dart';
 import 'package:ataulfo/features/labels/domain/entities/label.dart';
@@ -41,6 +42,8 @@ class _MockMembershipsBloc extends MockBloc<MembershipsEvent, MembershipsState>
 
 class _MockSwitchOrgCubit extends MockCubit<SwitchOrgState>
     implements SwitchOrgCubit {}
+
+class _MockAgendaCubit extends MockCubit<AgendaState> implements AgendaCubit {}
 
 class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
     implements TemplatesBloc {}
@@ -90,9 +93,11 @@ void main() {
   late _MockBotsBloc botsBloc;
   late _MockMembershipsBloc membershipsBloc;
   late _MockSwitchOrgCubit switchOrgCubit;
+  late _MockAgendaCubit agendaCubit;
   late _MockTemplatesBloc templatesBloc;
   late _MockLabelsAdminBloc labelsBloc;
   late _MockConversationsBloc inboxBloc;
+  late _MockPaBloc paBloc;
   late _MockMessagesRepository messagesRepository;
   late _MockChatLabelsRepository chatLabelsRepository;
 
@@ -105,9 +110,11 @@ void main() {
     botsBloc = _MockBotsBloc();
     membershipsBloc = _MockMembershipsBloc();
     switchOrgCubit = _MockSwitchOrgCubit();
+    agendaCubit = _MockAgendaCubit();
     templatesBloc = _MockTemplatesBloc();
     labelsBloc = _MockLabelsAdminBloc();
     inboxBloc = _MockConversationsBloc();
+    paBloc = _MockPaBloc();
     messagesRepository = _MockMessagesRepository();
     chatLabelsRepository = _MockChatLabelsRepository();
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
@@ -123,6 +130,15 @@ void main() {
       ),
     );
     when(() => switchOrgCubit.state).thenReturn(const SwitchOrgIdle());
+    when(() => agendaCubit.state).thenReturn(
+      AgendaState(
+        day: DateTime(2026, 7, 23),
+        status: AgendaStatus.loaded,
+        appointments: const [],
+        failure: null,
+        mutating: false,
+      ),
+    );
     when(() => templatesBloc.state).thenReturn(
       const TemplatesLoaded(items: <Template>[], isRefreshing: false),
     );
@@ -132,12 +148,18 @@ void main() {
     when(
       () => inboxBloc.state,
     ).thenReturn(const ConversationsState(phase: ConversationsPhase.ready));
+    whenListen(
+      paBloc,
+      const Stream<PaChatState>.empty(),
+      initialState: const PaChatFailed(PaServerFailure()),
+    );
   });
 
   Widget host({
     String assistantDraft = '',
     String? contextualBotId,
     bool realOrganizationContext = false,
+    PlatformAgentChatBloc? platformAgentBloc,
   }) => MultiRepositoryProvider(
     providers: <RepositoryProvider<dynamic>>[
       RepositoryProvider<ProfilePhotoCache>.value(
@@ -154,9 +176,13 @@ void main() {
         BlocProvider<BotsBloc>.value(value: botsBloc),
         BlocProvider<MembershipsBloc>.value(value: membershipsBloc),
         BlocProvider<SwitchOrgCubit>.value(value: switchOrgCubit),
+        BlocProvider<AgendaCubit>.value(value: agendaCubit),
         BlocProvider<TemplatesBloc>.value(value: templatesBloc),
         BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
         BlocProvider<ConversationsBloc>.value(value: inboxBloc),
+        BlocProvider<PlatformAgentChatBloc>.value(
+          value: platformAgentBloc ?? paBloc,
+        ),
       ],
       child: MaterialApp(
         home: ShellPage(
@@ -326,6 +352,57 @@ void main() {
       );
       expect(find.byKey(const Key('shell.drawer.appearance')), findsOneWidget);
     });
+
+    testWidgets(
+      'las cuatro tabs comparten eje de menú y título en el app bar',
+      (tester) async {
+        useViewport(tester, widthDp: 420);
+        await tester.pumpWidget(host());
+
+        ({Offset menu, Offset title}) geometry(String title) {
+          final header = find
+              .byKey(const Key('app_page_header.surface'))
+              .hitTestable();
+          expect(header, findsOneWidget);
+          final menu = find.descendant(
+            of: header,
+            matching: find.byKey(const Key('shell.header.menu')),
+          );
+          final heading = find.descendant(
+            of: header,
+            matching: find.text(title),
+          );
+          expect(menu, findsOneWidget);
+          expect(heading, findsOneWidget);
+          return (
+            menu: tester.getCenter(menu),
+            title: tester.getTopLeft(heading),
+          );
+        }
+
+        final inbox = geometry('Bandeja');
+        await tester.tap(inBottomNav(find.text('Asistentes')));
+        await tester.pumpAndSettle();
+        final assistants = geometry('Asistentes');
+        await tester.tap(inBottomNav(find.text('Agenda')));
+        await tester.pumpAndSettle();
+        final agenda = geometry('Agenda');
+        await tester.tap(inBottomNav(find.text('Copiloto')));
+        await tester.pumpAndSettle();
+        final copilot = geometry('Copiloto');
+
+        for (final candidate in <({Offset menu, Offset title})>[
+          assistants,
+          agenda,
+          copilot,
+        ]) {
+          expect(candidate.menu.dx, closeTo(inbox.menu.dx, 0.1));
+          expect(candidate.menu.dy, closeTo(inbox.menu.dy, 0.1));
+          expect(candidate.title.dx, closeTo(inbox.title.dx, 0.1));
+          expect(candidate.title.dy, closeTo(inbox.title.dy, 0.1));
+        }
+      },
+    );
 
     testWidgets('drawer de Agente oculta gestión sin privilegios', (
       tester,
@@ -497,19 +574,14 @@ void main() {
         initialState: const PaChatFailed(PaServerFailure()),
       );
 
-      await tester.pumpWidget(
-        BlocProvider<PlatformAgentChatBloc>.value(value: pa, child: host()),
-      );
+      await tester.pumpWidget(host(platformAgentBloc: pa));
       expect(find.byType(PlatformAgentPage), findsNothing);
       await tester.tap(inBottomNav(find.text('Copiloto')));
       await tester.pumpAndSettle();
       expect(find.byType(PlatformAgentPage), findsOneWidget);
 
       await tester.pumpWidget(
-        BlocProvider<PlatformAgentChatBloc>.value(
-          value: pa,
-          child: host(assistantDraft: 'Crea una campaña'),
-        ),
+        host(assistantDraft: 'Crea una campaña', platformAgentBloc: pa),
       );
       await tester.pump();
       expect(find.byType(PlatformAgentPage), findsOneWidget);

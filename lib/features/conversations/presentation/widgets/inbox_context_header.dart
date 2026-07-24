@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_page_header.dart';
 
 /// Chrome fijo y compacto de la Bandeja. Conserva una sola altura y cambia de
 /// contenido —no de geometría— al entrar en selección múltiple.
@@ -52,81 +53,49 @@ class InboxContextHeader extends StatelessWidget {
   final Widget? leading;
   final List<Widget> actions;
 
-  static const double _toolbarHeight = 56;
-
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return SizedBox(
       key: const Key('inbox.header'),
-      color: AppTokens.surface1,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: _toolbarHeight + 2,
-          child: Column(
-            children: <Widget>[
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: AppTokens.durationBase,
-                  switchInCurve: AppTokens.ease,
-                  switchOutCurve: AppTokens.ease,
-                  layoutBuilder: (currentChild, previousChildren) => Stack(
-                    alignment: Alignment.center,
-                    children: <Widget>[
-                      for (final child in previousChildren)
-                        IgnorePointer(child: ExcludeSemantics(child: child)),
-                      ?currentChild,
-                    ],
-                  ),
-                  child: selectionActive
-                      ? _SelectionHeader(
-                          key: const ValueKey<String>('selection'),
-                          count: selectedCount,
-                          isMutating: isMutating,
-                          canSelectVisible: canSelectVisible,
-                          canClearHistory: canClearHistory,
-                          onCancel: onCancelSelection,
-                          onSelectVisible: onSelectVisible,
-                          onLabels: onOpenLabels,
-                          onMarkRead: onMarkRead,
-                          onClearHistory: onClearHistory,
-                        )
-                      : _NormalHeader(
-                          key: const ValueKey<String>('normal'),
-                          canStartSelection: canStartSelection,
-                          showingArchived: showingArchived,
-                          hasActiveFilters: hasActiveFilters,
-                          onStartSelection: onStartSelection,
-                          onToggleArchived: onToggleArchived,
-                          onRefresh: onRefresh,
-                          onClearFilters: onClearFilters,
-                          onManageLabels: onManageLabels,
-                          onOpenSettings: onOpenSettings,
-                          leading: leading,
-                          actions: actions,
-                        ),
-                ),
-              ),
-              SizedBox(
-                height: 2,
-                child: AnimatedSwitcher(
-                  duration: AppTokens.durationFast,
-                  child: isMutating
-                      ? const LinearProgressIndicator(
-                          key: Key('inbox.selection.progress'),
-                          minHeight: 2,
-                          color: AppTokens.primary,
-                          backgroundColor: AppTokens.surface1,
-                        )
-                      : const ColoredBox(
-                          key: ValueKey<String>('inbox.header.divider'),
-                          color: AppTokens.divider,
-                        ),
-                ),
-              ),
-            ],
-          ),
+      child: AnimatedSwitcher(
+        duration: AppTokens.durationBase,
+        switchInCurve: AppTokens.ease,
+        switchOutCurve: AppTokens.ease,
+        layoutBuilder: (currentChild, previousChildren) => Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            for (final child in previousChildren)
+              IgnorePointer(child: ExcludeSemantics(child: child)),
+            ?currentChild,
+          ],
         ),
+        child: selectionActive
+            ? _SelectionHeader(
+                key: const ValueKey<String>('selection'),
+                count: selectedCount,
+                isMutating: isMutating,
+                canSelectVisible: canSelectVisible,
+                canClearHistory: canClearHistory,
+                onCancel: onCancelSelection,
+                onSelectVisible: onSelectVisible,
+                onLabels: onOpenLabels,
+                onMarkRead: onMarkRead,
+                onClearHistory: onClearHistory,
+              )
+            : _NormalHeader(
+                key: const ValueKey<String>('normal'),
+                canStartSelection: canStartSelection,
+                showingArchived: showingArchived,
+                hasActiveFilters: hasActiveFilters,
+                onStartSelection: onStartSelection,
+                onToggleArchived: onToggleArchived,
+                onRefresh: onRefresh,
+                onClearFilters: onClearFilters,
+                onManageLabels: onManageLabels,
+                onOpenSettings: onOpenSettings,
+                leading: leading,
+                actions: actions,
+              ),
       ),
     );
   }
@@ -171,108 +140,91 @@ class _NormalHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox.expand(
+    return AppPageHeader(
       key: const Key('inbox.header.normal'),
-      child: Row(
-        children: <Widget>[
-          ?leading,
-          if (leading == null)
-            const SizedBox(width: AppTokens.sp4)
-          else
-            const SizedBox(width: AppTokens.sp1),
-          Expanded(
-            child: Text(
-              'Bandeja',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge,
+      title: 'Bandeja',
+      leading: leading,
+      actions: <Widget>[
+        ...actions,
+        PopupMenuButton<_InboxMenuAction>(
+          key: const Key('inbox.header.more'),
+          tooltip: 'Más acciones',
+          icon: const Icon(Icons.more_vert),
+          onSelected: (action) {
+            switch (action) {
+              case _InboxMenuAction.startSelection:
+                onStartSelection();
+              case _InboxMenuAction.toggleArchived:
+                onToggleArchived();
+              case _InboxMenuAction.refresh:
+                onRefresh();
+              case _InboxMenuAction.clearFilters:
+                onClearFilters();
+              case _InboxMenuAction.manageLabels:
+                onManageLabels?.call();
+              case _InboxMenuAction.settings:
+                onOpenSettings?.call();
+            }
+          },
+          itemBuilder: (_) => <PopupMenuEntry<_InboxMenuAction>>[
+            PopupMenuItem<_InboxMenuAction>(
+              key: const Key('inbox.header.menu.select'),
+              value: _InboxMenuAction.startSelection,
+              enabled: canStartSelection,
+              child: const _MenuRow(
+                icon: Icons.checklist_outlined,
+                label: 'Seleccionar conversaciones',
+              ),
             ),
-          ),
-          ...actions,
-          PopupMenuButton<_InboxMenuAction>(
-            key: const Key('inbox.header.more'),
-            tooltip: 'Más acciones',
-            icon: const Icon(Icons.more_vert),
-            onSelected: (action) {
-              switch (action) {
-                case _InboxMenuAction.startSelection:
-                  onStartSelection();
-                case _InboxMenuAction.toggleArchived:
-                  onToggleArchived();
-                case _InboxMenuAction.refresh:
-                  onRefresh();
-                case _InboxMenuAction.clearFilters:
-                  onClearFilters();
-                case _InboxMenuAction.manageLabels:
-                  onManageLabels?.call();
-                case _InboxMenuAction.settings:
-                  onOpenSettings?.call();
-              }
-            },
-            itemBuilder: (_) => <PopupMenuEntry<_InboxMenuAction>>[
-              PopupMenuItem<_InboxMenuAction>(
-                key: const Key('inbox.header.menu.select'),
-                value: _InboxMenuAction.startSelection,
-                enabled: canStartSelection,
-                child: const _MenuRow(
-                  icon: Icons.checklist_outlined,
-                  label: 'Seleccionar conversaciones',
-                ),
+            PopupMenuItem<_InboxMenuAction>(
+              key: const Key('inbox.header.menu.archived'),
+              value: _InboxMenuAction.toggleArchived,
+              child: _MenuRow(
+                icon: showingArchived
+                    ? Icons.inbox_outlined
+                    : Icons.archive_outlined,
+                label: showingArchived ? 'Volver a todas' : 'Ver archivadas',
               ),
-              PopupMenuItem<_InboxMenuAction>(
-                key: const Key('inbox.header.menu.archived'),
-                value: _InboxMenuAction.toggleArchived,
-                child: _MenuRow(
-                  icon: showingArchived
-                      ? Icons.inbox_outlined
-                      : Icons.archive_outlined,
-                  label: showingArchived ? 'Volver a todas' : 'Ver archivadas',
-                ),
-              ),
+            ),
+            const PopupMenuItem<_InboxMenuAction>(
+              key: Key('inbox.header.menu.refresh'),
+              value: _InboxMenuAction.refresh,
+              child: _MenuRow(icon: Icons.refresh, label: 'Actualizar bandeja'),
+            ),
+            if (hasActiveFilters)
               const PopupMenuItem<_InboxMenuAction>(
-                key: Key('inbox.header.menu.refresh'),
-                value: _InboxMenuAction.refresh,
+                key: Key('inbox.header.menu.clear_filters'),
+                value: _InboxMenuAction.clearFilters,
                 child: _MenuRow(
-                  icon: Icons.refresh,
-                  label: 'Actualizar bandeja',
+                  icon: Icons.filter_alt_off_outlined,
+                  label: 'Limpiar filtros',
                 ),
               ),
-              if (hasActiveFilters)
-                const PopupMenuItem<_InboxMenuAction>(
-                  key: Key('inbox.header.menu.clear_filters'),
-                  value: _InboxMenuAction.clearFilters,
-                  child: _MenuRow(
-                    icon: Icons.filter_alt_off_outlined,
-                    label: 'Limpiar filtros',
-                  ),
+            if (onManageLabels != null) ...<PopupMenuEntry<_InboxMenuAction>>[
+              const PopupMenuDivider(),
+              const PopupMenuItem<_InboxMenuAction>(
+                key: Key('inbox.header.menu.manage_labels'),
+                value: _InboxMenuAction.manageLabels,
+                child: _MenuRow(
+                  icon: Icons.label_outline,
+                  label: 'Gestionar etiquetas',
                 ),
-              if (onManageLabels != null) ...<PopupMenuEntry<_InboxMenuAction>>[
-                const PopupMenuDivider(),
-                const PopupMenuItem<_InboxMenuAction>(
-                  key: Key('inbox.header.menu.manage_labels'),
-                  value: _InboxMenuAction.manageLabels,
-                  child: _MenuRow(
-                    icon: Icons.label_outline,
-                    label: 'Gestionar etiquetas',
-                  ),
-                ),
-              ],
-              if (onOpenSettings != null) ...<PopupMenuEntry<_InboxMenuAction>>[
-                if (onManageLabels == null) const PopupMenuDivider(),
-                const PopupMenuItem<_InboxMenuAction>(
-                  key: Key('inbox.header.menu.settings'),
-                  value: _InboxMenuAction.settings,
-                  child: _MenuRow(
-                    icon: Icons.settings_outlined,
-                    label: 'Ajustes',
-                  ),
-                ),
-              ],
+              ),
             ],
-          ),
-          const SizedBox(width: AppTokens.sp1),
-        ],
-      ),
+            if (onOpenSettings != null) ...<PopupMenuEntry<_InboxMenuAction>>[
+              if (onManageLabels == null) const PopupMenuDivider(),
+              const PopupMenuItem<_InboxMenuAction>(
+                key: Key('inbox.header.menu.settings'),
+                value: _InboxMenuAction.settings,
+                child: _MenuRow(
+                  icon: Icons.settings_outlined,
+                  label: 'Ajustes',
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 }
@@ -314,75 +266,73 @@ class _SelectionHeader extends StatelessWidget {
       container: true,
       liveRegion: true,
       label: countLabel,
-      child: SizedBox.expand(
-        child: Row(
-          children: <Widget>[
-            IconButton(
-              key: const Key('inbox.selection.cancel'),
-              tooltip: 'Cancelar selección',
-              onPressed: isMutating ? null : onCancel,
-              icon: const Icon(Icons.close),
-            ),
-            Expanded(
-              child: ExcludeSemantics(
-                child: Text(
-                  '$count',
-                  key: const Key('inbox.selection.count'),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ),
-            IconButton(
-              key: const Key('inbox.selection.labels'),
-              tooltip: 'Editar etiquetas',
-              onPressed: canMutate ? onLabels : null,
-              icon: const Icon(Icons.label_outline),
-            ),
-            if (canClearHistory)
-              IconButton(
-                key: const Key('inbox.selection.clear_history'),
-                tooltip: 'Vaciar historial',
-                color: AppTokens.danger,
-                onPressed: canMutate ? onClearHistory : null,
-                icon: const Icon(Icons.delete_sweep_outlined),
-              ),
-            PopupMenuButton<_SelectionMenuAction>(
-              key: const Key('inbox.selection.more'),
-              tooltip: 'Más acciones de selección',
-              enabled: !isMutating && (count > 0 || canSelectVisible),
-              icon: const Icon(Icons.more_vert),
-              onSelected: (action) {
-                switch (action) {
-                  case _SelectionMenuAction.markRead:
-                    onMarkRead();
-                  case _SelectionMenuAction.selectVisible:
-                    onSelectVisible();
-                }
-              },
-              itemBuilder: (_) => <PopupMenuEntry<_SelectionMenuAction>>[
-                PopupMenuItem<_SelectionMenuAction>(
-                  key: const Key('inbox.selection.mark_read'),
-                  value: _SelectionMenuAction.markRead,
-                  enabled: count > 0,
-                  child: const _MenuRow(
-                    icon: Icons.done_all,
-                    label: 'Marcar atendidas',
-                  ),
-                ),
-                PopupMenuItem<_SelectionMenuAction>(
-                  key: const Key('inbox.selection.select_visible'),
-                  value: _SelectionMenuAction.selectVisible,
-                  enabled: canSelectVisible,
-                  child: const _MenuRow(
-                    icon: Icons.select_all,
-                    label: 'Seleccionar visibles',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: AppTokens.sp1),
-          ],
+      child: AppPageHeader(
+        title: '$count',
+        titleKey: const Key('inbox.selection.count'),
+        leading: IconButton(
+          key: const Key('inbox.selection.cancel'),
+          tooltip: 'Cancelar selección',
+          onPressed: isMutating ? null : onCancel,
+          icon: const Icon(Icons.close),
         ),
+        actions: <Widget>[
+          IconButton(
+            key: const Key('inbox.selection.labels'),
+            tooltip: 'Editar etiquetas',
+            onPressed: canMutate ? onLabels : null,
+            icon: const Icon(Icons.label_outline),
+          ),
+          if (canClearHistory)
+            IconButton(
+              key: const Key('inbox.selection.clear_history'),
+              tooltip: 'Vaciar historial',
+              color: AppTokens.danger,
+              onPressed: canMutate ? onClearHistory : null,
+              icon: const Icon(Icons.delete_sweep_outlined),
+            ),
+          PopupMenuButton<_SelectionMenuAction>(
+            key: const Key('inbox.selection.more'),
+            tooltip: 'Más acciones de selección',
+            enabled: !isMutating && (count > 0 || canSelectVisible),
+            icon: const Icon(Icons.more_vert),
+            onSelected: (action) {
+              switch (action) {
+                case _SelectionMenuAction.markRead:
+                  onMarkRead();
+                case _SelectionMenuAction.selectVisible:
+                  onSelectVisible();
+              }
+            },
+            itemBuilder: (_) => <PopupMenuEntry<_SelectionMenuAction>>[
+              PopupMenuItem<_SelectionMenuAction>(
+                key: const Key('inbox.selection.mark_read'),
+                value: _SelectionMenuAction.markRead,
+                enabled: count > 0,
+                child: const _MenuRow(
+                  icon: Icons.done_all,
+                  label: 'Marcar atendidas',
+                ),
+              ),
+              PopupMenuItem<_SelectionMenuAction>(
+                key: const Key('inbox.selection.select_visible'),
+                value: _SelectionMenuAction.selectVisible,
+                enabled: canSelectVisible,
+                child: const _MenuRow(
+                  icon: Icons.select_all,
+                  label: 'Seleccionar visibles',
+                ),
+              ),
+            ],
+          ),
+        ],
+        bottomIndicator: isMutating
+            ? const LinearProgressIndicator(
+                key: Key('inbox.selection.progress'),
+                minHeight: 2,
+                color: AppTokens.primary,
+                backgroundColor: AppTokens.surface1,
+              )
+            : null,
       ),
     );
   }
