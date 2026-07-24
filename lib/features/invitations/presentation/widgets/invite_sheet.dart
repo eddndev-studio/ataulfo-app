@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
+import '../../../../core/design/motion.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
@@ -105,6 +106,8 @@ class _InviteSheetState extends State<InviteSheet> {
   _InviteStep _step = _InviteStep.person;
   AppWizardStepDirection _transitionDirection = AppWizardStepDirection.forward;
   String _role = 'WORKER';
+  Timer? _stepTransitionTimer;
+  bool _stepTransitioning = false;
 
   InvitationMutationState get _mutationState =>
       context.read<InvitationMutationCubit>().state;
@@ -136,6 +139,7 @@ class _InviteSheetState extends State<InviteSheet> {
 
   @override
   void dispose() {
+    _stepTransitionTimer?.cancel();
     _emailCtrl
       ..removeListener(_onEmailChanged)
       ..dispose();
@@ -160,31 +164,43 @@ class _InviteSheetState extends State<InviteSheet> {
   }
 
   void _continue() {
-    if (!_hasValidEmail) return;
+    if (!_hasValidEmail || _stepTransitioning) return;
     _clearFailure();
-    setState(() {
-      _transitionDirection = AppWizardStepDirection.forward;
-      _step = _InviteStep.access;
-    });
+    _moveToStep(_InviteStep.access, AppWizardStepDirection.forward);
   }
 
   void _back() {
-    if (_isSubmitting) return;
+    if (_isSubmitting || _stepTransitioning) return;
     _clearFailure();
+    _moveToStep(_InviteStep.person, AppWizardStepDirection.backward);
+  }
+
+  void _moveToStep(_InviteStep step, AppWizardStepDirection direction) {
+    if (_step == step) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final duration = AppMotion.durationOf(context, AppTokens.durationBase);
+    _stepTransitionTimer?.cancel();
     setState(() {
-      _transitionDirection = AppWizardStepDirection.backward;
-      _step = _InviteStep.person;
+      _transitionDirection = direction;
+      _step = step;
+      _stepTransitioning = duration != Duration.zero;
+    });
+    if (duration == Duration.zero) return;
+    _stepTransitionTimer = Timer(duration, () {
+      if (!mounted) return;
+      setState(() => _stepTransitioning = false);
+      _stepTransitionTimer = null;
     });
   }
 
   void _selectRole(String role) {
-    if (_isSubmitting || role == _role) return;
+    if (_isSubmitting || _stepTransitioning || role == _role) return;
     _clearFailure();
     setState(() => _role = role);
   }
 
   void _selectBot(String id, bool selected) {
-    if (_isSubmitting) return;
+    if (_isSubmitting || _stepTransitioning) return;
     _clearFailure();
     setState(() {
       if (selected) {
@@ -196,7 +212,7 @@ class _InviteSheetState extends State<InviteSheet> {
   }
 
   void _submit() {
-    if (_isSubmitting || !_hasValidEmail) return;
+    if (_isSubmitting || _stepTransitioning || !_hasValidEmail) return;
     final botIds = _role == 'WORKER'
         ? (_selectedBotIds.toList(growable: false)..sort())
         : const <String>[];
@@ -229,62 +245,82 @@ class _InviteSheetState extends State<InviteSheet> {
         final isSuccess =
             state is InvitationMutationSuccess &&
             state.action == InvitationMutationAction.created;
-        final Widget body;
-        final Widget footer;
+        final Widget wizardState;
+        final Widget footerState;
 
         if (isSuccess) {
           final success = state;
-          body = InvitationShareContent(
+          wizardState = InvitationShareContent(
             key: const ValueKey<String>('invite.success'),
             email: success.email ?? _emailCtrl.text.trim(),
             token: success.token,
             emailSent: success.emailSent,
             shareService: widget.shareService,
           );
-          footer = InvitationShareDoneAction(
+          footerState = InvitationShareDoneAction(
             key: const ValueKey<String>('invite.footer.success'),
             onDone: _finish,
           );
-        } else if (_step == _InviteStep.person) {
-          body = _PersonStep(
-            key: const ValueKey<String>('invite.step.person'),
-            controller: _emailCtrl,
-            canContinue: _hasValidEmail,
-            onSubmitted: _continue,
-          );
-          footer = KeyedSubtree(
-            key: const ValueKey<String>('invite.footer.person'),
-            child: _footer(state),
-          );
         } else {
-          body = _AccessStep(
-            key: const ValueKey<String>('invite.step.access'),
-            email: _emailCtrl.text.trim(),
-            bots: widget.bots,
-            searchController: _searchCtrl,
-            showSearch: widget.bots.length >= _searchThreshold,
-            role: _role,
-            selectedBotIds: _selectedBotIds,
-            submitting: state is InvitationMutationInProgress,
-            onRoleChanged: _selectRole,
-            onBotChanged: _selectBot,
+          final isPerson = _step == _InviteStep.person;
+          final stepContent = isPerson
+              ? _PersonStep(
+                  key: const ValueKey<String>('invite.step.person'),
+                  controller: _emailCtrl,
+                  canContinue: _hasValidEmail,
+                  onSubmitted: _continue,
+                )
+              : _AccessStep(
+                  key: const ValueKey<String>('invite.step.access'),
+                  email: _emailCtrl.text.trim(),
+                  bots: widget.bots,
+                  searchController: _searchCtrl,
+                  showSearch: widget.bots.length >= _searchThreshold,
+                  role: _role,
+                  selectedBotIds: _selectedBotIds,
+                  submitting: state is InvitationMutationInProgress,
+                  onRoleChanged: _selectRole,
+                  onBotChanged: _selectBot,
+                );
+          wizardState = Column(
+            key: const ValueKey<String>('invite.form'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              AppWizardStepHeader(
+                step: isPerson ? 1 : 2,
+                totalSteps: 2,
+                title: isPerson ? 'Persona' : 'Acceso',
+                description: isPerson
+                    ? 'Escribe el correo que usará para entrar a la organización.'
+                    : 'Elige lo que podrá ver y gestionar dentro de la organización.',
+                direction: _transitionDirection,
+              ),
+              const SizedBox(height: AppTokens.sp5),
+              AppWizardInlineTransition(
+                key: const Key('invite.step_transition'),
+                direction: _transitionDirection,
+                child: stepContent,
+              ),
+            ],
           );
-          footer = KeyedSubtree(
-            key: const ValueKey<String>('invite.footer.access'),
+          footerState = KeyedSubtree(
+            key: const ValueKey<String>('invite.footer.form'),
             child: _footer(state),
           );
         }
 
         return AppWizardSheet(
-          body: AppWizardStepTransition(
-            key: const Key('invite.step_transition'),
+          key: const Key('invite.sheet'),
+          bodyViewportFraction: 0.68,
+          body: AppWizardInlineTransition(
+            key: const Key('invite.state_transition'),
             direction: _transitionDirection,
-            child: body,
+            child: wizardState,
           ),
-          footer: AppWizardStepTransition(
+          footer: AppWizardInlineTransition(
             key: const Key('invite.footer_transition'),
             direction: _transitionDirection,
-            child: footer,
+            child: footerState,
           ),
         );
       },
@@ -300,7 +336,9 @@ class _InviteSheetState extends State<InviteSheet> {
               key: const Key('invite.cancel'),
               label: 'Cancelar',
               fullWidth: true,
-              onPressed: () => Navigator.of(context).maybePop(),
+              onPressed: _stepTransitioning
+                  ? null
+                  : () => Navigator.of(context).maybePop(),
             ),
           ),
           const SizedBox(width: AppTokens.sp3),
@@ -309,7 +347,9 @@ class _InviteSheetState extends State<InviteSheet> {
               key: const Key('invite.continue'),
               label: 'Continuar',
               fullWidth: true,
-              onPressed: _hasValidEmail ? _continue : null,
+              onPressed: _hasValidEmail && !_stepTransitioning
+                  ? _continue
+                  : null,
             ),
           ),
         ],
@@ -317,6 +357,7 @@ class _InviteSheetState extends State<InviteSheet> {
     }
 
     final submitting = state is InvitationMutationInProgress;
+    final controlsDisabled = submitting || _stepTransitioning;
     final failure = state is InvitationMutationFailure ? state.failure : null;
 
     return Column(
@@ -336,17 +377,17 @@ class _InviteSheetState extends State<InviteSheet> {
                 key: const Key('invite.back'),
                 label: 'Atrás',
                 fullWidth: true,
-                onPressed: submitting ? null : _back,
+                onPressed: controlsDisabled ? null : _back,
               ),
             ),
             const SizedBox(width: AppTokens.sp3),
             Expanded(
               child: AppButton.filled(
                 key: const Key('invite.submit'),
-                label: submitting ? 'Creando invitación…' : 'Enviar invitación',
+                label: submitting ? 'Creando invitación…' : 'Enviar',
                 fullWidth: true,
                 loading: submitting,
-                onPressed: submitting ? null : _submit,
+                onPressed: controlsDisabled ? null : _submit,
               ),
             ),
           ],
@@ -373,14 +414,6 @@ class _PersonStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const AppWizardStepHeader(
-          step: 1,
-          totalSteps: 2,
-          title: 'Persona',
-          description:
-              'Escribe el correo que usará para entrar a la organización.',
-        ),
-        const SizedBox(height: AppTokens.sp5),
         AppTextField(
           key: const Key('invite.email'),
           label: 'Correo electrónico',
@@ -430,14 +463,6 @@ class _AccessStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const AppWizardStepHeader(
-          step: 2,
-          totalSteps: 2,
-          title: 'Acceso',
-          description:
-              'Elige lo que podrá ver y gestionar dentro de la organización.',
-        ),
-        const SizedBox(height: AppTokens.sp5),
         AppCard.outline(
           key: const Key('invite.email_summary'),
           padding: const EdgeInsets.all(AppTokens.sp3),
