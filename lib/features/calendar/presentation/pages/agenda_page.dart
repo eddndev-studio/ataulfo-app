@@ -27,6 +27,8 @@ class AgendaPage extends StatelessWidget {
     this.onOpenSettings,
     this.onManageEventTypes,
     this.onManageBusinessHours,
+    this.headerLeading,
+    this.headerActions = const <Widget>[],
   });
 
   /// Acción del avatar del header → abrir Ajustes (la aporta el shell).
@@ -35,6 +37,8 @@ class AgendaPage extends StatelessWidget {
   /// Gestión contextual de Agenda. El shell las aporta sólo a ADMIN+.
   final VoidCallback? onManageEventTypes;
   final VoidCallback? onManageBusinessHours;
+  final Widget? headerLeading;
+  final List<Widget> headerActions;
 
   /// Correo del operador para el avatar del header. Solo se consulta
   /// cuando el shell aporta la navegación a Ajustes (el avatar va en pareja con
@@ -54,33 +58,35 @@ class AgendaPage extends StatelessWidget {
         ? null
         : _operatorEmail(context);
     final user = operatorEmail == null ? null : userGreeting(operatorEmail);
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          AppPageHeader(
-            title: 'Agenda',
-            avatarInitial: user?.initial,
-            avatarColorKey: operatorEmail,
-            onAvatarTap: onOpenSettings,
-            content: _DayNavBar(
-              onManageEventTypes: onManageEventTypes,
-              onManageBusinessHours: onManageBusinessHours,
+    return Column(
+      children: <Widget>[
+        AppPageHeader(
+          title: 'Agenda',
+          leading: headerLeading,
+          actions: headerActions,
+          avatarInitial: user?.initial,
+          avatarColorKey: operatorEmail,
+          onAvatarTap: onOpenSettings,
+          content: _DayNavBar(
+            onManageEventTypes: onManageEventTypes,
+            onManageBusinessHours: onManageBusinessHours,
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.sp5,
+                AppTokens.fabClearance + context.safeBottomInset,
+              ),
+              child: const _DayBody(),
             ),
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppTokens.sp5,
-              AppTokens.sp5,
-              AppTokens.sp5,
-              AppTokens.fabClearance + context.safeBottomInset,
-            ),
-            child: const _DayBody(),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../tokens.dart';
 
-/// Header rico para secciones que sí merecen tratamiento hero (Canales y
-/// Etiquetas): una tarjeta full-bleed con fondo PRIMARIO que reemplaza al
-/// AppBar. Las pantallas operativas frecuentes usan `AppPageHeader` para no
-/// competir visualmente con el contenido ni con el contexto de organización.
+/// Header rico para secciones que sí merecen tratamiento hero (Canales,
+/// Etiquetas y Organización): una tarjeta full-bleed con fondo PRIMARIO que
+/// reemplaza al AppBar. Las pantallas operativas frecuentes usan
+/// `AppPageHeader` para no competir visualmente con el contenido.
 ///
 /// Va pegada al borde superior —solo las esquinas inferiores son redondeadas—
 /// y muestra el título; opcionalmente el saludo, el acceso al perfil, la marca
@@ -24,6 +24,8 @@ class AppHeaderCard extends StatelessWidget {
     super.key,
     required this.title,
     this.greeting,
+    this.leading,
+    this.actions = const <Widget>[],
     this.avatarInitial,
     this.onAvatarTap,
     this.watermark,
@@ -38,6 +40,12 @@ class AppHeaderCard extends StatelessWidget {
   /// Saludo sobre el título. Sin él (y sin avatar) la fila superior no se
   /// pinta y el título abre la tarjeta.
   final String? greeting;
+
+  /// Navegación contextual antes del saludo (normalmente volver).
+  final Widget? leading;
+
+  /// Acciones del header, antes del avatar opcional.
+  final List<Widget> actions;
 
   /// Inicial del avatar de perfil; va en pareja con [onAvatarTap].
   final String? avatarInitial;
@@ -70,7 +78,11 @@ class AppHeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
-    final hasTopRow = greeting != null || avatarInitial != null;
+    final hasTopRow =
+        leading != null ||
+        greeting != null ||
+        actions.isNotEmpty ||
+        avatarInitial != null;
     return ClipRRect(
       borderRadius: const BorderRadius.only(
         bottomLeft: Radius.circular(AppTokens.radiusHeader),
@@ -107,36 +119,44 @@ class AppHeaderCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   if (hasTopRow) ...<Widget>[
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: greeting != null
-                              ? Text(
-                                  greeting!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: _t(15, FontWeight.w600, alpha: 0.9),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                        if (avatarInitial != null) ...<Widget>[
-                          const SizedBox(width: AppTokens.sp2),
-                          _DarkCircle(
-                            key: const Key('header.avatar'),
-                            onTap: onAvatarTap!,
-                            semanticLabel: 'Perfil',
-                            child: Text(
-                              avatarInitial!,
-                              style: const TextStyle(
-                                fontFamily: AppTokens.fontSans,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppTokens.primary,
+                    IconTheme(
+                      data: const IconThemeData(color: AppTokens.onPrimary),
+                      child: Row(
+                        children: <Widget>[
+                          if (leading != null) ...<Widget>[
+                            leading!,
+                            const SizedBox(width: AppTokens.sp1),
+                          ],
+                          Expanded(
+                            child: greeting != null
+                                ? Text(
+                                    greeting!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: _t(15, FontWeight.w600, alpha: 0.9),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                          ...actions,
+                          if (avatarInitial != null) ...<Widget>[
+                            const SizedBox(width: AppTokens.sp2),
+                            _DarkCircle(
+                              key: const Key('header.avatar'),
+                              onTap: onAvatarTap!,
+                              semanticLabel: 'Perfil',
+                              child: Text(
+                                avatarInitial!,
+                                style: const TextStyle(
+                                  fontFamily: AppTokens.fontSans,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTokens.primary,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                     const SizedBox(height: AppTokens.sp6),
                   ],

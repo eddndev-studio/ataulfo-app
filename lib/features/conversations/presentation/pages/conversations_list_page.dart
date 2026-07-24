@@ -30,6 +30,8 @@ class ConversationsListPage extends StatefulWidget {
     this.onOpenSettings,
     this.onManageLabels,
     this.isActiveListenable,
+    this.headerLeading,
+    this.headerActions = const <Widget>[],
   });
 
   final VoidCallback? onOpenSettings;
@@ -41,6 +43,9 @@ class ConversationsListPage extends StatefulWidget {
   /// cancela cualquier selección contextual para no restaurar un modo obsoleto
   /// al volver desde otra tab.
   final ValueListenable<bool>? isActiveListenable;
+
+  final Widget? headerLeading;
+  final List<Widget> headerActions;
 
   @override
   State<ConversationsListPage> createState() => _ConversationsListPageState();
@@ -371,6 +376,8 @@ class _ConversationsListPageState extends State<ConversationsListPage> {
                           onClearFilters: _clearFilters,
                           onManageLabels: widget.onManageLabels,
                           onOpenSettings: widget.onOpenSettings,
+                          leading: widget.headerLeading,
+                          actions: widget.headerActions,
                         ),
                         Expanded(child: body),
                       ],

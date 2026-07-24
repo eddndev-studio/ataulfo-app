@@ -44,12 +44,20 @@ enum _TemplateFilter { all, withAi, withoutAi }
 /// stack tras un pop. Sin observer la page funciona idéntico — composición
 /// opcional, no contrato obligatorio.
 class TemplatesListPage extends StatefulWidget {
-  const TemplatesListPage({super.key, this.routeObserver, this.onOpenSettings});
+  const TemplatesListPage({
+    super.key,
+    this.routeObserver,
+    this.onOpenSettings,
+    this.headerLeading,
+    this.headerActions = const <Widget>[],
+  });
 
   final RouteObserver<PageRoute<dynamic>>? routeObserver;
 
   /// Acción del avatar del header → abrir Ajustes. La aporta el shell.
   final VoidCallback? onOpenSettings;
+  final Widget? headerLeading;
+  final List<Widget> headerActions;
 
   @override
   State<TemplatesListPage> createState() => _TemplatesListPageState();
@@ -122,15 +130,33 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<TemplatesBloc, TemplatesState>(
-      builder: (context, state) => switch (state) {
-        TemplatesInitial() || TemplatesLoading() => const _LoadingView(),
-        TemplatesLoaded(items: final items) =>
-          items.isEmpty
-              ? _EmptyView(onRefresh: () => _refresh(context))
-              : _buildLoaded(context, items),
-        TemplatesFailed() => const _FailedView(),
-      },
+    final operatorEmail = widget.onOpenSettings == null
+        ? null
+        : _emailFromSession(context);
+    final user = operatorEmail == null ? null : userGreeting(operatorEmail);
+    return Column(
+      children: <Widget>[
+        AppPageHeader(
+          title: 'Asistentes',
+          leading: widget.headerLeading,
+          actions: widget.headerActions,
+          avatarInitial: user?.initial,
+          avatarColorKey: operatorEmail,
+          onAvatarTap: widget.onOpenSettings,
+        ),
+        Expanded(
+          child: BlocBuilder<TemplatesBloc, TemplatesState>(
+            builder: (context, state) => switch (state) {
+              TemplatesInitial() || TemplatesLoading() => const _LoadingView(),
+              TemplatesLoaded(items: final items) =>
+                items.isEmpty
+                    ? _EmptyView(onRefresh: () => _refresh(context))
+                    : _buildLoaded(context, items),
+              TemplatesFailed() => const _FailedView(),
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -145,53 +171,36 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
 
   Widget _buildLoaded(BuildContext context, List<Template> items) {
     final filtered = _applyFilters(items);
-    final operatorEmail = widget.onOpenSettings == null
-        ? null
-        : _emailFromSession(context);
-    final user = operatorEmail == null ? null : userGreeting(operatorEmail);
     return RefreshIndicator(
       onRefresh: () => _refresh(context),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        // Sin padding aquí: el header es full-bleed y va pegado arriba.
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            AppPageHeader(
-              title: 'Asistentes',
-              avatarInitial: user?.initial,
-              avatarColorKey: operatorEmail,
-              onAvatarTap: widget.onOpenSettings,
-            ),
-            Padding(
-              key: const Key('templates.content_padding'),
-              padding: EdgeInsets.fromLTRB(
-                AppTokens.sp5,
-                AppTokens.sp5,
-                AppTokens.sp5,
-                // fabClearance: la última fila debe poder quedar por encima
-                // del FAB de crear que flota sobre esta tab.
-                AppTokens.fabClearance + context.safeBottomInset,
+        child: Padding(
+          key: const Key('templates.content_padding'),
+          padding: EdgeInsets.fromLTRB(
+            AppTokens.sp5,
+            AppTokens.sp5,
+            AppTokens.sp5,
+            // fabClearance: la última fila debe poder quedar por encima
+            // del FAB de crear que flota sobre esta tab.
+            AppTokens.fabClearance + context.safeBottomInset,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _SearchField(controller: _searchCtrl),
+              const SizedBox(height: AppTokens.sp4),
+              _FilterChips(
+                selected: _filter,
+                onSelected: (f) => setState(() => _filter = f),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _SearchField(controller: _searchCtrl),
-                  const SizedBox(height: AppTokens.sp4),
-                  _FilterChips(
-                    selected: _filter,
-                    onSelected: (f) => setState(() => _filter = f),
-                  ),
-                  const SizedBox(height: AppTokens.sp5),
-                  if (filtered.isEmpty)
-                    const _NoResults()
-                  else
-                    _TemplatesCard(templates: filtered),
-                ],
-              ),
-            ),
-          ],
+              const SizedBox(height: AppTokens.sp5),
+              if (filtered.isEmpty)
+                const _NoResults()
+              else
+                _TemplatesCard(templates: filtered),
+            ],
+          ),
         ),
       ),
     );

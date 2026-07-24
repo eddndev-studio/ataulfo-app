@@ -26,6 +26,8 @@ class InboxContextHeader extends StatelessWidget {
     required this.onClearFilters,
     this.onManageLabels,
     this.onOpenSettings,
+    this.leading,
+    this.actions = const <Widget>[],
   });
 
   final bool selectionActive;
@@ -47,6 +49,8 @@ class InboxContextHeader extends StatelessWidget {
   final VoidCallback onClearFilters;
   final VoidCallback? onManageLabels;
   final VoidCallback? onOpenSettings;
+  final Widget? leading;
+  final List<Widget> actions;
 
   static const double _toolbarHeight = 56;
 
@@ -98,6 +102,8 @@ class InboxContextHeader extends StatelessWidget {
                           onClearFilters: onClearFilters,
                           onManageLabels: onManageLabels,
                           onOpenSettings: onOpenSettings,
+                          leading: leading,
+                          actions: actions,
                         ),
                 ),
               ),
@@ -147,6 +153,8 @@ class _NormalHeader extends StatelessWidget {
     required this.onClearFilters,
     required this.onManageLabels,
     required this.onOpenSettings,
+    required this.leading,
+    required this.actions,
   });
 
   final bool canStartSelection;
@@ -158,6 +166,8 @@ class _NormalHeader extends StatelessWidget {
   final VoidCallback onClearFilters;
   final VoidCallback? onManageLabels;
   final VoidCallback? onOpenSettings;
+  final Widget? leading;
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -165,15 +175,20 @@ class _NormalHeader extends StatelessWidget {
       key: const Key('inbox.header.normal'),
       child: Row(
         children: <Widget>[
-          const SizedBox(width: AppTokens.sp4),
+          ?leading,
+          if (leading == null)
+            const SizedBox(width: AppTokens.sp4)
+          else
+            const SizedBox(width: AppTokens.sp1),
           Expanded(
             child: Text(
-              'Ataúlfo',
+              'Bandeja',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
+          ...actions,
           PopupMenuButton<_InboxMenuAction>(
             key: const Key('inbox.header.more'),
             tooltip: 'Más acciones',

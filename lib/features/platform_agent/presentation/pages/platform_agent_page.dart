@@ -20,9 +20,16 @@ import '../widgets/pa_failure_copy.dart';
 /// context (provisto arriba del shell) y dispara la carga la primera vez que
 /// la tab se abre (init perezoso: solo si el estado sigue en Loading).
 class PlatformAgentPage extends StatefulWidget {
-  const PlatformAgentPage({super.key, this.initialDraft = ''});
+  const PlatformAgentPage({
+    super.key,
+    this.initialDraft = '',
+    this.headerLeading,
+    this.headerActions = const <Widget>[],
+  });
 
   final String initialDraft;
+  final Widget? headerLeading;
+  final List<Widget> headerActions;
 
   @override
   State<PlatformAgentPage> createState() => _PlatformAgentPageState();
@@ -125,6 +132,8 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
       child: Column(
         children: <Widget>[
           _Header(
+            leading: widget.headerLeading,
+            actions: widget.headerActions,
             onThreads: _showThreads,
             onNew: () => context.read<PlatformAgentChatBloc>().add(
               const PaChatNewConversationRequested(),
@@ -156,10 +165,17 @@ class _PlatformAgentPageState extends State<PlatformAgentPage> {
 /// comunican estado por color (modelo elegido), lenguaje que no lee sobre el
 /// gradiente de marca.
 class _Header extends StatelessWidget {
-  const _Header({required this.onThreads, required this.onNew});
+  const _Header({
+    required this.onThreads,
+    required this.onNew,
+    required this.leading,
+    required this.actions,
+  });
 
   final VoidCallback onThreads;
   final VoidCallback onNew;
+  final Widget? leading;
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +193,10 @@ class _Header extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
+          if (leading != null) ...<Widget>[
+            leading!,
+            const SizedBox(width: AppTokens.sp1),
+          ],
           const Icon(Icons.auto_awesome, size: 20, color: AppTokens.primary),
           const SizedBox(width: AppTokens.sp2),
           Expanded(
@@ -193,7 +213,7 @@ class _Header extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      'Ataúlfo',
+                      'Copiloto',
                       style: Theme.of(
                         context,
                       ).textTheme.titleMedium?.copyWith(color: AppTokens.text1),
@@ -212,6 +232,7 @@ class _Header extends StatelessWidget {
               },
             ),
           ),
+          ...actions,
           const _ModelMenu(),
           IconButton(
             key: const Key('pa.history'),

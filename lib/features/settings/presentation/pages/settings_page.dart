@@ -16,11 +16,18 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/domain/entities/identity.dart';
 
 /// Preferencias personales del operador. La organización activa y toda su
-/// administración viven en el selector global y en `/organization`; esta tab
+/// administración viven en el selector global y en `/organization`; esta pantalla
 /// conserva únicamente identidad personal, notificaciones, apariencia y
 /// sesión.
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({
+    super.key,
+    this.headerLeading,
+    this.headerActions = const <Widget>[],
+  });
+
+  final Widget? headerLeading;
+  final List<Widget> headerActions;
 
   /// Confirmación previa al logout: cerrar sesión descarta el estado local y
   /// obliga a re-autenticarse, así que un tap accidental no debe bastar.
@@ -50,15 +57,15 @@ class SettingsPage extends StatelessWidget {
           return const SizedBox.shrink();
         }
         final identity = state.identity;
-        return SingleChildScrollView(
-          // Sin padding aquí: el header es full-bleed y va pegado arriba. El
-          // resto del contenido lleva su propio padding más abajo.
-          padding: EdgeInsets.zero,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              _ProfileHeader(identity: identity),
-              Padding(
+        return Column(
+          children: <Widget>[
+            _ProfileHeader(
+              identity: identity,
+              leading: headerLeading,
+              actions: headerActions,
+            ),
+            Expanded(
+              child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
                   AppTokens.sp5,
                   AppTokens.sp5,
@@ -80,8 +87,8 @@ class SettingsPage extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -91,15 +98,23 @@ class SettingsPage extends StatelessWidget {
 /// Header personal: el rol se omite deliberadamente porque pertenece a la
 /// organización activa y ya se muestra en el selector global.
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.identity});
+  const _ProfileHeader({
+    required this.identity,
+    required this.leading,
+    required this.actions,
+  });
 
   final Identity identity;
+  final Widget? leading;
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
     return AppPageHeader(
       key: const Key('settings.header'),
       title: 'Ajustes',
+      leading: leading,
+      actions: actions,
       content: Row(
         children: <Widget>[
           AppAvatar(name: identity.email, size: 48, colorKey: identity.email),

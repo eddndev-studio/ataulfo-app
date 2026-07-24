@@ -5,7 +5,7 @@ import 'app_avatar.dart';
 
 /// Chrome superior neutro para las pantallas principales del shell.
 ///
-/// Mantiene la geometría compacta de Bandeja y Ataúlfo: una barra de 56 px
+/// Mantiene la geometría compacta de Bandeja y Copiloto: una barra de 56 px
 /// sobre [AppTokens.surface1], un divisor inferior y, cuando la sección lo
 /// necesita, un segundo renglón de controles. No es una card destacada ni usa
 /// gradiente; el amarillo queda reservado para acciones y estados.
@@ -13,6 +13,8 @@ class AppPageHeader extends StatelessWidget {
   const AppPageHeader({
     super.key,
     required this.title,
+    this.leading,
+    this.actions = const <Widget>[],
     this.avatarInitial,
     this.avatarColorKey,
     this.onAvatarTap,
@@ -23,6 +25,12 @@ class AppPageHeader extends StatelessWidget {
        );
 
   final String title;
+
+  /// Navegación global o contextual antes del título (p. ej. menú o volver).
+  final Widget? leading;
+
+  /// Acciones compactas de la sección, antes del avatar opcional.
+  final List<Widget> actions;
 
   /// Inicial visible del perfil. Va en pareja con [onAvatarTap].
   final String? avatarInitial;
@@ -55,6 +63,10 @@ class AppPageHeader extends StatelessWidget {
                 ),
                 child: Row(
                   children: <Widget>[
+                    if (leading != null) ...<Widget>[
+                      leading!,
+                      const SizedBox(width: AppTokens.sp1),
+                    ],
                     Expanded(
                       child: Text(
                         title,
@@ -65,6 +77,7 @@ class AppPageHeader extends StatelessWidget {
                         ),
                       ),
                     ),
+                    ...actions,
                     if (avatarInitial != null)
                       _ProfileButton(
                         initial: avatarInitial!,

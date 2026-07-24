@@ -204,7 +204,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('inbox.header.normal')), findsOneWidget);
-    expect(find.text('Ataúlfo'), findsOneWidget);
+    expect(find.text('Bandeja'), findsOneWidget);
     await tester.tap(find.byKey(const Key('inbox.header.more')));
     await tester.pumpAndSettle();
     expect(find.text('Ver archivadas'), findsOneWidget);
