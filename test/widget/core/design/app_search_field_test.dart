@@ -72,10 +72,7 @@ void main() {
       final clearSize = tester.getSize(find.byKey(clearKey));
       expect(clearSize.width, greaterThanOrEqualTo(48));
       expect(clearSize.height, greaterThanOrEqualTo(48));
-      expect(
-        tester.getSize(find.byType(AppSearchField)).height,
-        emptyHeight,
-      );
+      expect(tester.getSize(find.byType(AppSearchField)).height, emptyHeight);
 
       await tester.tap(find.byKey(clearKey));
       await tester.pump();
@@ -83,10 +80,7 @@ void main() {
       expect(controller.text, isEmpty);
       expect(changes, <String>['ventas', '']);
       expect(find.byKey(clearKey), findsNothing);
-      expect(
-        tester.getSize(find.byType(AppSearchField)).height,
-        emptyHeight,
-      );
+      expect(tester.getSize(find.byType(AppSearchField)).height, emptyHeight);
     },
   );
 
@@ -105,6 +99,8 @@ void main() {
     await tester.pump();
     expect(find.byTooltip('Limpiar búsqueda'), findsOneWidget);
 
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pump();
     expect(submitted, 'soporte');
