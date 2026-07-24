@@ -9,14 +9,13 @@ import '../tokens.dart';
 /// Dirección espacial entre dos pasos consecutivos de un wizard.
 enum AppWizardStepDirection { forward, backward }
 
-/// Cambia el contenido de un paso con continuidad espacial, sin crossfade.
+/// Releva contenido inline sin convertir cada paso en una hoja distinta.
 ///
-/// Cada [child] debe tener una key distinta. Al avanzar, la vista actual sale
-/// por la izquierda y la siguiente entra por la derecha; al volver se invierte
-/// el recorrido. [ClipRect] mantiene ambas páginas dentro del mismo viewport,
-/// de modo que nunca parecen dos hojas superpuestas.
-class AppWizardStepTransition extends StatelessWidget {
-  const AppWizardStepTransition({
+/// Cada [child] debe tener una key distinta. El contenido saliente desaparece
+/// primero y pierde interacción de inmediato; sólo después aparece el entrante
+/// con un desplazamiento corto que conserva la dirección del recorrido.
+class AppWizardInlineTransition extends StatelessWidget {
+  const AppWizardInlineTransition({
     super.key,
     required this.direction,
     required this.child,
@@ -28,12 +27,10 @@ class AppWizardStepTransition extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(child.key != null, 'Cada paso del wizard necesita una key estable.');
-    final incomingOffset = switch (direction) {
-      AppWizardStepDirection.forward => const Offset(1, 0),
-      AppWizardStepDirection.backward => const Offset(-1, 0),
+    final directionSign = switch (direction) {
+      AppWizardStepDirection.forward => 1.0,
+      AppWizardStepDirection.backward => -1.0,
     };
-    final outgoingOffset = -incomingOffset;
-    final currentKey = child.key;
 
     return ClipRect(
       child: AnimatedSwitcher(
@@ -45,21 +42,39 @@ class AppWizardStepTransition extends StatelessWidget {
           );
         },
         transitionBuilder: (transitionChild, animation) {
-          final isIncoming = transitionChild.key == currentKey;
-          final curvedAnimation = CurvedAnimation(
-            parent: animation,
-            curve: AppTokens.ease,
-            // La curva invertida conserva juntas ambas páginas durante la
-            // salida: no se cruzan ni dejan ver un hueco entre ellas.
-            reverseCurve: AppTokens.ease.flipped,
-          );
-
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: isIncoming ? incomingOffset : outgoingOffset,
-              end: Offset.zero,
-            ).animate(curvedAnimation),
+          return AnimatedBuilder(
+            animation: animation,
             child: transitionChild,
+            builder: (context, transitionChild) {
+              final isOutgoing = animation.status == AnimationStatus.reverse;
+              final elapsed = isOutgoing
+                  ? 1 - animation.value
+                  : animation.value;
+              final phase = isOutgoing
+                  ? (elapsed / 0.40).clamp(0.0, 1.0)
+                  : ((elapsed - 0.45) / 0.55).clamp(0.0, 1.0);
+              final curvedPhase = AppTokens.ease.transform(phase);
+              final opacity = isOutgoing ? 1 - curvedPhase : curvedPhase;
+              final translation = isOutgoing
+                  ? -directionSign * 0.035 * curvedPhase
+                  : directionSign * 0.035 * (1 - curvedPhase);
+              final interactive =
+                  !isOutgoing && animation.status == AnimationStatus.completed;
+
+              return IgnorePointer(
+                ignoring: !interactive,
+                child: ExcludeSemantics(
+                  excluding: !interactive,
+                  child: Opacity(
+                    opacity: opacity,
+                    child: FractionalTranslation(
+                      translation: Offset(translation, 0),
+                      child: transitionChild,
+                    ),
+                  ),
+                ),
+              );
+            },
           );
         },
         child: child,
@@ -74,18 +89,30 @@ class AppWizardStepTransition extends StatelessWidget {
 /// visible. El inset del teclado/nav se aplica una sola vez a toda la
 /// estructura para que las acciones nunca queden tapadas.
 class AppWizardSheet extends StatelessWidget {
-  const AppWizardSheet({super.key, required this.body, required this.footer});
+  const AppWizardSheet({
+    super.key,
+    required this.body,
+    required this.footer,
+    this.bodyViewportFraction,
+  }) : assert(
+         bodyViewportFraction == null ||
+             (bodyViewportFraction > 0 && bodyViewportFraction <= 1),
+       );
 
   final Widget body;
   final Widget footer;
+
+  /// Fracción del alto máximo reservada al cuerpo desplazable.
+  ///
+  /// Úsala en wizards cuyos pasos tienen alturas muy distintas para conservar
+  /// la geometría de la hoja; omítela en hojas compactas de un solo estado.
+  final double? bodyViewportFraction;
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.sizeOf(context).height;
 
-    return AnimatedPadding(
-      duration: AppTokens.durationBase,
-      curve: AppTokens.ease,
+    return Padding(
       padding: EdgeInsets.only(bottom: context.sheetBottomInset),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -99,6 +126,22 @@ class AppWizardSheet extends StatelessWidget {
               ? screenHeight
               : availableHeight;
           final maxHeight = math.min(availableHeight, viewportHeight * 0.90);
+          final scrollView = SingleChildScrollView(
+            primary: false,
+            padding: const EdgeInsets.fromLTRB(
+              AppTokens.sp6,
+              AppTokens.sp2,
+              AppTokens.sp6,
+              AppTokens.sp5,
+            ),
+            child: body,
+          );
+          final bodyViewport = bodyViewportFraction == null
+              ? scrollView
+              : SizedBox(
+                  height: maxHeight * bodyViewportFraction!,
+                  child: scrollView,
+                );
 
           return ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight),
@@ -106,18 +149,7 @@ class AppWizardSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Flexible(
-                  child: SingleChildScrollView(
-                    primary: false,
-                    padding: const EdgeInsets.fromLTRB(
-                      AppTokens.sp6,
-                      AppTokens.sp2,
-                      AppTokens.sp6,
-                      AppTokens.sp5,
-                    ),
-                    child: body,
-                  ),
-                ),
+                Flexible(child: bodyViewport),
                 DecoratedBox(
                   decoration: const BoxDecoration(
                     border: Border(top: BorderSide(color: AppTokens.divider)),
@@ -151,6 +183,7 @@ class AppWizardStepHeader extends StatelessWidget {
     required this.totalSteps,
     required this.title,
     required this.description,
+    this.direction = AppWizardStepDirection.forward,
   }) : assert(step > 0),
        assert(totalSteps > 0),
        assert(step <= totalSteps);
@@ -159,6 +192,7 @@ class AppWizardStepHeader extends StatelessWidget {
   final int totalSteps;
   final String title;
   final String description;
+  final AppWizardStepDirection direction;
 
   @override
   Widget build(BuildContext context) {
@@ -171,11 +205,25 @@ class AppWizardStepHeader extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('$step de $totalSteps · $title', style: textTheme.titleLarge),
-            const SizedBox(height: AppTokens.sp2),
-            Text(
-              description,
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+            AppWizardInlineTransition(
+              direction: direction,
+              child: Column(
+                key: ValueKey<String>('$step:$title:$description'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '$step de $totalSteps · $title',
+                    style: textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppTokens.sp2),
+                  Text(
+                    description,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppTokens.text2,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: AppTokens.sp4),
             Row(
@@ -185,7 +233,10 @@ class AppWizardStepHeader extends StatelessWidget {
                   Expanded(
                     child: AnimatedContainer(
                       key: Key('app_wizard.progress.$index'),
-                      duration: AppTokens.durationBase,
+                      duration: AppMotion.durationOf(
+                        context,
+                        AppTokens.durationBase,
+                      ),
                       curve: AppTokens.ease,
                       height: AppTokens.sp1,
                       decoration: BoxDecoration(
