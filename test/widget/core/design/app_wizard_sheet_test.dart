@@ -9,6 +9,7 @@ void main() {
     required Widget body,
     required Widget footer,
     double bottomInset = 0,
+    double? bodyViewportFraction,
   }) {
     return MaterialApp(
       theme: AppDesignTheme.dark(),
@@ -17,7 +18,12 @@ void main() {
         child: Scaffold(
           body: Align(
             alignment: Alignment.bottomCenter,
-            child: AppWizardSheet(body: body, footer: footer),
+            child: AppWizardSheet(
+              key: const Key('wizard.sheet'),
+              bodyViewportFraction: bodyViewportFraction,
+              body: body,
+              footer: footer,
+            ),
           ),
         ),
       ),
@@ -94,13 +100,27 @@ void main() {
     expect(find.text('Fila 19'), findsOneWidget);
   });
 
-  testWidgets('pie respeta el teclado mediante sheetBottomInset', (
+  testWidgets('pie sigue el inset del teclado en el mismo frame', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      host(
+        body: const Text('Contenido'),
+        footer: AppButton.filled(
+          key: const Key('primary'),
+          label: 'Continuar',
+          onPressed: () {},
+        ),
+      ),
+    );
+    final restingBottom = tester
+        .getBottomRight(find.byKey(const Key('primary')))
+        .dy;
 
     await tester.pumpWidget(
       host(
@@ -114,9 +134,121 @@ void main() {
       ),
     );
 
-    expect(
-      tester.getBottomRight(find.byKey(const Key('primary'))).dy,
-      lessThanOrEqualTo(520),
-    );
+    final keyboardBottom = tester
+        .getBottomRight(find.byKey(const Key('primary')))
+        .dy;
+    expect(keyboardBottom, lessThanOrEqualTo(520));
+    expect(restingBottom - keyboardBottom, closeTo(280, 0.1));
   });
+
+  testWidgets('viewport reservado conserva la altura con contenido variable', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    Widget buildHost(double bodyHeight) => host(
+      bodyViewportFraction: 0.68,
+      body: SizedBox(height: bodyHeight),
+      footer: AppButton.filled(label: 'Continuar', onPressed: () {}),
+    );
+
+    await tester.pumpWidget(buildHost(80));
+    final compactHeight = tester
+        .getSize(find.byKey(const Key('wizard.sheet')))
+        .height;
+
+    await tester.pumpWidget(buildHost(1200));
+    final longHeight = tester
+        .getSize(find.byKey(const Key('wizard.sheet')))
+        .height;
+
+    expect(longHeight, compactHeight);
+  });
+
+  testWidgets(
+    'transición inline releva elementos sin hitboxes ni planos visibles juntos',
+    (tester) async {
+      var step = 1;
+      var direction = AppWizardStepDirection.forward;
+      late StateSetter update;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                update = setState;
+                return AppWizardInlineTransition(
+                  direction: direction,
+                  child: SizedBox(
+                    key: ValueKey<int>(step),
+                    width: 240,
+                    height: 120,
+                    child: Text('Paso $step'),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      update(() {
+        direction = AppWizardStepDirection.forward;
+        step = 2;
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final first = find.byKey(const ValueKey<int>(1));
+      final second = find.byKey(const ValueKey<int>(2));
+      expect(first, findsOneWidget);
+      expect(second, findsOneWidget);
+      expect(
+        tester
+            .widgetList<IgnorePointer>(
+              find.ancestor(of: first, matching: find.byType(IgnorePointer)),
+            )
+            .any((widget) => widget.ignoring),
+        isTrue,
+      );
+      expect(
+        tester
+            .widgetList<IgnorePointer>(
+              find.ancestor(of: second, matching: find.byType(IgnorePointer)),
+            )
+            .any((widget) => widget.ignoring),
+        isTrue,
+      );
+
+      double transitionOpacity(Finder child) => tester
+          .widget<Opacity>(
+            find.ancestor(of: child, matching: find.byType(Opacity)).first,
+          )
+          .opacity;
+
+      expect(transitionOpacity(first), greaterThan(0));
+      expect(transitionOpacity(second), 0);
+
+      await tester.pump(const Duration(milliseconds: 70));
+      expect(transitionOpacity(first), 0);
+      expect(transitionOpacity(second), greaterThan(0));
+
+      await tester.pumpAndSettle();
+      expect(first, findsNothing);
+      expect(second, findsOneWidget);
+      expect(
+        tester
+            .widgetList<IgnorePointer>(
+              find.ancestor(of: second, matching: find.byType(IgnorePointer)),
+            )
+            .every((widget) => !widget.ignoring),
+        isTrue,
+      );
+    },
+  );
 }

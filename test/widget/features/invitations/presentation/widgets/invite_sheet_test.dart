@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:ataulfo/core/design/app_bottom_sheet.dart';
 import 'package:ataulfo/core/design/app_design_theme.dart';
-import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_radio_row.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
@@ -166,9 +165,15 @@ void main() {
   });
 
   testWidgets(
-    'Persona y Acceso se deslizan de lado sin fundirse ni superponerse',
+    'Persona y Acceso cambian inline sin alterar la geometría de la hoja',
     (tester) async {
       await pumpHost(tester);
+      final sheet = find.byKey(const Key('invite.sheet'));
+      final initialRect = tester.getRect(sheet);
+      final progressElement = tester.element(
+        find.byKey(const Key('app_wizard.progress.2')),
+      );
+
       await tester.enterText(
         find.byKey(const Key('invite.email')),
         'persona@empresa.com',
@@ -177,45 +182,65 @@ void main() {
 
       await tester.tap(find.byKey(const Key('invite.continue')));
       await tester.pump();
-      await tester.pump(AppTokens.durationBase ~/ 2);
+      await tester.pump(const Duration(milliseconds: 50));
 
       final viewport = find.byKey(const Key('invite.step_transition'));
+      final person = find.byKey(const Key('invite.step.person'));
+      final access = find.byKey(const Key('invite.step.access'));
       expect(viewport, findsOneWidget);
       expect(
-        find.ancestor(
-          of: find.byKey(const Key('invite.step.person')),
-          matching: find.byType(FadeTransition),
-        ),
-        findsNothing,
+        tester
+            .widgetList<IgnorePointer>(
+              find.ancestor(of: person, matching: find.byType(IgnorePointer)),
+            )
+            .any((widget) => widget.ignoring),
+        isTrue,
       );
       expect(
-        find.ancestor(
-          of: find.byKey(const Key('invite.step.access')),
-          matching: find.byType(FadeTransition),
-        ),
-        findsNothing,
-      );
-      expect(
-        find.descendant(of: viewport, matching: find.byType(SlideTransition)),
-        findsAtLeastNWidgets(2),
+        tester
+            .widgetList<IgnorePointer>(
+              find.ancestor(of: access, matching: find.byType(IgnorePointer)),
+            )
+            .any((widget) => widget.ignoring),
+        isTrue,
       );
 
-      final personX = tester
-          .getCenter(find.byKey(const Key('invite.step.person')))
-          .dx;
-      final accessX = tester
-          .getCenter(find.byKey(const Key('invite.step.access')))
-          .dx;
-      expect(personX, lessThan(accessX));
-      expect(
-        accessX - personX,
-        greaterThan(AppTokens.sp9),
-        reason: 'las vistas deben viajar lado a lado, no ocupar el mismo plano',
+      final back = tester.widget<AppButton>(
+        find.byKey(const Key('invite.back')),
       );
+      final submit = tester.widget<AppButton>(
+        find.byKey(const Key('invite.submit')),
+      );
+      expect(back.onPressed, isNull);
+      expect(submit.onPressed, isNull);
+
+      await tester.pump(const Duration(milliseconds: 70));
+      final personOpacity = tester
+          .widget<Opacity>(
+            find.ancestor(of: person, matching: find.byType(Opacity)).first,
+          )
+          .opacity;
+      final accessOpacity = tester
+          .widget<Opacity>(
+            find.ancestor(of: access, matching: find.byType(Opacity)).first,
+          )
+          .opacity;
+      expect(personOpacity, 0);
+      expect(accessOpacity, greaterThan(0));
 
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('invite.step.person')), findsNothing);
-      expect(find.byKey(const Key('invite.step.access')), findsOneWidget);
+      expect(person, findsNothing);
+      expect(access, findsOneWidget);
+      expect(tester.getRect(sheet), initialRect);
+      expect(
+        tester.element(find.byKey(const Key('app_wizard.progress.2'))),
+        same(progressElement),
+        reason: 'la barra de progreso debe persistir y animar su propio estado',
+      );
+
+      await tester.tap(find.byKey(const Key('invite.back')));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(sheet), initialRect);
     },
   );
 
