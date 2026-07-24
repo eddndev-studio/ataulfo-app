@@ -12,16 +12,88 @@ import '../../../memberships/domain/entities/membership.dart';
 import '../../../memberships/presentation/bloc/memberships_bloc.dart';
 import 'organization_switcher_sheet.dart';
 
-/// Selector persistente del contexto de organización.
+enum OrganizationContextPresentation { mobileBar, rail, header, drawer }
+
+/// Abre la única superficie de cambio de organización.
 ///
-/// En móvil ocupa una franja compacta antes del contenido de la tab; en rail
-/// se reduce a un control vertical. Ambos abren la misma hoja, por lo que el
-/// nombre visible, el cambio de contexto y los accesos de gestión tienen una
-/// sola implementación.
+/// El listener vive dentro de la hoja: así el header y el drawer pueden
+/// coexistir sin reaccionar dos veces al mismo cambio de contexto.
+Future<void> showOrganizationSwitcher(BuildContext context) async {
+  final memberships = context.read<MembershipsBloc>();
+  final switcher = context.read<SwitchOrgCubit>();
+  final auth = context.read<AuthBloc>();
+  await showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    // Un switch persiste tokens antes de refrescar AuthBloc. Mantener la hoja
+    // montada hasta éxito/fallo evita que un swipe la cierre a mitad.
+    isDismissible: false,
+    enableDrag: false,
+    builder: (sheetContext) => MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<MembershipsBloc>.value(value: memberships),
+        BlocProvider<SwitchOrgCubit>.value(value: switcher),
+        BlocProvider<AuthBloc>.value(value: auth),
+      ],
+      child: BlocListener<SwitchOrgCubit, SwitchOrgState>(
+        listener: (listenerContext, state) =>
+            _onSwitchState(context, listenerContext, state),
+        child: OrganizationSwitcherSheet(
+          onNavigate: (path) {
+            Navigator.of(sheetContext).pop();
+            context.push(path);
+          },
+        ),
+      ),
+    ),
+  );
+}
+
+void _onSwitchState(
+  BuildContext hostContext,
+  BuildContext sheetContext,
+  SwitchOrgState state,
+) {
+  switch (state) {
+    case SwitchOrgSwitched():
+      Navigator.of(sheetContext).pop();
+      if (!hostContext.mounted) return;
+      hostContext.read<AuthBloc>().add(const AuthCheckRequested());
+      ScaffoldMessenger.of(
+        hostContext,
+      ).showSnackBar(const SnackBar(content: Text('Organización cambiada')));
+      hostContext.go('/home');
+    case SwitchOrgFailed(failure: final failure):
+      if (failure is NotMemberFailure) {
+        hostContext.read<MembershipsBloc>().add(
+          const MembershipsLoadRequested(),
+        );
+      }
+      final message = failure is NetworkFailure
+          ? 'Sin conexión. Revisa tu red e inténtalo de nuevo.'
+          : 'No pudimos cambiar de organización. Inténtalo de nuevo.';
+      ScaffoldMessenger.of(
+        hostContext,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    case SwitchOrgIdle() || SwitchOrgSwitching():
+      break;
+  }
+}
+
+/// Proyecciones compactas del contexto activo. La franja móvil histórica se
+/// conserva por compatibilidad, pero el shell usa únicamente el drawer.
 class OrganizationContextSwitcher extends StatelessWidget {
-  const OrganizationContextSwitcher({super.key, this.compact = false});
+  const OrganizationContextSwitcher({
+    super.key,
+    this.compact = false,
+    this.presentation,
+    this.onTap,
+  });
 
   final bool compact;
+  final OrganizationContextPresentation? presentation;
+  final VoidCallback? onTap;
 
   Membership? _activeMembership(MembershipsState state, String orgId) {
     if (state case MembershipsLoaded(:final items)) {
@@ -32,87 +104,146 @@ class OrganizationContextSwitcher extends StatelessWidget {
     return null;
   }
 
-  Future<void> _open(BuildContext context) async {
-    final memberships = context.read<MembershipsBloc>();
-    final switcher = context.read<SwitchOrgCubit>();
-    final auth = context.read<AuthBloc>();
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      // Un switch persiste tokens antes de refrescar AuthBloc. Mantener la hoja
-      // montada hasta éxito/fallo evita que un swipe la cierre a mitad y deje
-      // la sesión visual en el contexto anterior.
-      isDismissible: false,
-      enableDrag: false,
-      builder: (sheetContext) => MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<MembershipsBloc>.value(value: memberships),
-          BlocProvider<SwitchOrgCubit>.value(value: switcher),
-          BlocProvider<AuthBloc>.value(value: auth),
-        ],
-        child: OrganizationSwitcherSheet(
-          onNavigate: (path) {
-            Navigator.of(sheetContext).pop();
-            context.push(path);
-          },
-        ),
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<MembershipsBloc, MembershipsState>(
+      builder: (context, memberships) {
+        final auth = context.read<AuthBloc>().state;
+        final identity = auth is AuthAuthenticated ? auth.identity : null;
+        final active = identity == null
+            ? null
+            : _activeMembership(memberships, identity.orgId);
+        final name = active?.orgName ?? 'Organización';
+        final role = roleLabel(active?.role ?? identity?.role ?? '');
+        final tap = onTap ?? () => showOrganizationSwitcher(context);
+        final mode =
+            presentation ??
+            (compact
+                ? OrganizationContextPresentation.rail
+                : OrganizationContextPresentation.mobileBar);
+        return switch (mode) {
+          OrganizationContextPresentation.mobileBar =>
+            _MobileOrganizationButton(
+              name: name,
+              role: role,
+              loading: memberships is MembershipsLoading,
+              onTap: tap,
+            ),
+          OrganizationContextPresentation.rail => _RailOrganizationButton(
+            name: name,
+            role: role,
+            loading: memberships is MembershipsLoading,
+            onTap: tap,
+          ),
+          OrganizationContextPresentation.header => _HeaderOrganizationButton(
+            name: name,
+            role: role,
+            loading: memberships is MembershipsLoading,
+            onTap: tap,
+          ),
+          OrganizationContextPresentation.drawer => _DrawerOrganizationButton(
+            name: name,
+            role: role,
+            loading: memberships is MembershipsLoading,
+            onTap: tap,
+          ),
+        };
+      },
     );
   }
+}
 
-  void _onSwitchState(BuildContext context, SwitchOrgState state) {
-    switch (state) {
-      case SwitchOrgSwitched():
-        final navigator = Navigator.of(context);
-        if (navigator.canPop()) navigator.pop();
-        context.read<AuthBloc>().add(const AuthCheckRequested());
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Organización cambiada')));
-        context.go('/home');
-      case SwitchOrgFailed(failure: final failure):
-        if (failure is NotMemberFailure) {
-          context.read<MembershipsBloc>().add(const MembershipsLoadRequested());
-        }
-        final message = failure is NetworkFailure
-            ? 'Sin conexión. Revisa tu red e inténtalo de nuevo.'
-            : 'No pudimos cambiar de organización. Inténtalo de nuevo.';
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
-      case SwitchOrgIdle() || SwitchOrgSwitching():
-        break;
-    }
-  }
+class _HeaderOrganizationButton extends StatelessWidget {
+  const _HeaderOrganizationButton({
+    required this.name,
+    required this.role,
+    required this.loading,
+    required this.onTap,
+  });
+
+  final String name;
+  final String role;
+  final bool loading;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<SwitchOrgCubit, SwitchOrgState>(
-      listener: _onSwitchState,
-      child: BlocBuilder<MembershipsBloc, MembershipsState>(
-        builder: (context, memberships) {
-          final auth = context.read<AuthBloc>().state;
-          final identity = auth is AuthAuthenticated ? auth.identity : null;
-          final active = identity == null
-              ? null
-              : _activeMembership(memberships, identity.orgId);
-          final name = active?.orgName ?? 'Organización';
-          final role = roleLabel(active?.role ?? identity?.role ?? '');
-          return compact
-              ? _RailOrganizationButton(
-                  name: name,
-                  role: role,
-                  loading: memberships is MembershipsLoading,
-                  onTap: () => _open(context),
+    return IconButton(
+      key: const Key('organization.context.header'),
+      tooltip: '$name · $role',
+      onPressed: onTap,
+      icon: loading
+          ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.business_outlined),
+    );
+  }
+}
+
+class _DrawerOrganizationButton extends StatelessWidget {
+  const _DrawerOrganizationButton({
+    required this.name,
+    required this.role,
+    required this.loading,
+    required this.onTap,
+  });
+
+  final String name;
+  final String role;
+  final bool loading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('organization.context.drawer'),
+      color: AppTokens.surface2,
+      borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppTokens.sp4),
+          child: Row(
+            children: <Widget>[
+              const AppEntityIcon(icon: Icons.business_outlined, size: 40),
+              const SizedBox(width: AppTokens.sp3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      name,
+                      key: const Key('organization.context.name'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppTokens.sp1),
+                    Text(
+                      role,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppTokens.text2),
+                    ),
+                  ],
+                ),
+              ),
+              if (loading)
+                const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : _MobileOrganizationButton(
-                  name: name,
-                  role: role,
-                  loading: memberships is MembershipsLoading,
-                  onTap: () => _open(context),
-                );
-        },
+              else
+                const Icon(Icons.unfold_more, color: AppTokens.text2),
+            ],
+          ),
+        ),
       ),
     );
   }

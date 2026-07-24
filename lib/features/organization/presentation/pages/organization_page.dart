@@ -6,6 +6,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
+import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_section_link.dart';
 import '../../../../core/i18n/role_labels.dart';
@@ -16,6 +17,7 @@ import '../../../invitations/presentation/bloc/invitations_bloc.dart';
 import '../../../members/presentation/bloc/members_bloc.dart';
 import '../../../memberships/domain/entities/membership.dart';
 import '../../../memberships/presentation/bloc/memberships_bloc.dart';
+import '../widgets/organization_context_switcher.dart';
 
 /// Hub de la organización activa.
 ///
@@ -52,62 +54,84 @@ class OrganizationPage extends StatelessWidget {
         final name = active?.orgName ?? 'Organización activa';
         final role = active?.role ?? auth.identity.role;
         return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            AppTokens.sp5,
-            AppTokens.sp5,
-            AppTokens.sp5,
-            AppTokens.sp7 + context.safeBottomInset,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: AppTokens.maxContentWidth,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  _OrganizationSummaryCard(
-                    name: name,
-                    role: role,
-                    canManage: canManage,
-                    hasBilling: hasBilling,
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              AppHeaderCard(
+                key: const Key('organization.summary'),
+                greeting: 'Organización',
+                title: name,
+                watermark: Icons.business_outlined,
+                leading: IconButton(
+                  key: const Key('organization.back'),
+                  tooltip: 'Volver',
+                  onPressed: () => context.pop(),
+                  icon: const Icon(Icons.arrow_back),
+                ),
+                actions: <Widget>[
+                  IconButton(
+                    key: const Key('organization.header.switch'),
+                    tooltip: 'Cambiar organización',
+                    onPressed: () => showOrganizationSwitcher(context),
+                    icon: const Icon(Icons.swap_horiz),
                   ),
-                  if (memberships is MembershipsLoading) ...<Widget>[
-                    const SizedBox(height: AppTokens.sp2),
-                    const LinearProgressIndicator(
-                      key: Key('organization.summary.loading'),
-                      minHeight: 2,
-                    ),
-                  ],
-                  if (memberships is MembershipsFailed) ...<Widget>[
-                    const SizedBox(height: AppTokens.sp3),
-                    _InlineLoadError(
-                      onRetry: () => context.read<MembershipsBloc>().add(
-                        const MembershipsLoadRequested(),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: AppTokens.sp4),
-                  AppButton.tonal(
-                    key: const Key('organization.change'),
-                    label: 'Cambiar organización',
-                    icon: Icons.swap_horiz,
-                    fullWidth: true,
-                    onPressed: () => context.push('/memberships'),
-                  ),
-                  const SizedBox(height: AppTokens.sp7),
-                  Text(
-                    canManage ? 'Administración' : 'Tu acceso',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppTokens.sp3),
-                  if (canManage)
-                    const _ManagementSections()
-                  else
-                    const _ReadOnlyNotice(),
                 ],
+                content: _OrganizationHeaderContent(
+                  role: role,
+                  canManage: canManage,
+                  hasBilling: hasBilling,
+                ),
               ),
-            ),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppTokens.maxContentWidth,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      AppTokens.sp5,
+                      AppTokens.sp5,
+                      AppTokens.sp5,
+                      AppTokens.sp7 + context.safeBottomInset,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        if (memberships is MembershipsLoading)
+                          const LinearProgressIndicator(
+                            key: Key('organization.summary.loading'),
+                            minHeight: 2,
+                          ),
+                        if (memberships is MembershipsFailed)
+                          _InlineLoadError(
+                            onRetry: () => context.read<MembershipsBloc>().add(
+                              const MembershipsLoadRequested(),
+                            ),
+                          ),
+                        AppButton.tonal(
+                          key: const Key('organization.change'),
+                          label: 'Cambiar organización',
+                          icon: Icons.swap_horiz,
+                          fullWidth: true,
+                          onPressed: () => showOrganizationSwitcher(context),
+                        ),
+                        const SizedBox(height: AppTokens.sp7),
+                        Text(
+                          canManage ? 'Administración' : 'Tu acceso',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: AppTokens.sp3),
+                        if (canManage)
+                          const _ManagementSections()
+                        else
+                          const _ReadOnlyNotice(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -115,64 +139,36 @@ class OrganizationPage extends StatelessWidget {
   }
 }
 
-class _OrganizationSummaryCard extends StatelessWidget {
-  const _OrganizationSummaryCard({
-    required this.name,
+class _OrganizationHeaderContent extends StatelessWidget {
+  const _OrganizationHeaderContent({
     required this.role,
     required this.canManage,
     required this.hasBilling,
   });
 
-  final String name;
   final String role;
   final bool canManage;
   final bool hasBilling;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard.gradient(
-      key: const Key('organization.summary'),
-      padding: const EdgeInsets.all(AppTokens.sp5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            'CONTEXTO ACTIVO',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppTokens.onPrimary.withValues(alpha: 0.72),
-              letterSpacing: 0.8,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        AppPill.glass(
+          key: const Key('organization.summary.role'),
+          label: roleLabel(role),
+        ),
+        if (canManage) ...<Widget>[
+          const SizedBox(height: AppTokens.sp5),
+          Divider(
+            height: 1,
+            color: AppTokens.onPrimary.withValues(alpha: 0.18),
           ),
-          const SizedBox(height: AppTokens.sp2),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  name,
-                  key: const Key('organization.summary.name'),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppTokens.onPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppTokens.sp3),
-              AppPill.glass(label: roleLabel(role)),
-            ],
-          ),
-          if (canManage) ...<Widget>[
-            const SizedBox(height: AppTokens.sp5),
-            Divider(
-              height: 1,
-              color: AppTokens.onPrimary.withValues(alpha: 0.18),
-            ),
-            const SizedBox(height: AppTokens.sp4),
-            _OverviewMetrics(hasBilling: hasBilling),
-          ],
+          const SizedBox(height: AppTokens.sp4),
+          _OverviewMetrics(hasBilling: hasBilling),
         ],
-      ),
+      ],
     );
   }
 }

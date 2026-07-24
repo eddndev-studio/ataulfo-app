@@ -81,6 +81,8 @@ import 'package:ataulfo/features/profile/domain/entities/chat_profile.dart';
 import 'package:ataulfo/features/profile/domain/repositories/profile_repository.dart';
 import 'package:ataulfo/features/profile/presentation/pages/profile_page.dart';
 import 'package:ataulfo/features/profile/presentation/widgets/chat_thread_app_bar.dart';
+import 'package:ataulfo/features/resources/presentation/pages/content_library_page.dart';
+import 'package:ataulfo/features/settings/presentation/pages/settings_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
@@ -95,7 +97,9 @@ import 'package:ataulfo/features/monitor/data/datasources/monitor_activity_datas
 import 'package:ataulfo/features/monitor/domain/entities/monitor_event.dart';
 import 'package:ataulfo/features/notes/domain/repositories/notes_repository.dart';
 import 'package:ataulfo/features/platform_agent/domain/repositories/platform_agent_repository.dart';
+import 'package:ataulfo/features/trainer/domain/entities/workspace_doc.dart';
 import 'package:ataulfo/features/trainer/domain/repositories/trainer_repositories.dart';
+import 'package:ataulfo/features/trainer/presentation/pages/workspace_page.dart';
 import 'package:ataulfo/features/triggers/domain/repositories/triggers_repository.dart';
 import 'package:ataulfo/features/quick_replies/domain/repositories/quick_replies_repository.dart';
 import 'package:ataulfo/features/wa_labels/domain/repositories/wa_labels_repository.dart';
@@ -326,6 +330,7 @@ void main() {
   late _MockLabelsRepo labelsRepo;
   late _MockNotificationsRepo notificationsRepo;
   late _MockAuthRepo authRepo;
+  late _MockWorkspaceRepo workspaceRepo;
   late AppRouter router;
 
   setUpAll(() {
@@ -366,6 +371,7 @@ void main() {
     orgAiConfigRepo = _MockOrgAiConfigRepo();
     labelsRepo = _MockLabelsRepo();
     notificationsRepo = _MockNotificationsRepo();
+    workspaceRepo = _MockWorkspaceRepo();
     // Los blocs page-scoped del shell arrancan con LoadRequested al
     // construirse; los repos mock devuelven listas vacías para que los
     // loads terminen sin colgar el pumpAndSettle. El CatalogBloc se
@@ -374,6 +380,9 @@ void main() {
     // su propio widget test).
     when(botsRepo.list).thenAnswer((_) async => const <Bot>[]);
     when(templatesRepo.list).thenAnswer((_) async => const <Template>[]);
+    when(
+      () => workspaceRepo.listDocs(templateId: any(named: 'templateId')),
+    ).thenAnswer((_) async => const <WorkspaceDoc>[]);
     when(
       conversationsRepo.watchAll,
     ).thenAnswer((_) => Stream.value(const <Conversation>[]));
@@ -480,7 +489,7 @@ void main() {
       trainerRepository: _MockTrainerRepo(),
       trainerEvents: _MockTrainerEvents(),
       monitorActivity: _FakeMonitorActivity(),
-      workspaceRepository: _MockWorkspaceRepo(),
+      workspaceRepository: workspaceRepo,
       previewRepository: _MockPreviewRepo(),
       platformAgentRepository: _MockPlatformAgentRepo(),
       platformAgentEvents: _MockPlatformAgentEvents(),
@@ -1111,6 +1120,58 @@ void main() {
       verify(invitationsRepo.list).called(1);
     },
   );
+
+  testWidgets(
+    'OWNER → /library monta activos de org y selector de workspaces',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+      clearInteractions(templatesRepo);
+
+      router.router.go('/library');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ContentLibraryPage), findsOneWidget);
+      expect(find.byKey(const Key('library.media')), findsOneWidget);
+      expect(find.byKey(const Key('library.products')), findsOneWidget);
+      expect(find.byKey(const Key('library.workspaces.empty')), findsOneWidget);
+      verify(templatesRepo.list).called(1);
+    },
+  );
+
+  testWidgets(
+    'AuthAuthenticated → /settings monta Ajustes como pantalla secundaria',
+    (tester) async {
+      when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+      await tester.pumpWidget(_host(router, authBloc));
+      await tester.pumpAndSettle();
+
+      router.router.go('/settings');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SettingsPage), findsOneWidget);
+      expect(find.byKey(const Key('settings.header.back')), findsOneWidget);
+    },
+  );
+
+  testWidgets('OWNER → workspace carga el conocimiento del Asistente elegido', (
+    tester,
+  ) async {
+    when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
+
+    await tester.pumpWidget(_host(router, authBloc));
+    await tester.pumpAndSettle();
+    clearInteractions(workspaceRepo);
+
+    router.router.go('/assistants/t1/workspace');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WorkspacePage), findsOneWidget);
+    verify(() => workspaceRepo.listDocs(templateId: 't1')).called(1);
+  });
 
   testWidgets(
     '/organization/team?tab=invitations abre la superficie unificada en la tab correcta',

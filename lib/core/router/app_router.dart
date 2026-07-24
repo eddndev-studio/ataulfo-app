@@ -91,10 +91,13 @@ import '../../features/labels/domain/repositories/chat_labels_repository.dart';
 import '../../features/labels/domain/repositories/labels_repository.dart';
 import '../../features/trainer/domain/repositories/trainer_repositories.dart';
 import '../../features/trainer/presentation/bloc/preview_bloc.dart';
+import '../../features/trainer/presentation/bloc/workspace_bloc.dart';
 import '../../features/trainer/presentation/pages/preview_page.dart';
+import '../../features/trainer/presentation/pages/workspace_page.dart';
 import '../../features/resources/domain/repositories/resources_repository.dart';
 import '../../features/resources/presentation/bloc/assistant_resources_cubit.dart';
 import '../../features/resources/presentation/pages/assistant_resources_page.dart';
+import '../../features/resources/presentation/pages/content_library_page.dart';
 import '../../features/platform_agent/domain/repositories/platform_agent_repository.dart';
 import '../../features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
 import '../../features/ai_ledger/domain/ai_ledger_repository.dart';
@@ -158,6 +161,7 @@ import '../../features/notifications/presentation/pages/notifications_page.dart'
 import '../../features/profile/domain/repositories/profile_repository.dart';
 import '../../features/profile/presentation/bloc/profile_bloc.dart';
 import '../../features/settings/presentation/pages/appearance_page.dart';
+import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/widgets/chat_thread_app_bar.dart';
 import '../../features/quick_replies/domain/repositories/quick_replies_repository.dart';
@@ -269,6 +273,7 @@ class AppRouter {
        _executionsRepo = executionsRepository,
        _monitorActivity = monitorActivity,
        _monitorCatchup = monitorCatchup,
+       _workspaceRepo = workspaceRepository,
        _previewRepo = previewRepository,
        _resourcesRepo = resourcesRepository,
        _platformAgentRepo = platformAgentRepository,
@@ -327,6 +332,7 @@ class AppRouter {
 
   final PlatformAgentRepository _platformAgentRepo;
   final PlatformAgentEvents _platformAgentEvents;
+  final WorkspaceRepository _workspaceRepo;
   final PreviewRepository _previewRepo;
   final ResourcesRepository? _resourcesRepo;
   final NotesRepository _notesRepo;
@@ -421,6 +427,7 @@ class AppRouter {
     '/agenda',
     '/calendar',
     '/catalog',
+    '/library',
     '/media',
     '/cuenta',
   };
@@ -1346,6 +1353,24 @@ class AppRouter {
         },
       ),
       GoRoute(
+        // El workspace pertenece al Asistente, no a la organización en
+        // abstracto. La Biblioteca obliga a elegir el Asistente antes de
+        // alcanzar este CRUD y la ruta conserva ese scope en su bloc.
+        path: '/assistants/:id/workspace',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return RepositoryProvider<WorkspaceRepository>.value(
+            value: _workspaceRepo,
+            child: BlocProvider<WorkspaceBloc>(
+              create: (_) =>
+                  WorkspaceBloc(repo: _workspaceRepo, templateId: id)
+                    ..add(const WorkspaceLoadRequested()),
+              child: WorkspacePage(templateId: id),
+            ),
+          );
+        },
+      ),
+      GoRoute(
         path: '/assistants/:id/preview',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
@@ -1369,6 +1394,11 @@ class AppRouter {
         path: '/templates/:id/trainer/preview',
         redirect: (_, state) =>
             '/assistants/${state.pathParameters['id']!}/preview',
+      ),
+      GoRoute(
+        path: '/templates/:id/trainer/workspace',
+        redirect: (_, state) =>
+            '/assistants/${state.pathParameters['id']!}/workspace',
       ),
       GoRoute(
         // Lista de flujos de la plantilla con buscador local. Página
@@ -1633,6 +1663,26 @@ class AppRouter {
         },
       ),
       GoRoute(
+        // Hub organizacional de activos reutilizables. Supervisores acceden a
+        // medios y productos; ADMIN+ ve además los workspaces y selecciona
+        // primero el Asistente que define su scope.
+        path: '/library',
+        builder: (context, _) {
+          final showWorkspaces = _isAdmin;
+          final page = Scaffold(
+            appBar: AppBar(title: const Text('Biblioteca y contenido')),
+            body: ContentLibraryPage(showWorkspaces: showWorkspaces),
+          );
+          if (!showWorkspaces) return page;
+          return BlocProvider<TemplatesBloc>(
+            create: (_) =>
+                TemplatesBloc(_templatesRepo)
+                  ..add(const TemplatesLoadRequested()),
+            child: page,
+          );
+        },
+      ),
+      GoRoute(
         // Hub de la organización activa. La identidad siempre carga; el
         // overview y las áreas de administración sólo solicitan endpoints
         // ADMIN+ cuando el rol puede usarlos.
@@ -1646,6 +1696,9 @@ class AppRouter {
                 create: (_) =>
                     MembershipsBloc(_membershipsRepo)
                       ..add(const MembershipsLoadRequested()),
+              ),
+              BlocProvider<SwitchOrgCubit>(
+                create: (_) => SwitchOrgCubit(_authRepo),
               ),
               if (canManage) ...<BlocProvider<dynamic>>[
                 BlocProvider<MembersBloc>(
@@ -1667,7 +1720,6 @@ class AppRouter {
               ],
             ],
             child: Scaffold(
-              appBar: AppBar(title: const Text('Organización')),
               body: OrganizationPage(
                 canManage: canManage,
                 hasBilling: canManage && billingRepo != null,
@@ -1744,6 +1796,28 @@ class AppRouter {
         // abre la tab correcta de Equipo y acceso.
         path: '/invitations',
         builder: (context, _) => _organizationTeamScaffold(initialTab: 1),
+      ),
+      GoRoute(
+        // Preferencias personales: destino secundario del drawer, no una tab
+        // operativa. Al abrirse con push vuelve al tab conservando su estado;
+        // un deep link sin pila cae de forma segura al shell.
+        path: '/settings',
+        builder: (context, _) => Scaffold(
+          body: SettingsPage(
+            headerLeading: IconButton(
+              key: const Key('settings.header.back'),
+              tooltip: 'Volver',
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
+              icon: const Icon(Icons.arrow_back),
+            ),
+          ),
+        ),
       ),
       GoRoute(
         path: '/notifications',

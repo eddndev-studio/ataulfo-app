@@ -239,6 +239,7 @@ void main() {
         '/agenda/book',
         '/calendar/hours',
         '/catalog/products',
+        '/library',
         '/media',
         '/cuenta',
       ]) {
@@ -298,6 +299,7 @@ void main() {
         '/agenda/book',
         '/calendar/hours',
         '/catalog/products',
+        '/library',
         '/media',
         '/cuenta',
       ]) {
@@ -316,6 +318,7 @@ void main() {
         '/invitations',
         '/organization/team',
         '/org/labels',
+        '/library',
         '/media',
       ]) {
         expect(

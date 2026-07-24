@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_header_card.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
@@ -226,6 +227,8 @@ void main() {
 
     expect(find.text('Acme Belize'), findsOneWidget);
     expect(find.text('Pro'), findsOneWidget);
+    expect(find.byType(AppHeaderCard), findsOneWidget);
+    expect(find.byType(AppBar), findsNothing);
     expect(find.byKey(const Key('organization.general')), findsOneWidget);
     expect(find.byKey(const Key('organization.team')), findsOneWidget);
     expect(find.byKey(const Key('organization.ai')), findsOneWidget);
