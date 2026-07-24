@@ -6,8 +6,9 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
-import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
+import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/appointment.dart';
@@ -75,13 +76,9 @@ class AgendaPage extends StatelessWidget {
         Expanded(
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppTokens.sp5,
-                AppTokens.sp5,
-                AppTokens.sp5,
-                AppTokens.fabClearance + context.safeBottomInset,
-              ),
+            child: AppPrimaryPageContainer(
+              top: AppTokens.sp5,
+              bottom: AppTokens.fabClearance + context.safeBottomInset,
               child: const _DayBody(),
             ),
           ),

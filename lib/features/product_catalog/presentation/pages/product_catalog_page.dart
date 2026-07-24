@@ -6,6 +6,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
 import '../../domain/entities/product.dart';
 import '../bloc/product_catalog_cubit.dart';
 import '../product_thumb_resolver.dart';
@@ -118,9 +119,9 @@ class _Loaded extends StatelessWidget {
     }
     return ListView.separated(
       padding: EdgeInsets.fromLTRB(
-        AppTokens.sp4,
+        AppPageGutters.primary,
         AppTokens.sp3,
-        AppTokens.sp4,
+        AppPageGutters.primary,
         AppTokens.sp5 + context.safeBottomInset,
       ),
       itemCount: visible.length,

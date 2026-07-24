@@ -6,6 +6,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
 import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../templates/domain/entities/variable_def.dart';
@@ -242,55 +243,53 @@ class _VariablesFormState extends State<_VariablesForm> {
     final textTheme = Theme.of(context).textTheme;
     final failure = widget.failure;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6 + context.safeBottomInset,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          AppCard(
-            child: Text(
-              'Estos valores reemplazan por completo los actuales. Los campos '
-              'vienen con el valor ya configurado; lo que dejes en blanco usará '
-              'el valor por defecto del Asistente.',
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+      child: AppDetailPageContainer(
+        top: AppTokens.sp6,
+        bottom: AppTokens.sp6 + context.safeBottomInset,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            AppCard(
+              child: Text(
+                'Estos valores reemplazan por completo los actuales. Los campos '
+                'vienen con el valor ya configurado; lo que dejes en blanco usará '
+                'el valor por defecto del Asistente.',
+                style: textTheme.bodyMedium?.copyWith(color: AppTokens.text2),
+              ),
             ),
-          ),
-          const SizedBox(height: AppTokens.sp5),
-          if (!_isCompact)
-            // Caso simple: todos los campos a la vista, con el nombre y la
-            // descripción en el propio campo.
-            for (final d in widget.defs) ...<Widget>[
-              _valueField(d, label: d.name, helper: d.description),
+            const SizedBox(height: AppTokens.sp5),
+            if (!_isCompact)
+              // Caso simple: todos los campos a la vista, con el nombre y la
+              // descripción en el propio campo.
+              for (final d in widget.defs) ...<Widget>[
+                _valueField(d, label: d.name, helper: d.description),
+                const SizedBox(height: AppTokens.sp4),
+              ]
+            else ...<Widget>[
+              AppSearchField(
+                key: const Key('bot_variables.search'),
+                hint: 'Buscar variables por nombre…',
+                controller: _search,
+              ),
               const SizedBox(height: AppTokens.sp4),
-            ]
-          else ...<Widget>[
-            AppSearchField(
-              key: const Key('bot_variables.search'),
-              hint: 'Buscar variables por nombre…',
-              controller: _search,
+              ..._cards(textTheme),
+            ],
+            if (failure != null) ...<Widget>[
+              Text(
+                _failureMessage(failure),
+                style: textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
+              ),
+              const SizedBox(height: AppTokens.sp3),
+            ],
+            AppButton.filled(
+              key: const Key('bot_variables.submit'),
+              label: 'Guardar variables',
+              fullWidth: true,
+              loading: widget.isSaving,
+              onPressed: widget.isSaving ? null : _submit,
             ),
-            const SizedBox(height: AppTokens.sp4),
-            ..._cards(textTheme),
           ],
-          if (failure != null) ...<Widget>[
-            Text(
-              _failureMessage(failure),
-              style: textTheme.bodyMedium?.copyWith(color: AppTokens.danger),
-            ),
-            const SizedBox(height: AppTokens.sp3),
-          ],
-          AppButton.filled(
-            key: const Key('bot_variables.submit'),
-            label: 'Guardar variables',
-            fullWidth: true,
-            loading: widget.isSaving,
-            onPressed: widget.isSaving ? null : _submit,
-          ),
-        ],
+        ),
       ),
     );
   }

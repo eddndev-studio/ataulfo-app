@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
 import '../../../../core/design/widgets/app_search_field.dart';
 import '../bloc/media_gallery_bloc.dart';
 
@@ -48,13 +49,8 @@ class _MediaGallerySearchFieldState extends State<MediaGallerySearchField> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTokens.sp4,
-        AppTokens.sp3,
-        AppTokens.sp4,
-        0,
-      ),
+    return AppPrimaryPageContainer(
+      top: AppTokens.sp3,
       child: AppSearchField(
         key: const Key('media_gallery.search_field'),
         hint: 'Buscar archivos por nombre…',
@@ -107,7 +103,7 @@ class _MediaGalleryTypeTabsState extends State<MediaGalleryTypeTabs> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.sp4,
+          horizontal: AppPageGutters.primary,
           vertical: AppTokens.sp2,
         ),
         children: <Widget>[

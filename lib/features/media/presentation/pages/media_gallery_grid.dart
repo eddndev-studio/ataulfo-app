@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
 import '../../domain/entities/media_asset.dart';
 import '../../domain/repositories/media_thumbnail_loader.dart';
 import '../bloc/media_gallery_bloc.dart';
@@ -46,9 +47,9 @@ class MediaGalleryGrid extends StatelessWidget {
       controller: controller,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(
+        AppPageGutters.primary,
         AppTokens.sp4,
-        AppTokens.sp4,
-        AppTokens.sp4,
+        AppPageGutters.primary,
         // Deja aire para que el FAB no tape la última fila.
         AppTokens.sp9 + context.safeBottomInset,
       ),

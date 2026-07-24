@@ -8,6 +8,7 @@ import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
 import '../../../../core/design/widgets/app_pill.dart';
 import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
@@ -96,55 +97,53 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
               .toList(growable: false);
     return SingleChildScrollView(
       key: const Key('template_flows.content'),
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp6,
-        AppTokens.sp4,
-        AppTokens.sp6,
+      child: AppDetailPageContainer(
+        top: AppTokens.sp4,
         // fabClearance: la última fila debe poder quedar por encima del FAB
         // de crear que flota sobre esta página.
-        AppTokens.fabClearance + context.safeBottomInset,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          // Sin flujos no hay nada que filtrar: el buscador solo aparece
-          // cuando existe una lista que recortar.
-          if (all.isNotEmpty) ...<Widget>[
-            AppSearchField(
-              key: const Key('template_flows.search'),
-              hint: 'Buscar flujos por nombre…',
-              controller: _search,
-            ),
-            const SizedBox(height: AppTokens.sp4),
+        bottom: AppTokens.fabClearance + context.safeBottomInset,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Sin flujos no hay nada que filtrar: el buscador solo aparece
+            // cuando existe una lista que recortar.
+            if (all.isNotEmpty) ...<Widget>[
+              AppSearchField(
+                key: const Key('template_flows.search'),
+                hint: 'Buscar flujos por nombre…',
+                controller: _search,
+              ),
+              const SizedBox(height: AppTokens.sp4),
+            ],
+            if (all.isEmpty)
+              Text(
+                'Este Asistente aún no tiene flujos.',
+                key: const Key('flows.empty'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: AppTokens.text2,
+                ),
+              )
+            else if (filtered.isEmpty)
+              Text(
+                'Sin resultados para "${_search.text.trim()}".',
+                key: const Key('template_flows.no_results'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: AppTokens.text2,
+                ),
+              )
+            else
+              // El count de disparadores por flujo sale del TriggersBloc del
+              // template (un solo GET); cada fila lo consume del mapa.
+              BlocBuilder<TriggersBloc, TriggersState>(
+                builder: (context, tState) => _FlowsCard(
+                  flows: filtered,
+                  triggerCounts: _triggerCounts(tState),
+                ),
+              ),
           ],
-          if (all.isEmpty)
-            Text(
-              'Este Asistente aún no tiene flujos.',
-              key: const Key('flows.empty'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            )
-          else if (filtered.isEmpty)
-            Text(
-              'Sin resultados para "${_search.text.trim()}".',
-              key: const Key('template_flows.no_results'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            )
-          else
-            // El count de disparadores por flujo sale del TriggersBloc del
-            // template (un solo GET); cada fila lo consume del mapa.
-            BlocBuilder<TriggersBloc, TriggersState>(
-              builder: (context, tState) => _FlowsCard(
-                flows: filtered,
-                triggerCounts: _triggerCounts(tState),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

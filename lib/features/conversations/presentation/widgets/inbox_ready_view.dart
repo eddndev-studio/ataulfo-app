@@ -5,6 +5,7 @@ import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_notice_banner.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
 import '../../../bots/domain/entities/bot.dart';
 import '../../../labels/domain/entities/label.dart';
 import '../../domain/entities/conversation.dart';
@@ -61,9 +62,9 @@ class InboxReadyView extends StatelessWidget {
           ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(
-            AppTokens.sp4,
+            AppPageGutters.primary,
             AppTokens.sp5,
-            AppTokens.sp4,
+            AppPageGutters.primary,
             AppTokens.sp4,
           ),
           sliver: SliverToBoxAdapter(
@@ -101,9 +102,9 @@ class InboxReadyView extends StatelessWidget {
         if (state.isOffline || state.failure != null)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
-              AppTokens.sp4,
+              AppPageGutters.primary,
               0,
-              AppTokens.sp4,
+              AppPageGutters.primary,
               AppTokens.sp4,
             ),
             sliver: SliverToBoxAdapter(
@@ -124,9 +125,9 @@ class InboxReadyView extends StatelessWidget {
         if (items.isEmpty)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
-              AppTokens.sp4,
+              AppPageGutters.primary,
               AppTokens.sp5,
-              AppTokens.sp4,
+              AppPageGutters.primary,
               AppTokens.sp7,
             ),
             sliver: SliverToBoxAdapter(

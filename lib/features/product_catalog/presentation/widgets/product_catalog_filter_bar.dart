@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
 import '../../../../core/design/widgets/app_search_field.dart';
 import '../../domain/entities/product.dart';
 import '../bloc/product_catalog_cubit.dart';
@@ -49,13 +50,8 @@ class _ProductCatalogSearchFieldState extends State<ProductCatalogSearchField> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTokens.sp4,
-        AppTokens.sp3,
-        AppTokens.sp4,
-        0,
-      ),
+    return AppPrimaryPageContainer(
+      top: AppTokens.sp3,
       child: AppSearchField(
         key: const Key('product_catalog.search_field'),
         hint: 'Buscar por nombre o descripción…',
@@ -82,7 +78,7 @@ class ProductCatalogFilterChips extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.sp4,
+          horizontal: AppPageGutters.primary,
           vertical: AppTokens.sp2,
         ),
         children: <Widget>[

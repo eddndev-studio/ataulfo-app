@@ -8,6 +8,7 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
 import '../../../../core/design/widgets/app_search_field.dart';
 import '../../domain/entities/variable_def.dart';
 import '../bloc/var_defs_bloc.dart';
@@ -108,54 +109,52 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
               .toList(growable: false);
     return SingleChildScrollView(
       key: const Key('template_variables.content'),
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp6,
-        AppTokens.sp4,
-        AppTokens.sp6,
+      child: AppDetailPageContainer(
+        top: AppTokens.sp4,
         // fabClearance: la última fila debe poder quedar por encima del FAB
         // de crear que flota sobre esta página.
-        AppTokens.fabClearance + context.safeBottomInset,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          // Sin variables no hay nada que filtrar: el buscador solo aparece
-          // cuando existe una lista que recortar.
-          if (all.isNotEmpty) ...<Widget>[
-            AppSearchField(
-              key: const Key('template_variables.search'),
-              hint: 'Buscar variables por nombre…',
-              controller: _search,
-            ),
-            const SizedBox(height: AppTokens.sp4),
+        bottom: AppTokens.fabClearance + context.safeBottomInset,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Sin variables no hay nada que filtrar: el buscador solo aparece
+            // cuando existe una lista que recortar.
+            if (all.isNotEmpty) ...<Widget>[
+              AppSearchField(
+                key: const Key('template_variables.search'),
+                hint: 'Buscar variables por nombre…',
+                controller: _search,
+              ),
+              const SizedBox(height: AppTokens.sp4),
+            ],
+            if (all.isEmpty)
+              Text(
+                'Este Asistente aún no tiene variables.',
+                key: const Key('var_defs.empty'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: AppTokens.text2,
+                ),
+              )
+            else if (filtered.isEmpty)
+              Text(
+                'Sin resultados para "${_search.text.trim()}".',
+                key: const Key('template_variables.no_results'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: AppTokens.text2,
+                ),
+              )
+            else
+              _VarDefsCard(
+                defs: filtered,
+                // El sheet valida contra TODOS los nombres, no solo los
+                // filtrados: renombrar hacia un duplicado oculto por el
+                // buscador debe seguir bloqueado.
+                onEdit: (d) => _openSheet(context, all, editing: d),
+              ),
           ],
-          if (all.isEmpty)
-            Text(
-              'Este Asistente aún no tiene variables.',
-              key: const Key('var_defs.empty'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            )
-          else if (filtered.isEmpty)
-            Text(
-              'Sin resultados para "${_search.text.trim()}".',
-              key: const Key('template_variables.no_results'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppTokens.text2,
-              ),
-            )
-          else
-            _VarDefsCard(
-              defs: filtered,
-              // El sheet valida contra TODOS los nombres, no solo los
-              // filtrados: renombrar hacia un duplicado oculto por el
-              // buscador debe seguir bloqueado.
-              onEdit: (d) => _openSheet(context, all, editing: d),
-            ),
-        ],
+        ),
       ),
     );
   }

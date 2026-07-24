@@ -17,9 +17,10 @@ import '../../../../core/design/widgets/app_choice_chip.dart';
 import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
-import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_dot_label.dart';
+import '../../../../core/design/widgets/app_page_container.dart';
+import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../../core/util/user_greeting.dart';
@@ -175,16 +176,11 @@ class _TemplatesListPageState extends State<TemplatesListPage> with RouteAware {
       onRefresh: () => _refresh(context),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Padding(
+        child: AppPrimaryPageContainer(
           key: const Key('templates.content_padding'),
-          padding: EdgeInsets.fromLTRB(
-            AppTokens.sp5,
-            AppTokens.sp5,
-            AppTokens.sp5,
-            // fabClearance: la última fila debe poder quedar por encima
-            // del FAB de crear que flota sobre esta tab.
-            AppTokens.fabClearance + context.safeBottomInset,
-          ),
+          top: AppTokens.sp5,
+          // La última fila debe poder quedar por encima del FAB de crear.
+          bottom: AppTokens.fabClearance + context.safeBottomInset,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
