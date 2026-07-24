@@ -371,6 +371,33 @@ void main() {
     ).called(2);
   });
 
+  testWidgets('un 5xx conserva refresh aunque se corrija antes de descartar', (
+    tester,
+  ) async {
+    when(
+      () => repo.create(any(), any(), any()),
+    ).thenThrow(const InvitationsServerFailure());
+
+    final session = await pumpHost(tester);
+    await goToAccess(tester);
+    await tester.tap(find.byKey(const Key('invite.submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('invite.failure')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('invite.back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('invite.step.person')), findsOneWidget);
+
+    // Volver limpió el estado visual del cubit, pero no la incertidumbre de
+    // que el servidor haya persistido la invitación antes del 5xx.
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(appSheetDiscardConfirmKey));
+    await tester.pumpAndSettle();
+
+    expect(await session.result, isTrue);
+  });
+
   testWidgets('Compartir desde el éxito usa correo y código del resultado', (
     tester,
   ) async {

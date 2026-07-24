@@ -32,10 +32,16 @@ enum _InviteStep { person, access }
 /// ante un fallo y, al terminar, se transforma en el estado para copiar o
 /// compartir el código.
 class InviteSheet extends StatefulWidget {
-  const InviteSheet({super.key, required this.bots, this.shareService});
+  const InviteSheet({
+    super.key,
+    required this.bots,
+    this.shareService,
+    this.onRefreshRequired,
+  });
 
   final List<Bot> bots;
   final ShareService? shareService;
+  final VoidCallback? onRefreshRequired;
 
   // OWNER se excluye a propósito: la propiedad se transfiere desde Miembros;
   // nunca se concede saltándose ese flujo mediante una invitación.
@@ -58,6 +64,7 @@ class InviteSheet extends StatefulWidget {
       context.read<InvitationsRepository>(),
     );
     final sheetKey = GlobalKey<_InviteSheetState>();
+    var shouldRefresh = false;
 
     final result = await showAppBottomSheet<bool>(
       context,
@@ -76,15 +83,10 @@ class InviteSheet extends StatefulWidget {
           key: sheetKey,
           bots: bots,
           shareService: shareService,
+          onRefreshRequired: () => shouldRefresh = true,
         ),
       ),
     );
-    final finalState = cubit.state;
-    final shouldRefresh =
-        (finalState is InvitationMutationSuccess &&
-            finalState.action == InvitationMutationAction.created) ||
-        (finalState is InvitationMutationFailure &&
-            finalState.failure is InvitationsServerFailure);
     return result ?? shouldRefresh;
   }
 
@@ -204,7 +206,18 @@ class _InviteSheetState extends State<InviteSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<InvitationMutationCubit, InvitationMutationState>(
+    return BlocConsumer<InvitationMutationCubit, InvitationMutationState>(
+      listener: (context, state) {
+        final creationSucceeded =
+            state is InvitationMutationSuccess &&
+            state.action == InvitationMutationAction.created;
+        final createMayHavePersisted =
+            state is InvitationMutationFailure &&
+            state.failure is InvitationsServerFailure;
+        if (creationSucceeded || createMayHavePersisted) {
+          widget.onRefreshRequired?.call();
+        }
+      },
       builder: (context, state) {
         final success =
             state is InvitationMutationSuccess &&
