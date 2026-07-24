@@ -1,244 +1,397 @@
+import 'dart:async';
+
+import 'package:ataulfo/core/design/app_bottom_sheet.dart';
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
-import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
+import 'package:ataulfo/core/design/widgets/app_radio_row.dart';
+import 'package:ataulfo/core/design/widgets/app_text_field.dart';
+import 'package:ataulfo/core/platform/share_service.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
+import 'package:ataulfo/features/invitations/domain/entities/created_invitation.dart';
+import 'package:ataulfo/features/invitations/domain/failures/invitations_failure.dart';
+import 'package:ataulfo/features/invitations/domain/repositories/invitations_repository.dart';
 import 'package:ataulfo/features/invitations/presentation/widgets/invite_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockRepo extends Mock implements InvitationsRepository {}
+
+class _FakeShareService implements ShareService {
+  String? lastText;
+
+  @override
+  Future<void> shareText(String text, {String? subject}) async {
+    lastText = text;
+  }
+}
+
+class _OpenSession {
+  Future<bool>? result;
+  bool? outcome;
+}
+
+Bot _bot(int index) => Bot(
+  id: 'b$index',
+  orgId: 'o1',
+  templateId: 't1',
+  name: switch (index) {
+    1 => 'Ventas',
+    2 => 'Soporte',
+    3 => 'Agenda',
+    _ => 'Canal $index',
+  },
+  channel: index.isEven ? BotChannel.waba : BotChannel.waUnofficial,
+  identifier: null,
+  version: 1,
+  paused: false,
+  aiDisabled: false,
+);
 
 void main() {
-  const bots = <Bot>[
-    Bot(
-      id: 'b1',
-      orgId: 'o1',
-      templateId: 't1',
-      name: 'Ventas',
-      channel: BotChannel.waUnofficial,
-      identifier: '50211111111',
-      version: 1,
-      paused: false,
-      aiDisabled: false,
-    ),
-    Bot(
-      id: 'b2',
-      orgId: 'o1',
-      templateId: 't1',
-      name: 'Soporte',
-      channel: BotChannel.waba,
-      identifier: null,
-      version: 1,
-      paused: false,
-      aiDisabled: false,
-    ),
-  ];
+  late _MockRepo repo;
+  late _FakeShareService share;
 
-  Future<InviteSheetResult?> Function() pumpHost(
-    WidgetTester tester, {
-    List<Bot> availableBots = bots,
-  }) {
-    InviteSheetResult? captured;
-    var done = false;
-    return () async {
-      if (!done) {
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppDesignTheme.dark(),
-            home: Scaffold(
-              body: Builder(
-                builder: (ctx) => Center(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      captured = await InviteSheet.open(
-                        ctx,
-                        bots: availableBots,
-                      );
-                      done = true;
-                    },
-                    child: const Text('open'),
-                  ),
+  setUp(() {
+    repo = _MockRepo();
+    share = _FakeShareService();
+    when(() => repo.create(any(), any(), any())).thenAnswer(
+      (_) async => const CreatedInvitation(
+        email: 'persona@empresa.com',
+        token: 'RAW-TOKEN',
+        emailSent: true,
+      ),
+    );
+  });
+
+  Future<_OpenSession> pumpHost(WidgetTester tester, {List<Bot>? bots}) async {
+    final session = _OpenSession();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppDesignTheme.dark(),
+        home: RepositoryProvider<InvitationsRepository>.value(
+          value: repo,
+          child: Scaffold(
+            body: Builder(
+              builder: (context) => Center(
+                child: ElevatedButton(
+                  onPressed: () {
+                    final result = InviteSheet.open(
+                      context,
+                      bots: bots ?? <Bot>[_bot(1), _bot(2)],
+                      shareService: share,
+                    );
+                    session.result = result;
+                    unawaited(
+                      result.then((value) {
+                        session.outcome = value;
+                      }),
+                    );
+                  },
+                  child: const Text('Abrir'),
                 ),
               ),
             ),
           ),
-        );
-        await tester.tap(find.text('open'));
-        await tester.pumpAndSettle();
-      }
-      return captured;
-    };
+        ),
+      ),
+    );
+    await tester.tap(find.text('Abrir'));
+    await tester.pumpAndSettle();
+    return session;
   }
 
-  testWidgets('muestra campo de correo y selector de rol', (tester) async {
-    final read = pumpHost(tester);
-    await read();
+  Future<void> goToAccess(
+    WidgetTester tester, {
+    String email = 'persona@empresa.com',
+  }) async {
+    await tester.enterText(find.byKey(const Key('invite.email')), email);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('invite.continue')));
+    await tester.pumpAndSettle();
+  }
 
+  testWidgets('abre en 1 de 2 · Persona con explicación y pie canónico', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+
+    expect(find.byKey(const Key('invite.step.person')), findsOneWidget);
+    expect(find.text('1 de 2 · Persona'), findsOneWidget);
+    expect(find.textContaining('correo que usará para entrar'), findsOneWidget);
     expect(find.byKey(const Key('invite.email')), findsOneWidget);
-    expect(find.byKey(const Key('invite.role')), findsOneWidget);
+    expect(find.byKey(const Key('invite.cancel')), findsOneWidget);
+    expect(find.byKey(const Key('invite.continue')), findsOneWidget);
+    expect(find.byKey(const Key('invite.role.WORKER')), findsNothing);
   });
 
-  testWidgets('WORKER muestra los Canales disponibles y aviso con cero', (
+  testWidgets('Continuar exige email válido y Enter avanza al acceso', (
     tester,
   ) async {
-    final read = pumpHost(tester);
-    await read();
+    await pumpHost(tester);
 
-    expect(find.byKey(const Key('invite.channels')), findsOneWidget);
-    expect(find.text('Ventas'), findsOneWidget);
-    expect(find.text('Soporte'), findsOneWidget);
-    expect(find.byKey(const Key('invite.channels.warning')), findsOneWidget);
-  });
+    AppButton button() =>
+        tester.widget<AppButton>(find.byKey(const Key('invite.continue')));
 
-  testWidgets('un WORKER devuelve sólo los canales seleccionados', (
-    tester,
-  ) async {
-    final read = pumpHost(tester);
-    await read();
-
-    await tester.enterText(find.byKey(const Key('invite.email')), 'a@x.com');
-    await tester.tap(find.text('Soporte'));
+    expect(button().onPressed, isNull);
+    await tester.enterText(find.byKey(const Key('invite.email')), 'invalido');
     await tester.pump();
-    await tester.tap(find.byKey(const Key('invite.submit')));
-    await tester.pumpAndSettle();
-
-    final result = await read();
-    expect(result!.role, 'WORKER');
-    expect(result.botIds, const <String>['b2']);
-  });
-
-  testWidgets('cambiar a un rol elevado oculta y limpia los canales', (
-    tester,
-  ) async {
-    final read = pumpHost(tester);
-    await read();
-
-    await tester.enterText(find.byKey(const Key('invite.email')), 'a@x.com');
-    await tester.tap(find.text('Ventas'));
-    await tester.tap(find.text('Supervisor'));
-    await tester.pump();
-
-    expect(find.byKey(const Key('invite.channels')), findsNothing);
-    await tester.tap(find.byKey(const Key('invite.submit')));
-    await tester.pumpAndSettle();
-
-    final result = await read();
-    expect(result!.role, 'SUPERVISOR');
-    expect(result.botIds, isEmpty);
-  });
-
-  testWidgets('sin Canales permite invitar un Agente con acceso cero', (
-    tester,
-  ) async {
-    final read = pumpHost(tester, availableBots: const <Bot>[]);
-    await read();
-
-    await tester.enterText(find.byKey(const Key('invite.email')), 'a@x.com');
-    await tester.pump();
-
-    expect(find.textContaining('No hay Canales disponibles'), findsOneWidget);
-    final submit = tester.widget<AppButton>(
-      find.byKey(const Key('invite.submit')),
-    );
-    expect(submit.onPressed, isNotNull);
-  });
-
-  testWidgets('el rol se elige con chips del kit (todos a la vista)', (
-    tester,
-  ) async {
-    final read = pumpHost(tester);
-    await read();
-
-    // Tres opciones (sin OWNER) como AppChoiceChip, con WORKER preseleccionado.
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('invite.role')),
-        matching: find.byType(AppChoiceChip),
-      ),
-      findsNWidgets(3),
-    );
-    final worker = tester.widget<AppChoiceChip>(
-      find.widgetWithText(AppChoiceChip, 'Agente'),
-    );
-    expect(worker.selected, isTrue);
-  });
-
-  testWidgets('Enviar está deshabilitado con el correo vacío', (tester) async {
-    final read = pumpHost(tester);
-    await read();
-
-    final submit = tester.widget<AppButton>(
-      find.byKey(const Key('invite.submit')),
-    );
-    expect(submit.onPressed, isNull);
-  });
-
-  testWidgets('correo sin forma de email deja Enviar deshabilitado', (
-    tester,
-  ) async {
-    final read = pumpHost(tester);
-    await read();
-
-    await tester.enterText(find.byKey(const Key('invite.email')), 'x');
-    await tester.pumpAndSettle();
-
-    final submit = tester.widget<AppButton>(
-      find.byKey(const Key('invite.submit')),
-    );
-    expect(
-      submit.onPressed,
-      isNull,
-      reason:
-          'sin @ con texto a ambos lados y punto en el dominio, '
-          'el backend lo rechazaría: mejor gatear local',
-    );
-  });
-
-  testWidgets('con correo, enviar devuelve InviteSheetResult(email, rol)', (
-    tester,
-  ) async {
-    final read = pumpHost(tester);
-    await read();
-
-    await tester.enterText(find.byKey(const Key('invite.email')), 'a@x.com');
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('invite.submit')));
-    await tester.pumpAndSettle();
-
-    final result = await read();
-    expect(result, isNotNull);
-    expect(result!.email, 'a@x.com');
-    // Rol por defecto: WORKER (el invitado más común; se puede cambiar).
-    expect(result.role, 'WORKER');
-    expect(result.botIds, isEmpty);
-  });
-
-  testWidgets('cambiar el rol se refleja en el resultado', (tester) async {
-    final read = pumpHost(tester);
-    await read();
-
-    await tester.enterText(find.byKey(const Key('invite.email')), 'a@x.com');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Administrador'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('invite.submit')));
-    await tester.pumpAndSettle();
-
-    final result = await read();
-    expect(result!.role, 'ADMIN');
-  });
-
-  testWidgets('recorta el correo (no envía espacios)', (tester) async {
-    final read = pumpHost(tester);
-    await read();
+    expect(button().onPressed, isNull);
 
     await tester.enterText(
       find.byKey(const Key('invite.email')),
-      '  a@x.com  ',
+      'persona@empresa.com',
+    );
+    await tester.pump();
+    expect(button().onPressed, isNotNull);
+
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('invite.step.access')), findsOneWidget);
+  });
+
+  testWidgets('2 de 2 · Acceso resume el correo y explica los tres roles', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+    await goToAccess(tester);
+
+    expect(find.text('2 de 2 · Acceso'), findsOneWidget);
+    expect(find.byKey(const Key('invite.email_summary')), findsOneWidget);
+    expect(find.text('persona@empresa.com'), findsOneWidget);
+    expect(find.byType(AppRadioRow<String>), findsNWidgets(3));
+    expect(find.text('Agente'), findsOneWidget);
+    expect(find.textContaining('Canales que selecciones'), findsOneWidget);
+    expect(find.text('Supervisor'), findsOneWidget);
+    expect(find.textContaining('todos los Canales operativos'), findsOneWidget);
+    expect(find.text('Administrador'), findsOneWidget);
+    expect(find.textContaining('equipo y configuración'), findsOneWidget);
+  });
+
+  testWidgets('Atrás conserva el correo y permite volver a Acceso', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+    await goToAccess(tester);
+
+    await tester.tap(find.byKey(const Key('invite.back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 de 2 · Persona'), findsOneWidget);
+    final field = tester.widget<AppTextField>(
+      find.byKey(const Key('invite.email')),
+    );
+    expect(field.controller.text, 'persona@empresa.com');
+
+    await tester.tap(find.byKey(const Key('invite.continue')));
+    await tester.pumpAndSettle();
+    expect(find.text('2 de 2 · Acceso'), findsOneWidget);
+  });
+
+  testWidgets('Agente muestra multiselección, contador y acceso cero neutral', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+    await goToAccess(tester);
+
+    expect(find.byKey(const Key('invite.channels')), findsOneWidget);
+    expect(find.text('0 de 2 seleccionados'), findsOneWidget);
+    expect(
+      find.byKey(const Key('invite.channels.assign_later')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('asignarlos después'), findsOneWidget);
+    expect(find.byKey(const Key('invite.channels.warning')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('invite.channel.b2')));
+    await tester.pump();
+    expect(find.text('1 de 2 seleccionados'), findsOneWidget);
+  });
+
+  testWidgets('la búsqueda aparece con seis Canales y conserva el contador', (
+    tester,
+  ) async {
+    await pumpHost(
+      tester,
+      bots: List<Bot>.generate(6, (index) => _bot(index + 1)),
+    );
+    await goToAccess(tester);
+
+    expect(find.byKey(const Key('invite.channels.search')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('invite.channel.b2')));
+    await tester.pump();
+    expect(find.text('1 de 6 seleccionados'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('invite.channels.search')),
+      'Ventas',
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('invite.channel.b1')), findsOneWidget);
+    expect(find.byKey(const Key('invite.channel.b2')), findsNothing);
+    expect(find.text('1 de 6 seleccionados'), findsOneWidget);
+  });
+
+  testWidgets('rol elevado oculta Canales y envía la selección vacía', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+    await goToAccess(tester);
+
+    await tester.tap(find.byKey(const Key('invite.channel.b1')));
+    await tester.tap(find.byKey(const Key('invite.role.SUPERVISOR')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('invite.channels')), findsNothing);
+    await tester.tap(find.byKey(const Key('invite.submit')));
+    await tester.pump();
+
+    verify(
+      () => repo.create('persona@empresa.com', 'SUPERVISOR', const <String>[]),
+    ).called(1);
+  });
+
+  testWidgets('Enviar conserva la hoja, bloquea controles y muestra progreso', (
+    tester,
+  ) async {
+    final completer = Completer<CreatedInvitation>();
+    when(
+      () => repo.create(any(), any(), any()),
+    ).thenAnswer((_) => completer.future);
+
+    await pumpHost(tester);
+    await goToAccess(tester);
+    await tester.tap(find.byKey(const Key('invite.channel.b2')));
+    await tester.tap(find.byKey(const Key('invite.submit')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('invite.step.access')), findsOneWidget);
+    final submit = tester.widget<AppButton>(
+      find.byKey(const Key('invite.submit')),
+    );
+    expect(submit.loading, isTrue);
+    expect(submit.label, 'Creando invitación…');
+    expect(
+      tester
+          .widget<AppRadioRow<String>>(
+            find.byKey(const Key('invite.role.WORKER')),
+          )
+          .onChanged,
+      isNull,
+    );
+
+    // La barrera no descarta una operación en vuelo.
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pump();
+    expect(find.byKey(const Key('invite.step.access')), findsOneWidget);
+
+    completer.complete(
+      const CreatedInvitation(
+        email: 'persona@empresa.com',
+        token: 'RAW-TOKEN',
+        emailSent: true,
+      ),
     );
     await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'éxito transforma la misma hoja y Listo cierra con refresh=true',
+    (tester) async {
+      final session = await pumpHost(tester);
+      await goToAccess(tester);
+
+      await tester.tap(find.byKey(const Key('invite.submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Invitación creada'), findsOneWidget);
+      expect(find.byKey(const Key('invite.step.access')), findsNothing);
+      expect(find.text('RAW-TOKEN'), findsOneWidget);
+      expect(
+        find.byKey(const Key('invitation_share.copy_code')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('invitation_share.share_message')),
+        findsOneWidget,
+      );
+      expect(session.outcome, isNull);
+
+      await tester.tap(find.byKey(const Key('invitation_share.done')));
+      await tester.pumpAndSettle();
+      expect(await session.result, isTrue);
+    },
+  );
+
+  testWidgets('fallo queda inline, conserva el borrador y permite reintentar', (
+    tester,
+  ) async {
+    var attempts = 0;
+    when(() => repo.create(any(), any(), any())).thenAnswer((_) async {
+      attempts++;
+      if (attempts == 1) throw const InvitationsDuplicateFailure();
+      return const CreatedInvitation(
+        email: 'persona@empresa.com',
+        token: 'RAW-TOKEN',
+        emailSent: false,
+      );
+    });
+
+    await pumpHost(tester);
+    await goToAccess(tester);
+    await tester.tap(find.byKey(const Key('invite.channel.b1')));
     await tester.tap(find.byKey(const Key('invite.submit')));
     await tester.pumpAndSettle();
 
-    final result = await read();
-    expect(result!.email, 'a@x.com');
+    expect(find.byKey(const Key('invite.failure')), findsOneWidget);
+    expect(
+      find.textContaining('invitación pendiente para ese correo'),
+      findsOneWidget,
+    );
+    expect(find.text('persona@empresa.com'), findsOneWidget);
+    expect(find.text('1 de 2 seleccionados'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('invite.submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Invitación creada'), findsOneWidget);
+    verify(
+      () => repo.create('persona@empresa.com', 'WORKER', const <String>['b1']),
+    ).called(2);
+  });
+
+  testWidgets('Compartir desde el éxito usa correo y código del resultado', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+    await goToAccess(tester);
+    await tester.tap(find.byKey(const Key('invite.submit')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('invitation_share.share_message')));
+    await tester.pumpAndSettle();
+
+    expect(share.lastText, contains('persona@empresa.com'));
+    expect(share.lastText, contains('RAW-TOKEN'));
+  });
+
+  testWidgets('descartar un correo escrito pasa por el guard de cambios', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+    await tester.enterText(
+      find.byKey(const Key('invite.email')),
+      'persona@empresa.com',
+    );
+    await tester.pump();
+
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+    await tester.tap(find.byKey(appSheetDiscardCancelKey));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('invite.step.person')), findsOneWidget);
   });
 }
