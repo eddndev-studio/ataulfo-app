@@ -9,7 +9,7 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_pill.dart';
-import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../flows/domain/entities/flow.dart' as fdom;
 import '../../../flows/presentation/bloc/flows_bloc.dart';
 import '../../../flows/presentation/widgets/flow_create_sheet.dart';
@@ -110,10 +110,9 @@ class _TemplateFlowsPageState extends State<TemplateFlowsPage> {
           // Sin flujos no hay nada que filtrar: el buscador solo aparece
           // cuando existe una lista que recortar.
           if (all.isNotEmpty) ...<Widget>[
-            AppTextField(
+            AppSearchField(
               key: const Key('template_flows.search'),
-              label: 'Buscar',
-              hint: 'Nombre del flujo',
+              hint: 'Buscar flujos por nombre…',
               controller: _search,
             ),
             const SizedBox(height: AppTokens.sp4),

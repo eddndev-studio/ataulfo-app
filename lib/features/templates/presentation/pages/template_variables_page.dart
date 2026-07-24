@@ -8,7 +8,7 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
-import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../../domain/entities/variable_def.dart';
 import '../bloc/var_defs_bloc.dart';
 import '../widgets/var_def_form_sheet.dart';
@@ -122,10 +122,9 @@ class _TemplateVariablesPageState extends State<TemplateVariablesPage> {
           // Sin variables no hay nada que filtrar: el buscador solo aparece
           // cuando existe una lista que recortar.
           if (all.isNotEmpty) ...<Widget>[
-            AppTextField(
+            AppSearchField(
               key: const Key('template_variables.search'),
-              label: 'Buscar',
-              hint: 'Nombre de la variable',
+              hint: 'Buscar variables por nombre…',
               controller: _search,
             ),
             const SizedBox(height: AppTokens.sp4),

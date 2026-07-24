@@ -6,6 +6,7 @@ import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
 import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../templates/domain/entities/variable_def.dart';
 import '../../domain/failures/bots_failure.dart';
@@ -267,10 +268,9 @@ class _VariablesFormState extends State<_VariablesForm> {
               const SizedBox(height: AppTokens.sp4),
             ]
           else ...<Widget>[
-            AppTextField(
+            AppSearchField(
               key: const Key('bot_variables.search'),
-              label: 'Buscar',
-              hint: 'Nombre de la variable',
+              hint: 'Buscar variables por nombre…',
               controller: _search,
             ),
             const SizedBox(height: AppTokens.sp4),

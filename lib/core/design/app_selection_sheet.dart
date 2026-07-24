@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'app_bottom_sheet.dart';
 import 'safe_bottom.dart';
 import 'tokens.dart';
+import 'widgets/app_search_field.dart';
 import 'widgets/app_section_header.dart';
-import 'widgets/app_text_field.dart';
 
 /// Una opción elegible de [showAppSelectionSheet]: el valor de dominio que
 /// representa y su presentación (glifo opcional, título y caption de una
@@ -150,13 +150,9 @@ class _SelectionSheetBodyState<T> extends State<_SelectionSheetBody<T>> {
             Text(widget.title, style: textTheme.titleLarge),
             if (widget.searchHint != null) ...<Widget>[
               const SizedBox(height: AppTokens.sp4),
-              AppTextField(
-                label: 'Buscar',
+              AppSearchField(
                 hint: widget.searchHint!,
                 controller: _searchController,
-                textInputAction: TextInputAction.search,
-                prefixIcon: Icons.search,
-                autocorrect: false,
                 onChanged: (_) => setState(() {}),
               ),
             ],

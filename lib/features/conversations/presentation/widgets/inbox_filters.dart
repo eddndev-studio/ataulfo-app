@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
-import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../bots/domain/entities/bot.dart';
 import '../../../labels/domain/entities/label.dart';
 import '../../../labels/presentation/widgets/label_dot.dart';
@@ -40,23 +40,12 @@ class InboxFilters extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        AppTextField(
+        AppSearchField(
           key: const Key('inbox.search'),
-          hint: 'Buscar…',
+          hint: 'Buscar contacto, canal o asistente…',
           controller: searchController,
-          prefixIcon: Icons.search,
           onChanged: onSearchChanged,
-          suffix: searchController.text.isEmpty
-              ? null
-              : IconButton(
-                  key: const Key('inbox.search.clear'),
-                  tooltip: 'Limpiar búsqueda',
-                  onPressed: () {
-                    searchController.clear();
-                    onSearchChanged('');
-                  },
-                  icon: const Icon(Icons.close, size: 20),
-                ),
+          clearButtonKey: const Key('inbox.search.clear'),
         ),
         const SizedBox(height: AppTokens.sp3),
         SingleChildScrollView(

@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
-import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../../domain/entities/product.dart';
 import '../bloc/product_catalog_cubit.dart';
 
@@ -37,18 +37,14 @@ class _ProductCatalogSearchFieldState extends State<ProductCatalogSearchField> {
 
   void _onChanged(String value) {
     _debounce?.cancel();
+    if (value.isEmpty) {
+      unawaited(context.read<ProductCatalogCubit>().setQuery(''));
+      return;
+    }
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       unawaited(context.read<ProductCatalogCubit>().setQuery(value));
     });
-    setState(() {}); // refresca la visibilidad del botón limpiar
-  }
-
-  void _clear() {
-    _debounce?.cancel();
-    _controller.clear();
-    unawaited(context.read<ProductCatalogCubit>().setQuery(''));
-    setState(() {});
   }
 
   @override
@@ -60,24 +56,12 @@ class _ProductCatalogSearchFieldState extends State<ProductCatalogSearchField> {
         AppTokens.sp4,
         0,
       ),
-      child: AppTextField(
+      child: AppSearchField(
         key: const Key('product_catalog.search_field'),
-        label: 'Buscar en el catálogo',
-        hint: 'Nombre o descripción',
+        hint: 'Buscar por nombre o descripción…',
         controller: _controller,
         onChanged: _onChanged,
-        textInputAction: TextInputAction.search,
-        prefixIcon: Icons.search,
-        suffix: _controller.text.isEmpty
-            ? null
-            : IconButton(
-                key: const Key('product_catalog.search_clear'),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.close, size: 18, color: AppTokens.text2),
-                onPressed: _clear,
-              ),
+        clearButtonKey: const Key('product_catalog.search_clear'),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../safe_bottom.dart';
 import '../tokens.dart';
+import 'app_search_field.dart';
 
 /// Un hilo en el selector de conversaciones: id + título ya resuelto (el
 /// llamador aplica el fallback de "sin título" al mapear su conversación).
@@ -92,14 +93,10 @@ class _AppThreadListSheetState extends State<AppThreadListSheet> {
                 AppTokens.sp4,
                 AppTokens.sp2,
               ),
-              child: TextField(
+              child: AppSearchField(
                 key: Key('${widget.keyPrefix}.search'),
                 controller: _search,
-                autofocus: false,
-                decoration: const InputDecoration(
-                  hintText: 'Buscar conversación',
-                  prefixIcon: Icon(Icons.search),
-                ),
+                hint: 'Buscar conversaciones…',
                 onChanged: (_) => setState(() {}),
               ),
             ),

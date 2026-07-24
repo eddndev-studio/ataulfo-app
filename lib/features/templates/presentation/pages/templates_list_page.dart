@@ -20,7 +20,7 @@ import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_page_header.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
 import '../../../../core/design/widgets/app_dot_label.dart';
-import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../../core/design/widgets/provider_badge.dart';
 import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -215,10 +215,9 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppTextField(
+    return AppSearchField(
       key: const Key('templates.search'),
-      label: 'Buscar Asistente',
-      hint: 'Nombre',
+      hint: 'Buscar asistentes por nombre…',
       controller: controller,
     );
   }

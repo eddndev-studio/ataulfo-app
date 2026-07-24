@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_choice_chip.dart';
-import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../bloc/media_gallery_bloc.dart';
 
 /// Filtros de la galería de media: búsqueda por nombre y tabs por familia.
@@ -36,18 +36,14 @@ class _MediaGallerySearchFieldState extends State<MediaGallerySearchField> {
 
   void _onChanged(String value) {
     _debounce?.cancel();
+    if (value.isEmpty) {
+      context.read<MediaGalleryBloc>().add(const MediaGallerySearchChanged(''));
+      return;
+    }
     _debounce = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
       context.read<MediaGalleryBloc>().add(MediaGallerySearchChanged(value));
     });
-    setState(() {}); // refresca la visibilidad del botón limpiar
-  }
-
-  void _clear() {
-    _debounce?.cancel();
-    _controller.clear();
-    context.read<MediaGalleryBloc>().add(const MediaGallerySearchChanged(''));
-    setState(() {});
   }
 
   @override
@@ -59,24 +55,12 @@ class _MediaGallerySearchFieldState extends State<MediaGallerySearchField> {
         AppTokens.sp4,
         0,
       ),
-      child: AppTextField(
+      child: AppSearchField(
         key: const Key('media_gallery.search_field'),
-        label: 'Buscar archivo',
-        hint: 'Buscar por nombre',
+        hint: 'Buscar archivos por nombre…',
         controller: _controller,
         onChanged: _onChanged,
-        textInputAction: TextInputAction.search,
-        prefixIcon: Icons.search,
-        suffix: _controller.text.isEmpty
-            ? null
-            : IconButton(
-                key: const Key('media_gallery.search_clear'),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.close, size: 18, color: AppTokens.text2),
-                onPressed: _clear,
-              ),
+        clearButtonKey: const Key('media_gallery.search_clear'),
       ),
     );
   }

@@ -16,7 +16,7 @@ import '../../../../core/design/widgets/app_empty_state.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
-import '../../../../core/design/widgets/app_text_field.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/bot.dart';
@@ -259,10 +259,9 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppTextField(
+    return AppSearchField(
       key: const Key('bots.search'),
-      label: 'Buscar Canal',
-      hint: 'Nombre o canal',
+      hint: 'Buscar canales por nombre o tipo…',
       controller: controller,
     );
   }

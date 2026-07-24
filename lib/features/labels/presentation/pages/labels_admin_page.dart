@@ -7,8 +7,8 @@ import '../../../../core/design/widgets/app_card.dart';
 import '../../../../core/design/widgets/app_error_state.dart';
 import '../../../../core/design/widgets/app_header_card.dart';
 import '../../../../core/design/widgets/app_loading_indicator.dart';
+import '../../../../core/design/widgets/app_search_field.dart';
 import '../../../../core/design/widgets/app_swatch_icon.dart';
-import '../../../../core/design/widgets/app_text_field.dart';
 import '../../../../core/util/user_greeting.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/label.dart';
@@ -148,10 +148,9 @@ class _LabelsAdminPageState extends State<LabelsAdminPage> {
                   if (labels.isEmpty)
                     const _EmptyCopy()
                   else ...<Widget>[
-                    AppTextField(
+                    AppSearchField(
                       key: const Key('labels_admin.search'),
-                      label: 'Buscar etiqueta',
-                      hint: 'Nombre o descripción',
+                      hint: 'Buscar etiquetas por nombre o descripción…',
                       controller: _searchCtrl,
                     ),
                     const SizedBox(height: AppTokens.sp5),
