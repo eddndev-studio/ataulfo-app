@@ -19,6 +19,7 @@ dependencies:
   flutter_local_notifications: ^21.0.0
   flutter_markdown_plus: ^1.0.7
   flutter_secure_storage: ^10.3.0
+  flutter_svg: ^2.3.0
   go_router: ^17.2.3
   image_picker: ^1.2.3
   just_audio: ^0.10.5
@@ -48,6 +49,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/mango.svg
   fonts:
     - family: DMSans
       fonts:

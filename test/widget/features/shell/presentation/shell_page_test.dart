@@ -13,7 +13,6 @@ import 'package:ataulfo/features/platform_agent/domain/failures/pa_failure.dart'
 import 'package:ataulfo/features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
 import 'package:ataulfo/features/platform_agent/presentation/pages/platform_agent_page.dart';
 import 'package:ataulfo/features/profile/data/cache/profile_photo_cache.dart';
-import 'package:ataulfo/features/settings/presentation/pages/settings_page.dart';
 import 'package:ataulfo/features/shell/presentation/pages/shell_page.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
 import 'package:ataulfo/features/templates/domain/repositories/templates_repository.dart';
@@ -22,6 +21,7 @@ import 'package:ataulfo/features/templates/presentation/pages/templates_list_pag
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -112,36 +112,40 @@ void main() {
     ).thenReturn(const ConversationsState(phase: ConversationsPhase.ready));
   });
 
-  Widget host({String assistantDraft = '', String? contextualBotId}) =>
-      MultiRepositoryProvider(
-        providers: <RepositoryProvider<dynamic>>[
-          RepositoryProvider<ProfilePhotoCache>.value(
-            value: NoopProfilePhotoCache(),
-          ),
-          RepositoryProvider<MessagesRepository>.value(
-            value: messagesRepository,
-          ),
-          RepositoryProvider<ChatLabelsRepository>.value(
-            value: chatLabelsRepository,
-          ),
-        ],
-        child: MultiBlocProvider(
-          providers: <BlocProvider<dynamic>>[
-            BlocProvider<AuthBloc>.value(value: authBloc),
-            BlocProvider<BotsBloc>.value(value: botsBloc),
-            BlocProvider<TemplatesBloc>.value(value: templatesBloc),
-            BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
-            BlocProvider<ConversationsBloc>.value(value: inboxBloc),
-          ],
-          child: MaterialApp(
-            home: ShellPage(
-              assistantDraft: assistantDraft,
-              contextualBotId: contextualBotId,
-              organizationContextBuilder: (_) => const SizedBox.shrink(),
+  Widget host({
+    String assistantDraft = '',
+    String? contextualBotId,
+  }) => MultiRepositoryProvider(
+    providers: <RepositoryProvider<dynamic>>[
+      RepositoryProvider<ProfilePhotoCache>.value(
+        value: NoopProfilePhotoCache(),
+      ),
+      RepositoryProvider<MessagesRepository>.value(value: messagesRepository),
+      RepositoryProvider<ChatLabelsRepository>.value(
+        value: chatLabelsRepository,
+      ),
+    ],
+    child: MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<AuthBloc>.value(value: authBloc),
+        BlocProvider<BotsBloc>.value(value: botsBloc),
+        BlocProvider<TemplatesBloc>.value(value: templatesBloc),
+        BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
+        BlocProvider<ConversationsBloc>.value(value: inboxBloc),
+      ],
+      child: MaterialApp(
+        home: ShellPage(
+          assistantDraft: assistantDraft,
+          contextualBotId: contextualBotId,
+          organizationContextBuilder: (compact) => SizedBox(
+            key: Key(
+              compact ? 'test.organization.header' : 'test.organization.drawer',
             ),
           ),
         ),
-      );
+      ),
+    ),
+  );
 
   void useViewport(WidgetTester tester, {required double widthDp}) {
     const dpr = 3.0;
@@ -169,29 +173,24 @@ void main() {
         'Bandeja',
         'Asistentes',
         'Agenda',
-        'Ataúlfo',
-        'Ajustes',
+        'Copiloto',
       ]);
       expect(inBottomNav(find.text('Etiquetas')), findsNothing);
+      expect(inBottomNav(find.text('Ajustes')), findsNothing);
     });
 
-    testWidgets('Agente solo ve Bandeja y Ajustes', (tester) async {
+    testWidgets('Agente solo ve Bandeja y no necesita navegación primaria', (
+      tester,
+    ) async {
       when(
         () => authBloc.state,
       ).thenReturn(const AuthAuthenticated(_workerIdentity));
       useViewport(tester, widthDp: 420);
       await tester.pumpWidget(host());
 
-      final nav = tester.widget<BottomNavigationBar>(
-        find.byType(BottomNavigationBar),
-      );
-      expect(nav.items.map((item) => item.label).toList(), <String>[
-        'Bandeja',
-        'Ajustes',
-      ]);
-      expect(inBottomNav(find.text('Asistentes')), findsNothing);
-      expect(inBottomNav(find.text('Agenda')), findsNothing);
-      expect(inBottomNav(find.text('Ataúlfo')), findsNothing);
+      expect(find.byType(ConversationsListPage), findsOneWidget);
+      expect(find.byType(BottomNavigationBar), findsNothing);
+      expect(find.byType(NavigationRail), findsNothing);
     });
 
     testWidgets('Supervisor ve operación global pero no Asistentes', (
@@ -209,13 +208,13 @@ void main() {
       expect(nav.items.map((item) => item.label).toList(), <String>[
         'Bandeja',
         'Agenda',
-        'Ataúlfo',
-        'Ajustes',
+        'Copiloto',
       ]);
       expect(find.text('Asistentes'), findsNothing);
+      expect(inBottomNav(find.text('Ajustes')), findsNothing);
     });
 
-    testWidgets('handoff a Ataúlfo no evade el rol Agente', (tester) async {
+    testWidgets('handoff a Copiloto no evade el rol Agente', (tester) async {
       when(
         () => authBloc.state,
       ).thenReturn(const AuthAuthenticated(_workerIdentity));
@@ -224,10 +223,7 @@ void main() {
 
       expect(find.byType(ConversationsListPage), findsOneWidget);
       expect(find.byType(PlatformAgentPage), findsNothing);
-      final nav = tester.widget<BottomNavigationBar>(
-        find.byType(BottomNavigationBar),
-      );
-      expect(nav.currentIndex, 0);
+      expect(find.byType(BottomNavigationBar), findsNothing);
     });
 
     testWidgets('la selección usa ícono filled + AppIconPop', (tester) async {
@@ -272,14 +268,55 @@ void main() {
       );
     });
 
-    testWidgets('Ajustes no expone FAB', (tester) async {
+    testWidgets('header nombra la sección y el menú concentra gestión', (
+      tester,
+    ) async {
       useViewport(tester, widthDp: 420);
       await tester.pumpWidget(host());
-      await tester.tap(inBottomNav(find.text('Ajustes')));
+
+      expect(find.text('Bandeja'), findsWidgets);
+      expect(find.byKey(const Key('test.organization.header')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('shell.header.menu')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(SettingsPage), findsOneWidget);
-      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(find.byKey(const Key('shell.drawer')), findsOneWidget);
+      expect(find.byKey(const Key('shell.drawer.brand.mango')), findsOneWidget);
+      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byKey(const Key('test.organization.drawer')), findsOneWidget);
+      expect(
+        find.byKey(const Key('shell.drawer.organization')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('shell.drawer.library')), findsOneWidget);
+      expect(find.byKey(const Key('shell.drawer.labels')), findsOneWidget);
+      expect(find.byKey(const Key('shell.drawer.settings')), findsOneWidget);
+      expect(
+        find.byKey(const Key('shell.drawer.notifications')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('shell.drawer.appearance')), findsOneWidget);
+    });
+
+    testWidgets('drawer de Agente oculta gestión sin privilegios', (
+      tester,
+    ) async {
+      when(
+        () => authBloc.state,
+      ).thenReturn(const AuthAuthenticated(_workerIdentity));
+      useViewport(tester, widthDp: 420);
+      await tester.pumpWidget(host());
+
+      await tester.tap(find.byKey(const Key('shell.header.menu')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('shell.drawer.organization')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('shell.drawer.library')), findsNothing);
+      expect(find.byKey(const Key('shell.drawer.labels')), findsNothing);
+      expect(find.byKey(const Key('shell.drawer.settings')), findsOneWidget);
     });
   });
 
@@ -293,7 +330,7 @@ void main() {
           .element(find.byType(ConversationsListPage))
           .read<ConversationsBloc>();
 
-      await tester.tap(inBottomNav(find.text('Ajustes')));
+      await tester.tap(inBottomNav(find.text('Asistentes')));
       await tester.pumpAndSettle();
       await tester.tap(inBottomNav(find.text('Bandeja')));
       await tester.pumpAndSettle();
@@ -309,7 +346,7 @@ void main() {
     ) async {
       useViewport(tester, widthDp: 420);
       await tester.pumpWidget(host());
-      await tester.tap(inBottomNav(find.text('Ajustes')));
+      await tester.tap(inBottomNav(find.text('Asistentes')));
       await tester.pumpAndSettle();
       clearInteractions(inboxBloc);
 
@@ -375,7 +412,7 @@ void main() {
     });
   });
 
-  group('Ataúlfo', () {
+  group('Copiloto', () {
     testWidgets('sigue lazy y un handoff contextual lo abre directamente', (
       tester,
     ) async {
@@ -391,7 +428,7 @@ void main() {
         BlocProvider<PlatformAgentChatBloc>.value(value: pa, child: host()),
       );
       expect(find.byType(PlatformAgentPage), findsNothing);
-      await tester.tap(inBottomNav(find.text('Ataúlfo')));
+      await tester.tap(inBottomNav(find.text('Copiloto')));
       await tester.pumpAndSettle();
       expect(find.byType(PlatformAgentPage), findsOneWidget);
 

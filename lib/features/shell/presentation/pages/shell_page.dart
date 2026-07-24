@@ -14,10 +14,10 @@ import '../../../conversations/presentation/pages/conversations_list_page.dart';
 import '../../../labels/presentation/bloc/labels_admin_bloc.dart';
 import '../../../organization/presentation/widgets/organization_context_switcher.dart';
 import '../../../platform_agent/presentation/pages/platform_agent_page.dart';
-import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../templates/presentation/pages/templates_list_page.dart';
 import '../../../templates/presentation/widgets/template_create_sheet.dart';
 import '../widgets/email_verification_banner.dart';
+import '../widgets/shell_navigation_drawer.dart';
 
 /// Shell adaptable de la app autenticada. Hospeda los tabs del producto y
 /// resuelve la navegación lateral según el ancho disponible (M3: compact
@@ -53,8 +53,8 @@ class ShellPage extends StatefulWidget {
   /// Cambiarla actualiza el mismo bloc para no desmontar el resto del shell.
   final String? contextualBotId;
 
-  /// Seam de composición para montajes aislados. Producción usa el selector
-  /// real; los tests de tabs pueden sustituir sólo este chrome sin construir
+  /// Seam de composición para montajes aislados. Producción usa la tarjeta
+  /// real del drawer; los tests de tabs pueden aislar este chrome sin
   /// repositorios ajenos al comportamiento que verifican.
   final Widget Function(bool compact)? organizationContextBuilder;
 
@@ -63,6 +63,7 @@ class ShellPage extends StatefulWidget {
 }
 
 class _ShellPageState extends State<ShellPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late _ShellTab _selectedTab;
   late final ValueNotifier<bool> _inboxVisible;
 
@@ -79,7 +80,7 @@ class _ShellPageState extends State<ShellPage> {
   @override
   void initState() {
     super.initState();
-    // Bandeja es la landing operativa. El handoff sólo abre Ataúlfo si el rol
+    // Bandeja es la landing operativa. El handoff sólo abre Copiloto si el rol
     // posee la capacidad global; nunca debe convertirse en una evasión para
     // un Agente limitado a sus Canales.
     final auth = context.read<AuthBloc>().state;
@@ -122,9 +123,9 @@ class _ShellPageState extends State<ShellPage> {
       icon: Icons.inbox_outlined,
       activeIcon: Icons.inbox,
       page: ConversationsListPage(
-        onOpenSettings: () => _select(_ShellTab.settings),
         onManageLabels: _canManageOrganization ? _manageLabels : null,
         isActiveListenable: _inboxVisible,
+        headerLeading: _headerMenuButton(),
       ),
     ),
     _TabSpec(
@@ -134,7 +135,7 @@ class _ShellPageState extends State<ShellPage> {
       activeIcon: Icons.support_agent,
       page: TemplatesListPage(
         routeObserver: widget.routeObserver,
-        onOpenSettings: () => _select(_ShellTab.settings),
+        headerLeading: _headerMenuButton(),
       ),
       fab: _assistantCreateFab,
       adminOnly: true,
@@ -148,13 +149,13 @@ class _ShellPageState extends State<ShellPage> {
       icon: Icons.event_outlined,
       activeIcon: Icons.event,
       page: AgendaPage(
-        onOpenSettings: () => _select(_ShellTab.settings),
         onManageEventTypes: _canManageAgenda
             ? () => context.push('/calendar/event-types')
             : null,
         onManageBusinessHours: _canManageAgenda
             ? () => context.push('/calendar/hours')
             : null,
+        headerLeading: _headerMenuButton(),
       ),
       fab: _agendaBookFab,
       lazy: true,
@@ -162,22 +163,33 @@ class _ShellPageState extends State<ShellPage> {
     ),
     _TabSpec(
       id: _ShellTab.platformAgent,
-      label: 'Ataúlfo',
+      label: 'Copiloto',
       icon: Icons.auto_awesome,
-      page: PlatformAgentPage(initialDraft: widget.assistantDraft),
+      page: PlatformAgentPage(
+        initialDraft: widget.assistantDraft,
+        headerLeading: _headerMenuButton(),
+      ),
       lazy: true,
       supervisorOnly: true,
     ),
-    // Ajustes cierra la barra: es la tab de menor frecuencia y el rincón
-    // final es donde el pulgar la busca en el resto de apps.
-    const _TabSpec(
-      id: _ShellTab.settings,
-      label: 'Ajustes',
-      icon: Icons.settings_outlined,
-      activeIcon: Icons.settings,
-      page: SettingsPage(),
-    ),
   ];
+
+  Widget _headerMenuButton() {
+    return IconButton(
+      key: const Key('shell.header.menu'),
+      tooltip: 'Abrir menú',
+      onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      icon: const Icon(Icons.menu),
+    );
+  }
+
+  Widget _drawerOrganizationContext() {
+    return widget.organizationContextBuilder?.call(false) ??
+        OrganizationContextSwitcher(
+          presentation: OrganizationContextPresentation.drawer,
+          onTap: _openOrganizationSwitcherFromDrawer,
+        );
+  }
 
   void _select(_ShellTab tab) {
     if (_selectedTab == tab) return;
@@ -189,6 +201,24 @@ class _ShellPageState extends State<ShellPage> {
     await context.push<void>('/org/labels');
     if (!mounted) return;
     context.read<LabelsAdminBloc>().add(const LabelsAdminRefreshRequested());
+  }
+
+  void _closeDrawer() => _scaffoldKey.currentState?.closeDrawer();
+
+  void _pushFromDrawer(String path) {
+    _closeDrawer();
+    context.push(path);
+  }
+
+  Future<void> _manageLabelsFromDrawer() async {
+    _closeDrawer();
+    await _manageLabels();
+  }
+
+  Future<void> _openOrganizationSwitcherFromDrawer() async {
+    _closeDrawer();
+    await Future<void>.delayed(Duration.zero);
+    if (mounted) await showOrganizationSwitcher(context);
   }
 
   @override
@@ -207,9 +237,6 @@ class _ShellPageState extends State<ShellPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final useRail = constraints.maxWidth >= 600;
-        Widget organizationContext(bool compact) =>
-            widget.organizationContextBuilder?.call(compact) ??
-            OrganizationContextSwitcher(compact: compact);
         // IndexedStack preserva el estado interno de cada tab (scroll
         // de la lista, bloc compartido por el shell) entre cambios. El aviso
         // de verificación envuelve el contenido de las tabs (sólo pinta su
@@ -227,16 +254,26 @@ class _ShellPageState extends State<ShellPage> {
             ],
           ),
         );
-        // Sin AppBar del shell: cada tab trae su propio encabezado. Catálogos y
-        // ajustes montan la tarjeta full-bleed del kit; Bandeja y Ataúlfo son
-        // superficies operativas de mensajería y usan chrome compacto fijo para
-        // no restar altura a listas/hilos ni separar sus acciones contextuales.
+        // Sin AppBar del shell: cada tab trae su propio encabezado. Catálogos
+        // montan la tarjeta full-bleed del kit; Bandeja y Copiloto son
+        // superficies operativas de mensajería y usan chrome compacto fijo
+        // para no restar altura a listas/hilos ni separar sus acciones.
         return Scaffold(
-          body: useRail
+          key: _scaffoldKey,
+          drawer: ShellNavigationDrawer(
+            role: role,
+            organizationContext: _drawerOrganizationContext(),
+            onOpenOrganization: () => _pushFromDrawer('/organization'),
+            onOpenLibrary: () => _pushFromDrawer('/library'),
+            onOpenLabels: _manageLabelsFromDrawer,
+            onOpenSettings: () => _pushFromDrawer('/settings'),
+            onOpenNotifications: () => _pushFromDrawer('/notifications'),
+            onOpenAppearance: () => _pushFromDrawer('/appearance'),
+          ),
+          body: useRail && tabs.length > 1
               ? Row(
                   children: <Widget>[
                     NavigationRail(
-                      leading: organizationContext(true),
                       selectedIndex: effectiveIndex,
                       onDestinationSelected: (i) => _select(tabs[i].id),
                       labelType: NavigationRailLabelType.all,
@@ -255,24 +292,9 @@ class _ShellPageState extends State<ShellPage> {
                     Expanded(child: tabBody),
                   ],
                 )
-              : Column(
-                  children: <Widget>[
-                    organizationContext(false),
-                    Expanded(
-                      // El selector ya consumió el inset del status bar. Las
-                      // cabeceras de cada tab reciben top=0 para evitar el
-                      // doble espacio y el banner de verificación conserva el
-                      // mismo contrato.
-                      child: MediaQuery.removePadding(
-                        context: context,
-                        removeTop: true,
-                        child: tabBody,
-                      ),
-                    ),
-                  ],
-                ),
+              : tabBody,
           floatingActionButton: effectiveTab.fab?.call(context),
-          bottomNavigationBar: useRail
+          bottomNavigationBar: useRail || tabs.length < 2
               ? null
               : BottomNavigationBar(
                   currentIndex: effectiveIndex,
@@ -294,7 +316,7 @@ class _ShellPageState extends State<ShellPage> {
   }
 }
 
-enum _ShellTab { inbox, assistants, agenda, platformAgent, settings }
+enum _ShellTab { inbox, assistants, agenda, platformAgent }
 
 /// Una tab del shell: etiqueta + ícono del navegador (con su variante filled
 /// para el estado activo), la página que monta el IndexedStack, su FAB
@@ -337,7 +359,7 @@ class _TabSpec {
 }
 
 // FABs por tab. Asistentes abre su hoja de creación in situ; los Canales se
-// conectan dentro del Asistente y Etiquetas se gestiona desde Ajustes.
+// conectan dentro del Asistente y Etiquetas se gestiona desde el drawer.
 Widget _assistantCreateFab(BuildContext context) => FloatingActionButton(
   key: const Key('shell.fab.template_create'),
   onPressed: () async {
