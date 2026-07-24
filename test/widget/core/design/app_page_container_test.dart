@@ -4,22 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<Rect> pumpContainer(
-    WidgetTester tester,
-    Widget container,
-  ) async {
+  Future<Rect> pumpContainer(WidgetTester tester, Widget container) async {
     tester.view.physicalSize = const Size(436, 240);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: container,
-        ),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: container)));
 
     return tester.getRect(find.byKey(const Key('page-content')));
   }
