@@ -46,4 +46,31 @@ void main() {
     await tester.tap(find.byKey(const Key('app_page_header.avatar')));
     expect(profileTaps, 1);
   });
+
+  testWidgets('alinea ópticamente el leading con el gutter del contenido', (
+    tester,
+  ) async {
+    const leadingKey = Key('header.leading');
+    const titleKey = Key('header.title');
+    await tester.pumpWidget(
+      host(
+        AppPageHeader(
+          title: 'Agenda',
+          titleKey: titleKey,
+          leading: IconButton(
+            key: leadingKey,
+            onPressed: () {},
+            icon: const Icon(Icons.menu),
+          ),
+        ),
+      ),
+    );
+
+    final leadingRect = tester.getRect(find.byKey(leadingKey));
+    final titleRect = tester.getRect(find.byKey(titleKey));
+
+    expect(leadingRect.left, AppTokens.sp2);
+    expect(leadingRect.width, 48);
+    expect(titleRect.left, AppTokens.sp2 + leadingRect.width + AppTokens.sp2);
+  });
 }

@@ -54,6 +54,8 @@ class AppPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final leadingWidget = leading;
+
     return Material(
       key: const Key('app_page_header.surface'),
       color: AppTokens.surface1,
@@ -65,15 +67,17 @@ class AppPageHeader extends StatelessWidget {
             SizedBox(
               height: _toolbarHeight,
               child: Padding(
-                padding: const EdgeInsets.only(
-                  left: AppTokens.sp4,
+                padding: EdgeInsets.only(
+                  // Con leading, 8 + (48 - 24) / 2 = 20 dp hasta el ícono:
+                  // el mismo gutter óptico que usa el contenido de sección.
+                  left: leadingWidget == null ? AppTokens.sp4 : AppTokens.sp2,
                   right: AppTokens.sp2,
                 ),
                 child: Row(
                   children: <Widget>[
-                    if (leading != null) ...<Widget>[
-                      leading!,
-                      const SizedBox(width: AppTokens.sp1),
+                    if (leadingWidget != null) ...<Widget>[
+                      leadingWidget,
+                      const SizedBox(width: AppTokens.sp2),
                     ],
                     Expanded(
                       child: Text(
