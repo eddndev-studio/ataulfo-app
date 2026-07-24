@@ -182,7 +182,17 @@ void main() {
       final viewport = find.byKey(const Key('invite.step_transition'));
       expect(viewport, findsOneWidget);
       expect(
-        find.descendant(of: viewport, matching: find.byType(FadeTransition)),
+        find.ancestor(
+          of: find.byKey(const Key('invite.step.person')),
+          matching: find.byType(FadeTransition),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('invite.step.access')),
+          matching: find.byType(FadeTransition),
+        ),
         findsNothing,
       );
       expect(
