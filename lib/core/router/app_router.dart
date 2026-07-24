@@ -462,30 +462,33 @@ class AppRouter {
   /// llaman este mismo builder con una tab inicial distinta para conservar
   /// deep links sin sostener dos superficies paralelas.
   Widget _organizationTeamScaffold({required int initialTab}) {
-    return MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<MembersBloc>(
-          create: (_) =>
-              MembersBloc(_membersRepo)..add(const MembersLoadRequested()),
+    return RepositoryProvider<InvitationsRepository>.value(
+      value: _invitationsRepo,
+      child: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<MembersBloc>(
+            create: (_) =>
+                MembersBloc(_membersRepo)..add(const MembersLoadRequested()),
+          ),
+          BlocProvider<MemberMutationCubit>(
+            create: (_) => MemberMutationCubit(_membersRepo),
+          ),
+          BlocProvider<InvitationsBloc>(
+            create: (_) =>
+                InvitationsBloc(_invitationsRepo)
+                  ..add(const InvitationsLoadRequested()),
+          ),
+          BlocProvider<InvitationMutationCubit>(
+            create: (_) => InvitationMutationCubit(_invitationsRepo),
+          ),
+          BlocProvider<BotsBloc>(
+            create: (_) => BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
+          ),
+        ],
+        child: Scaffold(
+          appBar: AppBar(title: const Text('Equipo y acceso')),
+          body: OrganizationTeamPage(initialTab: initialTab),
         ),
-        BlocProvider<MemberMutationCubit>(
-          create: (_) => MemberMutationCubit(_membersRepo),
-        ),
-        BlocProvider<InvitationsBloc>(
-          create: (_) =>
-              InvitationsBloc(_invitationsRepo)
-                ..add(const InvitationsLoadRequested()),
-        ),
-        BlocProvider<InvitationMutationCubit>(
-          create: (_) => InvitationMutationCubit(_invitationsRepo),
-        ),
-        BlocProvider<BotsBloc>(
-          create: (_) => BotsBloc(_botsRepo)..add(const BotsLoadRequested()),
-        ),
-      ],
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Equipo y acceso')),
-        body: OrganizationTeamPage(initialTab: initialTab),
       ),
     );
   }

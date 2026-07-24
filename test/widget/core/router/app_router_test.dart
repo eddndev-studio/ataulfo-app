@@ -1258,8 +1258,8 @@ void main() {
     verify(() => membersRepo.assignedBots('m1')).called(1);
   });
 
-  testWidgets('AuthAuthenticated → /invitations monta InvitationsPage y '
-      'expone el InvitationMutationCubit + dispara el load', (tester) async {
+  testWidgets('AuthAuthenticated → /invitations monta InvitationsPage, '
+      'expone repo/cubits y dispara el load', (tester) async {
     when(() => authBloc.state).thenReturn(const AuthAuthenticated(_identity));
 
     await tester.pumpWidget(_host(router, authBloc));
@@ -1270,6 +1270,7 @@ void main() {
     expect(find.byType(InvitationsPage), findsOneWidget);
     verify(invitationsRepo.list).called(1);
     final page = tester.element(find.byType(InvitationsPage));
+    expect(page.read<InvitationsRepository>(), same(invitationsRepo));
     expect(page.read<InvitationMutationCubit>(), isNotNull);
     expect(page.read<BotsBloc>(), isNotNull);
   });

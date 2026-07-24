@@ -112,6 +112,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    await tester.tap(finder);
+    await tester.pump();
+  }
+
   testWidgets('abre en 1 de 2 · Persona con explicación y pie canónico', (
     tester,
   ) async {
@@ -204,8 +211,7 @@ void main() {
     expect(find.textContaining('asignarlos después'), findsOneWidget);
     expect(find.byKey(const Key('invite.channels.warning')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('invite.channel.b2')));
-    await tester.pump();
+    await tapVisible(tester, find.byKey(const Key('invite.channel.b2')));
     expect(find.text('1 de 2 seleccionados'), findsOneWidget);
   });
 
@@ -219,10 +225,11 @@ void main() {
     await goToAccess(tester);
 
     expect(find.byKey(const Key('invite.channels.search')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('invite.channel.b2')));
-    await tester.pump();
+    await tapVisible(tester, find.byKey(const Key('invite.channel.b2')));
     expect(find.text('1 de 6 seleccionados'), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const Key('invite.channels.search')));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('invite.channels.search')),
       'Ventas',
@@ -240,8 +247,8 @@ void main() {
     await pumpHost(tester);
     await goToAccess(tester);
 
-    await tester.tap(find.byKey(const Key('invite.channel.b1')));
-    await tester.tap(find.byKey(const Key('invite.role.SUPERVISOR')));
+    await tapVisible(tester, find.byKey(const Key('invite.channel.b1')));
+    await tapVisible(tester, find.byKey(const Key('invite.role.SUPERVISOR')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('invite.channels')), findsNothing);
@@ -263,7 +270,7 @@ void main() {
 
     await pumpHost(tester);
     await goToAccess(tester);
-    await tester.tap(find.byKey(const Key('invite.channel.b2')));
+    await tapVisible(tester, find.byKey(const Key('invite.channel.b2')));
     await tester.tap(find.byKey(const Key('invite.submit')));
     await tester.pump();
 
@@ -286,6 +293,7 @@ void main() {
     await tester.tapAt(const Offset(4, 4));
     await tester.pump();
     expect(find.byKey(const Key('invite.step.access')), findsOneWidget);
+    expect(find.text('¿Descartar los cambios?'), findsNothing);
 
     completer.complete(
       const CreatedInvitation(
@@ -319,8 +327,10 @@ void main() {
       );
       expect(session.outcome, isNull);
 
-      await tester.tap(find.byKey(const Key('invitation_share.done')));
+      await tapVisible(tester, find.byKey(const Key('invitation_share.done')));
       await tester.pumpAndSettle();
+      expect(find.text('Invitación creada'), findsNothing);
+      expect(session.outcome, isTrue);
       expect(await session.result, isTrue);
     },
   );
@@ -341,7 +351,7 @@ void main() {
 
     await pumpHost(tester);
     await goToAccess(tester);
-    await tester.tap(find.byKey(const Key('invite.channel.b1')));
+    await tapVisible(tester, find.byKey(const Key('invite.channel.b1')));
     await tester.tap(find.byKey(const Key('invite.submit')));
     await tester.pumpAndSettle();
 
@@ -369,7 +379,10 @@ void main() {
     await tester.tap(find.byKey(const Key('invite.submit')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('invitation_share.share_message')));
+    await tapVisible(
+      tester,
+      find.byKey(const Key('invitation_share.share_message')),
+    );
     await tester.pumpAndSettle();
 
     expect(share.lastText, contains('persona@empresa.com'));

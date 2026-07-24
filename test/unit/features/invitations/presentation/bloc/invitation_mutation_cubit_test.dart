@@ -17,6 +17,15 @@ void main() {
       );
     });
 
+    blocTest<InvitationMutationCubit, InvitationMutationState>(
+      'reset limpia un resultado previo',
+      build: () => InvitationMutationCubit(_MockRepo()),
+      seed: () =>
+          const InvitationMutationFailure(InvitationsDuplicateFailure()),
+      act: (cubit) => cubit.reset(),
+      expect: () => const <InvitationMutationState>[InvitationMutationIdle()],
+    );
+
     group('create', () {
       blocTest<InvitationMutationCubit, InvitationMutationState>(
         'ok → [InProgress, Success(created, email, token, emailSent)]',

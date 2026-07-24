@@ -16,7 +16,7 @@ import '../../domain/entities/invitation.dart';
 import '../../domain/failures/invitations_failure.dart';
 import '../bloc/invitation_mutation_cubit.dart';
 import '../bloc/invitations_bloc.dart';
-import '../widgets/invitation_share_sheet.dart';
+import '../invitation_failure_copy.dart';
 import '../widgets/invitation_tile.dart';
 import '../widgets/invite_sheet.dart';
 
@@ -25,9 +25,9 @@ import '../widgets/invite_sheet.dart';
 ///
 /// El botón "Invitar" vive en la chrome persistente (siempre visible, también
 /// con el historial vacío) para que una org recién creada no quede sin salida.
-/// Las mutaciones viven en el `InvitationMutationCubit` del scope (la hoja sólo
-/// devuelve la intención; esta página despacha): ante éxito recarga el historial
-/// y avisa; ante 404/410 también recarga porque la lista local quedó stale.
+/// La creación vive dentro de [InviteSheet] para mantener un único modal; el
+/// `InvitationMutationCubit` del scope queda dedicado a cancelar. Ante éxito
+/// o ante un fallo que pueda dejar la lista stale, la página recarga.
 class InvitationsPage extends StatelessWidget {
   const InvitationsPage({super.key});
 
@@ -83,18 +83,9 @@ class InvitationsPage extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     switch (state) {
       case InvitationMutationSuccess(action: InvitationMutationAction.created):
+        // Defensa para consumidores antiguos del cubit de página. El flujo
+        // actual crea dentro de InviteSheet y recarga al cerrar ese mismo modal.
         context.read<InvitationsBloc>().add(const InvitationsLoadRequested());
-        // La hoja de compartir ES el feedback: muestra el código para pasarlo
-        // por WhatsApp y es honesta sobre si el correo salió (sin el viejo
-        // aviso "enviada por correo" que mentía cuando el envío fallaba).
-        unawaited(
-          InvitationShareSheet.open(
-            context,
-            email: state.email ?? '',
-            token: state.token,
-            emailSent: state.emailSent,
-          ),
-        );
       case InvitationMutationSuccess():
         context.read<InvitationsBloc>().add(const InvitationsLoadRequested());
         messenger.showSnackBar(
@@ -111,7 +102,7 @@ class InvitationsPage extends StatelessWidget {
           context.read<InvitationsBloc>().add(const InvitationsLoadRequested());
         }
         messenger.showSnackBar(
-          SnackBar(content: Text(_mutationMessage(failure))),
+          SnackBar(content: Text(invitationFailureMessage(failure))),
         );
       case InvitationMutationIdle() || InvitationMutationInProgress():
         break;
@@ -120,10 +111,9 @@ class InvitationsPage extends StatelessWidget {
 }
 
 Future<void> _openInviteSheet(BuildContext context, List<Bot> bots) async {
-  final cubit = context.read<InvitationMutationCubit>();
-  final result = await InviteSheet.open(context, bots: bots);
-  if (result == null) return;
-  unawaited(cubit.create(result.email, result.role, result.botIds));
+  final shouldRefresh = await InviteSheet.open(context, bots: bots);
+  if (!context.mounted || !shouldRefresh) return;
+  context.read<InvitationsBloc>().add(const InvitationsLoadRequested());
 }
 
 Future<void> _confirmCancel(BuildContext context, Invitation invitation) async {
@@ -141,23 +131,6 @@ Future<void> _confirmCancel(BuildContext context, Invitation invitation) async {
   if (!confirmed) return;
   unawaited(cubit.cancel(invitation.id));
 }
-
-/// Copy de fallo por variante. Exhaustivo sobre el sellado.
-String _mutationMessage(InvitationsFailure f) => switch (f) {
-  InvitationsDuplicateFailure() =>
-    'Ya hay una invitación pendiente para ese correo; '
-        'cancélala para reinvitar.',
-  InvitationsValidationFailure() => 'Revisa el correo y vuelve a intentarlo.',
-  InvitationsGoneFailure() => 'Esa invitación ya no se puede cancelar.',
-  InvitationsNotFoundFailure() => 'Esa invitación ya no existe.',
-  InvitationsForbiddenFailure() =>
-    'No tienes permiso para gestionar invitaciones.',
-  InvitationsNetworkFailure() || InvitationsTimeoutFailure() =>
-    'Sin conexión. Revisa tu red e inténtalo de nuevo.',
-  InvitationsServerFailure() =>
-    'No pudimos confirmar la operación; revisa el historial.',
-  UnknownInvitationsFailure() => 'Algo salió mal. Inténtalo de nuevo.',
-};
 
 class _Body extends StatelessWidget {
   const _Body();

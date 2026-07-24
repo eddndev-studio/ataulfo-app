@@ -3,17 +3,22 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/failures/invitations_failure.dart';
 import '../../domain/repositories/invitations_repository.dart';
 
-/// Cubit de las mutaciones de invitaciones (emitir, cancelar). Vive scoped a la
-/// página y NO conoce ni al bloc del listado ni a la navegación: ejecuta la
-/// mutación vía el repo y reporta el resultado. La página cierra el lazo
-/// (recargar el historial y avisar; ante 404/410 también recarga porque la
-/// lista local quedó stale). Cada acción emite `InProgress` antes de la espera,
+/// Cubit de las mutaciones de invitaciones (emitir, cancelar). Puede vivir en
+/// la página para cancelar o dentro del sheet para crear; no conoce navegación
+/// ni el bloc del listado. Cada acción emite `InProgress` antes de la espera,
 /// de modo que dos fallos idénticos seguidos siguen siendo transiciones
 /// distintas.
 class InvitationMutationCubit extends Cubit<InvitationMutationState> {
   InvitationMutationCubit(this._repo) : super(const InvitationMutationIdle());
 
   final InvitationsRepository _repo;
+
+  /// Limpia un resultado previo cuando la persona corrige el borrador.
+  void reset() {
+    if (state is! InvitationMutationIdle) {
+      emit(const InvitationMutationIdle());
+    }
+  }
 
   Future<void> create(String email, String role, List<String> botIds) async {
     emit(const InvitationMutationInProgress());

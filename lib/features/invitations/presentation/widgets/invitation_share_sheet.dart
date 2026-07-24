@@ -23,12 +23,14 @@ class InvitationShareSheet extends StatelessWidget {
     required this.token,
     required this.emailSent,
     ShareService? shareService,
+    this.onDone,
   }) : _shareService = shareService ?? const SharePlusService();
 
   final String email;
   final String? token;
   final bool emailSent;
   final ShareService _shareService;
+  final VoidCallback? onDone;
 
   /// Abre la hoja. No devuelve nada: es informativa (compartir el código).
   static Future<void> open(
@@ -144,8 +146,9 @@ class InvitationShareSheet extends StatelessWidget {
           ],
           const SizedBox(height: AppTokens.sp4),
           AppButton.text(
+            key: const Key('invitation_share.done'),
             label: 'Listo',
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: onDone ?? () => Navigator.of(context).pop(),
           ),
         ],
       ),

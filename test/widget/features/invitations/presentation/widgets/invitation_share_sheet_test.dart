@@ -30,6 +30,7 @@ void main() {
     required bool emailSent,
     String email = 'a@x.com',
     ShareService? shareService,
+    VoidCallback? onDone,
   }) => MaterialApp(
     home: Scaffold(
       body: InvitationShareSheet(
@@ -37,6 +38,7 @@ void main() {
         token: token,
         emailSent: emailSent,
         shareService: shareService,
+        onDone: onDone,
       ),
     ),
   );
@@ -54,6 +56,20 @@ void main() {
       find.byKey(const Key('invitation_share.share_message')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('invitation_share.done')), findsOneWidget);
+  });
+
+  testWidgets('Listo delega el cierre cuando vive dentro de otro sheet', (
+    tester,
+  ) async {
+    var done = false;
+    await tester.pumpWidget(
+      host(token: 'RAW-T', emailSent: true, onDone: () => done = true),
+    );
+
+    await tester.tap(find.byKey(const Key('invitation_share.done')));
+
+    expect(done, isTrue);
   });
 
   testWidgets('email_sent:false muestra el aviso de compartir el código', (
