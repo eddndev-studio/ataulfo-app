@@ -216,8 +216,6 @@ class _ShellPageState extends State<ShellPage> {
   }
 
   Future<void> _openOrganizationSwitcherFromDrawer() async {
-    _closeDrawer();
-    await Future<void>.delayed(Duration.zero);
     if (mounted) await showOrganizationSwitcher(context);
   }
 

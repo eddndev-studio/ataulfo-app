@@ -1,6 +1,7 @@
 import 'package:ataulfo/core/design/widgets/app_icon_pop.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bots_bloc.dart';
 import 'package:ataulfo/features/conversations/presentation/bloc/conversations_bloc.dart';
@@ -9,6 +10,8 @@ import 'package:ataulfo/features/labels/domain/entities/label.dart';
 import 'package:ataulfo/features/labels/domain/repositories/chat_labels_repository.dart';
 import 'package:ataulfo/features/labels/presentation/bloc/labels_admin_bloc.dart';
 import 'package:ataulfo/features/messages/domain/repositories/messages_repository.dart';
+import 'package:ataulfo/features/memberships/domain/entities/membership.dart';
+import 'package:ataulfo/features/memberships/presentation/bloc/memberships_bloc.dart';
 import 'package:ataulfo/features/platform_agent/domain/failures/pa_failure.dart';
 import 'package:ataulfo/features/platform_agent/presentation/bloc/platform_agent_chat_bloc.dart';
 import 'package:ataulfo/features/platform_agent/presentation/pages/platform_agent_page.dart';
@@ -32,6 +35,12 @@ class _MockAuthBloc extends MockBloc<AuthEvent, AuthState>
 
 class _MockBotsBloc extends MockBloc<BotsEvent, BotsState>
     implements BotsBloc {}
+
+class _MockMembershipsBloc extends MockBloc<MembershipsEvent, MembershipsState>
+    implements MembershipsBloc {}
+
+class _MockSwitchOrgCubit extends MockCubit<SwitchOrgState>
+    implements SwitchOrgCubit {}
 
 class _MockTemplatesBloc extends MockBloc<TemplatesEvent, TemplatesState>
     implements TemplatesBloc {}
@@ -79,6 +88,8 @@ const _supervisorIdentity = Identity(
 void main() {
   late _MockAuthBloc authBloc;
   late _MockBotsBloc botsBloc;
+  late _MockMembershipsBloc membershipsBloc;
+  late _MockSwitchOrgCubit switchOrgCubit;
   late _MockTemplatesBloc templatesBloc;
   late _MockLabelsAdminBloc labelsBloc;
   late _MockConversationsBloc inboxBloc;
@@ -92,6 +103,8 @@ void main() {
   setUp(() {
     authBloc = _MockAuthBloc();
     botsBloc = _MockBotsBloc();
+    membershipsBloc = _MockMembershipsBloc();
+    switchOrgCubit = _MockSwitchOrgCubit();
     templatesBloc = _MockTemplatesBloc();
     labelsBloc = _MockLabelsAdminBloc();
     inboxBloc = _MockConversationsBloc();
@@ -101,6 +114,15 @@ void main() {
     when(
       () => botsBloc.state,
     ).thenReturn(const BotsLoaded(items: <Bot>[], isRefreshing: false));
+    when(() => membershipsBloc.state).thenReturn(
+      const MembershipsLoaded(
+        items: <Membership>[
+          Membership(orgId: 'o1', orgName: 'Ataúlfo Studio', role: 'OWNER'),
+          Membership(orgId: 'o2', orgName: 'Taller Mango', role: 'ADMIN'),
+        ],
+      ),
+    );
+    when(() => switchOrgCubit.state).thenReturn(const SwitchOrgIdle());
     when(() => templatesBloc.state).thenReturn(
       const TemplatesLoaded(items: <Template>[], isRefreshing: false),
     );
@@ -115,6 +137,7 @@ void main() {
   Widget host({
     String assistantDraft = '',
     String? contextualBotId,
+    bool realOrganizationContext = false,
   }) => MultiRepositoryProvider(
     providers: <RepositoryProvider<dynamic>>[
       RepositoryProvider<ProfilePhotoCache>.value(
@@ -129,6 +152,8 @@ void main() {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<AuthBloc>.value(value: authBloc),
         BlocProvider<BotsBloc>.value(value: botsBloc),
+        BlocProvider<MembershipsBloc>.value(value: membershipsBloc),
+        BlocProvider<SwitchOrgCubit>.value(value: switchOrgCubit),
         BlocProvider<TemplatesBloc>.value(value: templatesBloc),
         BlocProvider<LabelsAdminBloc>.value(value: labelsBloc),
         BlocProvider<ConversationsBloc>.value(value: inboxBloc),
@@ -137,11 +162,15 @@ void main() {
         home: ShellPage(
           assistantDraft: assistantDraft,
           contextualBotId: contextualBotId,
-          organizationContextBuilder: (compact) => SizedBox(
-            key: Key(
-              compact ? 'test.organization.header' : 'test.organization.drawer',
-            ),
-          ),
+          organizationContextBuilder: realOrganizationContext
+              ? null
+              : (compact) => SizedBox(
+                  key: Key(
+                    compact
+                        ? 'test.organization.header'
+                        : 'test.organization.drawer',
+                  ),
+                ),
         ),
       ),
     ),
@@ -318,6 +347,50 @@ void main() {
       expect(find.byKey(const Key('shell.drawer.labels')), findsNothing);
       expect(find.byKey(const Key('shell.drawer.settings')), findsOneWidget);
     });
+
+    testWidgets(
+      'selector de organización se apila y al descartarlo conserva el drawer',
+      (tester) async {
+        useViewport(tester, widthDp: 420);
+        await tester.pumpWidget(host(realOrganizationContext: true));
+
+        await tester.tap(find.byKey(const Key('shell.header.menu')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('organization.context.drawer')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('shell.drawer')), findsOneWidget);
+        expect(find.text('Cambiar organización'), findsOneWidget);
+        expect(
+          find.byKey(const Key('organization.switch.close')),
+          findsNothing,
+        );
+
+        final bottomSheet = tester.widget<BottomSheet>(
+          find.byType(BottomSheet),
+        );
+        expect(bottomSheet.showDragHandle, isTrue);
+        expect(bottomSheet.enableDrag, isTrue);
+
+        await tester.tapAt(const Offset(410, 48));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Cambiar organización'), findsNothing);
+        expect(find.byKey(const Key('shell.drawer')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('organization.context.drawer')));
+        await tester.pumpAndSettle();
+        final sheetBounds = tester.getRect(find.byType(BottomSheet));
+        await tester.dragFrom(
+          Offset(sheetBounds.center.dx, sheetBounds.top + 12),
+          const Offset(0, 400),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Cambiar organización'), findsNothing);
+        expect(find.byKey(const Key('shell.drawer')), findsOneWidget);
+      },
+    );
   });
 
   group('preservación de estado', () {

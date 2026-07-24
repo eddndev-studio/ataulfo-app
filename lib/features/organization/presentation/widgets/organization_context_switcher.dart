@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design/app_bottom_sheet.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_entity_icon.dart';
 import '../../../../core/i18n/role_labels.dart';
@@ -16,49 +19,81 @@ enum OrganizationContextPresentation { mobileBar, rail, header, drawer }
 
 /// Abre la única superficie de cambio de organización.
 ///
-/// El listener vive dentro de la hoja: así el header y el drawer pueden
-/// coexistir sin reaccionar dos veces al mismo cambio de contexto.
+/// El listener pertenece al launcher, no a la hoja: si el operador descarta el
+/// modal mientras el backend termina un switch, la sesión igual procesa el
+/// resultado y nunca queda con tokens nuevos pero contexto visual viejo.
 Future<void> showOrganizationSwitcher(BuildContext context) async {
   final memberships = context.read<MembershipsBloc>();
   final switcher = context.read<SwitchOrgCubit>();
   final auth = context.read<AuthBloc>();
-  await showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    // Un switch persiste tokens antes de refrescar AuthBloc. Mantener la hoja
-    // montada hasta éxito/fallo evita que un swipe la cierre a mitad.
-    isDismissible: false,
-    enableDrag: false,
-    builder: (sheetContext) => MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<MembershipsBloc>.value(value: memberships),
-        BlocProvider<SwitchOrgCubit>.value(value: switcher),
-        BlocProvider<AuthBloc>.value(value: auth),
-      ],
-      child: BlocListener<SwitchOrgCubit, SwitchOrgState>(
-        listener: (listenerContext, state) =>
-            _onSwitchState(context, listenerContext, state),
-        child: OrganizationSwitcherSheet(
-          onNavigate: (path) {
-            Navigator.of(sheetContext).pop();
-            context.push(path);
+  NavigatorState? activeSheetNavigator;
+  Completer<void>? inFlightSwitch = switcher.state is SwitchOrgSwitching
+      ? Completer<void>()
+      : null;
+  final subscription = switcher.stream.listen((state) {
+    switch (state) {
+      case SwitchOrgSwitching():
+        inFlightSwitch = Completer<void>();
+      case SwitchOrgSwitched() || SwitchOrgFailed():
+        final pending = inFlightSwitch;
+        if (pending != null && !pending.isCompleted) pending.complete();
+      case SwitchOrgIdle():
+        break;
+    }
+    if (!context.mounted) return;
+    _onSwitchState(context, activeSheetNavigator, state);
+  });
+
+  try {
+    await showAppBottomSheet<void>(
+      context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.surface1,
+      builder: (sheetContext) {
+        activeSheetNavigator = Navigator.of(sheetContext);
+        return PopScope<Object?>(
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) activeSheetNavigator = null;
           },
-        ),
-      ),
-    ),
-  );
+          child: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<MembershipsBloc>.value(value: memberships),
+              BlocProvider<SwitchOrgCubit>.value(value: switcher),
+              BlocProvider<AuthBloc>.value(value: auth),
+            ],
+            child: OrganizationSwitcherSheet(
+              onNavigate: (path) {
+                Navigator.of(sheetContext).pop();
+                context.push(path);
+              },
+            ),
+          ),
+        );
+      },
+    );
+  } finally {
+    activeSheetNavigator = null;
+    final pending = inFlightSwitch;
+    if (switcher.state is SwitchOrgSwitching &&
+        pending != null &&
+        !pending.isCompleted) {
+      await pending.future;
+    }
+    await subscription.cancel();
+  }
 }
 
 void _onSwitchState(
   BuildContext hostContext,
-  BuildContext sheetContext,
+  NavigatorState? sheetNavigator,
   SwitchOrgState state,
 ) {
+  if (!hostContext.mounted) return;
   switch (state) {
     case SwitchOrgSwitched():
-      Navigator.of(sheetContext).pop();
-      if (!hostContext.mounted) return;
+      if (sheetNavigator != null && sheetNavigator.mounted) {
+        sheetNavigator.pop();
+      }
       hostContext.read<AuthBloc>().add(const AuthCheckRequested());
       ScaffoldMessenger.of(
         hostContext,

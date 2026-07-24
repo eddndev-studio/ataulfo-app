@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_header_card.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
+import 'package:ataulfo/features/auth/domain/failures/auth_failure.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/switch_org_cubit.dart';
 import 'package:ataulfo/features/billing/domain/entities/entitlement.dart';
@@ -111,6 +114,20 @@ void main() {
     expect(find.text('Cambiar organización'), findsOneWidget);
     expect(find.text('Estudio Norte'), findsOneWidget);
     expect(find.byKey(const Key('organization.switch.manage')), findsOneWidget);
+    expect(find.byKey(const Key('organization.switch.close')), findsNothing);
+    expect(find.byKey(const Key('organization.switch.list')), findsOneWidget);
+    expect(
+      find.byKey(const Key('organization.switch.active.o1')),
+      findsOneWidget,
+    );
+
+    final bottomSheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+    expect(bottomSheet.showDragHandle, isTrue);
+    expect(bottomSheet.enableDrag, isTrue);
+
+    final sheetTop = tester.getTopLeft(find.byType(BottomSheet)).dy;
+    final titleTop = tester.getTopLeft(find.text('Cambiar organización')).dy;
+    expect(titleTop - sheetTop, greaterThanOrEqualTo(40));
 
     await tester.tap(find.byKey(const Key('organization.switch.org.o2')));
     verify(() => switcher.switchTo('o2')).called(1);
@@ -140,6 +157,50 @@ void main() {
     expect(find.byKey(const Key('organization.context.mobile')), findsNothing);
     expect(find.text('Acme Belize'), findsOneWidget);
   });
+
+  testWidgets(
+    'un switch en curso termina de procesarse aunque se descarte la hoja',
+    (tester) async {
+      final states = StreamController<SwitchOrgState>.broadcast();
+      addTearDown(states.close);
+      SwitchOrgState currentState = const SwitchOrgIdle();
+      when(() => switcher.state).thenAnswer((_) => currentState);
+      when(() => switcher.stream).thenAnswer((_) => states.stream);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppDesignTheme.dark(),
+          home: MultiBlocProvider(
+            providers: <BlocProvider<dynamic>>[
+              BlocProvider<AuthBloc>.value(value: auth),
+              BlocProvider<MembershipsBloc>.value(value: memberships),
+              BlocProvider<SwitchOrgCubit>.value(value: switcher),
+            ],
+            child: const Scaffold(body: OrganizationContextSwitcher()),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('organization.context.mobile')));
+      await tester.pumpAndSettle();
+      currentState = const SwitchOrgSwitching();
+      states.add(currentState);
+      await tester.pump();
+
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.text('Cambiar organización'), findsNothing);
+
+      currentState = const SwitchOrgFailed(NetworkFailure());
+      states.add(currentState);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Sin conexión. Revisa tu red e inténtalo de nuevo.'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('hoja del selector sigue navegable en un teléfono corto', (
     tester,
