@@ -5,6 +5,7 @@ import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_notice_banner.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
@@ -192,6 +193,11 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.byType(AppSearchField), findsOneWidget);
+    final searchField = tester.widget<AppSearchField>(
+      find.byKey(const Key('inbox.search')),
+    );
+    expect(searchField.hint, 'Buscar contacto, canal o asistente…');
     final searchY = tester.getTopLeft(find.byKey(const Key('inbox.search'))).dy;
     final statusY = tester
         .getTopLeft(find.byKey(const Key('inbox.status.filters')))

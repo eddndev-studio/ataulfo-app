@@ -3,6 +3,7 @@ import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
 import 'package:ataulfo/features/flows/domain/failures/flows_failure.dart';
 import 'package:ataulfo/features/flows/domain/repositories/flows_repository.dart';
@@ -258,6 +259,11 @@ void main() {
     testWidgets('filtra por nombre (case-insensitive)', (tester) async {
       await tester.pumpWidget(host());
 
+      expect(find.byType(AppSearchField), findsOneWidget);
+      final search = tester.widget<AppSearchField>(
+        find.byKey(const Key('template_flows.search')),
+      );
+      expect(search.hint, 'Buscar flujos por nombre…');
       await tester.enterText(
         find.byKey(const Key('template_flows.search')),
         'bien',

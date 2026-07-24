@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/core/design/widgets/app_text_field.dart';
 import 'package:ataulfo/features/bots/presentation/bloc/bot_variables_bloc.dart';
 import 'package:ataulfo/features/bots/presentation/pages/bot_variables_page.dart';
@@ -111,6 +112,8 @@ void main() {
       );
 
       expect(search, findsOneWidget);
+      final searchField = tester.widget<AppSearchField>(search);
+      expect(searchField.hint, 'Buscar variables por nombre…');
       // Todas las variables tienen tarjeta; solo 'firma' (con override)
       // arranca expandida mostrando su campo precargado.
       for (final d in _manyDefs) {

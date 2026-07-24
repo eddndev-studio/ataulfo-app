@@ -5,6 +5,7 @@ import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_header_card.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/core/design/widgets/app_swatch_icon.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -131,6 +132,11 @@ void main() {
     seed(twoLabels);
     await tester.pumpWidget(host());
 
+    expect(find.byType(AppSearchField), findsOneWidget);
+    final search = tester.widget<AppSearchField>(
+      find.byKey(const Key('labels_admin.search')),
+    );
+    expect(search.hint, 'Buscar etiquetas por nombre o descripción…');
     await tester.enterText(find.byKey(const Key('labels_admin.search')), 'vip');
     await tester.pump();
 

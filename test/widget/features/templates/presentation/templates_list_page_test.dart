@@ -10,6 +10,7 @@ import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_page_header.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/templates/domain/entities/template.dart';
@@ -277,7 +278,12 @@ void main() {
     loaded(const <Template>[_t1, _t2]);
     await tester.pumpWidget(host());
 
-    await tester.enterText(find.byType(TextField), 'Vent');
+    expect(find.byType(AppSearchField), findsOneWidget);
+    final search = tester.widget<AppSearchField>(
+      find.byKey(const Key('templates.search')),
+    );
+    expect(search.hint, 'Buscar asistentes por nombre…');
+    await tester.enterText(find.byKey(const Key('templates.search')), 'Vent');
     await tester.pump();
 
     expect(find.byKey(const Key('templates.tile.t2')), findsOneWidget);

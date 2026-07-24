@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ataulfo/core/design/app_selection_sheet.dart';
 import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/core/design/widgets/app_section_header.dart';
 
 void main() {
@@ -142,6 +143,9 @@ void main() {
       tester,
     ) async {
       await open(tester, searchHint: 'Buscar tipo');
+      expect(find.byType(AppSearchField), findsOneWidget);
+      final search = tester.widget<AppSearchField>(find.byType(AppSearchField));
+      expect(search.hint, 'Buscar tipo');
       await tester.enterText(find.byType(TextField), 'imag');
       await tester.pumpAndSettle();
       expect(find.text('Imagen'), findsOneWidget);

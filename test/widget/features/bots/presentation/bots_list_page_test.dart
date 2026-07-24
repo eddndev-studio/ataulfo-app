@@ -12,6 +12,7 @@ import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_header_card.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ataulfo/features/bots/domain/entities/bot.dart';
@@ -185,7 +186,12 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    await tester.enterText(find.byType(TextField), 'cob');
+    expect(find.byType(AppSearchField), findsOneWidget);
+    final search = tester.widget<AppSearchField>(
+      find.byKey(const Key('bots.search')),
+    );
+    expect(search.hint, 'Buscar canales por nombre o tipo…');
+    await tester.enterText(find.byKey(const Key('bots.search')), 'cob');
     await tester.pump();
 
     expect(find.byKey(const Key('bots.tile.b2')), findsOneWidget);

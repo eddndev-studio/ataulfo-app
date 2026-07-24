@@ -7,7 +7,7 @@ import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
-import 'package:ataulfo/core/design/widgets/app_text_field.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_thumbnail_loader.dart';
 import 'package:ataulfo/features/media/domain/failures/media_failure.dart';
@@ -90,7 +90,7 @@ void main() {
     expect(find.byType(AppLoadingIndicator), findsOneWidget);
   });
 
-  testWidgets('el buscador es el AppTextField del kit con lupa', (
+  testWidgets('el buscador usa el componente canónico con copy contextual', (
     tester,
   ) async {
     when(() => bloc.state).thenReturn(
@@ -98,17 +98,13 @@ void main() {
     );
     await tester.pumpWidget(host());
 
-    // Mismo primitivo que los buscadores de bots/plantillas/conversaciones,
-    // con el ícono líder de búsqueda dentro de la píldora.
     expect(find.byKey(const Key('media_gallery.search_field')), findsOneWidget);
-    expect(find.byType(AppTextField), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(AppTextField),
-        matching: find.byIcon(Icons.search),
-      ),
-      findsOneWidget,
+    expect(find.byType(AppSearchField), findsOneWidget);
+    final search = tester.widget<AppSearchField>(
+      find.byKey(const Key('media_gallery.search_field')),
     );
+    expect(search.hint, 'Buscar archivos por nombre…');
+    expect(find.byIcon(Icons.search), findsOneWidget);
   });
 
   testWidgets('Loaded con N assets renderiza N miniaturas', (tester) async {

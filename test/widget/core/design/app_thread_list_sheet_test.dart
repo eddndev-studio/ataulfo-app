@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ataulfo/core/design/tokens.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/core/design/widgets/app_thread_list_sheet.dart';
 
 const _items = <AppThreadListItem>[
@@ -9,9 +10,18 @@ const _items = <AppThreadListItem>[
   AppThreadListItem(id: 'c2', title: 'Sobre envíos'),
 ];
 
+const _searchableItems = <AppThreadListItem>[
+  ..._items,
+  AppThreadListItem(id: 'c3', title: 'Pagos'),
+  AppThreadListItem(id: 'c4', title: 'Catálogo'),
+  AppThreadListItem(id: 'c5', title: 'Seguimiento'),
+  AppThreadListItem(id: 'c6', title: 'Cierre'),
+];
+
 void main() {
   Future<void> pump(
     WidgetTester tester, {
+    List<AppThreadListItem> items = _items,
     ValueChanged<String>? onSelect,
     ValueChanged<String>? onRename,
     ValueChanged<String>? onDelete,
@@ -22,7 +32,7 @@ void main() {
         home: Scaffold(
           body: AppThreadListSheet(
             keyPrefix: 'threads',
-            items: _items,
+            items: items,
             activeId: activeId,
             onSelect: onSelect ?? (_) {},
             onRename: onRename,
@@ -60,6 +70,23 @@ void main() {
     await tester.tap(find.byKey(const Key('threads.item.c2')));
     await tester.pumpAndSettle();
     expect(selected, 'c2');
+  });
+
+  testWidgets('listas largas usan el buscador canónico y filtran', (
+    tester,
+  ) async {
+    await pump(tester, items: _searchableItems);
+
+    expect(find.byType(AppSearchField), findsOneWidget);
+    final search = tester.widget<AppSearchField>(
+      find.byKey(const Key('threads.search')),
+    );
+    expect(search.hint, 'Buscar conversaciones…');
+
+    await tester.enterText(find.byKey(const Key('threads.search')), 'catálogo');
+    await tester.pump();
+    expect(find.byKey(const Key('threads.item.c4')), findsOneWidget);
+    expect(find.byKey(const Key('threads.item.c1')), findsNothing);
   });
 
   testWidgets('sin onRename/onDelete NO monta el menú por hilo', (

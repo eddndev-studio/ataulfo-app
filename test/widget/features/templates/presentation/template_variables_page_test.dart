@@ -6,6 +6,7 @@ import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
 import 'package:ataulfo/features/templates/presentation/bloc/var_defs_bloc.dart';
@@ -154,6 +155,11 @@ void main() {
     testWidgets('filtra por nombre (case-insensitive)', (tester) async {
       await tester.pumpWidget(host());
 
+      expect(find.byType(AppSearchField), findsOneWidget);
+      final search = tester.widget<AppSearchField>(
+        find.byKey(const Key('template_variables.search')),
+      );
+      expect(search.hint, 'Buscar variables por nombre…');
       await tester.enterText(
         find.byKey(const Key('template_variables.search')),
         'NOMBRE',
