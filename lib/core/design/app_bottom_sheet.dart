@@ -41,6 +41,11 @@ const Key appSheetDragHandleKey = Key('app_sheet.drag_handle');
 /// directo. El cierre programático (`Navigator.pop(context, resultado)`, el
 /// camino feliz de Guardar) NUNCA pasa por el guard.
 ///
+/// [canDismiss] permite bloquear temporalmente cualquier descarte (por ejemplo,
+/// mientras una petición está en vuelo). Si devuelve `false`, scrim, back y
+/// handle no cierran la hoja ni abren el diálogo de confirmación. Al omitirse
+/// conserva el comportamiento previo.
+///
 /// La hoja guardada pinta un handle propio (misma geometría y color que el de
 /// Material) porque el de serie cierra la ruta con un pop incondicional que
 /// ningún guard puede vetar; a cambio, el arrastre del handle no acompaña al
@@ -54,8 +59,9 @@ Future<T?> showAppBottomSheet<T>(
   Color? backgroundColor,
   bool showDragHandle = true,
   bool Function()? confirmDiscard,
+  bool Function()? canDismiss,
 }) {
-  if (confirmDiscard == null) {
+  if (confirmDiscard == null && canDismiss == null) {
     return showModalBottomSheet<T>(
       context: context,
       useSafeArea: true,
@@ -76,7 +82,8 @@ Future<T?> showAppBottomSheet<T>(
     isScrollControlled: isScrollControlled,
     backgroundColor: backgroundColor,
     builder: (sheetContext) => _GuardedSheet(
-      confirmDiscard: confirmDiscard,
+      confirmDiscard: confirmDiscard ?? () => false,
+      canDismiss: canDismiss ?? () => true,
       showDragHandle: showDragHandle,
       child: builder(sheetContext),
     ),
@@ -89,11 +96,13 @@ Future<T?> showAppBottomSheet<T>(
 class _GuardedSheet extends StatefulWidget {
   const _GuardedSheet({
     required this.confirmDiscard,
+    required this.canDismiss,
     required this.showDragHandle,
     required this.child,
   });
 
   final bool Function() confirmDiscard;
+  final bool Function() canDismiss;
   final bool showDragHandle;
   final Widget child;
 
@@ -114,6 +123,9 @@ class _GuardedSheetState extends State<_GuardedSheet> {
 
   Future<void> _onPopInvoked(bool didPop, Object? result) async {
     if (didPop || _confirming) {
+      return;
+    }
+    if (!widget.canDismiss()) {
       return;
     }
     if (!widget.confirmDiscard()) {

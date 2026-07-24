@@ -67,6 +67,7 @@ void main() {
               child: AppButton.tonal(
                 key: const Key('secondary'),
                 label: 'Atrás',
+                fullWidth: true,
                 onPressed: () {},
               ),
             ),
@@ -75,6 +76,7 @@ void main() {
               child: AppButton.filled(
                 key: const Key('primary'),
                 label: 'Continuar',
+                fullWidth: true,
                 onPressed: () {},
               ),
             ),

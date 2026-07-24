@@ -112,6 +112,7 @@ void main() {
     Future<Future<String?>> openGuarded(
       WidgetTester tester, {
       required bool Function() confirmDiscard,
+      bool Function()? canDismiss,
       bool showDragHandle = true,
     }) async {
       setTopInset(tester, 0);
@@ -122,6 +123,7 @@ void main() {
             context,
             isScrollControlled: true,
             confirmDiscard: confirmDiscard,
+            canDismiss: canDismiss,
             showDragHandle: showDragHandle,
             builder: (sheetContext) => SizedBox(
               key: const Key('sheet'),
@@ -184,6 +186,24 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('¿Descartar los cambios?'), findsOneWidget);
       expect(find.byKey(const Key('sheet')), findsOneWidget);
+    });
+
+    testWidgets('canDismiss false bloquea scrim y back sin pedir descarte', (
+      tester,
+    ) async {
+      await openGuarded(
+        tester,
+        confirmDiscard: () => true,
+        canDismiss: () => false,
+      );
+
+      await tester.tapAt(const Offset(200, 40));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('sheet')), findsOneWidget);
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
     });
 
     testWidgets('arrastrar el handle hacia abajo pasa por el guard', (
