@@ -103,6 +103,7 @@ class _InviteSheetState extends State<InviteSheet> {
   final Set<String> _selectedBotIds = <String>{};
 
   _InviteStep _step = _InviteStep.person;
+  AppWizardStepDirection _transitionDirection = AppWizardStepDirection.forward;
   String _role = 'WORKER';
 
   InvitationMutationState get _mutationState =>
@@ -161,13 +162,19 @@ class _InviteSheetState extends State<InviteSheet> {
   void _continue() {
     if (!_hasValidEmail) return;
     _clearFailure();
-    setState(() => _step = _InviteStep.access);
+    setState(() {
+      _transitionDirection = AppWizardStepDirection.forward;
+      _step = _InviteStep.access;
+    });
   }
 
   void _back() {
     if (_isSubmitting) return;
     _clearFailure();
-    setState(() => _step = _InviteStep.person);
+    setState(() {
+      _transitionDirection = AppWizardStepDirection.backward;
+      _step = _InviteStep.person;
+    });
   }
 
   void _selectRole(String role) {
@@ -219,44 +226,66 @@ class _InviteSheetState extends State<InviteSheet> {
         }
       },
       builder: (context, state) {
-        final success =
+        final isSuccess =
             state is InvitationMutationSuccess &&
             state.action == InvitationMutationAction.created;
+        final Widget body;
+        final Widget footer;
 
-        return AnimatedSwitcher(
-          duration: AppTokens.durationSlow,
-          switchInCurve: AppTokens.ease,
-          switchOutCurve: AppTokens.ease,
-          child: success
-              ? InvitationShareSheet(
-                  key: const ValueKey<String>('invite.success'),
-                  email: state.email ?? _emailCtrl.text.trim(),
-                  token: state.token,
-                  emailSent: state.emailSent,
-                  shareService: widget.shareService,
-                  onDone: _finish,
-                )
-              : AppWizardSheet(
-                  key: ValueKey<_InviteStep>(_step),
-                  body: _step == _InviteStep.person
-                      ? _PersonStep(
-                          controller: _emailCtrl,
-                          canContinue: _hasValidEmail,
-                          onSubmitted: _continue,
-                        )
-                      : _AccessStep(
-                          email: _emailCtrl.text.trim(),
-                          bots: widget.bots,
-                          searchController: _searchCtrl,
-                          showSearch: widget.bots.length >= _searchThreshold,
-                          role: _role,
-                          selectedBotIds: _selectedBotIds,
-                          submitting: state is InvitationMutationInProgress,
-                          onRoleChanged: _selectRole,
-                          onBotChanged: _selectBot,
-                        ),
-                  footer: _footer(state),
-                ),
+        if (isSuccess) {
+          final success = state as InvitationMutationSuccess;
+          body = InvitationShareContent(
+            key: const ValueKey<String>('invite.success'),
+            email: success.email ?? _emailCtrl.text.trim(),
+            token: success.token,
+            emailSent: success.emailSent,
+            shareService: widget.shareService,
+          );
+          footer = InvitationShareDoneAction(
+            key: const ValueKey<String>('invite.footer.success'),
+            onDone: _finish,
+          );
+        } else if (_step == _InviteStep.person) {
+          body = _PersonStep(
+            key: const ValueKey<String>('invite.step.person'),
+            controller: _emailCtrl,
+            canContinue: _hasValidEmail,
+            onSubmitted: _continue,
+          );
+          footer = KeyedSubtree(
+            key: const ValueKey<String>('invite.footer.person'),
+            child: _footer(state),
+          );
+        } else {
+          body = _AccessStep(
+            key: const ValueKey<String>('invite.step.access'),
+            email: _emailCtrl.text.trim(),
+            bots: widget.bots,
+            searchController: _searchCtrl,
+            showSearch: widget.bots.length >= _searchThreshold,
+            role: _role,
+            selectedBotIds: _selectedBotIds,
+            submitting: state is InvitationMutationInProgress,
+            onRoleChanged: _selectRole,
+            onBotChanged: _selectBot,
+          );
+          footer = KeyedSubtree(
+            key: const ValueKey<String>('invite.footer.access'),
+            child: _footer(state),
+          );
+        }
+
+        return AppWizardSheet(
+          body: AppWizardStepTransition(
+            key: const Key('invite.step_transition'),
+            direction: _transitionDirection,
+            child: body,
+          ),
+          footer: AppWizardStepTransition(
+            key: const Key('invite.footer_transition'),
+            direction: _transitionDirection,
+            child: footer,
+          ),
         );
       },
     );
@@ -329,6 +358,7 @@ class _InviteSheetState extends State<InviteSheet> {
 
 class _PersonStep extends StatelessWidget {
   const _PersonStep({
+    super.key,
     required this.controller,
     required this.canContinue,
     required this.onSubmitted,
@@ -341,7 +371,6 @@ class _PersonStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      key: const Key('invite.step.person'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const AppWizardStepHeader(
@@ -357,7 +386,7 @@ class _PersonStep extends StatelessWidget {
           label: 'Correo electrónico',
           hint: 'persona@empresa.com',
           controller: controller,
-          autofocus: true,
+          autofocus: false,
           autocorrect: false,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
@@ -374,6 +403,7 @@ class _PersonStep extends StatelessWidget {
 
 class _AccessStep extends StatelessWidget {
   const _AccessStep({
+    super.key,
     required this.email,
     required this.bots,
     required this.searchController,
@@ -398,7 +428,6 @@ class _AccessStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      key: const Key('invite.step.access'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const AppWizardStepHeader(

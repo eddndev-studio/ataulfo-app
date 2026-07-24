@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/design/app_bottom_sheet.dart';
-import '../../../../core/design/safe_bottom.dart';
 import '../../../../core/design/tokens.dart';
 import '../../../../core/design/widgets/app_button.dart';
+import '../../../../core/design/widgets/app_wizard_sheet.dart';
 import '../../../../core/platform/share_plus_service.dart';
 import '../../../../core/platform/share_service.dart';
 
@@ -53,6 +53,38 @@ class InvitationShareSheet extends StatelessWidget {
     );
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return AppWizardSheet(
+      body: InvitationShareContent(
+        email: email,
+        token: token,
+        emailSent: emailSent,
+        shareService: _shareService,
+      ),
+      footer: InvitationShareDoneAction(onDone: onDone),
+    );
+  }
+}
+
+/// Contenido reutilizable del resultado exitoso de una invitación.
+///
+/// Separarlo de la superficie permite que el wizard cambie a este estado sin
+/// cerrar una hoja y abrir otra, conservando el mismo viewport y el mismo pie.
+class InvitationShareContent extends StatelessWidget {
+  const InvitationShareContent({
+    super.key,
+    required this.email,
+    required this.token,
+    required this.emailSent,
+    ShareService? shareService,
+  }) : _shareService = shareService ?? const SharePlusService();
+
+  final String email;
+  final String? token;
+  final bool emailSent;
+  final ShareService _shareService;
+
   /// Mensaje listo para pegar en WhatsApp: instrucciones + código. Los pasos
   /// siguen el flujo real de aceptación (verificar el correo es obligatorio, y
   /// la invitación aparece sola en "Tus organizaciones" una vez verificado).
@@ -87,71 +119,57 @@ class InvitationShareSheet extends StatelessWidget {
           : 'No pudimos enviar el correo a $email. Cancela la invitación y '
                 'vuelve a enviarla para reintentar.';
     }
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6,
-        AppTokens.sp6 + context.sheetBottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              const Icon(
-                Icons.check_circle_outline,
-                color: AppTokens.success,
-                size: 24,
-              ),
-              const SizedBox(width: AppTokens.sp2),
-              Expanded(
-                child: Text('Invitación creada', style: textTheme.titleLarge),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          Text(
-            message,
-            style: textTheme.bodyMedium?.copyWith(
-              color: emailSent ? AppTokens.text2 : AppTokens.warning,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            const Icon(
+              Icons.check_circle_outline,
+              color: AppTokens.success,
+              size: 24,
             ),
-          ),
-          if (code != null) ...<Widget>[
-            const SizedBox(height: AppTokens.sp4),
-            _CodeBox(code: code),
-            const SizedBox(height: AppTokens.sp4),
-            AppButton.filled(
-              key: const Key('invitation_share.copy_code'),
-              label: 'Copiar código',
-              icon: Icons.content_copy,
-              fullWidth: true,
-              onPressed: () => _copy(context, code, 'Código copiado'),
-            ),
-            const SizedBox(height: AppTokens.sp2),
-            AppButton.tonal(
-              key: const Key('invitation_share.share_message'),
-              label: 'Compartir mensaje',
-              icon: Icons.share_outlined,
-              fullWidth: true,
-              onPressed: () => _share(context),
-            ),
-            const SizedBox(height: AppTokens.sp4),
-            Text(
-              'Para aceptar, la persona debe iniciar sesión con $email y tener '
-              'su correo verificado.',
-              style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
+            const SizedBox(width: AppTokens.sp2),
+            Expanded(
+              child: Text('Invitación creada', style: textTheme.titleLarge),
             ),
           ],
+        ),
+        const SizedBox(height: AppTokens.sp3),
+        Text(
+          message,
+          style: textTheme.bodyMedium?.copyWith(
+            color: emailSent ? AppTokens.text2 : AppTokens.warning,
+          ),
+        ),
+        if (code != null) ...<Widget>[
           const SizedBox(height: AppTokens.sp4),
-          AppButton.text(
-            key: const Key('invitation_share.done'),
-            label: 'Listo',
-            onPressed: onDone ?? () => Navigator.of(context).pop(),
+          _CodeBox(code: code),
+          const SizedBox(height: AppTokens.sp4),
+          AppButton.filled(
+            key: const Key('invitation_share.copy_code'),
+            label: 'Copiar código',
+            icon: Icons.content_copy,
+            fullWidth: true,
+            onPressed: () => _copy(context, code, 'Código copiado'),
+          ),
+          const SizedBox(height: AppTokens.sp2),
+          AppButton.tonal(
+            key: const Key('invitation_share.share_message'),
+            label: 'Compartir mensaje',
+            icon: Icons.share_outlined,
+            fullWidth: true,
+            onPressed: () => _share(context),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          Text(
+            'Para aceptar, la persona debe iniciar sesión con $email y tener '
+            'su correo verificado.',
+            style: textTheme.labelSmall?.copyWith(color: AppTokens.text2),
           ),
         ],
-      ),
+      ],
     );
   }
 
@@ -176,6 +194,23 @@ class InvitationShareSheet extends StatelessWidget {
           const SnackBar(content: Text('Invitación copiada')),
         );
       }),
+    );
+  }
+}
+
+/// Acción fija que cierra el resultado exitoso del wizard.
+class InvitationShareDoneAction extends StatelessWidget {
+  const InvitationShareDoneAction({super.key, this.onDone});
+
+  final VoidCallback? onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppButton.filled(
+      key: const Key('invitation_share.done'),
+      label: 'Listo',
+      fullWidth: true,
+      onPressed: onDone ?? () => Navigator.of(context).pop(),
     );
   }
 }
