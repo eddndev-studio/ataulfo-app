@@ -486,6 +486,9 @@ class AppRouter {
           ),
         ],
         child: Scaffold(
+          // Los formularios se presentan en una ruta modal propia. El teclado
+          // debe reajustar la hoja, no comprimir la pantalla que queda detrás.
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(title: const Text('Equipo y acceso')),
           body: OrganizationTeamPage(initialTab: initialTab),
         ),
