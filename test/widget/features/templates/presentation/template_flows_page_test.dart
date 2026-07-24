@@ -2,6 +2,7 @@ import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/tokens.dart';
 import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
+import 'package:ataulfo/core/design/widgets/app_page_container.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/flows/domain/entities/flow.dart' as flows;
@@ -176,11 +177,13 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    final scroll = tester.widget<SingleChildScrollView>(
-      find.byKey(const Key('template_flows.content')),
+    final container = tester.widget<AppDetailPageContainer>(
+      find.ancestor(
+        of: find.byKey(const Key('template_flows.search')),
+        matching: find.byType(AppDetailPageContainer),
+      ),
     );
-    final resolved = scroll.padding!.resolve(TextDirection.ltr);
-    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
+    expect(container.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   group('tarjetas ricas', () {

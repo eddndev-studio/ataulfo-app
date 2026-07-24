@@ -6,6 +6,7 @@ import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_card.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_page_container.dart';
 import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/templates/domain/entities/variable_def.dart';
 import 'package:ataulfo/features/templates/domain/failures/templates_failure.dart';
@@ -134,11 +135,13 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    final scroll = tester.widget<SingleChildScrollView>(
-      find.byKey(const Key('template_variables.content')),
+    final container = tester.widget<AppDetailPageContainer>(
+      find.ancestor(
+        of: find.byKey(const Key('template_variables.search')),
+        matching: find.byType(AppDetailPageContainer),
+      ),
     );
-    final resolved = scroll.padding!.resolve(TextDirection.ltr);
-    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
+    expect(container.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   group('buscador', () {

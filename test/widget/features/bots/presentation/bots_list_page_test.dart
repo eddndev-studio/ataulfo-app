@@ -11,6 +11,7 @@ import 'package:ataulfo/core/design/widgets/app_entity_icon.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_header_card.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_page_container.dart';
 import 'package:ataulfo/core/design/widgets/app_pill.dart';
 import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
@@ -187,6 +188,13 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byType(AppSearchField), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('bots.search')),
+        matching: find.byType(AppPrimaryPageContainer),
+      ),
+      findsOneWidget,
+    );
     final search = tester.widget<AppSearchField>(
       find.byKey(const Key('bots.search')),
     );
@@ -339,11 +347,10 @@ void main() {
 
     await tester.pumpWidget(host());
 
-    final padding = tester.widget<Padding>(
+    final container = tester.widget<AppPrimaryPageContainer>(
       find.byKey(const Key('bots.content_padding')),
     );
-    final resolved = padding.padding.resolve(TextDirection.ltr);
-    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
+    expect(container.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   testWidgets('al asentarse el listado, abanica las sesiones por id', (

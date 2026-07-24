@@ -1,6 +1,7 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_page_container.dart';
 import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/product_catalog/domain/entities/product.dart';
 import 'package:ataulfo/features/product_catalog/presentation/bloc/product_catalog_cubit.dart';
@@ -92,6 +93,13 @@ void main() {
       find.byKey(const Key('product_catalog.search_field')),
     );
     expect(search.hint, 'Buscar por nombre o descripción…');
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('product_catalog.search_field')),
+        matching: find.byType(AppPrimaryPageContainer),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('error → estado de error con retry que recarga', (tester) async {

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_page_container.dart';
 import 'package:ataulfo/core/design/widgets/app_choice_chip.dart';
 import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
@@ -194,6 +195,9 @@ void main() {
     await tester.pump();
 
     expect(find.byType(AppSearchField), findsOneWidget);
+    final searchRect = tester.getRect(find.byKey(const Key('inbox.search')));
+    expect(searchRect.left, AppPageGutters.primary);
+    expect(searchRect.right, 430 - AppPageGutters.primary);
     final searchField = tester.widget<AppSearchField>(
       find.byKey(const Key('inbox.search')),
     );

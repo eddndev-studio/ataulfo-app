@@ -7,6 +7,7 @@ import 'package:ataulfo/core/design/widgets/app_button.dart';
 import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_page_container.dart';
 import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/media/domain/entities/media_asset.dart';
 import 'package:ataulfo/features/media/domain/repositories/media_thumbnail_loader.dart';
@@ -104,6 +105,13 @@ void main() {
       find.byKey(const Key('media_gallery.search_field')),
     );
     expect(search.hint, 'Buscar archivos por nombre…');
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('media_gallery.search_field')),
+        matching: find.byType(AppPrimaryPageContainer),
+      ),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.search), findsOneWidget);
   });
 

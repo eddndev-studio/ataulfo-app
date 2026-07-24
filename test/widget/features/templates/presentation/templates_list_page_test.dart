@@ -10,6 +10,7 @@ import 'package:ataulfo/core/design/widgets/app_empty_state.dart';
 import 'package:ataulfo/core/design/widgets/app_error_state.dart';
 import 'package:ataulfo/core/design/widgets/app_page_header.dart';
 import 'package:ataulfo/core/design/widgets/app_loading_indicator.dart';
+import 'package:ataulfo/core/design/widgets/app_page_container.dart';
 import 'package:ataulfo/core/design/widgets/app_search_field.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -267,11 +268,10 @@ void main() {
     loaded(const <Template>[_t1]);
     await tester.pumpWidget(host());
 
-    final padding = tester.widget<Padding>(
+    final container = tester.widget<AppPrimaryPageContainer>(
       find.byKey(const Key('templates.content_padding')),
     );
-    final resolved = padding.padding.resolve(TextDirection.ltr);
-    expect(resolved.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
+    expect(container.bottom, greaterThanOrEqualTo(AppTokens.fabClearance));
   });
 
   testWidgets('búsqueda filtra por nombre', (tester) async {
@@ -279,6 +279,13 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.byType(AppSearchField), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('templates.search')),
+        matching: find.byType(AppPrimaryPageContainer),
+      ),
+      findsOneWidget,
+    );
     final search = tester.widget<AppSearchField>(
       find.byKey(const Key('templates.search')),
     );

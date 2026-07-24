@@ -1,4 +1,5 @@
 import 'package:ataulfo/core/design/app_design_theme.dart';
+import 'package:ataulfo/core/design/widgets/app_page_container.dart';
 import 'package:ataulfo/core/design/widgets/app_page_header.dart';
 import 'package:ataulfo/features/auth/domain/entities/identity.dart';
 import 'package:ataulfo/features/auth/presentation/bloc/auth_bloc.dart';
@@ -84,6 +85,7 @@ void main() {
   testWidgets('loaded vacío → empty state', (tester) async {
     when(() => cubit.state).thenReturn(_state(status: AgendaStatus.loaded));
     await pump(tester);
+    expect(find.byType(AppPrimaryPageContainer), findsOneWidget);
     expect(find.byKey(const Key('agenda.empty')), findsOneWidget);
   });
 
